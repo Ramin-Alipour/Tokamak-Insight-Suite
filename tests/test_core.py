@@ -841,3 +841,17 @@ def test_spectrum_moments_flags_undefined_signed_net_moments_without_throwing():
     xray = xray_spectrum_summary(energy, net, bin_representation="counts_per_bin")
     assert xray["moments_valid"] is False
     assert xray["energy_axis_unit"] == "keV"
+
+
+def test_load_table_reports_cells_coerced_to_missing():
+    raw = b"time,signal\n0,1.0\n1,not-a-number\n2,3.0\n"
+    frame = load_table(raw, "instrument.csv")
+    assert frame["signal"].isna().sum() == 1
+    report = frame.attrs["tis_import_report"]
+    assert report["numeric_coercions"]["signal"]["converted_to_missing"] == 1
+
+
+def test_load_table_enforces_row_limit_during_csv_read():
+    raw = b"time,signal\n0,1\n1,2\n2,3\n"
+    with pytest.raises(ValueError, match="row limit"):
+        load_table(raw, "instrument.csv", max_rows=2)
