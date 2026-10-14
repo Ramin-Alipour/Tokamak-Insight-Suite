@@ -41,14 +41,14 @@ jobs:
           cd /tmp
           /tmp/tis-wheel-env/bin/python -c "import app, tis; from tis.catalog import DIAGNOSTICS, FORMULAS; assert DIAGNOSTICS and FORMULAS; print('installed', tis.__version__, 'diagnostics', len(DIAGNOSTICS), 'formulas', len(FORMULAS))"
           /tmp/tis-wheel-env/bin/tis catalog --kind both --output-dir /tmp/tis-catalog
-          test -s /tmp/tis-catalog/diagnostics.json
-          test -s /tmp/tis-catalog/formulas.json
+          test -s /tmp/tis-catalog/DIAGNOSTIC_REGISTRY.json
+          test -s /tmp/tis-catalog/FORMULA_REGISTRY.json
       - name: Launch installed dashboard and check HTTP health
         shell: bash
         run: |
           set -euo pipefail
           cd /tmp
-          /tmp/tis-wheel-env/bin/python -m streamlit run /tmp/tis-wheel-env/lib/python${{ matrix.python-version }}/site-packages/app.py --server.headless true --server.port 8765 --browser.gatherUsageStats false > /tmp/tis-streamlit.log 2>&1 &
+          /tmp/tis-wheel-env/bin/tis-dashboard --server.headless true --server.port 8765 --browser.gatherUsageStats false > /tmp/tis-streamlit.log 2>&1 &
           PID=$!
           trap 'kill "$PID" 2>/dev/null || true' EXIT
           for i in $(seq 1 40); do
