@@ -7,7 +7,7 @@
     "assumptions": "Local electron density; cold-plasma definition.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-001",
+    "id": "formula-electron-plasma-frequency",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -19,7 +19,7 @@
     "assumptions": "Quasi-equilibrium Maxwellian electron approximation.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-002",
+    "id": "formula-debye-length",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -31,7 +31,7 @@
     "assumptions": "Non-relativistic single-particle frequency; harmonics and relativistic shifts may matter.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-003",
+    "id": "formula-electron-cyclotron-frequency",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -43,7 +43,7 @@
     "assumptions": "Model-dependent closure and ion species.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-004",
+    "id": "formula-ion-sound-speed-common-approximation",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -55,7 +55,7 @@
     "assumptions": "Temperature represented in electron-volts.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-005",
+    "id": "formula-electron-thermal-pressure",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -67,7 +67,7 @@
     "assumptions": "Sum over ion species; do not assume single-ion composition silently.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-006",
+    "id": "formula-ion-thermal-pressure",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -79,7 +79,7 @@
     "assumptions": "Excludes energetic/non-thermal components unless included explicitly.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-007",
+    "id": "formula-total-thermal-pressure",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -91,7 +91,7 @@
     "assumptions": "Classical isotropic ideal-gas form; geometry and species definitions matter.",
     "status": "reference_only",
     "category": "Core physics",
-    "id": "formula-008",
+    "id": "formula-thermal-stored-energy",
     "inference_class": "reference_only",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -103,7 +103,7 @@
     "assumptions": "A line integral; local profile needs multiple sightlines/model.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-009",
+    "id": "formula-line-integrated-electron-density",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -115,7 +115,7 @@
     "assumptions": "Approximate electron plasma frequency.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-010",
+    "id": "formula-plasma-frequency-from-density",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -127,7 +127,7 @@
     "assumptions": "Non-relativistic Doppler approximation and correct viewing geometry.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-011",
+    "id": "formula-doppler-line-of-sight-velocity",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -139,7 +139,7 @@
     "assumptions": "Thermal Gaussian Doppler width only; instrument response and other broadening removed.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-012",
+    "id": "formula-ion-temperature-from-gaussian-doppler-sigma",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -151,7 +151,7 @@
     "assumptions": "Gaussian profile only.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-013",
+    "id": "formula-gaussian-fwhm-and-sigma",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -163,7 +163,7 @@
     "assumptions": "Magnetic energy density in vacuum approximation.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-014",
+    "id": "formula-magnetic-energy-density",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -175,7 +175,7 @@
     "assumptions": "State volume/local average and field convention.",
     "status": "reference_only",
     "category": "Core physics",
-    "id": "formula-015",
+    "id": "formula-toroidal-beta",
     "inference_class": "reference_only",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -187,7 +187,7 @@
     "assumptions": "Approximate circular, large-aspect-ratio geometry; equilibrium reconstruction is preferred.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-016",
+    "id": "formula-safety-factor-large-aspect-ratio-estimate",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -199,7 +199,7 @@
     "assumptions": "Sign, turns, area and electronics response documented.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-017",
+    "id": "formula-faraday-induction",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -211,7 +211,7 @@
     "assumptions": "Only under consistent sign/definition; inductive terms can complicate interpretation.",
     "status": "reference_only",
     "category": "Core physics",
-    "id": "formula-018",
+    "id": "formula-plasma-loop-resistance-proxy",
     "inference_class": "reference_only",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -223,7 +223,7 @@
     "assumptions": "Not generally the same as net loss power or total input power.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-019",
+    "id": "formula-ohmic-power-approximation",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -235,7 +235,7 @@
     "assumptions": "Use consistent boundary, time window and loss-power definition.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-020",
+    "id": "formula-energy-confinement-time",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -247,7 +247,7 @@
     "assumptions": "Empirical reference scaling, not a universal physical limit.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-021",
+    "id": "formula-greenwald-density-reference",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -259,7 +259,7 @@
     "assumptions": "Number of particles in a Debye sphere.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-022",
+    "id": "formula-debye-parameter",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -271,7 +271,7 @@
     "assumptions": "Local electron density.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-023",
+    "id": "formula-electron-plasma-angular-frequency",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -283,7 +283,7 @@
     "assumptions": "Converts charge current to particle flux only with valid collection geometry/model.",
     "status": "reference_only",
     "category": "Core physics",
-    "id": "formula-024",
+    "id": "formula-ion-saturation-particle-flux-proxy",
     "inference_class": "reference_only",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -295,7 +295,7 @@
     "assumptions": "Input-power convention and time averaging must be specified.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-025",
+    "id": "formula-radiated-power-fraction",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -307,7 +307,7 @@
     "assumptions": "Surface mapping, geometry and heat-flux calibration required.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-026",
+    "id": "formula-integrated-surface-power",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -319,7 +319,7 @@
     "assumptions": "Projected apparent velocity, not necessarily plasma flow velocity.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-027",
+    "id": "formula-apparent-feature-speed",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -331,7 +331,7 @@
     "assumptions": "Gauge position, conductance and throughput convention matter.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-028",
+    "id": "formula-gas-pumping-speed",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -343,7 +343,7 @@
     "assumptions": "Rate calibration and time base required.",
     "status": "reference_only",
     "category": "Core physics",
-    "id": "formula-029",
+    "id": "formula-injected-particle-number",
     "inference_class": "reference_only",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -355,7 +355,7 @@
     "assumptions": "Requires consistent control volume and particle balance.",
     "status": "model_dependent_estimate",
     "category": "Core physics",
-    "id": "formula-030",
+    "id": "formula-particle-confinement-time-proxy",
     "inference_class": "model_dependent_estimate",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -367,7 +367,7 @@
     "assumptions": "Window and detrending must be specified; unstable near zero mean.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-031",
+    "id": "formula-relative-fluctuation-level",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -379,7 +379,7 @@
     "assumptions": "Specify whether DC component is included.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-032",
+    "id": "formula-rms-signal",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -391,7 +391,7 @@
     "assumptions": "Frequencies above Nyquist alias unless anti-alias filtering was applied.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-033",
+    "id": "formula-nyquist-frequency",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -403,7 +403,7 @@
     "assumptions": "Correlation lag does not establish causality; periodic signals can create ambiguous peaks.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-034",
+    "id": "formula-cross-correlation-lag",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -415,7 +415,7 @@
     "assumptions": "Estimator uncertainty depends on segment count and stationarity.",
     "status": "derived_quantity",
     "category": "Core physics",
-    "id": "formula-035",
+    "id": "formula-magnitude-squared-coherence",
     "inference_class": "derived_quantity",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -427,7 +427,7 @@
     "assumptions": "Ill-posed inverse problem; save regularization and uncertainty.",
     "status": "inverse_problem_or_model_inference",
     "category": "Core physics",
-    "id": "formula-036",
+    "id": "formula-bolometry-inverse-problem",
     "inference_class": "inverse_problem_or_model_inference",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
@@ -439,7 +439,7 @@
     "assumptions": "Define volume and avoid double-counting source/loss terms.",
     "status": "inverse_problem_or_model_inference",
     "category": "Core physics",
-    "id": "formula-037",
+    "id": "formula-continuity-particle-balance",
     "inference_class": "inverse_problem_or_model_inference",
     "validation_status": "Not independently validated as a complete diagnostic workflow"
   }
