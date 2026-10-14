@@ -210,25 +210,21 @@ def _r2(y: np.ndarray, pred: np.ndarray) -> float:
 
 
 def doppler_temperature_eV(sigma_lambda: float, lambda0: float, mass_amu: float) -> float:
-    if not np.all(np.isfinite([sigma_lambda, lambda0, mass_amu])) or sigma_lambda < 0 or lambda0 <= 0 or mass_amu <= 0:
-        raise ValueError('Width must be nonnegative; wavelength and mass must be positive; all inputs must be finite.')
+    if sigma_lambda<0 or lambda0<=0 or mass_amu<=0: raise ValueError('Widths must be nonnegative and wavelength/mass positive.')
     return float((mass_amu*AMU*C_LIGHT**2/E_CHARGE)*(sigma_lambda/lambda0)**2)
 
 
 def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
-    if not np.all(np.isfinite([delta_lambda, lambda0])) or lambda0 <= 0:
-        raise ValueError('Wavelength shift must be finite and rest wavelength positive.')
+    if lambda0<=0: raise ValueError('Rest wavelength must be positive.')
     return float(C_LIGHT*delta_lambda/lambda0)
 
 
 def linear_phase_density(phase_rad: Any, frequency_hz: float) -> np.ndarray:
     """High-frequency unmagnetized approximation: Δφ ≈ -r_e λ ∫n_e dl; sign convention configurable externally."""
-    phase=np.asarray(phase_rad,float)
-    if not np.isfinite(frequency_hz) or frequency_hz<=0 or not np.all(np.isfinite(phase)):
-        raise ValueError('Frequency must be positive and finite; phase values must be finite.')
+    if frequency_hz<=0: raise ValueError('Frequency must be positive.')
     r_e=2.8179403262e-15
     wavelength=C_LIGHT/frequency_hz
-    return -phase/(r_e*wavelength)
+    return -np.asarray(phase_rad,float)/(r_e*wavelength)
 
 
 def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vloop_V: float,
@@ -238,8 +234,6 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
     vals=[ne_m3,te_eV,ti_eV,ip_A,vloop_V,major_radius_m,minor_radius_m,bt_T,ion_mass_amu]
     if not np.all(np.isfinite(vals)) or min(ne_m3,te_eV,ti_eV,ip_A,major_radius_m,minor_radius_m,bt_T)<0 or major_radius_m==0 or minor_radius_m==0 or ion_mass_amu<=0:
         raise ValueError('Inputs must be finite and physically admissible; radii and ion mass must be positive.')
-    if ni_m3 is not None and (not np.isfinite(ni_m3) or ni_m3 < 0):
-        raise ValueError('Ion density must be finite and nonnegative.')
     ni=ne_m3 if ni_m3 is None else ni_m3
     pe=ne_m3*te_eV*E_CHARGE; pi=ni*ti_eV*E_CHARGE; p=pe+pi
     fpe=float(np.sqrt(ne_m3*E_CHARGE**2/(EPS0*M_E))/(2*np.pi)) if ne_m3>0 else 0.0
@@ -258,12 +252,7 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
 
 def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 0.0,
                        sigma_slope: float = 0.0, sigma_intercept: float = 0.0) -> tuple[np.ndarray,np.ndarray]:
-    if not np.all(np.isfinite([slope, intercept, sigma_y, sigma_slope, sigma_intercept])) or min(sigma_y, sigma_slope, sigma_intercept) < 0:
-        raise ValueError('Calibration coefficients and uncertainties must be finite; uncertainties must be nonnegative.')
-    x=np.asarray(y,float)
-    if not np.all(np.isfinite(x)):
-        raise ValueError('Input values must be finite; clean missing/nonfinite samples before calibration.')
-    cal=slope*x+intercept
+    x=np.asarray(y,float); cal=slope*x+intercept
     var=(slope*sigma_y)**2+(x*sigma_slope)**2+sigma_intercept**2
     return cal,np.sqrt(np.maximum(var,0))
 
@@ -272,7 +261,6 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
     """Solve min ||Ax-y||² + lam ||x||². Optional nonnegative constrained least squares."""
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
-    if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
     if lam<0 or not np.isfinite(lam): raise ValueError('Regularization must be finite and nonnegative.')
     if nonnegative:
         augA=np.vstack([A,np.sqrt(lam)*np.eye(A.shape[1])]) if lam else A
@@ -446,9 +434,7 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None)
 
 
 def neutron_rate_from_counts(counts_per_s: float, efficiency: float, geometric_factor: float = 1.0, calibration_factor: float = 1.0) -> dict[str, float]:
-    vals=[counts_per_s, efficiency, geometric_factor, calibration_factor]
-    if not np.all(np.isfinite(vals)) or counts_per_s<0 or not 0<efficiency<=1 or geometric_factor<=0 or calibration_factor<=0:
-        raise ValueError('Counts must be finite and nonnegative; efficiency in (0,1], geometric and calibration factors finite and positive.')
+    if counts_per_s<0 or not 0<efficiency<=1 or geometric_factor<=0 or calibration_factor<=0: raise ValueError('Counts must be nonnegative; efficiency in (0,1], geometric and calibration factors positive.')
     rate=float(counts_per_s/(efficiency*geometric_factor)*calibration_factor)
     return {'measured_count_rate_s-1':float(counts_per_s),'estimated_source_rate_s-1':rate,'efficiency':float(efficiency),'geometric_factor':float(geometric_factor),'calibration_factor':float(calibration_factor),'note':'Only valid when these factors represent the detector response and geometry for the specified neutron energy and configuration.'}
 
@@ -536,8 +522,7 @@ def reflectometry_cutoff_density(frequency_hz: float, mode: str = 'O') -> dict[s
 
 
 def electron_cyclotron_resonance_field(frequency_hz: float, harmonic: int = 1) -> dict[str, float | int | str]:
-    if not np.isfinite(frequency_hz) or frequency_hz<=0 or not np.isfinite(harmonic) or float(harmonic) != int(harmonic) or int(harmonic)<1:
-        raise ValueError('Frequency must be positive and harmonic a positive integer.')
+    if not np.isfinite(frequency_hz) or frequency_hz<=0 or int(harmonic)<1: raise ValueError('Frequency must be positive and harmonic a positive integer.')
     B=float(2*np.pi*frequency_hz*M_E/(E_CHARGE*int(harmonic)))
     return {'frequency_Hz':float(frequency_hz),'harmonic':int(harmonic),'resonance_field_T':B,'formula':'ω = h e B / m_e','assumption':'Relativistic and Doppler shifts are neglected; resonance geometry must be considered for actual ECE interpretation.'}
 
