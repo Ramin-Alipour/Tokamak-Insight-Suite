@@ -357,6 +357,55 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
     return signal.sosfiltfilt(sos, x)
 
 
+
+def filter_impact_analysis(values: Any, fs: float, highpass: float | None = None,
+                           lowpass: float | None = None, order: int = 3,
+                           window: str = "hann") -> dict[str, Any]:
+    """Apply the selected zero-phase Butterworth filter and quantify signal/spectral changes."""
+    x=np.asarray(values,dtype=float).ravel()
+    filtered=butterworth_filter(x,fs,highpass,lowpass,order)
+    freq_raw,amp_raw=fft_spectrum(x,fs,window=window)
+    freq_filt,amp_filt=fft_spectrum(filtered,fs,window=window)
+    if not np.array_equal(freq_raw,freq_filt):
+        raise RuntimeError("Raw and filtered FFT grids unexpectedly differ.")
+    valid=freq_raw>0
+    if not np.any(valid):
+        raise ValueError("Signal contains no positive-frequency FFT bins.")
+    raw_idx=int(np.flatnonzero(valid)[np.argmax(amp_raw[valid])])
+    filtered_idx=int(np.flatnonzero(valid)[np.argmax(amp_filt[valid])])
+    response_frequency=np.array([],dtype=float)
+    response_amplitude=np.array([],dtype=float)
+    if highpass is not None or lowpass is not None:
+        nyq=fs/2
+        if highpass is not None and lowpass is not None:
+            wn=[highpass,lowpass]; btype="bandpass"
+        elif highpass is not None:
+            wn=highpass; btype="highpass"
+        else:
+            wn=lowpass; btype="lowpass"
+        sos=signal.butter(int(order),wn,btype=btype,fs=fs,output="sos")
+        response_frequency,h=signal.sosfreqz(sos,worN=512,fs=fs)
+        # sosfiltfilt is forward-backward, so its steady-state amplitude response is |H|².
+        response_amplitude=np.abs(h)**2
+    return {
+        "filtered_signal":filtered,
+        "sampling_frequency_Hz":float(fs),
+        "filter_type":"none" if highpass is None and lowpass is None else ("bandpass" if highpass is not None and lowpass is not None else "highpass" if highpass is not None else "lowpass"),
+        "highpass_cutoff_Hz":highpass,"lowpass_cutoff_Hz":lowpass,"butterworth_order":int(order),
+        "zero_phase_method":"second-order-section forward-backward filtering",
+        "raw_rms":float(np.sqrt(np.mean(x*x))),
+        "filtered_rms":float(np.sqrt(np.mean(filtered*filtered))),
+        "rms_change_fraction":float((np.sqrt(np.mean(filtered*filtered))-np.sqrt(np.mean(x*x)))/max(np.sqrt(np.mean(x*x)),np.finfo(float).tiny)),
+        "raw_dominant_frequency_Hz":float(freq_raw[raw_idx]),
+        "raw_dominant_amplitude":float(amp_raw[raw_idx]),
+        "filtered_dominant_frequency_Hz":float(freq_filt[filtered_idx]),
+        "filtered_dominant_amplitude":float(amp_filt[filtered_idx]),
+        "frequency_response_Hz":response_frequency,
+        "forward_backward_amplitude_response":response_amplitude,
+        "interpretation_warning":"Filtering changes amplitudes and spectral content; dominant peak comparison is descriptive and does not validate cutoff choice. Edge transients and nonstationarity must be assessed.",
+    }
+
+
 def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = True) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(values, dtype=float).ravel()
     if len(x) < 2 or not np.isfinite(fs) or fs <= 0:
