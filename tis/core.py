@@ -26,7 +26,8 @@ def sha256_bytes(data: bytes) -> str:
 def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                delimiter: str | None = None, decimal: str = ".", skiprows: int = 0,
                header: int | None | str = "infer", comment: str | None = None,
-               max_bytes: int = 100_000_000) -> pd.DataFrame:
+               max_bytes: int = 100_000_000, max_rows: int = 10_000_000,
+               max_uncompressed_bytes: int = 500_000_000) -> pd.DataFrame:
     """Load tabular data with explicit parsing options and bounded input size.
 
     '#' remains an ordinary character by default, preserving headers such as Ch#1.
@@ -47,8 +48,28 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None,
                             engine="python" if delimiter is None else "c", **kwargs)
     elif name.endswith((".xlsx", ".xls")):
+        if name.endswith(".xlsx"):
+            import zipfile
+            try:
+                with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                    members=archive.infolist()
+                    expanded=sum(member.file_size for member in members)
+                    if len(members)>2000 or expanded>max_uncompressed_bytes:
+                        raise ValueError("Excel archive exceeds the safe member-count or uncompressed-size limit.")
+                    if any(member.compress_size>0 and member.file_size/member.compress_size>1000 for member in members):
+                        raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
+            except zipfile.BadZipFile as exc:
+                raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
         frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header)
     elif name.endswith((".parquet", ".pq")):
+        import pyarrow.parquet as pq
+        try:
+            parquet_file=pq.ParquetFile(io.BytesIO(data))
+            if parquet_file.metadata.num_rows>max_rows or parquet_file.metadata.num_row_groups>10000:
+                raise ValueError("Parquet file exceeds the configured row or row-group limit.")
+        except (ValueError, OSError) as exc:
+            if isinstance(exc, ValueError): raise
+            raise ValueError("Could not safely inspect Parquet metadata.") from exc
         frame = pd.read_parquet(io.BytesIO(data))
     else:
         raise ValueError("Supported formats: CSV, TXT, XLSX/XLS and Parquet.")
@@ -56,6 +77,8 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("Select one worksheet at a time.")
     if frame.empty:
         raise ValueError("The imported table is empty.")
+    if len(frame)>max_rows:
+        raise ValueError(f"Table exceeds the configured {max_rows:,}-row import limit.")
     frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
     # Recover mostly numeric instrument columns containing a unit row or a few
     # malformed cells. Those cells become NaN and remain visible to QC.
@@ -386,11 +409,20 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         raise ValueError("No resolvable emission or absorption feature is present in the selected fit range.")
     step=float(np.median(np.diff(xx)))
     model=model.lower()
+    if model not in {"gaussian","lorentzian","voigt"}:
+        raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
+    if model=="voigt" and len(xx)<15:
+        raise ValueError("Voigt fitting has five free parameters; at least 15 valid spectral points are required.")
     if model=='gaussian':
         def fn(z,b,a,c,s): return b+a*np.exp(-0.5*((z-c)/s)**2)
         p0=[baseline0,amp0,center0,max(step,span/20)]
         lo=[-np.inf,-np.inf,float(xx[0]),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2]
-        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=30000)
+        try:
+            p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=30000)
+        except (RuntimeError, ValueError, FloatingPointError) as exc:
+            raise ValueError(f"Gaussian spectral fit failed to converge: {exc}") from exc
+        if cov.shape!=(4,4) or not np.all(np.isfinite(cov)):
+            raise ValueError("Gaussian fit covariance is singular or non-finite; inspect fit range and signal-to-noise.")
         b,a,c,s=map(float,p); pred=fn(xx,*p); width=2*np.sqrt(2*np.log(2))*s
         se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Gaussian','baseline':b,'amplitude':a,'center':c,'sigma':s,'FWHM':float(width),'area_above_baseline':float(a*s*np.sqrt(2*np.pi)),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
@@ -400,7 +432,12 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         def fn(z,b,a,c,g): return b+a/(1+((z-c)/g)**2)
         p0=[baseline0,amp0,center0,max(step,span/20)]
         lo=[-np.inf,-np.inf,float(xx[0]),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2]
-        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=30000)
+        try:
+            p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=30000)
+        except (RuntimeError, ValueError, FloatingPointError) as exc:
+            raise ValueError(f"Lorentzian spectral fit failed to converge: {exc}") from exc
+        if cov.shape!=(4,4) or not np.all(np.isfinite(cov)):
+            raise ValueError("Lorentzian fit covariance is singular or non-finite; inspect fit range and signal-to-noise.")
         b,a,c,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3])}
@@ -408,11 +445,22 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         def fn(z,b,a,c,s,g): return b+a*voigt_profile(z-c,s,g)/max(voigt_profile(0,s,g),np.finfo(float).eps)
         p0=[baseline0,amp0,center0,max(step,span/30),max(step,span/30)]
         lo=[-np.inf,-np.inf,float(xx[0]),max(step/10,1e-15),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2,span*2]
-        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=40000)
+        try:
+            p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=40000)
+        except (RuntimeError, ValueError, FloatingPointError) as exc:
+            raise ValueError(f"Voigt spectral fit failed to converge: {exc}") from exc
+        if cov.shape!=(5,5) or not np.all(np.isfinite(cov)):
+            raise ValueError("Voigt fit covariance is singular or non-finite; inspect fit range and signal-to-noise.")
         b,a,c,s,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
-        return {'model':'Voigt','baseline':b,'amplitude_peak':a,'center':c,'gaussian_sigma':s,'lorentzian_HWHM':g,'r_squared':_r2(yy,pred),
+        gaussian_fwhm=2*np.sqrt(2*np.log(2))*s
+        lorentzian_fwhm=2*g
+        fwhm=float(0.5346*lorentzian_fwhm+np.sqrt(0.2166*lorentzian_fwhm**2+gaussian_fwhm**2))
+        area=float(a/max(voigt_profile(0,s,g),np.finfo(float).eps))
+        return {'model':'Voigt','baseline':b,'amplitude_peak':a,'center':c,'gaussian_sigma':s,'lorentzian_HWHM':g,
+                'FWHM':fwhm,'area_above_baseline':area,'r_squared':_r2(yy,pred),
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude_peak':float(se[1]),'standard_error_center':float(se[2]),
-                'standard_error_gaussian_sigma':float(se[3]),'standard_error_lorentzian_HWHM':float(se[4]),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None}
+                'standard_error_gaussian_sigma':float(se[3]),'standard_error_lorentzian_HWHM':float(se[4]),
+                'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None}
     raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
 
 
@@ -527,7 +575,9 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
             'electron_plasma_frequency_Hz':fpe,'debye_length_m':debye,'greenwald_density_1e20_m-3':float(ng),
             'ohmic_power_approx_W':float(p_ohm),'toroidal_beta_fraction':float(beta_t) if beta_t is not None else None,
             'energy_confinement_time_s':float(tau) if tau is not None else None,'ion_sound_speed_approx_m_s':cs,
-            'assumption_ion_density_equals_electron_density':bool(ni_m3 is None)}
+            'assumption_ion_density_equals_electron_density':bool(ni_m3 is None),
+            'beta_definition_note':'Pointwise pressure-based estimate from supplied n_e, T_e and T_i; not a volume-averaged experimental beta.',
+            'energy_confinement_note':'W/P_loss approximation only; dW/dt, transient energy balance, impurity radiation and Zeff are not included.'}
 
 
 def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 0.0,
@@ -890,9 +940,16 @@ def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | N
     out={'particle_flux_covariance_m-2_s-1':float(np.mean(nf*vf)),'mean_density_m-3':float(np.mean(n)),'mean_radial_velocity_m_s':float(np.mean(vr))}
     if te is not None:
         tf=te-np.mean(te)
-        out['density_temperature_velocity_covariance_eV_m-2_s-1']=float(np.mean(nf*tf*vf))
-        out['electron_heat_flux_proxy_W_m-2']=float(1.5*E_CHARGE*np.mean(n*te*vf))
-        out['heat_flux_note']='Proxy using 3/2 n e T_e v_r; use a validated transport convention and include conductive/convective terms as appropriate.'
+        mean_n=float(np.mean(n)); mean_te=float(np.mean(te))
+        term_n=mean_te*float(np.mean(nf*vf))
+        term_te=mean_n*float(np.mean(tf*vf))
+        term_triple=float(np.mean(nf*tf*vf))
+        out['density_temperature_velocity_covariance_eV_m-2_s-1']=term_triple
+        out['electron_heat_flux_density_fluctuation_component_W_m-2']=float(1.5*E_CHARGE*term_n)
+        out['electron_heat_flux_temperature_fluctuation_component_W_m-2']=float(1.5*E_CHARGE*term_te)
+        out['electron_heat_flux_triple_fluctuation_component_W_m-2']=float(1.5*E_CHARGE*term_triple)
+        out['electron_heat_flux_proxy_W_m-2']=float(1.5*E_CHARGE*(term_n+term_te+term_triple))
+        out['heat_flux_note']='Decomposition of <n T_e delta(v_r)> into density, temperature and triple-fluctuation terms. Requires synchronized calibrated series; it is not a complete transport power balance.'
     out['note']='Covariance estimates require synchronized measurements, calibrated units and justified radial-velocity reconstruction.'
     return out
 
@@ -962,13 +1019,16 @@ def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
 
 def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
                      count_uncertainty: Any | None = None,
-                     assume_poisson_counts: bool = False) -> dict[str, float | str | int | bool]:
-    """Calculate moments without clipping negative bins and optionally propagate count uncertainty.
+                     assume_poisson_counts: bool = False,
+                     bin_representation: str = "density_per_eV") -> dict[str, float | str | int | bool]:
+    """Calculate moments with an explicit interpretation of spectral bins.
 
-    Poisson uncertainty is inferred only when explicitly requested for raw, non-background-
-    subtracted counts. For background-subtracted data, supply the uncertainty of the net bins
-    (including background uncertainty/covariance as appropriate).
+    "density_per_eV" integrates signal density over the energy coordinate with trapezoidal
+    quadrature. "counts_per_bin" treats each input as a bin-integrated count and sums bins
+    directly. Poisson uncertainty is inferred only when explicitly requested for raw counts.
     """
+    if bin_representation not in {"density_per_eV", "counts_per_bin"}:
+        raise ValueError("bin_representation must be 'density_per_eV' or 'counts_per_bin'.")
     e=np.asarray(energy_eV,float).ravel(); raw=np.asarray(counts,float).ravel(); c=raw.copy()
     if len(e)!=len(c) or len(e)<3: raise ValueError('Energy and counts must have same length and at least 3 samples.')
     if not np.all(np.isfinite(e)): raise ValueError('Energy coordinates must be finite.')
@@ -996,9 +1056,12 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
     if np.any(np.diff(e) <= 0): raise ValueError('Energy coordinates must be unique after sorting.')
     # Signed net bins are retained after background subtraction; do not clip
     # measured noise. Total area and variance are checked below.
-    quad=np.empty_like(e)
-    quad[0]=(e[1]-e[0])/2; quad[-1]=(e[-1]-e[-2])/2
-    quad[1:-1]=(e[2:]-e[:-2])/2
+    if bin_representation == "counts_per_bin":
+        quad=np.ones_like(e)
+    else:
+        quad=np.empty_like(e)
+        quad[0]=(e[1]-e[0])/2; quad[-1]=(e[-1]-e[-2])/2
+        quad[1:-1]=(e[2:]-e[:-2])/2
     weighted=quad*c
     area=float(np.sum(weighted))
     if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
@@ -1007,10 +1070,17 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
     if var < -1e-10 * max(float(np.max(e*e)), 1.0):
         raise ValueError("Net spectrum yields a negative second central moment; check background subtraction and uncertainty.")
     spread=math.sqrt(max(var,0))
-    result={'integrated_counts_eV':area,'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
+    result={'integrated_signal':area,
+            'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal·energy_unit',
+            'bin_representation':bin_representation,
+            'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
             'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
             'uncertainty_propagated':sigma is not None,
-            'note':'Moments are descriptive; detector response, efficiency, pile-up and background model are not corrected automatically.'}
+            'note':'Moments retain signed background-subtracted bins. Detector response, efficiency, pile-up and background covariance are not corrected automatically.'}
+    if bin_representation == "density_per_eV":
+        result['integrated_counts_eV']=area
+    else:
+        result['integrated_counts']=area
     if sigma is not None:
         dmean=quad*(e-mean)/area
         var_derivative=quad*((e-mean)**2-var)/area
@@ -1047,13 +1117,17 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
 
 def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None,
                           count_uncertainty: Any | None = None,
-                          assume_poisson_counts: bool = False) -> dict[str, Any]:
-    r=spectrum_moments(energy_keV, counts, background, count_uncertainty, assume_poisson_counts)
-    r['peak_energy_keV']=r.pop('peak_energy_eV')/1.0
+                          assume_poisson_counts: bool = False,
+                          bin_representation: str = "counts_per_bin") -> dict[str, Any]:
+    r=spectrum_moments(energy_keV, counts, background, count_uncertainty,
+                       assume_poisson_counts, bin_representation)
+    r['peak_energy_keV']=r.pop('peak_energy_eV')
     r['mean_energy_keV']=r.pop('mean_energy_eV')
     r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
-    r['integrated_counts_keV']=r.pop('integrated_counts_eV')
-    r['note']='Energy axis is interpreted as keV. Detector response and absolute calibration are not applied.'
+    if 'integrated_counts_eV' in r:
+        r['integrated_signal_keV_weighted']=r.pop('integrated_counts_eV')
+    r['energy_axis_unit']='keV'
+    r['note']='Energy axis is interpreted as keV. Select counts-per-bin or signal density explicitly; detector response and absolute calibration are not applied.'
     return r
 
 
