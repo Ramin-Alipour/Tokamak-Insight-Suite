@@ -724,7 +724,7 @@ def test_positive_interferometer_phase_has_explicit_positive_default_convention(
 
 
 def test_load_table_recovers_numeric_signal_with_a_units_row():
-    raw=b"time,signal\\ns,V\\n0,1\\n1,2\\n2,3\\n"
+    raw=b"time,signal\ns,V\n0,1\n1,2\n2,3\n"
     frame=load_table(raw,"instrument.csv")
     assert pd.api.types.is_numeric_dtype(frame["signal"])
     assert np.isnan(frame["signal"].iloc[0])
@@ -733,7 +733,7 @@ def test_load_table_recovers_numeric_signal_with_a_units_row():
 
 def test_load_table_enforces_byte_limit():
     with pytest.raises(ValueError,match="import limit"):
-        load_table(b"time,signal\\n0,1\\n","sample.csv",max_bytes=8)
+        load_table(b"time,signal\n0,1\n","sample.csv",max_bytes=8)
 
 
 def test_spectrum_moments_distinguishes_counts_per_bin_from_density():
