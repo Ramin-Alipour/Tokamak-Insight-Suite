@@ -467,22 +467,43 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
                          ion_fit_range: tuple[float,float] | None = None, area_m2: float | None = None,
                          ion_mass_amu: float | None = None, ti_eV: float = 0.0,
                          sheath_factor: float = 0.61, gamma_i: float = 1.0) -> dict[str, Any]:
-    """Analyze a single Langmuir I-V sweep. Electron fit range must contain electron-retarding data."""
+    """Analyze a single Langmuir I-V sweep with explicit model-input validation."""
+    for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
+        if fit_range is not None:
+            if len(fit_range) != 2 or not np.all(np.isfinite(np.asarray(fit_range, dtype=float))):
+                raise ValueError(f"{name} must contain exactly two finite voltage limits.")
+    if (area_m2 is None) != (ion_mass_amu is None):
+        raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
+    if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
+        raise ValueError("Collection area must be positive and finite.")
+    if ion_mass_amu is not None and (not np.isfinite(ion_mass_amu) or ion_mass_amu <= 0):
+        raise ValueError("Ion mass must be positive and finite.")
+    if not np.all(np.isfinite([ti_eV, sheath_factor, gamma_i])) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0:
+        raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
     if len(v)<8 or len(np.unique(v))<8: raise ValueError('At least 8 distinct valid voltage points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
     out=probe_iv_summary(v,i)
-    # Floating potential: linear interpolation at the nearest sign change.
-    cross=np.where(i[:-1]*i[1:]<=0)[0]
-    out['floating_potential_V']=float(v[cross[0]]-i[cross[0]]*(v[cross[0]+1]-v[cross[0]])/(i[cross[0]+1]-i[cross[0]])) if len(cross) else None
+    # Handle exact zero-current samples explicitly; avoid 0/0 for repeated zero values.
+    exact_zero=np.flatnonzero(i == 0)
+    cross=np.where(i[:-1]*i[1:]<0)[0]
+    if len(exact_zero):
+        out['floating_potential_V']=float(v[exact_zero[0]])
+    elif len(cross):
+        k=int(cross[0])
+        out['floating_potential_V']=float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
+    else:
+        out['floating_potential_V']=None
     didv=np.gradient(i,v); out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
-    if ion_fit_range:
+    if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
             p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
             out['ion_saturation_current_A']=float(np.median(i[m]))
-    if electron_fit_range:
+        else:
+            raise ValueError("ion_fit_range must contain at least 3 valid samples.")
+    if electron_fit_range is not None:
         ion_baseline=float(out.get('ion_saturation_current_A',0.0))
         electron_current=i-ion_baseline
         m=(v>=min(electron_fit_range))&(v<=max(electron_fit_range))&(electron_current>0)
@@ -495,15 +516,15 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             out['electron_retarding_log_slope_per_V']=slope
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
-    if area_m2 and ion_mass_amu and area_m2>0 and ion_mass_amu>0 and 'ion_saturation_current_A' in out:
-        cs=math.sqrt(E_CHARGE*(max(ti_eV,0)*gamma_i + max(float(out.get('electron_temperature_eV') or 0),0))/ (ion_mass_amu*AMU))
+    if area_m2 is not None and 'ion_saturation_current_A' in out:
+        te=float(out.get('electron_temperature_eV') or 0.0)
+        cs=math.sqrt(E_CHARGE*(ti_eV*gamma_i + te)/(ion_mass_amu*AMU))
         denom=sheath_factor*E_CHARGE*area_m2*cs
         out['ion_sound_speed_m_s']=cs
         out['ion_density_estimate_m-3']=abs(out['ion_saturation_current_A'])/denom if denom>0 else None
         out['ion_density_model']='n_i≈|I_isat|/(sheath_factor·e·A·c_s); depends on sheath model, geometry and ion temperature.'
     out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
     return out
-
 
 def floating_potential(voltage: Any, current: Any) -> float | None:
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel(); m=np.isfinite(v)&np.isfinite(i); v,i=v[m],i[m]
