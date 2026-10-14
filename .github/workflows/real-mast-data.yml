@@ -60,9 +60,11 @@ jobs:
           print(f"PASS: real MAST shot 29790; signal={manifest['signal']}; samples={len(frame)}; fs={fs:.3f} Hz")
           print("PASS: CSV ingestion, FFT, Welch PSD, and digital filtering on public raw data")
           PY
+      - name: Fetch current and interferometer diagnostics from a second MAST shot
+        run: python tools/fetch_fair_mast_multidiag.py --output-dir artifacts/mast-multidiag
       - name: Upload real-data test artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: mast-29790-real-data-validation
-          path: artifacts/mast-real-data/
+          name: mast-real-data-multidiagnostic-validation
+          path: artifacts/
           if-no-files-found: error
