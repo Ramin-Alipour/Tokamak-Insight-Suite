@@ -5,7 +5,7 @@
 - Welch PSD now exposes segment length, overlap and window controls. Spectral fitting supports absorption as well as emission lines and optional intensity-uncertainty weighting.
 - Added an Eich-like exponential-convolved-with-Gaussian target heat-flux model with covariance-derived parameter uncertainties; the simpler exponential remains available.
 - Tomography supports measurement-uncertainty weighting and an optional discrete L-curve curvature heuristic for λ selection, with the full curve and a cautionary note exported.
-- Cached repeated time-series preparation, filtering and spectral calculations in Streamlit; plots of very long arrays are bounded to 20,000 display points.
+- Cached repeated time-series preparation, filtering and spectral calculations in Streamlit; min/max plot decimation preserves narrow spikes, uploads are keyed to file identity, and remote data are not overwritten on rerun.
 - FAIR-MAST signal reduction now uses polyphase FIR anti-alias filtering; source/output sample rates and filter metadata are included in the provenance manifest. Irregular/gapped timebases are rejected before decimation.
 - Mode-number fitting sorts sensors by angle, excludes zero-weight sensors before circular-phase fitting, recalculates the spatial alias limit from active sensor geometry, and searches integer modes using circular residuals. Phase-only data cannot distinguish modes that have already aliased.
 - Time-series preparation detects likely missing-sample gaps while allowing timestamp quantization at high sample rates.
@@ -14,9 +14,9 @@
 - Spectral moments preserve negative background-subtracted bins rather than clipping noise; nonpositive integrated area or an invalid second moment is rejected.
 - Cross-channel dashboard analysis now uses a common timestamp-validity mask and identical filter settings; lag and cross-phase sign conventions are labeled.
 - Interferometer phase conversion documents that its output is line-integrated electron density (m⁻²) and exposes an explicit sign-convention argument.
-- Public URL import blocks private/non-global destinations and validates redirect targets to mitigate SSRF.
+- Public URL import blocks non-global destinations, pins validated DNS addresses to sockets, validates redirect targets and disables environment proxies to mitigate SSRF/DNS rebinding.
 - Package metadata now uses the English README, optional dependencies are declared in pyproject.toml, and the runtime, dashboard, and package version are aligned to 0.4.0.
-- Regression tests cover the defects above; final pass/fail status is determined by the current CI run.
+- Voigt fits require sufficient samples, reject singular covariance and report approximate FWHM and integrated area. Regression tests cover these behavior changes; CI must pass before release.
 
 ## Scientific scope and limitations
 - These are research analysis workflows requiring calibrated inputs, correct units, appropriate geometry, documented uncertainty assumptions, and valid measurement conditions.
