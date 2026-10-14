@@ -57,7 +57,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
             for line in text_data.splitlines(keepends=True):
                 if line.lstrip().startswith(comment):
                     # Preserve the physical line count so skiprows retains its meaning.
-                    kept_lines.append("\\n" if line.endswith("\\n") else "")
+                    kept_lines.append("\n" if line.endswith("\n") else "")
                 else:
                     kept_lines.append(line)
             csv_data = "".join(kept_lines).encode("utf-8")
