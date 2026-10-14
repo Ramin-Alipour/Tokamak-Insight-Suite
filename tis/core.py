@@ -702,7 +702,7 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     gaps=np.diff(np.r_[th, th[0]+2*np.pi])
     if np.any(gaps <= 1e-10):
         raise ValueError('Sensor angles must be unique modulo 2π.')
-    alias_limit=int(np.floor(np.pi/np.max(gaps)))
+    alias_limit=int(np.floor(np.pi/np.max(gaps) + 1e-9))
     if alias_limit < 1:
         raise ValueError('Sensor geometry is too sparse for an unambiguous nonzero mode estimate.')
     if max_mode_number is not None and (isinstance(max_mode_number,bool) or int(max_mode_number)!=max_mode_number or max_mode_number < 0):
