@@ -642,7 +642,7 @@ elif page=='Advanced Analysis':
             st.info('Load synchronized numeric density and electric-field/potential channels.')
         else:
             ncol=col_select('Ion density nᵢ (m⁻³)',numeric,'transport_n')
-            field_source=st.radio('Electric-field source',['Already calibrated E-field channels','Compute from potential pairs'],horizontal=True,key='transport_field_source')
+            field_options=['Already calibrated E-field channels']+(['Compute from potential pairs'] if len(available)>=4 else [])\n            field_source=st.radio('Electric-field source',field_options,horizontal=True,key='transport_field_source')
             available=[c for c in numeric if c!=ncol]
             if field_source=='Already calibrated E-field channels':
                 ercol=col_select('Radial electric field Eᵣ (V/m)',available,'transport_er')
@@ -654,12 +654,12 @@ elif page=='Advanced Analysis':
                 p1=col_select('Poloidal-pair potential Vₚ₁ (V)',[c for c in available if c not in [r1,r2]],'transport_p1')
                 p2=col_select('Poloidal-pair potential Vₚ₂ (V)',[c for c in available if c not in [r1,r2,p1]],'transport_p2')
                 c1,c2=st.columns(2)
-                with c1: dr=st.number_input('Radial probe separation Δr (m)',min_value=0.000001,value=0.0025,format='%.8g',key='transport_dr')
-                with c2: dp=st.number_input('Poloidal probe separation Δθ (m)',min_value=0.000001,value=0.0025,format='%.8g',key='transport_dp')
+                with c1: dr=st.number_input('Radial probe separation Δr (m)',min_value=0.000001,value=0.0,format='%.8g',key='transport_dr',help='Enter the measured probe separation; zero is intentionally invalid.')
+                with c2: dp=st.number_input('Poloidal probe separation Δθ (m)',min_value=0.000001,value=0.0,format='%.8g',key='transport_dp',help='Enter the measured probe separation; zero is intentionally invalid.')
                 c1,c2=st.columns(2)
                 with c1: sr_field=st.selectbox('Radial E-field sign sᵣ',[-1,1],index=None,placeholder='Select convention',key='transport_sr_field')
                 with c2: sp_field=st.selectbox('Poloidal E-field sign sₚ',[-1,1],index=None,placeholder='Select convention',key='transport_sp_field')
-            bt=st.number_input('Toroidal magnetic field Bₜ (T)',value=1.0,format='%.8g',key='transport_bt')
+            bt=st.number_input('Toroidal magnetic field Bₜ (T)',value=0.0,format='%.8g',key='transport_bt',help='Enter the measured toroidal field for the discharge; no device value is assumed.')
             c1,c2=st.columns(2)
             with c1: sr=st.selectbox('Sign for vᵣ = sᵣ Eₚ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sr')
             with c2: sp=st.selectbox('Sign for vₚ = sₚ Eᵣ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sp')
