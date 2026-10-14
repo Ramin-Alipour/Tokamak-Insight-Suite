@@ -1215,14 +1215,18 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
                           bin_representation: str = "density_per_eV") -> dict[str, Any]:
     r=spectrum_moments(energy_keV, counts, background, count_uncertainty,
                        assume_poisson_counts, bin_representation)
-    r['peak_energy_keV']=r.pop('peak_energy_eV')
-    r['mean_energy_keV']=r.pop('mean_energy_eV')
-    r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
+    if 'peak_energy_eV' in r: r['peak_energy_keV']=r.pop('peak_energy_eV')
+    if 'mean_energy_eV' in r: r['mean_energy_keV']=r.pop('mean_energy_eV')
+    if 'rms_energy_spread_eV' in r: r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
+    if 'standard_uncertainty_mean_energy_eV' in r: r['standard_uncertainty_mean_energy_keV']=r.pop('standard_uncertainty_mean_energy_eV')
+    if 'standard_uncertainty_rms_energy_spread_eV' in r: r['standard_uncertainty_rms_energy_spread_keV']=r.pop('standard_uncertainty_rms_energy_spread_eV')
     if 'integrated_counts_eV' in r:
         r['integrated_signal_keV_weighted']=r.pop('integrated_counts_eV')
         # Retained for compatibility with existing callers; actual units follow
         # bin_representation and the supplied energy coordinate.
         r['integrated_counts_keV']=r['integrated_signal_keV_weighted']
+    elif 'integrated_signal' in r:
+        r['integrated_signal_keV_weighted']=r['integrated_signal']
     r['energy_axis_unit']='keV'
     r['note']='Energy axis is interpreted as keV. Select counts-per-bin or signal density explicitly; detector response and absolute calibration are not applied.'
     return r
