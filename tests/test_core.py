@@ -917,3 +917,15 @@ def test_resample_time_series_rejects_implicit_downsampling():
     signal = np.sin(2*np.pi*3*time)
     with pytest.raises(ValueError, match="Downsampling"):
         resample_time_series(time, signal, target_dt_s=0.02)
+
+
+def test_filter_impact_reports_transfer_response_and_spectral_changes():
+    from tis.core import filter_impact_analysis
+    fs = 2000.0
+    time = np.arange(4096)/fs
+    signal = np.sin(2*np.pi*40*time)+0.5*np.sin(2*np.pi*500*time)
+    result = filter_impact_analysis(signal,fs,lowpass=100.0,order=4)
+    assert result["filter_type"] == "lowpass"
+    assert result["filtered_rms"] < result["raw_rms"]
+    assert len(result["frequency_response_Hz"]) == 512
+    assert result["forward_backward_amplitude_response"][-1] < 0.01
