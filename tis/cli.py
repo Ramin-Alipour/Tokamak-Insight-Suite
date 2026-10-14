@@ -23,6 +23,7 @@ def dashboard_main() -> int:
 def main() -> int:
     parser=argparse.ArgumentParser(prog='tis',description='Tokamak Insight Suite command-line tools')
     sub=parser.add_subparsers(dest='command',required=True)
+    sub.add_parser('dashboard',help='Launch the Streamlit dashboard')
     p=sub.add_parser('qc',help='Audit columns and write a JSON report'); p.add_argument('input'); p.add_argument('--output',default='tis_qc.json')
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True); p.add_argument('--time'); p.add_argument('--fs',type=float,default=None); p.add_argument('--output',default='tis_fft.csv')
     p=sub.add_parser('catalog',help='Export diagnostic/formula registry JSON'); p.add_argument('--kind',choices=['diagnostics','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
