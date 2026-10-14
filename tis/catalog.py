@@ -88,6 +88,8 @@ _RAW = [
 ]
 
 DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","caveat"), row)) for row in _RAW]
+for _i, _d in enumerate(DIAGNOSTICS, start=1):
+    _d["id"] = f"diag-{_i:03d}"
 
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
