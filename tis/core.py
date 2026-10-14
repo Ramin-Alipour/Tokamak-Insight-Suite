@@ -1518,6 +1518,30 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
 
 
 
+def electric_field_from_potential_difference(
+    potential_a_V: Any,
+    potential_b_V: Any,
+    separation_m: float,
+    *,
+    field_sign: int = -1,
+) -> np.ndarray:
+    """Compute E = field_sign * (V_b - V_a) / separation in SI units.
+
+    The default field_sign=-1 corresponds to E=-grad(V) for a coordinate
+    increasing from probe a to probe b. Choose +1 only when the paper/device
+    coordinate convention explicitly requires it. Missing values are preserved.
+    """
+    va = np.asarray(potential_a_V, dtype=float).ravel()
+    vb = np.asarray(potential_b_V, dtype=float).ravel()
+    if len(va) != len(vb) or len(va) < 1:
+        raise ValueError("Potential channels must have equal nonzero lengths.")
+    if not np.isfinite(separation_m) or separation_m == 0:
+        raise ValueError("Probe separation must be finite and nonzero.")
+    if isinstance(field_sign, bool) or field_sign not in (-1, 1):
+        raise ValueError("field_sign must be +1 or -1.")
+    return int(field_sign) * (vb - va) / float(separation_m)
+
+
 def drift_transport_from_fields(
     density_m3: Any,
     radial_electric_field_V_m: Any,
