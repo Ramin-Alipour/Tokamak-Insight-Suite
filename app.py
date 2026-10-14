@@ -10,7 +10,7 @@ from tis import __version__
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
-    prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
+    prepare_time_series, resample_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, evaluate_spectral_fit, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
@@ -444,8 +444,18 @@ elif page=='Time Series & MHD':
     with c1: hp=st.number_input('High-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c2: lp=st.number_input('Low-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c3: order=st.slider('Butterworth order',1,8,3)
+    resample_jitter=st.checkbox('Explicitly resample timestamp jitter to a uniform grid (refuses large gaps)',value=False,disabled=(tcol=='<sample index>'),help='Linear interpolation is not a substitute for missing samples; the routine rejects large gaps and does not downsample.')
     try:
-        t,y,fs=cached_prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float),pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float),fs0)
+        raw_time=None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)
+        raw_signal=pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float)
+        if resample_jitter:
+            resampled=resample_time_series(raw_time,raw_signal)
+            t,y,fs=cached_prepare_time_series(resampled['time_s'],resampled['values'],fs0)
+            st.warning(resampled['warning'])
+            st.json({k:v for k,v in resampled.items() if k not in {'time_s','values'}})
+            json_download('Export resampling manifest',{k:v for k,v in resampled.items() if k not in {'time_s','values'}},'tis_resampling_manifest.json')
+        else:
+            t,y,fs=cached_prepare_time_series(raw_time,raw_signal,fs0)
         yf=cached_filter(y,fs,hp or None,lp or None,order)
     except Exception as e:
         st.error(f'Time-series preparation failed: {e}')
