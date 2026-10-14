@@ -451,3 +451,20 @@ def test_spectral_fit_reports_parameter_uncertainties():
 def test_spectral_fit_rejects_invalid_coordinates_and_limits(x,y,xmin,xmax):
     with pytest.raises(ValueError):
         fit_spectral_line(x,y,xmin=xmin,xmax=xmax,model="Gaussian")
+
+
+def test_doppler_temperature_uncertainty_propagation():
+    from tis.core import doppler_temperature_with_uncertainty_eV
+    r=doppler_temperature_with_uncertainty_eV(0.02,500.0,40.0,0.001,0.01,0.1)
+    expected=doppler_temperature_eV(0.02,500.0,40.0)
+    assert r["temperature_eV"] == pytest.approx(expected)
+    assert r["standard_uncertainty_eV"] > 0
+    assert r["relative_standard_uncertainty"] == pytest.approx(
+        np.sqrt((2*0.001/0.02)**2+(2*0.01/500.0)**2+(0.1/40.0)**2)
+    )
+
+
+def test_doppler_temperature_uncertainty_rejects_negative_uncertainty():
+    from tis.core import doppler_temperature_with_uncertainty_eV
+    with pytest.raises(ValueError):
+        doppler_temperature_with_uncertainty_eV(0.02,500.0,40.0,sigma_sigma_lambda=-0.1)
