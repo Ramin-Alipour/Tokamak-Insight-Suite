@@ -10,6 +10,7 @@ from tis import __version__
 from tis.ui.time_series_page import render_time_series_page
 from tis.ui.spectral_page import render_spectral_page
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.paper_benchmarks import P05_CLAIMS, P05_SOURCE, p05_claims_frame, compare_to_p05_range
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
@@ -106,7 +107,7 @@ with st.sidebar:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
         st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
     st.divider()
-    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
+    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Paper Benchmarks & P05 Audit','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
@@ -668,6 +669,32 @@ elif page=='Diagnostic Catalog':
         for f in entries:
             with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inference class:** {f.get('inference_class', f['status'])}\n\n**Validation status:** {f.get('validation_status', 'Not independently validated as a complete diagnostic workflow')}\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Assumptions:** {f['assumptions']}")
         json_download('Export formula registry JSON',entries,'tis_formula_registry.json')
+
+
+elif page=='Paper Benchmarks & P05 Audit':
+    st.title('Paper Benchmarks & P05 Audit')
+    st.markdown(f"**Source:** {P05_SOURCE['title']} · {P05_SOURCE['journal']} · DOI [{P05_SOURCE['doi']}](https://doi.org/{P05_SOURCE['doi']})")
+    st.error("Confirmed source-text conflict: for the radial electric field at 5 mm inside the plasma with +200 V, the abstract reports +35–45%, while the conclusion reports +20–30%. These ranges do not overlap. Neither is silently selected as ground truth.")
+    st.markdown("The following are traceable **prose claims**, not digitized raw measurements. Limiter position, voltage polarity, source section and the reported statistic must remain explicit.")
+    claims=p05_claims_frame()
+    st.dataframe(claims, use_container_width=True, hide_index=True)
+    st.download_button("Download P05 source-claim table (CSV)", claims.to_csv(index=False).encode("utf-8"), "p05_paper_claims.csv", "text/csv")
+    st.markdown("### Compare an observed percentage with the paper text")
+    eligible=[row for row in P05_CLAIMS if row["lower_pct"] is not None and row["upper_pct"] is not None]
+    options=sorted({(row["metric"],row["condition"]) for row in eligible})
+    selected=st.selectbox("Metric and exact condition",options,format_func=lambda item:f"{item[0]} — {item[1]}")
+    observed=st.number_input("Observed percentage change magnitude (%)",min_value=0.0,max_value=10000.0,value=25.0,step=1.0,help="Enter the magnitude as a positive number. Increase/decrease direction and the source claim are listed in the result.")
+    if st.button("Compare with paper claims", key="p05_compare_claims"):
+        result=compare_to_p05_range(selected[0],selected[1],observed)
+        if result["status"]=="matches_one_claim_but_conflicts_with_another":
+            st.warning("This value matches one reported section but conflicts with another section of the same paper.")
+        elif result["status"]=="within_all_reported_ranges":
+            st.success("This value lies within all matching prose ranges. This is not validation against raw experimental data.")
+        else:
+            st.info("This value is outside the matching prose ranges; check the measurement definition, condition, units and averaging window.")
+        st.json(result)
+    st.markdown("### Scientific interpretation")
+    st.markdown("- The abstract/conclusion radial-electric-field percentages remain an unresolved internal inconsistency. Do not average the two ranges.\n- The abstract and conclusion agree on a 25–35% increase in poloidal turbulent transport at 5 mm and +200 V.\n- The approximately 5% Reynolds-stress reduction in Results §3.6 is compatible with the lower end of the 5–10% maximum reduction reported in the abstract/conclusion.\n- Figures 3–7 are time traces; the paper does not specify a shared averaging interval/statistic or uncertainty for these percentages. This feature compares text claims and does not claim figure digitization or raw-data reproduction.")
 
 elif page=='Reports & Export':
     st.title('Reports, Provenance & Export')
