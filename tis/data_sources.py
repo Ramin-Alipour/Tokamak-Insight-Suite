@@ -188,80 +188,104 @@ def fetch_fair_mast_signal(
 
 
 def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: int = 30) -> tuple[bytes, dict[str, str]]:
-    """Download one public HTTP(S) tabular file with bounded size and provenance.
-
-    Intended for direct CSV/TXT/Parquet links such as GOLEM's public per-shot
-    exports. It deliberately does not crawl websites or scrape HTML pages.
-    """
+    """Download public HTTP(S) data with bounded reads and DNS-pinned connections."""
     from urllib.error import HTTPError, URLError
-    from urllib.request import Request, urlopen, build_opener, HTTPRedirectHandler
+    from urllib.request import Request, build_opener, HTTPRedirectHandler, HTTPHandler, HTTPSHandler, ProxyHandler
+    import http.client
+    import ssl
 
-    parsed = urlparse(str(url).strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+    parsed=urlparse(str(url).strip())
+    if parsed.scheme not in {"http","https"} or not parsed.hostname:
         raise ValueError("Enter a direct public http:// or https:// file URL.")
     if parsed.username or parsed.password:
         raise ValueError("URLs containing embedded credentials are not allowed.")
-    if max_bytes < 1024:
-        raise ValueError("Maximum download size must be at least 1024 bytes.")
+    if isinstance(max_bytes,bool) or not isinstance(max_bytes,int) or max_bytes<1024:
+        raise ValueError("Maximum download size must be an integer of at least 1024 bytes.")
+    if isinstance(timeout,bool) or not isinstance(timeout,(int,float)) or not math.isfinite(timeout) or timeout<=0:
+        raise ValueError("Timeout must be a positive finite number of seconds.")
+    pinned_hosts: dict[str,str]={}
 
-    def reject_private_destination(target: str) -> None:
-        parts = urlparse(target)
-        host = (parts.hostname or "").rstrip(".").lower()
-        if parts.scheme not in {"http", "https"} or not host or parts.username or parts.password:
+    def pin_destination(target: str) -> str:
+        parts=urlparse(target); host=(parts.hostname or "").rstrip(".").lower()
+        if parts.scheme not in {"http","https"} or not host or parts.username or parts.password:
             raise ValueError("Only credential-free HTTP(S) destinations are allowed.")
-        if host in {"localhost", "localhost.localdomain", "metadata.google.internal"} or host.endswith((".localhost", ".local", ".internal")):
+        if host in {"localhost","localhost.localdomain","metadata.google.internal"} or host.endswith((".localhost",".local",".internal")):
             raise ValueError("Local and internal network destinations are blocked.")
+        port=parts.port or (443 if parts.scheme=="https" else 80)
         try:
-            addresses = [ipaddress.ip_address(host)]
+            addresses=[ipaddress.ip_address(host)]
         except ValueError:
             try:
-                addresses = list({ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80), type=socket.SOCK_STREAM)})
-            except OSError as exc:
+                resolved=socket.getaddrinfo(host,port,type=socket.SOCK_STREAM)
+                addresses=sorted({ipaddress.ip_address(item[4][0]) for item in resolved},key=lambda ip:(ip.version,int(ip)))
+            except (OSError,ValueError) as exc:
                 raise ValueError(f"Could not resolve host {host!r}.") from exc
-        if not addresses or any(not address.is_global for address in addresses):
+        if not addresses or any(not ip.is_global for ip in addresses):
             raise ValueError("Private, loopback, link-local, reserved and non-global destinations are blocked.")
+        pinned_hosts[host]=str(addresses[0])
+        return host
 
-    reject_private_destination(parsed.geturl())
+    pin_destination(parsed.geturl())
+
+    class PinnedHTTPConnection(http.client.HTTPConnection):
+        def __init__(self,host,pinned_ip,**kwargs):
+            kwargs.pop("check_hostname",None); self._pinned_ip=pinned_ip
+            super().__init__(host,**kwargs)
+        def connect(self):
+            self.sock=socket.create_connection((self._pinned_ip,self.port),self.timeout,self.source_address)
+
+    class PinnedHTTPSConnection(http.client.HTTPSConnection):
+        def __init__(self,host,pinned_ip,**kwargs):
+            kwargs.pop("check_hostname",None); self._pinned_ip=pinned_ip
+            super().__init__(host,**kwargs)
+        def connect(self):
+            raw_sock=socket.create_connection((self._pinned_ip,self.port),self.timeout,self.source_address)
+            try: self.sock=self._context.wrap_socket(raw_sock,server_hostname=self.host)
+            except Exception:
+                raw_sock.close(); raise
+
+    class PinnedHTTPHandler(HTTPHandler):
+        def http_open(self,req):
+            host=(urlparse(req.full_url).hostname or "").rstrip(".").lower()
+            return self.do_open(lambda connection_host,**kwargs:
+                PinnedHTTPConnection(connection_host,pinned_hosts[host],**kwargs),req)
+
+    class PinnedHTTPSHandler(HTTPSHandler):
+        def https_open(self,req):
+            host=(urlparse(req.full_url).hostname or "").rstrip(".").lower()
+            return self.do_open(lambda connection_host,**kwargs:
+                PinnedHTTPSConnection(connection_host,pinned_hosts[host],**kwargs),req,
+                context=ssl.create_default_context(),check_hostname=True)
 
     class SafeRedirectHandler(HTTPRedirectHandler):
-        def redirect_request(self, req, fp, code, msg, headers, newurl):
-            reject_private_destination(newurl)
-            return super().redirect_request(req, fp, code, msg, headers, newurl)
+        def redirect_request(self,req,fp,code,msg,headers,newurl):
+            pin_destination(newurl)
+            return super().redirect_request(req,fp,code,msg,headers,newurl)
 
-    request = Request(parsed.geturl(), headers={"User-Agent": "Tokamak-Insight-Suite/0.4 (public scientific data import)"})
-    opener = build_opener(SafeRedirectHandler)
+    request=Request(parsed.geturl(),headers={"User-Agent":"Tokamak-Insight-Suite/0.4 (public scientific data import)"})
+    opener=build_opener(ProxyHandler({}),PinnedHTTPHandler(),PinnedHTTPSHandler(),SafeRedirectHandler())
     try:
-        with opener.open(request, timeout=timeout) as response:
-            content_type = response.headers.get("Content-Type", "unknown")
-            final_url = response.geturl()
-            reject_private_destination(final_url)
-            payload = response.read(max_bytes + 1)
-    except (HTTPError, URLError, TimeoutError) as exc:
+        with opener.open(request,timeout=timeout) as response:
+            content_type=response.headers.get("Content-Type","unknown")
+            final_url=response.geturl()
+            final_host=(urlparse(final_url).hostname or "").rstrip(".").lower()
+            if final_host not in pinned_hosts: pin_destination(final_url)
+            payload=response.read(max_bytes+1)
+    except (HTTPError,URLError,TimeoutError,OSError,ssl.SSLError,ValueError) as exc:
+        if isinstance(exc,ValueError): raise
         raise RuntimeError(f"Public data download failed: {exc}") from exc
-
-    if len(payload) > max_bytes:
-        raise ValueError(
-            f"File exceeds the {max_bytes:,}-byte download limit; use a smaller export."
-        )
-    if not payload:
-        raise ValueError("The downloaded file is empty.")
-    preview = payload[:512].lstrip().lower()
+    if len(payload)>max_bytes:
+        raise ValueError(f"File exceeds the {max_bytes:,}-byte download limit; use a smaller export.")
+    if not payload: raise ValueError("The downloaded file is empty.")
+    preview=payload[:512].lstrip().lower()
     if b"<html" in preview or b"<!doctype html" in preview:
-        raise ValueError(
-            "The URL returned an HTML page, not a direct data file. Use the archive's direct download URL."
-        )
+        raise ValueError("The URL returned an HTML page, not a direct data file. Use the archive's direct download URL.")
     import hashlib
-    from datetime import datetime, timezone
-
-    metadata = {
-        "source_url": str(url).strip(),
-        "final_url": final_url,
-        "content_type": content_type,
-        "downloaded_bytes": str(len(payload)),
-        "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
-        "sha256": hashlib.sha256(payload).hexdigest(),
-    }
-    return payload, metadata
+    from datetime import datetime,timezone
+    metadata={"source_url":str(url).strip(),"final_url":final_url,"content_type":content_type,
+              "downloaded_bytes":str(len(payload)),"downloaded_at_utc":datetime.now(timezone.utc).isoformat(),
+              "sha256":hashlib.sha256(payload).hexdigest()}
+    return payload,metadata
 
 
 def fetch_fair_mast_efit_snapshot(
