@@ -62,7 +62,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 ## Tests and CI
 
-The automated GitHub Actions workflow installs the dependencies and runs the test suite on repository updates. The suite includes **86 test cases** (including parameterized input-validation cases). The current result is recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
+The automated GitHub Actions workflow installs the dependencies and runs the test suite on repository updates. The suite includes numerical regression, parameterized input-validation, and physics-identity tests. The `Continuous validation` workflow compiles the source, runs `pytest`, and smoke-tests the Streamlit health endpoint on pushes and pull requests. Results are recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
 
 ## Scientific scope and limitations
 
