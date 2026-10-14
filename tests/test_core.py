@@ -590,6 +590,9 @@ def test_mode_number_from_channels_extracts_cross_spectral_phase_with_coherence(
     theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
     signals = np.vstack([np.sin(2*np.pi*120*time + 3*angle) for angle in theta])
     result = mode_number_from_channels(theta, signals, fs, frequency_range_hz=(100, 140))
+    assert "leave_one_sensor_out_results" in result
+    assert len(result["leave_one_sensor_out_results"]) == len(theta)
+    assert "not a confidence interval" in result["leave_one_sensor_out_note"]
     assert result["selected_frequency_Hz"] == pytest.approx(120, abs=1)
     assert result["mode_number_fit"] == pytest.approx(3, abs=0.15)
     assert min(result["coherence_with_reference"]) > 0.9
