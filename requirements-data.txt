@@ -1,0 +1,5 @@
+# Optional dependencies for the real-data MAST integration test
+xarray>=2024.1
+zarr>=2.16,<3
+fsspec>=2024.2
+numcodecs>=0.12
