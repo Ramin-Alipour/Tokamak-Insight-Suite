@@ -96,7 +96,7 @@ for _i, _d in enumerate(DIAGNOSTICS, start=1):
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
     "Langmuir probe": ["langmuir_iv_analysis", "probe_iv_summary"],
-    "Ion temperature from Doppler spectroscopy": ["fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
+    "Ion temperature from Doppler spectroscopy": ["analyze_doppler_line_end_to_end", "fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels"],
     "Flux loops": ["integrate_time_series"],
     "Interferometer": ["linear_phase_density"],
