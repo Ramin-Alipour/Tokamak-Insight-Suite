@@ -670,17 +670,17 @@ def test_spectrum_moments_requires_net_uncertainty_when_poisson_background_subtr
 
 # Regressions from the independent runtime review.
 def test_csv_hash_headers_and_decimal_comma_are_preserved():
-    frame = load_table(b"time,Ch#1,Ch#2\\n0,1.5,2.5\\n1,3.5,4.5\\n", "sample.csv")
+    frame = load_table(b"time,Ch#1,Ch#2\n0,1.5,2.5\n1,3.5,4.5\n", "sample.csv")
     assert list(frame.columns) == ["time", "Ch#1", "Ch#2"]
     assert frame["time"].tolist() == [0, 1]
     assert frame["Ch#1"].tolist() == [1.5, 3.5]
-    comma = load_table(b"time;voltage\\n0,0;1,5\\n0,5;2,5\\n", "sample.csv", delimiter=";", decimal=",")
+    comma = load_table(b"time;voltage\n0,0;1,5\n0,5;2,5\n", "sample.csv", delimiter=";", decimal=",")
     assert comma["time"].tolist() == pytest.approx([0.0, 0.5])
     assert comma["voltage"].tolist() == pytest.approx([1.5, 2.5])
 
 
 def test_csv_skiprows_and_explicit_comment_option():
-    raw = b"instrument export\\nunits: s,V\\ntime,signal\\n0,1\\n1,2\\n"
+    raw = b"instrument export\nunits: s,V\ntime,signal\n0,1\n1,2\n"
     frame = load_table(raw, "sample.txt", skiprows=2)
     assert list(frame.columns) == ["time", "signal"]
     assert frame["signal"].tolist() == [1, 2]
