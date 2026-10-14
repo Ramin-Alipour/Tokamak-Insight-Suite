@@ -8,6 +8,8 @@ WORKDIR /app
 COPY requirements.txt pyproject.toml ./
 RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 COPY . .
+RUN useradd --create-home --uid 10001 tis && chown -R tis:tis /app
+USER tis
 EXPOSE 8501
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)" || exit 1
