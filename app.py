@@ -16,7 +16,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
+    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, drift_transport_from_fields,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
@@ -611,7 +611,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','E×B transport & Reynolds stress','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
     if workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
@@ -636,6 +636,32 @@ elif page=='Advanced Analysis':
                 r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg],count_uncertainty=sigma,assume_poisson_counts=poisson)
                 st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
+    elif workflow=='E×B transport & Reynolds stress':
+        st.write('Calculate the instantaneous E×B drift, particle flux and Reynolds-stress product used in edge-transport analyses. Sign conventions are explicit because they depend on coordinate orientation.')
+        if df is None or len(numeric)<3:
+            st.info('Load synchronized numeric density and electric-field channels.')
+        else:
+            ncol=col_select('Ion density nᵢ (m⁻³)',numeric,'transport_n')
+            ercol=col_select('Radial electric field Eᵣ (V/m)',[c for c in numeric if c!=ncol],'transport_er')
+            epcol=col_select('Poloidal electric field Eₚ (V/m)',[c for c in numeric if c not in [ncol,ercol]],'transport_ep')
+            bt=st.number_input('Toroidal magnetic field Bₜ (T)',value=1.0,format='%.8g',key='transport_bt')
+            c1,c2=st.columns(2)
+            with c1: sr=st.selectbox('Sign for vᵣ = sᵣ Eₚ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sr')
+            with c2: sp=st.selectbox('Sign for vₚ = sₚ Eᵣ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sp')
+            st.caption('Inputs must already be calibrated, aligned in time and in SI units. For paper reproduction, match its sign convention, spatial locations, filtering and averaging window.')
+            if st.button('Calculate E×B transport',type='primary',key='transport_run'):
+                try:
+                    if sr is None or sp is None: raise ValueError('Select both velocity sign conventions from the target paper or diagnostic geometry.')
+                    result=drift_transport_from_fields(df[ncol],df[ercol],df[epcol],float(bt),radial_velocity_sign=int(sr),poloidal_velocity_sign=int(sp))
+                    st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
+                    out=pd.DataFrame({'density_m-3':pd.to_numeric(df[ncol],errors='coerce'),'E_r_V_m':pd.to_numeric(df[ercol],errors='coerce'),'E_p_V_m':pd.to_numeric(df[epcol],errors='coerce')})
+                    for key in ['radial_velocity_m_s','poloidal_velocity_m_s','radial_particle_flux_m-2_s-1','poloidal_particle_flux_m-2_s-1','reynolds_stress_velocity_product_m2_s-2']:
+                        out[key]=result[key]
+                    st.dataframe(out.head(50),use_container_width=True)
+                    download_df('Download E×B transport time series',out,'tis_exb_transport.csv')
+                    json_download('Export E×B transport metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_exb_transport_metadata.json')
+                    st.warning(result['warning'])
+                except Exception as e: st.error(f'E×B transport analysis failed: {e}')
     elif workflow=='MHD SVD decomposition':
         st.write('SVD of synchronized diagnostic channels. This extracts data-driven temporal components and channel patterns; mode index is not automatically a physical poloidal mode number.')
         if df is None or len(numeric)<2:
