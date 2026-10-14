@@ -36,12 +36,12 @@
     "id": "diag-004"
   },
   {
-    "family": "Plasma parameters",
+    "family": "Fast particles",
     "diagnostic": "Neutral particle analyzer (NPA)",
-    "quantities": "Neutral energy spectrum; fast-ion distribution constraints",
+    "quantities": "Fast neutral energy distribution and ion-distribution constraints",
     "status": "M→I",
-    "method": "Apply energy-dependent response and compare to a forward model of neutral production and transport.",
-    "caveat": "Not a direct measurement of local ion density or distribution without modeling.",
+    "method": "Use calibrated response and neutralization/charge-exchange forward model.",
+    "caveat": "Sightline integration and atomic cross sections are required; this is not a direct local ion-distribution measurement.",
     "id": "diag-005"
   },
   {
