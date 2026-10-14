@@ -1150,15 +1150,23 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
         quad[1:-1]=(e[2:]-e[:-2])/2
     weighted=quad*c
     area=float(np.sum(weighted))
-    if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
+    base={'integrated_signal':area,
+          'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal·energy_unit',
+          'bin_representation':bin_representation,'n_points':int(len(e)),
+          'uncertainty_propagated':sigma is not None}
+    if area<=0:
+        return {**base,'moments_valid':False,'moment_status':'not_defined_nonpositive_net_area',
+                'note':'Signed background-subtracted bins are retained without clipping. The net integrated signal is nonpositive, so centroid and width are not physically defined; inspect background subtraction and uncertainty.'}
     mean=float(np.sum(e*weighted)/area)
     var=float(np.sum((e-mean)**2*weighted)/area)
     if var < -1e-10 * max(float(np.max(e*e)), 1.0):
-        raise ValueError("Net spectrum yields a negative second central moment; check background subtraction and uncertainty.")
+        return {**base,'moments_valid':False,'mean_energy_eV':mean,'rms_energy_spread_eV':None,
+                'moment_status':'not_defined_negative_second_moment',
+                'note':'Signed background-subtracted bins produce a negative second central moment. No bins were clipped; inspect background subtraction, bin uncertainties and fit a physically constrained spectral model if appropriate.'}
     spread=math.sqrt(max(var,0))
     result={'integrated_signal':area,
             'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal·energy_unit',
-            'bin_representation':bin_representation,
+            'bin_representation':bin_representation,'moments_valid':True,'moment_status':'valid_signed_net_moments',
             'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
             'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
             'uncertainty_propagated':sigma is not None,
