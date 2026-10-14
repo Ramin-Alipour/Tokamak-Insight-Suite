@@ -26,8 +26,13 @@ def test_p05_comparison_reports_when_value_matches_neither_claim():
     assert result["status"] == "outside_all_reported_ranges"
 
 
-def test_p05_exact_metric_and_condition_are_required():
+def test_p05_consistent_poloidal_transport_ranges_match():
     result = compare_to_p05_range("Poloidal turbulent transport", RADIAL_E_CONDITION, 30.0)
+    assert result["status"] == "within_all_reported_ranges"
+
+
+def test_p05_exact_metric_and_condition_are_required():
+    result = compare_to_p05_range("Poloidal turbulent transport", "Limiter at plasma edge; +200 V", 30.0)
     assert result["status"] == "no_numeric_reference_for_exact_condition"
 
 
