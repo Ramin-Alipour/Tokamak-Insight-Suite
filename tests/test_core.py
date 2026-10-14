@@ -9,7 +9,7 @@ from tis.core import (
     linear_phase_density, load_table, sha256_bytes,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
-    exponential_heat_flux_fit,
+    exponential_heat_flux_fit, integrate_time_series,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
@@ -329,4 +329,32 @@ def test_axisymmetric_radiated_power_rejects_negative_emissivity():
     eps[2, 2] = -0.1
     with pytest.raises(ValueError, match="nonnegative"):
         axisymmetric_radiated_power(R, Z, eps)
+
+def test_integrate_time_series_recovers_linear_integral():
+    t = np.linspace(0.0, 1.0, 101)
+    y = np.full_like(t, 2.0)
+    result = integrate_time_series(t, y, scale=3.0, initial_value=1.0)
+    np.testing.assert_allclose(result["integrated_signal"], 1.0 + 6.0 * t, atol=1e-12)
+
+
+def test_integrate_time_series_baseline_correction_removes_constant_offset():
+    t = np.linspace(0.0, 1.0, 101)
+    y = np.full_like(t, 4.0)
+    result = integrate_time_series(t, y, baseline_start_s=0.0, baseline_end_s=0.2)
+    np.testing.assert_allclose(result["integrated_signal"], 0.0, atol=1e-12)
+    assert result["baseline_offset_in_calibrated_units"] == pytest.approx(4.0)
+
+
+@pytest.mark.parametrize(
+    "time, values, kwargs",
+    [
+        ([0, 1, 1], [1, 2, 3], {}),
+        ([0, 1], [1, np.nan], {}),
+        ([0, 1], [1, 2], {"baseline_start_s": 0.0}),
+        ([0, 1], [1, 2], {"baseline_start_s": 1.0, "baseline_end_s": 0.0}),
+    ],
+)
+def test_integrate_time_series_rejects_invalid_inputs(time, values, kwargs):
+    with pytest.raises(ValueError):
+        integrate_time_series(time, values, **kwargs)
 
