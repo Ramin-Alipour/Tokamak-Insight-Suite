@@ -393,6 +393,29 @@ def doppler_temperature_with_uncertainty_eV(
             "uncertainty_method":"First-order independent-error propagation; excludes model/systematic uncertainty."}
 
 
+def doppler_velocity_with_uncertainty_m_s(
+    observed_lambda: float, lambda0: float,
+    sigma_observed_lambda: float = 0.0, sigma_lambda0: float = 0.0,
+) -> dict[str, float | str]:
+    """Calculate nonrelativistic line-of-sight velocity and propagated 1-sigma uncertainty.
+
+    Wavelengths and their uncertainties must use the same units. Independent measurement
+    uncertainties are propagated in quadrature; systematic wavelength-calibration errors
+    are not included unless explicitly represented in the supplied uncertainties.
+    """
+    vals=[observed_lambda,lambda0,sigma_observed_lambda,sigma_lambda0]
+    if not np.all(np.isfinite(vals)) or observed_lambda <= 0 or lambda0 <= 0:
+        raise ValueError("Observed and rest wavelengths must be positive and all inputs finite.")
+    if sigma_observed_lambda < 0 or sigma_lambda0 < 0:
+        raise ValueError("Wavelength uncertainties must be nonnegative.")
+    velocity=float(C_LIGHT*(observed_lambda/lambda0-1.0))
+    uncertainty=float(C_LIGHT*np.sqrt((sigma_observed_lambda/lambda0)**2+
+                                     (observed_lambda*sigma_lambda0/lambda0**2)**2))
+    return {"line_of_sight_velocity_m_s":velocity,
+            "standard_uncertainty_m_s":uncertainty,
+            "uncertainty_method":"First-order independent-error propagation; nonrelativistic Doppler approximation."}
+
+
 def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     if not np.all(np.isfinite([delta_lambda, lambda0])) or lambda0 <= 0:
         raise ValueError('Wavelength shift must be finite and rest wavelength positive.')
