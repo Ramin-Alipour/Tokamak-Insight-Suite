@@ -1,4 +1,13 @@
-# Release notes — v0.4.0
+# Release notes — Tokamak Insight Suite
+
+## v0.4.3 — P05 paper benchmark audit (2026-10-14)
+- Added a source-traceable P05 claim registry and dashboard workspace for the limiter-biasing paper.
+- Preserved the paper's non-overlapping radial-electric-field ranges: abstract +35–45% vs conclusion +20–30% for 5 mm / +200 V.
+- Added exact metric/condition comparisons that report when an observed percentage matches only one conflicting source claim; no silent averaging or selected ground truth.
+- Documented condition-dependent transport and Reynolds-stress claims and their limitations; claims remain prose references, not digitized raw experimental data.
+- Added tests for source-section traceability, conflict handling, matching ranges, non-finite inputs, and dashboard rendering.
+
+## v0.4.0 historical notes
 
 ## Scientific correctness and security fixes
 - Added direct cross-spectral phase extraction from synchronized multi-sensor channels with coherence weighting; manual phase fitting remains available as an advanced path.
