@@ -2,11 +2,22 @@
 from __future__ import annotations
 import argparse
 import json
+import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
 from .catalog import DIAGNOSTICS, FORMULAS
 from .core import load_table, signal_quality, prepare_time_series, fft_spectrum, welch_psd, sha256_bytes
+
+
+def dashboard_main() -> int:
+    """Launch the installed Streamlit dashboard from source or a wheel install."""
+    spec = importlib.util.find_spec("app")
+    if spec is None or not spec.origin:
+        raise SystemExit("Dashboard module 'app' is not installed. Reinstall tokamak-insight-suite with dashboard dependencies.")
+    return subprocess.call([sys.executable, "-m", "streamlit", "run", spec.origin])
 
 
 def main() -> int:
@@ -16,6 +27,7 @@ def main() -> int:
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True); p.add_argument('--time'); p.add_argument('--fs',type=float,default=None); p.add_argument('--output',default='tis_fft.csv')
     p=sub.add_parser('catalog',help='Export diagnostic/formula registry JSON'); p.add_argument('--kind',choices=['diagnostics','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
     args=parser.parse_args()
+    if args.command=='dashboard': return dashboard_main()
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
         if args.kind in ('diagnostics','both'):(out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(DIAGNOSTICS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
