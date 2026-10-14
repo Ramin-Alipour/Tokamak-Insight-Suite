@@ -79,8 +79,10 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         import pyarrow.parquet as pq
         try:
             parquet_file=pq.ParquetFile(io.BytesIO(data))
-            if parquet_file.metadata.num_rows>max_rows or parquet_file.metadata.num_row_groups>10000:
-                raise ValueError("Parquet file exceeds the configured row or row-group limit.")
+            if (parquet_file.metadata.num_rows > max_rows
+                    or parquet_file.metadata.num_row_groups > 10000
+                    or parquet_file.metadata.total_byte_size > max_uncompressed_bytes):
+                raise ValueError("Parquet file exceeds the configured row, row-group, or uncompressed-size limit.")
         except (ValueError, OSError) as exc:
             if isinstance(exc, ValueError): raise
             raise ValueError("Could not safely inspect Parquet metadata.") from exc
