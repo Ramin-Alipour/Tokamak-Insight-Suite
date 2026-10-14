@@ -592,6 +592,53 @@ def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 
     return cal,np.sqrt(np.maximum(var,0))
 
 
+def build_tomography_matrix_2d(ray_start_xz: Any, ray_end_xz: Any,
+                               x_edges_m: Any, z_edges_m: Any) -> np.ndarray:
+    """Build a 2-D line-integral response matrix from ray segments and rectangular pixel edges.
+
+    Each row is one ray; columns are flattened as iz * nx + ix. Entries are path
+    lengths through each pixel in metres. Ray start/end coordinates are (R or x, z)
+    in metres. Segments are clipped to the grid; pixels outside the grid contribute 0.
+    """
+    starts=np.asarray(ray_start_xz,dtype=float)
+    ends=np.asarray(ray_end_xz,dtype=float)
+    x_edges=np.asarray(x_edges_m,dtype=float).ravel()
+    z_edges=np.asarray(z_edges_m,dtype=float).ravel()
+    if starts.ndim!=2 or starts.shape[1]!=2 or ends.shape!=starts.shape or starts.shape[0]<1:
+        raise ValueError("Ray start and end arrays must both have shape (n_rays, 2).")
+    if not np.all(np.isfinite(starts)) or not np.all(np.isfinite(ends)):
+        raise ValueError("Ray endpoints must be finite.")
+    for name,edges in (("x",x_edges),("z",z_edges)):
+        if len(edges)<2 or not np.all(np.isfinite(edges)) or np.any(np.diff(edges)<=0):
+            raise ValueError(f"{name}_edges_m must be a finite, strictly increasing edge vector.")
+    nx=len(x_edges)-1; nz=len(z_edges)-1
+    matrix=np.zeros((len(starts),nx*nz),dtype=float)
+    for row,(p0,p1) in enumerate(zip(starts,ends)):
+        delta=p1-p0
+        length=float(np.linalg.norm(delta))
+        if length<=np.finfo(float).eps:
+            raise ValueError(f"Ray {row} has coincident start and end points.")
+        ts=[0.0,1.0]
+        if abs(delta[0])>np.finfo(float).eps:
+            ts.extend(((x-p0[0])/delta[0] for x in x_edges if 0.0<(x-p0[0])/delta[0]<1.0))
+        if abs(delta[1])>np.finfo(float).eps:
+            ts.extend(((z-p0[1])/delta[1] for z in z_edges if 0.0<(z-p0[1])/delta[1]<1.0))
+        ts.sort()
+        unique=[ts[0]]
+        for value in ts[1:]:
+            if value-unique[-1]>1e-12: unique.append(value)
+        for left,right in zip(unique[:-1],unique[1:]):
+            if right-left<=1e-14: continue
+            mid=p0+((left+right)/2.0)*delta
+            ix=int(np.searchsorted(x_edges,mid[0],side="right")-1)
+            iz=int(np.searchsorted(z_edges,mid[1],side="right")-1)
+            if 0<=ix<nx and 0<=iz<nz:
+                matrix[row,iz*nx+ix]+=length*(right-left)
+    if not np.any(matrix>0):
+        raise ValueError("No ray segment intersects the supplied reconstruction grid.")
+    return matrix
+
+
 def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True,
                           measurement_sigma: Any | None = None,
                           regularization_order: int = 1) -> dict[str, Any]:
