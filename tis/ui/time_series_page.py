@@ -9,6 +9,8 @@ from matplotlib.figure import Figure
 from tis.core import (
     resample_time_series, filter_impact_analysis, fft_spectrum,
     time_frequency_spectrogram, autocorrelation_analysis, integrate_time_series,
+    prepare_time_series, butterworth_filter, cross_analysis, cross_correlation_lag,
+    mode_number_from_channels, mode_number_from_phase,
 )
 
 
