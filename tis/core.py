@@ -784,38 +784,59 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
             raise ValueError("frequency_range_hz must be a finite increasing interval within [0, Nyquist].")
     data = data - np.mean(data, axis=1, keepdims=True)
     nperseg = min(data.shape[1], max(64, min(4096, data.shape[1]//2)))
-    f, p_ref = signal.welch(data[0], fs=fs, nperseg=nperseg, noverlap=nperseg//2)
-    power = p_ref.copy()
+    noverlap = nperseg // 2
+    f, p0 = signal.welch(data[0], fs=fs, nperseg=nperseg, noverlap=noverlap)
+    spectra = [p0]
+    coherence_rows = [np.ones_like(f)]
+    phase_rows = [np.zeros_like(f)]
     for row in data[1:]:
-        _, p = signal.welch(row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
-        power += p
+        _, p = signal.welch(row, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        fc, pxy = signal.csd(data[0], row, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        _, coh = signal.coherence(data[0], row, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        spectra.append(p)
+        coherence_rows.append(np.clip(coh, 0.0, 1.0))
+        phase_rows.append(np.angle(pxy))
+    power = np.asarray(spectra)
+    coherence_matrix = np.asarray(coherence_rows)
+    # Score common coherent structure, not the largest raw summed PSD peak:
+    # a large low-frequency drift in one channel must not mask a shared mode.
+    normalized_power = power / np.maximum(np.sum(power, axis=1, keepdims=True), np.finfo(float).tiny)
+    common_score = np.sum(normalized_power, axis=0) * np.mean(coherence_matrix, axis=0)
     allowed = f > 0
     if frequency_range_hz is not None:
         allowed &= (f >= frequency_range_hz[0]) & (f <= frequency_range_hz[1])
     if not np.any(allowed):
         raise ValueError("No positive-frequency bins fall inside the selected frequency band.")
     candidates = np.flatnonzero(allowed)
-    peak_index = int(candidates[np.argmax(power[candidates])])
+    peak_index = int(candidates[np.argmax(common_score[candidates])])
     peak_frequency = float(f[peak_index])
-    phases = [0.0]
-    coherences = [1.0]
-    for row in data[1:]:
-        fc, pxy = signal.csd(data[0], row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
-        _, coh = signal.coherence(data[0], row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
-        idx = int(np.argmin(np.abs(fc - peak_frequency)))
-        phases.append(float(np.angle(pxy[idx])))
-        coherences.append(float(coh[idx]))
+    phases = [float(phase_row[peak_index]) for phase_row in phase_rows]
+    coherences = [float(coh_row[peak_index]) for coh_row in coherence_matrix]
+    # Magnitude-squared coherence significance threshold under the null:
+    # C_alpha = 1 - alpha**(1/(K-1)), with K Welch segments.
+    step = max(1, nperseg - noverlap)
+    n_segments = 1 + max(0, (data.shape[1] - nperseg) // step)
+    significance_threshold = float(1.0 - 0.05 ** (1.0 / max(1, n_segments - 1)))
+    effective_threshold = max(float(min_coherence), significance_threshold)
     weights = np.asarray(coherences)
-    if np.count_nonzero(weights >= min_coherence) < 3:
-        raise ValueError("Fewer than three sensors have adequate coherence with the reference at the selected frequency.")
-    weights = np.where(weights >= min_coherence, weights, 0.0)
+    if np.count_nonzero(weights >= effective_threshold) < 3:
+        raise ValueError(
+            f"Fewer than three sensors exceed the coherence significance threshold "
+            f"({effective_threshold:.3f}; {n_segments} Welch segments, alpha=0.05). "
+            "Increase record length or choose a physically justified frequency band."
+        )
+    weights = np.where(weights >= effective_threshold, weights, 0.0)
     fit = mode_number_from_phase(theta, phases, weights=weights)
     fit.update({
         "selected_frequency_Hz": peak_frequency,
         "sensor_phase_rad_relative_to_first": [float(v) for v in phases],
         "coherence_with_reference": [float(v) for v in coherences],
-        "minimum_coherence_threshold": float(min_coherence),
-        "phase_extraction_method": "cross-spectral phase relative to first sensor; coherence-weighted spatial fit",
+        "minimum_coherence_threshold_user": float(min_coherence),
+        "coherence_significance_threshold": significance_threshold,
+        "effective_coherence_threshold": effective_threshold,
+        "welch_segment_count": int(n_segments),
+        "frequency_selection_score": "sum of per-channel normalized PSD weighted by mean reference coherence",
+        "phase_extraction_method": "cross-spectral phase relative to first sensor; coherence-weighted integer circular fit",
     })
     return fit
 
