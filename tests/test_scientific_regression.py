@@ -236,3 +236,28 @@ def test_equilibrium_grid_derivatives_rejects_nonfinite_flux_and_field():
         equilibrium_grid_derivatives(R, Z, psi * np.nan, 2.0)
     with pytest.raises(ValueError, match="field"):
         equilibrium_grid_derivatives(R, Z, psi, float("inf"))
+
+
+def test_spectral_moments_reject_duplicate_energy_bins():
+    with pytest.raises(ValueError, match="unique"):
+        spectrum_moments([1.0, 2.0, 2.0, 3.0], [1.0, 2.0, 3.0, 1.0])
+
+
+def test_abel_reconstruction_rejects_nonfinite_radial_edges():
+    from tis.core import abel_reconstruction
+    with pytest.raises(ValueError, match="finite"):
+        abel_reconstruction([0.0, 0.1, 0.2], [1.0, 0.8, 0.4], [0.0, 0.1, np.nan, 0.3])
+
+
+def test_radiated_power_rejects_nonfinite_coordinates():
+    from tis.core import axisymmetric_radiated_power
+    R = np.array([1.0, 1.5, np.nan, 2.0])
+    Z = np.linspace(-0.5, 0.5, 4)
+    with pytest.raises(ValueError, match="coordinates"):
+        axisymmetric_radiated_power(R, Z, np.ones((4, 4)))
+
+
+def test_mode_number_requires_distinct_sensor_angles():
+    from tis.core import mode_number_from_phase
+    with pytest.raises(ValueError, match="distinct"):
+        mode_number_from_phase([1, 1, 1], [0, 1, 2])
