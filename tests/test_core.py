@@ -850,6 +850,7 @@ def test_load_table_reports_cells_coerced_to_missing():
     raw = b"time,signal\n0,1.0\n1,not-a-number\n2,3.0\n"
     frame = load_table(raw, "instrument.csv")
     assert frame["signal"].isna().sum() == 1
+    assert frame["signal"].dtype.kind in "fi"
     report = frame.attrs["tis_import_report"]
     assert report["numeric_coercions"]["signal"]["converted_to_missing"] == 1
 
