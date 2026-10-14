@@ -11,7 +11,7 @@ from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
-    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
+    fit_spectral_line, evaluate_spectral_fit, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
@@ -585,6 +585,21 @@ elif page=='Spectral Analysis':
         saved=st.session_state.get('tis_spectral_fit')
         if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model and saved.get('sigma_col')==sigma_col:
             fit=saved['fit']; st.json(fit)
+            xplot=pd.to_numeric(df[xcol],errors='coerce').to_numpy(dtype=float)
+            yplot=pd.to_numeric(df[ycol],errors='coerce').to_numpy(dtype=float)
+            fitmask=np.isfinite(xplot)&np.isfinite(yplot)&(xplot>=xmin)&(xplot<=xmax)
+            if fitmask.sum()>=7:
+                order_plot=np.argsort(xplot[fitmask])
+                xx=xplot[fitmask][order_plot]; yy=yplot[fitmask][order_plot]
+                predicted=evaluate_spectral_fit(xx,fit)
+                fig=Figure(figsize=(9,4)); ax=fig.subplots()
+                ax.plot(xx,yy,label='Observed'); ax.plot(xx,predicted,label=f"{model} fit")
+                ax.set_xlabel(xcol); ax.set_ylabel(ycol); ax.legend(); st.pyplot(fig)
+                fig_res=Figure(figsize=(9,3)); ax_res=fig_res.subplots()
+                ax_res.axhline(0.0,linewidth=1); ax_res.plot(xx,yy-predicted,marker='.',linestyle='none')
+                ax_res.set_xlabel(xcol); ax_res.set_ylabel('Residual'); ax_res.set_title('Fit residuals')
+                st.pyplot(fig_res)
+                st.caption(f"Fit RMSE: {fit['fit_rmse']:.5g}; residual mean: {fit['fit_residual_mean']:.5g}; reduced χ²: {fit.get('reduced_chi_square')}. Reduced χ² is interpretable only with calibrated independent uncertainties.")
             if model=='Gaussian':
                 lam0=st.number_input('Known rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=None,placeholder='Enter reference wavelength',key='doppler_rest_wavelength')
                 sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g')
