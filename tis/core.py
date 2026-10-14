@@ -1019,16 +1019,29 @@ def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | N
     return out
 
 
-def exponential_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, float]:
-    """Fit q(s)=q0 exp(-(s-s0)/lambda_q)+background using user-selected target interval."""
+def exponential_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
+    """Fit q(s)=q0 exp(-(s-s0)/lambda_q)+background with covariance diagnostics."""
     x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel(); m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
-    if len(x)<6 or len(np.unique(x))<6: raise ValueError('At least 6 distinct valid target-coordinate points are required.')
+    if len(x)<8 or len(np.unique(x))<8: raise ValueError('At least 8 distinct valid target-coordinate points are required for a stable three-parameter fit.')
     o=np.argsort(x); x,y=x[o],y[o]
-    span=float(np.ptp(x)); base0=float(np.percentile(y,10)); q0=max(float(np.max(y)-base0),1e-12)
+    span=float(np.ptp(x))
+    if span<=0: raise ValueError("Target coordinate must span a nonzero interval.")
+    base0=float(np.percentile(y,10)); q0=max(float(np.max(y)-base0),1e-12)
     def fn(z,q,l,b): return q*np.exp(-(z-x[0])/l)+b
-    p,_=optimize.curve_fit(fn,x,y,p0=[q0,max(span/5,1e-9),base0],bounds=([0,span/10000,-np.inf],[np.inf,span*100,np.inf]),maxfev=30000)
-    pred=fn(x,*p)
-    return {'q0_W_m-2':float(p[0]),'lambda_q_m':float(p[1]),'background_W_m-2':float(p[2]),'r_squared':_r2(y,pred),'n_points':int(len(x)),'note':'Fit quality and mapping from camera pixels to target coordinate must be checked; this is not a heat-transport model.'}
+    lower=[0,span/10000,-np.inf]; upper=[np.inf,span*100,np.inf]
+    try:
+        p,cov=optimize.curve_fit(fn,x,y,p0=[q0,max(span/5,1e-9),base0],bounds=(lower,upper),maxfev=50000)
+    except (RuntimeError,ValueError,FloatingPointError) as exc:
+        raise ValueError(f"Exponential heat-flux fit failed to converge: {exc}") from exc
+    if cov.shape!=(3,3) or not np.all(np.isfinite(cov)):
+        raise ValueError("Exponential fit covariance is singular or non-finite; inspect target coverage and signal-to-noise.")
+    pred=fn(x,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
+    boundary=bool(np.isclose(p[1],lower[1],rtol=1e-3,atol=0) or np.isclose(p[1],upper[1],rtol=1e-3,atol=0))
+    return {'q0_W_m-2':float(p[0]),'lambda_q_m':float(p[1]),'background_W_m-2':float(p[2]),
+            'standard_error_q0_W_m-2':float(se[0]),'standard_error_lambda_q_m':float(se[1]),
+            'standard_error_background_W_m-2':float(se[2]),'r_squared':_r2(y,pred),'n_points':int(len(x)),
+            'parameter_at_bound':boundary,
+            'note':'Covariance uncertainties assume the fitted model and independent homoscedastic residuals. Inspect residuals, target mapping, parameter identifiability and boundary flags; this is not a heat-transport model.'}
 
 
 def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
@@ -1040,8 +1053,8 @@ def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
     """
     x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel()
     valid=np.isfinite(x)&np.isfinite(y); x,y=x[valid],y[valid]
-    if len(x)<10 or len(np.unique(x))<10:
-        raise ValueError("Eich fit requires at least 10 distinct finite target-coordinate points.")
+    if len(x)<15 or len(np.unique(x))<15:
+        raise ValueError("Eich fit requires at least 15 distinct finite target-coordinate points for five free parameters.")
     order=np.argsort(x); x,y=x[order],y[order]
     span=float(np.ptp(x))
     if span<=0: raise ValueError("Target coordinate must span a nonzero interval.")
@@ -1061,14 +1074,22 @@ def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
     p0=[max(peak-baseline,1e-12),max(span/30,span/10000),max(span/50,span/10000),float(x[np.argmax(y)]),baseline]
     lower=[0.0,span/10000,span/10000,float(x[0]-span),-np.inf]
     upper=[np.inf,span*100,span*10,float(x[-1]+span),np.inf]
-    p,cov=optimize.curve_fit(model,x,y,p0=p0,bounds=(lower,upper),maxfev=100000)
+    try:
+        p,cov=optimize.curve_fit(model,x,y,p0=p0,bounds=(lower,upper),maxfev=100000)
+    except (RuntimeError,ValueError,FloatingPointError) as exc:
+        raise ValueError(f"Eich-like heat-flux fit failed to converge: {exc}") from exc
+    if cov.shape!=(5,5) or not np.all(np.isfinite(cov)):
+        raise ValueError("Eich fit covariance is singular or non-finite; lambda_q and spreading S may be unidentifiable.")
     pred=model(x,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
+    near_bounds=[bool(np.isclose(p[i],lower[i],rtol=1e-3,atol=0) or (np.isfinite(upper[i]) and np.isclose(p[i],upper[i],rtol=1e-3,atol=0))) for i in range(5)]
     return {
         "q0_W_m-2":float(p[0]),"lambda_q_m":float(p[1]),"spreading_S_m":float(p[2]),
         "strike_point_s0_m":float(p[3]),"background_W_m-2":float(p[4]),
         "standard_error_q0_W_m-2":float(se[0]),"standard_error_lambda_q_m":float(se[1]),
         "standard_error_spreading_S_m":float(se[2]),"standard_error_strike_point_s0_m":float(se[3]),
         "standard_error_background_W_m-2":float(se[4]),"r_squared":_r2(y,pred),"n_points":int(len(x)),
+        "parameters_at_bounds":{"q0":near_bounds[0],"lambda_q":near_bounds[1],"S":near_bounds[2],"s0":near_bounds[3],"background":near_bounds[4]},
+        "lambda_q_S_identifiability_warning":bool(near_bounds[1] or near_bounds[2] or abs(float(cov[1,2]))/max(float(np.sqrt(abs(cov[1,1]*cov[2,2]))),np.finfo(float).tiny)>0.98),
         "model":"Eich-like exponential-convolved-with-Gaussian profile",
         "note":"Parameter identifiability depends on target coverage, noise, spatial mapping and instrument response; inspect covariance and fit residuals before physical interpretation."
     }
