@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from scipy import signal, optimize, integrate, linalg
-from scipy.special import voigt_profile, erfcx
+from scipy.special import voigt_profile, erfcx, erfc
 
 E_CHARGE = 1.602176634e-19
 K_B = 1.380649e-23
@@ -843,9 +843,15 @@ def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
     if peak<=baseline: raise ValueError("Heat-flux profile must contain a positive signal above its baseline.")
     def model(s,q0,lam,S,s0,bg):
         u=(s-s0)/S
-        arg=S/(2*lam)-u
-        # erfcx form avoids overflow in exp(a^2)*erfc(a) for the far SOL tail.
-        return 0.5*q0*np.exp(-u*u)*erfcx(arg)+bg
+        a=S/(2*lam)
+        arg=a-u
+        core=np.empty_like(u,dtype=float)
+        positive=arg>=0
+        # For arg>=0 use erfcx; for arg<0 use the equivalent erfc form whose
+        # exponential factor is bounded because u>a in this branch.
+        core[positive]=np.exp(-u[positive]*u[positive])*erfcx(arg[positive])
+        core[~positive]=np.exp(a*a-2*a*u[~positive])*erfc(arg[~positive])
+        return 0.5*q0*core+bg
     p0=[max(peak-baseline,1e-12),max(span/30,span/10000),max(span/50,span/10000),float(x[np.argmax(y)]),baseline]
     lower=[0.0,span/10000,span/10000,float(x[0]-span),-np.inf]
     upper=[np.inf,span*100,span*10,float(x[-1]+span),np.inf]
