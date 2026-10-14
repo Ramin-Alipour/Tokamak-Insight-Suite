@@ -744,7 +744,7 @@ elif page=='Tomography & Bolometry':
                     choice=select_tikhonov_lambda(A,y,nonnegative=nonneg,measurement_sigma=sigma)
                     lambda_used=choice['selected_lambda']
                     st.metric('L-curve selected λ',f'{lambda_used:.6g}')
-                    plot_line(np.log10(np.maximum(choice['weighted_residual_norms'],np.finfo(float).tiny)),np.log10(np.maximum(choice['solution_norms'],np.finfo(float).tiny)),'log₁₀ residual norm','log₁₀ solution norm','Tikhonov L-curve')
+                    plot_line(np.log10(np.maximum(choice['weighted_residual_norms'],np.finfo(float).tiny)),np.log10(np.maximum(choice['regularization_norms'],np.finfo(float).tiny)),'log₁₀ weighted residual norm','log₁₀ regularization-operator norm','Tikhonov L-curve')
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
                 r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
