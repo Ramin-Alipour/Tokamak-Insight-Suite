@@ -26,8 +26,26 @@ def fetch_sample(output_dir: Path, max_samples: int = 70000) -> dict:
     if max_samples < 1024:
         raise ValueError("max_samples must be at least 1024")
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Open the public Zarr store remotely; don't commit the full experimental data.
-    ds = xr.open_zarr(DEFAULT_URL, group=DEFAULT_GROUP, consolidated=False)
+    # Open the public Zarr group remotely; do not commit the full experimental data.
+    # Some remote Zarr/fsspec combinations expose an empty root when opened over HTTP.
+    # Try the explicit group URL first, then FAIR-MAST's documented group argument.
+    ds = None
+    open_errors = []
+    for opener in (
+        lambda: xr.open_zarr(f"{DEFAULT_URL.rstrip('/')}/{DEFAULT_GROUP}", consolidated=False),
+        lambda: xr.open_zarr(DEFAULT_URL, group=DEFAULT_GROUP, consolidated=False),
+    ):
+        try:
+            candidate = opener()
+            if candidate.variables:
+                ds = candidate
+                break
+            candidate.close()
+            open_errors.append("opened dataset had no variables")
+        except Exception as exc:
+            open_errors.append(f"{type(exc).__name__}: {exc}")
+    if ds is None:
+        raise RuntimeError("Could not open FAIR-MAST Zarr group; " + " | ".join(open_errors))
     try:
         # Tolerate catalog/store revisions in coordinate and channel naming.
         time_name = next((name for name in ("time", "time1") if name in ds.variables), None)
