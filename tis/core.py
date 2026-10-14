@@ -786,6 +786,10 @@ def analyze_doppler_line_end_to_end(
         raise ValueError("Instrument width and all uncertainties must be nonnegative.")
     calibration=spectral_calibration(reference_pixels,reference_wavelengths,degree=calibration_degree)
     wavelength=polynomial_calibration(x,calibration["coefficients_high_to_low"])
+    sorted_wavelength=wavelength[np.argsort(x,kind="stable")]
+    delta_wavelength=np.diff(sorted_wavelength)
+    if not (np.all(delta_wavelength>0) or np.all(delta_wavelength<0)):
+        raise ValueError("Wavelength calibration is not monotonic over the supplied spectrum; inspect reference points and polynomial degree.")
     corrected=y.copy()
     if background is not None:
         bg=np.asarray(background,dtype=float).ravel()
