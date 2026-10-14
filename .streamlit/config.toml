@@ -10,4 +10,4 @@ font = "sans serif"
 headless = true
 address = "127.0.0.1"
 port = 8501
-maxUploadSize = 500
+maxUploadSize = 100
