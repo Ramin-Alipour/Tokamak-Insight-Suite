@@ -47,3 +47,16 @@ def test_p05_claim_table_is_exportable_and_retains_provenance_fields():
 def test_p05_rejects_non_finite_comparison(value):
     with pytest.raises(ValueError):
         compare_to_p05_range("Radial electric field", RADIAL_E_CONDITION, value)
+
+def test_p05_registry_covers_all_six_figure_families():
+    qualitative = [row for row in P05_CLAIMS if row["evidence_type"] in {"qualitative prose", "prose numeric point plus qualitative contrast"}]
+    metrics = {row["metric"] for row in qualitative}
+    assert {
+        "Plasma current",
+        "Radial electric field",
+        "Poloidal electric field",
+        "Poloidal turbulent transport",
+        "Radial turbulent transport",
+        "Reynolds-stress parameter",
+    } <= metrics
+    assert all(row["lower_pct"] is None and row["upper_pct"] is None for row in qualitative)
