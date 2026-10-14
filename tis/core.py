@@ -774,9 +774,14 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
         raise ValueError("Positive-weight sensor geometry is too sparse for a nonzero mode estimate.")
     limit=min(active_limit,int(max_mode_number)) if max_mode_number is not None else active_limit
     th0=th-th[0]
-    candidates=np.arange(-limit,limit+1,dtype=int)
+    candidates=np.arange(-limit-1,limit+2,dtype=int)
     scores=np.asarray([abs(np.sum(w*np.exp(1j*(ph-n*th0))))/np.sum(w) for n in candidates])
     n_int=int(candidates[int(np.argmax(scores))])
+    if abs(n_int)>limit:
+        raise ValueError(
+            f"Spatial phase pattern is consistent with boundary/aliased mode n={n_int}; "
+            f"the largest unambiguous integer mode for active sensor geometry is {limit}."
+        )
     phase_offset=float(np.angle(np.sum(w*np.exp(1j*(ph-n_int*th0)))))
     residual=np.angle(np.exp(1j*(ph-(n_int*th0+phase_offset))))
     rms=float(np.sqrt(np.average(residual**2,weights=w)))
