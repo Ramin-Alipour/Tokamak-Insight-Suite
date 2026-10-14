@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tokamak-insight-suite"
+version = "0.3.0"
+description = "Provenance-aware analysis tools and diagnostic reference registry for tokamak plasma measurements"
+readme = "README_FA.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = ["streamlit>=1.36", "numpy>=1.26", "pandas>=2.1", "scipy>=1.11", "matplotlib>=3.8", "openpyxl>=3.1", "pyarrow>=15"]
+
+[project.scripts]
+tis = "tis.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["tis*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
