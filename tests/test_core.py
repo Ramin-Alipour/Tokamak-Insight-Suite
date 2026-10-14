@@ -312,3 +312,13 @@ def test_exponential_heat_flux_fit_recovers_synthetic_decay_length():
     assert result["q0_W_m-2"] == pytest.approx(5e6, rel=0.02)
     assert result["r_squared"] > 0.999
 
+@pytest.mark.parametrize("degree", [0, -1, 1.5, True])
+def test_spectral_calibration_rejects_invalid_degree(degree):
+    with pytest.raises(ValueError, match="degree"):
+        spectral_calibration([0, 1, 2, 3], [400, 401, 402, 403], degree=degree)
+
+
+def test_spectral_calibration_rejects_mismatched_arrays():
+    with pytest.raises(ValueError, match="equal length"):
+        spectral_calibration([0, 1, 2], [400, 401], degree=1)
+
