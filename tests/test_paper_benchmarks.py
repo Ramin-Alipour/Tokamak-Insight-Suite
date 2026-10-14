@@ -38,6 +38,7 @@ def test_p05_claim_table_is_exportable_and_retains_provenance_fields():
     assert frame["claim_id"].is_unique
 
 
-def test_p05_rejects_non_numeric_comparison():
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_p05_rejects_non_finite_comparison(value):
     with pytest.raises(ValueError):
-        compare_to_p05_range("Radial electric field", RADIAL_E_CONDITION, float("nan"))
+        compare_to_p05_range("Radial electric field", RADIAL_E_CONDITION, value)
