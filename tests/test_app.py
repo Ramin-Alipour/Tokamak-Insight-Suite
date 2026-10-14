@@ -8,6 +8,7 @@ def test_dashboard_home_renders_without_uncaught_exceptions():
     app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=30)
     app.run()
     assert not app.exception
+    assert any("Tokamak Insight Suite" in str(item.value) for item in app.markdown)
 
 
 def test_probe_page_default_geometry_settings_do_not_crash():
