@@ -69,3 +69,22 @@ def test_public_table_fetch_enforces_download_limit(monkeypatch):
     fake_opener(monkeypatch, FakeResponse(b"x" * 1025))
     with pytest.raises(ValueError, match="exceeds"):
         fetch_public_table_bytes("https://example.org/large.csv", max_bytes=1024)
+
+
+def test_zarr_open_retries_transient_failure_and_passes_timeout():
+    from tis.data_sources import _open_zarr_with_retry
+
+    class FakeXarray:
+        def __init__(self):
+            self.calls = 0
+        def open_zarr(self, url, group=None, storage_options=None):
+            self.calls += 1
+            assert storage_options == {"timeout": 12.0}
+            if self.calls < 3:
+                raise OSError("temporary archive error")
+            return {"url": url, "group": group}
+
+    fake = FakeXarray()
+    result = _open_zarr_with_retry(fake, "https://example.org/shot.zarr", "magnetics", attempts=3, timeout_s=12)
+    assert fake.calls == 3
+    assert result["group"] == "magnetics"
