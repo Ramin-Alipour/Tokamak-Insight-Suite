@@ -9,7 +9,7 @@ from tis.core import (
     linear_phase_density, load_table, sha256_bytes,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
-    exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram,
+    exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram, autocorrelation_analysis,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
@@ -376,4 +376,19 @@ def test_time_frequency_spectrogram_detects_stationary_tone():
 def test_time_frequency_spectrogram_rejects_invalid_window_settings(kwargs):
     with pytest.raises(ValueError):
         time_frequency_spectrogram(np.arange(64, dtype=float), fs=1000, **kwargs)
+
+def test_autocorrelation_detects_sinusoidal_period_scale():
+    fs = 1000.0
+    t = np.arange(4000) / fs
+    x = 1e-8 * np.sin(2 * np.pi * 20 * t)
+    result = autocorrelation_analysis(x, fs, max_lag_s=0.1)
+    assert result["lag_s"][0] == 0.0
+    assert result["autocorrelation"][0] == pytest.approx(1.0)
+    assert result["e_folding_time_s"] is not None
+    assert len(result["lag_s"]) == len(result["autocorrelation"])
+
+
+def test_autocorrelation_rejects_constant_signal():
+    with pytest.raises(ValueError, match="constant"):
+        autocorrelation_analysis(np.ones(100), fs=1000)
 
