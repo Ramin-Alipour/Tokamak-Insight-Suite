@@ -416,6 +416,11 @@ elif page=='Data Import & QC':
     st.title('Data Import & Quality Control')
     if df is None: st.info('Use the upload control in the left panel. Raw input is preserved and never overwritten.'); st.stop()
     st.success(f'{filename}: {len(df):,} rows × {len(df.columns)} columns')
+    import_report = df.attrs.get("tis_import_report", {})
+    coercions = import_report.get("numeric_coercions", {})
+    if coercions:
+        st.warning("Some non-empty cells were converted to missing numeric values. Review this report before analysis.")
+        st.json(coercions)
     m1,m2,m3,m4=st.columns(4); m1.metric('Rows',f'{len(df):,}'); m2.metric('Columns',len(df.columns)); m3.metric('Numeric columns',len(numeric)); m4.metric('SHA-256',sha[:12]+'…')
     st.dataframe(df.head(50),use_container_width=True)
     st.markdown('### Quality audit')
