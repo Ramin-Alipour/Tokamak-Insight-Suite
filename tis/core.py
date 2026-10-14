@@ -545,6 +545,8 @@ def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dic
     if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)):
         raise ValueError('R and Z coordinates must contain only finite values.')
     if not np.all(np.isfinite(eps)): raise ValueError('Emissivity grid must be finite.')
+    if np.any(eps < 0):
+        raise ValueError('Emissivity must be nonnegative for a physical radiated-power integral; inspect background subtraction or inversion artifacts first.')
     # Integrate toroidal volume element 2*pi*R dR dZ over the provided rectangular grid.
     radial=integrate.trapezoid(2*np.pi*R[None,:]*eps,R,axis=1)
     power=float(integrate.trapezoid(radial,Z))
