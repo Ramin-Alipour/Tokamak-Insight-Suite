@@ -11,7 +11,7 @@ from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
-    fit_spectral_line, evaluate_spectral_fit, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
+    fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
@@ -600,8 +600,70 @@ elif page=='Time Series & MHD':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='Optical / emission line':
+    mode=st.radio('Workflow',['End-to-end Doppler workflow','Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='End-to-end Doppler workflow':
+        st.caption('Unified path: raw coordinate → wavelength calibration → optional background/relative-response correction → Gaussian fit/residuals → instrument-width correction → Doppler temperature and line-of-sight velocity with stated uncertainty. Verify the atomic transition and isotope independently.')
+        xcol=col_select('Raw pixel / spectral coordinate',numeric,'e2e_sp_x')
+        ycol=col_select('Measured intensity',numeric,'e2e_sp_y')
+        bgcol=st.selectbox('Background column (optional)',['<none>']+numeric,key='e2e_sp_bg')
+        response_col=st.selectbox('Relative instrument-response column (optional)',['<none>']+numeric,key='e2e_sp_response')
+        sigma_col=st.selectbox('Intensity standard-uncertainty column (optional)',['<none>']+numeric,key='e2e_sp_sigma')
+        ref_pixels_text=st.text_input('Reference pixel coordinates','100,500,900',key='e2e_ref_pixels')
+        ref_wavelengths_text=st.text_input('Reference wavelengths (same unit as rest wavelength)','500,550,600',key='e2e_ref_wavelengths')
+        degree=st.slider('Wavelength calibration polynomial degree',1,5,1,key='e2e_cal_degree')
+        try:
+            ref_pixels=[float(v.strip()) for v in ref_pixels_text.split(',')]
+            ref_wavelengths=[float(v.strip()) for v in ref_wavelengths_text.split(',')]
+            calibration_preview=spectral_calibration(ref_pixels,ref_wavelengths,degree=degree)
+            wavelength_preview=polynomial_calibration(pd.to_numeric(df[xcol],errors='coerce'),calibration_preview['coefficients_high_to_low'])
+            valid_preview=wavelength_preview[np.isfinite(wavelength_preview)]
+            if len(valid_preview)<7: raise ValueError('Fewer than seven finite calibrated wavelength points are available.')
+            default_min=float(np.min(valid_preview)); default_max=float(np.max(valid_preview))
+        except Exception as exc:
+            st.error(f'Wavelength calibration preview failed: {exc}')
+            st.stop()
+        c1,c2=st.columns(2)
+        with c1: fit_min=st.number_input('Fit minimum wavelength',value=default_min,format='%.10g',key='e2e_fit_min')
+        with c2: fit_max=st.number_input('Fit maximum wavelength',value=default_max,format='%.10g',key='e2e_fit_max')
+        c1,c2,c3=st.columns(3)
+        with c1: rest=st.number_input('Known rest wavelength',min_value=1e-12,value=None,placeholder='Enter verified line wavelength',key='e2e_rest')
+        with c2: rest_unc=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g',key='e2e_rest_unc')
+        with c3: mass=st.number_input('Emitting-ion mass (amu)',min_value=0.0,value=0.0,key='e2e_mass')
+        c1,c2,c3=st.columns(3)
+        with c1: mass_unc=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g',key='e2e_mass_unc')
+        with c2: inst=st.number_input('Instrument Gaussian sigma',min_value=0.0,value=0.0,format='%.8g',key='e2e_inst')
+        with c3: inst_unc=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g',key='e2e_inst_unc')
+        assume_inst=st.checkbox('Instrumental broadening is negligible (independently justified)',value=False,key='e2e_inst_negligible')
+        if st.button('Run end-to-end Doppler analysis',type='primary',key='e2e_run'):
+            try:
+                result=analyze_doppler_line_end_to_end(
+                    df[xcol],df[ycol],ref_pixels,ref_wavelengths,rest,mass,fit_min,fit_max,inst,
+                    instrument_sigma_uncertainty=inst_unc,rest_wavelength_uncertainty=rest_unc,
+                    ion_mass_uncertainty_amu=mass_unc,
+                    background=None if bgcol=='<none>' else df[bgcol],
+                    relative_response=None if response_col=='<none>' else df[response_col],
+                    intensity_uncertainty=None if sigma_col=='<none>' else df[sigma_col],
+                    calibration_degree=degree,assume_instrument_negligible=assume_inst)
+                st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray) and k!='line_fit' and k!='wavelength_calibration'})
+                st.markdown('#### Wavelength calibration')
+                st.json(result['wavelength_calibration'])
+                st.markdown('#### Gaussian fit and residual diagnostics')
+                st.json(result['line_fit'])
+                fig=Figure(figsize=(9,4)); ax=fig.subplots()
+                order_fit=np.argsort(result['calibrated_wavelength'])
+                ax.plot(result['calibrated_wavelength'][order_fit],result['corrected_intensity'][order_fit],label='Corrected spectrum')
+                ax.plot(result['calibrated_wavelength'][order_fit],result['fitted_intensity'][order_fit],label='Gaussian fit')
+                ax.set_xlabel('Wavelength'); ax.set_ylabel('Corrected intensity'); ax.legend(); st.pyplot(fig)
+                residual=result['corrected_intensity']-result['fitted_intensity']
+                fig=Figure(figsize=(9,3)); ax=fig.subplots()
+                ax.axhline(0.0,linewidth=1); ax.plot(result['calibrated_wavelength'][order_fit],residual[order_fit],marker='.',linestyle='none')
+                ax.set_xlabel('Wavelength'); ax.set_ylabel('Residual'); st.pyplot(fig)
+                out=pd.DataFrame({'raw_coordinate':df[xcol],'calibrated_wavelength':result['calibrated_wavelength'],'corrected_intensity':result['corrected_intensity'],'fitted_intensity':result['fitted_intensity'],'residual':residual})
+                download_df('Download end-to-end Doppler fit CSV',out,'tis_doppler_end_to_end.csv')
+                json_download('Export end-to-end Doppler analysis metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_doppler_end_to_end.json')
+            except Exception as exc:
+                st.error(f'End-to-end Doppler analysis failed: {exc}')
+    elif mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
         model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
         if st.button('Fit spectral line'):
