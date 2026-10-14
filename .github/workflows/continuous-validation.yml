@@ -1,0 +1,53 @@
+name: Continuous validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: continuous-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-and-dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Compile Python sources
+        run: python -m compileall -q app.py tis tests
+      - name: Run automated tests
+        run: python -m pytest -q
+      - name: Start Streamlit dashboard and check HTTP health
+        shell: bash
+        run: |
+          streamlit run app.py --server.headless true --server.address 127.0.0.1 --server.port 8501 > /tmp/tis-streamlit.log 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health; then
+              echo
+              echo "PASS: Streamlit health endpoint responded."
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/tis-streamlit.log
+          echo "FAIL: Streamlit health endpoint did not respond."
+          exit 1
