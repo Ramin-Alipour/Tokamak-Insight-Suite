@@ -55,11 +55,11 @@ jobs:
       - name: Build source ZIP from tested repository
         run: |
           rm -rf /tmp/tis-package
-          mkdir -p /tmp/tis-package
-          git archive HEAD | tar -x -C /tmp/tis-package
-          rm -f /tmp/tis-package/Tokamak_Insight_Suite_v0.3.0.zip
+          mkdir -p /tmp/tis-package/Tokamak_Insight_Suite
+          git archive HEAD | tar -x -C /tmp/tis-package/Tokamak_Insight_Suite
+          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.3.0.zip
           cd /tmp/tis-package
-          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.3.0.zip" .
+          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.3.0.zip" Tokamak_Insight_Suite
 
       - name: Commit refreshed source ZIP
         run: |
