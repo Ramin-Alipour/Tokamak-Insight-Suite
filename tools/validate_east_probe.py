@@ -9,7 +9,6 @@ status only after unit/scale conversion has been explicitly established.
 from __future__ import annotations
 import json, re, urllib.request, zipfile, io, math
 from pathlib import Path
-import numpy as np
 
 BASE = "https://zenodo.org/records/18473625/files/"
 FILES = ["22010ne.txt", "22010Te.txt", "22010vf1.txt", "22010vf2.txt", "22010vf3.txt"]
