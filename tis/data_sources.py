@@ -194,7 +194,7 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
     exports. It deliberately does not crawl websites or scrape HTML pages.
     """
     from urllib.error import HTTPError, URLError
-    from urllib.request import Request, urlopen
+    from urllib.request import Request, urlopen, build_opener, HTTPRedirectHandler
 
     parsed = urlparse(str(url).strip())
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
@@ -222,9 +222,16 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
             raise ValueError("Private, loopback, link-local, reserved and non-global destinations are blocked.")
 
     reject_private_destination(parsed.geturl())
-    request = Request(parsed.geturl(), headers={"User-Agent": "Tokamak-Insight-Suite/0.3 (public scientific data import)"})
+
+    class SafeRedirectHandler(HTTPRedirectHandler):
+        def redirect_request(self, req, fp, code, msg, headers, newurl):
+            reject_private_destination(newurl)
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+    request = Request(parsed.geturl(), headers={"User-Agent": "Tokamak-Insight-Suite/0.4 (public scientific data import)"})
+    opener = build_opener(SafeRedirectHandler)
     try:
-        with urlopen(request, timeout=timeout) as response:
+        with opener.open(request, timeout=timeout) as response:
             content_type = response.headers.get("Content-Type", "unknown")
             final_url = response.geturl()
             reject_private_destination(final_url)
