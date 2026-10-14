@@ -13,12 +13,26 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
-# Optional extras: pip install '.[test,excel,data]'
-streamlit run app.py
+pip install -e .
+# Optional extras: pip install -e '.[test,excel,data]'
+tis dashboard
+# Equivalent from a source checkout: streamlit run app.py
 ```
 
 On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_unix.sh`.
+
+## Install a built wheel (including the dashboard)
+
+The wheel installs the `app` dashboard module, the `tis` CLI, and bundled registry JSON resources. From the directory containing the release wheel:
+
+```bash
+python -m pip install ./tokamak_insight_suite-0.4.0-py3-none-any.whl
+tis dashboard
+# CLI remains usable independently:
+tis catalog --kind both --output-dir ./tis-catalog
+```
+
+CI builds the wheel and source distribution, installs the wheel in a clean virtual environment outside the checkout, checks the installed module/resources/CLI, and launches the installed dashboard health endpoint. This tests package completeness, not the scientific validity of every analysis workflow.
 
 ## Run with Docker
 
