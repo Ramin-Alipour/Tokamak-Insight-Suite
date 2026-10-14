@@ -364,6 +364,37 @@ def doppler_temperature_eV(sigma_lambda: float, lambda0: float, mass_amu: float)
     return float((mass_amu*AMU*C_LIGHT**2/E_CHARGE)*(sigma_lambda/lambda0)**2)
 
 
+def doppler_temperature_with_uncertainty_eV(
+    sigma_lambda: float, lambda0: float, mass_amu: float,
+    sigma_sigma_lambda: float = 0.0, sigma_lambda0: float = 0.0,
+    sigma_mass_amu: float = 0.0,
+) -> dict[str, float | str]:
+    """Estimate Doppler temperature and first-order 1-sigma uncertainty.
+
+    Inputs and their uncertainties must use the same wavelength units. Independent
+    uncertainties are propagated in quadrature; model/systematic errors are not included.
+    """
+    vals=[sigma_lambda,lambda0,mass_amu,sigma_sigma_lambda,sigma_lambda0,sigma_mass_amu]
+    if not np.all(np.isfinite(vals)) or sigma_lambda < 0 or lambda0 <= 0 or mass_amu <= 0:
+        raise ValueError("Width must be nonnegative; wavelength and mass positive; inputs finite.")
+    if min(sigma_sigma_lambda,sigma_lambda0,sigma_mass_amu) < 0:
+        raise ValueError("Input uncertainties must be finite and nonnegative.")
+    temperature=doppler_temperature_eV(sigma_lambda,lambda0,mass_amu)
+    variance_terms=[]
+    if sigma_lambda > 0:
+        variance_terms.append((2.0*sigma_sigma_lambda/sigma_lambda)**2)
+    elif sigma_sigma_lambda > 0:
+        return {"temperature_eV":temperature,"standard_uncertainty_eV":float("nan"),
+                "relative_standard_uncertainty":float("nan"),
+                "note":"Linear uncertainty propagation is undefined at zero Doppler width; use a profile-likelihood or Monte Carlo interval."}
+    variance_terms.append((2.0*sigma_lambda0/lambda0)**2)
+    variance_terms.append((sigma_mass_amu/mass_amu)**2)
+    relative=float(np.sqrt(sum(variance_terms)))
+    return {"temperature_eV":temperature,"standard_uncertainty_eV":float(temperature*relative),
+            "relative_standard_uncertainty":relative,
+            "uncertainty_method":"First-order independent-error propagation; excludes model/systematic uncertainty."}
+
+
 def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     if not np.all(np.isfinite([delta_lambda, lambda0])) or lambda0 <= 0:
         raise ValueError('Wavelength shift must be finite and rest wavelength positive.')
