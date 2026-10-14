@@ -39,7 +39,7 @@ def test_ion_sound_speed_matches_supplied_model():
     te, ti, mass = 20.0, 5.0, 2.0
     result = ion_sound_speed_m_s(te, ti, mass)
     expected = np.sqrt(E_CHARGE * (te + ti) / (mass * AMU))
-    assert result["sound_speed_m_s"] == pytest.approx(expected)
+    assert result["ion_sound_speed_m_s"] == pytest.approx(expected)
 
 
 def test_mach_number_preserves_flow_sign():
@@ -90,7 +90,7 @@ def test_fluctuation_flux_is_zero_for_uncorrelated_constant_density():
     n = np.full(128, 4e18)
     vr = np.sin(np.linspace(0, 8 * np.pi, 128))
     result = fluctuation_flux(n, vr)
-    assert result["particle_flux_m-2_s-1"] == pytest.approx(0.0, abs=1e-12)
+    assert result["particle_flux_covariance_m-2_s-1"] == pytest.approx(0.0, abs=1e-12)
 
 
 def test_equilibrium_grid_derivatives_match_analytic_flux_surface():
