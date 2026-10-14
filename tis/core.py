@@ -593,12 +593,15 @@ def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 
 
 
 def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True,
-                          measurement_sigma: Any | None = None) -> dict[str, Any]:
-    """Solve weighted min ||(Ax-y)/sigma||² + lam ||x||² (or unweighted if sigma omitted)."""
+                          measurement_sigma: Any | None = None,
+                          regularization_order: int = 1) -> dict[str, Any]:
+    """Solve a normalized Tikhonov inverse problem with order-0/1/2 regularization.""""
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
     if lam<0 or not np.isfinite(lam): raise ValueError('Regularization must be finite and nonnegative.')
+    if isinstance(regularization_order,bool) or regularization_order not in (0,1,2):
+        raise ValueError("regularization_order must be 0 (magnitude), 1 (gradient) or 2 (curvature).")
     if measurement_sigma is not None:
         sigma=np.asarray(measurement_sigma,float).ravel()
         if len(sigma)!=len(y) or not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
@@ -606,24 +609,39 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
         Aw=A/sigma[:,None]; yw=y/sigma
     else:
         sigma=None; Aw=A; yw=y
+    # Normalize A by its weighted spectral norm so lambda is dimensionless with
+    # respect to response scale. First-order regularization penalizes profile
+    # gradients rather than shrinking every emissivity value toward zero.
+    response_scale=float(np.linalg.norm(Aw,ord=2))
+    if not np.isfinite(response_scale) or response_scale<=np.finfo(float).eps:
+        raise ValueError("Response matrix has zero or invalid weighted norm.")
+    An=Aw/response_scale
+    yn=yw/response_scale
+    identity=np.eye(A.shape[1])
+    operator=identity if regularization_order==0 else np.diff(identity,n=regularization_order,axis=0)
+    operator_norm=float(np.linalg.norm(operator,ord=2)) if operator.size else 1.0
+    if operator_norm>0: operator=operator/operator_norm
     if nonnegative:
-        augA=np.vstack([Aw,np.sqrt(lam)*np.eye(A.shape[1])]) if lam else Aw
-        augy=np.concatenate([yw,np.zeros(A.shape[1])]) if lam else yw
+        augA=np.vstack([An,np.sqrt(lam)*operator]) if lam else An
+        augy=np.concatenate([yn,np.zeros(operator.shape[0])]) if lam else yn
         res=optimize.lsq_linear(augA,augy,bounds=(0,np.inf),method='trf')
         x=res.x; success=bool(res.success); message=str(res.message)
     else:
-        if lam > 0:
-            augA=np.vstack([Aw,np.sqrt(lam)*np.eye(A.shape[1])])
-            augy=np.concatenate([yw,np.zeros(A.shape[1])])
+        if lam>0:
+            augA=np.vstack([An,np.sqrt(lam)*operator])
+            augy=np.concatenate([yn,np.zeros(operator.shape[0])])
         else:
-            augA,augy=Aw,yw
+            augA,augy=An,yn
         x=np.linalg.lstsq(augA,augy,rcond=None)[0]
         success=True; message='least-squares / Tikhonov solution'
     residual=A@x-y
     weighted_residual=residual if sigma is None else residual/sigma
+    regularization_norm=float(np.linalg.norm(operator@x))
     return {'solution':x,'residual':residual,'residual_norm':float(np.linalg.norm(residual)),
             'weighted_residual_norm':float(np.linalg.norm(weighted_residual)),
-            'regularization':float(lam),'success':success,'message':message,'nonnegative':bool(nonnegative),
+            'regularization':float(lam),'regularization_order':int(regularization_order),
+            'regularization_operator_norm':regularization_norm,'response_spectral_norm':response_scale,
+            'success':success,'message':message,'nonnegative':bool(nonnegative),
             'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
 
 
@@ -641,7 +659,7 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     for value in candidates:
         result=regularized_tomography(A,y,float(value),nonnegative,measurement_sigma)
         residuals.append(max(result['weighted_residual_norm'],np.finfo(float).tiny))
-        norms.append(max(float(np.linalg.norm(result['solution'])),np.finfo(float).tiny))
+        norms.append(max(float(result['regularization_operator_norm']),np.finfo(float).tiny))
     lx=np.log(residuals); ly=np.log(norms); lt=np.log(candidates)
     dx=np.gradient(lx,lt); dy=np.gradient(ly,lt)
     ddx=np.gradient(dx,lt); ddy=np.gradient(dy,lt)
@@ -651,7 +669,7 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     return {'selected_lambda':float(candidates[selected]),'candidate_lambdas':candidates,
             'weighted_residual_norms':np.asarray(residuals),'solution_norms':np.asarray(norms),
             'discrete_log_lcurve_curvature':curvature,
-            'selection_method':'maximum discrete curvature of log-residual vs log-solution L-curve',
+            'selection_method':'maximum discrete curvature of log-weighted-residual vs log-regularization-norm L-curve',
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
 
 
@@ -1135,7 +1153,8 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
 
 
 def abel_reconstruction(chord_impact_m: Any, line_integrals: Any, radial_edges_m: Any,
-                        lam: float = 1e-2, nonnegative: bool = True) -> dict[str, Any]:
+                        lam: float = 1e-2, nonnegative: bool = True,
+                        regularization_order: int = 1) -> dict[str, Any]:
     """Axisymmetric Abel inversion via a shell path-length matrix and Tikhonov regularization."""
     b=np.asarray(chord_impact_m,float).ravel(); y=np.asarray(line_integrals,float).ravel(); edges=np.asarray(radial_edges_m,float).ravel()
     if len(b)!=len(y) or len(b)<3: raise ValueError('At least 3 paired chord impact parameters and line integrals are required.')
@@ -1145,9 +1164,9 @@ def abel_reconstruction(chord_impact_m: Any, line_integrals: Any, radial_edges_m
     rin=edges[:-1][None,:]; rout=edges[1:][None,:]; bb=b[:,None]
     A=2*(np.sqrt(np.maximum(rout*rout-bb*bb,0))-np.sqrt(np.maximum(rin*rin-bb*bb,0)))
     A=np.where(bb>=rout,0,A)
-    result=regularized_tomography(A,y,lam,nonnegative)
+    result=regularized_tomography(A,y,lam,nonnegative,regularization_order=regularization_order)
     centers=.5*(edges[:-1]+edges[1:])
-    return {'radius_centers_m':centers,'emissivity_or_density_profile':result['solution'],'response_matrix':A,'residual_norm':result['residual_norm'],'success':result['success'],'message':result['message'],'lambda':float(lam),'nonnegative':bool(nonnegative),'note':'Axisymmetry, straight chord geometry and the units of the supplied line integrals are assumed; validate edge definition and diagnostic response.'}
+    return {'radius_centers_m':centers,'emissivity_or_density_profile':result['solution'],'response_matrix':A,'residual_norm':result['residual_norm'],'success':result['success'],'message':result['message'],'lambda':float(lam),'regularization_order':int(regularization_order),'regularization_operator_norm':result['regularization_operator_norm'],'nonnegative':bool(nonnegative),'note':'Axisymmetry, straight chord geometry and the units of the supplied line integrals are assumed. Lambda is dimensionless relative to the normalized response matrix; default first-order regularization penalizes profile gradients, not absolute amplitude.'}
 
 
 def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dict[str, float]:
