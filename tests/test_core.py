@@ -9,7 +9,7 @@ from tis.core import (
     linear_phase_density, load_table, sha256_bytes,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
-    exponential_heat_flux_fit, integrate_time_series,
+    exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
@@ -357,4 +357,23 @@ def test_integrate_time_series_baseline_correction_removes_constant_offset():
 def test_integrate_time_series_rejects_invalid_inputs(time, values, kwargs):
     with pytest.raises(ValueError):
         integrate_time_series(time, values, **kwargs)
+
+def test_time_frequency_spectrogram_detects_stationary_tone():
+    fs = 1000.0
+    t = np.arange(4096) / fs
+    x = np.sin(2 * np.pi * 125 * t)
+    result = time_frequency_spectrogram(x, fs, nperseg=256)
+    assert result["psd"].shape == (len(result["frequency_Hz"]), len(result["time_s"]))
+    peak = result["frequency_Hz"][np.argmax(np.mean(result["psd"], axis=1))]
+    assert peak == pytest.approx(125.0, abs=4.0)
+    assert np.all(np.isfinite(result["psd"])) and np.all(result["psd"] >= 0)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"nperseg": 7}, {"nperseg": 8, "noverlap": 8}, {"nperseg": 8, "noverlap": -1}],
+)
+def test_time_frequency_spectrogram_rejects_invalid_window_settings(kwargs):
+    with pytest.raises(ValueError):
+        time_frequency_spectrogram(np.arange(64, dtype=float), fs=1000, **kwargs)
 
