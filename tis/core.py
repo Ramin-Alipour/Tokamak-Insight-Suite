@@ -98,10 +98,17 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
     # malformed cells. Those cells become NaN and remain visible to QC.
     for col in frame.columns:
         if not pd.api.types.is_numeric_dtype(frame[col]):
-            candidate = pd.to_numeric(frame[col], errors="coerce")
+            values = frame[col]
+            # When a unit/metadata row forces object dtype, honor the selected
+            # decimal separator during numeric recovery as well as CSV parsing.
+            if decimal == "," and name.endswith((".csv", ".txt")):
+                values = values.astype("string").str.replace(",", ".", regex=False)
+            candidate = pd.to_numeric(values, errors="coerce")
             nonempty = int(frame[col].notna().sum())
             numeric_count = int(candidate.notna().sum())
-            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.67:
+            # Recover channels with one embedded unit/text row while requiring
+            # at least two actual numeric samples to avoid coercing labels/IDs.
+            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.5:
                 frame[col] = candidate
     return frame
 
