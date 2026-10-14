@@ -19,6 +19,48 @@ FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
 
 
+def _open_fair_mast_zarr(xr: Any, url: str, group: str, timeout_s: float = 45.0, retries: int = 3):
+    """Open a public FAIR-MAST Zarr group with bounded HTTP timeouts and retries.
+
+    Timeout settings apply to the underlying HTTP requests, including lazy chunk
+    reads. Retries are limited to transient network/timeout failures while opening
+    the store; malformed metadata and missing groups are surfaced immediately.
+    """
+    import time
+    try:
+        import aiohttp
+    except ImportError as exc:
+        raise RuntimeError(
+            "FAIR-MAST network access requires aiohttp. Install requirements-data.txt."
+        ) from exc
+    if not np.isfinite(timeout_s) or timeout_s <= 0:
+        raise ValueError("Zarr request timeout must be positive and finite.")
+    if isinstance(retries, bool) or not isinstance(retries, int) or retries < 1 or retries > 5:
+        raise ValueError("Zarr open retries must be an integer from 1 to 5.")
+    timeout = aiohttp.ClientTimeout(
+        total=float(timeout_s),
+        connect=min(10.0, float(timeout_s)),
+        sock_read=float(timeout_s),
+    )
+    last_error = None
+    for attempt in range(retries):
+        try:
+            return xr.open_zarr(
+                url,
+                group=group,
+                storage_options={"client_kwargs": {"timeout": timeout}},
+            )
+        except (aiohttp.ClientError, OSError, TimeoutError) as exc:
+            last_error = exc
+            if attempt + 1 >= retries:
+                break
+            time.sleep(0.5 * (2 ** attempt))
+    raise RuntimeError(
+        f"Could not open FAIR-MAST Zarr group {group!r} after {retries} attempts "
+        f"with a {timeout_s:g}-second request timeout."
+    ) from last_error
+
+
 def anti_alias_decimate(time_s: Any, values: Any, max_samples: int = 70000) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     """Anti-alias-filter a uniformly sampled trace before integer-factor downsampling."""
     t = np.asarray(time_s, dtype=np.float64).ravel()
@@ -82,7 +124,7 @@ def fetch_fair_mast_signal(
         ) from exc
 
     shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
-    ds = xr.open_zarr(shot_url, group=group)
+    ds = _open_fair_mast_zarr(xr, shot_url, group)
     try:
         # The documented FAIR-MAST groups usually expose time as a coordinate;
         # time1 can also be present as a data variable on the same dimension.
@@ -310,7 +352,7 @@ def fetch_fair_mast_efit_snapshot(
         ) from exc
 
     shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
-    ds = xr.open_zarr(shot_url, group="efm")
+    ds = _open_fair_mast_zarr(xr, shot_url, "efm")
     try:
         required = {"plasma_current_rz", "r", "z", "time"}
         missing = required.difference(ds.variables)
