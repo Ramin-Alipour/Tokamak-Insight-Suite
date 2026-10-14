@@ -474,3 +474,17 @@ def test_doppler_temperature_uncertainty_rejects_undefined_zero_width_case():
     from tis.core import doppler_temperature_with_uncertainty_eV
     with pytest.raises(ValueError, match="zero Doppler width"):
         doppler_temperature_with_uncertainty_eV(0.0,500.0,40.0,sigma_sigma_lambda=0.001)
+
+
+def test_doppler_velocity_uncertainty_propagation():
+    from tis.core import doppler_velocity_with_uncertainty_m_s
+    r=doppler_velocity_with_uncertainty_m_s(500.1,500.0,0.002,0.001)
+    assert r["line_of_sight_velocity_m_s"] == pytest.approx(59958.4916, rel=1e-6)
+    expected=299792458*np.sqrt((0.002/500.0)**2+(500.1*0.001/500.0**2)**2)
+    assert r["standard_uncertainty_m_s"] == pytest.approx(expected)
+
+
+def test_doppler_velocity_uncertainty_rejects_invalid_inputs():
+    from tis.core import doppler_velocity_with_uncertainty_m_s
+    with pytest.raises(ValueError):
+        doppler_velocity_with_uncertainty_m_s(500.0,500.0,sigma_observed_lambda=-0.1)
