@@ -930,3 +930,36 @@ def test_filter_impact_reports_transfer_response_and_spectral_changes():
     assert result["filtered_rms"] < result["raw_rms"]
     assert len(result["frequency_response_Hz"]) == 512
     assert result["forward_backward_amplitude_response"][-1] < 0.01
+
+
+def test_end_to_end_doppler_workflow_calibrates_corrects_and_derives_physics():
+    from tis.core import analyze_doppler_line_end_to_end
+    pixels = np.linspace(0.0, 100.0, 501)
+    wavelength = 499.5 + 0.01*pixels
+    response = np.linspace(1.0, 2.0, len(pixels))
+    corrected = 5.0 + 100.0*np.exp(-0.5*((wavelength-500.05)/0.05)**2)
+    measured = corrected*response
+    result = analyze_doppler_line_end_to_end(
+        pixels, measured, [0, 50, 100], [499.5, 500.0, 500.5],
+        rest_wavelength=500.0, ion_mass_amu=40.0,
+        fit_min_wavelength=499.8, fit_max_wavelength=500.3,
+        instrument_sigma=0.02, relative_response=response,
+        calibration_degree=1)
+    assert result["line_fit"]["center"] == pytest.approx(500.05, abs=1e-5)
+    assert result["doppler_temperature_eV"] > 0
+    assert result["line_of_sight_velocity_m_s"] == pytest.approx(29979.2458, rel=1e-5)
+    assert result["relative_response_correction_applied"] is True
+    assert result["line_fit"]["fit_rmse"] < 1e-5
+
+
+def test_end_to_end_doppler_workflow_rejects_unresolved_thermal_width():
+    from tis.core import analyze_doppler_line_end_to_end
+    pixels = np.linspace(0.0, 100.0, 101)
+    wavelength = 499.5 + 0.01*pixels
+    intensity = 1.0 + 10.0*np.exp(-0.5*((wavelength-500.0)/0.03)**2)
+    with pytest.raises(ValueError, match="does not exceed instrumental"):
+        analyze_doppler_line_end_to_end(
+            pixels, intensity, [0, 50, 100], [499.5, 500.0, 500.5],
+            rest_wavelength=500.0, ion_mass_amu=40.0,
+            fit_min_wavelength=499.8, fit_max_wavelength=500.2,
+            instrument_sigma=0.04, calibration_degree=1)
