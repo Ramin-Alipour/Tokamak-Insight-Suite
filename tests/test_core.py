@@ -856,7 +856,7 @@ def test_load_table_reports_cells_coerced_to_missing():
 
 def test_load_table_enforces_row_limit_during_csv_read():
     raw = b"time,signal\n0,1\n1,2\n2,3\n"
-    with pytest.raises(ValueError, match="row limit"):
+    with pytest.raises(ValueError, match="import limit"):
         load_table(raw, "instrument.csv", max_rows=2)
 
 
