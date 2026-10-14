@@ -1,0 +1,62 @@
+name: Real MAST data integration test
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 8 * *"
+
+permissions:
+  contents: read
+
+jobs:
+  real-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+      - name: Install TIS and public-data dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-data.txt
+      - name: Fetch public raw MAST shot and run real-data checks
+        run: |
+          python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import numpy as np
+          import pandas as pd
+          from tis.core import fft_spectrum, psd_welch, filter_signal
+
+          base = Path("artifacts/mast-real-data")
+          manifest = json.loads((base / "mast_29790_mirnov_manifest.json").read_text())
+          frame = pd.read_csv(base / "mast_29790_mirnov_omaha_1lz.csv")
+          assert manifest["shot"] == 29790
+          assert manifest["source_signal_class"] == "Raw"
+          assert len(frame) >= 1024
+          assert np.all(np.isfinite(frame["time_s"]))
+          assert np.all(np.isfinite(frame["signal_raw"]))
+          assert np.all(np.diff(frame["time_s"].to_numpy()) > 0)
+          fs = manifest["estimated_sampling_rate_hz_after_stride"]
+          f, a = fft_spectrum(frame["signal_raw"].to_numpy(), fs)
+          fp, p = psd_welch(frame["signal_raw"].to_numpy(), fs)
+          filtered = filter_signal(frame["signal_raw"].to_numpy(), fs, low_hz=1000, high_hz=min(100000, fs*0.4))
+          assert len(f) > 10 and len(fp) > 10 and len(filtered) == len(frame)
+          assert np.all(np.isfinite(a)) and np.all(np.isfinite(p)) and np.all(np.isfinite(filtered))
+          print(f"PASS: real MAST shot 29790; samples={len(frame)}; fs={fs:.3f} Hz")
+          print("PASS: CSV ingestion, FFT, Welch PSD, and digital filtering on public raw data")
+          PY
+      - name: Upload real-data test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mast-29790-real-data-validation
+          path: artifacts/mast-real-data/
+          if-no-files-found: error
