@@ -1,4 +1,6 @@
-# Coverage map against `tokamak.pdf`
+# Coverage map against the extracted `tokamak.pdf` reference text
+
+The original PDF is retained in the user's Library and is not included in this repository; the extracted reference text is bundled at `docs/reference/tokamak_reference_extracted.txt`.
 
 This map follows the source document's final diagnostic-family index. “Registry” means an explanatory catalog entry exists; “implemented workflow” means a generic analysis operation is executable in this release. It does not imply every listed observable is solved from raw detector data.
 
