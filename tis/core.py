@@ -1948,6 +1948,45 @@ def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
     return result
 
 
+def ion_sound_speed_m_s(
+    electron_temperature_eV: float,
+    ion_temperature_eV: float,
+    ion_mass_amu: float,
+) -> dict[str, float | str]:
+    """Calculate the ion-acoustic speed using the IR-T1 compound-probe paper's Eq. (4).
+
+    c_s = sqrt(e * (T_e + T_i) / m_i), where temperatures are in eV and
+    mass is supplied in amu. This is the stated paper model, not a universal
+    sound-speed formula for every plasma regime.
+    """
+    vals = (electron_temperature_eV, ion_temperature_eV, ion_mass_amu)
+    if not all(np.isfinite(v) for v in vals):
+        raise ValueError("Temperatures and ion mass must be finite.")
+    if electron_temperature_eV <= 0 or ion_temperature_eV < 0 or ion_mass_amu <= 0:
+        raise ValueError("Electron temperature and ion mass must be positive; ion temperature must be nonnegative.")
+    mass_kg = float(ion_mass_amu) * AMU
+    speed = float(np.sqrt(E_CHARGE * (float(electron_temperature_eV) + float(ion_temperature_eV)) / mass_kg))
+    return {
+        "ion_sound_speed_m_s": speed,
+        "electron_temperature_eV": float(electron_temperature_eV),
+        "ion_temperature_eV": float(ion_temperature_eV),
+        "ion_mass_amu": float(ion_mass_amu),
+        "ion_mass_kg": mass_kg,
+        "formula": "c_s = sqrt(e * (T_e + T_i) / m_i)",
+        "assumption": "Matches the simplified ion-acoustic-speed relation used in the IR-T1 compound-probe paper; verify the paper's temperature and isotope assumptions before comparison.",
+    }
+
+
+def mach_number_from_velocity(flow_velocity_m_s: Any, sound_speed_m_s: float) -> np.ndarray:
+    """Return signed Mach number from velocity and a supplied positive sound speed."""
+    v = np.asarray(flow_velocity_m_s, dtype=float)
+    if not np.isfinite(sound_speed_m_s) or sound_speed_m_s <= 0:
+        raise ValueError("Sound speed must be positive and finite.")
+    if np.any(~np.isfinite(v)):
+        raise ValueError("Flow velocity must contain only finite values.")
+    return v / float(sound_speed_m_s)
+
+
 def triple_probe_temperature_eV(v_difference_V: float, model_factor: float = 1.0) -> dict[str, float | str]:
     """First-order triple-probe Te estimate under a user-selected idealized exponential-current model."""
     if not np.isfinite(v_difference_V) or v_difference_V<=0 or not np.isfinite(model_factor) or model_factor<=0:
