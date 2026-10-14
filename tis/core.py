@@ -460,6 +460,43 @@ def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = N
     return lags,corr,float(lags[idx])
 
 
+
+def _spectral_fit_diagnostics(observed: np.ndarray, predicted: np.ndarray,
+                              sigma: np.ndarray | None, parameter_count: int) -> dict[str, Any]:
+    residual=observed-predicted
+    dof=max(0,len(observed)-parameter_count)
+    result={"fit_points":int(len(observed)),
+            "fit_degrees_of_freedom":int(dof),
+            "fit_rmse":float(np.sqrt(np.mean(residual**2))),
+            "fit_residual_std":float(np.std(residual,ddof=1)) if len(residual)>1 else 0.0,
+            "fit_residual_mean":float(np.mean(residual))}
+    if sigma is not None and dof>0:
+        result["reduced_chi_square"]=float(np.sum((residual/sigma)**2)/dof)
+        result["reduced_chi_square_interpretation"]="Meaningful only if sigma values are calibrated independent 1-sigma uncertainties and the model assumptions hold."
+    else:
+        result["reduced_chi_square"]=None
+    return result
+
+
+def evaluate_spectral_fit(x: Any, fit: dict[str, Any]) -> np.ndarray:
+    """Evaluate a supported fitted line shape on coordinates, for residual plots."""
+    xx=np.asarray(x,dtype=float)
+    model=str(fit.get("model","")).lower()
+    baseline=float(fit["baseline"])
+    center=float(fit["center"])
+    if model=="gaussian":
+        return baseline+float(fit["amplitude"])*np.exp(-0.5*((xx-center)/float(fit["sigma"]))**2)
+    if model=="lorentzian":
+        width=float(fit["half_width_at_half_max"])
+        return baseline+float(fit["amplitude"])/(1.0+((xx-center)/width)**2)
+    if model=="voigt":
+        sigma=float(fit["gaussian_sigma"])
+        gamma=float(fit["lorentzian_HWHM"])
+        peak=float(voigt_profile(0,sigma,gamma))
+        return baseline+float(fit["amplitude_peak"])*voigt_profile(xx-center,sigma,gamma)/max(peak,np.finfo(float).eps)
+    raise ValueError("Fit model must be Gaussian, Lorentzian, or Voigt.")
+
+
 def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | None = None, model: str = 'Gaussian', sigma_y: Any | None = None) -> dict[str, float | str]:
     xx, yy = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
     if (xmin is not None and not np.isfinite(xmin)) or (xmax is not None and not np.isfinite(xmax)):
@@ -512,7 +549,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Gaussian','baseline':b,'amplitude':a,'center':c,'sigma':s,'FWHM':float(width),'area_above_baseline':float(a*s*np.sqrt(2*np.pi)),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_sigma':float(se[3]),
-                'standard_error_FWHM':float(2*np.sqrt(2*np.log(2))*se[3])}
+                'standard_error_FWHM':float(2*np.sqrt(2*np.log(2))*se[3]), **_spectral_fit_diagnostics(yy,pred,sigma_fit,4)}
     if model=='lorentzian':
         def fn(z,b,a,c,g): return b+a/(1+((z-c)/g)**2)
         p0=[baseline0,amp0,center0,max(step,span/20)]
@@ -525,7 +562,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
             raise ValueError("Lorentzian fit covariance is singular or non-finite; inspect fit range and signal-to-noise.")
         b,a,c,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
-                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3])}
+                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3]), **_spectral_fit_diagnostics(yy,pred,sigma_fit,4)}
     if model=='voigt':
         def fn(z,b,a,c,s,g): return b+a*voigt_profile(z-c,s,g)/max(voigt_profile(0,s,g),np.finfo(float).eps)
         p0=[baseline0,amp0,center0,max(step,span/30),max(step,span/30)]
@@ -545,7 +582,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
                 'FWHM':fwhm,'area_above_baseline':area,'r_squared':_r2(yy,pred),
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude_peak':float(se[1]),'standard_error_center':float(se[2]),
                 'standard_error_gaussian_sigma':float(se[3]),'standard_error_lorentzian_HWHM':float(se[4]),
-                'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None}
+                'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None, **_spectral_fit_diagnostics(yy,pred,sigma_fit,5)}
     raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
 
 
