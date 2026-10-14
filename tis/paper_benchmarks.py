@@ -5,6 +5,7 @@ Do not merge claims with different limiter positions, bias polarities, or source
 """
 from __future__ import annotations
 
+import math
 import pandas as pd
 
 P05_SOURCE = {
@@ -38,7 +39,7 @@ def compare_to_p05_range(metric: str, condition: str, observed_change_pct: float
         value = float(observed_change_pct)
     except (TypeError, ValueError) as exc:
         raise ValueError("observed_change_pct must be a finite numeric percentage.") from exc
-    if not pd.notna(value):
+    if not math.isfinite(value):
         raise ValueError("observed_change_pct must be finite.")
     rows = [
         row for row in P05_CLAIMS
