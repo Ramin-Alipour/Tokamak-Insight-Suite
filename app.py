@@ -308,7 +308,14 @@ elif page=='Time Series & MHD':
         yf=butterworth_filter(y,fs,hp or None,lp or None,order)
         x1,x2,x3=st.columns(3); x1.metric('Finite samples',len(y)); x2.metric('Sampling rate',f'{fs:.6g} Hz'); x3.metric('Nyquist',f'{fs/2:.6g} Hz')
         plot_line(t,y,'Time (s)',scol,'Raw signal'); plot_line(t,yf,'Time (s)',scol,'Filtered signal')
-        f,amp=fft_spectrum(yf,fs); fp,psd=welch_psd(yf,fs)
+        st.markdown('### Welch PSD settings')
+        wc1,wc2,wc3=st.columns(3)
+        with wc1: welch_n=st.number_input('Segment length (samples)',min_value=8,max_value=int(len(y)),value=min(4096,int(len(y))),step=1,key='welch_nperseg')
+        with wc2: welch_overlap=st.number_input('Overlap (samples)',min_value=0,max_value=max(0,int(welch_n)-1),value=int(welch_n)//2,step=1,key='welch_overlap')
+        with wc3: welch_window=st.selectbox('Window',['hann','hamming','blackman','boxcar','bartlett'],index=0,key='welch_window')
+        f,amp=fft_spectrum(yf,fs)
+        fp,psd=welch_psd(yf,fs,nperseg=int(welch_n),noverlap=int(welch_overlap),window=welch_window)
+        st.caption(f'Welch nominal frequency-bin spacing: {fs/int(welch_n):.6g} Hz; overlap: {int(welch_overlap)/int(welch_n):.0%}.')
         plot_line(f,amp,'Frequency (Hz)','Amplitude','FFT amplitude'); plot_line(fp,np.maximum(psd,np.finfo(float).tiny),'Frequency (Hz)','PSD (unit²/Hz)','Welch PSD',True)
         st.markdown('### Time-frequency spectrogram')
         tf_n=st.number_input('Spectrogram segment length',min_value=8,max_value=int(len(y)),value=min(256,int(len(y))),step=1,key='tf_n')
@@ -405,8 +412,11 @@ elif page=='Spectral Analysis':
         if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model:
             fit=saved['fit']; st.json(fit)
             if model=='Gaussian':
-                lam0=st.number_input('Rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=max(float(fit['center']),1e-12)); sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g'); mass=st.number_input('Ion mass (amu)',min_value=1e-6,value=40.0); sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g'); inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g'); sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
+                lam0=st.number_input('Known rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=None,placeholder='Enter reference wavelength',key='doppler_rest_wavelength'); sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g'); mass=st.number_input('Ion mass (amu)',min_value=1e-6,value=40.0); sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g'); inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g'); sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
                 if st.button('Estimate Doppler quantities'):
+                    if lam0 is None:
+                        st.error('Enter the independently known rest wavelength; using the fitted center would force the velocity to zero.')
+                        st.stop()
                     sig2=float(fit['sigma'])**2-inst**2
                     if sig2<=0: st.error('Instrument width equals/exceeds observed Gaussian sigma.')
                     else:
