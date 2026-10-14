@@ -35,7 +35,8 @@ h1,h2,h3{color:#f0f7ff!important}
 
 def _clear_loaded_data():
     for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
-                "tis_upload_sha", "tis_imported_at_utc", "tis_import_parameters"):
+                "tis_upload_sha", "tis_upload_signature", "tis_active_source",
+                "tis_imported_at_utc", "tis_import_parameters"):
         st.session_state.pop(key, None)
     st.session_state["global_upload"] = None
 
@@ -59,10 +60,15 @@ with st.sidebar:
         try:
             uploaded_bytes=upload.getvalue()
             uploaded_sha=sha256_bytes(uploaded_bytes)
-            if uploaded_sha != st.session_state.get("tis_upload_sha"):
-                delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\\t","|":"|"}
-                sheet_value=import_sheet.strip()
-                sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
+            delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\\t","|":"|"}
+            sheet_value=import_sheet.strip()
+            sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
+            import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
+                "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value},sort_keys=True)
+            needs_import=(uploaded_sha != st.session_state.get("tis_upload_sha") or
+                (st.session_state.get("tis_active_source")=="upload" and
+                 import_signature != st.session_state.get("tis_upload_signature")))
+            if needs_import:
                 frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
                                  delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
                                  skiprows=int(import_skiprows),comment=None if import_comment=="None" else import_comment)
@@ -72,6 +78,8 @@ with st.sidebar:
                 st.session_state["tis_df"]=frame
                 st.session_state["tis_sha"]=uploaded_sha
                 st.session_state["tis_upload_sha"]=uploaded_sha
+                st.session_state["tis_upload_signature"]=import_signature
+                st.session_state["tis_active_source"]="upload"
                 st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
                 st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
                     "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value}
@@ -226,6 +234,7 @@ elif page=='Public Data Access':
                 mast_csv = mast_frame.to_csv(index=False).encode('utf-8')
                 mast_filename = f"mast_{int(mast_shot)}_{mast_group}_{mast_manifest['signal']}.csv"
                 st.session_state.pop('tis_source_manifest', None)
+                st.session_state['tis_active_source'] = 'mast'
                 st.session_state['tis_raw'] = mast_csv
                 st.session_state['tis_filename'] = mast_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
@@ -273,6 +282,7 @@ elif page=='Public Data Access':
                     public_filename += '.txt'
                 public_frame = load_table(payload, public_filename)
                 st.session_state.pop('tis_source_manifest', None)
+                st.session_state['tis_active_source'] = 'public_url'
                 st.session_state['tis_raw'] = payload
                 st.session_state['tis_filename'] = public_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
