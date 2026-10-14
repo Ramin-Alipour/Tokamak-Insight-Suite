@@ -55,10 +55,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                 raise ValueError("CSV/TXT input must be UTF-8 encoded when comment filtering is enabled.") from exc
             kept_lines = []
             for line in text_data.splitlines(keepends=True):
-                if line.lstrip().startswith(comment):
-                    # Preserve the physical line count so skiprows retains its meaning.
-                    kept_lines.append("\n" if line.endswith("\n") else "")
-                else:
+                if not line.lstrip().startswith(comment):
                     kept_lines.append(line)
             csv_data = "".join(kept_lines).encode("utf-8")
         kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
