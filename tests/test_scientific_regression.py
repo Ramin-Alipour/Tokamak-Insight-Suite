@@ -332,3 +332,38 @@ def test_welch_psd_integral_is_consistent_with_white_noise_variance():
     assert integrated_power == pytest.approx(np.var(x), rel=0.08)
     assert np.all(np.isfinite(psd))
     assert np.all(psd >= 0)
+
+
+
+def test_cross_correlation_lag_sign_for_known_delayed_signal():
+    from tis.core import cross_correlation_lag
+    rng = np.random.default_rng(20261014)
+    x = rng.normal(size=4096)
+    delay_samples = 17
+    y = np.r_[np.zeros(delay_samples), x[:-delay_samples]]
+    _, _, lag_s = cross_correlation_lag(x, y, fs=2000.0)
+    # This API defines negative lag when y occurs later than x.
+    assert lag_s == pytest.approx(-delay_samples / 2000.0, abs=1e-12)
+
+
+def test_cross_spectral_mode_number_recovers_known_positive_phase_winding():
+    from tis.core import mode_number_from_channels
+    sensor_count = 8
+    theta = np.arange(sensor_count) * (2 * np.pi / sensor_count)
+    fs = 1024.0
+    n = 2048
+    t = np.arange(n) / fs
+    frequency_hz = 64.0
+    true_mode = 2
+    signals = np.array([
+        np.sin(2 * np.pi * frequency_hz * t + true_mode * angle)
+        for angle in theta
+    ])
+    result = mode_number_from_channels(
+        theta, signals, fs,
+        frequency_range_hz=(60.0, 68.0),
+        min_coherence=0.2,
+    )
+    assert result["dominant_frequency_Hz"] == pytest.approx(frequency_hz, abs=fs / 512)
+    assert result["mode_number_fit"] == pytest.approx(true_mode)
+    assert result["phase_rms_residual_rad"] < 1e-8
