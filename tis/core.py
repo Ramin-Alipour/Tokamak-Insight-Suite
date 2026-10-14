@@ -595,7 +595,7 @@ def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 
 def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True,
                           measurement_sigma: Any | None = None,
                           regularization_order: int = 1) -> dict[str, Any]:
-    """Solve a normalized Tikhonov inverse problem with order-0/1/2 regularization.""""
+    """Solve a normalized Tikhonov inverse problem with order-0/1/2 regularization."""
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
