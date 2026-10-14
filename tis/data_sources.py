@@ -6,10 +6,14 @@ checking calibration, units, quality flags, and the validity of any inference.
 from __future__ import annotations
 
 import math
+import ipaddress
+import socket
+from urllib.parse import urlparse
 from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy.signal import resample_poly
 
 FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
@@ -24,8 +28,8 @@ def fetch_fair_mast_signal(
     """Fetch one 1-D signal from the public FAIR-MAST Zarr archive.
 
     Uses the archive's documented direct shot URL pattern. Returns a
-    time_s/signal_raw table and a provenance manifest. Data are downsampled
-    by stride only when necessary; no calibration is applied.
+    time_s/signal_raw table and provenance manifest. Downsampling uses polyphase
+    FIR anti-alias filtering; no calibration is applied.
     """
     if int(shot) < 1:
         raise ValueError("Shot number must be a positive integer.")
@@ -109,8 +113,18 @@ def fetch_fair_mast_signal(
             )
 
         original_count = int(time.size)
+        source_dt = np.diff(time)
+        source_dt_median = float(np.median(source_dt))
+        source_jitter = float(np.std(source_dt) / source_dt_median)
+        if np.max(source_dt) > 1.05 * source_dt_median or source_jitter > 0.02:
+            raise ValueError(
+                "Source timestamps are irregular or contain gaps; anti-aliased decimation "
+                "requires an approximately uniform source timebase. Resample explicitly first."
+            )
         stride = max(1, int(math.ceil(original_count / max_samples)))
-        time, values = time[::stride], values[::stride]
+        if stride > 1:
+            values = resample_poly(values, up=1, down=stride, window=("kaiser", 8.6), padtype="line")
+            time = time[::stride][:values.size]
         if time.size < 1024:
             raise ValueError("Downsampled signal unexpectedly has fewer than 1024 samples.")
 
@@ -132,6 +146,9 @@ def fetch_fair_mast_signal(
             "original_finite_samples": original_count,
             "exported_samples": int(values.size),
             "downsample_stride": stride,
+            "downsampling_method": "scipy.signal.resample_poly with Kaiser-window FIR anti-alias filter" if stride > 1 else "none (source sample rate retained)",
+            "anti_alias_filter_applied": bool(stride > 1),
+            "source_sampling_rate_hz": float(1.0 / source_dt_median),
             "time_start_s": float(time[0]),
             "time_end_s": float(time[-1]),
             "estimated_sampling_rate_hz_after_stride": fs,
@@ -157,25 +174,40 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
     exports. It deliberately does not crawl websites or scrape HTML pages.
     """
     from urllib.error import HTTPError, URLError
-    from urllib.parse import urlparse
     from urllib.request import Request, urlopen
 
     parsed = urlparse(str(url).strip())
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ValueError("Enter a direct public http:// or https:// file URL.")
     if parsed.username or parsed.password:
         raise ValueError("URLs containing embedded credentials are not allowed.")
     if max_bytes < 1024:
         raise ValueError("Maximum download size must be at least 1024 bytes.")
 
-    request = Request(
-        parsed.geturl(),
-        headers={"User-Agent": "Tokamak-Insight-Suite/0.4 (public scientific data import)"},
-    )
+    def reject_private_destination(target: str) -> None:
+        parts = urlparse(target)
+        host = (parts.hostname or "").rstrip(".").lower()
+        if parts.scheme not in {"http", "https"} or not host or parts.username or parts.password:
+            raise ValueError("Only credential-free HTTP(S) destinations are allowed.")
+        if host in {"localhost", "localhost.localdomain", "metadata.google.internal"} or host.endswith((".localhost", ".local", ".internal")):
+            raise ValueError("Local and internal network destinations are blocked.")
+        try:
+            addresses = [ipaddress.ip_address(host)]
+        except ValueError:
+            try:
+                addresses = list({ipaddress.ip_address(info[4][0]) for info in socket.getaddrinfo(host, parts.port or (443 if parts.scheme == "https" else 80), type=socket.SOCK_STREAM)})
+            except OSError as exc:
+                raise ValueError(f"Could not resolve host {host!r}.") from exc
+        if not addresses or any(not address.is_global for address in addresses):
+            raise ValueError("Private, loopback, link-local, reserved and non-global destinations are blocked.")
+
+    reject_private_destination(parsed.geturl())
+    request = Request(parsed.geturl(), headers={"User-Agent": "Tokamak-Insight-Suite/0.3 (public scientific data import)"})
     try:
         with urlopen(request, timeout=timeout) as response:
             content_type = response.headers.get("Content-Type", "unknown")
             final_url = response.geturl()
+            reject_private_destination(final_url)
             payload = response.read(max_bytes + 1)
     except (HTTPError, URLError, TimeoutError) as exc:
         raise RuntimeError(f"Public data download failed: {exc}") from exc
