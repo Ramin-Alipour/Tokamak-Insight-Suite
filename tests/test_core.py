@@ -802,3 +802,20 @@ def test_geometry_derived_tomography_rejects_invalid_grid():
     from tis.core import build_tomography_matrix_2d
     with pytest.raises(ValueError,match="strictly increasing"):
         build_tomography_matrix_2d([[0,0]],[[1,1]],[0,1,1],[0,1])
+
+
+def test_load_table_comment_marker_preserves_hash_in_channel_headers():
+    raw = b"# instrument export\\nCh#1,Ch#2\\n1.0,2.0\\n3.0,4.0\\n"
+    frame = load_table(raw, "channels.csv", comment="#")
+    assert list(frame.columns) == ["Ch#1", "Ch#2"]
+    np.testing.assert_allclose(frame["Ch#1"], [1.0, 3.0])
+    np.testing.assert_allclose(frame["Ch#2"], [2.0, 4.0])
+
+
+def test_load_table_decimal_comma_and_unit_row_keeps_numeric_channel():
+    raw = b"time;signal\\nunit;V\\n0,0;1,5\\n0,1;2,5\\n0,2;3,5\\n"
+    frame = load_table(raw, "channels.csv", delimiter=";", decimal=",", skiprows=0)
+    # The first unit row is retained as a row but numeric conversion recovers the channel.
+    assert frame["signal"].dtype.kind in "fi"
+    assert frame["signal"].isna().sum() == 1
+    np.testing.assert_allclose(frame["signal"].dropna(), [1.5, 2.5, 3.5])
