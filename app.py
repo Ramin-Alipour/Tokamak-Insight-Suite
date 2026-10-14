@@ -866,7 +866,7 @@ elif page=='Diagnostic Catalog':
         entries=[f for f in FORMULAS if not query or query in ' '.join(str(v) for v in f.values()).lower()]
         st.write(f'{len(entries)} formula entries')
         for f in entries:
-            with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Status:** {f['status']}\n\n**Assumptions:** {f['assumptions']}")
+            with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inference class:** {f.get('inference_class', f['status'])}\n\n**Validation status:** {f.get('validation_status', 'Not independently validated as a complete diagnostic workflow')}\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Assumptions:** {f['assumptions']}")
         json_download('Export formula registry JSON',entries,'tis_formula_registry.json')
 
 elif page=='Reports & Export':
