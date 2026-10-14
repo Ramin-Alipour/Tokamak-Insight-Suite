@@ -164,6 +164,16 @@ def _result_summary(value):
 def download_df(label, data, name):
     st.download_button(label,data.to_csv(index=False).encode(),name,'text/csv')
 
+def _parameter_snapshot():
+    snapshot={}
+    for key,value in st.session_state.items():
+        if key.startswith(("tis_raw","tis_df","tis_upload_raw","global_upload","tomo_A","tomo_y","tomo_sigma","rad_E")):
+            continue
+        if isinstance(value,(str,int,float,bool,type(None),list,tuple,dict,np.integer,np.floating,np.bool_)):
+            try: snapshot[str(key)]=_json_safe(value)
+            except (TypeError,ValueError): continue
+    return snapshot
+
 def json_download(label,obj,name):
     safe=_json_safe(obj)
     payload=json.dumps(safe,indent=2,ensure_ascii=False,allow_nan=False).encode()
@@ -171,6 +181,7 @@ def json_download(label,obj,name):
     if not any(token in name.lower() for token in ("provenance","registry","formula_registry")):
         history=st.session_state.get("tis_analysis_history",[])
         history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
+                  "page":page,"parameter_snapshot":_parameter_snapshot(),
                   "result_summary":_result_summary(obj)}]+history
         st.session_state["tis_analysis_history"]=history[:20]
 def need_data():
