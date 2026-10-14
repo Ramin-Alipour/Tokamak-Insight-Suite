@@ -390,15 +390,18 @@ def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | N
     """Compute covariance fluxes from aligned physical-unit time series."""
     n=np.asarray(density,float).ravel(); vr=np.asarray(radial_velocity,float).ravel()
     if len(n)!=len(vr) or len(n)<3: raise ValueError('Density and radial velocity must be aligned and have at least 3 samples.')
-    good=np.isfinite(n)&np.isfinite(vr); n,vr=n[good],vr[good]
-    if len(n)<3: raise ValueError('Not enough finite aligned samples.')
-    nf=n-np.mean(n); vf=vr-np.mean(vr)
-    out={'particle_flux_covariance_m-2_s-1':float(np.mean(nf*vf)),'mean_density_m-3':float(np.mean(n)),'mean_radial_velocity_m_s':float(np.mean(vr))}
+    te=None
     if temperature_eV is not None:
         te=np.asarray(temperature_eV,float).ravel()
-        if len(te)!=len(good): raise ValueError('Temperature series must have same original length as density.')
-        te=te[good]
-        if len(te)!=len(n): raise ValueError('Temperature, density and velocity must align.')
+        if len(te)!=len(n): raise ValueError('Temperature series must have same original length as density.')
+    good=np.isfinite(n)&np.isfinite(vr)
+    if te is not None: good &= np.isfinite(te)
+    n,vr=n[good],vr[good]
+    if te is not None: te=te[good]
+    if len(n)<3: raise ValueError('Not enough finite aligned samples after applying the common validity mask.')
+    nf=n-np.mean(n); vf=vr-np.mean(vr)
+    out={'particle_flux_covariance_m-2_s-1':float(np.mean(nf*vf)),'mean_density_m-3':float(np.mean(n)),'mean_radial_velocity_m_s':float(np.mean(vr))}
+    if te is not None:
         tf=te-np.mean(te)
         out['density_temperature_velocity_covariance_eV_m-2_s-1']=float(np.mean(nf*tf*vf))
         out['electron_heat_flux_proxy_W_m-2']=float(1.5*E_CHARGE*np.mean(n*te*vf))
