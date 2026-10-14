@@ -746,6 +746,13 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     th,ph,w=th[keep],ph[keep],w[keep]
     if len(th)<3:
         raise ValueError("At least three positive-weight sensors are required for mode fitting.")
+    # Recompute the resolvable mode bound after excluding zero-weight sensors:
+    # the resulting angular gaps, not the original sensor count, set the limit.
+    active_gaps=np.diff(np.r_[th, th[0]+2*np.pi])
+    active_limit=max(0, int(np.ceil(np.pi/np.max(active_gaps)-1e-12))-1)
+    if active_limit<1:
+        raise ValueError("Positive-weight sensor geometry is too sparse for a nonzero mode estimate.")
+    limit=min(active_limit,int(max_mode_number)) if max_mode_number is not None else active_limit
     th0=th-th[0]
     candidates=np.arange(-limit,limit+1,dtype=int)
     scores=np.asarray([abs(np.sum(w*np.exp(1j*(ph-n*th0))))/np.sum(w) for n in candidates])
