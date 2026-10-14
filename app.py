@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
-from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, fetch_public_table_bytes
+from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_velocity_m_s, derive_parameters,
@@ -127,6 +127,31 @@ elif page=='Public Data Access':
     st.title('Public Experimental Data Access')
     st.caption('Fetch a single time-series signal directly from the public UKAEA FAIR-MAST archive. Shot/group availability varies; this does not download the entire archive.')
     st.markdown('Source documentation: [FAIR-MAST Level-1 data](https://mastapp.site/level1-data.html) · [Archive overview](https://www.ukaea.org/service/fair-mast/)')
+    st.subheader('Discover signals in a public shot')
+    with st.form('fair_mast_inventory_form'):
+        inv1, inv2 = st.columns(2)
+        with inv1:
+            inventory_shot = st.number_input('Shot to inspect', min_value=1, value=30421, step=1, key='inventory_shot')
+        with inv2:
+            inventory_group = st.selectbox('Group to inspect', ['amc', 'ane', 'ayc', 'efm', 'xmo'], key='inventory_group', help='Some groups contain multidimensional profiles or images that need a dedicated loader.')
+        inventory_clicked = st.form_submit_button('List available signals')
+    if inventory_clicked:
+        try:
+            with st.spinner('Reading signal metadata from FAIR-MAST...'):
+                inventory_frame, inventory_manifest = list_fair_mast_signals(int(inventory_shot), inventory_group)
+                st.session_state['tis_signal_inventory'] = inventory_frame
+                st.session_state['tis_signal_inventory_manifest'] = inventory_manifest
+        except Exception as e:
+            st.error(f'Signal inventory failed: {e}')
+    if 'tis_signal_inventory' in st.session_state:
+        inventory_frame = st.session_state['tis_signal_inventory']
+        inventory_manifest = st.session_state['tis_signal_inventory_manifest']
+        st.success(f"{inventory_manifest['variable_count']} variables found · {inventory_manifest['one_dimensional_numeric_time_traces']} numeric 1-D time traces supported by the current importer")
+        st.dataframe(inventory_frame, use_container_width=True, hide_index=True)
+        st.download_button('Download signal inventory CSV', data=inventory_frame.to_csv(index=False).encode('utf-8'), file_name=f"mast_{inventory_manifest['shot']}_{inventory_manifest['source_group']}_signal_inventory.csv", mime='text/csv')
+        with st.expander('Inventory provenance and limitations'):
+            st.json(inventory_manifest)
+
     with st.form('fair_mast_fetch_form'):
         c1, c2 = st.columns(2)
         with c1:
