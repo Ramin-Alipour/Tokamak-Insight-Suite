@@ -58,7 +58,7 @@ jobs:
           /tmp/tis-wheel-env/bin/tis catalog --kind both --output-dir /tmp/tis-wheel-catalog
           test -s /tmp/tis-wheel-catalog/DIAGNOSTIC_REGISTRY.json
           test -s /tmp/tis-wheel-catalog/FORMULA_REGISTRY.json
-          /tmp/tis-wheel-env/bin/python -m streamlit run /tmp/tis-wheel-env/lib/python${{ matrix.python-version }}/site-packages/app.py --server.headless true --server.address 127.0.0.1 --server.port 8502 > /tmp/tis-wheel-streamlit.log 2>&1 &
+          /tmp/tis-wheel-env/bin/tis dashboard -- --server.headless true --server.address 127.0.0.1 --server.port 8502 > /tmp/tis-wheel-streamlit.log 2>&1 &
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 30); do
