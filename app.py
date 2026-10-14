@@ -14,7 +14,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, fluctuation_flux,
     exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
-    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio)
+    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
 st.markdown('''<style>
@@ -328,6 +328,27 @@ elif page=='Time Series & MHD':
         phs=st.text_input('Measured phase (radians, comma-separated)','0,1.5707963,3.1415927,4.712389')
         if st.button('Fit mode number'):
             try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')]))
+            except Exception as e: st.error(str(e))
+        st.markdown('### Calibrated signal integration')
+        st.caption('Useful for derivative-type diagnostics such as pickup coils or Rogowski signals only when the sensor scale, offset/baseline, bandwidth and initial condition are known. The software does not infer these calibrations.')
+        int_scale=st.number_input('Integration input scale',value=1.0,format='%.8g',key='int_scale')
+        int_initial=st.number_input('Integrated initial value',value=0.0,format='%.8g',key='int_initial')
+        use_baseline=st.checkbox('Subtract mean over a baseline interval',value=False,key='int_use_baseline')
+        if use_baseline:
+            tmin=float(np.min(t)); tmax=float(np.max(t))
+            b1,b2=st.columns(2)
+            with b1: baseline_start=st.number_input('Baseline start (s)',value=tmin, min_value=tmin, max_value=tmax, key='int_baseline_start')
+            with b2: baseline_end=st.number_input('Baseline end (s)',value=min(tmin+(tmax-tmin)*0.1,tmax), min_value=tmin, max_value=tmax, key='int_baseline_end')
+        else:
+            baseline_start=baseline_end=None
+        if st.button('Integrate calibrated signal'):
+            try:
+                integrated=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end)
+                st.json({k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}})
+                plot_line(t,integrated['integrated_signal'],'Time (s)','Integrated signal','Cumulative calibrated integral')
+                out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':integrated['calibrated_signal'],'integrated_signal':integrated['integrated_signal']})
+                download_df('Download integrated series',out,'tis_integrated_timeseries.csv')
+                json_download('Export integration manifest',{k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}},'tis_integration_manifest.json')
             except Exception as e: st.error(str(e))
     except Exception as e: st.error(str(e))
 
