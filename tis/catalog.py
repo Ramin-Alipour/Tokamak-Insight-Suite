@@ -9,7 +9,6 @@ _RAW = [
 ("Plasma parameters","Langmuir probe","I–V curve, T_e, V_f, V_p estimate, density/flux estimates","M→D/I","Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.","Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."),
 ("Plasma parameters","Electron cyclotron emission (ECE)","T_e profile and fluctuations","M→D/I","Map frequency to resonance location and fit radiance using radiative transfer assumptions.","Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping."),
 ("Plasma parameters","Charge-exchange recombination spectroscopy (CXRS)","T_i, toroidal/poloidal rotation, impurity density constraints","M→D/I","Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.","Neutral-beam overlap, background, instrument function and atomic data are required."),
-("Plasma parameters","Neutral particle analyzer (NPA)","Neutral energy spectrum; fast-ion distribution constraints","M→I","Apply energy-dependent response and compare to a forward model of neutral production and transport.","Not a direct measurement of local ion density or distribution without modeling."),
 ("Plasma parameters","Ion temperature from Doppler spectroscopy","T_i from corrected Gaussian thermal width","M→D/I","Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.","Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."),
 ("Plasma parameters","Molecular spectroscopy","Rotational/vibrational temperatures; molecular species indicators","M→D/I","Fit molecular band structure and compare populations with an appropriate model.","Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."),
 ("Plasma parameters","Thomson spectral distribution analysis","Electron velocity-distribution constraints","M→I","Fit a scattering spectrum using the correct collective/non-collective model.","Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian."),
@@ -89,6 +88,38 @@ _RAW = [
 ]
 
 DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","caveat"), row)) for row in _RAW]
+
+# Function mapping is deliberately conservative: a catalog entry is not an
+# implemented end-to-end diagnostic unless a callable analysis workflow exists.
+_IMPLEMENTED_WORKFLOWS = {
+    "Langmuir probe": ["langmuir_iv_analysis", "probe_iv_summary"],
+    "Ion temperature from Doppler spectroscopy": ["fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
+    "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels"],
+    "Flux loops": ["integrate_time_series"],
+    "Interferometer": ["linear_phase_density"],
+    "Bolometry": ["regularized_tomography", "build_tomography_matrix_2d", "abel_reconstruction"],
+    "X-ray spectroscopy": ["xray_spectrum_summary"],
+    "Target/divertor heat flux": ["eich_heat_flux_fit", "exponential_heat_flux_fit"],
+    "Calibration curve and uncertainty": ["linear_calibration", "polynomial_calibration", "uncertainty_linear"],
+    "Sampling / aliasing audit": ["prepare_time_series", "signal_quality"],
+    "Correlation / cross-correlation": ["cross_analysis", "cross_correlation_lag"],
+    "Spectral transfer / coherence": ["cross_analysis"],
+    "Multi-channel fluctuation analysis": ["mode_number_from_channels", "fluctuation_flux"],
+    "Energy confinement": ["derive_parameters"],
+    "Greenwald density reference": ["derive_parameters"],
+    "Pressure and beta": ["derive_parameters"],
+    "Plasma parameters": ["derive_parameters"],
+    "Electron plasma frequency": ["derive_parameters"],
+    "Debye length": ["derive_parameters"],
+    "Energy confinement time": ["derive_parameters"],
+    "Tomography inverse problem": ["regularized_tomography", "build_tomography_matrix_2d"],
+    "Abel inversion": ["abel_reconstruction"],
+    "Radiated power": ["axisymmetric_radiated_power"],
+}
+for _d in DIAGNOSTICS:
+    _functions = _IMPLEMENTED_WORKFLOWS.get(_d["diagnostic"], [])
+    _d["implementation_functions"] = _functions
+    _d["implementation_status"] = "Implemented numerical workflow (see limits)" if _functions else "Registry reference only"
 
 FORMULAS = [
 {"name":"Electron plasma frequency","equation":"ω_pe = sqrt(n_e e²/(ε₀ m_e)); f_pe=ω_pe/(2π)","inputs":"n_e [m^-3]","output":"rad/s, Hz","assumptions":"Local electron density; cold-plasma definition."},
