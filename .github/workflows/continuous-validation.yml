@@ -79,6 +79,7 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
             dist/*.zip
+            dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
       - name: Start Streamlit dashboard and check HTTP health
