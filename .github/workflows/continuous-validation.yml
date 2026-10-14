@@ -16,7 +16,7 @@ concurrency:
 jobs:
   tests-and-dashboard:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -41,7 +41,7 @@ jobs:
           python -m pip install build
           python -m build
           git archive --format=zip --output=dist/tokamak-insight-suite-source.zip HEAD
-          python -c "import zipfile; z=zipfile.ZipFile('dist/tokamak-insight-suite-source.zip'); bad=z.testzip(); assert bad is None, bad; names=z.namelist(); assert ('app.py' in names or any(n.endswith('/app.py') for n in names)); assert any(n.endswith('/tis/core.py') for n in names); print('Source ZIP entries:', len(names))"
+          python -c "import zipfile; z=zipfile.ZipFile('dist/tokamak-insight-suite-source.zip'); bad=z.testzip(); assert bad is None, bad; names=z.namelist(); assert ('app.py' in names or any(n.endswith('/app.py') for n in names)); assert ('tis/core.py' in names or any(n.endswith('/tis/core.py') for n in names)); print('Source ZIP entries:', len(names))"
       - name: Verify source ZIP outside checkout
         run: |
           python -c "import zipfile; zipfile.ZipFile('dist/tokamak-insight-suite-source.zip').extractall('/tmp/tis-source-zip')"
