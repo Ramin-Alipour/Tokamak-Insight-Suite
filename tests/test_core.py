@@ -6,7 +6,7 @@ from tis.core import (
     fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag, fit_spectral_line,
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
     regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality,
-    linear_phase_density, load_table, sha256_bytes,
+    linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
     exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram, autocorrelation_analysis,
@@ -515,13 +515,16 @@ def test_langmuir_density_refuses_missing_electron_temperature():
         langmuir_iv_analysis(v, i, ion_fit_range=(-10, -7), area_m2=1e-5, ion_mass_amu=2.0)
 
 
-def test_spectrum_moments_do_not_clip_negative_background_bins():
+def test_spectrum_moments_preserves_negative_net_bins_without_clipping():
     e = np.linspace(1, 10, 10)
-    counts = np.ones(10)
-    background = np.full(10, 1.1)
-    with pytest.raises(ValueError, match="negative bins"):
-        from tis.core import spectrum_moments
-        spectrum_moments(e, counts, background)
+    counts = np.array([1., 3., 7., 10., 12., 9., 6., 3., 1., 0.])
+    background = np.array([1.2, 2.5, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 1.5, 0.5])
+    net = counts - background
+    assert np.any(net < 0)
+    result = spectrum_moments(e, counts, background)
+    assert result["integrated_counts_eV"] > 0
+    assert result["mean_energy_eV"] > 0
+    assert result["n_points"] == len(e)
 
 
 def test_mode_number_sorts_sensors_and_checks_spatial_nyquist():
@@ -531,7 +534,7 @@ def test_mode_number_sorts_sensors_and_checks_spatial_nyquist():
     order = np.array([4, 1, 7, 0, 5, 2, 6, 3])
     result = mode_number_from_phase(theta[order], phase[order])
     assert result["mode_number_fit"] == pytest.approx(3, abs=1e-10)
-    assert result["spatial_alias_limit_mode_number"] == 4
+    assert result["spatial_alias_limit_mode_number"] == 3
     theta6 = np.linspace(0, 2*np.pi, 6, endpoint=False)
     with pytest.raises(ValueError, match="Nyquist|ambiguous"):
         mode_number_from_phase(theta6, 3*theta6)
@@ -663,3 +666,58 @@ def test_spectrum_moments_requires_net_uncertainty_when_poisson_background_subtr
     from tis.core import spectrum_moments
     with pytest.raises(ValueError, match="background-subtracted"):
         spectrum_moments(np.arange(1, 11), np.ones(10)*5, background=np.ones(10), assume_poisson_counts=True)
+
+
+# Regressions from the independent runtime review.
+def test_csv_hash_headers_and_decimal_comma_are_preserved():
+    frame = load_table(b"time,Ch#1,Ch#2\\n0,1.5,2.5\\n1,3.5,4.5\\n", "sample.csv")
+    assert list(frame.columns) == ["time", "Ch#1", "Ch#2"]
+    assert frame["time"].tolist() == [0, 1]
+    assert frame["Ch#1"].tolist() == [1.5, 3.5]
+    comma = load_table(b"time;voltage\\n0,0;1,5\\n0,5;2,5\\n", "sample.csv", delimiter=";", decimal=",")
+    assert comma["time"].tolist() == pytest.approx([0.0, 0.5])
+    assert comma["voltage"].tolist() == pytest.approx([1.5, 2.5])
+
+
+def test_csv_skiprows_and_explicit_comment_option():
+    raw = b"instrument export\\nunits: s,V\\ntime,signal\\n0,1\\n1,2\\n"
+    frame = load_table(raw, "sample.txt", skiprows=2)
+    assert list(frame.columns) == ["time", "signal"]
+    assert frame["signal"].tolist() == [1, 2]
+
+
+def test_quantized_microsecond_timestamps_are_accepted_at_400khz():
+    t = np.round(np.arange(1000, dtype=float) / 400_000.0, 6)
+    y = np.sin(2*np.pi*20_000*t)
+    _, _, fs = prepare_time_series(t, y)
+    assert fs == pytest.approx(400_000, rel=0.2)
+
+
+@pytest.mark.parametrize("n_sensors,expected_limit", [(3,1),(5,2),(7,3),(8,3)])
+def test_mode_limit_is_largest_unambiguous_integer(n_sensors, expected_limit):
+    theta = np.linspace(0, 2*np.pi, n_sensors, endpoint=False)
+    result = mode_number_from_phase(theta, 0.3*theta)
+    assert result["spatial_alias_limit_mode_number"] == expected_limit
+
+
+def test_zero_weight_sensor_does_not_corrupt_integer_mode_fit():
+    theta = np.linspace(0, 2*np.pi, 7, endpoint=False)
+    phase = 2*theta + 0.2
+    phase[3] += 2.4
+    weights = np.ones(7)
+    weights[3] = 0.0
+    result = mode_number_from_phase(theta, phase, weights=weights)
+    assert result["mode_number_fit"] == 2
+
+
+def test_langmuir_missing_ion_range_is_reported_not_silently_omitted():
+    voltage = np.linspace(-5, 5, 101)
+    current = 0.01*np.exp(voltage/2) - 0.02
+    result = langmuir_iv_analysis(voltage, current, area_m2=1e-5, ion_mass_amu=2.0)
+    assert "ion_density_status" in result
+    assert result["ion_density_status"].startswith("not_estimated")
+
+
+def test_positive_interferometer_phase_has_explicit_positive_default_convention():
+    density = linear_phase_density(0.1, 10e9)
+    assert density[()] > 0
