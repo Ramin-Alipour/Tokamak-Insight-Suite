@@ -839,3 +839,45 @@ def test_profile_fwhm_does_not_merge_separated_peaks():
     y = np.exp(-0.5 * ((x + 2.0) / 0.6) ** 2) + 0.9 * np.exp(-0.5 * ((x - 2.0) / 0.6) ** 2)
     result = profile_gradient_analysis(x, y)
     assert result["FWHM_coordinate_units"] < 2.0
+
+
+
+def test_fair_mast_zarr_open_retries_transient_network_failure(monkeypatch):
+    aiohttp = pytest.importorskip("aiohttp")
+    from tis.data_sources import _open_fair_mast_zarr
+    import time
+
+    class FakeXarray:
+        attempts = 0
+
+        def open_zarr(self, url, group, storage_options):
+            self.attempts += 1
+            timeout = storage_options["client_kwargs"]["timeout"]
+            assert isinstance(timeout, aiohttp.ClientTimeout)
+            assert timeout.total == 45.0
+            if self.attempts == 1:
+                raise aiohttp.ClientConnectionError("temporary network failure")
+            return {"url": url, "group": group}
+
+    fake = FakeXarray()
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+    result = _open_fair_mast_zarr(fake, "https://example.invalid/test.zarr", "xmo")
+    assert result == {"url": "https://example.invalid/test.zarr", "group": "xmo"}
+    assert fake.attempts == 2
+
+
+def test_fair_mast_zarr_open_does_not_retry_invalid_group_metadata():
+    aiohttp = pytest.importorskip("aiohttp")
+    from tis.data_sources import _open_fair_mast_zarr
+
+    class FakeXarray:
+        attempts = 0
+
+        def open_zarr(self, url, group, storage_options):
+            self.attempts += 1
+            raise ValueError("group not found")
+
+    fake = FakeXarray()
+    with pytest.raises(ValueError, match="group not found"):
+        _open_fair_mast_zarr(fake, "https://example.invalid/test.zarr", "missing")
+    assert fake.attempts == 1
