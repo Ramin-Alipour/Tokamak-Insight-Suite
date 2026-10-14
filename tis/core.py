@@ -141,7 +141,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
             candidate = pd.to_numeric(frame[col], errors="coerce")
             nonempty = int(frame[col].notna().sum())
             numeric_count = int(candidate.notna().sum())
-            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.67:
+            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= (2.0 / 3.0):
                 converted = int((frame[col].notna() & candidate.isna()).sum())
                 if converted:
                     coercions[str(col)] = {"converted_to_missing": converted, "nonempty_before": nonempty}
