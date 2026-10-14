@@ -12,7 +12,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, fluctuation_flux,
+    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
@@ -373,13 +373,37 @@ elif page=='Time Series & MHD':
                     download_df('Download cross-channel results',pd.DataFrame(xa),'tis_cross_analysis.csv')
                 else: st.warning('Channels need aligned timestamps and compatible sampling rates.')
             except Exception as e: st.warning(f'Cross-channel analysis unavailable: {e}')
-        st.markdown('### Mode number from multi-sensor phase')
-        st.caption('Enter measured sensor angles and synchronized phase estimates; unwrap convention and geometry must be physically consistent.')
-        ang=st.text_input('Sensor angles θ (radians, comma-separated)','0,1.5707963,3.1415927,4.712389')
-        phs=st.text_input('Measured phase (radians, comma-separated)','0,1.5707963,3.1415927,4.712389')
-        if st.button('Fit mode number'):
-            try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')]))
+        st.markdown('### Mode number from synchronized sensor channels')
+        st.caption('Select at least three synchronized channels in sensor order and enter their toroidal/poloidal angles. Relative phases are extracted from cross spectra and weighted by coherence.')
+        mode_channels=st.multiselect('Sensor signal channels',numeric,default=[],key='mode_sensor_channels')
+        mode_angles=st.text_input('Sensor angles θ (radians, same order as channels)','0,0.785398,1.570796,2.356194,3.141593,3.926991,4.712389,5.497787',key='mode_sensor_angles')
+        mode_coh=st.slider('Minimum coherence with reference sensor',0.0,1.0,0.2,0.05,key='mode_min_coherence')
+        if st.button('Extract phases and fit mode number'):
+            try:
+                if len(mode_channels)<3: raise ValueError('Select at least three sensor channels.')
+                angles=np.asarray([float(z.strip()) for z in mode_angles.split(',')],dtype=float)
+                if len(angles)!=len(mode_channels): raise ValueError('The number of sensor angles must match the selected channels.')
+                raw_signals=np.column_stack([pd.to_numeric(df[name],errors='coerce').to_numpy(dtype=float) for name in mode_channels])
+                raw_times=None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)
+                valid=np.all(np.isfinite(raw_signals),axis=1)
+                if raw_times is not None: valid &= np.isfinite(raw_times)
+                t_common=None if raw_times is None else raw_times[valid]
+                clean=[]
+                fs_common=None
+                for j in range(raw_signals.shape[1]):
+                    _,yj,fsj=prepare_time_series(t_common,raw_signals[valid,j],fs0)
+                    if fs_common is not None and not np.isclose(fsj,fs_common): raise ValueError('Sensor channels do not share a common sampling rate.')
+                    fs_common=fsj; clean.append(yj)
+                result=mode_number_from_channels(angles,np.vstack(clean),fs_common,min_coherence=mode_coh)
+                st.json(result)
+                json_download('Export channel-derived mode fit',result,'tis_mode_number_from_channels.json')
             except Exception as e: st.error(str(e))
+        with st.expander('Advanced: fit already-extracted phases'):
+            ang=st.text_input('Sensor angles θ (radians, comma-separated)','0,1.5707963,3.1415927,4.712389',key='manual_mode_angles')
+            phs=st.text_input('Measured phase (radians, comma-separated)','0,1.5707963,3.1415927,4.712389',key='manual_mode_phases')
+            if st.button('Fit supplied phases',key='fit_manual_mode'):
+                try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')]))
+                except Exception as e: st.error(str(e))
         st.markdown('### Calibrated signal integration')
         st.caption('Useful for derivative-type diagnostics such as pickup coils or Rogowski signals only when the sensor scale, offset/baseline, bandwidth and initial condition are known. The software does not infer these calibrations.')
         int_scale=st.number_input('Integration input scale',value=1.0,format='%.8g',key='int_scale')
