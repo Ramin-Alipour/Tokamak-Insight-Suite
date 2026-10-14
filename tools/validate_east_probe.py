@@ -12,6 +12,8 @@ from pathlib import Path
 from urllib.parse import quote
 import numpy as np
 
+from tis.core import electric_field_from_potential_difference, signal_quality
+
 BASE = "https://zenodo.org/records/18473625/files/"
 FILES = ["22010ne.txt", "22010Te.txt", "22010vf1.txt", "22010vf2.txt", "22010vf3.txt"]
 OUT = Path("artifacts/east-probe-validation")
@@ -55,7 +57,14 @@ for filename in FILES:
     # The density series is stored in units of 10^19 m^-3; the other series
     # are in eV (Te) and V (floating potentials), as cross-checked against paper.
     scale = 1e19 if key == "ne" else 1.0
-    observed = float(np.std(detrended, ddof=1) * scale)
+    # Exercise the actual TIS implementation, then cross-check it independently
+    # against NumPy's sample standard deviation before comparing to the paper.
+    tis_quality = signal_quality(detrended)
+    observed = float(tis_quality["std_sample"] * scale)
+    independent_std = float(np.std(detrended, ddof=1) * scale)
+    software_crosscheck_error = abs(observed - independent_std) / max(abs(independent_std), np.finfo(float).tiny)
+    if not math.isclose(observed, independent_std, rel_tol=1e-12, abs_tol=1e-14):
+        raise RuntimeError(f"{key}: TIS signal_quality disagrees with independent sample standard deviation")
     reference = EXPECTED[key]["std"]
     rel_error = abs(observed - reference) / abs(reference)
     limit = EXPECTED[key]["tolerance_fraction"]
@@ -66,11 +75,14 @@ for filename in FILES:
         "raw_mean_source_units": float(np.mean(segment)),
         "raw_std_source_units": float(np.std(segment, ddof=1)),
         "detrended_std": observed, "unit": EXPECTED[key]["unit"],
+        "tis_core_function": "tis.core.signal_quality",
+        "independent_numpy_sample_std": independent_std,
+        "software_vs_independent_relative_error": software_crosscheck_error,
         "published_reference": reference, "published_statement": EXPECTED[key]["paper"],
         "relative_error": rel_error, "acceptance_limit_fraction": limit, "comparison": status,
     }
     if key == "ne":
-        relative_fluctuation = float(np.std(detrended, ddof=1) / np.mean(segment))
+        relative_fluctuation = float(tis_quality["std_sample"] / np.mean(segment))
         relative_reference = 0.15
         relative_tolerance = 0.20  # paper reports an approximate ~15% relative fluctuation
         relative_error = abs(relative_fluctuation - relative_reference) / relative_reference
@@ -88,19 +100,33 @@ for filename in FILES:
 
 # Reproduce electric-field fluctuation levels from detrended floating potentials.
 field_defs = {
-    "E12": (cleaned["vf2"] - cleaned["vf1"], 0.008),
-    "E13": (cleaned["vf3"] - cleaned["vf1"], 0.016),
-    "E23": (cleaned["vf3"] - cleaned["vf2"], 0.008),
+    "E12": ("vf1", "vf2", 0.008),
+    "E13": ("vf1", "vf3", 0.016),
+    "E23": ("vf2", "vf3", 0.008),
 }
 fields = []
-for key, (delta_v, separation_m) in field_defs.items():
-    observed = float(np.std(delta_v / separation_m, ddof=1))
+for key, (channel_a, channel_b, separation_m) in field_defs.items():
+    # The TIS electric-field routine is the subject under test. The paper
+    # compares fluctuation magnitudes, so field_sign=+1 matches the explicit
+    # difference convention here; the sign does not affect standard deviation.
+    tis_field = electric_field_from_potential_difference(
+        cleaned[channel_a], cleaned[channel_b], separation_m, field_sign=1
+    )
+    independent_field = (cleaned[channel_b] - cleaned[channel_a]) / separation_m
+    observed = float(signal_quality(tis_field)["std_sample"])
+    independent_std = float(np.std(independent_field, ddof=1))
+    software_crosscheck_error = abs(observed - independent_std) / max(abs(independent_std), np.finfo(float).tiny)
+    if not math.isclose(observed, independent_std, rel_tol=1e-12, abs_tol=1e-10):
+        raise RuntimeError(f"{key}: TIS electric-field result disagrees with independent difference calculation")
     reference = FIELD_EXPECTED[key]
     rel_error = abs(observed - reference) / reference
     # Article reports approximate values at two significant digits.
     limit = 0.15
     status = "PASS" if rel_error <= limit else "FAIL"
     fields.append({"quantity": key, "observed_std_V_per_m": observed,
+                   "tis_core_functions": ["tis.core.electric_field_from_potential_difference", "tis.core.signal_quality"],
+                   "independent_numpy_std_V_per_m": independent_std,
+                   "software_vs_independent_relative_error": software_crosscheck_error,
                    "published_reference_V_per_m": reference, "relative_error": rel_error,
                    "acceptance_limit_fraction": limit, "comparison": status})
     print(f"{status} {key}: sigma_E={observed:.6g} V/m; published≈{reference:.6g}; error={rel_error:.2%}")
@@ -127,7 +153,7 @@ report = {
     "results": results, "electric_field_results": fields,
     "passed_comparisons": passed, "total_comparisons": total,
     "status": "PASS" if passed == total else "FAIL",
-    "interpretation": "Independent numerical reproduction of published EAST probe fluctuation statistics; not a blanket validation of every TIS module.",
+    "interpretation": "The TIS signal_quality and electric_field_from_potential_difference functions were run on the independent published EAST probe dataset and cross-checked against separately expressed NumPy calculations before comparison to paper values. This validates only these tested routines and settings, not every TIS module or diagnostic calibration.",
 }
 (OUT / "east_probe_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 if passed != total:
