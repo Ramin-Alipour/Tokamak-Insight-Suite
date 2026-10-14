@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 
 def test_dashboard_home_renders_without_uncaught_exceptions():
-    app = AppTest.from_file("app.py", default_timeout=30)
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=30)
     app.run()
     assert not app.exception
 
