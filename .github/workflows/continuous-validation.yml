@@ -55,6 +55,14 @@ jobs:
           /tmp/tis-wheel-env/bin/python -m pip install dist/*.whl
           cd /tmp
           /tmp/tis-wheel-env/bin/python -c "import app, tis, importlib.resources as r; assert app.__file__.endswith('app.py'); assert r.files('tis.data').joinpath('DIAGNOSTIC_REGISTRY.json').is_file(); assert r.files('tis.data').joinpath('FORMULA_REGISTRY.json').is_file(); print('Installed dashboard and bundled registries import successfully:', tis.__version__)"
+          /tmp/tis-wheel-env/bin/python - <<'PY'
+          import app
+          from streamlit.testing.v1 import AppTest
+          tested = AppTest.from_file(app.__file__, default_timeout=30).run()
+          assert not tested.exception, [str(item.value) for item in tested.exception]
+          assert any("Tokamak Insight Suite" in str(item.value) for item in tested.markdown)
+          print("Installed wheel dashboard renders without uncaught exceptions.")
+          PY
           /tmp/tis-wheel-env/bin/tis catalog --kind both --output-dir /tmp/tis-wheel-catalog
           test -s /tmp/tis-wheel-catalog/DIAGNOSTIC_REGISTRY.json
           test -s /tmp/tis-wheel-catalog/FORMULA_REGISTRY.json
