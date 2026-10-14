@@ -57,6 +57,7 @@ with st.sidebar:
         import_delimiter=st.selectbox("CSV/TXT delimiter",["Auto-detect",",",";","Tab","|"],index=0,key="import_delimiter")
         import_comment=st.selectbox("Comment marker",["None","#","%"],index=0,key="import_comment")
         import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
+        import_drop_units=st.checkbox("Drop first data row if it contains units (e.g. V / s)",value=False,key="import_drop_units")
     if upload is not None:
         try:
             upload_identity=f"{getattr(upload,'file_id',upload.name)}:{upload.name}:{upload.size}"
@@ -71,13 +72,18 @@ with st.sidebar:
             sheet_value=import_sheet.strip()
             sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
-                "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value},sort_keys=True)
+                "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units)},sort_keys=True)
             needs_import=(new_upload or (st.session_state.get("tis_active_source")=="upload" and
                 import_signature != st.session_state.get("tis_upload_signature")))
             if needs_import:
                 frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
                                  delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
                                  skiprows=int(import_skiprows),comment=None if import_comment=="None" else import_comment)
+                if import_drop_units:
+                    if len(frame)<2: raise ValueError("Cannot drop a units row because the table has fewer than two rows.")
+                    frame=frame.iloc[1:].reset_index(drop=True)
+                    for column in frame.columns:
+                        frame[column]=pd.to_numeric(frame[column],errors="ignore")
                 st.session_state.pop("tis_source_manifest",None)
                 st.session_state["tis_raw"]=uploaded_bytes
                 st.session_state["tis_filename"]=upload.name
@@ -91,7 +97,7 @@ with st.sidebar:
                 st.session_state["tis_active_source"]="upload"
                 st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
                 st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
-                    "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value}
+                    "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units)}
         except Exception as e:
             st.error(f"Import failed: {e}")
     if 'tis_df' in st.session_state:
