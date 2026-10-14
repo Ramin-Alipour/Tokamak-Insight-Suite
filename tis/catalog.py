@@ -2,6 +2,7 @@
 Catalog entries describe observables and analysis pathways; they are not universal calibrations.
 """
 from __future__ import annotations
+import re
 
 # M = directly measured; D = derived from calibrated measurements; I = model-dependent inference.
 _RAW = [
@@ -89,7 +90,7 @@ _RAW = [
 
 DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","caveat"), row)) for row in _RAW]
 for _i, _d in enumerate(DIAGNOSTICS, start=1):
-    _d["id"] = f"diag-{_i:03d}"
+    _d["id"] = "diag-" + re.sub(r"[^a-z0-9]+", "-", _d["diagnostic"].lower()).strip("-")
 
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
@@ -176,7 +177,7 @@ def _formula_classification(name: str) -> str:
 
 for _i, _f in enumerate(FORMULAS, start=1):
     _f.setdefault("category", "Core physics")
-    _f["id"] = f"formula-{_i:03d}"
+    _f["id"] = "formula-" + re.sub(r"[^a-z0-9]+", "-", _f["name"].lower()).strip("-")
     _f["inference_class"] = _formula_classification(_f["name"])
     _f["status"] = _f["inference_class"]
     _f["validation_status"] = "Not independently validated as a complete diagnostic workflow"
