@@ -43,7 +43,7 @@ Then open `http://localhost:8501`.
 
 ## Tests and CI
 
-The automated GitHub Actions workflow installs the dependencies and runs the test suite on repository updates. The v0.3.0 suite passed **39 tests** in GitHub Actions.
+The automated GitHub Actions workflow installs the dependencies and runs the test suite on repository updates. The suite includes **66 test cases** (including parameterized input-validation cases). The current result is recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
 
 ## Scientific scope and limitations
 
