@@ -876,30 +876,64 @@ def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
     return {'integral_trapezoid':float(integrate.trapezoid(y,x)),'coordinate_min':float(x[0]),'coordinate_max':float(x[-1]),'profile_max':float(np.max(y)),'profile_min':float(np.min(y))}
 
 
-def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None) -> dict[str, float]:
-    """Calculate moments only for nonnegative background-corrected spectral weights.
+def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
+                     count_uncertainty: Any | None = None,
+                     assume_poisson_counts: bool = False) -> dict[str, float | str | int | bool]:
+    """Calculate moments without clipping negative bins and optionally propagate count uncertainty.
 
-    Negative bins are not silently clipped: use a justified background/noise model
-    or an explicit nonnegative reconstruction before interpreting moments.
+    Poisson uncertainty is inferred only when explicitly requested for raw, non-background-
+    subtracted counts. For background-subtracted data, supply the uncertainty of the net bins
+    (including background uncertainty/covariance as appropriate).
     """
-    e=np.asarray(energy_eV,float).ravel(); c=np.asarray(counts,float).ravel()
+    e=np.asarray(energy_eV,float).ravel(); raw=np.asarray(counts,float).ravel(); c=raw.copy()
     if len(e)!=len(c) or len(e)<3: raise ValueError('Energy and counts must have same length and at least 3 samples.')
-    if not np.all(np.isfinite(e)):
-        raise ValueError('Energy coordinates must be finite.')
+    if not np.all(np.isfinite(e)): raise ValueError('Energy coordinates must be finite.')
+    if assume_poisson_counts and background is not None and count_uncertainty is None:
+        raise ValueError("Poisson uncertainty cannot be inferred from background-subtracted net counts; supply count_uncertainty including background uncertainty.")
+    if count_uncertainty is not None:
+        sigma=np.asarray(count_uncertainty,float).ravel()
+        if len(sigma)!=len(c) or not np.all(np.isfinite(sigma)) or np.any(sigma<0):
+            raise ValueError('count_uncertainty must be finite, nonnegative and match counts length.')
+    elif assume_poisson_counts:
+        if np.any(raw<0): raise ValueError("Raw Poisson counts must be nonnegative.")
+        sigma=np.sqrt(raw)
+    else:
+        sigma=None
     if background is not None:
         b=np.asarray(background,float).ravel()
         if len(b)!=len(c) or not np.all(np.isfinite(b)): raise ValueError('Background must be finite and match counts length.')
         c=c-b
-    m=np.isfinite(e)&np.isfinite(c); e,c=e[m],c[m]
+    m=np.isfinite(e)&np.isfinite(c)
+    if sigma is not None: m &= np.isfinite(sigma)
+    e,c=e[m],c[m]
+    if sigma is not None: sigma=sigma[m]
     o=np.argsort(e); e,c=e[o],c[o]
-    if np.any(np.diff(e) <= 0):
-        raise ValueError('Energy coordinates must be unique after sorting.')
+    if sigma is not None: sigma=sigma[o]
+    if np.any(np.diff(e) <= 0): raise ValueError('Energy coordinates must be unique after sorting.')
     if np.any(c < 0):
         raise ValueError('Background-subtracted spectrum contains negative bins; moments are not computed by clipping noise. Improve the background/noise model or explicitly select a justified nonnegative signal.')
-    area=float(integrate.trapezoid(c,e))
+    quad=np.empty_like(e)
+    quad[0]=(e[1]-e[0])/2; quad[-1]=(e[-1]-e[-2])/2
+    quad[1:-1]=(e[2:]-e[:-2])/2
+    weighted=quad*c
+    area=float(np.sum(weighted))
     if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
-    mean=float(integrate.trapezoid(e*c,e)/area); var=float(integrate.trapezoid((e-mean)**2*c,e)/area)
-    return {'integrated_counts_eV':area,'mean_energy_eV':mean,'rms_energy_spread_eV':math.sqrt(max(var,0)),'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),'note':'Moments are descriptive; detector response, efficiency, pile-up and background model are not corrected automatically.'}
+    mean=float(np.sum(e*weighted)/area)
+    var=float(np.sum((e-mean)**2*weighted)/area)
+    spread=math.sqrt(max(var,0))
+    result={'integrated_counts_eV':area,'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
+            'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
+            'uncertainty_propagated':sigma is not None,
+            'note':'Moments are descriptive; detector response, efficiency, pile-up and background model are not corrected automatically.'}
+    if sigma is not None:
+        dmean=quad*(e-mean)/area
+        var_derivative=quad*((e-mean)**2-var)/area
+        u_mean=float(np.sqrt(np.sum((dmean*sigma)**2)))
+        u_spread=float(np.sqrt(np.sum((var_derivative*sigma)**2))/(2*spread)) if spread>0 else None
+        result['standard_uncertainty_mean_energy_eV']=u_mean
+        result['standard_uncertainty_rms_energy_spread_eV']=u_spread
+        result['uncertainty_note']='First-order independent-bin uncertainty propagation; background covariance, detector response and model systematics are excluded unless included in supplied bin uncertainties.'
+    return result
 
 
 def neutron_rate_from_counts(counts_per_s: float, efficiency: float, geometric_factor: float = 1.0, calibration_factor: float = 1.0) -> dict[str, float]:
