@@ -800,3 +800,30 @@ def test_geometry_derived_tomography_rejects_invalid_grid():
     from tis.core import build_tomography_matrix_2d
     with pytest.raises(ValueError,match="strictly increasing"):
         build_tomography_matrix_2d([[0,0]],[[1,1]],[0,1,1],[0,1])
+
+
+def test_load_table_preserves_hash_channel_headers_and_decimal_comma():
+    raw = b"time;Ch#1;Ch#2\n0;0,5;1,5\n1;2,5;3,5\n"
+    frame = load_table(raw, "scope.csv", delimiter=";", decimal=",")
+    assert list(frame.columns) == ["time", "Ch#1", "Ch#2"]
+    np.testing.assert_allclose(frame["Ch#1"], [0.5, 2.5])
+    np.testing.assert_allclose(frame["Ch#2"], [1.5, 3.5])
+
+
+def test_prepare_time_series_accepts_microsecond_quantized_clock_without_gap():
+    # 400 kHz acquisition with timestamps rounded to the nearest microsecond
+    # naturally alternates 2 and 3 microseconds.
+    true_t = np.arange(4096, dtype=float) / 400_000
+    rounded_t = np.round(true_t * 1e6) / 1e6
+    signal_values = np.sin(2 * np.pi * 20_000 * true_t)
+    t, y, fs = prepare_time_series(rounded_t, signal_values)
+    assert len(t) == len(y) == len(signal_values)
+    assert fs == pytest.approx(400_000, rel=0.15)
+
+
+def test_langmuir_without_geometry_does_not_require_default_ion_mass():
+    voltage = np.linspace(-20, 20, 101)
+    current = 0.01 * np.exp(voltage / 10) - 0.02
+    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-5, 15), ion_fit_range=(-20, -10))
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_density_status" not in result
