@@ -1,6 +1,6 @@
 # Tokamak Insight Suite (TIS)
 
-**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.3.0**.
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.0**.
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
@@ -14,6 +14,7 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+# Optional extras: pip install '.[test,excel,data]'
 streamlit run app.py
 ```
 
@@ -41,9 +42,9 @@ python -m pip install -r requirements-data.txt
 python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
 ```
 
-A GitHub Actions integration workflow now exercises multiple real diagnostics, not just one trace: shot 29790 `xmo/omaha_1lz` (Mirnov pickup signal), plus shot 30421 `amc/plasma_current` (plasma/coil-current source) and `ane/density` (CO₂ interferometer). It also exports a selected `efm/plasma_current_rz` grid from the archive’s existing EFIT reconstruction at a requested time. In the dashboard, the Public Data Access page can inventory variables available in a shot/group, mark which numeric one-dimensional traces the current importer supports, fetch time-series data, and retrieve/plot an existing EFIT grid. It checks finite samples, strictly increasing time, CSV export, FFT, Welch PSD, and digital filtering for the Mirnov case; FFT/Welch plus signal-quality metrics for the current and interferometer traces; and the dimensions, coordinates, finite fraction, and metadata of the EFIT grid. Successful runs publish CSV files, JSON provenance manifests, and a summary in the downloadable artifact `mast-real-data-multidiagnostic-validation`. Run it manually from **Actions → Real MAST data integration test → Run workflow**. Network access to the public archive is required, so raw data are not bundled in Git.
+A GitHub Actions integration workflow now exercises multiple real diagnostics, not just one trace: shot 29790 `xmo/omaha_1lz` (Mirnov pickup signal), plus shot 30421 `amc/plasma_current` (plasma/coil-current source) and `ane/density` (CO₂ interferometer). It also exports a selected `efm/plasma_current_rz` grid from the archive’s existing EFIT reconstruction at a requested time. In the dashboard, the Public Data Access page can inventory variables available in a shot/group, mark which numeric one-dimensional traces the current importer supports, fetch time-series data, and retrieve/plot an existing EFIT grid. It checks finite samples, strictly increasing time, anti-alias-filtered downsampling, CSV export, FFT, Welch PSD, and digital filtering for the Mirnov case; FFT/Welch plus signal-quality metrics for the current and interferometer traces; and the dimensions, coordinates, finite fraction, and metadata of the EFIT grid. Successful runs publish CSV files, JSON provenance manifests, and a summary in the downloadable artifact `mast-real-data-multidiagnostic-validation`. Run it manually from **Actions → Real MAST data integration test → Run workflow**. Network access to the public archive is required, so raw data are not bundled in Git.
 
-This validates a real diagnostic time-series path only. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
+This validates a real diagnostic time-series path only. Anti-aliasing is applied before downsampling; the exported sample-rate and filter method are recorded in the provenance manifest. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
 
 Public real-data archives and access notes: [Public Tokamak Data Sources](docs/public_tokamak_data_sources.md).
 
@@ -62,10 +63,12 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 ## Tests and CI
 
+Install test tools with `pip install -e '.[test]'`; data archive support is optional via `pip install -e '.[data]'`, and legacy `.xls` support via `pip install -e '.[excel]'`.
+
 The automated GitHub Actions workflow installs the dependencies and runs the test suite on repository updates. The suite includes numerical regression, parameterized input-validation, and physics-identity tests. The `Continuous validation` workflow compiles the source, runs `pytest`, and smoke-tests the Streamlit health endpoint on pushes and pull requests. Results are recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
 
 ## Scientific scope and limitations
 
-This is a research analysis framework, **not** a tokamak control, interlock, or safety system. Calculations are only meaningful when the user supplies appropriate units, calibration, geometry, instrument response, uncertainty assumptions, and valid measurement conditions. Some modules provide generic estimates or analysis building blocks rather than complete device-specific diagnostic inversions. In particular, flux-grid derivatives are not an EFIT/Grad–Shafranov equilibrium solver. Do not treat a formula catalog entry as proof of a validated end-to-end implementation.
+This is a research analysis framework, **not** a tokamak control, interlock, or safety system. Calculations are only meaningful when the user supplies appropriate units, calibration, geometry, instrument response, uncertainty assumptions, and valid measurement conditions. Mode-number fits sort sensors by angle and report the spatial alias limit; phase-only data cannot identify a mode above that limit without a physical prior. Timestamp gaps, invalid Langmuir temperature estimates, and negative background-subtracted spectral bins are rejected rather than silently converted into plausible-looking values. Some modules provide generic estimates or analysis building blocks rather than complete device-specific diagnostic inversions. In particular, flux-grid derivatives are not an EFIT/Grad–Shafranov equilibrium solver. Do not treat a formula catalog entry as proof of a validated end-to-end implementation.
 
 The bundled source reference is `docs/reference/tokamak_reference_extracted.txt`, extracted from the 24-page `tokamak.pdf` held in the user's Library. The original PDF is not bundled in this repository. Read [Scientific Scope](docs/scientific_scope.md), [Diagnostic Coverage](docs/diagnostic_coverage.md), and [Release Notes](RELEASE_NOTES.md) before interpreting research results.
