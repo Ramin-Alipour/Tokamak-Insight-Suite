@@ -206,16 +206,27 @@ def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = T
     return f, amp
 
 
-def welch_psd(values: Any, fs: float, nperseg: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+def welch_psd(values: Any, fs: float, nperseg: int | None = None,
+              noverlap: int | None = None, window: str = 'hann') -> tuple[np.ndarray, np.ndarray]:
+    """Estimate PSD with explicit segment length, overlap, and window choices."""
     x = np.asarray(values, dtype=float).ravel()
     if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before PSD analysis.')
-    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 1):
-        raise ValueError('nperseg must be a positive integer when supplied.')
-    nperseg = min(len(x), int(nperseg) if nperseg is not None else min(1024, max(8, len(x)//4)))
-    return signal.welch(x, fs=fs, nperseg=nperseg, detrend='constant', scaling='density')
+    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 8):
+        raise ValueError('nperseg must be an integer of at least 8 when supplied.')
+    nperseg = min(len(x), int(nperseg) if nperseg is not None else min(4096, max(8, len(x)//4)))
+    if noverlap is not None and (isinstance(noverlap, bool) or int(noverlap) != noverlap or noverlap < 0 or noverlap >= nperseg):
+        raise ValueError('noverlap must be an integer in [0, nperseg).')
+    if not isinstance(window, str) or not window.strip():
+        raise ValueError('window must be a valid SciPy window name.')
+    overlap = int(noverlap) if noverlap is not None else nperseg // 2
+    try:
+        return signal.welch(x, fs=fs, window=window, nperseg=nperseg, noverlap=overlap,
+                            detrend='constant', scaling='density')
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f'Invalid Welch window or configuration: {exc}') from exc
 
 
 
