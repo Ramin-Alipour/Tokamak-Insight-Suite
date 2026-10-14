@@ -112,8 +112,10 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; handle missing samples before filtering.')
     nyq = fs/2
-    if highpass is not None and highpass <= 0: highpass = None
-    if lowpass is not None and lowpass <= 0: lowpass = None
+    if highpass is not None and (not np.isfinite(highpass) or highpass <= 0):
+        raise ValueError('High-pass cutoff must be positive and finite when supplied.')
+    if lowpass is not None and (not np.isfinite(lowpass) or lowpass <= 0):
+        raise ValueError('Low-pass cutoff must be positive and finite when supplied.')
     if highpass is None and lowpass is None:
         return x.copy()
     if highpass is not None and (highpass >= nyq or not np.isfinite(highpass)):
@@ -135,7 +137,9 @@ def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = T
         raise ValueError('Need at least two samples and a positive finite sampling rate.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before FFT.')
-    x = signal.detrend(x) if detrend else x - np.mean(x)
+    # Preserve the DC component when detrend=False; otherwise remove the mean.
+    if detrend:
+        x = signal.detrend(x)
     w = signal.get_window(window, len(x), fftbins=True)
     z = np.fft.rfft(x*w)
     f = np.fft.rfftfreq(len(x), 1/fs)
