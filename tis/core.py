@@ -198,7 +198,7 @@ def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None
     # Quantized clocks can alternate adjacent intervals; reject likely gaps,
     # not harmless timestamp rounding at high sample rates.
     outlier_fraction = float(np.mean(dt > 1.5 * med_dt))
-    if max_gap_ratio > 1.5 or outlier_fraction > 0.01:
+    if max_gap_ratio > 1.6 or outlier_fraction > 0.01:
         raise ValueError(
             "A likely dropped-sample gap was detected "
             f"(std/mean={jitter:.3g}, max_dt/median_dt={max_gap_ratio:.3g}, "
