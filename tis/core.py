@@ -102,10 +102,15 @@ def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None
 
 def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lowpass: float | None = None, order: int = 3) -> np.ndarray:
     x = np.asarray(values, dtype=float).ravel()
+    if isinstance(order, bool) or int(order) != order or order < 1:
+        raise ValueError('Filter order must be a positive integer.')
+    order = int(order)
     if len(x) < max(12, 3*order+1):
         raise ValueError('Signal is too short for the selected filter.')
-    if fs <= 0 or not np.isfinite(fs):
-        raise ValueError('Sampling frequency must be positive.')
+    if not np.isfinite(fs) or fs <= 0:
+        raise ValueError('Sampling frequency must be positive and finite.')
+    if not np.all(np.isfinite(x)):
+        raise ValueError('Signal must contain only finite values; handle missing samples before filtering.')
     nyq = fs/2
     if highpass is not None and highpass <= 0: highpass = None
     if lowpass is not None and lowpass <= 0: lowpass = None
@@ -126,7 +131,10 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
 
 def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = True) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(values, dtype=float).ravel()
-    if len(x)<2 or fs<=0: raise ValueError('Need at least two samples and a positive sampling rate.')
+    if len(x) < 2 or not np.isfinite(fs) or fs <= 0:
+        raise ValueError('Need at least two samples and a positive finite sampling rate.')
+    if not np.all(np.isfinite(x)):
+        raise ValueError('Signal must contain only finite values; clean missing samples before FFT.')
     x = signal.detrend(x) if detrend else x - np.mean(x)
     w = signal.get_window(window, len(x), fftbins=True)
     z = np.fft.rfft(x*w)
@@ -139,15 +147,27 @@ def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = T
 
 def welch_psd(values: Any, fs: float, nperseg: int | None = None) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(values, dtype=float).ravel()
-    if len(x)<8 or fs<=0: raise ValueError('At least 8 samples and positive fs required.')
-    nperseg = min(len(x), nperseg or min(1024, max(8, len(x)//4)))
+    if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
+        raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
+    if not np.all(np.isfinite(x)):
+        raise ValueError('Signal must contain only finite values; clean missing samples before PSD analysis.')
+    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 1):
+        raise ValueError('nperseg must be a positive integer when supplied.')
+    nperseg = min(len(x), int(nperseg) if nperseg is not None else min(1024, max(8, len(x)//4)))
     return signal.welch(x, fs=fs, nperseg=nperseg, detrend='constant', scaling='density')
 
 
 def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dict[str, np.ndarray]:
     a, b = np.asarray(x, float).ravel(), np.asarray(y, float).ravel()
-    if len(a)!=len(b) or len(a)<8: raise ValueError('Signals must have equal length and at least 8 samples.')
-    n = min(len(a), nperseg or min(1024, max(8, len(a)//4)))
+    if len(a) != len(b) or len(a) < 8:
+        raise ValueError('Signals must have equal length and at least 8 samples.')
+    if not np.isfinite(fs) or fs <= 0:
+        raise ValueError('Sampling frequency must be positive and finite.')
+    if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+        raise ValueError('Both signals must contain only finite values.')
+    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 1):
+        raise ValueError('nperseg must be a positive integer when supplied.')
+    n = min(len(a), int(nperseg) if nperseg is not None else min(1024, max(8, len(a)//4)))
     f, coh = signal.coherence(a,b,fs=fs,nperseg=n)
     fc, pxy = signal.csd(a,b,fs=fs,nperseg=n)
     return {'frequency_Hz':f, 'coherence':coh, 'cross_phase_rad':np.angle(pxy), 'cross_spectrum_real':pxy.real, 'cross_spectrum_imag':pxy.imag}
@@ -155,7 +175,12 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
 
 def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
     a, b = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
-    if len(a)!=len(b) or len(a)<3 or fs<=0: raise ValueError('Equal-length signals and positive fs are required.')
+    if len(a) != len(b) or len(a) < 3 or not np.isfinite(fs) or fs <= 0:
+        raise ValueError('Equal-length signals and a positive finite sampling rate are required.')
+    if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
+        raise ValueError('Both signals must contain only finite values.')
+    if max_lag_s is not None and (not np.isfinite(max_lag_s) or max_lag_s < 0):
+        raise ValueError('Maximum lag must be finite and nonnegative when supplied.')
     a, b = signal.detrend(a), signal.detrend(b)
     corr = signal.correlate(a,b,mode='full',method='auto')
     corr /= max(np.linalg.norm(a)*np.linalg.norm(b), np.finfo(float).eps)
@@ -240,6 +265,10 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
         raise ValueError('Inputs must be finite and physically admissible; radii and ion mass must be positive.')
     if ni_m3 is not None and (not np.isfinite(ni_m3) or ni_m3 < 0):
         raise ValueError('Ion density must be finite and nonnegative.')
+    if stored_energy_J is not None and (not np.isfinite(stored_energy_J) or stored_energy_J < 0):
+        raise ValueError('Stored energy must be finite and nonnegative when supplied.')
+    if loss_power_W is not None and (not np.isfinite(loss_power_W) or loss_power_W < 0):
+        raise ValueError('Loss power must be finite and nonnegative when supplied.')
     ni=ne_m3 if ni_m3 is None else ni_m3
     pe=ne_m3*te_eV*E_CHARGE; pi=ni*ti_eV*E_CHARGE; p=pe+pi
     fpe=float(np.sqrt(ne_m3*E_CHARGE**2/(EPS0*M_E))/(2*np.pi)) if ne_m3>0 else 0.0
@@ -380,7 +409,8 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     if weights is None: coef=np.linalg.lstsq(X,ph,rcond=None)[0]
     else:
         w=np.asarray(weights,float).ravel()
-        if len(w)!=len(th) or np.any(w<0): raise ValueError('Weights must be nonnegative and match sensor count.')
+        if len(w)!=len(th) or not np.all(np.isfinite(w)) or np.any(w<0) or not np.any(w>0):
+            raise ValueError('Weights must be finite, nonnegative, match sensor count, and include a positive value.')
         coef=np.linalg.lstsq(X*np.sqrt(w[:,None]),ph*np.sqrt(w),rcond=None)[0]
     pred=X@coef
     return {'mode_number_fit':float(coef[0]),'nearest_integer_mode_number':float(np.rint(coef[0])),'phase_offset_rad':float(coef[1]),'phase_fit_R2':_r2(ph,pred),'phase_rms_residual_rad':float(np.sqrt(np.mean((ph-pred)**2)))}
@@ -458,6 +488,10 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
     R=np.asarray(R_m,float).ravel(); Z=np.asarray(Z_m,float).ravel(); p=np.asarray(psi,float)
     if p.shape!=(len(Z),len(R)) or len(R)<3 or len(Z)<3: raise ValueError('psi must have shape (len(Z), len(R)) with at least 3 points per axis.')
     if np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0) or np.any(R<=0): raise ValueError('R and Z must be strictly increasing and R positive.')
+    if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or not np.all(np.isfinite(p)):
+        raise ValueError('R, Z and psi grid must contain only finite values.')
+    if not np.isfinite(Bphi_T):
+        raise ValueError('Toroidal magnetic field must be finite.')
     dpsi_dZ,dpsi_dR=np.gradient(p,Z,R,edge_order=2)
     RR=np.broadcast_to(R[None,:],p.shape)
     BR=-dpsi_dZ/RR; BZ=dpsi_dR/RR; BP=np.sqrt(BR**2+BZ**2); BT=np.full_like(BP,float(Bphi_T))
