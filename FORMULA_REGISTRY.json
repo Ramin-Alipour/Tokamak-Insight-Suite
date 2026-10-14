@@ -5,8 +5,11 @@
     "inputs": "n_e [m^-3]",
     "output": "rad/s, Hz",
     "assumptions": "Local electron density; cold-plasma definition.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-001",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Debye length",
@@ -14,8 +17,11 @@
     "inputs": "T_e [K] or convert eV using k_B T=e T_e[eV]; n_e [m^-3]",
     "output": "m",
     "assumptions": "Quasi-equilibrium Maxwellian electron approximation.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-002",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Electron cyclotron frequency",
@@ -23,8 +29,11 @@
     "inputs": "B [T]",
     "output": "rad/s, Hz",
     "assumptions": "Non-relativistic single-particle frequency; harmonics and relativistic shifts may matter.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-003",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Ion sound speed (common approximation)",
@@ -32,8 +41,11 @@
     "inputs": "T_e,T_i [eV], m_i [kg], model γ_i",
     "output": "m/s",
     "assumptions": "Model-dependent closure and ion species.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-004",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Electron thermal pressure",
@@ -41,8 +53,11 @@
     "inputs": "n_e [m^-3], T_e [eV]",
     "output": "Pa",
     "assumptions": "Temperature represented in electron-volts.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-005",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Ion thermal pressure",
@@ -50,8 +65,11 @@
     "inputs": "Species densities and temperatures",
     "output": "Pa",
     "assumptions": "Sum over ion species; do not assume single-ion composition silently.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-006",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Total thermal pressure",
@@ -59,8 +77,11 @@
     "inputs": "Species-consistent electron and ion pressures",
     "output": "Pa",
     "assumptions": "Excludes energetic/non-thermal components unless included explicitly.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-007",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Thermal stored energy",
@@ -68,8 +89,11 @@
     "inputs": "Pressure profile and volume element",
     "output": "J",
     "assumptions": "Classical isotropic ideal-gas form; geometry and species definitions matter.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "reference_only",
+    "category": "Core physics",
+    "id": "formula-008",
+    "inference_class": "reference_only",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Line-integrated electron density",
@@ -77,8 +101,11 @@
     "inputs": "n_e along line of sight",
     "output": "m^-2",
     "assumptions": "A line integral; local profile needs multiple sightlines/model.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-009",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Plasma frequency from density",
@@ -86,8 +113,11 @@
     "inputs": "n_e [cm^-3]",
     "output": "Hz",
     "assumptions": "Approximate electron plasma frequency.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-010",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Doppler line-of-sight velocity",
@@ -95,8 +125,11 @@
     "inputs": "Calibrated centroid shift Δλ; rest wavelength λ₀",
     "output": "m/s",
     "assumptions": "Non-relativistic Doppler approximation and correct viewing geometry.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-011",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Ion temperature from Gaussian Doppler sigma",
@@ -104,8 +137,11 @@
     "inputs": "Corrected σ_λ and λ₀ in same units; ion mass in kg for SI form",
     "output": "eV",
     "assumptions": "Thermal Gaussian Doppler width only; instrument response and other broadening removed.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-012",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Gaussian FWHM and sigma",
@@ -113,8 +149,11 @@
     "inputs": "Gaussian profile width",
     "output": "same width unit",
     "assumptions": "Gaussian profile only.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-013",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Magnetic energy density",
@@ -122,8 +161,11 @@
     "inputs": "B [T]",
     "output": "J/m³ = Pa",
     "assumptions": "Magnetic energy density in vacuum approximation.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-014",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Toroidal beta",
@@ -131,8 +173,11 @@
     "inputs": "Defined pressure average and reference toroidal field",
     "output": "dimensionless",
     "assumptions": "State volume/local average and field convention.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "reference_only",
+    "category": "Core physics",
+    "id": "formula-015",
+    "inference_class": "reference_only",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Safety factor large-aspect-ratio estimate",
@@ -140,8 +185,11 @@
     "inputs": "r,R [m], B_t,B_p [T]",
     "output": "dimensionless",
     "assumptions": "Approximate circular, large-aspect-ratio geometry; equilibrium reconstruction is preferred.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-016",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Faraday induction",
@@ -149,8 +197,11 @@
     "inputs": "Calibrated coil voltage and geometry",
     "output": "V, Wb",
     "assumptions": "Sign, turns, area and electronics response documented.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-017",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Plasma loop resistance proxy",
@@ -158,8 +209,11 @@
     "inputs": "V_loop [V], I_p [A]",
     "output": "Ω",
     "assumptions": "Only under consistent sign/definition; inductive terms can complicate interpretation.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "reference_only",
+    "category": "Core physics",
+    "id": "formula-018",
+    "inference_class": "reference_only",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Ohmic power approximation",
@@ -167,8 +221,11 @@
     "inputs": "V_loop [V], I_p [A]",
     "output": "W",
     "assumptions": "Not generally the same as net loss power or total input power.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-019",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Energy confinement time",
@@ -176,8 +233,11 @@
     "inputs": "W_th [J], P_loss [W]",
     "output": "s",
     "assumptions": "Use consistent boundary, time window and loss-power definition.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-020",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Greenwald density reference",
@@ -185,8 +245,11 @@
     "inputs": "I_p [MA], minor radius a [m]",
     "output": "10^20 m^-3",
     "assumptions": "Empirical reference scaling, not a universal physical limit.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-021",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Debye parameter",
@@ -194,8 +257,11 @@
     "inputs": "n_e [m^-3], λ_D [m]",
     "output": "dimensionless particles",
     "assumptions": "Number of particles in a Debye sphere.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-022",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Electron plasma angular frequency",
@@ -203,8 +269,11 @@
     "inputs": "n_e [m^-3]",
     "output": "rad/s",
     "assumptions": "Local electron density.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-023",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Ion saturation particle flux proxy",
@@ -212,8 +281,11 @@
     "inputs": "I_sat [A], effective area A_eff [m²]",
     "output": "m^-2 s^-1",
     "assumptions": "Converts charge current to particle flux only with valid collection geometry/model.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "reference_only",
+    "category": "Core physics",
+    "id": "formula-024",
+    "inference_class": "reference_only",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Radiated power fraction",
@@ -221,8 +293,11 @@
     "inputs": "P_rad and defined input power, both W",
     "output": "dimensionless",
     "assumptions": "Input-power convention and time averaging must be specified.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-025",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Integrated surface power",
@@ -230,8 +305,11 @@
     "inputs": "Heat flux q_perp [W/m²] and surface area",
     "output": "W",
     "assumptions": "Surface mapping, geometry and heat-flux calibration required.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-026",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Apparent feature speed",
@@ -239,8 +317,11 @@
     "inputs": "Calibrated image displacement and frame interval",
     "output": "m/s",
     "assumptions": "Projected apparent velocity, not necessarily plasma flow velocity.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-027",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Gas pumping speed",
@@ -248,8 +329,11 @@
     "inputs": "Throughput Q and pressure p in consistent units",
     "output": "m³/s (SI throughput convention)",
     "assumptions": "Gauge position, conductance and throughput convention matter.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-028",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Injected particle number",
@@ -257,8 +341,11 @@
     "inputs": "Particle injection rate Ṅ(t) [s^-1]",
     "output": "particles",
     "assumptions": "Rate calibration and time base required.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "reference_only",
+    "category": "Core physics",
+    "id": "formula-029",
+    "inference_class": "reference_only",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Particle confinement time proxy",
@@ -266,8 +353,11 @@
     "inputs": "Stored particle number and loss rate",
     "output": "s",
     "assumptions": "Requires consistent control volume and particle balance.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "model_dependent_estimate",
+    "category": "Core physics",
+    "id": "formula-030",
+    "inference_class": "model_dependent_estimate",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Relative fluctuation level",
@@ -275,8 +365,11 @@
     "inputs": "Time series x with nonzero mean",
     "output": "dimensionless",
     "assumptions": "Window and detrending must be specified; unstable near zero mean.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-031",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "RMS signal",
@@ -284,8 +377,11 @@
     "inputs": "Signal samples",
     "output": "same as signal",
     "assumptions": "Specify whether DC component is included.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-032",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Nyquist frequency",
@@ -293,8 +389,11 @@
     "inputs": "Sampling frequency f_s [Hz]",
     "output": "Hz",
     "assumptions": "Frequencies above Nyquist alias unless anti-alias filtering was applied.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-033",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Cross-correlation lag",
@@ -302,8 +401,11 @@
     "inputs": "Synchronized x(t), y(t)",
     "output": "s",
     "assumptions": "Correlation lag does not establish causality; periodic signals can create ambiguous peaks.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-034",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Magnitude-squared coherence",
@@ -311,8 +413,11 @@
     "inputs": "Synchronized channel time series",
     "output": "0–1",
     "assumptions": "Estimator uncertainty depends on segment count and stationarity.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "derived_quantity",
+    "category": "Core physics",
+    "id": "formula-035",
+    "inference_class": "derived_quantity",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Bolometry inverse problem",
@@ -320,8 +425,11 @@
     "inputs": "Line-integrated signals y, geometry matrix A",
     "output": "Spatial emissivity x",
     "assumptions": "Ill-posed inverse problem; save regularization and uncertainty.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "inverse_problem_or_model_inference",
+    "category": "Core physics",
+    "id": "formula-036",
+    "inference_class": "inverse_problem_or_model_inference",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   },
   {
     "name": "Continuity / particle balance",
@@ -329,7 +437,10 @@
     "inputs": "Stored particles, input/output and source/loss rates",
     "output": "particles/s",
     "assumptions": "Define volume and avoid double-counting source/loss terms.",
-    "status": "D",
-    "category": "Core physics"
+    "status": "inverse_problem_or_model_inference",
+    "category": "Core physics",
+    "id": "formula-037",
+    "inference_class": "inverse_problem_or_model_inference",
+    "validation_status": "Not independently validated as a complete diagnostic workflow"
   }
 ]
