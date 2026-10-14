@@ -11,7 +11,7 @@ from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapsh
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
-    uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
+    uncertainty_linear, regularized_tomography, select_tikhonov_lambda, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
@@ -585,10 +585,20 @@ elif page=='Tomography & Bolometry':
     lam=st.number_input('Tikhonov regularization λ',min_value=0.0,value=.01,format='%.8g',key='tomo_lam'); nonneg=st.checkbox('Constrain reconstructed profile to be nonnegative',value=True,key='tomo_nonneg')
     if tomo_mode=='General response-matrix inversion':
         st.write('Solve y = A x + noise using a calibrated geometry / response matrix.')
-        Afile=st.file_uploader('Response / geometry matrix A (CSV, no header)',type=['csv'],key='tomo_A'); yfile=st.file_uploader('Measurements y (CSV, one column)',type=['csv'],key='tomo_y')
+        Afile=st.file_uploader('Response / geometry matrix A (CSV, no header)',type=['csv'],key='tomo_A'); yfile=st.file_uploader('Measurements y (CSV, one column)',type=['csv'],key='tomo_y'); sigfile=st.file_uploader('Measurement standard uncertainties σ (optional CSV column)',type=['csv'],key='tomo_sigma')
+        auto_lambda=st.checkbox('Select λ using an L-curve curvature heuristic',value=False,key='tomo_auto_lambda')
         if Afile and yfile and st.button('Run regularized reconstruction',type='primary'):
             try:
-                A=pd.read_csv(Afile,header=None).to_numpy(float); y=pd.read_csv(yfile,header=None).to_numpy(float).ravel(); r=regularized_tomography(A,y,lam,nonneg)
+                A=pd.read_csv(Afile,header=None).to_numpy(float); y=pd.read_csv(yfile,header=None).to_numpy(float).ravel()
+                sigma=None if sigfile is None else pd.read_csv(sigfile,header=None).to_numpy(float).ravel()
+                lambda_used=lam
+                if auto_lambda:
+                    choice=select_tikhonov_lambda(A,y,nonnegative=nonneg,measurement_sigma=sigma)
+                    lambda_used=choice['selected_lambda']
+                    st.metric('L-curve selected λ',f'{lambda_used:.6g}')
+                    plot_line(np.log10(np.maximum(choice['weighted_residual_norms'],np.finfo(float).tiny)),np.log10(np.maximum(choice['solution_norms'],np.finfo(float).tiny)),'log₁₀ residual norm','log₁₀ solution norm','Tikhonov L-curve')
+                    json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
+                r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Axisymmetric Abel inversion':
