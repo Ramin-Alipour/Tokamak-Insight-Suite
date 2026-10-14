@@ -325,7 +325,8 @@ def test_welch_psd_integral_is_consistent_with_white_noise_variance():
     rng = np.random.default_rng(20261014)
     x = rng.normal(loc=0.0, scale=2.0, size=32768)
     frequencies, psd = welch_psd(x, fs=2000.0, nperseg=2048, noverlap=1024)
-    integrated_power = float(np.trapezoid(psd, frequencies))
+    from scipy.integrate import trapezoid
+    integrated_power = float(trapezoid(psd, frequencies))
     # For a sufficiently long white-noise realization, integrated one-sided
     # density should recover the variance to statistical accuracy.
     assert integrated_power == pytest.approx(np.var(x), rel=0.08)
