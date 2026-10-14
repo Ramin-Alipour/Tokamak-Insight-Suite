@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from scipy import signal, optimize, integrate, linalg
-from scipy.special import voigt_profile
+from scipy.special import voigt_profile, erfcx
 
 E_CHARGE = 1.602176634e-19
 K_B = 1.380649e-23
@@ -767,6 +767,43 @@ def exponential_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str,
     p,_=optimize.curve_fit(fn,x,y,p0=[q0,max(span/5,1e-9),base0],bounds=([0,span/10000,-np.inf],[np.inf,span*100,np.inf]),maxfev=30000)
     pred=fn(x,*p)
     return {'q0_W_m-2':float(p[0]),'lambda_q_m':float(p[1]),'background_W_m-2':float(p[2]),'r_squared':_r2(y,pred),'n_points':int(len(x)),'note':'Fit quality and mapping from camera pixels to target coordinate must be checked; this is not a heat-transport model.'}
+
+
+def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
+    """Fit the standard Eich-like divertor heat-flux profile including Gaussian spreading.
+
+    q(s) = q0/2 * exp(-((s-s0)/S)^2) * erfcx(S/(2*lambda_q) - (s-s0)/S) + q_bg.
+    The fit is descriptive and assumes the supplied coordinate is already mapped to target
+    distance; it does not infer equilibrium mapping or account for diagnostic response.
+    """
+    x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel()
+    valid=np.isfinite(x)&np.isfinite(y); x,y=x[valid],y[valid]
+    if len(x)<10 or len(np.unique(x))<10:
+        raise ValueError("Eich fit requires at least 10 distinct finite target-coordinate points.")
+    order=np.argsort(x); x,y=x[order],y[order]
+    span=float(np.ptp(x))
+    if span<=0: raise ValueError("Target coordinate must span a nonzero interval.")
+    baseline=float(np.percentile(y,10)); peak=float(np.max(y))
+    if peak<=baseline: raise ValueError("Heat-flux profile must contain a positive signal above its baseline.")
+    def model(s,q0,lam,S,s0,bg):
+        u=(s-s0)/S
+        arg=S/(2*lam)-u
+        # erfcx form avoids overflow in exp(a^2)*erfc(a) for the far SOL tail.
+        return 0.5*q0*np.exp(-u*u)*erfcx(arg)+bg
+    p0=[max(peak-baseline,1e-12),max(span/30,span/10000),max(span/50,span/10000),float(x[np.argmax(y)]),baseline]
+    lower=[0.0,span/10000,span/10000,float(x[0]-span),-np.inf]
+    upper=[np.inf,span*100,span*10,float(x[-1]+span),np.inf]
+    p,cov=optimize.curve_fit(model,x,y,p0=p0,bounds=(lower,upper),maxfev=100000)
+    pred=model(x,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
+    return {
+        "q0_W_m-2":float(p[0]),"lambda_q_m":float(p[1]),"spreading_S_m":float(p[2]),
+        "strike_point_s0_m":float(p[3]),"background_W_m-2":float(p[4]),
+        "standard_error_q0_W_m-2":float(se[0]),"standard_error_lambda_q_m":float(se[1]),
+        "standard_error_spreading_S_m":float(se[2]),"standard_error_strike_point_s0_m":float(se[3]),
+        "standard_error_background_W_m-2":float(se[4]),"r_squared":_r2(y,pred),"n_points":int(len(x)),
+        "model":"Eich-like exponential-convolved-with-Gaussian profile",
+        "note":"Parameter identifiability depends on target coverage, noise, spatial mapping and instrument response; inspect covariance and fit residuals before physical interpretation."
+    }
 
 
 def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
