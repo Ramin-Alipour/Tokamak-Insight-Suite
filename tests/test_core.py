@@ -604,3 +604,46 @@ def test_eich_heat_flux_fit_recovers_synthetic_profile_and_uncertainties():
     assert result["lambda_q_m"] == pytest.approx(lam, rel=0.15)
     assert result["spreading_S_m"] == pytest.approx(spread, rel=0.25)
     assert result["standard_error_lambda_q_m"] >= 0
+
+
+def test_absorption_spectral_line_fit_and_sigma_weighting():
+    x = np.linspace(654, 658, 401)
+    y = 5.0 - 2.0*np.exp(-0.5*((x-656.2)/0.15)**2)
+    sigma = np.full_like(x, 0.05)
+    fit = fit_spectral_line(x, y, model="Gaussian", sigma_y=sigma)
+    assert fit["center"] == pytest.approx(656.2, abs=1e-3)
+    assert fit["amplitude"] == pytest.approx(-2.0, rel=0.02)
+    assert fit["line_polarity"] == "absorption"
+    assert fit["uncertainty_weighted_fit"] is True
+
+
+def test_tomography_accepts_measurement_uncertainties_and_lcurve():
+    from tis.core import select_tikhonov_lambda
+    A = np.array([[1., 0.], [0., 1.], [1., 1.], [2., 1.]])
+    y = np.array([1.0, 2.0, 3.1, 4.0])
+    sigma = np.array([0.1, 0.2, 0.1, 0.3])
+    result = regularized_tomography(A, y, 0.01, False, measurement_sigma=sigma)
+    assert result["measurement_weighting"] == "inverse-variance (1/sigma²)"
+    choice = select_tikhonov_lambda(A, y, lambdas=[1e-4, 1e-2, 1.0, 100.0], nonnegative=False, measurement_sigma=sigma)
+    assert choice["selected_lambda"] in [1e-4, 1e-2, 1.0, 100.0]
+    assert len(choice["discrete_log_lcurve_curvature"]) == 4
+
+
+def test_cross_spectral_phase_convention_is_phi_y_minus_phi_x():
+    fs = 2000.0
+    t = np.arange(4096)/fs
+    x = np.sin(2*np.pi*100*t)
+    y = np.sin(2*np.pi*100*t + 0.4)
+    result = cross_analysis(x, y, fs, nperseg=2048)
+    index = int(np.argmin(np.abs(result["frequency_Hz"]-100)))
+    assert result["cross_phase_rad"][index] == pytest.approx(0.4, abs=0.03)
+
+
+def test_welch_psd_configurable_window_and_overlap():
+    fs = 1000.0
+    t = np.arange(4096)/fs
+    x = np.sin(2*np.pi*50*t)
+    f, p = welch_psd(x, fs, nperseg=1024, noverlap=768, window="hamming")
+    assert f[np.argmax(p)] == pytest.approx(50, abs=1)
+    with pytest.raises(ValueError, match="noverlap"):
+        welch_psd(x, fs, nperseg=128, noverlap=128)
