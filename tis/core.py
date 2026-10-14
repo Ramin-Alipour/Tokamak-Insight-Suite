@@ -405,6 +405,8 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     th=np.asarray(theta_rad,float).ravel(); ph=np.unwrap(np.asarray(phase_rad,float).ravel())
     if len(th)!=len(ph) or len(th)<3 or not np.all(np.isfinite(th)) or not np.all(np.isfinite(ph)):
         raise ValueError('Provide at least 3 paired finite sensor angles and phases.')
+    if np.unique(th).size < 3:
+        raise ValueError('At least 3 distinct sensor angles are required to fit a mode number.')
     X=np.column_stack([th,np.ones_like(th)])
     if weights is None: coef=np.linalg.lstsq(X,ph,rcond=None)[0]
     else:
@@ -463,12 +465,16 @@ def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
 def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None) -> dict[str, float]:
     e=np.asarray(energy_eV,float).ravel(); c=np.asarray(counts,float).ravel()
     if len(e)!=len(c) or len(e)<3: raise ValueError('Energy and counts must have same length and at least 3 samples.')
+    if not np.all(np.isfinite(e)):
+        raise ValueError('Energy coordinates must be finite.')
     if background is not None:
         b=np.asarray(background,float).ravel()
         if len(b)!=len(c): raise ValueError('Background must match counts length.')
         c=c-b
     m=np.isfinite(e)&np.isfinite(c); e,c=e[m],c[m]
     o=np.argsort(e); e,c=e[o],c[o]; c=np.clip(c,0,None)
+    if np.any(np.diff(e) <= 0):
+        raise ValueError('Energy coordinates must be unique after sorting.')
     area=float(integrate.trapezoid(c,e))
     if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
     mean=float(integrate.trapezoid(e*c,e)/area); var=float(integrate.trapezoid((e-mean)**2*c,e)/area)
@@ -513,7 +519,8 @@ def abel_reconstruction(chord_impact_m: Any, line_integrals: Any, radial_edges_m
     """Axisymmetric Abel inversion via a shell path-length matrix and Tikhonov regularization."""
     b=np.asarray(chord_impact_m,float).ravel(); y=np.asarray(line_integrals,float).ravel(); edges=np.asarray(radial_edges_m,float).ravel()
     if len(b)!=len(y) or len(b)<3: raise ValueError('At least 3 paired chord impact parameters and line integrals are required.')
-    if len(edges)<3 or np.any(np.diff(edges)<=0) or edges[0]<0: raise ValueError('Radial edges must be increasing, nonnegative and contain at least 3 values.')
+    if len(edges)<3 or not np.all(np.isfinite(edges)) or np.any(np.diff(edges)<=0) or edges[0]<0:
+        raise ValueError('Radial edges must be finite, increasing, nonnegative and contain at least 3 values.')
     if not np.all(np.isfinite(b)) or not np.all(np.isfinite(y)) or np.any(b<0): raise ValueError('Chord coordinates and line integrals must be finite; impact parameters nonnegative.')
     rin=edges[:-1][None,:]; rout=edges[1:][None,:]; bb=b[:,None]
     A=2*(np.sqrt(np.maximum(rout*rout-bb*bb,0))-np.sqrt(np.maximum(rin*rin-bb*bb,0)))
@@ -528,6 +535,8 @@ def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dic
     R=np.asarray(R_m,float).ravel(); Z=np.asarray(Z_m,float).ravel(); eps=np.asarray(emissivity_W_m3,float)
     if eps.shape!=(len(Z),len(R)) or len(R)<2 or len(Z)<2: raise ValueError('Emissivity grid shape must be (len(Z),len(R)).')
     if np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0) or np.any(R<=0): raise ValueError('R and Z must be increasing and R positive.')
+    if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)):
+        raise ValueError('R and Z coordinates must contain only finite values.')
     if not np.all(np.isfinite(eps)): raise ValueError('Emissivity grid must be finite.')
     # Integrate toroidal volume element 2*pi*R dR dZ over the provided rectangular grid.
     radial=integrate.trapezoid(2*np.pi*R[None,:]*eps,R,axis=1)
