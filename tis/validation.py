@@ -94,3 +94,128 @@ def compare_reference_results(
     out["reference_value"] = ref
     out["software_value"] = got
     return out
+
+
+def compare_reference_series(
+    table: pd.DataFrame,
+    *,
+    coverage_factor: float = 2.0,
+    absolute_tolerance: float | None = None,
+    relative_tolerance: float | None = None,
+) -> dict[str, Any]:
+    """Compare digitized/reference curve data with a software-result series.
+
+    Required columns are x_reference, reference_value, x_software,
+    software_value. Optional uncertainty columns are sampled on their
+    respective series grids. The reference curve is linearly interpolated
+    onto software x values only over the common domain; no extrapolation is
+    performed. Uncertainty interpolation assumes independent endpoint errors.
+    """
+    required = {"x_reference", "reference_value", "x_software", "software_value"}
+    missing = required.difference(table.columns)
+    if missing:
+        raise ValueError("Missing required curve columns: " + ", ".join(sorted(missing)))
+    if not np.isfinite(coverage_factor) or coverage_factor <= 0:
+        raise ValueError("coverage_factor must be positive and finite.")
+    if absolute_tolerance is not None and relative_tolerance is not None:
+        raise ValueError("Specify absolute_tolerance or relative_tolerance, not both.")
+    for name, value in (("absolute_tolerance", absolute_tolerance), ("relative_tolerance", relative_tolerance)):
+        if value is not None and (not np.isfinite(value) or value < 0):
+            raise ValueError(f"{name} must be finite and nonnegative.")
+
+    xr = pd.to_numeric(table["x_reference"], errors="coerce").to_numpy(float)
+    yr = pd.to_numeric(table["reference_value"], errors="coerce").to_numpy(float)
+    xs = pd.to_numeric(table["x_software"], errors="coerce").to_numpy(float)
+    ys = pd.to_numeric(table["software_value"], errors="coerce").to_numpy(float)
+    mr = np.isfinite(xr) & np.isfinite(yr)
+    ms = np.isfinite(xs) & np.isfinite(ys)
+    xr, yr, xs, ys = xr[mr], yr[mr], xs[ms], ys[ms]
+    if len(xr) < 2 or len(xs) < 2:
+        raise ValueError("Each reference/software curve needs at least two finite coordinate-value pairs.")
+    ir, isw = np.argsort(xr), np.argsort(xs)
+    xr, yr, xs, ys = xr[ir], yr[isw], xs[isw], ys[isw]
+    if np.any(np.diff(xr) <= 0) or np.any(np.diff(xs) <= 0):
+        raise ValueError("Coordinates within each curve must be unique; duplicate x values must be resolved explicitly.")
+
+    lo, hi = max(xr[0], xs[0]), min(xr[-1], xs[-1])
+    overlap = (xs >= lo) & (xs <= hi)
+    x = xs[overlap]
+    software = ys[overlap]
+    if len(x) < 2:
+        raise ValueError("Reference and software curves overlap at fewer than two software coordinates.")
+    reference = np.interp(x, xr, yr)
+    difference = software - reference
+    scale = float(np.max(reference) - np.min(reference))
+    rmse = float(np.sqrt(np.mean(difference ** 2)))
+    normalized_rmse = rmse / abs(scale) if abs(scale) > np.finfo(float).eps else None
+    corr = float(np.corrcoef(reference, software)[0, 1]) if np.std(reference) > 0 and np.std(software) > 0 else None
+
+    ref_unc = sw_unc = None
+    if "reference_uncertainty" in table.columns and "software_uncertainty" in table.columns:
+        ur_all = pd.to_numeric(table["reference_uncertainty"], errors="coerce").to_numpy(float)[mr][ir]
+        us_all = pd.to_numeric(table["software_uncertainty"], errors="coerce").to_numpy(float)[ms][isw]
+        if not np.all(np.isfinite(ur_all)) or not np.all(np.isfinite(us_all)) or np.any(ur_all < 0) or np.any(us_all < 0):
+            raise ValueError("Curve uncertainties must be finite, nonnegative and supplied for every corresponding data point.")
+        # Interpolate independent endpoint standard uncertainties in quadrature.
+        right = np.searchsorted(xr, x, side="right").clip(1, len(xr)-1)
+        left = right - 1
+        weight = (x - xr[left]) / (xr[right] - xr[left])
+        ref_unc = np.sqrt(((1.0-weight)*ur_all[left])**2 + (weight*ur_all[right])**2)
+        sw_unc = us_all[overlap]
+        combined = np.hypot(ref_unc, sw_unc)
+        within = np.abs(difference) <= coverage_factor * combined
+        rule = f"combined_uncertainty_{coverage_factor:g}sigma"
+        normalized = np.divide(np.abs(difference), combined, out=np.full(len(x), np.nan), where=combined > 0)
+        exact = (combined == 0) & (difference == 0)
+        within = within | exact
+    elif absolute_tolerance is not None:
+        rule = "absolute_tolerance"
+        normalized = np.divide(np.abs(difference), absolute_tolerance, out=np.full(len(x), np.nan), where=absolute_tolerance > 0)
+        within = np.abs(difference) <= absolute_tolerance
+    elif relative_tolerance is not None:
+        rule = "relative_tolerance"
+        tol = relative_tolerance * np.abs(reference)
+        normalized = np.divide(np.abs(difference), tol, out=np.full(len(x), np.nan), where=tol > 0)
+        within = np.abs(difference) <= tol
+    else:
+        rule = "none"
+        normalized = np.full(len(x), np.nan)
+        within = None
+
+    if within is None:
+        status = "UNASSESSED"
+        fraction = None
+    else:
+        fraction = float(np.mean(within))
+        status = "AGREES_WITHIN_CRITERION" if bool(np.all(within)) else "DISAGREES_WITH_CRITERION"
+
+    aligned = pd.DataFrame({
+        "x": x,
+        "reference_value_interpolated": reference,
+        "software_value": software,
+        "difference_software_minus_reference": difference,
+        "absolute_difference": np.abs(difference),
+        "normalized_difference": normalized,
+    })
+    if ref_unc is not None:
+        aligned["reference_uncertainty_interpolated"] = ref_unc
+        aligned["software_uncertainty"] = sw_unc
+    summary = {
+        "n_reference_points": int(len(xr)),
+        "n_software_points": int(len(xs)),
+        "n_compared_points": int(len(x)),
+        "x_overlap_min": float(lo),
+        "x_overlap_max": float(hi),
+        "bias_software_minus_reference": float(np.mean(difference)),
+        "mean_absolute_error": float(np.mean(np.abs(difference))),
+        "root_mean_square_error": rmse,
+        "normalized_RMSE_by_reference_range": normalized_rmse,
+        "maximum_absolute_error": float(np.max(np.abs(difference))),
+        "pearson_correlation": corr,
+        "comparison_rule": rule,
+        "fraction_within_criterion": fraction,
+        "agreement_status": status,
+        "coverage_factor": float(coverage_factor),
+        "warning": "Reference interpolation is limited to the overlapping x-domain. Digitization, axis calibration, model and physical calibration uncertainties must be included by the analyst.",
+    }
+    return {"summary": summary, "aligned_comparison": aligned}
