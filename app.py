@@ -10,7 +10,7 @@ from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
-    fit_spectral_line, doppler_temperature_eV, doppler_velocity_m_s, derive_parameters,
+    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, fluctuation_flux,
     exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
@@ -388,11 +388,16 @@ elif page=='Spectral Analysis':
         if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model:
             fit=saved['fit']; st.json(fit)
             if model=='Gaussian':
-                lam0=st.number_input('Rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=max(float(fit['center']),1e-12)); mass=st.number_input('Ion mass (amu)',min_value=1e-6,value=40.0); inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g')
+                lam0=st.number_input('Rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=max(float(fit['center']),1e-12)); sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g'); mass=st.number_input('Ion mass (amu)',min_value=1e-6,value=40.0); sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g'); inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g'); sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
                 if st.button('Estimate Doppler quantities'):
                     sig2=float(fit['sigma'])**2-inst**2
                     if sig2<=0: st.error('Instrument width equals/exceeds observed Gaussian sigma.')
-                    else: st.json({'doppler_temperature_eV':doppler_temperature_eV(np.sqrt(sig2),lam0,mass),'line_of_sight_velocity_m_s':doppler_velocity_m_s(float(fit['center'])-lam0,lam0),'assumptions':'Isolated line, Gaussian Doppler broadening, valid instrument-width subtraction.'})
+                    else:
+                        sigma_doppler=float(np.sqrt(sig2))
+                        sigma_obs_unc=float(fit.get('standard_error_sigma',0.0))
+                        sigma_doppler_unc=float(np.sqrt((float(fit['sigma'])/sigma_doppler*sigma_obs_unc)**2+(inst/sigma_doppler*sigma_inst)**2))
+                        thermal=doppler_temperature_with_uncertainty_eV(sigma_doppler,lam0,mass,sigma_doppler_unc,sigma_lam0,sigma_mass)
+                        st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_standard_uncertainty':thermal['relative_standard_uncertainty'],'line_of_sight_velocity_m_s':doppler_velocity_m_s(float(fit['center'])-lam0,lam0),'uncertainty_method':thermal['uncertainty_method'],'assumptions':'Gaussian Doppler broadening; independent input uncertainties; systematic/model uncertainty excluded.'})
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
     elif mode=='Line-ratio analysis':
