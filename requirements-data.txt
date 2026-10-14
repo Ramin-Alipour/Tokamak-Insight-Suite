@@ -1,5 +1,7 @@
 # Optional dependencies for the real-data MAST integration test
-xarray>=2024.1
+# Keep xarray on the Zarr v2-compatible line; newer xarray releases expect
+# Zarr v3 APIs even when the selected store is Zarr v2.
+xarray>=2024.1,<2025.0
 zarr>=2.16,<3
 fsspec>=2024.2
 numcodecs>=0.12
