@@ -1,6 +1,11 @@
 # Release notes — v0.4.0
 
 ## Scientific correctness and security fixes
+- Added direct cross-spectral phase extraction from synchronized multi-sensor channels with coherence weighting; manual phase fitting remains available as an advanced path.
+- Welch PSD now exposes segment length, overlap and window controls. Spectral fitting supports absorption as well as emission lines and optional intensity-uncertainty weighting.
+- Added an Eich-like exponential-convolved-with-Gaussian target heat-flux model with covariance-derived parameter uncertainties; the simpler exponential remains available.
+- Tomography supports measurement-uncertainty weighting and an optional discrete L-curve curvature heuristic for λ selection, with the full curve and a cautionary note exported.
+- Cached repeated time-series preparation, filtering and spectral calculations in Streamlit; plots of very long arrays are bounded to 20,000 display points.
 - FAIR-MAST signal reduction now uses polyphase FIR anti-alias filtering; source/output sample rates and filter metadata are included in the provenance manifest. Irregular/gapped timebases are rejected before decimation.
 - Mode-number fitting sorts sensors by angle, applies weights in the sorted order, reports a spatial alias limit, and rejects fits at the ambiguous spatial Nyquist boundary. Phase-only data cannot distinguish modes that have already aliased.
 - Time-series preparation detects isolated dropped-sample gaps, not only global interval jitter.
