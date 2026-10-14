@@ -21,7 +21,7 @@ def test_hard_xray_figure_digitization_reproduces_table_mean_energy():
     )
     table_mean_energy_keV = 3301.0 / 5.0
     assert result["moments_valid"] is True
-    assert result["integrated_counts_keV_weighted"] == pytest.approx(5.0)
+    assert result["integrated_counts"] == pytest.approx(5.0)
     # Figure digitization is pixel-limited; allow 1% against the table value.
     assert result["mean_energy_keV"] == pytest.approx(table_mean_energy_keV, rel=0.01)
     assert result["mean_energy_keV"] == pytest.approx(657.69, rel=0.002)
