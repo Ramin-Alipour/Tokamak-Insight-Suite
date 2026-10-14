@@ -52,3 +52,11 @@ def test_morlet_wavelet_rejects_nyquist_and_unsorted_frequencies():
         morlet_wavelet_analysis(t, x, [10, 64])
     with pytest.raises(ValueError, match="strictly increasing"):
         morlet_wavelet_analysis(t, x, [20, 10])
+
+
+def test_morlet_wavelet_rejects_frequency_support_longer_than_record():
+    fs = 10000.0
+    t = np.arange(256) / fs
+    x = np.sin(2 * np.pi * 100 * t)
+    with pytest.raises(ValueError, match="too long for this record"):
+        morlet_wavelet_analysis(t, x, [100.0])
