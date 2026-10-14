@@ -205,7 +205,13 @@ def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None
             f"intervals >1.5× median={outlier_fraction:.2%}). "
             "Repair/resample explicitly before FFT/filtering."
         )
-    return t, y, 1.0/med_dt
+    # The median is robust for detecting gaps, but can be biased by one full
+    # clock-quantization tick when intervals alternate (e.g. 2 and 3 µs).
+    # After the gap check, use the full-record mean interval for the sample rate.
+    mean_dt=float(np.mean(dt))
+    if not np.isfinite(mean_dt) or mean_dt<=0:
+        raise ValueError('Could not estimate a valid mean sampling interval.')
+    return t, y, 1.0/mean_dt
 
 
 def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lowpass: float | None = None, order: int = 3) -> np.ndarray:
