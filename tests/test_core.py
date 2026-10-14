@@ -827,3 +827,15 @@ def test_langmuir_without_geometry_does_not_require_default_ion_mass():
     result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-5, 15), ion_fit_range=(-20, -10))
     assert "ion_density_estimate_m-3" not in result
     assert "ion_density_status" not in result
+
+
+def test_spectrum_moments_flags_undefined_signed_net_moments_without_throwing():
+    from tis.core import spectrum_moments, xray_spectrum_summary
+    energy = np.array([1.0, 2.0, 3.0])
+    net = np.array([-1.0, 3.0, -1.0])
+    result = spectrum_moments(energy, net, bin_representation="counts_per_bin")
+    assert result["moments_valid"] is False
+    assert result["moment_status"] == "not_defined_negative_second_moment"
+    xray = xray_spectrum_summary(energy, net, bin_representation="counts_per_bin")
+    assert xray["moments_valid"] is False
+    assert xray["energy_axis_unit"] == "keV"
