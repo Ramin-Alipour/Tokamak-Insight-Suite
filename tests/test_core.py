@@ -855,3 +855,25 @@ def test_load_table_enforces_row_limit_during_csv_read():
     raw = b"time,signal\n0,1\n1,2\n2,3\n"
     with pytest.raises(ValueError, match="row limit"):
         load_table(raw, "instrument.csv", max_rows=2)
+
+
+def test_tomography_reports_conditioning_and_coverage():
+    A = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    result = regularized_tomography(A, np.array([1.0, 2.0, 3.0]), 0.1, False)
+    assert result["response_effective_rank"] == 2
+    assert result["response_condition_number"] >= 1.0
+    assert result["response_column_coverage_fraction"] == pytest.approx(1.0)
+    assert "uncertainty" in result["linearized_uncertainty_status"].lower()
+
+
+def test_tomography_noise_sensitivity_is_reproducible():
+    from tis.core import tomography_noise_sensitivity
+    A = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
+    y = np.array([1.0, 2.0, 3.0])
+    sigma = np.full(3, 0.05)
+    first = tomography_noise_sensitivity(A, y, sigma, lam=0.1, nonnegative=False,
+                                         n_replicates=20, random_seed=12)
+    second = tomography_noise_sensitivity(A, y, sigma, lam=0.1, nonnegative=False,
+                                          n_replicates=20, random_seed=12)
+    assert np.allclose(first["monte_carlo_standard_deviation"], second["monte_carlo_standard_deviation"])
+    assert np.all(first["percentile_97_5"] >= first["percentile_2_5"])
