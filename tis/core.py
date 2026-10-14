@@ -143,10 +143,17 @@ def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None
     med_dt = float(np.median(dt))
     if not np.isfinite(med_dt) or med_dt <= 0:
         raise ValueError('Could not infer a valid sampling interval.')
-    # Avoid pretending an irregularly sampled signal is uniformly sampled.
+    # Detect isolated dropped samples as well as globally jittery clocks.
     jitter = float(np.std(dt) / np.mean(dt)) if len(dt)>1 else 0.0
-    if jitter > 0.02:
-        raise ValueError(f'Irregular sampling detected (relative interval spread {jitter:.3g}). Resample/interpolate explicitly before FFT/filtering.')
+    max_gap_ratio = float(np.max(dt) / med_dt)
+    outlier_fraction = float(np.mean(np.abs(dt - med_dt) > 0.05 * med_dt))
+    if max_gap_ratio > 1.05 or outlier_fraction > 0.01 or jitter > 0.02:
+        raise ValueError(
+            "Irregular sampling or a timestamp gap was detected "
+            f"(std/mean={jitter:.3g}, max_dt/median_dt={max_gap_ratio:.3g}, "
+            f"intervals outside ±5%={outlier_fraction:.2%}). "
+            "Repair/resample explicitly before FFT/filtering."
+        )
     return t, y, 1.0/med_dt
 
 
@@ -422,14 +429,20 @@ def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     return float(C_LIGHT*delta_lambda/lambda0)
 
 
-def linear_phase_density(phase_rad: Any, frequency_hz: float) -> np.ndarray:
-    """High-frequency unmagnetized approximation: Δφ ≈ -r_e λ ∫n_e dl; sign convention configurable externally."""
+def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int = -1) -> np.ndarray:
+    """Return line-integrated electron density ∫n_e dl in m⁻², not local density.
+
+    sign_convention must be +1 or -1 and reflects the instrument's phase convention:
+    Δφ = sign_convention * r_e * wavelength * ∫n_e dl.
+    """
     phase=np.asarray(phase_rad,float)
     if not np.isfinite(frequency_hz) or frequency_hz<=0 or not np.all(np.isfinite(phase)):
         raise ValueError('Frequency must be positive and finite; phase values must be finite.')
+    if sign_convention not in (-1,1):
+        raise ValueError('sign_convention must be either -1 or +1.')
     r_e=2.8179403262e-15
     wavelength=C_LIGHT/frequency_hz
-    return -phase/(r_e*wavelength)
+    return phase/(sign_convention*r_e*wavelength)
 
 
 def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vloop_V: float,
@@ -437,8 +450,8 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
                       stored_energy_J: float | None = None, loss_power_W: float | None = None,
                       ni_m3: float | None = None, ion_mass_amu: float = 2.0) -> dict[str, float | None]:
     vals=[ne_m3,te_eV,ti_eV,ip_A,vloop_V,major_radius_m,minor_radius_m,bt_T,ion_mass_amu]
-    if not np.all(np.isfinite(vals)) or min(ne_m3,te_eV,ti_eV,ip_A,major_radius_m,minor_radius_m,bt_T)<0 or major_radius_m==0 or minor_radius_m==0 or ion_mass_amu<=0:
-        raise ValueError('Inputs must be finite and physically admissible; radii and ion mass must be positive.')
+    if not np.all(np.isfinite(vals)) or min(ne_m3,te_eV,ti_eV,major_radius_m,minor_radius_m)<0 or major_radius_m==0 or minor_radius_m==0 or ion_mass_amu<=0:
+        raise ValueError('Inputs must be finite; densities/temperatures nonnegative, radii and ion mass positive. Ip and Bt are signed quantities.')
     if ni_m3 is not None and (not np.isfinite(ni_m3) or ni_m3 < 0):
         raise ValueError('Ion density must be finite and nonnegative.')
     if stored_energy_J is not None and (not np.isfinite(stored_energy_J) or stored_energy_J < 0):
@@ -449,7 +462,7 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
     pe=ne_m3*te_eV*E_CHARGE; pi=ni*ti_eV*E_CHARGE; p=pe+pi
     fpe=float(np.sqrt(ne_m3*E_CHARGE**2/(EPS0*M_E))/(2*np.pi)) if ne_m3>0 else 0.0
     debye=float(np.sqrt(EPS0*te_eV*E_CHARGE/(ne_m3*E_CHARGE**2))) if ne_m3>0 and te_eV>0 else None
-    ng=ip_A/1e6/(np.pi*minor_radius_m**2) if ip_A>0 else 0.0
+    ng=abs(ip_A)/1e6/(np.pi*minor_radius_m**2)
     p_ohm=vloop_V*ip_A
     beta_t=p/(bt_T**2/(2*MU0)) if bt_T>0 else None
     tau=stored_energy_J/loss_power_W if stored_energy_J is not None and loss_power_W is not None and loss_power_W>0 else None
@@ -581,7 +594,10 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
     if area_m2 is not None and 'ion_saturation_current_A' in out:
-        te=float(out.get('electron_temperature_eV') or 0.0)
+        te_value = out.get('electron_temperature_eV')
+        if te_value is None or not np.isfinite(te_value) or te_value <= 0:
+            raise ValueError("Ion-density estimation requires a valid positive electron temperature from the electron-retarding fit; refusing to substitute Te=0.")
+        te=float(te_value)
         cs=math.sqrt(E_CHARGE*(ti_eV*gamma_i + te)/(ion_mass_amu*AMU))
         denom=sheath_factor*E_CHARGE*area_m2*cs
         out['ion_sound_speed_m_s']=cs
@@ -600,22 +616,52 @@ def floating_potential(voltage: Any, current: Any) -> float | None:
     return float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
 
 
-def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None = None) -> dict[str, float]:
-    """Fit phase(theta)=n*theta+offset; requires phase from synchronized toroidally/poloidally placed sensors."""
-    th=np.asarray(theta_rad,float).ravel(); ph=np.unwrap(np.asarray(phase_rad,float).ravel())
+def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None = None,
+                           max_mode_number: int | None = None) -> dict[str, float | str | int]:
+    """Fit spatial phase after sorting sensors by angle; report the sampling alias limit.
+
+    Phase-only data cannot distinguish aliased modes (for example n=7 and n=1
+    on six equally spaced sensors). Supply a physically justified max_mode_number
+    to reject unsupported modes; a mode at the spatial Nyquist limit is ambiguous.
+    Optional weights should be coherence or inverse-variance weights.
+    """
+    th=np.asarray(theta_rad,float).ravel(); ph=np.asarray(phase_rad,float).ravel()
     if len(th)!=len(ph) or len(th)<3 or not np.all(np.isfinite(th)) or not np.all(np.isfinite(ph)):
         raise ValueError('Provide at least 3 paired finite sensor angles and phases.')
-    if np.unique(th).size < 3:
-        raise ValueError('At least 3 distinct sensor angles are required to fit a mode number.')
-    X=np.column_stack([th,np.ones_like(th)])
-    if weights is None: coef=np.linalg.lstsq(X,ph,rcond=None)[0]
+    th=np.mod(th,2*np.pi)
+    order=np.argsort(th, kind='stable'); th,ph=th[order],ph[order]
+    if np.unique(np.round(th,12)).size < 3:
+        raise ValueError('At least 3 distinct sensor angles modulo 2π are required.')
+    gaps=np.diff(np.r_[th, th[0]+2*np.pi])
+    if np.any(gaps <= 1e-10):
+        raise ValueError('Sensor angles must be unique modulo 2π.')
+    alias_limit=int(np.floor(np.pi/np.max(gaps)))
+    if alias_limit < 1:
+        raise ValueError('Sensor geometry is too sparse for an unambiguous nonzero mode estimate.')
+    if max_mode_number is not None and (isinstance(max_mode_number,bool) or int(max_mode_number)!=max_mode_number or max_mode_number < 0):
+        raise ValueError('max_mode_number must be a nonnegative integer when supplied.')
+    limit=min(alias_limit,int(max_mode_number)) if max_mode_number is not None else alias_limit
+    # Unwrap only after spatial sorting; fit against angles shifted to start at zero.
+    ph=np.unwrap(ph)
+    th0=th-th[0]
+    X=np.column_stack([th0,np.ones_like(th0)])
+    if weights is None:
+        w=np.ones(len(th))
     else:
-        w=np.asarray(weights,float).ravel()
-        if len(w)!=len(th) or not np.all(np.isfinite(w)) or np.any(w<0) or not np.any(w>0):
+        w0=np.asarray(weights,float).ravel()
+        if len(w0)!=len(th) or not np.all(np.isfinite(w0)) or np.any(w0<0) or not np.any(w0>0):
             raise ValueError('Weights must be finite, nonnegative, match sensor count, and include a positive value.')
-        coef=np.linalg.lstsq(X*np.sqrt(w[:,None]),ph*np.sqrt(w),rcond=None)[0]
+        w=w0[order]
+    coef=np.linalg.lstsq(X*np.sqrt(w[:,None]),ph*np.sqrt(w),rcond=None)[0]
     pred=X@coef
-    return {'mode_number_fit':float(coef[0]),'nearest_integer_mode_number':float(np.rint(coef[0])),'phase_offset_rad':float(coef[1]),'phase_fit_R2':_r2(ph,pred),'phase_rms_residual_rad':float(np.sqrt(np.mean((ph-pred)**2)))}
+    n=float(coef[0])
+    if abs(n) >= limit-1e-8 and limit > 0:
+        raise ValueError(f'Estimated |n|={abs(n):.4g} is at/above the unambiguous spatial limit {limit}; mode direction/aliasing is ambiguous. Add sensors or supply a justified lower max_mode_number.')
+    residual=ph-pred
+    return {'mode_number_fit':n,'nearest_integer_mode_number':float(np.rint(n)),'phase_offset_rad':float(coef[1]),
+            'phase_fit_R2':_r2(ph,pred),'phase_rms_residual_rad':float(np.sqrt(np.average(residual**2,weights=w))),
+            'spatial_alias_limit_mode_number':limit,
+            'aliasing_note':'Modes above the spatial Nyquist limit alias to lower modes; phase-only fitting cannot identify the true aliased mode without additional geometry or a prior bound.'}
 
 
 def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | None = None) -> dict[str, float]:
@@ -663,18 +709,25 @@ def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
 
 
 def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None) -> dict[str, float]:
+    """Calculate moments only for nonnegative background-corrected spectral weights.
+
+    Negative bins are not silently clipped: use a justified background/noise model
+    or an explicit nonnegative reconstruction before interpreting moments.
+    """
     e=np.asarray(energy_eV,float).ravel(); c=np.asarray(counts,float).ravel()
     if len(e)!=len(c) or len(e)<3: raise ValueError('Energy and counts must have same length and at least 3 samples.')
     if not np.all(np.isfinite(e)):
         raise ValueError('Energy coordinates must be finite.')
     if background is not None:
         b=np.asarray(background,float).ravel()
-        if len(b)!=len(c): raise ValueError('Background must match counts length.')
+        if len(b)!=len(c) or not np.all(np.isfinite(b)): raise ValueError('Background must be finite and match counts length.')
         c=c-b
     m=np.isfinite(e)&np.isfinite(c); e,c=e[m],c[m]
-    o=np.argsort(e); e,c=e[o],c[o]; c=np.clip(c,0,None)
+    o=np.argsort(e); e,c=e[o],c[o]
     if np.any(np.diff(e) <= 0):
         raise ValueError('Energy coordinates must be unique after sorting.')
+    if np.any(c < 0):
+        raise ValueError('Background-subtracted spectrum contains negative bins; moments are not computed by clipping noise. Improve the background/noise model or explicitly select a justified nonnegative signal.')
     area=float(integrate.trapezoid(c,e))
     if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
     mean=float(integrate.trapezoid(e*c,e)/area); var=float(integrate.trapezoid((e-mean)**2*c,e)/area)
