@@ -647,3 +647,19 @@ def test_welch_psd_configurable_window_and_overlap():
     assert f[np.argmax(p)] == pytest.approx(50, abs=1)
     with pytest.raises(ValueError, match="noverlap"):
         welch_psd(x, fs, nperseg=128, noverlap=128)
+
+
+def test_spectrum_moments_propagates_explicit_poisson_uncertainty():
+    from tis.core import spectrum_moments
+    energy = np.linspace(1.0, 10.0, 10)
+    counts = np.array([0, 1, 2, 4, 8, 12, 9, 5, 2, 1], dtype=float)
+    result = spectrum_moments(energy, counts, assume_poisson_counts=True)
+    assert result["uncertainty_propagated"] is True
+    assert result["standard_uncertainty_mean_energy_eV"] > 0
+    assert result["standard_uncertainty_rms_energy_spread_eV"] > 0
+
+
+def test_spectrum_moments_requires_net_uncertainty_when_poisson_background_subtracted():
+    from tis.core import spectrum_moments
+    with pytest.raises(ValueError, match="background-subtracted"):
+        spectrum_moments(np.arange(1, 11), np.ones(10)*5, background=np.ones(10), assume_poisson_counts=True)
