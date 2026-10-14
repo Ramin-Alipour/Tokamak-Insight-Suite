@@ -18,7 +18,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, drift_transport_from_fields, electric_field_from_potential_difference,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
-    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
+    equilibrium_grid_derivatives, xray_spectrum_summary, ion_sound_speed_m_s, mach_number_from_velocity, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
 st.markdown('''<style>
@@ -611,7 +611,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','E×B transport & Reynolds stress','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','E×B transport & Reynolds stress','Ion sound speed & Mach consistency','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
     if workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
@@ -687,6 +687,36 @@ elif page=='Advanced Analysis':
                     json_download('Export E×B transport metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_exb_transport_metadata.json')
                     st.warning(result['warning'])
                 except Exception as e: st.error(f'E×B transport analysis failed: {e}')
+    elif workflow=='Ion sound speed & Mach consistency':
+        st.write('Check the sound-speed and flow-Mach relation used in the IR-T1 compound-probe paper: cₛ = sqrt[e(Tₑ + Tᵢ)/mᵢ] and M = V/cₛ.')
+        st.caption('Reference: Alipour et al., RSI 88, 093516 (2017), DOI 10.1063/1.4994037, Eqs. (3)–(4), Figs. 10(a) and 11(a). Defaults are provisional graph-digitized whole-discharge means (M≈0.511 and V≈17.57 km/s), not raw measurements; replace them with values and uncertainty appropriate to your comparison.')
+        c1,c2,c3=st.columns(3)
+        with c1: te=st.number_input('Electron temperature Tₑ (eV)',min_value=0.0,value=14.0,format='%.8g',key='mach_te')
+        with c2: ti=st.number_input('Ion temperature Tᵢ (eV)',min_value=0.0,value=2.8,format='%.8g',key='mach_ti')
+        with c3: mass=st.number_input('Ion mass (amu)',min_value=0.0,value=1.0073,format='%.8g',key='mach_mass')
+        c1,c2=st.columns(2)
+        with c1: velocity=st.number_input('Reference parallel velocity (km/s)',value=17.57,format='%.8g',key='mach_velocity')
+        with c2: ref_mach=st.number_input('Reference parallel Mach number',value=0.511,format='%.8g',key='mach_reference')
+        if st.button('Check sound-speed / Mach consistency',type='primary',key='mach_check'):
+            try:
+                cs_result=ion_sound_speed_m_s(float(te),float(ti),float(mass))
+                cs=cs_result['ion_sound_speed_m_s']
+                derived_mach=float(mach_number_from_velocity(float(velocity)*1000.0,cs))
+                predicted_velocity=float(ref_mach)*cs/1000.0
+                delta_v=float(velocity)-predicted_velocity
+                st.json({
+                    'ion_sound_speed_km_s':cs/1000.0,
+                    'Mach_from_reference_velocity':derived_mach,
+                    'reference_Mach_number':float(ref_mach),
+                    'velocity_predicted_from_reference_Mach_km_s':predicted_velocity,
+                    'reference_velocity_km_s':float(velocity),
+                    'velocity_difference_km_s':delta_v,
+                    'velocity_relative_difference_percent':100.0*delta_v/predicted_velocity if predicted_velocity else None,
+                    'sound_speed_equation':cs_result['formula'],
+                    'source':'Alipour et al., RSI 88, 093516 (2017), Figs. 10(a), 11(a), Eq. (4)',
+                })
+                st.warning('This is an internal consistency check, not independent validation: the paper states that the velocity curve is calculated from the Mach curve. A mismatch flags the assumed temperatures, ion mass, averaging window, figure digitization or equation implementation for review.')
+            except Exception as e: st.error(f'Mach consistency check failed: {e}')
     elif workflow=='MHD SVD decomposition':
         st.write('SVD of synchronized diagnostic channels. This extracts data-driven temporal components and channel patterns; mode index is not automatically a physical poloidal mode number.')
         if df is None or len(numeric)<2:
