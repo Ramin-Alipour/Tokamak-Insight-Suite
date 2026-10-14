@@ -211,6 +211,34 @@ def welch_psd(values: Any, fs: float, nperseg: int | None = None) -> tuple[np.nd
     return signal.welch(x, fs=fs, nperseg=nperseg, detrend='constant', scaling='density')
 
 
+
+def time_frequency_spectrogram(
+    values: Any,
+    fs: float,
+    nperseg: int = 256,
+    noverlap: int | None = None,
+    window: str = 'hann',
+) -> dict[str, np.ndarray]:
+    """Return a Welch-style short-time power spectrum for transient/frequency-evolving signals."""
+    x = np.asarray(values, dtype=float).ravel()
+    if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
+        raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
+    if not np.all(np.isfinite(x)):
+        raise ValueError('Signal must contain only finite values; clean missing samples before spectrogram analysis.')
+    if isinstance(nperseg, (bool, np.bool_)) or int(nperseg) != nperseg or nperseg < 8:
+        raise ValueError('nperseg must be an integer of at least 8.')
+    nperseg = min(int(nperseg), len(x))
+    if noverlap is not None:
+        if isinstance(noverlap, (bool, np.bool_)) or int(noverlap) != noverlap or noverlap < 0 or noverlap >= nperseg:
+            raise ValueError('noverlap must be an integer in [0, nperseg).')
+        noverlap = int(noverlap)
+    f, t, pxx = signal.spectrogram(
+        x, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap,
+        detrend='constant', scaling='density', mode='psd'
+    )
+    return {'frequency_Hz': f, 'time_s': t, 'psd': pxx}
+
+
 def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dict[str, np.ndarray]:
     a, b = np.asarray(x, float).ravel(), np.asarray(y, float).ravel()
     if len(a) != len(b) or len(a) < 8:
