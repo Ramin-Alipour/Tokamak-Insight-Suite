@@ -34,7 +34,7 @@ jobs:
           from pathlib import Path
           import numpy as np
           import pandas as pd
-          from tis.core import fft_spectrum, psd_welch, filter_signal
+          from tis.core import fft_spectrum, welch_psd, butterworth_filter
 
           base = Path("artifacts/mast-real-data")
           manifest = json.loads((base / "mast_29790_mirnov_manifest.json").read_text())
@@ -47,8 +47,8 @@ jobs:
           assert np.all(np.diff(frame["time_s"].to_numpy()) > 0)
           fs = manifest["estimated_sampling_rate_hz_after_stride"]
           f, a = fft_spectrum(frame["signal_raw"].to_numpy(), fs)
-          fp, p = psd_welch(frame["signal_raw"].to_numpy(), fs)
-          filtered = filter_signal(frame["signal_raw"].to_numpy(), fs, low_hz=1000, high_hz=min(100000, fs*0.4))
+          fp, p = welch_psd(frame["signal_raw"].to_numpy(), fs)
+          filtered = butterworth_filter(frame["signal_raw"].to_numpy(), fs, highpass=1000, lowpass=min(100000, fs*0.4))
           assert len(f) > 10 and len(fp) > 10 and len(filtered) == len(frame)
           assert np.all(np.isfinite(a)) and np.all(np.isfinite(p)) and np.all(np.isfinite(filtered))
           print(f"PASS: real MAST shot 29790; samples={len(frame)}; fs={fs:.3f} Hz")
