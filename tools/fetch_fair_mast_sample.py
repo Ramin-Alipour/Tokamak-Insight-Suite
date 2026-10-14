@@ -5,11 +5,15 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+# Make the repository root importable when this file is run as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 from scipy.signal import welch
 
-from tis.core import butterworth_filter, fft_spectrum, welch_psd
+from tis.core import fft_spectrum, welch_psd
 from tis.data_sources import fetch_fair_mast_signal
 
 
