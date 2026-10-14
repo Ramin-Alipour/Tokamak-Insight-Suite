@@ -488,3 +488,93 @@ def test_doppler_velocity_uncertainty_rejects_invalid_inputs():
     from tis.core import doppler_velocity_with_uncertainty_m_s
     with pytest.raises(ValueError):
         doppler_velocity_with_uncertainty_m_s(500.0,500.0,sigma_observed_lambda=-0.1)
+
+
+# Regression tests for failure modes found in the independent numerical review.
+def test_prepare_time_series_rejects_isolated_missing_sample_gap():
+    t = np.arange(10000, dtype=float) * 1e-5
+    t[5001:] += 2e-4
+    with pytest.raises(ValueError, match="gap|Irregular"):
+        prepare_time_series(t, np.sin(2*np.pi*1000*t))
+
+
+def test_signed_current_and_magnetic_field_are_supported():
+    positive = derive_parameters(1e19, 100, 80, 4e4, 1.0, 0.7, 0.2, 1.5)
+    negative = derive_parameters(1e19, 100, 80, -4e4, 1.0, 0.7, 0.2, -1.5)
+    assert negative["greenwald_density_1e20_m-3"] == pytest.approx(positive["greenwald_density_1e20_m-3"])
+    assert negative["toroidal_beta_fraction"] == pytest.approx(positive["toroidal_beta_fraction"])
+    assert negative["ohmic_power_approx_W"] == pytest.approx(-positive["ohmic_power_approx_W"])
+
+
+def test_langmuir_density_refuses_missing_electron_temperature():
+    from tis.core import langmuir_iv_analysis
+    v = np.linspace(-10, 10, 301)
+    # No valid positive electron-retarding slope is supplied.
+    i = np.where(v < -7, -0.01, -0.02 - 0.001*v)
+    with pytest.raises(ValueError, match="positive electron temperature"):
+        langmuir_iv_analysis(v, i, ion_fit_range=(-10, -7), area_m2=1e-5, ion_mass_amu=2.0)
+
+
+def test_spectrum_moments_do_not_clip_negative_background_bins():
+    e = np.linspace(1, 10, 10)
+    counts = np.ones(10)
+    background = np.full(10, 1.1)
+    with pytest.raises(ValueError, match="negative bins"):
+        from tis.core import spectrum_moments
+        spectrum_moments(e, counts, background)
+
+
+def test_mode_number_sorts_sensors_and_checks_spatial_nyquist():
+    from tis.core import mode_number_from_phase
+    theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
+    phase = 3*theta + 0.2
+    order = np.array([4, 1, 7, 0, 5, 2, 6, 3])
+    result = mode_number_from_phase(theta[order], phase[order])
+    assert result["mode_number_fit"] == pytest.approx(3, abs=1e-10)
+    assert result["spatial_alias_limit_mode_number"] == 4
+    theta6 = np.linspace(0, 2*np.pi, 6, endpoint=False)
+    with pytest.raises(ValueError, match="Nyquist|ambiguous"):
+        mode_number_from_phase(theta6, 3*theta6)
+
+
+def test_cross_correlation_lag_sign_convention_for_delayed_y():
+    rng = np.random.default_rng(44)
+    x = rng.normal(size=1000)
+    y = np.r_[np.zeros(7), x[:-7]]
+    _, _, lag = cross_correlation_lag(x, y, fs=1000)
+    # Convention: y delayed relative to x produces a negative lag.
+    assert lag == pytest.approx(-0.007, abs=0.001)
+
+
+def test_linear_phase_density_exposes_sign_convention_and_units():
+    a = linear_phase_density(0.1, 140e9, sign_convention=-1)
+    b = linear_phase_density(0.1, 140e9, sign_convention=1)
+    np.testing.assert_allclose(a, -b)
+    with pytest.raises(ValueError, match="sign_convention"):
+        linear_phase_density(0.1, 140e9, sign_convention=0)
+
+
+def test_anti_alias_decimation_suppresses_out_of_band_tone():
+    from tis.data_sources import anti_alias_decimate
+    fs = 2_000_000.0
+    t = np.arange(200_000) / fs
+    x = np.sin(2*np.pi*370_000*t)
+    td, xd, info = anti_alias_decimate(t, x, max_samples=10_000)
+    assert len(xd) <= 10_000
+    assert info["anti_alias_filter_applied"] is True
+    assert info["exported_sampling_rate_hz"] == pytest.approx(100_000, rel=1e-3)
+    assert np.std(xd[100:-100]) < 0.03
+
+
+def test_anti_alias_decimation_rejects_time_gaps():
+    from tis.data_sources import anti_alias_decimate
+    t = np.arange(5000, dtype=float) * 1e-4
+    t[2501:] += 5e-4
+    with pytest.raises(ValueError, match="irregular|gaps"):
+        anti_alias_decimate(t, np.sin(t), max_samples=1024)
+
+
+def test_public_table_fetcher_blocks_loopback_before_network_access():
+    from tis.data_sources import fetch_public_table_bytes
+    with pytest.raises(ValueError, match="non-global|blocked"):
+        fetch_public_table_bytes("http://127.0.0.1/private.csv")
