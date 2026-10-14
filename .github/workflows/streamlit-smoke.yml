@@ -1,0 +1,24 @@
+name: Streamlit app smoke test
+
+on:
+  push:
+    branches: [main, 'deploy/**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install project and test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+      - name: Run test suite
+        run: python -m pytest -q
+      - name: Verify Streamlit entrypoint imports
+        run: python -c "import app; print('Streamlit entrypoint import OK')"
