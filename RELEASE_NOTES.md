@@ -8,11 +8,11 @@
 - Expanded dashboard navigation to include data QC, time series/MHD, spectroscopy, probe analysis, plasma parameters, equilibrium-grid tools, tomography/bolometry, advanced analysis, diagnostic catalog, and provenance/export.
 - Added automated tests for the new analysis functions.
 - Added O-mode reflectometry cutoff-density calculation, ECE cyclotron-resonance field estimate, and instrument-response-corrected spectral line ratios.
-- Automated test suite: 39 passed in the build environment.
+- Automated test suite: 66 test cases, including numerical regression and invalid-input checks; current CI status is recorded in GitHub Actions.
 
 ## Scope and limitations
 - These are research analysis workflows that require calibrated input data, correct units, appropriate geometry, and documented assumptions. They do not automatically validate an experimental diagnostic.
 - The supplied-flux-grid equilibrium page computes derivatives and magnetic-field components; it does not solve the Grad–Shafranov equation or replace EFIT.
 - Abel inversion assumes axisymmetry and simplified chord geometry. General tomography needs the real response matrix.
 - Atomic collisional-radiative models, full ray tracing, validated fast-ion orbit following, and device-specific equilibrium reconstruction remain separate specialist solvers.
-- Streamlit is not installed in the build environment, so the GUI could be syntax-compiled but not launched in a browser during this build. Install dependencies with `pip install -r requirements.txt` before launch.
+- CI installs the declared dependencies, compiles the Python sources, runs the full test suite, and performs a Streamlit HTTP health smoke test. This checks application startup, not every interactive page or scientific workflow.
