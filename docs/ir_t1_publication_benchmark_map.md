@@ -18,12 +18,22 @@ This file fixes the scientific target of the next validation pass: reproduce the
 Source: Alipour et al., RSI 88, 093516 (2017), DOI [10.1063/1.4994037](https://doi.org/10.1063/1.4994037), Fig. 10(a) (smoothed parallel Mach number), Fig. 11(a) (parallel flow velocity), and Eq. (4).
 
 A provisional pixel-based digitization of the two plotted curves over the full 0–30 ms discharge gives:
-- Figure 10(a): mean smoothed (M_{\parallel}\approx0.511).
-- Figure 11(a): mean (V_{\parallel}\approx17.57\;\mathrm{km\,s^{-1}}).
+- Figure 10(a): mean smoothed (M_{\\parallel}\\approx0.511).
+- Figure 11(a): mean (V_{\\parallel}\\approx17.57\\;\\mathrm{km\\,s^{-1}}).
 
-These graph-derived averages are consistent with the paper's rounded textual descriptions (~0.5 and ~17 km/s). Applying the paper's Eq. (4), (c_s=\sqrt{e(T_e+T_i)/m_i}), with (T_e=14) eV, (T_i/T_e=0.2), and hydrogen-ion mass (m_i=1.0073) amu gives (c_s\approx40.115\;\mathrm{km\,s^{-1}}). The digitized Mach mean would then imply (V_{\parallel}\approx20.51\;\mathrm{km\,s^{-1}}), about **14.3% above** the digitized Fig. 11 mean; conversely, (V_{\parallel}/c_s\approx0.438), below the Fig. 10 mean.
+The paper's abstract reports rounded values (~0.5 and ~17 km/s), consistent with these approximate digitizations. The consistency calculation is assumption-sensitive:
+- With the simplified electron-temperature-only estimate (T_e=14) eV and (m_i=1.0073) amu, (c_s\\approx36.620\\;\\mathrm{km\\,s^{-1}}); (M c_s\\approx18.713) km/s, 6.50% above the digitized velocity, while (V/c_s\\approx0.480).
+- If one additionally assumes (T_i/T_e=0.2), then (c_s\\approx40.115\\;\\mathrm{km\\,s^{-1}}); (M c_s\\approx20.499) km/s, 16.67% above the digitized velocity, while (V/c_s\\approx0.438), 14.29% below the digitized Mach mean.
 
-This is an **internal consistency flag, not independent validation**: the paper states that Fig. 11 velocities were calculated from the Mach-number data. Before treating this as a physical discrepancy, refine the digitization/uncertainty and verify the exact temperature used for Eq. (4), ion mass, and averaging convention. The TIS workflow now calculates this relation explicitly so the assumptions and discrepancy are visible rather than silently declaring agreement.
+The probe-paper's exact sound-speed temperature convention and the pointwise inputs used for the plotted velocity must be verified before choosing between these cases; (T_i/T_e=0.2) is shown only as a conditional scenario, not a confirmed input from this paper. Averages digitized independently from plotted traces can also differ from a calculation made from the original paired time series. This is an **unresolved consistency flag**, not proof that the software or paper is wrong. Next steps are to refine both curve digitizations with uncertainty, inspect the equation/definitions in the paper, and compare pointwise values if original data can be obtained. The regression test keeps the alternative assumptions explicit rather than forcing a match.
+
+## Doppler-temperature reconstruction from the published tables
+
+Source: Alipour et al., *AIP Advances* 7, 115303 (2017), DOI [10.1063/1.4990869](https://doi.org/10.1063/1.4990869), Table VI (corrected Doppler FWHM) and Table VII (ion temperature).
+
+The published Table VI widths are Doppler **FWHM**, not Gaussian standard deviations. The reconstruction therefore uses (\\sigma_\\lambda=\\Delta\\lambda_{\\rm FWHM}/[2\\sqrt{2\\ln2}]) before applying (T_i=m_i c^2/e\\,(\\sigma_\\lambda/\\lambda_0)^2). This is equivalent to the paper's Eq. (15)–(16). A regression test reconstructs all 15 Table VII temperatures from the rounded Table VI widths and Table VII masses, and independently checks the SI formula against the software routine. The reported rounding is reproduced within 0.16 eV; examples are Ti I: 3.65 eV calculated vs 3.66 eV published, and O V: 85.63 eV vs 85.75 eV.
+
+This is a successful **table-to-formula reconstruction**, not a fresh fit of the experimental spectra: the paper's underlying CCD samples and the full Gaussian-fit residuals are not available in these table values. It checks the FWHM-to-sigma convention and the temperature conversion, but does not independently confirm line isolation, instrument correction, calibration, or neglected Zeeman/Stark/natural broadening. The new test is `tests/test_ir_t1_doppler_table_reconstruction.py`.
 
 ## Figure-derived hard-X-ray result check
 
