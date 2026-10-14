@@ -1159,7 +1159,28 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
         )
     weights = np.where(weights >= effective_threshold, weights, 0.0)
     fit = mode_number_from_phase(theta, phases, weights=weights)
+    leave_one_out=[]
+    if len(theta)>=4:
+        for omitted in range(len(theta)):
+            keep=np.arange(len(theta))!=omitted
+            try:
+                trial=mode_number_from_phase(theta[keep],np.asarray(phases)[keep],
+                                             weights=weights[keep])
+                leave_one_out.append({"omitted_sensor_index":int(omitted),
+                                      "mode_number":int(trial["mode_number_fit"]),
+                                      "phase_rms_residual_rad":float(trial["phase_rms_residual_rad"])})
+            except ValueError as exc:
+                leave_one_out.append({"omitted_sensor_index":int(omitted),"mode_number":None,
+                                      "phase_rms_residual_rad":None,"failure":str(exc)})
+    else:
+        leave_one_out=[{"status":"Not evaluated: at least four sensors are required for leave-one-out robustness."}]
+    valid_loo=[entry["mode_number"] for entry in leave_one_out if entry.get("mode_number") is not None]
     fit.update({
+        "leave_one_sensor_out_results":leave_one_out,
+        "leave_one_sensor_out_stability_fraction":(
+            float(np.mean(np.asarray(valid_loo)==int(fit["mode_number_fit"])))
+            if len(valid_loo)==len(theta) else None),
+        "leave_one_sensor_out_note":"Robustness to one sensor at a time; not a confidence interval and does not correct geometric aliasing.",
         "selected_frequency_Hz": peak_frequency,
         "sensor_phase_rad_relative_to_first": [float(v) for v in phases],
         "coherence_with_reference": [float(v) for v in coherences],
