@@ -2,7 +2,7 @@
 
 This map follows the source document's final diagnostic-family index. “Registry” means an explanatory catalog entry exists; “implemented workflow” means a generic analysis operation is executable in this release. It does not imply every listed observable is solved from raw detector data.
 
-| # | Source family | TIS coverage in v0.2.0 |
+| # | Source family | TIS coverage in v0.3.0 |
 |---:|---|---|
 | 1 | Magnetic measurements | Registry; general time-series/FFT/cross-channel tools |
 | 2 | Equilibrium reconstruction | Registry only; specialized Grad–Shafranov solver not included |
