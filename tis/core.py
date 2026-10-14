@@ -357,9 +357,23 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
     if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 1):
         raise ValueError('nperseg must be a positive integer when supplied.')
     n = min(len(a), int(nperseg) if nperseg is not None else min(1024, max(8, len(a)//4)))
-    f, coh = signal.coherence(a,b,fs=fs,nperseg=n)
-    fc, pxy = signal.csd(a,b,fs=fs,nperseg=n)
-    return {'frequency_Hz':f, 'coherence':coh, 'cross_phase_rad':np.angle(pxy), 'cross_spectrum_real':pxy.real, 'cross_spectrum_imag':pxy.imag}
+    overlap=n//2
+    f, coh = signal.coherence(a,b,fs=fs,nperseg=n,noverlap=overlap,window='hann')
+    fc, pxy = signal.csd(a,b,fs=fs,nperseg=n,noverlap=overlap,window='hann')
+    step=max(1,n-overlap)
+    segments=1+max(0,(len(a)-n)//step)
+    # Approximate 95% null threshold and phase standard error from nominal Welch
+    # segment count. Overlap reduces the effective independent averages, so these
+    # are diagnostic estimates, not exact confidence intervals.
+    coh_threshold=float(1.0-0.05**(1.0/max(1,segments-1)))
+    phase_se=np.full_like(coh,np.nan,dtype=float)
+    positive=coh>np.finfo(float).eps
+    phase_se[positive]=np.sqrt(np.maximum(1.0-coh[positive],0.0)/(2.0*coh[positive]*max(segments,1)))
+    return {'frequency_Hz':f, 'coherence':coh, 'cross_phase_rad':np.angle(pxy),
+            'cross_spectrum_real':pxy.real, 'cross_spectrum_imag':pxy.imag,
+            'coherence_95pct_null_threshold':np.full_like(coh,coh_threshold,dtype=float),
+            'phase_standard_error_approx_rad':phase_se,
+            'nominal_welch_segment_count':np.full(len(f),segments,dtype=int)}
 
 
 def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
