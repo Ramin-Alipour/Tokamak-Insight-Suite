@@ -39,3 +39,7 @@ This map follows the source document's final diagnostic-family index. “Registr
 
 ## Design rule
 Where the source requires an inverse problem, machine geometry, atomic rates, sheath models, instrument response, or specialized equilibrium/orbit solvers, the program documents the requirement instead of claiming a direct measurement or inventing missing physics.
+
+
+## Status semantics (updated 2026-10-14)
+Registry entries are reference metadata unless a callable workflow is explicitly mapped. Formula records now separate `inference_class` from `validation_status`; no formula is labelled independently validated merely because a unit test exists. Thomson scattering forward modelling and a general Grad–Shafranov equilibrium solver remain reference-only/model-dependent entries, not claimed as implemented end-to-end workflows.
