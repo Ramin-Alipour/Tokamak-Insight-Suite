@@ -5,7 +5,8 @@
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "M→D/I",
     "method": "Fit calibrated scattered-light spectrum using instrument response and scattering model.",
-    "caveat": "Laser energy, absolute calibration, stray light, collection geometry and spectral response are required."
+    "caveat": "Laser energy, absolute calibration, stray light, collection geometry and spectral response are required.",
+    "id": "diag-001"
   },
   {
     "family": "Plasma parameters",
@@ -13,7 +14,8 @@
     "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
     "status": "M→D/I",
     "method": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
-    "caveat": "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."
+    "caveat": "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter.",
+    "id": "diag-002"
   },
   {
     "family": "Plasma parameters",
@@ -21,7 +23,8 @@
     "quantities": "T_e profile and fluctuations",
     "status": "M→D/I",
     "method": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
-    "caveat": "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping."
+    "caveat": "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping.",
+    "id": "diag-003"
   },
   {
     "family": "Plasma parameters",
@@ -29,7 +32,8 @@
     "quantities": "T_i, toroidal/poloidal rotation, impurity density constraints",
     "status": "M→D/I",
     "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
-    "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required."
+    "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
+    "id": "diag-004"
   },
   {
     "family": "Plasma parameters",
@@ -37,7 +41,8 @@
     "quantities": "Neutral energy spectrum; fast-ion distribution constraints",
     "status": "M→I",
     "method": "Apply energy-dependent response and compare to a forward model of neutral production and transport.",
-    "caveat": "Not a direct measurement of local ion density or distribution without modeling."
+    "caveat": "Not a direct measurement of local ion density or distribution without modeling.",
+    "id": "diag-005"
   },
   {
     "family": "Plasma parameters",
@@ -45,7 +50,8 @@
     "quantities": "T_i from corrected Gaussian thermal width",
     "status": "M→D/I",
     "method": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
-    "caveat": "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."
+    "caveat": "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i.",
+    "id": "diag-006"
   },
   {
     "family": "Plasma parameters",
@@ -53,7 +59,8 @@
     "quantities": "Rotational/vibrational temperatures; molecular species indicators",
     "status": "M→D/I",
     "method": "Fit molecular band structure and compare populations with an appropriate model.",
-    "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."
+    "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures.",
+    "id": "diag-007"
   },
   {
     "family": "Plasma parameters",
@@ -61,7 +68,8 @@
     "quantities": "Electron velocity-distribution constraints",
     "status": "M→I",
     "method": "Fit a scattering spectrum using the correct collective/non-collective model.",
-    "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian."
+    "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian.",
+    "id": "diag-008"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -69,7 +77,8 @@
     "quantities": "B_t",
     "status": "M→D",
     "method": "Apply calibration and geometry-specific field-coil relation.",
-    "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials."
+    "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
+    "id": "diag-009"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -77,7 +86,8 @@
     "quantities": "B_p; boundary constraints",
     "status": "M→D/I",
     "method": "Calibrate field probes and combine with equilibrium reconstruction.",
-    "caveat": "Local fields alone do not determine a full equilibrium."
+    "caveat": "Local fields alone do not determine a full equilibrium.",
+    "id": "diag-010"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -85,7 +95,8 @@
     "quantities": "dB/dt, MHD spectra, mode frequency, phase",
     "status": "M→D",
     "method": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
-    "caveat": "Orientation, bandwidth, transfer function, integration drift and pickup must be checked."
+    "caveat": "Orientation, bandwidth, transfer function, integration drift and pickup must be checked.",
+    "id": "diag-011"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -93,7 +104,8 @@
     "quantities": "Flux change, loop voltage constraints",
     "status": "M→D",
     "method": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
-    "caveat": "Integration constants, loop area/orientation and bandwidth matter."
+    "caveat": "Integration constants, loop area/orientation and bandwidth matter.",
+    "id": "diag-012"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -101,7 +113,8 @@
     "quantities": "Plasma current I_p",
     "status": "M→D",
     "method": "Integrate calibrated Rogowski output with documented integrator response.",
-    "caveat": "Offset drift, saturation, bandwidth and calibration are critical."
+    "caveat": "Offset drift, saturation, bandwidth and calibration are critical.",
+    "id": "diag-013"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -109,7 +122,8 @@
     "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
     "status": "I",
     "method": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
-    "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution."
+    "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution.",
+    "id": "diag-014"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -117,7 +131,8 @@
     "quantities": "Line-integrated density-weighted B_parallel; rotation angle",
     "status": "M→D/I",
     "method": "Invert rotation with wavelength, density and line-of-sight geometry model.",
-    "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled."
+    "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled.",
+    "id": "diag-015"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -125,7 +140,8 @@
     "quantities": "Φ_B, ψ",
     "status": "M→D/I",
     "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
-    "caveat": "Reference surfaces and sign conventions must be recorded."
+    "caveat": "Reference surfaces and sign conventions must be recorded.",
+    "id": "diag-016"
   },
   {
     "family": "Electrostatic probes",
@@ -133,7 +149,8 @@
     "quantities": "Floating-potential proxy; potential fluctuations",
     "status": "M→D/I",
     "method": "Use collector-current balance and a configuration-specific correction validated for the probe.",
-    "caveat": "Do not universally equate raw ball-pen voltage with plasma potential."
+    "caveat": "Do not universally equate raw ball-pen voltage with plasma potential.",
+    "id": "diag-017"
   },
   {
     "family": "Electrostatic probes",
@@ -141,7 +158,8 @@
     "quantities": "Ion saturation current, flow direction and components, particle flux",
     "status": "M→D/I",
     "method": "Fit angular current response with probe-specific collection/sheath model.",
-    "caveat": "Probe orientation, geometry, bias, collisionality and electrical isolation matter."
+    "caveat": "Probe orientation, geometry, bias, collisionality and electrical isolation matter.",
+    "id": "diag-018"
   },
   {
     "family": "Electrostatic probes",
@@ -149,7 +167,8 @@
     "quantities": "I_sat and flux proxy",
     "status": "M→D/I",
     "method": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
-    "caveat": "Not a standalone density measurement without assumptions."
+    "caveat": "Not a standalone density measurement without assumptions.",
+    "id": "diag-019"
   },
   {
     "family": "Electrostatic probes",
@@ -157,7 +176,8 @@
     "quantities": "V_f, relative potential, E×B fluctuation proxies",
     "status": "M→D/I",
     "method": "Calibrate channels and derive spatial potential gradients using known geometry.",
-    "caveat": "Potential gradients require spatial calibration and consistent time alignment."
+    "caveat": "Potential gradients require spatial calibration and consistent time alignment.",
+    "id": "diag-020"
   },
   {
     "family": "Electrostatic probes",
@@ -165,7 +185,8 @@
     "quantities": "ñ_e proxy; correlation length/time",
     "status": "M→D/I",
     "method": "Use calibrated probe response and a validated conversion from current/voltage to density.",
-    "caveat": "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions."
+    "caveat": "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions.",
+    "id": "diag-021"
   },
   {
     "family": "Spectroscopy",
@@ -173,7 +194,8 @@
     "quantities": "Line centroid, width, intensity, species/charge state, flow projection",
     "status": "M→D/I",
     "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
-    "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter."
+    "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
+    "id": "diag-022"
   },
   {
     "family": "Spectroscopy",
@@ -181,7 +203,8 @@
     "quantities": "Impurity line emission, radiation spectrum, line ratios",
     "status": "M→D/I",
     "method": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
-    "caveat": "Detector response and atomic rates are often dominant uncertainties."
+    "caveat": "Detector response and atomic rates are often dominant uncertainties.",
+    "id": "diag-023"
   },
   {
     "family": "Spectroscopy",
@@ -189,7 +212,8 @@
     "quantities": "Photon energy spectrum, line emission, continuum constraints",
     "status": "M→D/I",
     "method": "Calibrate energy scale and response; fit lines/continuum using a physics model.",
-    "caveat": "Pile-up, dead time, detector response and continuum assumptions matter."
+    "caveat": "Pile-up, dead time, detector response and continuum assumptions matter.",
+    "id": "diag-024"
   },
   {
     "family": "Spectroscopy",
@@ -197,7 +221,8 @@
     "quantities": "Ion temperature, rotation, impurity population constraints",
     "status": "M→D/I",
     "method": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
-    "caveat": "Neutral density and atomic rates can dominate inference."
+    "caveat": "Neutral density and atomic rates can dominate inference.",
+    "id": "diag-025"
   },
   {
     "family": "Spectroscopy",
@@ -205,7 +230,8 @@
     "quantities": "Line intensity, particle-recycling and edge-emission proxies",
     "status": "M→D/I",
     "method": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
-    "caveat": "Line intensity is not a direct particle flux without a collisional-radiative model."
+    "caveat": "Line intensity is not a direct particle flux without a collisional-radiative model.",
+    "id": "diag-026"
   },
   {
     "family": "Spectroscopy",
@@ -213,7 +239,8 @@
     "quantities": "Wavelength axis and line-centroid accuracy",
     "status": "D",
     "method": "Fit known reference lines using a documented calibration function and residuals.",
-    "caveat": "Calibration range, polynomial order and time drift must be assessed."
+    "caveat": "Calibration range, polynomial order and time drift must be assessed.",
+    "id": "diag-027"
   },
   {
     "family": "Spectroscopy",
@@ -221,7 +248,8 @@
     "quantities": "Instrument width and response function",
     "status": "M→D",
     "method": "Measure a narrow reference line or use a validated instrument function.",
-    "caveat": "Do not subtract widths without a compatible convolution model."
+    "caveat": "Do not subtract widths without a compatible convolution model.",
+    "id": "diag-028"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -229,7 +257,8 @@
     "quantities": "Line-integrated electron density N_e",
     "status": "M→D",
     "method": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
-    "caveat": "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter."
+    "caveat": "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter.",
+    "id": "diag-029"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -237,7 +266,8 @@
     "quantities": "Cutoff layer, density profile/fluctuations, group delay",
     "status": "M→D/I",
     "method": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
-    "caveat": "Mode identification, ray/beam effects and equilibrium assumptions are essential."
+    "caveat": "Mode identification, ray/beam effects and equilibrium assumptions are essential.",
+    "id": "diag-030"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -245,7 +275,8 @@
     "quantities": "Ion/electron fluctuation spectrum and fast-ion constraints",
     "status": "M→I",
     "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
-    "caveat": "Requires wave-vector geometry, calibration and plasma response model."
+    "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
+    "id": "diag-031"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -253,7 +284,8 @@
     "quantities": "Ray bending, propagation delay and density constraints",
     "status": "M→I",
     "method": "Solve propagation through a spatially varying refractive index.",
-    "caveat": "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs."
+    "caveat": "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs.",
+    "id": "diag-032"
   },
   {
     "family": "Radiation and imaging",
@@ -261,7 +293,8 @@
     "quantities": "Line-integrated radiated power; emissivity reconstruction",
     "status": "M→D/I",
     "method": "Calibrate detector channels and solve a regularized geometry-matrix inverse problem.",
-    "caveat": "Tomography is ill-posed; report regularization, coverage and uncertainty."
+    "caveat": "Tomography is ill-posed; report regularization, coverage and uncertainty.",
+    "id": "diag-033"
   },
   {
     "family": "Radiation and imaging",
@@ -269,7 +302,8 @@
     "quantities": "Time-resolved radiated-power fluctuations and transients",
     "status": "M→D",
     "method": "Calibrate bandwidth/response and analyze time series consistently.",
-    "caveat": "Detector response and channel synchronization limit transient interpretation."
+    "caveat": "Detector response and channel synchronization limit transient interpretation.",
+    "id": "diag-034"
   },
   {
     "family": "Radiation and imaging",
@@ -277,7 +311,8 @@
     "quantities": "Line-integrated emissivity, sawteeth, MHD and impurity-radiation proxies",
     "status": "M→D/I",
     "method": "Calibrate channels and combine with geometry/model for reconstruction.",
-    "caveat": "Signals depend on spectral response, impurity mix and detector sightlines."
+    "caveat": "Signals depend on spectral response, impurity mix and detector sightlines.",
+    "id": "diag-035"
   },
   {
     "family": "Radiation and imaging",
@@ -285,7 +320,8 @@
     "quantities": "Photon counts/rate and energy spectrum; runaway-electron proxies",
     "status": "M→D/I",
     "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
-    "caveat": "Counts are not direct runaway current or electron energy without transport/response models."
+    "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
+    "id": "diag-036"
   },
   {
     "family": "Radiation and imaging",
@@ -293,7 +329,8 @@
     "quantities": "Plasma boundary, strike-point/feature position, light fluctuations",
     "status": "M→D/I",
     "method": "Apply geometric calibration and image segmentation/tracking.",
-    "caveat": "Line integration, brightness thresholds and viewing geometry affect interpretation."
+    "caveat": "Line integration, brightness thresholds and viewing geometry affect interpretation.",
+    "id": "diag-037"
   },
   {
     "family": "Radiation and imaging",
@@ -301,7 +338,8 @@
     "quantities": "Transient structures, apparent propagation speed, event timing",
     "status": "M→D",
     "method": "Track calibrated image features across synchronized frames.",
-    "caveat": "Apparent velocity is line-of-sight projected and affected by exposure/time resolution."
+    "caveat": "Apparent velocity is line-of-sight projected and affected by exposure/time resolution.",
+    "id": "diag-038"
   },
   {
     "family": "Radiation and imaging",
@@ -309,7 +347,8 @@
     "quantities": "Surface radiance, surface temperature and heat-flux inference",
     "status": "M→D/I",
     "method": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
-    "caveat": "Emissivity, reflections, viewing angle and thermal properties are critical."
+    "caveat": "Emissivity, reflections, viewing angle and thermal properties are critical.",
+    "id": "diag-039"
   },
   {
     "family": "Radiation and imaging",
@@ -317,7 +356,8 @@
     "quantities": "Spatial radiation emissivity",
     "status": "I",
     "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
-    "caveat": "Geometry matrix, regularization and uncertainty must be saved with output."
+    "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
+    "id": "diag-040"
   },
   {
     "family": "Neutron and nuclear",
@@ -325,7 +365,8 @@
     "quantities": "Neutron count rate and fusion-yield proxy",
     "status": "M→D/I",
     "method": "Apply efficiency, dead-time, geometry and background corrections.",
-    "caveat": "Neutron scattering and source anisotropy can affect absolute yield."
+    "caveat": "Neutron scattering and source anisotropy can affect absolute yield.",
+    "id": "diag-041"
   },
   {
     "family": "Neutron and nuclear",
@@ -333,7 +374,8 @@
     "quantities": "Neutron energy spectrum; ion-temperature constraints",
     "status": "M→D/I",
     "method": "Unfold detector response or fit spectrum with a forward model.",
-    "caveat": "Unfolding is ill-conditioned and must include response and uncertainty."
+    "caveat": "Unfolding is ill-conditioned and must include response and uncertainty.",
+    "id": "diag-042"
   },
   {
     "family": "Neutron and nuclear",
@@ -341,7 +383,8 @@
     "quantities": "Spatial neutron emissivity",
     "status": "M→I",
     "method": "Reconstruct from multiple sightlines or imaging response.",
-    "caveat": "Sparse viewing and scattering make inversion uncertain."
+    "caveat": "Sparse viewing and scattering make inversion uncertain.",
+    "id": "diag-043"
   },
   {
     "family": "Neutron and nuclear",
@@ -349,15 +392,8 @@
     "quantities": "Gamma count rate and energy spectrum",
     "status": "M→D/I",
     "method": "Calibrate energy and efficiency; fit peaks and background.",
-    "caveat": "Pile-up, dead time, shielding and activation backgrounds matter."
-  },
-  {
-    "family": "Fast particles",
-    "diagnostic": "Neutral particle analyzer (NPA)",
-    "quantities": "Fast neutral energy distribution and ion-distribution constraints",
-    "status": "M→I",
-    "method": "Use calibrated response and neutralization/charge-exchange forward model.",
-    "caveat": "Sightline integration and atomic cross sections are required."
+    "caveat": "Pile-up, dead time, shielding and activation backgrounds matter.",
+    "id": "diag-044"
   },
   {
     "family": "Fast particles",
@@ -365,7 +401,8 @@
     "quantities": "Fast-ion distribution constraints and energy/pitch sensitivity",
     "status": "M→I",
     "method": "Separate thermal/background emission and compare calibrated spectra with forward model.",
-    "caveat": "Atomic physics, beam geometry, background and phase-space sensitivity matter."
+    "caveat": "Atomic physics, beam geometry, background and phase-space sensitivity matter.",
+    "id": "diag-045"
   },
   {
     "family": "Fast particles",
@@ -373,7 +410,8 @@
     "quantities": "Fast-ion velocity-space constraints",
     "status": "M→I",
     "method": "Fit frequency-shifted scattered spectrum using plasma response model.",
-    "caveat": "Calibration, scattering geometry and background rejection are required."
+    "caveat": "Calibration, scattering geometry and background rejection are required.",
+    "id": "diag-046"
   },
   {
     "family": "Fast particles",
@@ -381,7 +419,8 @@
     "quantities": "Lost-particle flux, energy/pitch constraints and impact patterns",
     "status": "M→D/I",
     "method": "Calibrate scintillator/particle response and compare to orbit-following model.",
-    "caveat": "Detector geometry and magnetic equilibrium are needed for energy/pitch inference."
+    "caveat": "Detector geometry and magnetic equilibrium are needed for energy/pitch inference.",
+    "id": "diag-047"
   },
   {
     "family": "Fast particles",
@@ -389,7 +428,8 @@
     "quantities": "Hard X-ray/gamma signatures, synchrotron light, runaway proxies",
     "status": "M→D/I",
     "method": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
-    "caveat": "Radiation is a proxy, not a direct measurement of runaway population."
+    "caveat": "Radiation is a proxy, not a direct measurement of runaway population.",
+    "id": "diag-048"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -397,7 +437,8 @@
     "quantities": "Vacuum vessel pressure",
     "status": "M→D",
     "method": "Apply gauge-specific calibration and gas sensitivity corrections.",
-    "caveat": "Gauge type, gas species, location and operating range matter."
+    "caveat": "Gauge type, gas species, location and operating range matter.",
+    "id": "diag-049"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -405,7 +446,8 @@
     "quantities": "Partial-pressure pattern and residual-gas composition",
     "status": "M→D/I",
     "method": "Apply mass-sensitivity and cracking-pattern corrections.",
-    "caveat": "Species cross-sensitivity, fragmentation and calibration are essential."
+    "caveat": "Species cross-sensitivity, fragmentation and calibration are essential.",
+    "id": "diag-050"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -413,7 +455,8 @@
     "quantities": "Gas injection rate and injected particle number",
     "status": "M→D",
     "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
-    "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter."
+    "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
+    "id": "diag-051"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -421,7 +464,8 @@
     "quantities": "Neutral density and flux constraints",
     "status": "I",
     "method": "Combine pressure, spectroscopy and transport/neutral model.",
-    "caveat": "Chamber pressure is not equal to local edge neutral density."
+    "caveat": "Chamber pressure is not equal to local edge neutral density.",
+    "id": "diag-052"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -429,7 +473,8 @@
     "quantities": "S = Q/p under consistent throughput/pressure units",
     "status": "D",
     "method": "Compute from calibrated throughput and pressure under defined conditions.",
-    "caveat": "Conductance, gauge position and units must be consistent."
+    "caveat": "Conductance, gauge position and units must be consistent.",
+    "id": "diag-053"
   },
   {
     "family": "MHD and turbulence",
@@ -437,7 +482,8 @@
     "quantities": "PSD, mode frequency, cross-phase, coherence, delay and correlation length",
     "status": "D",
     "method": "Detrend/window; compute Welch PSD, cross-spectrum, coherence and correlation with synchronized channels.",
-    "caveat": "Aliasing, nonstationarity, common pickup, time skew and low coherence can mislead."
+    "caveat": "Aliasing, nonstationarity, common pickup, time skew and low coherence can mislead.",
+    "id": "diag-054"
   },
   {
     "family": "MHD and turbulence",
@@ -445,7 +491,8 @@
     "quantities": "Mode frequency, phase propagation and mode-number constraints",
     "status": "D/I",
     "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
-    "caveat": "Mode number needs array geometry and assumptions about mode structure."
+    "caveat": "Mode number needs array geometry and assumptions about mode structure.",
+    "id": "diag-055"
   },
   {
     "family": "MHD and turbulence",
@@ -453,7 +500,8 @@
     "quantities": "Event times, amplitude, repetition rate and energy proxies",
     "status": "D/I",
     "method": "Detect pulses with robust threshold/prominence and cross-check independent diagnostics.",
-    "caveat": "Thresholds are dataset-dependent; event energy needs calibrated power/energy channels."
+    "caveat": "Thresholds are dataset-dependent; event energy needs calibrated power/energy channels.",
+    "id": "diag-056"
   },
   {
     "family": "MHD and turbulence",
@@ -461,7 +509,8 @@
     "quantities": "Crash times, period and pre/post-crash changes",
     "status": "D",
     "method": "Detect rapid changes in ECE, SXR or other core channels.",
-    "caveat": "Signal choice, temporal resolution and event overlap affect timing."
+    "caveat": "Signal choice, temporal resolution and event overlap affect timing.",
+    "id": "diag-057"
   },
   {
     "family": "MHD and turbulence",
@@ -469,7 +518,8 @@
     "quantities": "Current drop, voltage/radiation transients, precursor activity",
     "status": "D/I",
     "method": "Align calibrated channels and detect multi-signal event signatures.",
-    "caveat": "A single threshold is not a robust universal disruption classifier."
+    "caveat": "A single threshold is not a robust universal disruption classifier.",
+    "id": "diag-058"
   },
   {
     "family": "MHD and turbulence",
@@ -477,7 +527,8 @@
     "quantities": "Correlation coefficient, lag and apparent propagation delay",
     "status": "D",
     "method": "Compute normalized correlation after time alignment and detrending.",
-    "caveat": "Correlation does not prove causation; periodic signals create ambiguous lags."
+    "caveat": "Correlation does not prove causation; periodic signals create ambiguous lags.",
+    "id": "diag-059"
   },
   {
     "family": "MHD and turbulence",
@@ -485,7 +536,8 @@
     "quantities": "Cross-spectrum, phase and magnitude-squared coherence",
     "status": "D",
     "method": "Estimate using consistent windows and sampling; report degrees of freedom if available.",
-    "caveat": "Coherence estimates are biased for short/nonstationary records."
+    "caveat": "Coherence estimates are biased for short/nonstationary records.",
+    "id": "diag-060"
   },
   {
     "family": "Transport and confinement",
@@ -493,7 +545,8 @@
     "quantities": "Γ, D_eff, convective velocity constraints",
     "status": "D/I",
     "method": "Combine density/velocity profiles and a stated transport convention.",
-    "caveat": "Flux convention and simultaneous local measurements are essential."
+    "caveat": "Flux convention and simultaneous local measurements are essential.",
+    "id": "diag-061"
   },
   {
     "family": "Transport and confinement",
@@ -501,7 +554,8 @@
     "quantities": "τ_E = W_th/P_loss",
     "status": "D",
     "method": "Use consistent stored energy and net loss power for the same time window.",
-    "caveat": "Do not substitute input power for loss power without an explicit energy balance."
+    "caveat": "Do not substitute input power for loss power without an explicit energy balance.",
+    "id": "diag-062"
   },
   {
     "family": "Transport and confinement",
@@ -509,7 +563,8 @@
     "quantities": "Input, radiation, stored-energy derivative and loss power",
     "status": "D/I",
     "method": "Construct a time-resolved power balance with explicit sign convention.",
-    "caveat": "Missing channels and derivative noise can dominate inferred losses."
+    "caveat": "Missing channels and derivative noise can dominate inferred losses.",
+    "id": "diag-063"
   },
   {
     "family": "Transport and confinement",
@@ -517,7 +572,8 @@
     "quantities": "n_G = I_p/(πa²) in conventional MA and 10²⁰ m⁻³ units",
     "status": "D",
     "method": "Use plasma current in MA and minor radius in metres.",
-    "caveat": "Empirical reference scaling, not a universal physical limit."
+    "caveat": "Empirical reference scaling, not a universal physical limit.",
+    "id": "diag-064"
   },
   {
     "family": "Transport and confinement",
@@ -525,7 +581,8 @@
     "quantities": "p_e, p_i, total pressure, β_t and β_p",
     "status": "D/I",
     "method": "Combine calibrated density/temperature with equilibrium magnetic field.",
-    "caveat": "Species composition and averaging definitions must be explicit."
+    "caveat": "Species composition and averaging definitions must be explicit.",
+    "id": "diag-065"
   },
   {
     "family": "Heating and RF",
@@ -533,7 +590,8 @@
     "quantities": "Injected/absorbed beam power and energy deposition constraints",
     "status": "M→D/I",
     "method": "Use beam diagnostics and power-balance/attenuation models.",
-    "caveat": "Injected power is not equal to absorbed power."
+    "caveat": "Injected power is not equal to absorbed power.",
+    "id": "diag-066"
   },
   {
     "family": "Heating and RF",
@@ -541,7 +599,8 @@
     "quantities": "Injected/reflected/transmitted RF power and deposition constraints",
     "status": "M→D/I",
     "method": "Calibrate directional couplers and apply propagation/absorption model.",
-    "caveat": "Forward/reflected power and absorbed plasma power differ."
+    "caveat": "Forward/reflected power and absorbed plasma power differ.",
+    "id": "diag-067"
   },
   {
     "family": "Heating and RF",
@@ -549,7 +608,8 @@
     "quantities": "Forward/reflected RF power and coupling constraints",
     "status": "M→D/I",
     "method": "Use calibrated RF measurements and coupling/absorption model.",
-    "caveat": "Matching-network and antenna losses must be accounted for."
+    "caveat": "Matching-network and antenna losses must be accounted for.",
+    "id": "diag-068"
   },
   {
     "family": "Heating and RF",
@@ -557,7 +617,8 @@
     "quantities": "RF power and current-drive constraints",
     "status": "M→I",
     "method": "Combine calibrated RF power with propagation/absorption/current-drive model.",
-    "caveat": "Deposition and driven current are model-dependent."
+    "caveat": "Deposition and driven current are model-dependent.",
+    "id": "diag-069"
   },
   {
     "family": "Heating and RF",
@@ -565,7 +626,8 @@
     "quantities": "Species-resolved heating rates",
     "status": "I",
     "method": "Infer from power balance and transport model.",
-    "caveat": "Needs source partition, exchange terms and time-dependent energy balance."
+    "caveat": "Needs source partition, exchange terms and time-dependent energy balance.",
+    "id": "diag-070"
   },
   {
     "family": "Plasma-facing components",
@@ -573,7 +635,8 @@
     "quantities": "Local temperature histories",
     "status": "M→D/I",
     "method": "Calibrate sensor dynamics and apply heat-transfer model.",
-    "caveat": "Sensor lag and conduction mean measured temperature may differ from surface temperature."
+    "caveat": "Sensor lag and conduction mean measured temperature may differ from surface temperature.",
+    "id": "diag-071"
   },
   {
     "family": "Plasma-facing components",
@@ -581,7 +644,8 @@
     "quantities": "q_perp and integrated target power",
     "status": "M→D/I",
     "method": "Infer from calibrated IR/surface sensors and transient heat-conduction inversion.",
-    "caveat": "Emissivity, surface properties, geometry and time response are critical."
+    "caveat": "Emissivity, surface properties, geometry and time response are critical.",
+    "id": "diag-072"
   },
   {
     "family": "Plasma-facing components",
@@ -589,7 +653,8 @@
     "quantities": "Thickness change, morphology and composition",
     "status": "M→D/I",
     "method": "Compare pre/post exposure profilometry, microscopy and spectroscopy.",
-    "caveat": "Sampling and surface preparation can bias apparent changes."
+    "caveat": "Sampling and surface preparation can bias apparent changes.",
+    "id": "diag-073"
   },
   {
     "family": "Plasma-facing components",
@@ -597,7 +662,8 @@
     "quantities": "Impurity deposition, dust motion and surface composition",
     "status": "M→D/I",
     "method": "Use calibrated imaging/spectroscopy and post-mortem surface analysis.",
-    "caveat": "Line-of-sight and sampling bias matter."
+    "caveat": "Line-of-sight and sampling bias matter.",
+    "id": "diag-074"
   },
   {
     "family": "Plasma-facing components",
@@ -605,7 +671,8 @@
     "quantities": "Position, velocity and peak temperature/heat-flux proxies",
     "status": "D/I",
     "method": "Map camera pixels to machine coordinates and track features over time.",
-    "caveat": "Camera calibration and perspective are essential."
+    "caveat": "Camera calibration and perspective are essential.",
+    "id": "diag-075"
   },
   {
     "family": "Plasma-facing components",
@@ -613,7 +680,8 @@
     "quantities": "Subsurface temperature and heat flux constraints",
     "status": "I",
     "method": "Solve a stated heat equation with material properties and boundary conditions.",
-    "caveat": "Inverse heat conduction is ill-conditioned; report regularization and sensitivity."
+    "caveat": "Inverse heat conduction is ill-conditioned; report regularization and sensitivity.",
+    "id": "diag-076"
   },
   {
     "family": "Data quality and calibration",
@@ -621,7 +689,8 @@
     "quantities": "Physical units, offset, gain, uncertainty propagation",
     "status": "M→D",
     "method": "Fit documented calibration and propagate input/calibration uncertainty.",
-    "caveat": "Calibration range and covariance must be retained."
+    "caveat": "Calibration range and covariance must be retained.",
+    "id": "diag-077"
   },
   {
     "family": "Data quality and calibration",
@@ -629,7 +698,8 @@
     "quantities": "Noise spectrum, detectable signal threshold",
     "status": "D",
     "method": "Estimate from background/no-signal data using a stated detection criterion.",
-    "caveat": "Detection limit depends on bandwidth, false-positive rate and averaging."
+    "caveat": "Detection limit depends on bandwidth, false-positive rate and averaging.",
+    "id": "diag-078"
   },
   {
     "family": "Data quality and calibration",
@@ -637,7 +707,8 @@
     "quantities": "Sampling rate, Nyquist frequency, timing gaps and jitter",
     "status": "D",
     "method": "Inspect timestamps, monotonicity, gaps and sample-rate consistency.",
-    "caveat": "Digital filtering cannot recover aliased information."
+    "caveat": "Digital filtering cannot recover aliased information.",
+    "id": "diag-079"
   },
   {
     "family": "Data quality and calibration",
@@ -645,6 +716,7 @@
     "quantities": "Inter-channel time offset and jitter",
     "status": "D",
     "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
-    "caveat": "Small offsets can corrupt cross-phase and transport estimates."
+    "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
+    "id": "diag-080"
   }
 ]
