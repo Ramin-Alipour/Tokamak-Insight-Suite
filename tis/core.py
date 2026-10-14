@@ -168,7 +168,9 @@ def signal_quality(values: Any) -> dict[str, Any]:
         'median': float(np.median(v)), 'min': float(np.min(v)), 'max': float(np.max(v)),
         'rms_including_dc': float(np.sqrt(np.mean(v*v))), 'peak_to_peak': float(np.ptp(v)),
         'relative_rms_fluctuation': float(np.std(v)/abs(np.mean(v))) if abs(np.mean(v))>np.finfo(float).eps else None,
+        # Counts repeated amplitudes, not duplicate timestamps; timestamp checks use the time column.
         'duplicate_fraction': float((len(v)-len(np.unique(v)))/len(v)),
+        'duplicate_fraction_definition': 'fraction of repeated exact signal values among finite samples; not a timestamp-duplicate metric',
     }
 
 
