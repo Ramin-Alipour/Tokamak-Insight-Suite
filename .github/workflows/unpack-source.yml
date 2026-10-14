@@ -3,9 +3,6 @@ name: Extract source package and test
 on:
   push:
     branches: [main]
-    paths:
-      - "Tokamak_Insight_Suite_v0.3.0.zip"
-      - ".github/workflows/unpack-source.yml"
   workflow_dispatch:
 
 permissions:
@@ -17,8 +14,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
       - name: Extract source files
         run: |
           unzip -q Tokamak_Insight_Suite_v0.3.0.zip -d /tmp/tis-package
