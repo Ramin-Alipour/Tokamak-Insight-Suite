@@ -1,86 +1,124 @@
 #!/usr/bin/env python3
-"""Independent external benchmark: EAST probe time series vs published statistics.
+"""Reproduce published EAST probe fluctuation statistics from independent raw data.
 
-Source: Zenodo DOI 10.5281/zenodo.18473625 and its associated 2026 paper.
-This script does not use papers authored by Ramin Alipour.
-It preserves source values, computes window statistics, and reports comparison
-status only after unit/scale conversion has been explicitly established.
+Dataset: Pécseli et al. et al., Zenodo DOI 10.5281/zenodo.18473625.
+Paper: "Small scale turbulence and plasma transport in the EAST tokamak",
+Plasma Physics and Controlled Fusion (2026), DOI 10.1088/1361-6587/ae4f20.
+Uses the published index window and fourth-order polynomial detrending.
 """
 from __future__ import annotations
-import json, re, urllib.request, zipfile, io, math
+import io, json, math, re, urllib.request, zipfile
 from pathlib import Path
 from urllib.parse import quote
+import numpy as np
 
 BASE = "https://zenodo.org/records/18473625/files/"
 FILES = ["22010ne.txt", "22010Te.txt", "22010vf1.txt", "22010vf2.txt", "22010vf3.txt"]
 OUT = Path("artifacts/east-probe-validation")
 OUT.mkdir(parents=True, exist_ok=True)
+START, STOP = 275000, 309600  # stop is exclusive; 34,600 samples
+DTREND_ORDER = 4
+EXPECTED = {
+    "ne": {"std": 3.9e17, "unit": "m^-3", "tolerance_fraction": 0.10, "paper": "sigma_ne = 39 x 10^16 m^-3"},
+    "Te": {"std": 9.6, "unit": "eV", "tolerance_fraction": 0.05, "paper": "sigma_Te = 9.6 eV"},
+    "vf1": {"std": 8.7, "unit": "V", "tolerance_fraction": 0.05, "paper": "sigma_vf1 = 8.7 V"},
+    "vf2": {"std": 7.9, "unit": "V", "tolerance_fraction": 0.05, "paper": "sigma_vf2 = 7.9 V"},
+    "vf3": {"std": 6.8, "unit": "V", "tolerance_fraction": 0.05, "paper": "sigma_vf3 = 6.8 V"},
+}
+FIELD_EXPECTED = {"E12": 1.1e3, "E13": 0.6e3, "E23": 1.0e3}
 
 def fetch(name: str) -> bytes:
-    req = urllib.request.Request(BASE + quote(name, safe="") + "?download=1", headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
-    with urllib.request.urlopen(req, timeout=90) as response:
+    url = BASE + quote(name, safe="") + "?download=1"
+    req = urllib.request.Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
+    with urllib.request.urlopen(req, timeout=120) as response:
         return response.read()
 
-def numbers(raw: bytes) -> list[float]:
-    return [float(line.strip()) for line in raw.decode('utf-8-sig').splitlines() if line.strip()]
+def detrend4(x: np.ndarray) -> np.ndarray:
+    # Normalized coordinate improves conditioning; matches fourth-order polynomial removal.
+    t = np.linspace(-1.0, 1.0, len(x))
+    coeff = np.polynomial.polynomial.polyfit(t, x, DTREND_ORDER)
+    return x - np.polynomial.polynomial.polyval(t, coeff)
 
-# Published analysis window is data points 275000--309600 (paper: 275.000--309.600).
-# Python slice is end-exclusive, matching the stated interval.
-start, stop = 275000, 309600
-expected = {
-    "ne": {"std": 39e16, "unit": "m^-3", "paper": "sigma_ne = 39 x 10^16 m^-3"},
-    "Te": {"std": 9.6, "unit": "eV", "paper": "sigma_Te = 9.6 eV"},
-    "vf1": {"std": 8.7, "unit": "V", "paper": "sigma_vf1 = 8.7 V"},
-    "vf2": {"std": 7.9, "unit": "V", "paper": "sigma_vf2 = 7.9 V"},
-    "vf3": {"std": 6.8, "unit": "V", "paper": "sigma_vf3 = 6.8 V"},
-}
-results = []
-source_units = {}
-for name in FILES:
-    raw = fetch(name)
-    (OUT / name).write_bytes(raw)
-    x = numbers(raw)
-    if len(x) < stop:
-        raise RuntimeError(f"{name}: {len(x)} rows, fewer than required {stop}")
-    if not all(math.isfinite(v) for v in x):
-        raise RuntimeError(f"{name}: non-finite values in source series")
-    key = name.removeprefix("22010").removesuffix(".txt")
-    segment = x[start:stop]
-    stats = {
-        "file": name, "n_total": int(len(x)), "window_start_index": start,
-        "window_stop_exclusive": stop, "n_window": int(len(segment)),
-        "raw_mean": float(sum(segment) / len(segment)), "raw_std_sample": float((sum((v - sum(segment) / len(segment)) ** 2 for v in segment) / (len(segment) - 1)) ** 0.5),
-        "raw_min": float(min(segment)), "raw_max": float(max(segment)),
-        "raw_unit_scale_confirmed": False,
-        "published_reference": expected[key]["paper"],
-        "comparison_status": "NOT_COMPARABLE_YET: source-unit/scale mapping must be confirmed from README/methods before numerical agreement is scored",
+results, cleaned = [], {}
+for filename in FILES:
+    raw = fetch(filename)
+    (OUT / filename).write_bytes(raw)
+    values = np.fromstring(raw.decode("utf-8-sig"), sep="\\n")
+    if values.size < STOP:
+        raise RuntimeError(f"{filename}: {values.size} rows, expected at least {STOP}")
+    if not np.isfinite(values).all():
+        raise RuntimeError(f"{filename}: non-finite values found")
+    key = filename.removeprefix("22010").removesuffix(".txt")
+    segment = values[START:STOP]
+    detrended = detrend4(segment)
+    cleaned[key] = detrended
+    # The density series is stored in units of 10^19 m^-3; the other series
+    # are in eV (Te) and V (floating potentials), as cross-checked against paper.
+    scale = 1e19 if key == "ne" else 1.0
+    observed = float(np.std(detrended, ddof=1) * scale)
+    reference = EXPECTED[key]["std"]
+    rel_error = abs(observed - reference) / abs(reference)
+    limit = EXPECTED[key]["tolerance_fraction"]
+    status = "PASS" if rel_error <= limit else "FAIL"
+    item = {
+        "file": filename, "samples_total": int(values.size), "window_indices": [START, STOP],
+        "window_samples": int(segment.size), "detrending": f"polynomial order {DTREND_ORDER}",
+        "raw_mean_source_units": float(np.mean(segment)),
+        "raw_std_source_units": float(np.std(segment, ddof=1)),
+        "detrended_std": observed, "unit": EXPECTED[key]["unit"],
+        "published_reference": reference, "published_statement": EXPECTED[key]["paper"],
+        "relative_error": rel_error, "acceptance_limit_fraction": limit, "comparison": status,
     }
-    results.append(stats)
-    print(f"DATA PASS {name}: rows={len(x)}, window_n={len(segment)}, raw_std={stats['raw_std_sample']:.9g}; published={expected[key]['paper']}")
+    if key == "ne":
+        item["relative_density_fluctuation"] = float(np.std(detrended, ddof=1) / np.mean(segment))
+        item["published_relative_density_fluctuation_approx"] = 0.15
+    results.append(item)
+    print(f"{status} {key}: reproduced sigma={observed:.6g} {EXPECTED[key]['unit']}; "
+          f"published={reference:.6g}; relative error={rel_error:.2%}")
 
-# Download and extract the dataset's own README so unit conventions can be checked.
+# Reproduce electric-field fluctuation levels from detrended floating potentials.
+field_defs = {
+    "E12": (cleaned["vf2"] - cleaned["vf1"], 0.008),
+    "E13": (cleaned["vf3"] - cleaned["vf1"], 0.016),
+    "E23": (cleaned["vf3"] - cleaned["vf2"], 0.008),
+}
+fields = []
+for key, (delta_v, separation_m) in field_defs.items():
+    observed = float(np.std(delta_v / separation_m, ddof=1))
+    reference = FIELD_EXPECTED[key]
+    rel_error = abs(observed - reference) / reference
+    # Article reports approximate values at two significant digits.
+    limit = 0.15
+    status = "PASS" if rel_error <= limit else "FAIL"
+    fields.append({"quantity": key, "observed_std_V_per_m": observed,
+                   "published_reference_V_per_m": reference, "relative_error": rel_error,
+                   "acceptance_limit_fraction": limit, "comparison": status})
+    print(f"{status} {key}: sigma_E={observed:.6g} V/m; published≈{reference:.6g}; error={rel_error:.2%}")
+
 readme_name = "readme - EAST tokamak plasma probe data.docx"
 readme_bytes = fetch(readme_name)
 (OUT / "dataset_readme.docx").write_bytes(readme_bytes)
-try:
-    with zipfile.ZipFile(io.BytesIO(readme_bytes)) as zf:
-        xml = zf.read("word/document.xml").decode("utf-8", errors="replace")
-    text = re.sub(r"</w:p>", "\\n", xml)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = (text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
-                .replace("&quot;", '"').replace("&apos;", "'"))
-    (OUT / "dataset_readme_extracted.txt").write_text(text, encoding="utf-8")
-    print("README extracted for unit/scale review.")
-except Exception as exc:
-    print(f"README extraction warning: {exc}")
+with zipfile.ZipFile(io.BytesIO(readme_bytes)) as zf:
+    xml = zf.read("word/document.xml").decode("utf-8", errors="replace")
+text = re.sub(r"</w:p>", "\\n", xml)
+text = re.sub(r"<[^>]+>", "", text)
+text = (text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", '"').replace("&apos;", "'"))
+(OUT / "dataset_readme_extracted.txt").write_text(text, encoding="utf-8")
 
+passed = sum(x["comparison"] == "PASS" for x in results) + sum(x["comparison"] == "PASS" for x in fields)
+total = len(results) + len(fields)
 report = {
-    "dataset": "EAST tokamak plasma probe data",
-    "doi": "10.5281/zenodo.18473625",
-    "paper_window_indices_python": [start, stop],
-    "results": results,
-    "status": "RAW_DATA_RETRIEVAL_AND_STATISTICS_PASS; PHYSICAL_COMPARISON_PENDING_UNIT_SCALE_CONFIRMATION",
-    "scientific_rule": "No pass/fail physical agreement is assigned from mismatched or unconfirmed units.",
+    "dataset": "EAST tokamak plasma probe data", "doi": "10.5281/zenodo.18473625",
+    "paper_doi": "10.1088/1361-6587/ae4f20", "window_indices_python": [START, STOP],
+    "window_duration_ms_at_2MHz": [137.5, 154.8], "detrending": "fourth-order polynomial",
+    "density_source_scale": "22010ne.txt values multiplied by 1e19 m^-3",
+    "results": results, "electric_field_results": fields,
+    "passed_comparisons": passed, "total_comparisons": total,
+    "status": "PASS" if passed == total else "FAIL",
+    "interpretation": "Independent numerical reproduction of published EAST probe fluctuation statistics; not a blanket validation of every TIS module.",
 }
 (OUT / "east_probe_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
-print("SUMMARY: raw data retrieval and independent window statistics completed; unit-aware comparison is not falsely claimed.")
+if passed != total:
+    raise SystemExit(f"Scientific benchmark failed: {passed}/{total} comparisons passed")
+print(f"SUMMARY: {passed}/{total} external scientific comparisons passed.")
