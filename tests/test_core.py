@@ -5,7 +5,7 @@ from tis.core import (
     linear_calibration, polynomial_calibration, prepare_time_series, butterworth_filter,
     fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag, fit_spectral_line,
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
-    regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality,
+    regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality, evaluate_spectral_fit,
     linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
@@ -877,3 +877,14 @@ def test_tomography_noise_sensitivity_is_reproducible():
                                           n_replicates=20, random_seed=12)
     assert np.allclose(first["monte_carlo_standard_deviation"], second["monte_carlo_standard_deviation"])
     assert np.all(first["percentile_97_5"] >= first["percentile_2_5"])
+
+
+def test_spectral_fit_reports_residual_quality_and_evaluator_matches_data():
+    x = np.linspace(499.5, 500.5, 201)
+    y = 3.0 + 20.0*np.exp(-0.5*((x-500.03)/0.08)**2)
+    fit = fit_spectral_line(x, y, model="Gaussian")
+    predicted = evaluate_spectral_fit(x, fit)
+    assert fit["fit_points"] == len(x)
+    assert fit["fit_rmse"] < 1e-6
+    assert np.allclose(predicted, y, atol=1e-5)
+    assert fit["reduced_chi_square"] is None
