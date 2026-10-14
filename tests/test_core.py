@@ -772,3 +772,15 @@ def test_heat_flux_proxy_decomposes_into_fluctuation_components():
            result["electron_heat_flux_temperature_fluctuation_component_W_m-2"]+
            result["electron_heat_flux_triple_fluctuation_component_W_m-2"])
     assert result["electron_heat_flux_proxy_W_m-2"] == pytest.approx(total,rel=1e-12)
+
+
+def test_abel_first_order_regularization_preserves_flat_truth_profile():
+    from tis.core import abel_reconstruction
+    chords=np.array([0.0,0.5,1.0,1.5,2.0,2.5])
+    edges=np.array([0.0,1.0,2.0,3.0])
+    forward=abel_reconstruction(chords,np.zeros_like(chords),edges,lam=0.0)
+    truth=np.ones(len(edges)-1)
+    line_integrals=forward["response_matrix"]@truth
+    result=abel_reconstruction(chords,line_integrals,edges,lam=0.01)
+    np.testing.assert_allclose(result["emissivity_or_density_profile"],truth,atol=0.08)
+    assert result["regularization_order"]==1
