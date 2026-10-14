@@ -1254,17 +1254,37 @@ def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dic
 
 
 def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
-    """Calculate profile gradients and basic pedestal/peak descriptors from calibrated profile data."""
-    x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel(); m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
+    """Compute calibrated profile gradients, interpolated half-height width and peak descriptors."""
+    x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel()
+    m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
     if len(x)<5: raise ValueError('At least 5 finite profile points are required.')
     o=np.argsort(x); x,y=x[o],y[o]
     if np.any(np.diff(x)<=0): raise ValueError('Profile coordinate must be unique and increasing.')
-    grad=np.gradient(y,x,edge_order=2); k=int(np.argmax(np.abs(grad)))
-    result={'peak_value':float(np.max(y)),'minimum_value':float(np.min(y)),'peak_coordinate':float(x[np.argmax(y)]),'profile_integral':float(integrate.trapezoid(y,x)),'max_abs_gradient':float(np.max(np.abs(grad))),'max_gradient_coordinate':float(x[k]),'gradient_at_max_abs':float(grad[k]),'n_points':int(len(x))}
-    # Half-maximum width is meaningful only for nonnegative profiles with a positive peak.
+    grad=np.gradient(y,x,edge_order=2); peak_idx=int(np.argmax(y)); k=int(np.argmax(np.abs(grad)))
+    result={'peak_value':float(np.max(y)),'minimum_value':float(np.min(y)),
+            'peak_coordinate':float(x[peak_idx]),'profile_integral':float(integrate.trapezoid(y,x)),
+            'max_abs_gradient':float(np.max(np.abs(grad))),'max_gradient_coordinate':float(x[k]),
+            'gradient_at_max_abs':float(grad[k]),'n_points':int(len(x)),
+            'gradient_method':'second-order finite differences on the supplied coordinate grid'}
+    # FWHM is defined around the global peak and uses linear interpolation at crossings.
     if np.max(y)>0 and np.min(y)>=0:
-        inds=np.where(y>=.5*np.max(y))[0]
-        if len(inds): result['FWHM_coordinate_units']=float(x[inds[-1]]-x[inds[0]])
+        half=0.5*float(y[peak_idx])
+        left_candidates=np.flatnonzero(y[:peak_idx] < half)
+        right_candidates=np.flatnonzero(y[peak_idx+1:] < half)
+        if len(left_candidates) and len(right_candidates):
+            il=int(left_candidates[-1]); ir=int(peak_idx+1+right_candidates[0])
+            left=float(x[il]+(half-y[il])*(x[il+1]-x[il])/(y[il+1]-y[il]))
+            right=float(x[ir-1]+(half-y[ir-1])*(x[ir]-x[ir-1])/(y[ir]-y[ir-1]))
+            result['FWHM_coordinate_units']=right-left
+            result['FWHM_method']='linearly interpolated half-height crossings around global peak'
+        else:
+            result['FWHM_coordinate_units']=None
+            result['FWHM_status']='profile does not cross half maximum on both sides; coordinate coverage is insufficient'
+        peak_count=int(np.count_nonzero((y[1:-1]>y[:-2])&(y[1:-1]>=y[2:])))
+        if peak_count>1:
+            result['multiple_local_peaks_detected']=True
+            result['FWHM_warning']='Multiple local peaks are present; the global-peak FWHM may not characterize the full profile.'
+    result['pedestal_note']='No pedestal location/width is inferred automatically; pedestal characterization requires a chosen physical model or user-defined core/edge windows.'
     return result
 
 
