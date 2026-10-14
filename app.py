@@ -449,13 +449,14 @@ elif page=='Spectral Analysis':
     mode=st.radio('Workflow',['Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
-        model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
+        model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
         if st.button('Fit spectral line'):
             try:
-                st.session_state['tis_spectral_fit']={'xcol':xcol,'ycol':ycol,'model':model,'fit':fit_spectral_line(df[xcol],df[ycol],xmin,xmax,model)}
+                fit_sigma=None if sigma_col=='<none>' else pd.to_numeric(df[sigma_col],errors='coerce')
+                st.session_state['tis_spectral_fit']={'xcol':xcol,'ycol':ycol,'model':model,'sigma_col':sigma_col,'fit':fit_spectral_line(df[xcol],df[ycol],xmin,xmax,model,sigma_y=fit_sigma)}
             except Exception as e: st.error(str(e))
         saved=st.session_state.get('tis_spectral_fit')
-        if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model:
+        if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model and saved.get('sigma_col')==sigma_col:
             fit=saved['fit']; st.json(fit)
             if model=='Gaussian':
                 lam0=st.number_input('Known rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=None,placeholder='Enter reference wavelength',key='doppler_rest_wavelength'); sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g'); mass=st.number_input('Ion mass (amu)',min_value=1e-6,value=40.0); sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g'); inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g'); sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
