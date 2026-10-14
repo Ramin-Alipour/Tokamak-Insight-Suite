@@ -7,6 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.data_sources import fetch_fair_mast_signal
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_velocity_m_s, derive_parameters,
@@ -53,7 +54,7 @@ with st.sidebar:
             for k in ['tis_raw','tis_filename','tis_df','tis_sha']: st.session_state.pop(k,None)
             st.rerun()
     st.divider()
-    pages=['Home','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
+    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
@@ -121,6 +122,48 @@ if page=='Home':
     grid=st.columns(4)
     for i,x in enumerate(categories): grid[i%4].markdown(f'**{x}**')
     st.caption('Scientific outputs must be interpreted with the actual diagnostic calibration, units, geometry, assumptions and uncertainty model.')
+
+elif page=='Public Data Access':
+    st.title('Public Experimental Data Access')
+    st.caption('Fetch a single time-series signal directly from the public UKAEA FAIR-MAST archive. Shot/group availability varies; this does not download the entire archive.')
+    st.markdown('Source documentation: [FAIR-MAST Level-1 data](https://mastapp.site/level1-data.html) · [Archive overview](https://www.ukaea.org/service/fair-mast/)')
+    with st.form('fair_mast_fetch_form'):
+        c1, c2 = st.columns(2)
+        with c1:
+            mast_shot = st.number_input('MAST shot number', min_value=1, value=29790, step=1)
+            mast_group = st.selectbox('Diagnostic group', ['xmo', 'amc', 'ane'], help='xmo: Mirnov coils; amc: currents; ane: interferometry. Not every group exists in every shot.')
+        with c2:
+            mast_signal = st.text_input('Signal name (leave blank to auto-select)', value='', help='For xmo, the default is omaha_1lz when available.')
+            mast_max_samples = st.number_input('Maximum exported samples', min_value=1024, max_value=500000, value=70000, step=1024)
+        fetch_clicked = st.form_submit_button('Fetch public signal')
+    if fetch_clicked:
+        try:
+            with st.spinner('Connecting to FAIR-MAST and reading the selected signal...'):
+                mast_frame, mast_manifest = fetch_fair_mast_signal(
+                    int(mast_shot), mast_group, mast_signal.strip() or None, int(mast_max_samples)
+                )
+                mast_csv = mast_frame.to_csv(index=False).encode('utf-8')
+                mast_filename = f"mast_{int(mast_shot)}_{mast_group}_{mast_manifest['signal']}.csv"
+                st.session_state['tis_raw'] = mast_csv
+                st.session_state['tis_filename'] = mast_filename
+                st.session_state['tis_df'] = mast_frame
+                st.session_state['tis_sha'] = sha256_bytes(mast_csv)
+                st.session_state['tis_source_manifest'] = mast_manifest
+                st.session_state['tis_source_manifest']['csv_sha256'] = st.session_state['tis_sha']
+                st.session_state['tis_source_manifest']['csv_file'] = mast_filename
+            st.rerun()
+        except Exception as e:
+            st.error(f'Public data fetch failed: {e}')
+            st.info('Check the shot/group/signal name and internet access. Some public archives or individual groups may be temporarily unavailable.')
+    if 'tis_source_manifest' in st.session_state:
+        manifest = st.session_state['tis_source_manifest']
+        st.success(f"Loaded shot {manifest['shot']} · {manifest['source_group']} / {manifest['signal']} · {manifest['exported_samples']:,} samples")
+        st.caption(f"Source class: {manifest['source_signal_class']} · Quality: {manifest['source_quality']} · Units: {manifest['source_units']}")
+        st.dataframe(st.session_state['tis_df'].head(30), use_container_width=True)
+        st.json(manifest)
+        st.download_button('Download CSV', data=st.session_state['tis_raw'], file_name=st.session_state['tis_filename'], mime='text/csv')
+        st.download_button('Download provenance manifest', data=json.dumps(manifest, indent=2), file_name='mast_source_manifest.json', mime='application/json')
+        st.caption('The fetched data are not calibrated by TIS. Verify units, calibration and quality before physical interpretation.')
 
 elif page=='Data Import & QC':
     st.title('Data Import & Quality Control')
