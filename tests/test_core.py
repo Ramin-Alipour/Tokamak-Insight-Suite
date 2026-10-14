@@ -819,3 +819,23 @@ def test_load_table_decimal_comma_and_unit_row_keeps_numeric_channel():
     assert frame["signal"].dtype.kind in "fi"
     assert frame["signal"].isna().sum() == 1
     np.testing.assert_allclose(frame["signal"].dropna(), [1.5, 2.5, 3.5])
+
+
+
+def test_profile_fwhm_uses_interpolated_main_peak_crossings():
+    from tis.core import profile_gradient_analysis
+    x = np.linspace(-5.0, 5.0, 101)
+    sigma = 1.0
+    y = 0.2 + np.exp(-0.5 * (x / sigma) ** 2)
+    result = profile_gradient_analysis(x, y)
+    expected = 2.0 * np.sqrt(2.0 * np.log(2.0)) * sigma
+    assert result["FWHM_coordinate_units"] == pytest.approx(expected, rel=0.01)
+    assert "interpolated" in result["FWHM_status"]
+
+
+def test_profile_fwhm_does_not_merge_separated_peaks():
+    from tis.core import profile_gradient_analysis
+    x = np.linspace(-6.0, 6.0, 241)
+    y = np.exp(-0.5 * ((x + 2.0) / 0.6) ** 2) + 0.9 * np.exp(-0.5 * ((x - 2.0) / 0.6) ** 2)
+    result = profile_gradient_analysis(x, y)
+    assert result["FWHM_coordinate_units"] < 2.0
