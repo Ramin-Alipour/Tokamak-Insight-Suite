@@ -784,3 +784,19 @@ def test_abel_first_order_regularization_preserves_flat_truth_profile():
     result=abel_reconstruction(chords,line_integrals,edges,lam=0.01)
     np.testing.assert_allclose(result["emissivity_or_density_profile"],truth,atol=0.08)
     assert result["regularization_order"]==1
+
+
+def test_geometry_derived_2d_tomography_matrix_has_path_lengths():
+    from tis.core import build_tomography_matrix_2d
+    starts=np.array([[0.0,0.5],[0.5,0.0],[0.0,0.0]])
+    ends=np.array([[2.0,0.5],[0.5,2.0],[2.0,2.0]])
+    A=build_tomography_matrix_2d(starts,ends,[0,1,2],[0,1,2])
+    np.testing.assert_allclose(A[0],[1,1,0,0],atol=1e-12)
+    np.testing.assert_allclose(A[1],[1,0,1,0],atol=1e-12)
+    np.testing.assert_allclose(A[2],[np.sqrt(2),0,0,np.sqrt(2)],atol=1e-12)
+
+
+def test_geometry_derived_tomography_rejects_invalid_grid():
+    from tis.core import build_tomography_matrix_2d
+    with pytest.raises(ValueError,match="strictly increasing"):
+        build_tomography_matrix_2d([[0,0]],[[1,1]],[0,1,1],[0,1])
