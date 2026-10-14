@@ -326,9 +326,12 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
 
 
 def spectral_calibration(raw_pixel: Any, reference_wavelength: Any, degree: int = 1) -> dict[str, Any]:
+    if isinstance(degree, (bool, np.bool_)) or not isinstance(degree, (int, np.integer)) or degree < 1:
+        raise ValueError('Polynomial degree must be a positive integer.')
     x=np.asarray(raw_pixel,float).ravel(); y=np.asarray(reference_wavelength,float).ravel()
+    if len(x) != len(y): raise ValueError('Pixel and reference-wavelength arrays must have equal length.')
     good=np.isfinite(x)&np.isfinite(y); x,y=x[good],y[good]
-    if len(x)<degree+2 or degree<1: raise ValueError('Need at least degree+2 finite calibration points and degree >= 1.')
+    if len(x)<degree+2: raise ValueError('Need at least degree+2 finite calibration points.')
     if len(np.unique(x))<degree+1: raise ValueError('Pixel coordinates do not span enough unique points for this polynomial degree.')
     coeff=np.polyfit(x,y,degree); pred=np.polyval(coeff,x); resid=y-pred
     return {'coefficients_high_to_low':coeff.tolist(),'rms_residual':float(np.sqrt(np.mean(resid**2))),
