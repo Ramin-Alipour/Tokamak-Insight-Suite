@@ -28,6 +28,15 @@ Open **Reference Results Validation** and upload a CSV with:
 
 The workflow calculates signed and absolute differences. If both standard uncertainties are supplied, it compares the absolute difference with (k\sqrt{u_{ref}^2+u_{TIS}^2}). Otherwise it uses an explicitly supplied tolerance. If neither is supplied, the row is marked **UNASSESSED**; the software does not invent a pass/fail threshold.
 
+## Compare curves, time series and spectra
+
+For figure-derived time series or spectra, choose **Curves / time series / spectra** in the same workspace and upload a CSV with:
+- `x_reference`, `reference_value`: digitized reference coordinates and values.
+- `x_software`, `software_value`: TIS result coordinates and values.
+- Optional `reference_uncertainty`, `software_uncertainty`: standard uncertainties aligned to each curve's own coordinate columns.
+
+The two x grids may differ. TIS linearly interpolates the reference onto software coordinates only within the common domain; it never extrapolates. The report includes bias, MAE, RMSE, normalized RMSE, maximum absolute error, correlation, and—only when an uncertainty or explicit tolerance criterion is selected—the fraction of points within that criterion. Curves should be compared only after matching axis units, time window, normalization and physical definitions.
+
 ## Interpretation
 
 - **AGREES** means only that the numbers agree under the supplied uncertainty/tolerance rule.
