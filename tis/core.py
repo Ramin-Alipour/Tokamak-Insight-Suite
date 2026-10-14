@@ -1239,6 +1239,119 @@ def floating_potential(voltage: Any, current: Any) -> float | None:
     return float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
 
 
+
+def svd_mode_decomposition(
+    signals: Any,
+    *,
+    center: bool = True,
+    standardize: bool = False,
+    n_modes: int | None = None,
+) -> dict[str, Any]:
+    """Decompose synchronized multi-channel signals using SVD.
+
+    Input shape is (time samples, channels). Principal components are U*S;
+    spatial/channel modes are columns of V. SVD signs are mathematically
+    arbitrary. Energy fractions describe variance/energy in the processed
+    matrix, not a universal physical energy unless the channel units/scales
+    and weighting justify that interpretation.
+    """
+    x = np.asarray(signals, dtype=float)
+    if x.ndim != 2 or min(x.shape) < 2:
+        raise ValueError("signals must be a 2-D array with at least 2 samples and 2 channels.")
+    if not np.all(np.isfinite(x)):
+        raise ValueError("SVD input must be finite; align and handle missing samples explicitly.")
+    if isinstance(n_modes, bool) or (n_modes is not None and (not isinstance(n_modes, (int, np.integer)) or n_modes < 1)):
+        raise ValueError("n_modes must be a positive integer or None.")
+    mean = np.mean(x, axis=0) if center else np.zeros(x.shape[1], dtype=float)
+    processed = x - mean
+    scale = np.ones(x.shape[1], dtype=float)
+    if standardize:
+        scale = np.std(processed, axis=0, ddof=0)
+        if np.any(~np.isfinite(scale)) or np.any(scale <= np.finfo(float).eps):
+            raise ValueError("Cannot standardize a constant or numerically constant channel.")
+        processed = processed / scale
+    U, singular_values, Vh = np.linalg.svd(processed, full_matrices=False)
+    total = float(np.sum(singular_values ** 2))
+    energy = singular_values ** 2 / total if total > 0 else np.zeros_like(singular_values)
+    count = len(singular_values) if n_modes is None else min(int(n_modes), len(singular_values))
+    pcs = U[:, :count] * singular_values[:count]
+    modes = Vh[:count, :].T
+    reconstruction_processed = pcs @ modes.T
+    reconstruction = reconstruction_processed * scale + mean
+    return {
+        "principal_components": pcs,
+        "channel_modes": modes,
+        "singular_values": singular_values[:count],
+        "all_singular_values": singular_values,
+        "energy_fraction": energy[:count],
+        "cumulative_energy_fraction": np.cumsum(energy[:count]),
+        "mean_by_channel": mean,
+        "scale_by_channel": scale,
+        "reconstruction": reconstruction,
+        "n_samples": int(x.shape[0]),
+        "n_channels": int(x.shape[1]),
+        "n_modes_returned": int(count),
+        "centered": bool(center),
+        "standardized": bool(standardize),
+        "interpretation": "SVD modes are data-driven basis components; mode index is not automatically a physical poloidal/toroidal mode number. Sign is arbitrary. Channel scaling and synchronization affect the decomposition.",
+    }
+
+
+def morlet_wavelet_analysis(
+    time_s: Any,
+    values: Any,
+    frequencies_hz: Any,
+    *,
+    omega0: float = 6.0,
+) -> dict[str, Any]:
+    """Compute a complex Morlet CWT on a uniformly sampled finite time series.
+
+    Frequencies are explicitly supplied in Hz and must lie below Nyquist.
+    Returned power is |coefficient|^2 in the chosen normalization; it is best
+    used for relative time-frequency structure, not absolute spectral power.
+    Edge coefficients are flagged because wavelet support is truncated there.
+    """
+    t, y, fs = prepare_time_series(time_s, values)
+    freq = np.asarray(frequencies_hz, dtype=float).ravel()
+    if len(freq) < 1 or not np.all(np.isfinite(freq)) or np.any(freq <= 0) or np.any(np.diff(freq) <= 0):
+        raise ValueError("frequencies_hz must be finite, positive and strictly increasing.")
+    if freq[-1] >= fs / 2:
+        raise ValueError("Wavelet frequencies must be below the Nyquist frequency.")
+    if not np.isfinite(omega0) or omega0 < 5:
+        raise ValueError("omega0 must be finite and >= 5 to limit the Morlet wavelet's DC component.")
+    dt = 1.0 / fs
+    centered = y - np.mean(y)
+    coefficients = np.empty((len(freq), len(y)), dtype=complex)
+    edge_mask = np.zeros((len(freq), len(y)), dtype=bool)
+    for i, f_hz in enumerate(freq):
+        scale_samples = omega0 / (2.0 * np.pi * f_hz * dt)
+        half_width = max(4, int(np.ceil(4.0 * scale_samples)))
+        tau = np.arange(-half_width, half_width + 1, dtype=float) / scale_samples
+        wavelet = (np.pi ** -0.25) * np.exp(1j * omega0 * tau) * np.exp(-0.5 * tau ** 2)
+        wavelet = wavelet / np.sqrt(scale_samples)
+        wavelet = wavelet - np.mean(wavelet)
+        norm = np.sqrt(np.sum(np.abs(wavelet) ** 2))
+        if norm <= np.finfo(float).eps:
+            raise ValueError("Degenerate wavelet at the selected frequency; adjust frequency grid.")
+        wavelet = wavelet / norm
+        coefficients[i] = signal.fftconvolve(centered, np.conjugate(wavelet[::-1]), mode="same")
+        edge = min(half_width, len(y) // 2)
+        if edge:
+            edge_mask[i, :edge] = True
+            edge_mask[i, -edge:] = True
+    return {
+        "time_s": t,
+        "frequencies_Hz": freq,
+        "coefficients": coefficients,
+        "power": np.abs(coefficients) ** 2,
+        "edge_affected": edge_mask,
+        "sample_rate_Hz": float(fs),
+        "omega0": float(omega0),
+        "normalization": "unit-energy discrete Morlet kernels; power is relative |coefficient|^2, not calibrated PSD",
+        "warning": "Interpret time-frequency power away from flagged edges. The transform assumes uniform sampling and is sensitive to the selected frequency grid and wavelet normalization.",
+    }
+
+
 def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None = None,
                            max_mode_number: int | None = None) -> dict[str, float | str | int]:
     """Fit spatial phase after sorting sensors by angle; report the sampling alias limit.
