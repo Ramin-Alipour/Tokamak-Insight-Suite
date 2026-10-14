@@ -348,9 +348,10 @@ elif page=='Time Series & MHD':
                 _,x_pair,fs_pair=prepare_time_series(tx,raw_x[common],fs0)
                 _,y_pair,fs2=prepare_time_series(tx,raw_y[common],fs0)
                 if len(x_pair)==len(y_pair) and np.isclose(fs_pair,fs2) and np.isclose(fs,fs_pair):
+                    x_pair_f=butterworth_filter(x_pair,fs_pair,hp or None,lp or None,order)
                     y2f=butterworth_filter(y_pair,fs2,hp or None,lp or None,order)
-                    xa=cross_analysis(yf,y2f,fs)
-                    lags,corr,lag=cross_correlation_lag(yf,y2f,fs)
+                    xa=cross_analysis(x_pair_f,y2f,fs_pair)
+                    lags,corr,lag=cross_correlation_lag(x_pair_f,y2f,fs_pair)
                     st.caption('Both channels use the same timestamp-validity mask and the same filter settings. Lag convention: a y-channel delayed relative to x gives a negative lag.')
                     st.metric('Peak absolute-correlation lag',f'{lag:.6g} s')
                     plot_line(xa['frequency_Hz'],xa['coherence'],'Frequency (Hz)','Coherence','Magnitude-squared coherence')
