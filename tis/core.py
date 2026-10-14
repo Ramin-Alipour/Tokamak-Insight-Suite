@@ -28,12 +28,15 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                header: int | None | str = "infer", comment: str | None = None,
                max_bytes: int = 100_000_000, max_rows: int = 10_000_000,
                max_uncompressed_bytes: int = 500_000_000) -> pd.DataFrame:
-    """Load tabular data with explicit parsing options and bounded input size.
+    """Load a table with preflight limits and an explicit report of numeric coercions.
 
-    '#' remains an ordinary character by default, preserving headers such as Ch#1.
+    Raw bytes remain caller-owned and unchanged. Limits are checked before full
+    materialization wherever the format exposes trustworthy metadata.
     """
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("data must be bytes.")
+    if max_bytes <= 0 or max_rows <= 0 or max_uncompressed_bytes <= 0:
+        raise ValueError("Import limits must be positive.")
     if len(data) > max_bytes:
         raise ValueError(f"Input exceeds the configured {max_bytes:,}-byte import limit.")
     if decimal not in {".", ","}:
@@ -42,7 +45,8 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("skiprows must be a nonnegative integer.")
     name = filename.lower()
     if name.endswith((".csv", ".txt")):
-        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
+        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header,
+                  "nrows": max_rows + 1}
         if comment is not None:
             kwargs["comment"] = comment
         frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None,
@@ -52,23 +56,74 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
             import zipfile
             try:
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                    members=archive.infolist()
-                    expanded=sum(member.file_size for member in members)
-                    if len(members)>2000 or expanded>max_uncompressed_bytes:
+                    members = archive.infolist()
+                    expanded = sum(member.file_size for member in members)
+                    if len(members) > 2000 or expanded > max_uncompressed_bytes:
                         raise ValueError("Excel archive exceeds the safe member-count or uncompressed-size limit.")
-                    if any(member.compress_size>0 and member.file_size/member.compress_size>1000 for member in members):
+                    if any(m.compress_size > 0 and m.file_size / m.compress_size > 1000 for m in members):
                         raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
+                from openpyxl import load_workbook
+                book = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+                try:
+                    if sheet_name == 0:
+                        sheet = book.worksheets[0]
+                    elif isinstance(sheet_name, int):
+                        if sheet_name < 0 or sheet_name >= len(book.worksheets):
+                            raise ValueError("Requested worksheet index is out of range.")
+                        sheet = book.worksheets[sheet_name]
+                    else:
+                        if sheet_name not in book.sheetnames:
+                            raise ValueError(f"Worksheet {sheet_name!r} was not found.")
+                        sheet = book[sheet_name]
+                    if sheet.max_row and sheet.max_row > max_rows + skiprows + 1:
+                        raise ValueError(f"Worksheet exceeds the configured {max_rows:,}-row import limit.")
+                    if sheet.max_column and sheet.max_column > 100_000:
+                        raise ValueError("Worksheet exceeds the configured column limit.")
+                finally:
+                    book.close()
             except zipfile.BadZipFile as exc:
                 raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header)
+        else:
+            try:
+                import xlrd
+            except ImportError as exc:
+                raise ValueError("Reading legacy .xls requires the optional 'xlrd' dependency.") from exc
+            try:
+                book = xlrd.open_workbook(file_contents=bytes(data), on_demand=True)
+                try:
+                    if isinstance(sheet_name, int):
+                        if sheet_name < 0 or sheet_name >= book.nsheets:
+                            raise ValueError("Requested worksheet index is out of range.")
+                        sheet = book.sheet_by_index(sheet_name)
+                    else:
+                        sheet = book.sheet_by_name(sheet_name)
+                    if sheet.nrows > max_rows + skiprows + 1:
+                        raise ValueError(f"Worksheet exceeds the configured {max_rows:,}-row import limit.")
+                    if sheet.ncols > 100_000:
+                        raise ValueError("Worksheet exceeds the configured column limit.")
+                finally:
+                    book.release_resources()
+            except ValueError:
+                raise
+            except Exception as exc:
+                raise ValueError("Could not safely inspect the legacy XLS workbook.") from exc
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header,
+                              nrows=max_rows + 1, engine="openpyxl" if name.endswith(".xlsx") else "xlrd")
     elif name.endswith((".parquet", ".pq")):
         import pyarrow.parquet as pq
         try:
-            parquet_file=pq.ParquetFile(io.BytesIO(data))
-            if parquet_file.metadata.num_rows>max_rows or parquet_file.metadata.num_row_groups>10000:
+            parquet_file = pq.ParquetFile(io.BytesIO(data))
+            metadata = parquet_file.metadata
+            if metadata.num_rows > max_rows or metadata.num_row_groups > 10000:
                 raise ValueError("Parquet file exceeds the configured row or row-group limit.")
+            expanded = sum(metadata.row_group(i).total_byte_size for i in range(metadata.num_row_groups))
+            if expanded > max_uncompressed_bytes:
+                raise ValueError("Parquet file exceeds the configured uncompressed-size limit.")
+            if metadata.num_columns > 100_000:
+                raise ValueError("Parquet file exceeds the configured column limit.")
         except (ValueError, OSError) as exc:
-            if isinstance(exc, ValueError): raise
+            if isinstance(exc, ValueError):
+                raise
             raise ValueError("Could not safely inspect Parquet metadata.") from exc
         frame = pd.read_parquet(io.BytesIO(data))
     else:
@@ -77,18 +132,27 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("Select one worksheet at a time.")
     if frame.empty:
         raise ValueError("The imported table is empty.")
-    if len(frame)>max_rows:
+    if len(frame) > max_rows:
         raise ValueError(f"Table exceeds the configured {max_rows:,}-row import limit.")
     frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
-    # Recover mostly numeric instrument columns containing a unit row or a few
-    # malformed cells. Those cells become NaN and remain visible to QC.
+    coercions = {}
     for col in frame.columns:
         if not pd.api.types.is_numeric_dtype(frame[col]):
             candidate = pd.to_numeric(frame[col], errors="coerce")
             nonempty = int(frame[col].notna().sum())
             numeric_count = int(candidate.notna().sum())
             if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.67:
+                converted = int((frame[col].notna() & candidate.isna()).sum())
+                if converted:
+                    coercions[str(col)] = {"converted_to_missing": converted, "nonempty_before": nonempty}
                 frame[col] = candidate
+    frame.attrs["tis_import_report"] = {
+        "filename": filename,
+        "input_bytes": len(data),
+        "numeric_coercions": coercions,
+        "row_limit": max_rows,
+        "uncompressed_byte_limit": max_uncompressed_bytes,
+    }
     return frame
 
 
