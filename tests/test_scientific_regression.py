@@ -367,3 +367,23 @@ def test_cross_spectral_mode_number_recovers_known_positive_phase_winding():
     assert result["selected_frequency_Hz"] == pytest.approx(frequency_hz, abs=fs / 512)
     assert result["mode_number_fit"] == pytest.approx(true_mode)
     assert result["phase_rms_residual_rad"] < 1e-8
+
+
+
+def test_langmuir_electron_temperature_recovers_known_exponential_retarding_slope():
+    from tis.core import langmuir_iv_analysis
+    voltage = np.linspace(-20.0, 0.0, 81)
+    ion_saturation_current = -0.1
+    amplitude = 1e-5
+    true_te_eV = 3.0
+    current = ion_saturation_current + amplitude * np.exp(voltage / true_te_eV)
+    result = langmuir_iv_analysis(
+        voltage, current,
+        electron_fit_range=(-5.0, 0.0),
+        ion_fit_range=(-20.0, -15.0),
+    )
+    # Analytic Maxwellian electron-retarding model: d(ln(Ie))/dV = 1/Te.
+    # Small electron-current contamination of the finite ion-fit window is
+    # expected, so this is a model-recovery tolerance, not experimental validation.
+    assert result["electron_temperature_eV"] == pytest.approx(true_te_eV, rel=0.03)
+    assert result["electron_retarding_fit_R2"] > 0.999
