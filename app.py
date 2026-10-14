@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
+from tis import __version__
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
@@ -32,7 +33,13 @@ h1,h2,h3{color:#f0f7ff!important}
 .small-muted{color:#9fc7ec;font-size:.88rem}
 </style>''', unsafe_allow_html=True)
 
-# Sidebar: project identity and persistent data selection, modeled on the saved dashboard reference.
+def _clear_loaded_data():
+    for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
+                "tis_upload_sha", "tis_imported_at_utc", "tis_import_parameters"):
+        st.session_state.pop(key, None)
+    st.session_state["global_upload"] = None
+
+# Sidebar: project identity and persistent data selection.
 with st.sidebar:
     st.markdown('## ⚛️ Tokamak Insight Suite')
     st.caption('Data Analysis · Diagnostics · Plasma Physics')
@@ -42,24 +49,44 @@ with st.sidebar:
     analyst=st.text_input('Analyst',st.session_state.get('analyst',''),key='analyst')
     st.markdown('**Load diagnostic data**')
     upload=st.file_uploader('CSV · TXT · Excel · Parquet',type=['csv','txt','xlsx','xls','parquet','pq'],key='global_upload')
+    with st.expander("Import parsing options"):
+        import_skiprows=st.number_input("Rows to skip before header",min_value=0,max_value=10000,value=0,step=1,key="import_skiprows")
+        import_decimal=st.selectbox("Decimal separator",[".",","],index=0,key="import_decimal")
+        import_delimiter=st.selectbox("CSV/TXT delimiter",["Auto-detect",",",";","Tab","|"],index=0,key="import_delimiter")
+        import_comment=st.selectbox("Comment marker",["None","#","%"],index=0,key="import_comment")
+        import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
     if upload is not None:
         try:
-            raw=upload.getvalue(); frame=load_table(raw,upload.name)
-            st.session_state['tis_raw']=raw; st.session_state['tis_filename']=upload.name
-            st.session_state['tis_df']=frame; st.session_state['tis_sha']=sha256_bytes(raw)
-        except Exception as e: st.error(f'Import failed: {e}')
+            uploaded_bytes=upload.getvalue()
+            uploaded_sha=sha256_bytes(uploaded_bytes)
+            if uploaded_sha != st.session_state.get("tis_upload_sha"):
+                delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\\t","|":"|"}
+                sheet_value=import_sheet.strip()
+                sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
+                frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
+                                 delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
+                                 skiprows=int(import_skiprows),comment=None if import_comment=="None" else import_comment)
+                st.session_state.pop("tis_source_manifest",None)
+                st.session_state["tis_raw"]=uploaded_bytes
+                st.session_state["tis_filename"]=upload.name
+                st.session_state["tis_df"]=frame
+                st.session_state["tis_sha"]=uploaded_sha
+                st.session_state["tis_upload_sha"]=uploaded_sha
+                st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
+                st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
+                    "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value}
+        except Exception as e:
+            st.error(f"Import failed: {e}")
     if 'tis_df' in st.session_state:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
-        if st.button('Clear loaded data',use_container_width=True):
-            for k in ['tis_raw','tis_filename','tis_df','tis_sha']: st.session_state.pop(k,None)
-            st.rerun()
+        st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
     st.divider()
     pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
-    st.caption('Reference: tokamak.pdf · 24 pages')
-    st.caption('Independent Python project · v0.4.0')
+    st.caption('Reference catalog: extracted tokamak diagnostic reference')
+    st.caption(f'Independent Python project · v{__version__}')
 
 df=st.session_state.get('tis_df')
 filename=st.session_state.get('tis_filename','')
@@ -75,7 +102,14 @@ def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
     xx=np.asarray(x).ravel(); yy=np.asarray(y).ravel()
     if len(xx)!=len(yy): raise ValueError('Plot x/y arrays must have equal lengths.')
     if len(xx)>20000:
-        idx=np.linspace(0,len(xx)-1,20000,dtype=int)
+        # Bucketed min/max decimation preserves ELM-like spikes and glitches.
+        edges=np.linspace(0,len(xx),10001,dtype=int)
+        keep=[]
+        for lo,hi in zip(edges[:-1],edges[1:]):
+            if hi>lo:
+                segment=yy[lo:hi]
+                keep.extend((lo+int(np.argmin(segment)),lo+int(np.argmax(segment))))
+        idx=np.asarray(sorted(set(keep)),dtype=int)
         xx,yy=xx[idx],yy[idx]
     fig,ax=plt.subplots(figsize=(9,3.3)); ax.plot(xx,yy,lw=1.0)
     if logy: ax.set_yscale('log')
@@ -89,19 +123,19 @@ def need_data():
         st.info('Load a diagnostic data file using the left-hand panel. The diagnostic library and formula registry remain available without a data file.')
         st.stop()
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=3)
 def cached_prepare_time_series(time_values, signal_values, sample_rate):
     return prepare_time_series(time_values, signal_values, sample_rate)
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=3)
 def cached_filter(values, fs, highpass, lowpass, order):
     return butterworth_filter(values, fs, highpass, lowpass, order)
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=3)
 def cached_fft(values, fs):
     return fft_spectrum(values, fs)
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, max_entries=3)
 def cached_welch(values, fs, nperseg, noverlap, window):
     return welch_psd(values, fs, nperseg, noverlap, window)
 
@@ -191,11 +225,14 @@ elif page=='Public Data Access':
                 )
                 mast_csv = mast_frame.to_csv(index=False).encode('utf-8')
                 mast_filename = f"mast_{int(mast_shot)}_{mast_group}_{mast_manifest['signal']}.csv"
+                st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_raw'] = mast_csv
                 st.session_state['tis_filename'] = mast_filename
+                st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
                 st.session_state['tis_df'] = mast_frame
                 st.session_state['tis_sha'] = sha256_bytes(mast_csv)
                 st.session_state['tis_source_manifest'] = mast_manifest
+                st.session_state['tis_source_manifest']['imported_at_utc'] = st.session_state['tis_imported_at_utc']
                 st.session_state['tis_source_manifest']['csv_sha256'] = st.session_state['tis_sha']
                 st.session_state['tis_source_manifest']['csv_file'] = mast_filename
             st.rerun()
@@ -235,8 +272,10 @@ elif page=='Public Data Access':
                 if Path(public_filename).suffix.lower() not in {'.csv', '.txt', '.xlsx', '.xls', '.parquet', '.pq'}:
                     public_filename += '.txt'
                 public_frame = load_table(payload, public_filename)
+                st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_raw'] = payload
                 st.session_state['tis_filename'] = public_filename
+                st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
                 st.session_state['tis_df'] = public_frame
                 st.session_state['tis_sha'] = sha256_bytes(payload)
                 st.session_state['tis_source_manifest'] = {
@@ -247,6 +286,8 @@ elif page=='Public Data Access':
                     'source_signal_class': 'As published by source',
                     'source_quality': 'Not independently assessed',
                     'source_units': 'Preserved as provided; inspect source documentation',
+                    'imported_at_utc': st.session_state['tis_imported_at_utc'],
+                    'csv_sha256': st.session_state['tis_sha'],
                     'rows': int(len(public_frame)),
                     'columns': [str(x) for x in public_frame.columns],
                     **source_meta,
@@ -491,10 +532,19 @@ elif page=='Spectral Analysis':
                 calibrated=polynomial_calibration(df[rawcol],[float(v) for v in r['coefficients_high_to_low']]); out=pd.DataFrame({'raw_coordinate':df[rawcol],'calibrated_wavelength':calibrated}); st.dataframe(out.head(20)); download_df('Download calibrated spectrum coordinates',out,'tis_calibrated_wavelength.csv'); json_download('Export calibration fit JSON',r,'tis_wavelength_calibration.json')
             except Exception as e: st.error(str(e))
     else:
-        ecol=col_select('Energy coordinate (keV)',numeric,'energy_x'); ccol=col_select('Counts / intensity',numeric,'energy_y'); bgcol=st.selectbox('Background column (optional)',['<none>']+numeric,key='energy_bg')
+        energy_unit=st.radio("Energy-axis unit",["keV","eV"],horizontal=True,key="xray_energy_unit")
+        ecol=col_select(f'Energy coordinate ({energy_unit})',numeric,'energy_x'); ccol=col_select('Counts / intensity',numeric,'energy_y'); bgcol=st.selectbox('Background column (optional)',['<none>']+numeric,key='energy_bg')
         if st.button('Analyze energy spectrum'):
             try:
-                result=xray_spectrum_summary(df[ecol],df[ccol],None if bgcol=='<none>' else df[bgcol]) if mode=='X-ray energy spectrum' else spectrum_moments(df[ecol],df[ccol],None if bgcol=='<none>' else df[bgcol]); st.json(result); json_download('Export spectrum summary',result,'tis_energy_spectrum_summary.json')
+                if mode=='X-ray energy spectrum':
+                    xray_energy=np.asarray(df[ecol],dtype=float)
+                    if energy_unit=="eV":
+                        xray_energy=xray_energy/1000.0
+                    result=xray_spectrum_summary(xray_energy,df[ccol],None if bgcol=='<none>' else df[bgcol])
+                    result["input_energy_axis_unit"]=energy_unit
+                else:
+                    result=spectrum_moments(df[ecol],df[ccol],None if bgcol=='<none>' else df[bgcol])
+                st.json(result); json_download('Export spectrum summary',result,'tis_energy_spectrum_summary.json')
                 plot_line(df[ecol],df[ccol],ecol,ccol,'Energy spectrum')
             except Exception as e: st.error(str(e))
 
@@ -659,7 +709,11 @@ elif page=='Advanced Analysis':
     else:
         need_data(); chosen=st.multiselect('Select synchronized numeric channels',numeric,default=numeric[:min(6,len(numeric))])
         if len(chosen)>=2:
-            mat=df[chosen].apply(pd.to_numeric,errors='coerce').corr(); st.dataframe(mat.style.format('{:.3f}')); plot_line(np.arange(len(mat.columns)),mat.iloc[0].values,'Channel index',f'Correlation with {mat.columns[0]}','Channel correlation row'); download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
+            mat=df[chosen].apply(pd.to_numeric,errors='coerce').corr()
+            st.dataframe(mat.style.format('{:.3f}'))
+            st.bar_chart(mat.iloc[0].drop(mat.columns[0],errors="ignore").rename("Pearson r"))
+            st.caption(f"Pearson correlation coefficients with reference channel {mat.columns[0]!r}; these are not a spatial profile.")
+            download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
 
 elif page=='Diagnostic Catalog':
     st.title('Diagnostic Knowledge Base')
@@ -683,7 +737,7 @@ elif page=='Diagnostic Catalog':
 elif page=='Reports & Export':
     st.title('Reports, Provenance & Export')
     if df is None: st.info('Load a file to create a provenance record.'); st.stop()
-    record={'software':'Tokamak Insight Suite','version':'0.3.0','project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':datetime.now(timezone.utc).isoformat(),'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'reference_document':'tokamak.pdf','diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'python_version':sys.version,'platform':platform.platform(),'status':'Analysis record; scientific validity depends on calibration, geometry, uncertainty and method assumptions.'}
+    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_parameters':st.session_state.get('tis_last_analysis_parameters',{}),'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance record; it does not itself certify scientific validity.'}
     st.json(record); json_download('Download provenance JSON',record,'tis_provenance.json'); download_df('Export imported data CSV',df,'tis_imported_data.csv')
     st.markdown('### Session activity')
     st.write(st.session_state.get('tis_activity',[]))
@@ -693,4 +747,4 @@ activity=st.session_state.get('tis_activity',[])
 entry=f'{page} opened · {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")}'
 if not activity or activity[0].split(' · ')[0]!=page: st.session_state['tis_activity']=([entry]+activity)[:10]
 st.divider()
-st.caption('Tokamak Insight Suite v0.3.0 · PDF-derived knowledge base and analysis workflows. Every output must be interpreted using the actual device calibration, units, geometry and uncertainty model. Specialized equilibrium solvers and collisional-radiative atomic models remain distinct modules, not implied by the catalog.')
+st.caption(f'Tokamak Insight Suite v{__version__} · diagnostic reference catalog and analysis workflows. Every output must be interpreted using the actual device calibration, units, geometry and uncertainty model. Specialized equilibrium solvers and collisional-radiative atomic models remain distinct modules, not implied by the catalog.')
