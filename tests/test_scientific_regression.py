@@ -183,7 +183,7 @@ def test_welch_rejects_invalid_segment_length_and_nonfinite_samples():
 def test_cross_analysis_validates_sampling_and_segment_length():
     from tis.core import cross_analysis
     x = np.arange(32, dtype=float)
-    with pytest.raises(ValueError, match="sampling frequency"):
+    with pytest.raises(ValueError, match="(?i)sampling frequency"):
         cross_analysis(x, x, 0.0)
     with pytest.raises(ValueError, match="nperseg"):
         cross_analysis(x, x, 100.0, nperseg=-1)
