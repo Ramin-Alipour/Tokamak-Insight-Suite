@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 from tis.core import fft_spectrum, welch_psd, signal_quality
-from tis.data_sources import fetch_fair_mast_signal
+from tis.data_sources import fetch_fair_mast_signal, list_fair_mast_signals
 
 
 CASES = (
@@ -76,9 +76,33 @@ def main() -> None:
             f"samples={len(frame)}; fs={fs:.3f} Hz; FFT and Welch PSD"
         )
 
+    # Exercise the metadata inventory used by the dashboard, without loading every signal.
+    inventories = []
+    for group, expected in (("amc", "plasma_current"), ("ane", "density")):
+        inventory, inventory_manifest = list_fair_mast_signals(30421, group)
+        available = set(inventory["signal"].astype(str)) if not inventory.empty else set()
+        assert expected in available, f"{group}: expected documented signal {expected!r} absent"
+        inventory_name = f"mast_30421_{group}_signal_inventory.csv"
+        inventory.to_csv(args.output_dir / inventory_name, index=False)
+        inventory_manifest["csv_file"] = inventory_name
+        (args.output_dir / f"mast_30421_{group}_signal_inventory_manifest.json").write_text(
+            json.dumps(inventory_manifest, indent=2), encoding="utf-8"
+        )
+        inventories.append({
+            "group": group, "variables": inventory_manifest["variable_count"],
+            "supported_1d_traces": inventory_manifest["one_dimensional_numeric_time_traces"],
+            "csv": inventory_name,
+        })
+        print(
+            f"PASS: FAIR-MAST signal inventory shot 30421 group={group}; "
+            f"variables={inventory_manifest['variable_count']}; "
+            f"1-D traces={inventory_manifest['one_dimensional_numeric_time_traces']}"
+        )
+
     summary = {
         "dataset": "UKAEA FAIR-MAST Level-1",
         "cases": results,
+        "signal_inventories": inventories,
         "status": "PASS",
         "limit": "Data retrieval and generic numerical pipeline only; no calibration validation.",
     }
