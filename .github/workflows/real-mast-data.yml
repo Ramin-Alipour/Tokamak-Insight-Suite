@@ -62,6 +62,8 @@ jobs:
           PY
       - name: Fetch current and interferometer diagnostics from a second MAST shot
         run: python tools/fetch_fair_mast_multidiag.py --output-dir artifacts/mast-multidiag
+      - name: Export an existing EFIT equilibrium snapshot
+        run: python tools/fetch_fair_mast_efit.py --output-dir artifacts/mast-efit --time-s 0.2
       - name: Upload real-data test artifacts
         uses: actions/upload-artifact@v4
         with:
