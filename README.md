@@ -1,6 +1,6 @@
 # Tokamak Insight Suite (TIS)
 
-**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.1**.
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.2**.
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
@@ -26,7 +26,7 @@ On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_un
 The wheel installs the `app` dashboard module, the `tis` CLI, and bundled registry JSON resources. From the directory containing the release wheel:
 
 ```bash
-python -m pip install ./tokamak_insight_suite-0.4.1-py3-none-any.whl
+python -m pip install ./tokamak_insight_suite-0.4.2-py3-none-any.whl
 tis dashboard
 # CLI remains usable independently:
 tis catalog --kind both --output-dir ./tis-catalog
@@ -66,7 +66,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
 - **Time Series & MHD:** filtering, FFT, configurable Welch PSD, cross-correlation/coherence, channel-derived coherence-weighted mode-number estimates, calibrated time-series integration with optional baseline subtraction, time-frequency spectrograms, and autocorrelation/correlation-time estimates.
-- **Spectral Analysis:** line fitting, spectral calibration, Doppler temperature/velocity estimates, spectral moments and line-ratio utilities.
+- **Spectral Analysis:** line fitting and residual diagnostics, wavelength calibration, an end-to-end Doppler workflow (background/relative-response correction, Gaussian fit, instrument-width correction, and propagated temperature/LOS-velocity uncertainties), spectral moments and line-ratio utilities.
 - **Probe Analysis:** Langmuir I–V analysis, probe summaries, triple-probe estimates and fluctuation/particle-flux utilities.
 - **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
 - **Equilibrium & Reconstruction:** derivatives of an input flux grid and profile analysis; Public Data Access can fetch and plot an existing FAIR-MAST EFIT `plasma_current_rz` grid without claiming to reconstruct equilibrium.
