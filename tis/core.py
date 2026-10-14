@@ -1326,6 +1326,11 @@ def morlet_wavelet_analysis(
     for i, f_hz in enumerate(freq):
         scale_samples = omega0 / (2.0 * np.pi * f_hz * dt)
         half_width = max(4, int(np.ceil(4.0 * scale_samples)))
+        if half_width >= len(y) // 2:
+            raise ValueError(
+                f"Wavelet support at {f_hz:g} Hz is too long for this record; "
+                "raise the minimum frequency or provide a longer time series."
+            )
         tau = np.arange(-half_width, half_width + 1, dtype=float) / scale_samples
         wavelet = (np.pi ** -0.25) * np.exp(1j * omega0 * tau) * np.exp(-0.5 * tau ** 2)
         wavelet = wavelet / np.sqrt(scale_samples)
