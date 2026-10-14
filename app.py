@@ -642,8 +642,9 @@ elif page=='Advanced Analysis':
             st.info('Load synchronized numeric density and electric-field/potential channels.')
         else:
             ncol=col_select('Ion density nᵢ (m⁻³)',numeric,'transport_n')
-            field_options=['Already calibrated E-field channels']+(['Compute from potential pairs'] if len(available)>=4 else [])\n            field_source=st.radio('Electric-field source',field_options,horizontal=True,key='transport_field_source')
             available=[c for c in numeric if c!=ncol]
+            field_options=['Already calibrated E-field channels']+(['Compute from potential pairs'] if len(available)>=4 else [])
+            field_source=st.radio('Electric-field source',field_options,horizontal=True,key='transport_field_source')
             if field_source=='Already calibrated E-field channels':
                 ercol=col_select('Radial electric field Eᵣ (V/m)',available,'transport_er')
                 epcol=col_select('Poloidal electric field Eₚ (V/m)',[c for c in available if c!=ercol],'transport_ep')
