@@ -9,6 +9,7 @@ import streamlit as st
 from tis import __version__
 from tis.ui.time_series_page import render_time_series_page
 from tis.ui.spectral_page import render_spectral_page
+from tis.ui.validation_page import render_validation_page
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
@@ -106,7 +107,7 @@ with st.sidebar:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
         st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
     st.divider()
-    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
+    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reference Results Validation','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
@@ -648,6 +649,9 @@ elif page=='Advanced Analysis':
             st.bar_chart(mat.iloc[0].drop(mat.columns[0],errors="ignore").rename("Pearson r"))
             st.caption(f"Pearson correlation coefficients with reference channel {mat.columns[0]!r}; these are not a spatial profile.")
             download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
+
+elif page=='Reference Results Validation':
+    render_validation_page()
 
 elif page=='Diagnostic Catalog':
     st.title('Diagnostic Knowledge Base')
