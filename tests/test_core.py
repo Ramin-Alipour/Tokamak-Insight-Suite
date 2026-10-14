@@ -299,8 +299,8 @@ def test_equilibrium_grid_derivatives_of_quadratic_flux():
     Z = np.linspace(-0.5, 0.5, 21)
     psi = Z[:, None] ** 2 + R[None, :] ** 2
     result = equilibrium_grid_derivatives(R, Z, psi, Bphi_T=1.5)
-    np.testing.assert_allclose(result["dpsi_dR"][:, 1:-1], 2 * R[None, 1:-1], atol=1e-10)
-    np.testing.assert_allclose(result["dpsi_dZ"][1:-1, :], 2 * Z[1:-1, None], atol=1e-10)
+    np.testing.assert_allclose(result["dpsi_dR"][:, 1:-1], np.broadcast_to(2 * R[None, 1:-1], (len(Z), len(R) - 2)), atol=1e-10)
+    np.testing.assert_allclose(result["dpsi_dZ"][1:-1, :], np.broadcast_to(2 * Z[1:-1, None], (len(Z) - 2, len(R))), atol=1e-10)
     assert np.all(np.isfinite(result["Btotal_T"]))
 
 
