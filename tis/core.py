@@ -288,6 +288,7 @@ def time_frequency_spectrogram(
 
 
 def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dict[str, np.ndarray]:
+    """Return coherence and cross phase; phase convention is φ_y − φ_x (SciPy CSD)."""
     a, b = np.asarray(x, float).ravel(), np.asarray(y, float).ravel()
     if len(a) != len(b) or len(a) < 8:
         raise ValueError('Signals must have equal length and at least 8 samples.')
@@ -304,6 +305,7 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
 
 
 def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
+    """Return lag at maximum absolute correlation; y delayed relative to x gives a negative lag."""
     a, b = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
     if len(a) != len(b) or len(a) < 3 or not np.isfinite(fs) or fs <= 0:
         raise ValueError('Equal-length signals and a positive finite sampling rate are required.')
