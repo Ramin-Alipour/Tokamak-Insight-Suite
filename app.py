@@ -16,7 +16,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, drift_transport_from_fields, electric_field_from_potential_difference,
+    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, compare_condition_signals, drift_transport_from_fields, electric_field_from_potential_difference,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
     equilibrium_grid_derivatives, xray_spectrum_summary, ion_sound_speed_m_s, mach_number_from_velocity, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
@@ -611,7 +611,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','E×B transport & Reynolds stress','Ion sound speed & Mach consistency','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Baseline vs treatment comparison','E×B transport & Reynolds stress','Ion sound speed & Mach consistency','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
     if workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
@@ -636,6 +636,47 @@ elif page=='Advanced Analysis':
                 r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg],count_uncertainty=sigma,assume_poisson_counts=poisson)
                 st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
+    elif workflow=='Baseline vs treatment comparison':
+        st.write('Compare baseline and treatment traces for limiter bias/location or gas-pressure conditions. Mean and RMS changes are separate; mean percentage change is withheld when the baseline mean is near zero.')
+        if df is None or len(numeric)<2:
+            st.info('Load a table containing matched baseline and treatment result columns.')
+        else:
+            time_col=st.selectbox('Time coordinate for optional windowing/plotting',['<sample index>']+numeric,key='condition_time_col')
+            choices=[c for c in numeric if c!=time_col]
+            baseline_col=col_select('Baseline/control result',choices,'condition_baseline')
+            treatment_col=col_select('Treatment/bias/pressure result',[c for c in choices if c!=baseline_col],'condition_treatment')
+            use_window=st.checkbox('Restrict to a defined time window',value=False,key='condition_use_window')
+            if use_window and time_col=='<sample index>':
+                st.warning('Select an actual time column to define a physical time window. Sample-index windowing is not enabled here.')
+            if use_window and time_col!='<sample index>':
+                tv=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
+                finite_t=tv[np.isfinite(tv)]
+                if len(finite_t)<2:
+                    st.error('The selected time column has fewer than two finite values.')
+                    use_window=False
+                else:
+                    c1,c2=st.columns(2)
+                    with c1: start_s=st.number_input('Window start',value=float(np.min(finite_t)),format='%.8g',key='condition_start')
+                    with c2: end_s=st.number_input('Window end',value=float(np.max(finite_t)),format='%.8g',key='condition_end')
+            else:
+                start_s=end_s=None
+            floor_fraction=st.number_input('Near-zero baseline mean guard (fraction of baseline RMS)',min_value=0.0,max_value=0.5,value=0.05,step=0.01,key='condition_mean_floor')
+            if st.button('Compare conditions',type='primary',key='condition_compare_run'):
+                try:
+                    base=pd.to_numeric(df[baseline_col],errors='coerce').to_numpy(float)
+                    treat=pd.to_numeric(df[treatment_col],errors='coerce').to_numpy(float)
+                    t=None if time_col=='<sample index>' else pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
+                    result=compare_condition_signals(base,treat,time_s=t,start_s=start_s if use_window and t is not None else None,end_s=end_s if use_window and t is not None else None,baseline_mean_floor_fraction=float(floor_fraction))
+                    st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
+                    out=pd.DataFrame({'baseline':result['baseline_values'],'treatment':result['treatment_values'],'difference_treatment_minus_baseline':result['difference_values']})
+                    if result['time_s'] is not None: out.insert(0,'time_s',result['time_s'])
+                    else: out.insert(0,'sample_index',np.arange(len(out)))
+                    st.line_chart(out.set_index(out.columns[0])[['baseline','treatment']])
+                    st.line_chart(out.set_index(out.columns[0])[['difference_treatment_minus_baseline']])
+                    st.dataframe(out.head(100),use_container_width=True)
+                    download_df('Download condition comparison series',out,'tis_condition_comparison.csv')
+                    st.warning(result['warning'])
+                except Exception as e: st.error(f'Condition comparison failed: {e}')
     elif workflow=='E×B transport & Reynolds stress':
         st.write('Calculate E×B drift, particle flux and Reynolds-stress products. The software can use calibrated E-field channels or derive fields from paired probe potentials.')
         if df is None or len(numeric)<3:
