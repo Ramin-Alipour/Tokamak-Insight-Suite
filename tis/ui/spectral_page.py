@@ -28,6 +28,7 @@ def render_spectral_page(st, df, numeric, col_select, plot_line, json_download, 
         st.caption('The coordinate and reference line list must use identical units. Correct background and instrument response before interpreting weak/overlapping lines.')
         if st.button('Detect spectral peaks',type='primary',key='peak_id_run'):
             try:
+                if xcol==ycol: raise ValueError('Choose separate coordinate and intensity columns.')
                 result=detect_spectral_peaks(df[xcol],df[ycol],min_prominence=None if absolute_prominence==0 else float(absolute_prominence),prominence_fraction=float(prominence_fraction),min_distance_coordinate=float(min_distance))
                 st.session_state['tis_peak_detection']={'xcol':xcol,'ycol':ycol,'result':result}
             except Exception as exc:
@@ -48,9 +49,13 @@ def render_spectral_page(st, df, numeric, col_select, plot_line, json_download, 
                     with c1: ref_x=st.selectbox('Reference coordinate column',list(refs.columns),key='peak_id_ref_x')
                     with c2: ref_species=st.selectbox('Species column (optional)',['<none>']+list(refs.columns),key='peak_id_ref_species')
                     with c3: ref_transition=st.selectbox('Transition column (optional)',['<none>']+list(refs.columns),key='peak_id_ref_transition')
-                    tolerance=st.number_input('Matching tolerance (same coordinate units)',min_value=0.000001,value=0.05,format='%.8g',key='peak_id_tolerance')
+                    tolerance=st.number_input('Matching tolerance (same coordinate units)',min_value=0.0,value=0.0,format='%.8g',key='peak_id_tolerance',help='Enter a tolerance justified by the spectral resolution and line-list uncertainty; zero is intentionally invalid.')
                     if st.button('Match peaks to reference line list',key='peak_id_match'):
                         matches=match_spectral_lines(result['peak_coordinate'],refs,tolerance=float(tolerance),wavelength_column=ref_x,species_column=ref_species if ref_species!='<none>' else '__no_species__',transition_column=ref_transition if ref_transition!='<none>' else '__no_transition__')
+                        st.session_state['tis_spectral_matches']={'xcol':xcol,'ycol':ycol,'reference_file':ref_file.name,'matches':matches}
+                    saved_matches=st.session_state.get('tis_spectral_matches')
+                    if saved_matches and saved_matches.get('xcol')==xcol and saved_matches.get('ycol')==ycol and saved_matches.get('reference_file')==ref_file.name:
+                        matches=saved_matches['matches']
                         st.dataframe(matches,use_container_width=True)
                         download_df('Download line matches',matches,'tis_spectral_line_matches.csv')
                         if (matches['match_status']=='AMBIGUOUS_MATCH').any():
