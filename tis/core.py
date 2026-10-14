@@ -752,6 +752,96 @@ def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     return float(C_LIGHT*delta_lambda/lambda0)
 
 
+
+def analyze_doppler_line_end_to_end(
+    raw_coordinate: Any, intensity: Any,
+    reference_pixels: Any, reference_wavelengths: Any,
+    rest_wavelength: float, ion_mass_amu: float,
+    fit_min_wavelength: float, fit_max_wavelength: float,
+    instrument_sigma: float, instrument_sigma_uncertainty: float = 0.0,
+    rest_wavelength_uncertainty: float = 0.0, ion_mass_uncertainty_amu: float = 0.0,
+    background: Any | None = None, relative_response: Any | None = None,
+    intensity_uncertainty: Any | None = None, calibration_degree: int = 1,
+    assume_instrument_negligible: bool = False,
+) -> dict[str, Any]:
+    """End-to-end calibrated Gaussian Doppler-line analysis with explicit corrections.
+
+    The emitting line and ion species must be identified by the analyst. Calibration
+    residual is reported but not silently treated as a full calibration covariance.
+    Relative response and background uncertainty are not propagated in this version.
+    """
+    x=np.asarray(raw_coordinate,dtype=float).ravel()
+    y=np.asarray(intensity,dtype=float).ravel()
+    if len(x)!=len(y) or len(x)<7:
+        raise ValueError("Coordinate and intensity arrays must have equal length and at least 7 samples.")
+    if not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
+        raise ValueError("Coordinate and intensity arrays must be finite; clean missing samples explicitly.")
+    if not np.all(np.isfinite([rest_wavelength,ion_mass_amu,fit_min_wavelength,fit_max_wavelength,
+                               instrument_sigma,instrument_sigma_uncertainty,rest_wavelength_uncertainty,
+                               ion_mass_uncertainty_amu])):
+        raise ValueError("Physical inputs and uncertainties must be finite.")
+    if rest_wavelength<=0 or ion_mass_amu<=0 or fit_min_wavelength>=fit_max_wavelength:
+        raise ValueError("Rest wavelength and ion mass must be positive; fit minimum must be below maximum.")
+    if min(instrument_sigma,instrument_sigma_uncertainty,rest_wavelength_uncertainty,ion_mass_uncertainty_amu)<0:
+        raise ValueError("Instrument width and all uncertainties must be nonnegative.")
+    calibration=spectral_calibration(reference_pixels,reference_wavelengths,degree=calibration_degree)
+    wavelength=polynomial_calibration(x,calibration["coefficients_high_to_low"])
+    corrected=y.copy()
+    if background is not None:
+        bg=np.asarray(background,dtype=float).ravel()
+        if len(bg)!=len(y) or not np.all(np.isfinite(bg)):
+            raise ValueError("Background array must be finite and match the spectrum length.")
+        corrected=corrected-bg
+    response_applied=False
+    if relative_response is not None:
+        response=np.asarray(relative_response,dtype=float).ravel()
+        if len(response)!=len(y) or not np.all(np.isfinite(response)) or np.any(response<=0):
+            raise ValueError("Relative-response array must be positive, finite, and match the spectrum length.")
+        corrected=corrected/response
+        response_applied=True
+    fit=fit_spectral_line(wavelength,corrected,fit_min_wavelength,fit_max_wavelength,model="Gaussian",
+                          sigma_y=intensity_uncertainty)
+    observed_sigma=float(fit["sigma"])
+    if instrument_sigma==0 and not assume_instrument_negligible:
+        raise ValueError("Provide the calibrated instrumental Gaussian sigma or explicitly justify negligible instrumental broadening.")
+    corrected_variance=observed_sigma**2-instrument_sigma**2
+    if corrected_variance<=0:
+        raise ValueError("Observed Gaussian width does not exceed instrumental width; thermal Doppler width is unresolved.")
+    doppler_sigma=float(np.sqrt(corrected_variance))
+    observed_sigma_unc=float(fit["standard_error_sigma"])
+    doppler_sigma_unc=float(np.sqrt((observed_sigma/doppler_sigma*observed_sigma_unc)**2+
+                                    (instrument_sigma/doppler_sigma*instrument_sigma_uncertainty)**2))
+    temperature=doppler_temperature_with_uncertainty_eV(
+        doppler_sigma,rest_wavelength,ion_mass_amu,doppler_sigma_unc,
+        rest_wavelength_uncertainty,ion_mass_uncertainty_amu)
+    velocity=doppler_velocity_with_uncertainty_m_s(
+        float(fit["center"]),rest_wavelength,float(fit["standard_error_center"]),
+        rest_wavelength_uncertainty)
+    return {
+        "wavelength_calibration":calibration,
+        "line_fit":fit,
+        "line_identification":"User-supplied rest wavelength and ion mass; automatic atomic line identification is not performed.",
+        "rest_wavelength":float(rest_wavelength),
+        "ion_mass_amu":float(ion_mass_amu),
+        "background_subtracted":background is not None,
+        "relative_response_correction_applied":response_applied,
+        "instrument_sigma":float(instrument_sigma),
+        "instrument_sigma_uncertainty":float(instrument_sigma_uncertainty),
+        "corrected_thermal_doppler_sigma":doppler_sigma,
+        "corrected_thermal_doppler_sigma_standard_uncertainty":doppler_sigma_unc,
+        "doppler_temperature_eV":temperature["temperature_eV"],
+        "doppler_temperature_standard_uncertainty_eV":temperature["standard_uncertainty_eV"],
+        "line_of_sight_velocity_m_s":velocity["line_of_sight_velocity_m_s"],
+        "line_of_sight_velocity_standard_uncertainty_m_s":velocity["standard_uncertainty_m_s"],
+        "calibration_rms_residual_in_wavelength_units":calibration["rms_residual"],
+        "uncertainty_scope":"First-order fit and supplied-input uncertainties only; calibration-coefficient covariance, response/background uncertainty, line blends, atomic structure, Zeeman splitting, non-Gaussian instrument response and model systematics are excluded.",
+        "assumptions":["Gaussian isolated line","Gaussian instrument width removed in quadrature","Non-relativistic Doppler velocity","Analyst has verified the emitting transition and isotope","Calibration references span the fitted line region"],
+        "calibrated_wavelength":wavelength,
+        "corrected_intensity":corrected,
+        "fitted_intensity":evaluate_spectral_fit(wavelength,fit),
+    }
+
+
 def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int | None = None) -> np.ndarray:
     """Return line-integrated electron density ∫n_e dl in m⁻², not local density.
 
