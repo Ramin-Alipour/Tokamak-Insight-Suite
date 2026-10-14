@@ -41,7 +41,7 @@ python -m pip install -r requirements-data.txt
 python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
 ```
 
-A separate GitHub Actions workflow runs the fetch and checks real-data CSV ingestion, finite/time-ordered samples, FFT, Welch PSD, and filtering. Run it manually from **Actions → Real MAST data integration test → Run workflow**; successful runs publish the CSV and manifest as a downloadable workflow artifact. Network access to the public archive is required, so the raw data are not bundled in Git.
+A GitHub Actions integration workflow now exercises multiple real diagnostics, not just one trace: shot 29790 `xmo/omaha_1lz` (Mirnov pickup signal), plus shot 30421 `amc/plasma_current` (plasma/coil-current source) and `ane/density` (CO₂ interferometer). It checks finite samples, strictly increasing time, CSV export, FFT, Welch PSD, and digital filtering for the Mirnov case, and FFT/Welch plus signal-quality metrics for the additional current and interferometer traces. Successful runs publish the CSV files, JSON provenance manifests, and a summary in the downloadable artifact `mast-real-data-multidiagnostic-validation`. Run it manually from **Actions → Real MAST data integration test → Run workflow**. Network access to the public archive is required, so raw data are not bundled in Git.
 
 This validates a real diagnostic time-series path only. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
 
