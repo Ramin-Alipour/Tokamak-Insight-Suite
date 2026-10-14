@@ -43,7 +43,7 @@ results, cleaned = [], {}
 for filename in FILES:
     raw = fetch(filename)
     (OUT / filename).write_bytes(raw)
-    values = np.fromstring(raw.decode("utf-8-sig"), sep="\\n")
+    values = np.fromstring(raw.decode("utf-8-sig"), sep=" ")
     if values.size < STOP:
         raise RuntimeError(f"{filename}: {values.size} rows, expected at least {STOP}")
     if not np.isfinite(values).all():
