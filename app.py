@@ -187,8 +187,8 @@ def cached_filter(values, fs, highpass, lowpass, order):
     return butterworth_filter(values, fs, highpass, lowpass, order)
 
 @st.cache_data(show_spinner=False, max_entries=3)
-def cached_fft(values, fs):
-    return fft_spectrum(values, fs)
+def cached_fft(values, fs, window):
+    return fft_spectrum(values, fs, window=window)
 
 @st.cache_data(show_spinner=False, max_entries=3)
 def cached_welch(values, fs, nperseg, noverlap, window):
@@ -442,7 +442,9 @@ elif page=='Time Series & MHD':
     with wc1: welch_n=st.number_input('Segment length (samples)',min_value=8,max_value=int(len(y)),value=min(4096,int(len(y))),step=1,key='welch_nperseg')
     with wc2: welch_overlap=st.number_input('Overlap (samples)',min_value=0,max_value=max(0,int(welch_n)-1),value=int(welch_n)//2,step=1,key='welch_overlap')
     with wc3: welch_window=st.selectbox('Window',['hann','hamming','blackman','boxcar','bartlett'],index=0,key='welch_window')
-    f,amp=cached_fft(yf,fs)
+    fft_window=st.selectbox('FFT amplitude window',['hann','flattop','hamming','blackman','boxcar'],index=0,key='fft_window')
+    f,amp=cached_fft(yf,fs,fft_window)
+    st.caption(f'FFT window: {fft_window}; amplitude scaling uses the selected window coherent gain. Flat-top is available for reduced off-bin amplitude bias.')
     fp,psd=cached_welch(yf,fs,int(welch_n),int(welch_overlap),welch_window)
     st.caption(f'Welch nominal frequency-bin spacing: {fs/int(welch_n):.6g} Hz; overlap: {int(welch_overlap)/int(welch_n):.0%}.')
     plot_line(f,amp,'Frequency (Hz)','Amplitude','FFT amplitude'); plot_line(fp,np.maximum(psd,np.finfo(float).tiny),'Frequency (Hz)','PSD (unit²/Hz)','Welch PSD',True)
