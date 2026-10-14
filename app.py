@@ -12,7 +12,7 @@ from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapsh
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
-    uncertainty_linear, regularized_tomography, select_tikhonov_lambda, spectral_calibration, probe_iv_summary,
+    uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
@@ -751,6 +751,8 @@ elif page=='Tomography & Bolometry':
         st.write('Solve y = A x + noise using a calibrated geometry / response matrix.')
         Afile=st.file_uploader('Response / geometry matrix A (CSV, no header)',type=['csv'],key='tomo_A'); yfile=st.file_uploader('Measurements y (CSV, one column)',type=['csv'],key='tomo_y'); sigfile=st.file_uploader('Measurement standard uncertainties σ (optional CSV column)',type=['csv'],key='tomo_sigma')
         auto_lambda=st.checkbox('Select λ using an L-curve curvature heuristic',value=False,key='tomo_auto_lambda')
+        noise_mc=st.checkbox('Propagate supplied measurement uncertainties by Monte Carlo',value=False,key='tomo_noise_mc',help='Requires one positive standard uncertainty per measurement. Does not include geometry or model error.')
+        noise_replicates=st.number_input('Monte Carlo replicates',min_value=20,max_value=1000,value=100,step=20,key='tomo_noise_replicates')
         if Afile and yfile and st.button('Run regularized reconstruction',type='primary'):
             try:
                 A=pd.read_csv(Afile,header=None).to_numpy(float); y=pd.read_csv(yfile,header=None).to_numpy(float).ravel()
@@ -764,6 +766,17 @@ elif page=='Tomography & Bolometry':
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
                 r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
+                if noise_mc:
+                    if sigma is None:
+                        st.warning('Monte Carlo uncertainty requires a supplied σ file with one positive standard uncertainty per measurement.')
+                    else:
+                        mc=tomography_noise_sensitivity(A,y,sigma,lambda_used,nonneg,n_replicates=int(noise_replicates))
+                        mc_frame=pd.DataFrame({'basis_or_voxel_index':np.arange(len(mc['baseline_solution'])),'baseline_solution':mc['baseline_solution'],'mc_mean':mc['monte_carlo_mean'],'mc_std':mc['monte_carlo_standard_deviation'],'percentile_2_5':mc['percentile_2_5'],'percentile_97_5':mc['percentile_97_5']})
+                        st.markdown('#### Measurement-noise sensitivity')
+                        st.caption(mc['noise_model']+' Excluded: '+mc['excluded_uncertainties'])
+                        st.dataframe(mc_frame,use_container_width=True)
+                        download_df('Download Monte Carlo uncertainty CSV',mc_frame,'tis_tomography_uncertainty.csv')
+                        json_download('Export Monte Carlo uncertainty metadata',{k:v for k,v in mc.items() if not isinstance(v,np.ndarray)},'tis_tomography_uncertainty.json')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Build 2-D ray geometry matrix':
         st.write('Build a path-length response matrix from straight diagnostic lines of sight crossing a rectangular (x,z) pixel grid. This is geometry-based; it does not infer detector response, attenuation or equilibrium mapping.')
