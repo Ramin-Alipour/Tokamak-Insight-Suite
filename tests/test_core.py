@@ -255,14 +255,14 @@ def test_corrected_line_ratio():
 
 def test_fft_detrend_false_preserves_dc_component():
     x = np.full(256, 3.0)
-    f, amplitude = fft_spectrum(x, fs=1000, detrend=False)
+    f, amplitude = fft_spectrum(x, fs=1000, detrend=False, window='boxcar')
     assert amplitude[0] == pytest.approx(3.0, abs=1e-12)
     assert np.max(amplitude[1:]) < 1e-12
 
 
 def test_fft_detrend_true_removes_dc_component():
     x = np.full(256, 3.0)
-    f, amplitude = fft_spectrum(x, fs=1000, detrend=True)
+    f, amplitude = fft_spectrum(x, fs=1000, detrend=True, window='boxcar')
     assert np.max(amplitude) < 1e-12
 
 
