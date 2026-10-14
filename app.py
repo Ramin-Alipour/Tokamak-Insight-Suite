@@ -10,7 +10,7 @@ from tis import __version__
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
-    prepare_time_series, resample_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
+    prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, evaluate_spectral_fit, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
@@ -456,13 +456,30 @@ elif page=='Time Series & MHD':
             json_download('Export resampling manifest',{k:v for k,v in resampled.items() if k not in {'time_s','values'}},'tis_resampling_manifest.json')
         else:
             t,y,fs=cached_prepare_time_series(raw_time,raw_signal,fs0)
-        yf=cached_filter(y,fs,hp or None,lp or None,order)
+        filter_result=filter_impact_analysis(y,fs,hp or None,lp or None,order)
+        yf=filter_result['filtered_signal']
     except Exception as e:
         st.error(f'Time-series preparation failed: {e}')
         st.stop()
 
     x1,x2,x3=st.columns(3); x1.metric('Finite samples',len(y)); x2.metric('Sampling rate',f'{fs:.6g} Hz'); x3.metric('Nyquist',f'{fs/2:.6g} Hz')
     plot_line(t,y,'Time (s)',scol,'Raw signal'); plot_line(t,yf,'Time (s)',scol,'Filtered signal')
+    st.markdown('### Filter impact audit')
+    st.json({k:v for k,v in filter_result.items() if not isinstance(v,np.ndarray) and k!='filtered_signal'})
+    if len(filter_result['frequency_response_Hz']):
+        fig_response=Figure(figsize=(8,3)); ax_response=fig_response.subplots()
+        ax_response.plot(filter_result['frequency_response_Hz'],filter_result['forward_backward_amplitude_response'])
+        ax_response.set_xlabel('Frequency (Hz)'); ax_response.set_ylabel('Amplitude response |H|²')
+        ax_response.set_ylim(0,1.05); ax_response.set_title('Zero-phase filter steady-state response')
+        st.pyplot(fig_response)
+    f_raw,amp_raw=fft_spectrum(y,fs,fft_window if 'fft_window' in locals() else 'hann')
+    f_filt,amp_filt=fft_spectrum(yf,fs,fft_window if 'fft_window' in locals() else 'hann')
+    fig_compare=Figure(figsize=(9,3)); ax_compare=fig_compare.subplots()
+    ax_compare.plot(f_raw,amp_raw,label='Raw'); ax_compare.plot(f_filt,amp_filt,label='Filtered')
+    ax_compare.set_xlabel('Frequency (Hz)'); ax_compare.set_ylabel('Amplitude'); ax_compare.legend()
+    ax_compare.set_title('Raw versus filtered FFT')
+    st.pyplot(fig_compare)
+    json_download('Export filter impact audit',{k:v for k,v in filter_result.items() if not isinstance(v,np.ndarray) and k!='filtered_signal'},'tis_filter_impact.json')
     st.markdown('### Welch PSD settings')
     wc1,wc2,wc3=st.columns(3)
     with wc1: welch_n=st.number_input('Segment length (samples)',min_value=8,max_value=int(len(y)),value=min(4096,int(len(y))),step=1,key='welch_nperseg')
