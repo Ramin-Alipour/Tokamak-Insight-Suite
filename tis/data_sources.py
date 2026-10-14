@@ -19,6 +19,40 @@ FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
 
 
+def anti_alias_decimate(time_s: Any, values: Any, max_samples: int = 70000) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    """Anti-alias-filter a uniformly sampled trace before integer-factor downsampling."""
+    t = np.asarray(time_s, dtype=np.float64).ravel()
+    x = np.asarray(values, dtype=np.float64).ravel()
+    if len(t) != len(x) or len(t) < 1024:
+        raise ValueError("Time and signal must have equal lengths and at least 1024 samples.")
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(x)) or not np.all(np.diff(t) > 0):
+        raise ValueError("Time and signal must be finite and timestamps strictly increasing.")
+    if isinstance(max_samples, bool) or int(max_samples) != max_samples or max_samples < 1024:
+        raise ValueError("max_samples must be an integer of at least 1024.")
+    dt = np.diff(t)
+    median_dt = float(np.median(dt))
+    jitter = float(np.std(dt) / median_dt)
+    if np.max(dt) > 1.05 * median_dt or jitter > 0.02:
+        raise ValueError("Source timestamps are irregular or contain gaps; resample explicitly before anti-aliased decimation.")
+    stride = max(1, int(math.ceil(len(x) / int(max_samples))))
+    original_fs = 1.0 / median_dt
+    if stride > 1:
+        x_out = resample_poly(x, up=1, down=stride, window=("kaiser", 8.6), padtype="line")
+        t_out = t[::stride][:len(x_out)]
+    else:
+        t_out, x_out = t.copy(), x.copy()
+    metadata = {
+        "original_samples": int(len(x)),
+        "exported_samples": int(len(x_out)),
+        "stride": stride,
+        "source_sampling_rate_hz": original_fs,
+        "exported_sampling_rate_hz": 1.0 / float(np.median(np.diff(t_out))),
+        "anti_alias_filter_applied": bool(stride > 1),
+        "method": "polyphase FIR Kaiser-window low-pass" if stride > 1 else "none",
+    }
+    return t_out, x_out, metadata
+
+
 def fetch_fair_mast_signal(
     shot: int,
     group: str,
@@ -113,23 +147,9 @@ def fetch_fair_mast_signal(
             )
 
         original_count = int(time.size)
-        source_dt = np.diff(time)
-        source_dt_median = float(np.median(source_dt))
-        source_jitter = float(np.std(source_dt) / source_dt_median)
-        if np.max(source_dt) > 1.05 * source_dt_median or source_jitter > 0.02:
-            raise ValueError(
-                "Source timestamps are irregular or contain gaps; anti-aliased decimation "
-                "requires an approximately uniform source timebase. Resample explicitly first."
-            )
-        stride = max(1, int(math.ceil(original_count / max_samples)))
-        if stride > 1:
-            values = resample_poly(values, up=1, down=stride, window=("kaiser", 8.6), padtype="line")
-            time = time[::stride][:values.size]
-        if time.size < 1024:
-            raise ValueError("Downsampled signal unexpectedly has fewer than 1024 samples.")
-
-        dt = float(np.median(np.diff(time)))
-        fs = 1.0 / dt
+        time, values, decimation = anti_alias_decimate(time, values, max_samples=max_samples)
+        stride = int(decimation["stride"])
+        fs = float(decimation["exported_sampling_rate_hz"])
         frame = pd.DataFrame({"time_s": time, "signal_raw": values})
         attrs = dict(ds.attrs)
         signal_attrs = dict(ds[selected].attrs)
@@ -146,9 +166,9 @@ def fetch_fair_mast_signal(
             "original_finite_samples": original_count,
             "exported_samples": int(values.size),
             "downsample_stride": stride,
-            "downsampling_method": "scipy.signal.resample_poly with Kaiser-window FIR anti-alias filter" if stride > 1 else "none (source sample rate retained)",
-            "anti_alias_filter_applied": bool(stride > 1),
-            "source_sampling_rate_hz": float(1.0 / source_dt_median),
+            "downsampling_method": decimation["method"],
+            "anti_alias_filter_applied": decimation["anti_alias_filter_applied"],
+            "source_sampling_rate_hz": decimation["source_sampling_rate_hz"],
             "time_start_s": float(time[0]),
             "time_end_s": float(time[-1]),
             "estimated_sampling_rate_hz_after_stride": fs,
