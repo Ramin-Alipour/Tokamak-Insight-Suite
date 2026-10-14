@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
-from tis.data_sources import fetch_fair_mast_signal
+from tis.data_sources import fetch_fair_mast_signal, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_velocity_m_s, derive_parameters,
@@ -164,6 +164,50 @@ elif page=='Public Data Access':
         st.download_button('Download CSV', data=st.session_state['tis_raw'], file_name=st.session_state['tis_filename'], mime='text/csv')
         st.download_button('Download provenance manifest', data=json.dumps(manifest, indent=2), file_name='mast_source_manifest.json', mime='application/json')
         st.caption('The fetched data are not calibrated by TIS. Verify units, calibration and quality before physical interpretation.')
+
+    st.markdown('---')
+    st.subheader('Import a direct public data-file URL')
+    st.caption('For archives that provide direct CSV/TXT/Parquet exports, such as GOLEM. This downloads a single file; it does not crawl or scrape websites.')
+    with st.form('public_table_url_form'):
+        public_url = st.text_input(
+            'Direct data-file URL',
+            value='',
+            placeholder='https://golem.fjfi.cvut.cz/utils/data/23078/loop_voltage.csv',
+            help='Use a direct file link, not a shot homepage or catalog page. Supported formats: CSV, TXT, XLSX/XLS and Parquet.',
+        )
+        public_max_mb = st.number_input('Maximum download size (MB)', min_value=1, max_value=100, value=25, step=1)
+        public_fetch_clicked = st.form_submit_button('Download and import URL')
+    if public_fetch_clicked:
+        try:
+            with st.spinner('Downloading public data file...'):
+                payload, source_meta = fetch_public_table_bytes(
+                    public_url, max_bytes=int(public_max_mb) * 1_000_000
+                )
+                from urllib.parse import urlparse
+                public_filename = Path(urlparse(public_url).path).name or 'public_data.csv'
+                if Path(public_filename).suffix.lower() not in {'.csv', '.txt', '.xlsx', '.xls', '.parquet', '.pq'}:
+                    public_filename += '.txt'
+                public_frame = load_table(payload, public_filename)
+                st.session_state['tis_raw'] = payload
+                st.session_state['tis_filename'] = public_filename
+                st.session_state['tis_df'] = public_frame
+                st.session_state['tis_sha'] = sha256_bytes(payload)
+                st.session_state['tis_source_manifest'] = {
+                    'dataset': 'Public direct-file URL',
+                    'shot': 'As encoded in source URL / metadata',
+                    'source_group': 'Direct tabular file',
+                    'signal': ', '.join(map(str, public_frame.columns)),
+                    'source_signal_class': 'As published by source',
+                    'source_quality': 'Not independently assessed',
+                    'source_units': 'Preserved as provided; inspect source documentation',
+                    'rows': int(len(public_frame)),
+                    'columns': [str(x) for x in public_frame.columns],
+                    **source_meta,
+                }
+            st.rerun()
+        except Exception as e:
+            st.error(f'Public URL import failed: {e}')
+            st.info('Use a direct file URL and confirm that the source permits public download.')
 
 elif page=='Data Import & QC':
     st.title('Data Import & Quality Control')
