@@ -13,7 +13,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
-    exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
+    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
@@ -605,8 +605,12 @@ elif page=='Tomography & Bolometry':
     st.markdown('### Target heat-flux profile fit')
     if df is not None and len(numeric)>=2:
         xcol=col_select('Target coordinate (m)',numeric,'heat_x'); qcol=col_select('Heat flux (W/m²)',numeric,'heat_q')
-        if st.button('Fit exponential heat-flux profile'):
-            try: r=exponential_heat_flux_fit(df[xcol],df[qcol]); st.json(r); json_download('Export heat-flux fit',r,'tis_heat_flux_fit.json')
+        heat_model=st.selectbox('Heat-flux model',['Eich-like convolved profile','Simple exponential'],key='heat_model')
+        st.caption('The Eich-like model includes Gaussian spreading and reports fit-parameter uncertainties. Target-coordinate mapping and diagnostic response remain user-supplied.')
+        if st.button('Fit heat-flux profile'):
+            try:
+                r=eich_heat_flux_fit(df[xcol],df[qcol]) if heat_model=='Eich-like convolved profile' else exponential_heat_flux_fit(df[xcol],df[qcol])
+                st.json(r); json_download('Export heat-flux fit',r,'tis_heat_flux_fit.json')
             except Exception as e: st.error(str(e))
 
 elif page=='Advanced Analysis':
