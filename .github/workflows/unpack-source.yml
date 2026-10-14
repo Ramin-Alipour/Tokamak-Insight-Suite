@@ -1,0 +1,46 @@
+name: Extract source package and test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Tokamak_Insight_Suite_v0.3.0.zip"
+      - ".github/workflows/unpack-source.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Extract source files
+        run: |
+          unzip -q Tokamak_Insight_Suite_v0.3.0.zip -d /tmp/tis-package
+          cp -a /tmp/tis-package/Tokamak_Insight_Suite/. .
+          rm -rf /tmp/tis-package
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+      - name: Run tests
+        run: pytest -q
+      - name: Commit extracted source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "Add source, dashboard, diagnostic catalog, formulas, and tests"
+            git push
+          fi
