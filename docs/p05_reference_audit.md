@@ -24,6 +24,19 @@ The reported increase in poloidal turbulent transport is consistent between abst
 | Radial turbulent transport | Edge, +200 V | — | Reduction about 50% | — | Different position; not comparable to 5 mm |
 | Reynolds-stress parameter | 5 mm, +200 V | Maximum reduction 5–10% | About 5% reduction | Maximum reduction 5–10% | Compatible at lower end; condition-specific |
 
+## Qualitative findings preserved by figure/condition
+
+The machine-readable registry also retains the non-percentage statements from Results §§3.1–3.6 so they are not lost behind the abstract's headline percentages:
+
+- **Plasma current (Fig. 2):** +200 V at the edge slightly improves current duration; −200 V at the edge reduces current strongly. At 5 mm, the text says −200 V can sustain a discharge up to 31 ms while +200 V causes earlier disruption; the paper also reports a maximum current above 20 kA at 5 mm without tying that maximum to one polarity. At 10 mm, the current trace is described as the worst and more unstable.
+- **Radial electric field (Fig. 3):** positive bias raises the field at the edge and at 5/10 mm; both polarities are said to raise it noticeably at 5 mm. At 10 mm, +200 V is described as more effective than −200 V, although −200 V also has an effect. These qualitative statements do not resolve the conflicting percentage ranges.
+- **Poloidal electric field (Fig. 4):** +200 V gives the lowest edge value in the described comparison and reduces the field at 5 mm; at 10 mm, the paper describes a rise of nearly 30% under applied ±200 V, with no uncertainty/statistic specified.
+- **Poloidal turbulent transport (Fig. 5):** at the edge, +200 V increases and −200 V decreases transport relative to no bias. At 5 mm, both polarities increase it, with +200 V having the larger effect. At 10 mm, −200 V causes the largest increase and +200 V produces more fluctuations.
+- **Radial turbulent transport (Fig. 6):** at the edge, +200 V reduces it by about 50% while −200 V produces erratic changes. At 5 mm, +200 V reduces it by almost 35% but −200 V is not effective at reducing it. At 10 mm, both applied polarities increase it.
+- **Reynolds-stress parameter (Fig. 7):** at the edge, +200 V reduces it by 15% while −200 V increases it. At 5 mm, both polarities reduce it and +200 V reduces it by about 5%. At 10 mm, the text describes wild fluctuations and a dramatic increase.
+
+These are transcriptions of the paper's narrative descriptions of plotted traces, not independent digitization of the plotted pixels.
+
 ## What the plots establish—and what they do not
 
 Figures 3–7 are time-evolution plots. The prose does not specify a common averaging window, whether percentages refer to mean, peak, envelope, or selected time interval, or the uncertainty of the percentage estimates. Digitizing a plot can estimate displayed curve coordinates, but cannot recover the original acquired signal or resolve the abstract/conclusion inconsistency without a declared comparison statistic.
