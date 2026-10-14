@@ -475,7 +475,7 @@ def derive_parameters(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, vlo
     debye=float(np.sqrt(EPS0*te_eV*E_CHARGE/(ne_m3*E_CHARGE**2))) if ne_m3>0 and te_eV>0 else None
     ng=abs(ip_A)/1e6/(np.pi*minor_radius_m**2)
     p_ohm=vloop_V*ip_A
-    beta_t=p/(bt_T**2/(2*MU0)) if bt_T>0 else None
+    beta_t=p/(bt_T**2/(2*MU0)) if abs(bt_T)>0 else None
     tau=stored_energy_J/loss_power_W if stored_energy_J is not None and loss_power_W is not None and loss_power_W>0 else None
     cs=float(np.sqrt(E_CHARGE*(te_eV+ti_eV)/ (ion_mass_amu*AMU))) if te_eV+ti_eV>0 else 0.0
     return {'electron_pressure_Pa':float(pe),'ion_pressure_Pa':float(pi),'total_thermal_pressure_Pa':float(p),
