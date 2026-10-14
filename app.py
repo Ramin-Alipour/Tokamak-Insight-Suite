@@ -14,7 +14,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, fluctuation_flux,
     exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
-    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio)
+    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
 st.markdown('''<style>
@@ -310,6 +310,18 @@ elif page=='Time Series & MHD':
         plot_line(t,y,'Time (s)',scol,'Raw signal'); plot_line(t,yf,'Time (s)',scol,'Filtered signal')
         f,amp=fft_spectrum(yf,fs); fp,psd=welch_psd(yf,fs)
         plot_line(f,amp,'Frequency (Hz)','Amplitude','FFT amplitude'); plot_line(fp,np.maximum(psd,np.finfo(float).tiny),'Frequency (Hz)','PSD (unit²/Hz)','Welch PSD',True)
+        st.markdown('### Time-frequency spectrogram')
+        tf_n=st.number_input('Spectrogram segment length',min_value=8,max_value=int(len(y)),value=min(256,int(len(y))),step=1,key='tf_n')
+        tf_overlap=st.number_input('Segment overlap (samples)',min_value=0,max_value=int(tf_n)-1,value=int(tf_n)//2,step=1,key='tf_overlap')
+        if st.button('Calculate spectrogram'):
+            try:
+                tf=time_frequency_spectrogram(yf,fs,nperseg=int(tf_n),noverlap=int(tf_overlap))
+                fig,ax=plt.subplots(figsize=(9,4))
+                mesh=ax.pcolormesh(tf['time_s'],tf['frequency_Hz'],10*np.log10(np.maximum(tf['psd'],np.finfo(float).tiny)),shading='auto')
+                ax.set_xlabel('Time (s)'); ax.set_ylabel('Frequency (Hz)'); ax.set_title('Short-time power spectral density (dB)')
+                fig.colorbar(mesh,ax=ax,label='PSD (dB re 1 unit²/Hz)'); fig.tight_layout(); st.pyplot(fig); plt.close(fig)
+                download_df('Download spectrogram matrix',pd.DataFrame(tf['psd'],index=tf['frequency_Hz'],columns=[f'{v:.9g}' for v in tf['time_s']]).reset_index(names='frequency_Hz'),'tis_spectrogram.csv')
+            except Exception as e: st.error(str(e))
         download_df('Download filtered series',pd.DataFrame({'time_s':t,'raw':y,'filtered':yf}),'tis_timeseries.csv')
         download_df('Download FFT',pd.DataFrame({'frequency_Hz':f,'amplitude':amp}),'tis_fft.csv'); download_df('Download PSD',pd.DataFrame({'frequency_Hz':fp,'psd':psd}),'tis_welch_psd.csv')
         st.markdown('### Cross-channel coherence / phase / delay')
