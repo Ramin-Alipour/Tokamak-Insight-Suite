@@ -5,9 +5,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
-COPY requirements.txt pyproject.toml ./
-RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 COPY . .
+RUN python -m pip install --upgrade pip && pip install -r requirements.txt
 RUN useradd --create-home --uid 10001 tis && chown -R tis:tis /app
 USER tis
 EXPOSE 8501
