@@ -22,3 +22,23 @@ A quantity can pass through more than one class (for example M→D/I). Catalog l
 2. **Synthetic-data demonstrations:** bundled for app smoke testing; never represented as experimental tokamak data.
 3. **Device-specific validation:** not claimed. Requires independent benchmark datasets, machine calibration, documented conventions and expert review.
 4. **Operational/control use:** explicitly out of scope.
+
+
+## Registry inference and validation metadata
+Each formula reference carries an `inference_class` separate from `validation_status`:
+- `derived_quantity`: an explicit relation applied to correctly calibrated inputs;
+- `model_dependent_estimate`: an empirical scaling or result conditional on a physical/engineering model;
+- `inverse_problem_or_model_inference`: an inverse or reconstruction problem requiring geometry, regularization or a forward model;
+- `reference_only`: documented knowledge without a mapped executable end-to-end implementation.
+
+The validation field currently states that a complete diagnostic workflow has **not** been independently validated. Unit tests are evidence about tested numerical behavior, not independent experimental validation. The dashboard displays both fields. Diagnostic and formula IDs are stable within the checked-in registry ordering, and duplicate diagnostic names are rejected by regression tests.
+
+## Input safety and provenance
+The table importer applies a byte cap before parsing, bounds CSV row materialization, checks XLSX archive expansion and workbook dimensions, checks legacy XLS dimensions where the optional reader is installed, and checks Parquet row counts, row groups and uncompressed metadata size. Numeric coercions are recorded in the DataFrame import report and surfaced in the QC page. These checks reduce accidental/resource-exhaustion risk; they are not a sandbox for hostile documents.
+
+## Algorithm-specific cautions
+- Filter impact output includes the forward-backward filter response and raw/filtered RMS and dominant FFT peak. These are diagnostics for user review, not automatic proof that a cutoff is physically appropriate.
+- Spectral fits report residual diagnostics and plot residuals. The reference line must be selected by the user; a line-shape fit does not identify atomic species or automatically correct all blends, detector response, Zeeman/fine structure or background errors.
+- Tomography reports response-matrix coverage and, when matrix dimensions are manageable, SVD rank/condition diagnostics. Optional Monte Carlo perturbation propagates only supplied independent Gaussian measurement uncertainties; geometry/model error and regularization-choice uncertainty remain excluded.
+- Channel-derived mode-number analysis reports phase residuals and leave-one-sensor-out sensitivity when enough sensors are available. This is not a confidence interval and cannot eliminate spatial aliasing.
+- Explicit time-base resampling uses linear interpolation only for records without large gaps, refuses implicit downsampling, and exports method metadata. It cannot reconstruct missing samples.
