@@ -73,6 +73,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Tomography & Bolometry:** uncertainty-weighted regularized tomography with optional L-curve λ selection, Abel reconstruction, axisymmetric radiated-power integration, and Eich-like or simple-exponential target heat-flux fitting.
 - **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
+- **Reference Results Validation:** compare TIS outputs with paper/device reference values using supplied uncertainties or explicit tolerances; rows without a criterion remain unassessed. Protocol: `docs/reference_result_validation.md`.
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
 ## Tests and CI
