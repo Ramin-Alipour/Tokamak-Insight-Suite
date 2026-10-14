@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: tis-source-check-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   unpack-and-test:
     runs-on: ubuntu-latest
@@ -28,8 +32,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest
-      - name: Run tests
+      - name: Compile Python sources
+        run: python -m compileall -q app.py tis tests
+      - name: Run test suite
         run: pytest -q
+      - name: Launch dashboard smoke test
+        run: |
+          streamlit run app.py --server.headless=true --server.port=8501 > /tmp/tis-streamlit.log 2>&1 &
+          pid=$!
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              echo "Streamlit dashboard health check passed."
+              kill "$pid" || true
+              wait "$pid" || true
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/tis-streamlit.log
+          kill "$pid" || true
+          exit 1
       - name: Commit extracted source
         run: |
           git config user.name "github-actions[bot]"
@@ -37,5 +59,6 @@ jobs:
           git add -A
           if ! git diff --cached --quiet; then
             git commit -m "Add source, dashboard, diagnostic catalog, formulas, and tests"
+            git pull --rebase origin main
             git push
           fi
