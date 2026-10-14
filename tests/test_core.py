@@ -7,6 +7,9 @@ from tis.core import (
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
     regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality,
     linear_phase_density, load_table, sha256_bytes,
+    reflectometry_cutoff_density, electron_cyclotron_resonance_field,
+    axisymmetric_radiated_power, equilibrium_grid_derivatives,
+    exponential_heat_flux_fit,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
@@ -271,4 +274,41 @@ def test_fft_detrend_true_removes_dc_component():
 def test_filter_rejects_explicit_nonpositive_or_nonfinite_cutoff(kwargs):
     with pytest.raises(ValueError):
         butterworth_filter(np.linspace(0, 1, 100), fs=100, **kwargs)
+
+def test_o_mode_reflectometry_cutoff_matches_known_28_ghz_scale():
+    result = reflectometry_cutoff_density(28e9, mode="O")
+    assert result["cutoff_density_m-3"] == pytest.approx(9.72e18, rel=0.02)
+
+
+def test_fundamental_electron_cyclotron_field_at_28_ghz():
+    result = electron_cyclotron_resonance_field(28e9, harmonic=1)
+    assert result["resonance_field_T"] == pytest.approx(1.001, rel=0.01)
+
+
+def test_axisymmetric_radiated_power_constant_emissivity():
+    R = np.linspace(1.0, 2.0, 101)
+    Z = np.linspace(-0.5, 0.5, 81)
+    eps = np.full((len(Z), len(R)), 4.0)
+    result = axisymmetric_radiated_power(R, Z, eps)
+    # Integral of 2*pi*R*eps over R in [1,2] and Z in [-0.5,0.5].
+    assert result["total_radiated_power_W"] == pytest.approx(12 * np.pi, rel=2e-4)
+
+
+def test_equilibrium_grid_derivatives_of_quadratic_flux():
+    R = np.linspace(1.0, 2.0, 21)
+    Z = np.linspace(-0.5, 0.5, 21)
+    psi = Z[:, None] ** 2 + R[None, :] ** 2
+    result = equilibrium_grid_derivatives(R, Z, psi, Bphi_T=1.5)
+    np.testing.assert_allclose(result["dpsi_dR"][:, 1:-1], 2 * R[None, 1:-1], atol=1e-10)
+    np.testing.assert_allclose(result["dpsi_dZ"][1:-1, :], 2 * Z[1:-1, None], atol=1e-10)
+    assert np.all(np.isfinite(result["Btotal_T"]))
+
+
+def test_exponential_heat_flux_fit_recovers_synthetic_decay_length():
+    x = np.linspace(0.0, 0.1, 100)
+    y = 5e6 * np.exp(-x / 0.02) + 2e5
+    result = exponential_heat_flux_fit(x, y)
+    assert result["lambda_q_m"] == pytest.approx(0.02, rel=0.02)
+    assert result["q0_W_m-2"] == pytest.approx(5e6, rel=0.02)
+    assert result["r_squared"] > 0.999
 
