@@ -203,3 +203,86 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
         "sha256": hashlib.sha256(payload).hexdigest(),
     }
     return payload, metadata
+
+
+def fetch_fair_mast_efit_snapshot(
+    shot: int = 30421,
+    time_s: float = 0.2,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Fetch one existing EFIT-derived plasma-current R-Z grid from FAIR-MAST.
+
+    This exports archive output; it does not perform a Grad-Shafranov solve.
+    The returned table has z_m plus one column per R coordinate.
+    """
+    if int(shot) < 1:
+        raise ValueError("Shot number must be a positive integer.")
+    if not np.isfinite(time_s):
+        raise ValueError("Requested EFIT time must be finite.")
+    try:
+        import xarray as xr
+    except ImportError as exc:
+        raise RuntimeError(
+            "FAIR-MAST EFIT access needs optional dependencies. "
+            "Install with: python -m pip install -r requirements-data.txt"
+        ) from exc
+
+    shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
+    ds = xr.open_zarr(shot_url, group="efm")
+    try:
+        required = {"plasma_current_rz", "r", "z", "time"}
+        missing = required.difference(ds.variables)
+        if missing:
+            raise KeyError(f"EFIT archive missing required variables: {sorted(missing)}")
+        field = ds["plasma_current_rz"]
+        if not {"time", "r", "z"}.issubset(field.dims):
+            raise ValueError(f"Unexpected plasma_current_rz dimensions: {field.dims}")
+        times = np.asarray(ds["time"].values, dtype=np.float64).ravel()
+        if not times.size or not np.all(np.isfinite(times)):
+            raise ValueError("EFIT time coordinate is empty or nonfinite.")
+        index = int(np.argmin(np.abs(times - float(time_s))))
+        grid = np.asarray(field.isel(time=index).transpose("z", "r").values, dtype=np.float64)
+        r = np.asarray(ds["r"].values, dtype=np.float64).ravel()
+        z = np.asarray(ds["z"].values, dtype=np.float64).ravel()
+        if grid.shape != (z.size, r.size):
+            raise ValueError(f"Grid/coordinate mismatch: field={grid.shape}, z={z.size}, r={r.size}")
+        finite = np.isfinite(grid)
+        if not np.any(finite):
+            raise ValueError("Selected EFIT snapshot contains no finite grid values.")
+        frame = pd.DataFrame(grid, columns=[f"R={v:.9g}_m" for v in r])
+        frame.insert(0, "z_m", z)
+        attrs = dict(ds.attrs)
+        manifest = {
+            "dataset": "UKAEA FAIR-MAST / MAST Level-1",
+            "shot": int(shot),
+            "source_group": "efm",
+            "signal": "plasma_current_rz",
+            "source_url": shot_url,
+            "source_documentation": FAIR_MAST_DOCS,
+            "source_quality": attrs.get("quality", "Unspecified"),
+            "requested_time_s": float(time_s),
+            "selected_time_s": float(times[index]),
+            "time_index": index,
+            "grid_shape_z_by_r": [int(grid.shape[0]), int(grid.shape[1])],
+            "r_min_m": float(np.min(r)),
+            "r_max_m": float(np.max(r)),
+            "z_min_m": float(np.min(z)),
+            "z_max_m": float(np.max(z)),
+            "finite_grid_fraction": float(np.mean(finite)),
+            "grid_min_finite": float(np.min(grid[finite])),
+            "grid_max_finite": float(np.max(grid[finite])),
+            "grid_mean_finite": float(np.mean(grid[finite])),
+            "scientific_limit": (
+                "Exports an existing EFIT-derived archive grid only. TIS does not solve "
+                "the Grad-Shafranov equation here; verify coordinate conventions, units, "
+                "quality flags, and reconstruction assumptions before scientific use."
+            ),
+        }
+        for var, key in (("current_centrd_r", "current_centroid_r_m"),
+                         ("current_centrd_z", "current_centroid_z_m")):
+            if var in ds:
+                value = np.asarray(ds[var].isel(time=index).values).item()
+                if np.isfinite(value):
+                    manifest[key] = float(value)
+        return frame, manifest
+    finally:
+        ds.close()
