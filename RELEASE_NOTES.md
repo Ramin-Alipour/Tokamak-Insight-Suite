@@ -6,6 +6,7 @@
 - Spectral calibration now validates polynomial degree and matching input-array lengths before fitting.
 - Axisymmetric radiated-power integration rejects negative emissivity grids instead of returning a potentially nonphysical total.
 - Added regression tests for DC handling, invalid filter/calibration inputs, reflectometry cutoff scaling, electron-cyclotron resonance, analytic equilibrium derivatives, radiated-power integration, and synthetic heat-flux decay recovery.
+- Added calibrated time-series integration with optional baseline subtraction, CSV export, and a dashboard workflow for derivative-type diagnostics; sensor calibration and initial conditions remain explicit user inputs.
 - Added a continuous integration workflow to compile sources, run the test suite, and check the Streamlit HTTP health endpoint on pushes and pull requests. These checks must pass in GitHub Actions before the changes are considered verified.
 
 
