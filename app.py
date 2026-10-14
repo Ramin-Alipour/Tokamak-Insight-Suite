@@ -771,9 +771,14 @@ elif page=='Tomography & Bolometry':
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Axisymmetric Abel inversion':
         btxt=st.text_input('Chord impact parameters b (m, comma-separated)','0,0.02,0.04,0.06,0.08'); ytxt=st.text_input('Line-integrated measurements (units·m, comma-separated)','1.0,0.9,0.7,0.4,0.1'); etxt=st.text_input('Radial bin edges (m, comma-separated)','0,0.02,0.04,0.06,0.08,0.10')
+        sigmatxt=st.text_input('Measurement standard uncertainties σ (optional, same length; comma-separated)','')
         if st.button('Run Abel inversion',type='primary'):
             try:
-                r=abel_reconstruction([float(z) for z in btxt.split(',')],[float(z) for z in ytxt.split(',')],[float(z) for z in etxt.split(',')],lam,nonneg); out=pd.DataFrame({'radius_m':r['radius_centers_m'],'reconstructed_profile':r['emissivity_or_density_profile']}); st.json({k:v for k,v in r.items() if k not in ['response_matrix','radius_centers_m','emissivity_or_density_profile']}); st.dataframe(out); plot_line(out['radius_m'],out['reconstructed_profile'],'Radius (m)','Reconstructed value','Abel inversion'); download_df('Download Abel profile',out,'tis_abel_profile.csv')
+                bvals=[float(z) for z in btxt.split(',')]
+                yvals=[float(z) for z in ytxt.split(',')]
+                edges=[float(z) for z in etxt.split(',')]
+                sigma_vals=None if not sigmatxt.strip() else [float(z) for z in sigmatxt.split(',')]
+                r=abel_reconstruction(bvals,yvals,edges,lam,nonneg,measurement_sigma=sigma_vals); out=pd.DataFrame({'radius_m':r['radius_centers_m'],'reconstructed_profile':r['emissivity_or_density_profile']}); st.json({k:v for k,v in r.items() if k not in ['response_matrix','radius_centers_m','emissivity_or_density_profile']}); st.dataframe(out); plot_line(out['radius_m'],out['reconstructed_profile'],'Radius (m)','Reconstructed value','Abel inversion'); download_df('Download Abel profile',out,'tis_abel_profile.csv')
             except Exception as e: st.error(str(e))
     else:
         Rf=st.file_uploader('Major-radius grid R (m), CSV row',type=['csv'],key='rad_R'); Zf=st.file_uploader('Vertical grid Z (m), CSV column',type=['csv'],key='rad_Z'); Ef=st.file_uploader('Emissivity grid (W/m³), CSV',type=['csv'],key='rad_E')
