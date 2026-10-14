@@ -13,6 +13,18 @@ This file fixes the scientific target of the next validation pass: reproduce the
 | Alipour et al., *Effects of the location of a biased limiter on turbulent transport in the IR-T1 tokamak plasma*, EPJ D 71, 228 (2017), DOI [10.1140/epjd/e2017-80215-6](https://doi.org/10.1140/epjd/e2017-80215-6) | Plotted plasma-current, electric-field, transport and Reynolds-stress traces for limiter positions and ±200 V bias | Same edge-transport workflow plus consistent windowing and baseline/control comparisons | Reproduce each position/bias condition separately; percentage changes must use a documented baseline and avoid dividing by near-zero reference values. |
 | Alipour & Ghanbari, *Magnetic evaluation of hydrogen pressures changes on MHD fluctuations in IR-T1 tokamak plasma*, EPJ D 72, 75 (2018), DOI [10.1140/epjd/e2018-90033-y](https://doi.org/10.1140/epjd/e2018-90033-y) | Mirnov PSD peaks and relative spectral levels; Morlet/wavelet time-frequency maps; SVD spatial/temporal components and mode-energy fractions for 1.9, 2.5 and 2.9 Torr | Uniform-sampling QC; FFT/Welch PSD; SVD; Morlet CWT; explicit sensor order and time windows | Compare peak frequency and relative power with the plotted figure. SVD signs are arbitrary; mode ordering, sensor order, normalization and window selection must match before comparing component shapes. |
 
+## First figure-derived consistency check: compound probe
+
+Source: Alipour et al., RSI 88, 093516 (2017), DOI [10.1063/1.4994037](https://doi.org/10.1063/1.4994037), Fig. 10(a) (smoothed parallel Mach number), Fig. 11(a) (parallel flow velocity), and Eq. (4).
+
+A provisional pixel-based digitization of the two plotted curves over the full 0–30 ms discharge gives:
+- Figure 10(a): mean smoothed (M_{\parallel}\approx0.511).
+- Figure 11(a): mean (V_{\parallel}\approx17.57\;\mathrm{km\,s^{-1}}).
+
+These graph-derived averages are consistent with the paper's rounded textual descriptions (~0.5 and ~17 km/s). Applying the paper's Eq. (4), (c_s=\sqrt{e(T_e+T_i)/m_i}), with (T_e=14) eV, (T_i/T_e=0.2), and hydrogen-ion mass (m_i=1.0073) amu gives (c_s\approx40.115\;\mathrm{km\,s^{-1}}). The digitized Mach mean would then imply (V_{\parallel}\approx20.51\;\mathrm{km\,s^{-1}}), about **14.3% above** the digitized Fig. 11 mean; conversely, (V_{\parallel}/c_s\approx0.438), below the Fig. 10 mean.
+
+This is an **internal consistency flag, not independent validation**: the paper states that Fig. 11 velocities were calculated from the Mach-number data. Before treating this as a physical discrepancy, refine the digitization/uncertainty and verify the exact temperature used for Eq. (4), ion mass, and averaging convention. The TIS workflow now calculates this relation explicitly so the assumptions and discrepancy are visible rather than silently declaring agreement.
+
 ## Evidence boundary
 
 The original IR-T1 raw diagnostic files are not included with these papers and are not assumed to be publicly available. The first reproduction pass therefore must label each reference as one of:
