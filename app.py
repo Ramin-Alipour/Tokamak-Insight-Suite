@@ -654,7 +654,8 @@ elif page=='Advanced Analysis':
                     if sr is None or sp is None: raise ValueError('Select both velocity sign conventions from the target paper or diagnostic geometry.')
                     result=drift_transport_from_fields(df[ncol],df[ercol],df[epcol],float(bt),radial_velocity_sign=int(sr),poloidal_velocity_sign=int(sp))
                     st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
-                    valid_mask=np.isfinite(pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[epcol],errors='coerce').to_numpy(float))\n                    out=pd.DataFrame({'density_m-3':pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)[valid_mask],'E_r_V_m':pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)[valid_mask],'E_p_V_m':pd.to_numeric(df[epcol],errors='coerce').to_numpy(float)[valid_mask]})
+                    valid_mask=np.isfinite(pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[epcol],errors='coerce').to_numpy(float))
+                    out=pd.DataFrame({'density_m-3':pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)[valid_mask],'E_r_V_m':pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)[valid_mask],'E_p_V_m':pd.to_numeric(df[epcol],errors='coerce').to_numpy(float)[valid_mask]})
                     for key in ['radial_velocity_m_s','poloidal_velocity_m_s','radial_particle_flux_m-2_s-1','poloidal_particle_flux_m-2_s-1','reynolds_stress_velocity_product_m2_s-2']:
                         out[key]=result[key]
                     st.dataframe(out.head(50),use_container_width=True)
