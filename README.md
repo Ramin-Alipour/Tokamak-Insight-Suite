@@ -24,7 +24,7 @@ On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_un
 
 ```bash
 docker build -t tokamak-insight-suite .
-docker run --rm -p 8501:8501 tokamak-insight-suite
+docker run --rm -p 127.0.0.1:8501:8501 tokamak-insight-suite
 ```
 
 Then open `http://localhost:8501`.
