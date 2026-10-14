@@ -6,7 +6,7 @@ This map follows the source document's final diagnostic-family index. “Registr
 
 | # | Source family | TIS coverage in v0.3.0 |
 |---:|---|---|
-| 1 | Magnetic measurements | Registry; general time-series/FFT/cross-channel tools |
+| 1 | Magnetic measurements | Generic time-series/FFT/cross-channel tools plus calibrated signal integration with optional baseline subtraction; device-specific transfer functions remain user-supplied |
 | 2 | Equilibrium reconstruction | Registry only; specialized Grad–Shafranov solver not included |
 | 3 | Langmuir probes | Registry; I–V descriptive analysis, not full regime-specific Te/ne inference |
 | 4 | Ball-pen probe | Registry only; no universal calibration correction |
