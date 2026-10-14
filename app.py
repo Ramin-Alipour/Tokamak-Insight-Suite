@@ -337,12 +337,28 @@ elif page=='Time Series & MHD':
         others=[c for c in numeric if c!=scol]
         if others:
             other=st.selectbox('Second synchronized channel',others,key='cross_other')
-            _,y2,fs2=prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce'),pd.to_numeric(df[other],errors='coerce'),fs0)
-            if len(y2)==len(y) and np.isclose(fs,fs2):
-                xa=cross_analysis(yf,y2,fs); lags,corr,lag=cross_correlation_lag(yf,y2,fs)
-                st.metric('Peak absolute-correlation lag',f'{lag:.6g} s'); plot_line(xa['frequency_Hz'],xa['coherence'],'Frequency (Hz)','Coherence','Magnitude-squared coherence'); plot_line(xa['frequency_Hz'],xa['cross_phase_rad'],'Frequency (Hz)','Phase (rad)','Cross phase'); plot_line(lags,corr,'Lag (s)','Correlation','Cross-correlation')
-                download_df('Download cross-channel results',pd.DataFrame(xa),'tis_cross_analysis.csv')
-            else: st.warning('Channels need aligned timestamps and compatible sampling rates.')
+            # Apply one shared validity mask before any NaN removal so samples remain paired.
+            raw_x=pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float)
+            raw_y=pd.to_numeric(df[other],errors='coerce').to_numpy(dtype=float)
+            raw_t=None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)
+            common=np.isfinite(raw_x)&np.isfinite(raw_y)
+            if raw_t is not None: common &= np.isfinite(raw_t)
+            tx=None if raw_t is None else raw_t[common]
+            try:
+                _,x_pair,fs_pair=prepare_time_series(tx,raw_x[common],fs0)
+                _,y_pair,fs2=prepare_time_series(tx,raw_y[common],fs0)
+                if len(x_pair)==len(y_pair) and np.isclose(fs_pair,fs2) and np.isclose(fs,fs_pair):
+                    y2f=butterworth_filter(y_pair,fs2,hp or None,lp or None,order)
+                    xa=cross_analysis(yf,y2f,fs)
+                    lags,corr,lag=cross_correlation_lag(yf,y2f,fs)
+                    st.caption('Both channels use the same timestamp-validity mask and the same filter settings. Lag convention: a y-channel delayed relative to x gives a negative lag.')
+                    st.metric('Peak absolute-correlation lag',f'{lag:.6g} s')
+                    plot_line(xa['frequency_Hz'],xa['coherence'],'Frequency (Hz)','Coherence','Magnitude-squared coherence')
+                    plot_line(xa['frequency_Hz'],xa['cross_phase_rad'],'Frequency (Hz)','Phase (rad)','Cross phase φy−φx')
+                    plot_line(lags,corr,'Lag (s)','Correlation','Cross-correlation')
+                    download_df('Download cross-channel results',pd.DataFrame(xa),'tis_cross_analysis.csv')
+                else: st.warning('Channels need aligned timestamps and compatible sampling rates.')
+            except Exception as e: st.warning(f'Cross-channel analysis unavailable: {e}')
         st.markdown('### Mode number from multi-sensor phase')
         st.caption('Enter measured sensor angles and synchronized phase estimates; unwrap convention and geometry must be physically consistent.')
         ang=st.text_input('Sensor angles θ (radians, comma-separated)','0,1.5707963,3.1415927,4.712389')
