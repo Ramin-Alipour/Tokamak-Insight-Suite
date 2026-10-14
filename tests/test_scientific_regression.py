@@ -80,27 +80,27 @@ def test_reflectometry_cutoff_density_scales_with_frequency_squared():
 def test_electron_cyclotron_resonance_field_scales_with_frequency():
     a = electron_cyclotron_resonance_field(60e9, harmonic=1)
     b = electron_cyclotron_resonance_field(120e9, harmonic=1)
-    assert b["magnetic_field_T"] == pytest.approx(2 * a["magnetic_field_T"], rel=1e-10)
+    assert b["resonance_field_T"] == pytest.approx(2 * a["resonance_field_T"], rel=1e-10)
 
 
 def test_neutron_count_rate_efficiency_correction():
     r = neutron_rate_from_counts(1000, efficiency=0.2, geometric_factor=0.5, calibration_factor=2)
-    assert r["neutron_rate_s-1"] == pytest.approx(20000)
+    assert r["estimated_source_rate_s-1"] == pytest.approx(20000)
 
 
 def test_line_ratio_response_correction():
     r = corrected_line_ratio(20, 10, response_1=2, response_2=1)
-    assert r["corrected_ratio"] == pytest.approx(1)
+    assert r["instrument_response_corrected_ratio"] == pytest.approx(1)
 
 
 def test_spectral_moment_centroid_for_symmetric_peak():
     r = spectrum_moments([-2, -1, 0, 1, 2], [0, 1, 2, 1, 0])
-    assert r["centroid_eV"] == pytest.approx(0.0)
+    assert r["mean_energy_eV"] == pytest.approx(0.0)
 
 
 def test_xray_spectrum_summary_reports_positive_total_counts():
     r = xray_spectrum_summary([1, 2, 3], [2, 5, 2])
-    assert r["total_counts"] == pytest.approx(9)
+    assert r["integrated_counts_keV"] == pytest.approx(6.0)
 
 
 def test_catalog_and_formula_registry_are_nonempty_and_structured():
