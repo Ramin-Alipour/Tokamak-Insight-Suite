@@ -7,7 +7,7 @@ It preserves source values, computes window statistics, and reports comparison
 status only after unit/scale conversion has been explicitly established.
 """
 from __future__ import annotations
-import json, re, urllib.request, zipfile, io
+import json, re, urllib.request, zipfile, io, math
 from pathlib import Path
 import numpy as np
 
@@ -21,8 +21,8 @@ def fetch(name: str) -> bytes:
     with urllib.request.urlopen(req, timeout=90) as response:
         return response.read()
 
-def numbers(raw: bytes) -> np.ndarray:
-    return np.loadtxt(io.BytesIO(raw), dtype=float, ndmin=1).reshape(-1)
+def numbers(raw: bytes) -> list[float]:
+    return [float(line.strip()) for line in raw.decode('utf-8-sig').splitlines() if line.strip()]
 
 # Published analysis window is data points 275000--309600 (paper: 275.000--309.600).
 # Python slice is end-exclusive, matching the stated interval.
@@ -42,15 +42,15 @@ for name in FILES:
     x = numbers(raw)
     if len(x) < stop:
         raise RuntimeError(f"{name}: {len(x)} rows, fewer than required {stop}")
-    if not np.all(np.isfinite(x)):
+    if not all(math.isfinite(v) for v in x):
         raise RuntimeError(f"{name}: non-finite values in source series")
     key = name.removeprefix("22010").removesuffix(".txt")
     segment = x[start:stop]
     stats = {
         "file": name, "n_total": int(len(x)), "window_start_index": start,
         "window_stop_exclusive": stop, "n_window": int(len(segment)),
-        "raw_mean": float(np.mean(segment)), "raw_std_sample": float(np.std(segment, ddof=1)),
-        "raw_min": float(np.min(segment)), "raw_max": float(np.max(segment)),
+        "raw_mean": float(sum(segment) / len(segment)), "raw_std_sample": float((sum((v - sum(segment) / len(segment)) ** 2 for v in segment) / (len(segment) - 1)) ** 0.5),
+        "raw_min": float(min(segment)), "raw_max": float(max(segment)),
         "raw_unit_scale_confirmed": False,
         "published_reference": expected[key]["paper"],
         "comparison_status": "NOT_COMPARABLE_YET: source-unit/scale mapping must be confirmed from README/methods before numerical agreement is scored",
