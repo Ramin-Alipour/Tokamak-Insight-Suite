@@ -61,8 +61,8 @@ def test_end_to_end_synthetic_gaussian_recovers_known_temperature_and_velocity()
     result = analyze_doppler_line_end_to_end(
         raw_coordinate=pixels,
         intensity=intensity,
-        reference_pixels=[0.0, 800.0],
-        reference_wavelengths=[499.7, 500.3],
+        reference_pixels=[0.0, 400.0, 800.0],
+        reference_wavelengths=[499.7, 500.0, 500.3],
         rest_wavelength=rest_nm,
         ion_mass_amu=mass_amu,
         fit_min_wavelength=499.94,
@@ -88,8 +88,8 @@ def test_end_to_end_doppler_analysis_rejects_unresolved_instrument_width():
         analyze_doppler_line_end_to_end(
             raw_coordinate=pixels,
             intensity=intensity,
-            reference_pixels=[0.0, 100.0],
-            reference_wavelengths=[499.9, 500.1],
+            reference_pixels=[0.0, 50.0, 100.0],
+            reference_wavelengths=[499.9, 500.0, 500.1],
             rest_wavelength=500.0,
             ion_mass_amu=47.9,
             fit_min_wavelength=499.97,
