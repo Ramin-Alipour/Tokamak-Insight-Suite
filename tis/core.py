@@ -71,6 +71,56 @@ def polynomial_calibration(values: Any, coefficients: list[float]) -> np.ndarray
     return np.polyval(np.asarray(coefficients, dtype=float), np.asarray(values, dtype=float))
 
 
+
+def integrate_time_series(
+    time_s: Any,
+    values: Any,
+    scale: float = 1.0,
+    initial_value: float = 0.0,
+    baseline_start_s: float | None = None,
+    baseline_end_s: float | None = None,
+) -> dict[str, Any]:
+    """Integrate a calibrated time trace by the trapezoidal rule, optionally subtracting a measured baseline.
+
+    The scale converts input units to the derivative/integrand units required by the user.
+    This utility does not infer a sensor transfer function or physical calibration.
+    """
+    t = np.asarray(time_s, dtype=float).ravel()
+    y = np.asarray(values, dtype=float).ravel()
+    if len(t) != len(y) or len(t) < 2:
+        raise ValueError('Time and signal must have equal lengths and at least two samples.')
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)):
+        raise ValueError('Time and signal must contain only finite values.')
+    if np.any(np.diff(t) <= 0):
+        raise ValueError('Time values must be strictly increasing with no duplicates.')
+    if not np.isfinite(scale) or not np.isfinite(initial_value):
+        raise ValueError('Scale and initial value must be finite.')
+    if (baseline_start_s is None) != (baseline_end_s is None):
+        raise ValueError('Specify both baseline start and end, or neither.')
+    calibrated = y * float(scale)
+    baseline = 0.0
+    if baseline_start_s is not None:
+        if not np.isfinite(baseline_start_s) or not np.isfinite(baseline_end_s) or baseline_start_s >= baseline_end_s:
+            raise ValueError('Baseline interval must be finite with start < end.')
+        mask = (t >= baseline_start_s) & (t <= baseline_end_s)
+        if np.count_nonzero(mask) < 2:
+            raise ValueError('Baseline interval must include at least two samples.')
+        baseline = float(np.mean(calibrated[mask]))
+        calibrated = calibrated - baseline
+    integrated = float(initial_value) + integrate.cumulative_trapezoid(calibrated, t, initial=0.0)
+    return {
+        'time_s': t,
+        'calibrated_signal': calibrated,
+        'integrated_signal': integrated,
+        'scale': float(scale),
+        'baseline_offset_in_calibrated_units': baseline,
+        'initial_value': float(initial_value),
+        'n_samples': int(len(t)),
+        'method': 'cumulative trapezoidal integration',
+        'note': 'The result is physically meaningful only when the input signal, scale, baseline interval, sensor response and initial condition are appropriate for the diagnostic.',
+    }
+
+
 def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
     y = np.asarray(values, dtype=float).ravel()
     if time is None:
