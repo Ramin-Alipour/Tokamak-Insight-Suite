@@ -578,3 +578,15 @@ def test_public_table_fetcher_blocks_loopback_before_network_access():
     from tis.data_sources import fetch_public_table_bytes
     with pytest.raises(ValueError, match="non-global|blocked"):
         fetch_public_table_bytes("http://127.0.0.1/private.csv")
+
+
+def test_mode_number_from_channels_extracts_cross_spectral_phase_with_coherence():
+    from tis.core import mode_number_from_channels
+    fs = 2000.0
+    time = np.arange(4096) / fs
+    theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
+    signals = np.vstack([np.sin(2*np.pi*120*time + 3*angle) for angle in theta])
+    result = mode_number_from_channels(theta, signals, fs, frequency_range_hz=(100, 140))
+    assert result["selected_frequency_Hz"] == pytest.approx(120, abs=1)
+    assert result["mode_number_fit"] == pytest.approx(3, abs=0.15)
+    assert min(result["coherence_with_reference"]) > 0.9
