@@ -224,7 +224,7 @@ def autocorrelation_analysis(values: Any, fs: float, max_lag_s: float | None = N
         raise ValueError('Maximum lag must be finite and nonnegative.')
     x = x - np.mean(x)
     energy = float(np.dot(x, x))
-    if energy <= np.finfo(float).eps:
+    if energy <= np.finfo(float).tiny:
         raise ValueError('Autocorrelation is undefined for a constant or numerically flat signal.')
     corr = signal.correlate(x, x, mode='full', method='auto')[len(x)-1:] / energy
     lags = np.arange(len(x), dtype=float) / fs
