@@ -24,3 +24,5 @@ def test_probe_page_default_geometry_settings_do_not_crash():
     app.run()
     assert not app.exception
     assert any("Analyze probe I–V" in button.label for button in app.button)
+    next(button for button in app.button if "Analyze probe I–V" in button.label).click().run()
+    assert not app.exception
