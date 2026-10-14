@@ -161,9 +161,23 @@ FORMULAS = [
 {"name":"Continuity / particle balance","equation":"dN/dt=Ṅ_in−Ṅ_out+S−L","inputs":"Stored particles, input/output and source/loss rates","output":"particles/s","assumptions":"Define volume and avoid double-counting source/loss terms."},
 ]
 
-for _f in FORMULAS:
-    _f.setdefault("status", "D")
+def _formula_classification(name: str) -> str:
+    n = name.lower()
+    if any(k in n for k in ("inverse problem", "tomograph", "abel", "bolometr", "reconstruction", "continuity / particle balance")):
+        return "inverse_problem_or_model_inference"
+    if any(k in n for k in ("greenwald", "ohmic power approximation", "ion sound speed", "safety factor large-aspect", "confinement time", "particle confinement", "gas pumping", "radiated power fraction", "integrated surface power", "apparent feature speed")):
+        return "model_dependent_estimate"
+    if any(k in n for k in ("rms signal", "nyquist frequency", "gaussian fwhm", "electron plasma frequency", "electron plasma angular frequency", "electron cyclotron frequency", "debye length", "debye parameter", "magnetic energy density", "faraday induction", "doppler line-of-sight velocity", "ion temperature from gaussian doppler sigma", "plasma frequency from density", "electron thermal pressure", "ion thermal pressure", "total thermal pressure", "line-integrated electron density", "cross-correlation lag", "magnitude-squared coherence", "relative fluctuation level")):
+        return "derived_quantity"
+    return "reference_only"
+
+
+for _i, _f in enumerate(FORMULAS, start=1):
     _f.setdefault("category", "Core physics")
+    _f["id"] = f"formula-{_i:03d}"
+    _f["inference_class"] = _formula_classification(_f["name"])
+    _f["status"] = _f["inference_class"]
+    _f["validation_status"] = "Not independently validated as a complete diagnostic workflow"
 
 def diagnostic_families():
     return sorted({d["family"] for d in DIAGNOSTICS})
