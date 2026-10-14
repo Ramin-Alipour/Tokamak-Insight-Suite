@@ -286,3 +286,77 @@ def fetch_fair_mast_efit_snapshot(
         return frame, manifest
     finally:
         ds.close()
+
+
+def list_fair_mast_signals(shot: int, group: str) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """List available variables in a FAIR-MAST group without downloading signal arrays.
+
+    The table marks numeric one-dimensional time traces that can be imported by
+    :func:`fetch_fair_mast_signal`. Multidimensional profiles/images are listed
+    for discovery but are not misrepresented as supported by the 1-D importer.
+    """
+    if int(shot) < 1:
+        raise ValueError("Shot number must be a positive integer.")
+    group = str(group).strip()
+    if not group or "/" in group or "\\" in group:
+        raise ValueError("Group must be a single FAIR-MAST group name.")
+    try:
+        import xarray as xr
+    except ImportError as exc:
+        raise RuntimeError(
+            "FAIR-MAST access needs optional dependencies. Install with: "
+            "python -m pip install -r requirements-data.txt"
+        ) from exc
+
+    shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
+    ds = xr.open_zarr(shot_url, group=group)
+    try:
+        time_name = next(
+            (name for name in ("time", "time1")
+             if name in ds.variables and ds[name].ndim == 1),
+            None,
+        )
+        time_dim = ds[time_name].dims[0] if time_name else None
+        rows = []
+        for name, variable in ds.data_vars.items():
+            dims = tuple(str(d) for d in variable.dims)
+            numeric = bool(np.issubdtype(variable.dtype, np.number))
+            is_trace = bool(numeric and time_dim and dims == (time_dim,))
+            rows.append({
+                "signal": str(name),
+                "dimensions": " × ".join(dims),
+                "shape": " × ".join(str(int(n)) for n in variable.shape),
+                "dtype": str(variable.dtype),
+                "units": str(variable.attrs.get("units", "Not specified")),
+                "description": str(variable.attrs.get("description", "")),
+                "numeric": numeric,
+                "time_series_import_supported": is_trace,
+            })
+        table = pd.DataFrame(rows)
+        if not table.empty:
+            table = table.sort_values(
+                ["time_series_import_supported", "signal"],
+                ascending=[False, True],
+            ).reset_index(drop=True)
+        manifest = {
+            "dataset": "UKAEA FAIR-MAST / MAST Level-1",
+            "shot": int(shot),
+            "source_group": group,
+            "source_url": shot_url,
+            "source_documentation": FAIR_MAST_DOCS,
+            "source_quality": ds.attrs.get("quality", "Unspecified"),
+            "source_signal_class": ds.attrs.get("signal_type", "Unknown"),
+            "time_coordinate": time_name,
+            "variable_count": int(len(table)),
+            "one_dimensional_numeric_time_traces": int(
+                table["time_series_import_supported"].sum()
+            ) if not table.empty else 0,
+            "note": (
+                "Metadata inventory only. Multidimensional profiles/images may require "
+                "dedicated diagnostic-specific loaders; this inventory does not load or "
+                "validate their full data arrays."
+            ),
+        }
+        return table, manifest
+    finally:
+        ds.close()
