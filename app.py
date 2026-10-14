@@ -16,7 +16,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, drift_transport_from_fields,
+    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, drift_transport_from_fields, electric_field_from_potential_difference,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
@@ -637,25 +637,48 @@ elif page=='Advanced Analysis':
                 st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
     elif workflow=='E×B transport & Reynolds stress':
-        st.write('Calculate the instantaneous E×B drift, particle flux and Reynolds-stress product used in edge-transport analyses. Sign conventions are explicit because they depend on coordinate orientation.')
+        st.write('Calculate E×B drift, particle flux and Reynolds-stress products. The software can use calibrated E-field channels or derive fields from paired probe potentials.')
         if df is None or len(numeric)<3:
-            st.info('Load synchronized numeric density and electric-field channels.')
+            st.info('Load synchronized numeric density and electric-field/potential channels.')
         else:
             ncol=col_select('Ion density nᵢ (m⁻³)',numeric,'transport_n')
-            ercol=col_select('Radial electric field Eᵣ (V/m)',[c for c in numeric if c!=ncol],'transport_er')
-            epcol=col_select('Poloidal electric field Eₚ (V/m)',[c for c in numeric if c not in [ncol,ercol]],'transport_ep')
+            field_source=st.radio('Electric-field source',['Already calibrated E-field channels','Compute from potential pairs'],horizontal=True,key='transport_field_source')
+            available=[c for c in numeric if c!=ncol]
+            if field_source=='Already calibrated E-field channels':
+                ercol=col_select('Radial electric field Eᵣ (V/m)',available,'transport_er')
+                epcol=col_select('Poloidal electric field Eₚ (V/m)',[c for c in available if c!=ercol],'transport_ep')
+            else:
+                st.caption('Uses E = s·(V_b − V_a)/Δx. Select sign and physical probe separation from the article/device coordinate convention.')
+                r1=col_select('Radial-pair potential Vᵣ₁ (V)',available,'transport_r1')
+                r2=col_select('Radial-pair potential Vᵣ₂ (V)',[c for c in available if c!=r1],'transport_r2')
+                p1=col_select('Poloidal-pair potential Vₚ₁ (V)',[c for c in available if c not in [r1,r2]],'transport_p1')
+                p2=col_select('Poloidal-pair potential Vₚ₂ (V)',[c for c in available if c not in [r1,r2,p1]],'transport_p2')
+                c1,c2=st.columns(2)
+                with c1: dr=st.number_input('Radial probe separation Δr (m)',min_value=0.000001,value=0.0025,format='%.8g',key='transport_dr')
+                with c2: dp=st.number_input('Poloidal probe separation Δθ (m)',min_value=0.000001,value=0.0025,format='%.8g',key='transport_dp')
+                c1,c2=st.columns(2)
+                with c1: sr_field=st.selectbox('Radial E-field sign sᵣ',[-1,1],index=None,placeholder='Select convention',key='transport_sr_field')
+                with c2: sp_field=st.selectbox('Poloidal E-field sign sₚ',[-1,1],index=None,placeholder='Select convention',key='transport_sp_field')
             bt=st.number_input('Toroidal magnetic field Bₜ (T)',value=1.0,format='%.8g',key='transport_bt')
             c1,c2=st.columns(2)
             with c1: sr=st.selectbox('Sign for vᵣ = sᵣ Eₚ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sr')
             with c2: sp=st.selectbox('Sign for vₚ = sₚ Eᵣ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sp')
-            st.caption('Inputs must already be calibrated, aligned in time and in SI units. For paper reproduction, match its sign convention, spatial locations, filtering and averaging window.')
+            st.caption('Inputs must be calibrated, synchronized and in SI units. Match the target paper’s sign conventions, probe locations, filtering, time window and averaging definition.')
             if st.button('Calculate E×B transport',type='primary',key='transport_run'):
                 try:
                     if sr is None or sp is None: raise ValueError('Select both velocity sign conventions from the target paper or diagnostic geometry.')
-                    result=drift_transport_from_fields(df[ncol],df[ercol],df[epcol],float(bt),radial_velocity_sign=int(sr),poloidal_velocity_sign=int(sp))
+                    if field_source=='Already calibrated E-field channels':
+                        er_values=pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)
+                        ep_values=pd.to_numeric(df[epcol],errors='coerce').to_numpy(float)
+                    else:
+                        if sr_field is None or sp_field is None: raise ValueError('Select both electric-field gradient signs from the target paper or probe coordinate convention.')
+                        er_values=electric_field_from_potential_difference(df[r1],df[r2],float(dr),field_sign=int(sr_field))
+                        ep_values=electric_field_from_potential_difference(df[p1],df[p2],float(dp),field_sign=int(sp_field))
+                    density_values=pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)
+                    result=drift_transport_from_fields(density_values,er_values,ep_values,float(bt),radial_velocity_sign=int(sr),poloidal_velocity_sign=int(sp))
                     st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
-                    valid_mask=np.isfinite(pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)) & np.isfinite(pd.to_numeric(df[epcol],errors='coerce').to_numpy(float))
-                    out=pd.DataFrame({'density_m-3':pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)[valid_mask],'E_r_V_m':pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)[valid_mask],'E_p_V_m':pd.to_numeric(df[epcol],errors='coerce').to_numpy(float)[valid_mask]})
+                    valid_mask=np.isfinite(density_values) & np.isfinite(er_values) & np.isfinite(ep_values)
+                    out=pd.DataFrame({'density_m-3':density_values[valid_mask],'E_r_V_m':er_values[valid_mask],'E_p_V_m':ep_values[valid_mask]})
                     for key in ['radial_velocity_m_s','poloidal_velocity_m_s','radial_particle_flux_m-2_s-1','poloidal_particle_flux_m-2_s-1','reynolds_stress_velocity_product_m2_s-2']:
                         out[key]=result[key]
                     st.dataframe(out.head(50),use_container_width=True)
