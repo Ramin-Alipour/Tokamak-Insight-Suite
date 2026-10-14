@@ -384,9 +384,7 @@ def doppler_temperature_with_uncertainty_eV(
     if sigma_lambda > 0:
         variance_terms.append((2.0*sigma_sigma_lambda/sigma_lambda)**2)
     elif sigma_sigma_lambda > 0:
-        return {"temperature_eV":temperature,"standard_uncertainty_eV":float("nan"),
-                "relative_standard_uncertainty":float("nan"),
-                "note":"Linear uncertainty propagation is undefined at zero Doppler width; use a profile-likelihood or Monte Carlo interval."}
+        raise ValueError("First-order uncertainty propagation is undefined at zero Doppler width; use a profile-likelihood or Monte Carlo interval.")
     variance_terms.append((2.0*sigma_lambda0/lambda0)**2)
     variance_terms.append((sigma_mass_amu/mass_amu)**2)
     relative=float(np.sqrt(sum(variance_terms)))
