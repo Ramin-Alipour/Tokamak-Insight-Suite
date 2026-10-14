@@ -415,10 +415,24 @@ elif page=='Time Series & MHD':
     tcol=st.selectbox('Time column (or sample index)',['<sample index>']+numeric,key='ts_t')
     scol=col_select('Signal channel',numeric,'ts_s')
     fs0=st.number_input('Sampling frequency if no time column (Hz)',min_value=1e-9,value=10000.0,format='%.8g')
+    assume_sample_rate = True
+    if tcol == '<sample index>':
+        assume_sample_rate = st.checkbox(
+            'I confirm this assumed sampling frequency matches the acquisition settings',
+            value=False,
+            key='ts_confirm_assumed_fs',
+        )
+        st.warning(
+            'No time column is selected. Frequency axes and all time-based quantities '
+            'will use the assumed sampling frequency above; this value is not inferred from the data.'
+        )
     c1,c2,c3=st.columns(3)
     with c1: hp=st.number_input('High-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c2: lp=st.number_input('Low-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c3: order=st.slider('Butterworth order',1,8,3)
+    if tcol == '<sample index>' and not assume_sample_rate:
+        st.info('Confirm the acquisition sampling frequency to enable time/frequency analysis. Select a measured time column instead if one is available.')
+        st.stop()
     try:
         t,y,fs=cached_prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float),pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float),fs0)
         yf=cached_filter(y,fs,hp or None,lp or None,order)
