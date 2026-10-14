@@ -1104,6 +1104,130 @@ def tomography_noise_sensitivity(
     }
 
 
+def detect_spectral_peaks(
+    coordinate: Any,
+    intensity: Any,
+    *,
+    min_prominence: float | None = None,
+    prominence_fraction: float = 0.01,
+    min_distance_coordinate: float = 0.0,
+) -> dict[str, Any]:
+    """Detect emission/spectrum peaks with a local quadratic sub-sample estimate.
+
+    Coordinate and intensity must use the same paired samples. Coordinates are
+    sorted; duplicates are rejected. A prominence threshold is required either
+    explicitly or as a fraction of the measured intensity range. The algorithm
+    detects peaks, not atomic species; identification needs an external line list.
+    """
+    x = np.asarray(coordinate, dtype=float).ravel()
+    y = np.asarray(intensity, dtype=float).ravel()
+    if len(x) != len(y) or len(x) < 5:
+        raise ValueError("Coordinate and intensity must have equal lengths and at least five samples.")
+    finite = np.isfinite(x) & np.isfinite(y)
+    x, y = x[finite], y[finite]
+    if len(x) < 5:
+        raise ValueError("At least five finite coordinate-intensity pairs are required.")
+    order = np.argsort(x)
+    x, y = x[order], y[order]
+    if np.any(np.diff(x) <= 0):
+        raise ValueError("Spectral coordinates must be unique.")
+    if not np.isfinite(prominence_fraction) or prominence_fraction < 0:
+        raise ValueError("prominence_fraction must be finite and nonnegative.")
+    if not np.isfinite(min_distance_coordinate) or min_distance_coordinate < 0:
+        raise ValueError("min_distance_coordinate must be finite and nonnegative.")
+    dynamic_range = float(np.ptp(y))
+    prominence = prominence_fraction * dynamic_range if min_prominence is None else float(min_prominence)
+    if not np.isfinite(prominence) or prominence < 0:
+        raise ValueError("min_prominence must be finite and nonnegative.")
+    dx = float(np.median(np.diff(x)))
+    distance_samples = max(1, int(np.ceil(min_distance_coordinate / dx))) if min_distance_coordinate > 0 else 1
+    indices, properties = signal.find_peaks(y, prominence=prominence, distance=distance_samples)
+    peak_x, peak_y = [], []
+    for idx in indices:
+        xp, yp = float(x[idx]), float(y[idx])
+        if 0 < idx < len(x) - 1:
+            coeff = np.polyfit(x[idx-1:idx+2], y[idx-1:idx+2], 2)
+            if coeff[0] < 0:
+                vertex = -coeff[1] / (2.0 * coeff[0])
+                if x[idx-1] <= vertex <= x[idx+1]:
+                    xp = float(vertex)
+                    yp = float(np.polyval(coeff, vertex))
+        peak_x.append(xp)
+        peak_y.append(yp)
+    return {
+        "peak_coordinate": np.asarray(peak_x, dtype=float),
+        "peak_intensity": np.asarray(peak_y, dtype=float),
+        "prominence": np.asarray(properties.get("prominences", []), dtype=float),
+        "sample_indices_sorted": indices,
+        "n_finite_samples": int(len(x)),
+        "n_detected_peaks": int(len(indices)),
+        "min_prominence_used": float(prominence),
+        "min_distance_coordinate": float(min_distance_coordinate),
+        "note": "Sub-sample quadratic peak positions are estimates; resolution, line overlap, baseline, noise and instrument response still limit identification. Atomic labels require an external validated line list.",
+    }
+
+
+def match_spectral_lines(
+    measured_coordinates: Any,
+    reference_lines: pd.DataFrame,
+    *,
+    tolerance: float,
+    wavelength_column: str = "wavelength_nm",
+    species_column: str = "species",
+    transition_column: str = "transition",
+) -> pd.DataFrame:
+    """Match measured spectral peak coordinates against a user-supplied line list."""
+    measured = np.asarray(measured_coordinates, dtype=float).ravel()
+    if not np.all(np.isfinite(measured)):
+        raise ValueError("Measured peak coordinates must be finite.")
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("Matching tolerance must be positive and finite.")
+    if not isinstance(reference_lines, pd.DataFrame) or wavelength_column not in reference_lines.columns:
+        raise ValueError(f"Reference line table must contain {wavelength_column!r}.")
+    ref = pd.to_numeric(reference_lines[wavelength_column], errors="coerce").to_numpy(float)
+    valid = np.isfinite(ref)
+    if not np.any(valid):
+        raise ValueError("Reference line table has no finite wavelength values.")
+    refs = reference_lines.loc[valid].reset_index(drop=True).copy()
+    ref_values = ref[valid]
+    rows = []
+    for observed in measured:
+        diff = np.abs(ref_values - observed)
+        order = np.argsort(diff)
+        candidates = [int(i) for i in order if diff[i] <= tolerance]
+        if not candidates:
+            rows.append({
+                "measured_coordinate": float(observed),
+                "matched_coordinate": np.nan,
+                "coordinate_difference": np.nan,
+                "species": None,
+                "transition": None,
+                "candidate_count_within_tolerance": 0,
+                "candidate_lines": "",
+                "match_status": "NO_MATCH_WITHIN_TOLERANCE",
+            })
+            continue
+        best = candidates[0]
+        species = str(refs.iloc[best][species_column]) if species_column in refs.columns and pd.notna(refs.iloc[best][species_column]) else ""
+        transition = str(refs.iloc[best][transition_column]) if transition_column in refs.columns and pd.notna(refs.iloc[best][transition_column]) else ""
+        descriptions = []
+        for i in candidates:
+            sp = str(refs.iloc[i][species_column]) if species_column in refs.columns and pd.notna(refs.iloc[i][species_column]) else "unknown"
+            tr = str(refs.iloc[i][transition_column]) if transition_column in refs.columns and pd.notna(refs.iloc[i][transition_column]) else ""
+            descriptions.append(f"{sp} {tr} ({ref_values[i]:.8g})".strip())
+        rows.append({
+            "measured_coordinate": float(observed),
+            "matched_coordinate": float(ref_values[best]),
+            "coordinate_difference": float(observed - ref_values[best]),
+            "species": species or None,
+            "transition": transition or None,
+            "candidate_count_within_tolerance": int(len(candidates)),
+            "candidate_lines": "; ".join(descriptions),
+            "match_status": "AMBIGUOUS_MATCH" if len(candidates) > 1 else "MATCH",
+        })
+    return pd.DataFrame(rows)
+
+
 def spectral_calibration(raw_pixel: Any, reference_wavelength: Any, degree: int = 1) -> dict[str, Any]:
     if isinstance(degree, (bool, np.bool_)) or not isinstance(degree, (int, np.integer)) or degree < 1:
         raise ValueError('Polynomial degree must be a positive integer.')
