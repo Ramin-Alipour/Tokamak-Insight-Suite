@@ -63,7 +63,7 @@ def test_reconstruct_published_ir_t1_doppler_temperature_table(
     ), species
     # Table widths/masses are rounded, so the comparison is not over-tight.
     assert software_temperature_eV == pytest.approx(
-        published_temperature_eV, abs=0.16
+        published_temperature_eV, abs=0.02
     ), species
 
 
