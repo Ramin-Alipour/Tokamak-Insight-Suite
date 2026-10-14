@@ -305,3 +305,29 @@ def test_fluctuation_flux_uses_common_finite_sample_mask():
     expected = np.mean((np.array([1.0, 2.0, 4.0, 5.0]) - 3.0) *
                        (np.array([5.0, 4.0, 2.0, 1.0]) - 3.0))
     assert result["particle_flux_covariance_m-2_s-1"] == pytest.approx(expected)
+
+
+
+def test_fft_recovers_even_length_nyquist_amplitude_without_factor_of_two_error():
+    from tis.core import fft_spectrum
+    n = 1024
+    fs = 1024.0
+    # At Nyquist, a cosine is sampled as an alternating sequence.
+    x = 3.25 * (-1.0) ** np.arange(n)
+    frequencies, amplitude = fft_spectrum(x, fs, window="boxcar", detrend=False)
+    nyquist = int(np.argmax(amplitude))
+    assert frequencies[nyquist] == pytest.approx(fs / 2)
+    assert amplitude[nyquist] == pytest.approx(3.25, rel=1e-12)
+
+
+def test_welch_psd_integral_is_consistent_with_white_noise_variance():
+    from tis.core import welch_psd
+    rng = np.random.default_rng(20261014)
+    x = rng.normal(loc=0.0, scale=2.0, size=32768)
+    frequencies, psd = welch_psd(x, fs=2000.0, nperseg=2048, noverlap=1024)
+    integrated_power = float(np.trapezoid(psd, frequencies))
+    # For a sufficiently long white-noise realization, integrated one-sided
+    # density should recover the variance to statistical accuracy.
+    assert integrated_power == pytest.approx(np.var(x), rel=0.08)
+    assert np.all(np.isfinite(psd))
+    assert np.all(psd >= 0)
