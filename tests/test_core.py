@@ -249,3 +249,26 @@ def test_corrected_line_ratio():
     from tis.core import corrected_line_ratio
     r=corrected_line_ratio(100,50,2,1)
     assert r['instrument_response_corrected_ratio']==pytest.approx(1)
+
+def test_fft_detrend_false_preserves_dc_component():
+    x = np.full(256, 3.0)
+    f, amplitude = fft_spectrum(x, fs=1000, detrend=False)
+    assert amplitude[0] == pytest.approx(3.0, abs=1e-12)
+    assert np.max(amplitude[1:]) < 1e-12
+
+
+def test_fft_detrend_true_removes_dc_component():
+    x = np.full(256, 3.0)
+    f, amplitude = fft_spectrum(x, fs=1000, detrend=True)
+    assert np.max(amplitude) < 1e-12
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"lowpass": 0}, {"lowpass": -1}, {"highpass": 0}, {"highpass": -1},
+     {"lowpass": float("nan")}, {"highpass": float("inf")}],
+)
+def test_filter_rejects_explicit_nonpositive_or_nonfinite_cutoff(kwargs):
+    with pytest.raises(ValueError):
+        butterworth_filter(np.linspace(0, 1, 100), fs=100, **kwargs)
+
