@@ -364,6 +364,6 @@ def test_cross_spectral_mode_number_recovers_known_positive_phase_winding():
         frequency_range_hz=(60.0, 68.0),
         min_coherence=0.2,
     )
-    assert result["dominant_frequency_Hz"] == pytest.approx(frequency_hz, abs=fs / 512)
+    assert result["selected_frequency_Hz"] == pytest.approx(frequency_hz, abs=fs / 512)
     assert result["mode_number_fit"] == pytest.approx(true_mode)
     assert result["phase_rms_residual_rad"] < 1e-8
