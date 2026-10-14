@@ -45,6 +45,8 @@ A separate GitHub Actions workflow runs the fetch and checks real-data CSV inges
 
 This validates a real diagnostic time-series path only. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
 
+Public real-data archives and access notes: [Public Tokamak Data Sources](docs/public_tokamak_data_sources.md).
+
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
