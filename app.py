@@ -10,7 +10,7 @@ from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
-    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_m_s, derive_parameters,
+    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, fluctuation_flux,
     exponential_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
@@ -397,7 +397,8 @@ elif page=='Spectral Analysis':
                         sigma_obs_unc=float(fit.get('standard_error_sigma',0.0))
                         sigma_doppler_unc=float(np.sqrt((float(fit['sigma'])/sigma_doppler*sigma_obs_unc)**2+(inst/sigma_doppler*sigma_inst)**2))
                         thermal=doppler_temperature_with_uncertainty_eV(sigma_doppler,lam0,mass,sigma_doppler_unc,sigma_lam0,sigma_mass)
-                        st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_standard_uncertainty':thermal['relative_standard_uncertainty'],'line_of_sight_velocity_m_s':doppler_velocity_m_s(float(fit['center'])-lam0,lam0),'uncertainty_method':thermal['uncertainty_method'],'assumptions':'Gaussian Doppler broadening; independent input uncertainties; systematic/model uncertainty excluded.'})
+                        velocity=doppler_velocity_with_uncertainty_m_s(float(fit['center']),lam0,float(fit.get('standard_error_center',0.0)),sigma_lam0)
+                        st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_temperature_standard_uncertainty':thermal['relative_standard_uncertainty'],'line_of_sight_velocity_m_s':velocity['line_of_sight_velocity_m_s'],'line_of_sight_velocity_standard_uncertainty_m_s':velocity['standard_uncertainty_m_s'],'temperature_uncertainty_method':thermal['uncertainty_method'],'velocity_uncertainty_method':velocity['uncertainty_method'],'assumptions':'Gaussian Doppler broadening; independent input uncertainties; systematic/model uncertainty excluded.'})
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
     elif mode=='Line-ratio analysis':
