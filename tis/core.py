@@ -306,12 +306,18 @@ def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = N
 
 def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | None = None, model: str = 'Gaussian') -> dict[str, float | str]:
     xx, yy = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
+    if (xmin is not None and not np.isfinite(xmin)) or (xmax is not None and not np.isfinite(xmax)):
+        raise ValueError("Fit limits must be finite when supplied.")
+    if xmin is not None and xmax is not None and xmin >= xmax:
+        raise ValueError("xmin must be smaller than xmax.")
     mask = np.isfinite(xx)&np.isfinite(yy)
     if xmin is not None: mask &= xx>=xmin
     if xmax is not None: mask &= xx<=xmax
     xx,yy=xx[mask],yy[mask]
     if len(xx)<7: raise ValueError('At least 7 valid points are required in the fit range.')
     sort=np.argsort(xx); xx,yy=xx[sort],yy[sort]
+    if len(np.unique(xx)) != len(xx):
+        raise ValueError("Spectral coordinates in the selected fit range must be unique.")
     span=float(np.ptp(xx))
     if span<=0: raise ValueError('Spectral coordinate must span a nonzero interval.')
     baseline0=float(np.percentile(yy,10)); amp0=float(np.max(yy)-baseline0); center0=float(xx[np.argmax(yy)])
@@ -321,23 +327,29 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         def fn(z,b,a,c,s): return b+a*np.exp(-0.5*((z-c)/s)**2)
         p0=[baseline0,max(amp0,1e-12),center0,max(step,span/20)]
         lo=[-np.inf,0,float(xx[0]),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2]
-        p,_=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=30000)
+        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=30000)
         b,a,c,s=map(float,p); pred=fn(xx,*p); width=2*np.sqrt(2*np.log(2))*s
-        return {'model':'Gaussian','baseline':b,'amplitude':a,'center':c,'sigma':s,'FWHM':float(width),'area_above_baseline':float(a*s*np.sqrt(2*np.pi)),'r_squared':_r2(yy,pred)}
+        se=np.sqrt(np.maximum(np.diag(cov),0.0))
+        return {'model':'Gaussian','baseline':b,'amplitude':a,'center':c,'sigma':s,'FWHM':float(width),'area_above_baseline':float(a*s*np.sqrt(2*np.pi)),'r_squared':_r2(yy,pred),
+                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_sigma':float(se[3]),
+                'standard_error_FWHM':float(2*np.sqrt(2*np.log(2))*se[3])}
     if model=='lorentzian':
         def fn(z,b,a,c,g): return b+a/(1+((z-c)/g)**2)
         p0=[baseline0,max(amp0,1e-12),center0,max(step,span/20)]
         lo=[-np.inf,0,float(xx[0]),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2]
-        p,_=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=30000)
-        b,a,c,g=map(float,p); pred=fn(xx,*p)
-        return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred)}
+        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=30000)
+        b,a,c,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
+        return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),
+                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3])}
     if model=='voigt':
         def fn(z,b,a,c,s,g): return b+a*voigt_profile(z-c,s,g)/max(voigt_profile(0,s,g),np.finfo(float).eps)
         p0=[baseline0,max(amp0,1e-12),center0,max(step,span/30),max(step,span/30)]
         lo=[-np.inf,0,float(xx[0]),max(step/10,1e-15),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2,span*2]
-        p,_=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=40000)
-        b,a,c,s,g=map(float,p); pred=fn(xx,*p)
-        return {'model':'Voigt','baseline':b,'amplitude_peak':a,'center':c,'gaussian_sigma':s,'lorentzian_HWHM':g,'r_squared':_r2(yy,pred)}
+        p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),maxfev=40000)
+        b,a,c,s,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
+        return {'model':'Voigt','baseline':b,'amplitude_peak':a,'center':c,'gaussian_sigma':s,'lorentzian_HWHM':g,'r_squared':_r2(yy,pred),
+                'standard_error_baseline':float(se[0]),'standard_error_amplitude_peak':float(se[1]),'standard_error_center':float(se[2]),
+                'standard_error_gaussian_sigma':float(se[3]),'standard_error_lorentzian_HWHM':float(se[4])}
     raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
 
 
