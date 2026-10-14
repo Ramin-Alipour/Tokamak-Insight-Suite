@@ -1,6 +1,8 @@
 name: Real MAST data integration test
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   schedule:
     - cron: "23 4 8 * *"
