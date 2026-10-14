@@ -26,7 +26,7 @@
 - CI compilation, unit tests, and dashboard health checks do not validate every interactive workflow or every physical diagnostic model.
 
 
-## v0.4.1 engineering fixes (2026-10-14)
+## v0.4.2 engineering fixes (2026-10-14)
 - Fixed wheel metadata to include the dashboard module and bundled JSON registries; added `tis dashboard` / `tis-dashboard` launchers and clean-environment wheel smoke tests.
 - Added source-distribution and tracked-source ZIP build/verification to CI.
 - Removed the duplicate NPA catalog entry; assigned diagnostic/formula IDs and classified formula inference separately from independent-validation status.
@@ -34,3 +34,5 @@
 - Added filter-impact analysis, spectral-fit residual diagnostics, tomography matrix conditioning/coverage and optional measurement-noise Monte Carlo sensitivity, leave-one-sensor-out mode robustness, and guarded uniform-grid resampling.
 - Consolidated duplicate dashboard smoke tests and expanded UI regression coverage to click the probe-analysis action.
 - These changes improve engineering checks; they do not imply independent experimental validation of every diagnostic workflow.
+
+- Added an end-to-end optical Doppler workflow that calibrates raw spectral coordinates, optionally subtracts background and corrects relative response, fits a Gaussian with residual diagnostics, corrects instrumental width, and reports conditional Doppler temperature/line-of-sight velocity uncertainties.
