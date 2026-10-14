@@ -674,9 +674,14 @@ elif page=='Plasma Parameters':
         try: result=derive_parameters(ne,te,ti,ip,vl,R,minor,bt,W or None,ploss or None,ni or None,mi); st.json(result); json_download('Export parameter calculations',result,'tis_plasma_parameters.json')
         except Exception as e: st.error(str(e))
     with tabs[1]:
-        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g'); phase_sign=st.selectbox('Instrument phase convention',[-1,1],index=0)
-        if st.button('Convert phase to line-integrated density'): st.metric('Approximate line-integrated density (m⁻²)',f'{float(linear_phase_density(ph,freq,sign_convention=phase_sign)):.7g}')
-        st.caption('Output is ∫nₑ dl in m⁻², not local density. Verify the phase-sign convention and high-frequency/unmagnetized approximation for the instrument.')
+        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g')
+        phase_sign=st.selectbox('Instrument phase convention',['Select convention',-1,1],index=0,format_func=lambda value: value if isinstance(value,str) else f'{value:+d}')
+        if st.button('Convert phase to line-integrated density'):
+            if phase_sign == 'Select convention':
+                st.warning('Select the instrument-specific phase-sign convention before converting phase to density.')
+            else:
+                st.metric('Approximate line-integrated density (m⁻²)',f'{float(linear_phase_density(ph,freq,sign_convention=phase_sign)):.7g}')
+        st.caption('Output is ∫nₑ dl in m⁻², not local density. The sign convention is instrument-specific and must be established from the diagnostic documentation or calibration.')
     with tabs[2]:
         st.markdown('#### O-mode reflectometry cutoff density')
         rf=st.number_input('Probe frequency (GHz)',min_value=0.001,value=60.0,key='refl_freq')
