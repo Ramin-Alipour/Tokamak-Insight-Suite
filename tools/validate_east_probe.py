@@ -70,8 +70,18 @@ for filename in FILES:
         "relative_error": rel_error, "acceptance_limit_fraction": limit, "comparison": status,
     }
     if key == "ne":
-        item["relative_density_fluctuation"] = float(np.std(detrended, ddof=1) / np.mean(segment))
-        item["published_relative_density_fluctuation_approx"] = 0.15
+        relative_fluctuation = float(np.std(detrended, ddof=1) / np.mean(segment))
+        relative_reference = 0.15
+        relative_tolerance = 0.20  # paper reports an approximate ~15% relative fluctuation
+        relative_error = abs(relative_fluctuation - relative_reference) / relative_reference
+        relative_status = "PASS" if relative_error <= relative_tolerance else "FAIL"
+        item["relative_density_fluctuation"] = relative_fluctuation
+        item["published_relative_density_fluctuation_approx"] = relative_reference
+        item["relative_fluctuation_relative_error"] = relative_error
+        item["relative_fluctuation_acceptance_limit_fraction"] = relative_tolerance
+        item["relative_fluctuation_comparison"] = relative_status
+        print(f"{relative_status} relative density fluctuation: {relative_fluctuation:.6g}; "
+              f"published≈{relative_reference:.6g}; relative error={relative_error:.2%}")
     results.append(item)
     print(f"{status} {key}: reproduced sigma={observed:.6g} {EXPECTED[key]['unit']}; "
           f"published={reference:.6g}; relative error={rel_error:.2%}")
@@ -107,7 +117,8 @@ text = (text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
 (OUT / "dataset_readme_extracted.txt").write_text(text, encoding="utf-8")
 
 passed = sum(x["comparison"] == "PASS" for x in results) + sum(x["comparison"] == "PASS" for x in fields)
-total = len(results) + len(fields)
+passed += sum(x.get("relative_fluctuation_comparison") == "PASS" for x in results)
+total = len(results) + len(fields) + sum("relative_fluctuation_comparison" in x for x in results)
 report = {
     "dataset": "EAST tokamak plasma probe data", "doi": "10.5281/zenodo.18473625",
     "paper_doi": "10.1088/1361-6587/ae4f20", "window_indices_python": [START, STOP],
