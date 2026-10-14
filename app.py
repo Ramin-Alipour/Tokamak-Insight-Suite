@@ -167,7 +167,7 @@ def download_df(label, data, name):
 def _parameter_snapshot():
     snapshot={}
     for key,value in st.session_state.items():
-        if key.startswith(("tis_raw","tis_df","tis_upload_raw","global_upload","tomo_A","tomo_y","tomo_sigma","rad_E")):
+        if key.startswith("tis_") or key in {"global_upload","tomo_A","tomo_y","tomo_sigma","rad_E","tomo_ray_start","tomo_ray_end","rad_R","rad_Z"}:
             continue
         if isinstance(value,(str,int,float,bool,type(None),list,tuple,dict,np.integer,np.floating,np.bool_)):
             try: snapshot[str(key)]=_json_safe(value)
