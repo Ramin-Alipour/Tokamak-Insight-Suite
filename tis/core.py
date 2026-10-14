@@ -675,6 +675,64 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
             'aliasing_note':'Modes above the spatial Nyquist limit alias to lower modes; phase-only fitting cannot identify the true aliased mode without additional geometry or a prior bound.'}
 
 
+def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
+                              frequency_range_hz: tuple[float, float] | None = None,
+                              min_coherence: float = 0.2) -> dict[str, Any]:
+    """Extract relative cross-spectral phases from synchronized sensor traces and fit a mode number.
+
+    The first sensor is the phase reference. The dominant shared spectral peak is selected
+    unless a frequency band is supplied; coherence with the reference weights the phase fit.
+    Sensor geometry must be a single toroidal/poloidal ring with a consistent angle convention.
+    """
+    theta = np.asarray(theta_rad, dtype=float).ravel()
+    data = np.asarray(signals, dtype=float)
+    if data.ndim != 2 or data.shape[0] != len(theta) or data.shape[0] < 3 or data.shape[1] < 64:
+        raise ValueError("signals must have shape (at least 3 sensors, at least 64 time samples) matching theta.")
+    if not np.all(np.isfinite(theta)) or not np.all(np.isfinite(data)) or not np.isfinite(fs) or fs <= 0:
+        raise ValueError("Sensor angles and synchronized signals must be finite; fs must be positive.")
+    if not np.isfinite(min_coherence) or not 0 <= min_coherence <= 1:
+        raise ValueError("min_coherence must be in [0, 1].")
+    if frequency_range_hz is not None:
+        if len(frequency_range_hz) != 2 or not np.all(np.isfinite(frequency_range_hz)) or frequency_range_hz[0] < 0 or frequency_range_hz[0] >= frequency_range_hz[1] or frequency_range_hz[1] > fs/2:
+            raise ValueError("frequency_range_hz must be a finite increasing interval within [0, Nyquist].")
+    data = data - np.mean(data, axis=1, keepdims=True)
+    nperseg = min(data.shape[1], max(64, min(4096, data.shape[1]//2)))
+    f, p_ref = signal.welch(data[0], fs=fs, nperseg=nperseg, noverlap=nperseg//2)
+    power = p_ref.copy()
+    for row in data[1:]:
+        _, p = signal.welch(row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
+        power += p
+    allowed = f > 0
+    if frequency_range_hz is not None:
+        allowed &= (f >= frequency_range_hz[0]) & (f <= frequency_range_hz[1])
+    if not np.any(allowed):
+        raise ValueError("No positive-frequency bins fall inside the selected frequency band.")
+    candidates = np.flatnonzero(allowed)
+    peak_index = int(candidates[np.argmax(power[candidates])])
+    peak_frequency = float(f[peak_index])
+    phases = [0.0]
+    coherences = [1.0]
+    for row in data[1:]:
+        fc, pxy = signal.csd(data[0], row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
+        _, coh = signal.coherence(data[0], row, fs=fs, nperseg=nperseg, noverlap=nperseg//2)
+        idx = int(np.argmin(np.abs(fc - peak_frequency)))
+        phases.append(float(np.angle(pxy[idx])))
+        coherences.append(float(coh[idx]))
+    weights = np.asarray(coherences)
+    if np.count_nonzero(weights >= min_coherence) < 3:
+        raise ValueError("Fewer than three sensors have adequate coherence with the reference at the selected frequency.")
+    weights = np.where(weights >= min_coherence, weights, 0.0)
+    fit = mode_number_from_phase(theta, phases, weights=weights)
+    fit.update({
+        "selected_frequency_Hz": peak_frequency,
+        "sensor_phase_rad_relative_to_first": [float(v) for v in phases],
+        "coherence_with_reference": [float(v) for v in coherences],
+        "minimum_coherence_threshold": float(min_coherence),
+        "phase_extraction_method": "cross-spectral phase relative to first sensor; coherence-weighted spatial fit",
+    })
+    return fit
+
+
 def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | None = None) -> dict[str, float]:
     """Compute covariance fluxes from aligned physical-unit time series."""
     n=np.asarray(density,float).ravel(); vr=np.asarray(radial_velocity,float).ravel()
