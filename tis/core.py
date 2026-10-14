@@ -512,28 +512,67 @@ def uncertainty_linear(y: Any, slope: float, intercept: float, sigma_y: float = 
     return cal,np.sqrt(np.maximum(var,0))
 
 
-def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True) -> dict[str, Any]:
-    """Solve min ||Ax-y||² + lam ||x||². Optional nonnegative constrained least squares."""
+def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True,
+                          measurement_sigma: Any | None = None) -> dict[str, Any]:
+    """Solve weighted min ||(Ax-y)/sigma||² + lam ||x||² (or unweighted if sigma omitted)."""
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
     if lam<0 or not np.isfinite(lam): raise ValueError('Regularization must be finite and nonnegative.')
+    if measurement_sigma is not None:
+        sigma=np.asarray(measurement_sigma,float).ravel()
+        if len(sigma)!=len(y) or not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
+            raise ValueError("measurement_sigma must be finite, positive and have one value per measurement.")
+        Aw=A/sigma[:,None]; yw=y/sigma
+    else:
+        sigma=None; Aw=A; yw=y
     if nonnegative:
-        augA=np.vstack([A,np.sqrt(lam)*np.eye(A.shape[1])]) if lam else A
-        augy=np.concatenate([y,np.zeros(A.shape[1])]) if lam else y
+        augA=np.vstack([Aw,np.sqrt(lam)*np.eye(A.shape[1])]) if lam else Aw
+        augy=np.concatenate([yw,np.zeros(A.shape[1])]) if lam else yw
         res=optimize.lsq_linear(augA,augy,bounds=(0,np.inf),method='trf')
         x=res.x; success=bool(res.success); message=str(res.message)
     else:
         if lam > 0:
-            augA=np.vstack([A,np.sqrt(lam)*np.eye(A.shape[1])])
-            augy=np.concatenate([y,np.zeros(A.shape[1])])
+            augA=np.vstack([Aw,np.sqrt(lam)*np.eye(A.shape[1])])
+            augy=np.concatenate([yw,np.zeros(A.shape[1])])
         else:
-            augA,augy=A,y
+            augA,augy=Aw,yw
         x=np.linalg.lstsq(augA,augy,rcond=None)[0]
         success=True; message='least-squares / Tikhonov solution'
     residual=A@x-y
+    weighted_residual=residual if sigma is None else residual/sigma
     return {'solution':x,'residual':residual,'residual_norm':float(np.linalg.norm(residual)),
-            'regularization':float(lam),'success':success,'message':message,'nonnegative':bool(nonnegative)}
+            'weighted_residual_norm':float(np.linalg.norm(weighted_residual)),
+            'regularization':float(lam),'success':success,'message':message,'nonnegative':bool(nonnegative),
+            'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
+
+
+def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
+                           nonnegative: bool = True, measurement_sigma: Any | None = None) -> dict[str, Any]:
+    """Choose a candidate Tikhonov parameter from discrete L-curve curvature.
+
+    This is a heuristic selection aid, not a substitute for a noise model or validation
+    against known profiles. The full curve is returned for review.
+    """
+    candidates=np.logspace(-8,2,31) if lambdas is None else np.asarray(lambdas,float).ravel()
+    if len(candidates)<3 or not np.all(np.isfinite(candidates)) or np.any(candidates<=0) or np.any(np.diff(candidates)<=0):
+        raise ValueError("Provide at least three finite, positive, strictly increasing candidate lambdas.")
+    residuals=[]; norms=[]
+    for value in candidates:
+        result=regularized_tomography(A,y,float(value),nonnegative,measurement_sigma)
+        residuals.append(max(result['weighted_residual_norm'],np.finfo(float).tiny))
+        norms.append(max(float(np.linalg.norm(result['solution'])),np.finfo(float).tiny))
+    lx=np.log(residuals); ly=np.log(norms); lt=np.log(candidates)
+    dx=np.gradient(lx,lt); dy=np.gradient(ly,lt)
+    ddx=np.gradient(dx,lt); ddy=np.gradient(dy,lt)
+    curvature=np.abs(dx*ddy-dy*ddx)/np.maximum((dx*dx+dy*dy)**1.5,np.finfo(float).tiny)
+    interior=np.arange(1,len(candidates)-1)
+    selected=int(interior[np.argmax(curvature[interior])])
+    return {'selected_lambda':float(candidates[selected]),'candidate_lambdas':candidates,
+            'weighted_residual_norms':np.asarray(residuals),'solution_norms':np.asarray(norms),
+            'discrete_log_lcurve_curvature':curvature,
+            'selection_method':'maximum discrete curvature of log-residual vs log-solution L-curve',
+            'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
 
 
 def spectral_calibration(raw_pixel: Any, reference_wavelength: Any, degree: int = 1) -> dict[str, Any]:
