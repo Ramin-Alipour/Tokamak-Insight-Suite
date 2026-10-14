@@ -1,6 +1,6 @@
 # Tokamak Insight Suite (TIS)
 
-**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.2**.
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.3**.
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
@@ -26,7 +26,7 @@ On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_un
 The wheel installs the `app` dashboard module, the `tis` CLI, and bundled registry JSON resources. From the directory containing the release wheel:
 
 ```bash
-python -m pip install ./tokamak_insight_suite-0.4.2-py3-none-any.whl
+python -m pip install ./tokamak_insight_suite-0.4.3-py3-none-any.whl
 tis dashboard
 # CLI remains usable independently:
 tis catalog --kind both --output-dir ./tis-catalog
