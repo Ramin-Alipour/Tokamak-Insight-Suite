@@ -162,3 +162,77 @@ def test_fluctuation_flux_uses_common_finite_mask():
     assert np.isfinite(result["particle_flux_covariance_m-2_s-1"])
     assert np.isfinite(result["electron_heat_flux_proxy_W_m-2"])
     assert result["mean_density_m-3"] == pytest.approx(7 / 3)
+
+
+def test_fft_rejects_nonfinite_signal_and_sampling_rate():
+    from tis.core import fft_spectrum
+    with pytest.raises(ValueError, match="finite"):
+        fft_spectrum([0, 1, np.nan, 2], 100.0)
+    with pytest.raises(ValueError, match="sampling rate"):
+        fft_spectrum(np.arange(8), float("nan"))
+
+
+def test_welch_rejects_invalid_segment_length_and_nonfinite_samples():
+    from tis.core import welch_psd
+    with pytest.raises(ValueError, match="nperseg"):
+        welch_psd(np.arange(32, dtype=float), 100.0, nperseg=0)
+    with pytest.raises(ValueError, match="finite"):
+        welch_psd([0, 1, 2, 3, 4, 5, np.inf, 7], 100.0)
+
+
+def test_cross_analysis_validates_sampling_and_segment_length():
+    from tis.core import cross_analysis
+    x = np.arange(32, dtype=float)
+    with pytest.raises(ValueError, match="sampling frequency"):
+        cross_analysis(x, x, 0.0)
+    with pytest.raises(ValueError, match="nperseg"):
+        cross_analysis(x, x, 100.0, nperseg=-1)
+
+
+def test_cross_correlation_rejects_nonfinite_signal_and_invalid_lag():
+    from tis.core import cross_correlation_lag
+    x = np.arange(10, dtype=float)
+    with pytest.raises(ValueError, match="finite"):
+        cross_correlation_lag(x, np.r_[x[:-1], np.nan], 100.0)
+    with pytest.raises(ValueError, match="Maximum lag"):
+        cross_correlation_lag(x, x, 100.0, max_lag_s=-0.1)
+
+
+def test_filter_rejects_nonfinite_signal_and_noninteger_order():
+    from tis.core import butterworth_filter
+    x = np.arange(100, dtype=float)
+    with pytest.raises(ValueError, match="finite"):
+        butterworth_filter(np.r_[x[:-1], np.nan], 1000.0, lowpass=100.0)
+    with pytest.raises(ValueError, match="order"):
+        butterworth_filter(x, 1000.0, lowpass=100.0, order=0)
+
+
+@pytest.mark.parametrize("field,value", [("stored_energy_J", -1.0), ("loss_power_W", float("nan"))])
+def test_derived_parameters_reject_invalid_confinement_inputs(field, value):
+    kwargs = {"stored_energy_J": 1000.0, "loss_power_W": 500.0}
+    kwargs[field] = value
+    with pytest.raises(ValueError, match="energy|power"):
+        derive_parameters(1e19, 10, 10, 1e5, 1, 1.5, .3, 2.0, **kwargs)
+
+
+def test_mode_number_rejects_zero_or_nonfinite_weights():
+    from tis.core import mode_number_from_phase
+    theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
+    phase = 2*theta
+    with pytest.raises(ValueError, match="Weights"):
+        mode_number_from_phase(theta, phase, np.zeros_like(theta))
+    weights = np.ones_like(theta)
+    weights[0] = np.nan
+    with pytest.raises(ValueError, match="Weights"):
+        mode_number_from_phase(theta, phase, weights)
+
+
+def test_equilibrium_grid_derivatives_rejects_nonfinite_flux_and_field():
+    from tis.core import equilibrium_grid_derivatives
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    psi = np.add.outer(Z, R)
+    with pytest.raises(ValueError, match="finite"):
+        equilibrium_grid_derivatives(R, Z, psi * np.nan, 2.0)
+    with pytest.raises(ValueError, match="field"):
+        equilibrium_grid_derivatives(R, Z, psi, float("inf"))
