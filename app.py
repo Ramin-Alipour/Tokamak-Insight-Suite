@@ -643,9 +643,13 @@ elif page=='Advanced Analysis':
                 r=integrate_profile(df[x],df[y]); g=profile_gradient_analysis(df[x],df[y]); st.json({'integral':r,'profile_descriptors':g}); plot_line(df[x],df[y],x,y,'Calibrated profile'); json_download('Export profile analysis',{'integral':r,'profile_descriptors':g},'tis_profile_analysis.json')
             except Exception as e: st.error(str(e))
     elif workflow=='Fast-ion / neutron energy spectrum':
-        need_data(); e=col_select('Energy coordinate (eV)',numeric,'adv_energy'); c=col_select('Counts / distribution',numeric,'adv_counts'); bg=st.selectbox('Background (optional)',['<none>']+numeric,key='adv_bg')
+        need_data(); e=col_select('Energy coordinate (eV)',numeric,'adv_energy'); c=col_select('Counts / distribution',numeric,'adv_counts'); bg=st.selectbox('Background (optional)',['<none>']+numeric,key='adv_bg'); sigma_col=st.selectbox('Net-bin uncertainty σ (optional)',['<none>']+numeric,key='adv_energy_sigma')
+        poisson=st.checkbox('Assume raw independent Poisson counts (no background subtraction)',value=False,key='adv_poisson')
         if st.button('Calculate spectrum moments'):
-            try: r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg]); st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
+            try:
+                sigma=None if sigma_col=='<none>' else df[sigma_col]
+                r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg],count_uncertainty=sigma,assume_poisson_counts=poisson)
+                st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
     elif workflow=='Triple-probe temperature':
         vd=st.number_input('Measured triple-probe voltage difference (V)',min_value=0.000001,value=10.0); mf=st.number_input('Model correction factor',min_value=0.000001,value=1.0)
