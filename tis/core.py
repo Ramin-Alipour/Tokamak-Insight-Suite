@@ -251,9 +251,10 @@ def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = T
         raise ValueError('Need at least two samples and a positive finite sampling rate.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before FFT.')
-    # Preserve the DC component when detrend=False; otherwise remove the mean.
+    # Remove only the mean (constant detrend); preserve linear trends unless the
+    # caller explicitly preprocesses them. This matches the documented FFT option.
     if detrend:
-        x = signal.detrend(x)
+        x = signal.detrend(x, type="constant")
     w = signal.get_window(window, len(x), fftbins=True)
     z = np.fft.rfft(x*w)
     f = np.fft.rfftfreq(len(x), 1/fs)
