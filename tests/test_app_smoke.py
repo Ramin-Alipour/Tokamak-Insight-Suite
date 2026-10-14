@@ -17,7 +17,7 @@ def test_probe_page_renders_with_default_geometry_without_error():
 
     voltage = np.linspace(-20.0, 20.0, 101)
     current = 0.01 * np.exp(voltage / 10.0) - 0.02
-    app = AppTest.from_file("app.py", default_timeout=30)
+    app = AppTest.from_file(APP_PATH, default_timeout=30)
     app.session_state["tis_df"] = pd.DataFrame({"voltage_V": voltage, "current_A": current})
     app.session_state["tis_filename"] = "synthetic_probe.csv"
     app.session_state["tis_raw"] = b"synthetic"
