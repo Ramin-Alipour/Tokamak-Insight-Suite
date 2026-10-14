@@ -590,3 +590,17 @@ def test_mode_number_from_channels_extracts_cross_spectral_phase_with_coherence(
     assert result["selected_frequency_Hz"] == pytest.approx(120, abs=1)
     assert result["mode_number_fit"] == pytest.approx(3, abs=0.15)
     assert min(result["coherence_with_reference"]) > 0.9
+
+
+def test_eich_heat_flux_fit_recovers_synthetic_profile_and_uncertainties():
+    from tis.core import eich_heat_flux_fit
+    x = np.linspace(-0.04, 0.08, 160)
+    q0, lam, spread, s0, bg = 1.0e6, 0.008, 0.003, 0.01, 1.0e5
+    u = (x-s0)/spread
+    from scipy.special import erfcx
+    y = 0.5*q0*np.exp(-u*u)*erfcx(spread/(2*lam)-u)+bg
+    result = eich_heat_flux_fit(x, y)
+    assert result["r_squared"] > 0.995
+    assert result["lambda_q_m"] == pytest.approx(lam, rel=0.15)
+    assert result["spreading_S_m"] == pytest.approx(spread, rel=0.25)
+    assert result["standard_error_lambda_q_m"] >= 0
