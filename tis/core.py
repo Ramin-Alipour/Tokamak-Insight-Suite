@@ -533,17 +533,18 @@ def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     return float(C_LIGHT*delta_lambda/lambda0)
 
 
-def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int = 1) -> np.ndarray:
+def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int | None = None) -> np.ndarray:
     """Return line-integrated electron density ∫n_e dl in m⁻², not local density.
 
-    sign_convention must be +1 or -1 and reflects the instrument's phase convention:
-    Δφ = sign_convention * r_e * wavelength * ∫n_e dl.
+    sign_convention must be +1 or -1 and reflects the instrument's documented phase
+    convention: Δφ = sign_convention * r_e * wavelength * ∫n_e dl. No default sign
+    is assumed because the convention is instrument- and reference-phase-dependent.
     """
     phase=np.asarray(phase_rad,float)
     if not np.isfinite(frequency_hz) or frequency_hz<=0 or not np.all(np.isfinite(phase)):
         raise ValueError('Frequency must be positive and finite; phase values must be finite.')
     if sign_convention not in (-1,1):
-        raise ValueError('sign_convention must be either -1 or +1.')
+        raise ValueError('Select sign_convention=+1 or -1 from the instrument calibration; no default is assumed.')
     r_e=2.8179403262e-15
     wavelength=C_LIGHT/frequency_hz
     return phase/(sign_convention*r_e*wavelength)
