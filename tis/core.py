@@ -57,6 +57,15 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
     if frame.empty:
         raise ValueError("The imported table is empty.")
     frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
+    # Recover mostly numeric instrument columns containing a unit row or a few
+    # malformed cells. Those cells become NaN and remain visible to QC.
+    for col in frame.columns:
+        if not pd.api.types.is_numeric_dtype(frame[col]):
+            candidate = pd.to_numeric(frame[col], errors="coerce")
+            nonempty = int(frame[col].notna().sum())
+            numeric_count = int(candidate.notna().sum())
+            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.67:
+                frame[col] = candidate
     return frame
 
 
@@ -616,7 +625,12 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
     if len(v)<5: raise ValueError('At least 5 finite I-V points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
-    if len(np.unique(v))<5: raise ValueError('Voltage must contain at least 5 unique values.')
+    unique_v, inverse = np.unique(v, return_inverse=True)
+    if len(unique_v)<5: raise ValueError('Voltage must contain at least 5 unique values.')
+    if len(unique_v)<len(v):
+        sums=np.bincount(inverse,weights=i)
+        counts=np.bincount(inverse)
+        v,i=unique_v,sums/counts
     dIdV=np.gradient(i,v)
     return {'n_points':int(len(v)),'voltage_min_V':float(v.min()),'voltage_max_V':float(v.max()),
             'current_min_A':float(i.min()),'current_max_A':float(i.max()),
@@ -638,7 +652,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if area_m2 is None:
         ion_mass_amu = None
     elif ion_mass_amu is None:
-        raise ValueError("ion_mass_amu is required when area_m2 is supplied.")
+        raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
     if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
         raise ValueError("Collection area must be positive and finite.")
     if ion_mass_amu is not None and (not np.isfinite(ion_mass_amu) or ion_mass_amu <= 0):
@@ -647,8 +661,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
-    if len(v)<8 or len(np.unique(v))<8: raise ValueError('At least 8 distinct valid voltage points are required.')
+    if len(v)<8: raise ValueError('At least 8 valid voltage points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
+    unique_v, inverse = np.unique(v, return_inverse=True)
+    if len(unique_v)<8: raise ValueError('At least 8 distinct voltage points are required after duplicate aggregation.')
+    if len(unique_v)<len(v):
+        sums=np.bincount(inverse,weights=i)
+        counts=np.bincount(inverse)
+        v,i=unique_v,sums/counts
     out=probe_iv_summary(v,i)
     # Handle exact zero-current samples explicitly; avoid 0/0 for repeated zero values.
     exact_zero=np.flatnonzero(i == 0)
