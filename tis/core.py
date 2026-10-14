@@ -341,6 +341,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
     sigma_fit=None if sigma_all is None else sigma_all[mask]
     if len(xx)<7: raise ValueError('At least 7 valid points are required in the fit range.')
     sort=np.argsort(xx); xx,yy=xx[sort],yy[sort]
+    if sigma_fit is not None: sigma_fit=sigma_fit[sort]
     if len(np.unique(xx)) != len(xx):
         raise ValueError("Spectral coordinates in the selected fit range must be unique.")
     span=float(np.ptp(xx))
@@ -371,7 +372,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         lo=[-np.inf,-np.inf,float(xx[0]),max(step/10,1e-15)]; hi=[np.inf,np.inf,float(xx[-1]),span*2]
         p,cov=optimize.curve_fit(fn,xx,yy,p0=p0,bounds=(lo,hi),sigma=sigma_fit,absolute_sigma=sigma_fit is not None,maxfev=30000)
         b,a,c,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
-        return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),
+        return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3])}
     if model=='voigt':
         def fn(z,b,a,c,s,g): return b+a*voigt_profile(z-c,s,g)/max(voigt_profile(0,s,g),np.finfo(float).eps)
