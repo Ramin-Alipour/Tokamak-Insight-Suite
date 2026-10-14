@@ -59,12 +59,17 @@ jobs:
           git archive HEAD | tar -x -C /tmp/tis-package/Tokamak_Insight_Suite
           rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.4.0.zip
           cd /tmp/tis-package
-          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.3.0.zip" Tokamak_Insight_Suite
+          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip" Tokamak_Insight_Suite
 
-      - name: Upload tested source ZIP
+      - name: Generate SHA-256 checksum
+        run: sha256sum "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip" > "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip.sha256"
+
+      - name: Upload tested source ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
           name: tokamak-insight-suite-v0.4.0-source
-          path: Tokamak_Insight_Suite_v0.3.0.zip
+          path: |
+            Tokamak_Insight_Suite_v0.4.0.zip
+            Tokamak_Insight_Suite_v0.4.0.zip.sha256
           if-no-files-found: error
           retention-days: 30
