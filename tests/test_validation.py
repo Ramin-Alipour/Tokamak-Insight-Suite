@@ -40,7 +40,7 @@ def test_reference_comparison_relative_tolerance_handles_zero_reference():
 
 def test_reference_comparison_rejects_invalid_uncertainty():
     frame = pd.DataFrame({"reference_value": [1.0], "software_value": [1.0], "reference_uncertainty": [-1.0], "software_uncertainty": [0.0]})
-    with pytest.raises(ValueError, match="uncertainties"):
+    with pytest.raises(ValueError, match="(?i)uncertainties"):
         compare_reference_results(frame)
 
 
