@@ -1256,19 +1256,40 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
 
 def abel_reconstruction(chord_impact_m: Any, line_integrals: Any, radial_edges_m: Any,
                         lam: float = 1e-2, nonnegative: bool = True,
-                        regularization_order: int = 1) -> dict[str, Any]:
-    """Axisymmetric Abel inversion via a shell path-length matrix and Tikhonov regularization."""
+                        regularization_order: int = 1,
+                        measurement_sigma: Any | None = None) -> dict[str, Any]:
+    """Axisymmetric Abel inversion with chord-coverage and response-rank diagnostics."""
     b=np.asarray(chord_impact_m,float).ravel(); y=np.asarray(line_integrals,float).ravel(); edges=np.asarray(radial_edges_m,float).ravel()
     if len(b)!=len(y) or len(b)<3: raise ValueError('At least 3 paired chord impact parameters and line integrals are required.')
     if len(edges)<3 or not np.all(np.isfinite(edges)) or np.any(np.diff(edges)<=0) or edges[0]<0:
         raise ValueError('Radial edges must be finite, increasing, nonnegative and contain at least 3 values.')
     if not np.all(np.isfinite(b)) or not np.all(np.isfinite(y)) or np.any(b<0): raise ValueError('Chord coordinates and line integrals must be finite; impact parameters nonnegative.')
+    if np.any(b>=edges[-1]): raise ValueError('Every chord impact parameter must be smaller than the outer radial edge.')
+    if len(np.unique(np.round(b,12)))<3: raise ValueError('At least 3 distinct chord impact parameters are required.')
     rin=edges[:-1][None,:]; rout=edges[1:][None,:]; bb=b[:,None]
     A=2*(np.sqrt(np.maximum(rout*rout-bb*bb,0))-np.sqrt(np.maximum(rin*rin-bb*bb,0)))
     A=np.where(bb>=rout,0,A)
-    result=regularized_tomography(A,y,lam,nonnegative,regularization_order=regularization_order)
+    rank=int(np.linalg.matrix_rank(A))
+    n_shells=len(edges)-1
+    coverage_warning=None
+    if rank<n_shells:
+        coverage_warning=f"Response matrix rank {rank} is below the {n_shells} reconstructed shells; the profile is not uniquely constrained by these chords."
+    elif len(np.unique(np.round(b,12)))<n_shells:
+        coverage_warning=f"Only {len(np.unique(np.round(b,12)))} distinct chords constrain {n_shells} shells; inspect resolution and regularization."
+    if float(np.max(b))<float(edges[-2]):
+        coverage_warning=(coverage_warning+" " if coverage_warning else "")+"No chord is tangent within the outermost radial shell; outer-profile sensitivity may be weak."
+    result=regularized_tomography(A,y,lam,nonnegative,measurement_sigma=measurement_sigma,
+                                  regularization_order=regularization_order)
     centers=.5*(edges[:-1]+edges[1:])
-    return {'radius_centers_m':centers,'emissivity_or_density_profile':result['solution'],'response_matrix':A,'residual_norm':result['residual_norm'],'success':result['success'],'message':result['message'],'lambda':float(lam),'regularization_order':int(regularization_order),'regularization_operator_norm':result['regularization_operator_norm'],'nonnegative':bool(nonnegative),'note':'Axisymmetry, straight chord geometry and the units of the supplied line integrals are assumed. Lambda is dimensionless relative to the normalized response matrix; default first-order regularization penalizes profile gradients, not absolute amplitude.'}
+    return {'radius_centers_m':centers,'emissivity_or_density_profile':result['solution'],'response_matrix':A,
+            'residual_norm':result['residual_norm'],'success':result['success'],'message':result['message'],
+            'lambda':float(lam),'regularization_order':int(regularization_order),
+            'regularization_operator_norm':result['regularization_operator_norm'],'nonnegative':bool(nonnegative),
+            'response_matrix_rank':rank,'number_of_radial_shells':int(n_shells),
+            'number_of_distinct_chords':int(len(np.unique(np.round(b,12)))),
+            'chord_coverage_warning':coverage_warning,
+            'measurement_weighting':result['measurement_weighting'],
+            'note':'Axisymmetry, straight chord geometry and the units of the supplied line integrals are assumed. Lambda is dimensionless relative to the normalized response matrix; default first-order regularization penalizes profile gradients, not absolute amplitude.'}
 
 
 def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dict[str, float]:
