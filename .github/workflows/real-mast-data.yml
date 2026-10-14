@@ -28,8 +28,7 @@ jobs:
       - name: Install TIS and public-data dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-data.txt
+          pip install '.[data]'
       - name: Fetch public raw MAST shot and run real-data checks
         run: |
           python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
