@@ -79,7 +79,7 @@ def test_ir_t1_published_mhd_frequency_band_is_resolved_by_fft_and_welch():
 
     fft_peak = freq_fft[np.argmax(amplitude)]
     psd_peak = freq_psd[np.argmax(psd)]
-    integrated_variance = np.trapezoid(psd, freq_psd)
+    integrated_variance = float(np.sum(psd) * (freq_psd[1] - freq_psd[0]))
 
     assert fft_peak == pytest.approx(44_000.0, abs=20.0)
     assert psd_peak == pytest.approx(44_000.0, abs=100.0)
