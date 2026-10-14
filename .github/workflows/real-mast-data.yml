@@ -40,7 +40,7 @@ jobs:
 
           base = Path("artifacts/mast-real-data")
           manifest = json.loads((base / "mast_29790_mirnov_manifest.json").read_text())
-          frame = pd.read_csv(base / "mast_29790_mirnov_omaha_1lz.csv")
+          frame = pd.read_csv(base / manifest["csv_file"])
           assert manifest["shot"] == 29790
           assert manifest["source_signal_class"] == "Raw"
           assert len(frame) >= 1024
@@ -53,7 +53,7 @@ jobs:
           filtered = butterworth_filter(frame["signal_raw"].to_numpy(), fs, highpass=1000, lowpass=min(100000, fs*0.4))
           assert len(f) > 10 and len(fp) > 10 and len(filtered) == len(frame)
           assert np.all(np.isfinite(a)) and np.all(np.isfinite(p)) and np.all(np.isfinite(filtered))
-          print(f"PASS: real MAST shot 29790; samples={len(frame)}; fs={fs:.3f} Hz")
+          print(f"PASS: real MAST shot 29790; signal={manifest['signal']}; samples={len(frame)}; fs={fs:.3f} Hz")
           print("PASS: CSV ingestion, FFT, Welch PSD, and digital filtering on public raw data")
           PY
       - name: Upload real-data test artifacts
