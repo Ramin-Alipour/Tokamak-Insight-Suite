@@ -28,6 +28,23 @@ docker run --rm -p 8501:8501 tokamak-insight-suite
 
 Then open `http://localhost:8501`.
 
+## Real experimental data integration test
+
+TIS includes a reproducible fetcher for **public raw MAST data** from the UKAEA FAIR-MAST archive. The reference case is shot **29790**, Mirnov-coil source group `xmo`, signal `omaha_1lz`. The public catalog documents the signal as raw and shows 1,400,000 time samples. The script exports a downsampled CSV plus a JSON provenance/quality manifest; it does not claim absolute magnetic calibration.
+
+Source documentation: https://mastapp.site/level1-data.html  
+Archive overview and access: https://www.ukaea.org/service/fair-mast/
+
+Run locally (requires network access):
+```bash
+python -m pip install -r requirements-data.txt
+python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
+```
+
+A separate GitHub Actions workflow runs the fetch and checks real-data CSV ingestion, finite/time-ordered samples, FFT, Welch PSD, and filtering. Run it manually from **Actions → Real MAST data integration test → Run workflow**; successful runs publish the CSV and manifest as a downloadable workflow artifact. Network access to the public archive is required, so the raw data are not bundled in Git.
+
+This validates a real diagnostic time-series path only. It does not validate all TIS algorithms, diagnostic calibration, or absolute physical units. The source catalog labels data quality as “Not Checked”; inspect the source metadata and limitations before using the data for scientific conclusions.
+
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
