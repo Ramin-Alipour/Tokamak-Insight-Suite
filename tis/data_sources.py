@@ -18,6 +18,27 @@ from scipy.signal import resample_poly
 FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
 
+def _open_zarr_with_retry(xr: Any, url: str, group: str, attempts: int = 3,
+                          timeout_s: float = 30.0):
+    """Open a public Zarr group with bounded request timeout and transient retries."""
+    import time
+    if isinstance(attempts, bool) or int(attempts) != attempts or attempts < 1 or attempts > 5:
+        raise ValueError("attempts must be an integer in [1, 5].")
+    if not np.isfinite(timeout_s) or timeout_s <= 0 or timeout_s > 120:
+        raise ValueError("timeout_s must be positive and no greater than 120 seconds.")
+    last_error = None
+    for attempt in range(int(attempts)):
+        try:
+            return xr.open_zarr(url, group=group, storage_options={"timeout": float(timeout_s)})
+        except Exception as exc:
+            last_error = exc
+            if attempt + 1 < int(attempts):
+                time.sleep(min(2 ** attempt, 4))
+    raise RuntimeError(
+        f"Could not open public Zarr group {group!r} after {attempts} bounded attempts: {last_error}"
+    ) from last_error
+
+
 
 def anti_alias_decimate(time_s: Any, values: Any, max_samples: int = 70000) -> tuple[np.ndarray, np.ndarray, dict[str, Any]]:
     """Anti-alias-filter a uniformly sampled trace before integer-factor downsampling."""
@@ -82,7 +103,7 @@ def fetch_fair_mast_signal(
         ) from exc
 
     shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
-    ds = xr.open_zarr(shot_url, group=group)
+    ds = _open_zarr_with_retry(xr, shot_url, group)
     try:
         # The documented FAIR-MAST groups usually expose time as a coordinate;
         # time1 can also be present as a data variable on the same dimension.
@@ -310,7 +331,7 @@ def fetch_fair_mast_efit_snapshot(
         ) from exc
 
     shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
-    ds = xr.open_zarr(shot_url, group="efm")
+    ds = _open_zarr_with_retry(xr, shot_url, "efm")
     try:
         required = {"plasma_current_rz", "r", "z", "time"}
         missing = required.difference(ds.variables)
@@ -392,7 +413,7 @@ def list_fair_mast_signals(shot: int, group: str) -> tuple[pd.DataFrame, dict[st
         ) from exc
 
     shot_url = f"{FAIR_MAST_BASE}/{int(shot)}.zarr"
-    ds = xr.open_zarr(shot_url, group=group)
+    ds = _open_zarr_with_retry(xr, shot_url, group)
     try:
         time_name = next(
             (name for name in ("time", "time1")
