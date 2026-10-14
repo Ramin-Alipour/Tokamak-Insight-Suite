@@ -1,10 +1,10 @@
 # Coverage map against the extracted `tokamak.pdf` reference text
 
-The original PDF is retained in the user's Library and is not included in this repository; the extracted reference text is bundled at `docs/reference/tokamak_reference_extracted.txt`.
+The original third-party PDF is not redistributed in this repository. A limited extracted-text reference used to organize the diagnostic catalog is bundled at `docs/reference/tokamak_reference_extracted.txt`; consult the original publication and its license for authoritative details.
 
 This map follows the source document's final diagnostic-family index. “Registry” means an explanatory catalog entry exists; “implemented workflow” means a generic analysis operation is executable in this release. It does not imply every listed observable is solved from raw detector data.
 
-| # | Source family | TIS coverage in v0.3.0 |
+| # | Source family | TIS coverage in v0.4.0 |
 |---:|---|---|
 | 1 | Magnetic measurements | Generic time-series/FFT/cross-channel tools plus calibrated signal integration with optional baseline subtraction; device-specific transfer functions remain user-supplied |
 | 2 | Equilibrium reconstruction | Registry only; specialized Grad–Shafranov solver not included |
