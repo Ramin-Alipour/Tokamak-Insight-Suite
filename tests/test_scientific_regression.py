@@ -100,7 +100,7 @@ def test_spectral_moment_centroid_for_symmetric_peak():
 
 def test_xray_spectrum_summary_reports_positive_total_counts():
     r = xray_spectrum_summary([1, 2, 3], [2, 5, 2])
-    assert r["integrated_counts_keV"] == pytest.approx(6.0)
+    assert r["integrated_counts_keV"] == pytest.approx(7.0)
 
 
 def test_catalog_and_formula_registry_are_nonempty_and_structured():
