@@ -701,10 +701,10 @@ def test_mode_limit_is_largest_unambiguous_integer(n_sensors, expected_limit):
 
 
 def test_zero_weight_sensor_does_not_corrupt_integer_mode_fit():
-    theta = np.linspace(0, 2*np.pi, 7, endpoint=False)
+    theta = np.linspace(0, 2*np.pi, 9, endpoint=False)
     phase = 2*theta + 0.2
     phase[3] += 2.4
-    weights = np.ones(7)
+    weights = np.ones(9)
     weights[3] = 0.0
     result = mode_number_from_phase(theta, phase, weights=weights)
     assert result["mode_number_fit"] == 2
