@@ -89,6 +89,22 @@ def need_data():
         st.info('Load a diagnostic data file using the left-hand panel. The diagnostic library and formula registry remain available without a data file.')
         st.stop()
 
+@st.cache_data(show_spinner=False)
+def cached_prepare_time_series(time_values, signal_values, sample_rate):
+    return prepare_time_series(time_values, signal_values, sample_rate)
+
+@st.cache_data(show_spinner=False)
+def cached_filter(values, fs, highpass, lowpass, order):
+    return butterworth_filter(values, fs, highpass, lowpass, order)
+
+@st.cache_data(show_spinner=False)
+def cached_fft(values, fs):
+    return fft_spectrum(values, fs)
+
+@st.cache_data(show_spinner=False)
+def cached_welch(values, fs, nperseg, noverlap, window):
+    return welch_psd(values, fs, nperseg, noverlap, window)
+
 if page=='Home':
     st.markdown('# Tokamak Insight Suite')
     st.markdown('**Integrated Analysis Platform for Tokamak Diagnostics**')
@@ -310,8 +326,8 @@ elif page=='Time Series & MHD':
     with c2: lp=st.number_input('Low-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c3: order=st.slider('Butterworth order',1,8,3)
     try:
-        t,y,fs=prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce'),pd.to_numeric(df[scol],errors='coerce'),fs0)
-        yf=butterworth_filter(y,fs,hp or None,lp or None,order)
+        t,y,fs=cached_prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float),pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float),fs0)
+        yf=cached_filter(y,fs,hp or None,lp or None,order)
         x1,x2,x3=st.columns(3); x1.metric('Finite samples',len(y)); x2.metric('Sampling rate',f'{fs:.6g} Hz'); x3.metric('Nyquist',f'{fs/2:.6g} Hz')
         plot_line(t,y,'Time (s)',scol,'Raw signal'); plot_line(t,yf,'Time (s)',scol,'Filtered signal')
         st.markdown('### Welch PSD settings')
@@ -319,8 +335,8 @@ elif page=='Time Series & MHD':
         with wc1: welch_n=st.number_input('Segment length (samples)',min_value=8,max_value=int(len(y)),value=min(4096,int(len(y))),step=1,key='welch_nperseg')
         with wc2: welch_overlap=st.number_input('Overlap (samples)',min_value=0,max_value=max(0,int(welch_n)-1),value=int(welch_n)//2,step=1,key='welch_overlap')
         with wc3: welch_window=st.selectbox('Window',['hann','hamming','blackman','boxcar','bartlett'],index=0,key='welch_window')
-        f,amp=fft_spectrum(yf,fs)
-        fp,psd=welch_psd(yf,fs,nperseg=int(welch_n),noverlap=int(welch_overlap),window=welch_window)
+        f,amp=cached_fft(yf,fs)
+        fp,psd=cached_welch(yf,fs,int(welch_n),int(welch_overlap),welch_window)
         st.caption(f'Welch nominal frequency-bin spacing: {fs/int(welch_n):.6g} Hz; overlap: {int(welch_overlap)/int(welch_n):.0%}.')
         plot_line(f,amp,'Frequency (Hz)','Amplitude','FFT amplitude'); plot_line(fp,np.maximum(psd,np.finfo(float).tiny),'Frequency (Hz)','PSD (unit²/Hz)','Welch PSD',True)
         st.markdown('### Time-frequency spectrogram')
