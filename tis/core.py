@@ -1517,6 +1517,75 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
     return fit
 
 
+
+def drift_transport_from_fields(
+    density_m3: Any,
+    radial_electric_field_V_m: Any,
+    poloidal_electric_field_V_m: Any,
+    toroidal_field_T: float,
+    *,
+    radial_velocity_sign: int = 1,
+    poloidal_velocity_sign: int = 1,
+) -> dict[str, Any]:
+    """Derive E×B drift velocities, instantaneous particle fluxes and Reynolds stress.
+
+    Uses the explicitly selected convention
+      v_r = radial_velocity_sign * E_p / B_t
+      v_p = poloidal_velocity_sign * E_r / B_t.
+    The signs depend on coordinate orientation and the paper/device convention;
+    they are never inferred. Inputs must be synchronized arrays in SI units.
+    Both the time-mean product and fluctuation covariance are reported because
+    <n v> = <n><v> + <n~ v~>; these are not interchangeable.
+    """
+    n = np.asarray(density_m3, dtype=float).ravel()
+    er = np.asarray(radial_electric_field_V_m, dtype=float).ravel()
+    ep = np.asarray(poloidal_electric_field_V_m, dtype=float).ravel()
+    if len(n) != len(er) or len(n) != len(ep) or len(n) < 2:
+        raise ValueError("Density and both electric-field arrays must have equal lengths and at least two samples.")
+    if not np.isfinite(toroidal_field_T) or toroidal_field_T == 0:
+        raise ValueError("Toroidal magnetic field must be finite and nonzero.")
+    if radial_velocity_sign not in (-1, 1) or poloidal_velocity_sign not in (-1, 1):
+        raise ValueError("Velocity sign conventions must each be +1 or -1.")
+    valid = np.isfinite(n) & np.isfinite(er) & np.isfinite(ep)
+    if np.count_nonzero(valid) < 2:
+        raise ValueError("At least two common finite synchronized samples are required.")
+    n, er, ep = n[valid], er[valid], ep[valid]
+    vr = radial_velocity_sign * ep / float(toroidal_field_T)
+    vp = poloidal_velocity_sign * er / float(toroidal_field_T)
+    gamma_r = n * vr
+    gamma_p = n * vp
+    reynolds = vr * vp
+    def covariance(a: np.ndarray, b: np.ndarray) -> float:
+        return float(np.mean((a - np.mean(a)) * (b - np.mean(b))))
+    return {
+        "radial_velocity_m_s": vr,
+        "poloidal_velocity_m_s": vp,
+        "radial_particle_flux_m-2_s-1": gamma_r,
+        "poloidal_particle_flux_m-2_s-1": gamma_p,
+        "reynolds_stress_velocity_product_m2_s-2": reynolds,
+        "mean_radial_velocity_m_s": float(np.mean(vr)),
+        "mean_poloidal_velocity_m_s": float(np.mean(vp)),
+        "mean_radial_particle_flux_m-2_s-1": float(np.mean(gamma_r)),
+        "mean_poloidal_particle_flux_m-2_s-1": float(np.mean(gamma_p)),
+        "mean_reynolds_stress_velocity_product_m2_s-2": float(np.mean(reynolds)),
+        "radial_particle_flux_fluctuation_covariance_m-2_s-1": covariance(n, vr),
+        "poloidal_particle_flux_fluctuation_covariance_m-2_s-1": covariance(n, vp),
+        "reynolds_stress_fluctuation_covariance_m2_s-2": covariance(vr, vp),
+        "n_common_finite_samples": int(np.count_nonzero(valid)),
+        "toroidal_field_T": float(toroidal_field_T),
+        "radial_velocity_sign": int(radial_velocity_sign),
+        "poloidal_velocity_sign": int(poloidal_velocity_sign),
+        "equations": {
+            "radial_velocity": "v_r = radial_velocity_sign * E_p / B_t",
+            "poloidal_velocity": "v_p = poloidal_velocity_sign * E_r / B_t",
+            "radial_particle_flux": "Gamma_r(t) = n_i(t) * v_r(t)",
+            "poloidal_particle_flux": "Gamma_p(t) = n_i(t) * v_p(t)",
+            "reynolds_stress": "R(t) = v_r(t) * v_p(t)",
+        },
+        "warning": "Electric fields and density must be calibrated, spatially defined and synchronized. Coordinate orientation determines velocity signs. Mean instantaneous products and fluctuation covariances are both reported and must not be conflated.",
+    }
+
+
 def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | None = None) -> dict[str, float]:
     """Compute covariance fluxes from aligned physical-unit time series."""
     n=np.asarray(density,float).ravel(); vr=np.asarray(radial_velocity,float).ravel()
