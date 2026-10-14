@@ -42,3 +42,20 @@ The exported time arrays were finite and strictly increasing in all three CSVs. 
 - Independent recomputation of MAST 29790 Welch peak: **PASS** as a software cross-check (19,836.43 Hz).
 - Publication-level or calibrated physical validation of these three signals: **NOT ESTABLISHED**.
 - Full scientific validation of all analysis families: **INCOMPLETE**.
+
+
+## Independent IR-T1 publication-table calculation (Doppler spectroscopy)
+
+The open full-text of Alipour, Ghoranneviss & Salar Elahi, *AIP Advances* 7, 115303 (2017), DOI https://doi.org/10.1063/1.4990869, exposes Tables V–VII. I independently recalculated all 15 Table-VI Doppler widths using
+`Delta_lambda_D = sqrt(Delta_lambda_measured^2 - Delta_lambda_resolution^2)`
+and then recalculated all 15 Table-VII ion temperatures using the paper's printed equation
+`Ti[eV] = M * 1.68216831e8 * (Delta_lambda_D/lambda0)^2`
+with wavelengths and widths in nm and masses in amu.
+
+- All 15 widths reproduce the published Doppler-width column to its rounding precision; largest absolute discrepancy from the printed value is about `6.98e-6 nm`.
+- All 15 temperatures reproduce the published table within rounding. The largest relative difference is about `0.18%` (Fe I; the input width and published temperature are rounded).
+- Ti I recalculates to `3.65884 eV`, which rounds to the published `3.66 eV`.
+
+**Verdict: PASS — publication-table arithmetic/formula reconstruction, 15/15 rows.** This validates the conversion from the published rounded widths to the published rounded temperatures. It does **not** validate Gaussian fitting of raw CCD spectra, wavelength calibration, instrumental line-spread function, blends, or the physical assumption that the residual width is entirely Doppler broadening. The paper itself notes overlapping lines and decomposes total broadening into several terms, so those assumptions must remain explicit.
+
+Source table evidence: https://www.researchgate.net/publication/320839921_First_investigation_on_plasma_impurities_of_the_IR-T1_Tokamak (Tables V–VII); publisher DOI above.
