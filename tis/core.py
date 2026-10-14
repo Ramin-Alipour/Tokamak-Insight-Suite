@@ -770,10 +770,26 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
     residual=A@x-y
     weighted_residual=residual if sigma is None else residual/sigma
     regularization_norm=float(np.linalg.norm(operator@x))
+    column_norms=np.linalg.norm(Aw,axis=0)
+    coverage_fraction=float(np.count_nonzero(column_norms>np.finfo(float).eps)/A.shape[1])
+    if min(Aw.shape) <= 512:
+        singular_values=np.linalg.svd(Aw,compute_uv=False)
+        tol=(singular_values[0] if len(singular_values) else 0.0)*max(Aw.shape)*np.finfo(float).eps
+        effective_rank=int(np.count_nonzero(singular_values>tol))
+        condition_number=(float(singular_values[0]/singular_values[-1])
+                          if len(singular_values) and singular_values[-1]>tol else float("inf"))
+        conditioning_status="SVD diagnostic computed"
+    else:
+        effective_rank=None
+        condition_number=None
+        conditioning_status="Not computed automatically for large response matrices; inspect rank/conditioning with a matrix-free diagnostic."
     return {'solution':x,'residual':residual,'residual_norm':float(np.linalg.norm(residual)),
             'weighted_residual_norm':float(np.linalg.norm(weighted_residual)),
             'regularization':float(lam),'regularization_order':int(regularization_order),
             'regularization_operator_norm':regularization_norm,'response_spectral_norm':response_scale,
+            'response_effective_rank':effective_rank,'response_condition_number':condition_number,
+            'response_conditioning_status':conditioning_status,'response_column_coverage_fraction':coverage_fraction,
+            'linearized_uncertainty_status':'Not estimated by this solver; use noise perturbation/bootstrap and report regularization/model sensitivity.',
             'success':success,'message':message,'nonnegative':bool(nonnegative),
             'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
 
