@@ -1250,17 +1250,39 @@ def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dic
 
 
 def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
-    """Calculate profile gradients and basic pedestal/peak descriptors from calibrated profile data."""
+    """Calculate gradients and an interpolated main-peak half-height width.
+
+    FWHM is measured around the global maximum relative to the profile minimum
+    (half-height above baseline), not as the span of every point above half of
+    the absolute maximum. This avoids merging separated peaks and reduces
+    grid-quantization bias. It remains a descriptive width, not a pedestal fit.
+    """
     x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel(); m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
     if len(x)<5: raise ValueError('At least 5 finite profile points are required.')
     o=np.argsort(x); x,y=x[o],y[o]
     if np.any(np.diff(x)<=0): raise ValueError('Profile coordinate must be unique and increasing.')
-    grad=np.gradient(y,x,edge_order=2); k=int(np.argmax(np.abs(grad)))
-    result={'peak_value':float(np.max(y)),'minimum_value':float(np.min(y)),'peak_coordinate':float(x[np.argmax(y)]),'profile_integral':float(integrate.trapezoid(y,x)),'max_abs_gradient':float(np.max(np.abs(grad))),'max_gradient_coordinate':float(x[k]),'gradient_at_max_abs':float(grad[k]),'n_points':int(len(x))}
-    # Half-maximum width is meaningful only for nonnegative profiles with a positive peak.
-    if np.max(y)>0 and np.min(y)>=0:
-        inds=np.where(y>=.5*np.max(y))[0]
-        if len(inds): result['FWHM_coordinate_units']=float(x[inds[-1]]-x[inds[0]])
+    grad=np.gradient(y,x,edge_order=2); peak_index=int(np.argmax(y)); k=int(np.argmax(np.abs(grad)))
+    result={'peak_value':float(np.max(y)),'minimum_value':float(np.min(y)),'peak_coordinate':float(x[peak_index]),'profile_integral':float(integrate.trapezoid(y,x)),'max_abs_gradient':float(np.max(np.abs(grad))),'max_gradient_coordinate':float(x[k]),'gradient_at_max_abs':float(grad[k]),'n_points':int(len(x))}
+    peak=float(y[peak_index]); baseline=float(np.min(y)); half_level=baseline+0.5*(peak-baseline)
+    if peak>baseline and peak_index>0 and peak_index<len(y)-1:
+        left_candidates=np.flatnonzero(y[:peak_index] < half_level)
+        right_candidates=np.flatnonzero(y[peak_index+1:] < half_level)
+        if len(left_candidates) and len(right_candidates):
+            left=int(left_candidates[-1]); right=int(peak_index+1+right_candidates[0])
+            y0,y1=float(y[left]),float(y[left+1])
+            z0,z1=float(y[right-1]),float(y[right])
+            if y1!=y0 and z1!=z0:
+                x_left=float(x[left]+(half_level-y0)*(x[left+1]-x[left])/(y1-y0))
+                x_right=float(x[right-1]+(half_level-z0)*(x[right]-x[right-1])/(z1-z0))
+                result['FWHM_coordinate_units']=float(x_right-x_left)
+                result['FWHM_half_level']=float(half_level)
+                result['FWHM_status']='linearly interpolated around global maximum relative to profile minimum'
+            else:
+                result['FWHM_status']='undefined: half-height crossing is flat on the sampled grid'
+        else:
+            result['FWHM_status']='unavailable: main peak does not cross half-height on both sides within the measured coordinate range'
+    else:
+        result['FWHM_status']='unavailable: profile has no distinct interior maximum above baseline'
     return result
 
 
