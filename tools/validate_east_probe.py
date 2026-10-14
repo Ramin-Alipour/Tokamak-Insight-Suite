@@ -9,6 +9,7 @@ status only after unit/scale conversion has been explicitly established.
 from __future__ import annotations
 import json, re, urllib.request, zipfile, io, math
 from pathlib import Path
+from urllib.parse import quote
 
 BASE = "https://zenodo.org/records/18473625/files/"
 FILES = ["22010ne.txt", "22010Te.txt", "22010vf1.txt", "22010vf2.txt", "22010vf3.txt"]
@@ -16,7 +17,7 @@ OUT = Path("artifacts/east-probe-validation")
 OUT.mkdir(parents=True, exist_ok=True)
 
 def fetch(name: str) -> bytes:
-    req = urllib.request.Request(BASE + name + "?download=1", headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
+    req = urllib.request.Request(BASE + quote(name, safe="") + "?download=1", headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
     with urllib.request.urlopen(req, timeout=90) as response:
         return response.read()
 
