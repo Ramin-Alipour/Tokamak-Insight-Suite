@@ -823,6 +823,51 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
 
 
+
+def tomography_noise_sensitivity(
+    A: Any, y: Any, measurement_sigma: Any, lam: float = 1e-2,
+    nonnegative: bool = True, regularization_order: int = 1,
+    n_replicates: int = 100, random_seed: int = 0,
+) -> dict[str, Any]:
+    """Monte Carlo sensitivity of a regularized reconstruction to stated measurement noise.
+
+    This propagates only the supplied independent Gaussian measurement errors. It does
+    not include geometry/model error, correlated noise, calibration uncertainty, or
+    regularization-selection uncertainty, and is not a complete posterior interval.
+    """
+    matrix=np.asarray(A,dtype=float)
+    values=np.asarray(y,dtype=float).ravel()
+    sigma=np.asarray(measurement_sigma,dtype=float).ravel()
+    if matrix.ndim!=2 or matrix.shape[0]!=len(values) or len(sigma)!=len(values):
+        raise ValueError("A, y, and measurement_sigma dimensions are inconsistent.")
+    if not np.all(np.isfinite(matrix)) or not np.all(np.isfinite(values)):
+        raise ValueError("A and y must contain only finite values.")
+    if not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
+        raise ValueError("measurement_sigma must contain positive finite standard uncertainties.")
+    if isinstance(n_replicates,bool) or int(n_replicates)!=n_replicates or not 20<=n_replicates<=1000:
+        raise ValueError("n_replicates must be an integer from 20 to 1000.")
+    base=regularized_tomography(matrix,values,lam,nonnegative,measurement_sigma=sigma,
+                                regularization_order=regularization_order)
+    rng=np.random.default_rng(random_seed)
+    draws=np.empty((int(n_replicates),matrix.shape[1]),dtype=float)
+    for i in range(int(n_replicates)):
+        perturbed=values+rng.normal(0.0,sigma)
+        draws[i]=regularized_tomography(matrix,perturbed,lam,nonnegative,
+                                        measurement_sigma=sigma,
+                                        regularization_order=regularization_order)["solution"]
+    return {
+        "baseline_solution":base["solution"],
+        "monte_carlo_mean":np.mean(draws,axis=0),
+        "monte_carlo_standard_deviation":np.std(draws,axis=0,ddof=1),
+        "percentile_2_5":np.percentile(draws,2.5,axis=0),
+        "percentile_97_5":np.percentile(draws,97.5,axis=0),
+        "n_replicates":int(n_replicates),
+        "random_seed":int(random_seed),
+        "noise_model":"Independent Gaussian measurement errors using supplied per-measurement standard uncertainties.",
+        "excluded_uncertainties":"Geometry/response-matrix error, correlated noise, calibration/systematic errors, model mismatch, and lambda-selection uncertainty.",
+    }
+
+
 def spectral_calibration(raw_pixel: Any, reference_wavelength: Any, degree: int = 1) -> dict[str, Any]:
     if isinstance(degree, (bool, np.bool_)) or not isinstance(degree, (int, np.integer)) or degree < 1:
         raise ValueError('Polynomial degree must be a positive integer.')
