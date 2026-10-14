@@ -392,3 +392,42 @@ def test_autocorrelation_rejects_constant_signal():
     with pytest.raises(ValueError, match="constant"):
         autocorrelation_analysis(np.ones(100), fs=1000)
 
+
+def test_langmuir_exact_zero_current_uses_sample_without_division_by_zero():
+    from tis.core import langmuir_iv_analysis
+    v=np.linspace(-4,4, nine:=9)
+    i=np.array([-4.,-3.,-2.,-1.,0.,0.,1.,2.,3.])
+    r=langmuir_iv_analysis(v,i)
+    assert r["floating_potential_V"] == pytest.approx(0.0)
+
+
+def test_langmuir_requires_area_and_ion_mass_together():
+    from tis.core import langmuir_iv_analysis
+    v=np.linspace(-4,4,9)
+    i=np.linspace(-1,1,9)
+    with pytest.raises(ValueError, match="supplied together"):
+        langmuir_iv_analysis(v,i,area_m2=1e-6)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"area_m2": 0.0, "ion_mass_amu": 2.0},
+    {"area_m2": 1e-6, "ion_mass_amu": float("nan")},
+    {"ti_eV": -1.0},
+    {"sheath_factor": 0.0},
+    {"gamma_i": -1.0},
+    {"electron_fit_range": (float("nan"), 1.0)},
+])
+def test_langmuir_rejects_nonphysical_model_inputs(kwargs):
+    from tis.core import langmuir_iv_analysis
+    v=np.linspace(-4,4,9)
+    i=np.linspace(-1,1,9)
+    with pytest.raises(ValueError):
+        langmuir_iv_analysis(v,i,**kwargs)
+
+
+def test_langmuir_rejects_requested_ion_fit_with_too_few_samples():
+    from tis.core import langmuir_iv_analysis
+    v=np.linspace(-4,4,9)
+    i=np.linspace(-1,1,9)
+    with pytest.raises(ValueError, match="at least 3 valid samples"):
+        langmuir_iv_analysis(v,i,ion_fit_range=(100,101))
