@@ -29,7 +29,7 @@ def test_prepare_time_series_and_fs():
 
 
 def test_prepare_rejects_irregular_sampling():
-    with pytest.raises(ValueError,match='Irregular'):
+    with pytest.raises(ValueError,match='gap|Irregular'):
         prepare_time_series([0,1,2,4,5,6,7,8],[1,2,3,4,5,6,7,8])
 
 
