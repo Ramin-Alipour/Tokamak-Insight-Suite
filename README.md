@@ -74,6 +74,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
 - **Reference Results Validation:** compare TIS outputs with paper/device reference values using supplied uncertainties or explicit tolerances; rows without a criterion remain unassessed. Protocol: `docs/reference_result_validation.md`.
+- **IR-T1 paper benchmark map:** six user-relevant IR-T1 publications are mapped to their main plotted results, equations, and evidence requirements in `docs/ir_t1_publication_benchmark_map.md`.
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
 ## Tests and CI
