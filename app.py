@@ -17,7 +17,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibrati
     fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
-    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
+    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
@@ -611,7 +611,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
     if workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
@@ -636,6 +636,75 @@ elif page=='Advanced Analysis':
                 r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg],count_uncertainty=sigma,assume_poisson_counts=poisson)
                 st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
+    elif workflow=='MHD SVD decomposition':
+        st.write('SVD of synchronized diagnostic channels. This extracts data-driven temporal components and channel patterns; mode index is not automatically a physical poloidal mode number.')
+        if df is None or len(numeric)<2:
+            st.info('Load at least two synchronized numeric diagnostic channels.')
+        else:
+            time_col=st.selectbox('Time column for plotting (optional)',['<sample index>']+numeric,key='svd_time_col')
+            channel_options=[c for c in numeric if c!=time_col]
+            chosen=st.multiselect('Synchronized channels (same units preferred)',channel_options,default=channel_options[:min(4,len(channel_options))],key='svd_channels')
+            center=st.checkbox('Subtract each channel mean',value=True,key='svd_center')
+            standardize=st.checkbox('Standardize channels to unit variance (use when scales/units differ)',value=False,key='svd_standardize')
+            modes=st.number_input('Number of modes to return (0 = all)',min_value=0,max_value=1000,value=0,key='svd_n_modes')
+            if st.button('Run SVD decomposition',type='primary',key='svd_run'):
+                try:
+                    if len(chosen)<2: raise ValueError('Select at least two channels.')
+                    matrix=df[chosen].apply(pd.to_numeric,errors='coerce').to_numpy(float)
+                    if not np.all(np.isfinite(matrix)): raise ValueError('Selected channels contain missing/non-finite values; align and handle them explicitly before SVD.')
+                    if time_col=='<sample index>':
+                        xaxis=np.arange(len(matrix),dtype=float); xlabel='Sample index'
+                    else:
+                        xaxis=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
+                        if not np.all(np.isfinite(xaxis)) or np.any(np.diff(xaxis)<=0): raise ValueError('Time values must be finite, strictly increasing and aligned with all selected channels.')
+                        dt=np.diff(xaxis)
+                        jitter=float(np.std(dt)/np.mean(dt))
+                        if jitter>0.01: raise ValueError(f'Timestamp interval jitter is {jitter:.2%}; resample or segment the data before SVD.')
+                        xlabel='Time (s)'
+                    result=svd_mode_decomposition(matrix,center=center,standardize=standardize,n_modes=None if int(modes)==0 else int(modes))
+                    frame=pd.DataFrame({'mode':np.arange(1,len(result['singular_values'])+1),'singular_value':result['singular_values'],'energy_fraction':result['energy_fraction'],'cumulative_energy_fraction':result['cumulative_energy_fraction']})
+                    st.dataframe(frame,use_container_width=True)
+                    fig=Figure(figsize=(9,3)); ax=fig.subplots(); ax.bar(frame['mode'],frame['energy_fraction']); ax.set_xlabel('SVD mode'); ax.set_ylabel('Fraction of processed variance'); st.pyplot(fig)
+                    for i in range(min(3,result['principal_components'].shape[1])):
+                        plot_line(xaxis,result['principal_components'][:,i],xlabel,f'PC {i+1}','SVD principal component')
+                    mode_frame=pd.DataFrame(result['channel_modes'],index=chosen,columns=[f'mode_{i+1}' for i in range(result['channel_modes'].shape[1])]).reset_index(names='channel')
+                    download_df('Download SVD channel modes',mode_frame,'tis_svd_channel_modes.csv')
+                    download_df('Download SVD principal components',pd.DataFrame({'time_or_sample':xaxis,**{f'PC_{i+1}':result['principal_components'][:,i] for i in range(result['principal_components'].shape[1])}}),'tis_svd_principal_components.csv')
+                    json_download('Export SVD analysis metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_svd_metadata.json')
+                    st.caption(result['interpretation'])
+                except Exception as e: st.error(f'SVD analysis failed: {e}')
+    elif workflow=='Morlet wavelet time-frequency':
+        st.write('Complex Morlet continuous wavelet transform for time-localized MHD/fluctuation frequencies. Use a calibrated, uniformly sampled time base.')
+        if df is None or not numeric:
+            st.info('Load a numeric time-series file first.')
+        else:
+            time_col=st.selectbox('Time column (or sample index)',['<sample index>']+numeric,key='wavelet_time_col')
+            signal_col=col_select('Signal channel',numeric,'wavelet_signal_col')
+            fs=st.number_input('Sampling frequency for sample-index mode (Hz)',min_value=0.0,value=0.0,format='%.8g',key='wavelet_fs')
+            c1,c2,c3=st.columns(3)
+            with c1: fmin=st.number_input('Minimum wavelet frequency (Hz)',min_value=0.001,value=100.0,format='%.8g',key='wavelet_fmin')
+            with c2: fmax=st.number_input('Maximum wavelet frequency (Hz)',min_value=0.002,value=10000.0,format='%.8g',key='wavelet_fmax')
+            with c3: nfreq=st.number_input('Frequency bins',min_value=8,max_value=256,value=64,key='wavelet_nfreq')
+            omega0=st.number_input('Morlet omega0',min_value=5.0,value=6.0,step=0.5,key='wavelet_omega0')
+            if st.button('Run Morlet wavelet analysis',type='primary',key='wavelet_run'):
+                try:
+                    y=pd.to_numeric(df[signal_col],errors='coerce').to_numpy(float)
+                    if time_col=='<sample index>':
+                        if fs<=0: raise ValueError('Enter the actual sampling frequency; no default is assumed.')
+                        t=np.arange(len(y),dtype=float)/fs
+                    else:
+                        t=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
+                    result=morlet_wavelet_analysis(t,y,np.linspace(float(fmin),float(fmax),int(nfreq)),omega0=float(omega0))
+                    fig=Figure(figsize=(10,4)); ax=fig.subplots()
+                    masked=np.ma.masked_where(result['edge_affected'],result['power'])
+                    mesh=ax.pcolormesh(result['time_s'],result['frequencies_Hz'],masked,shading='auto')
+                    ax.set_xlabel('Time (s)'); ax.set_ylabel('Frequency (Hz)'); ax.set_title('Morlet wavelet power (relative)')
+                    fig.colorbar(mesh,ax=ax,label='|CWT coefficient|²'); st.pyplot(fig)
+                    st.warning(result['warning'])
+                    out=pd.DataFrame(result['power'].T,columns=[f'{v:.8g}_Hz' for v in result['frequencies_Hz']]); out.insert(0,'time_s',result['time_s'])
+                    download_df('Download wavelet power CSV',out,'tis_morlet_wavelet_power.csv')
+                    json_download('Export wavelet analysis metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_morlet_wavelet_metadata.json')
+                except Exception as e: st.error(f'Wavelet analysis failed: {e}')
     elif workflow=='Triple-probe temperature':
         vd=st.number_input('Measured triple-probe voltage difference (V)',min_value=0.000001,value=10.0); mf=st.number_input('Model correction factor',min_value=0.000001,value=1.0)
         if st.button('Estimate triple-probe Te'):
