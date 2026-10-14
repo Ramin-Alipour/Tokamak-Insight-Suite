@@ -636,6 +636,8 @@ elif page=='Spectral Analysis':
         assume_inst=st.checkbox('Instrumental broadening is negligible (independently justified)',value=False,key='e2e_inst_negligible')
         if st.button('Run end-to-end Doppler analysis',type='primary',key='e2e_run'):
             try:
+                if rest is None: raise ValueError('Enter the independently verified rest wavelength.')
+                if mass<=0: raise ValueError('Enter the actual emitting-ion mass; no isotope is assumed.')
                 result=analyze_doppler_line_end_to_end(
                     df[xcol],df[ycol],ref_pixels,ref_wavelengths,rest,mass,fit_min,fit_max,inst,
                     instrument_sigma_uncertainty=inst_unc,rest_wavelength_uncertainty=rest_unc,
