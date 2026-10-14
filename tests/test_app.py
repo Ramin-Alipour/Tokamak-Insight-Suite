@@ -11,7 +11,7 @@ def test_dashboard_home_renders_without_uncaught_exceptions():
 
 
 def test_probe_page_default_geometry_settings_do_not_crash():
-    app = AppTest.from_file("app.py", default_timeout=30)
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=30)
     voltage = np.linspace(-5.0, 5.0, 101)
     current = 0.01 * np.exp(voltage / 2.0) - 0.02
     app.session_state["jump"] = "Probe Analysis"
