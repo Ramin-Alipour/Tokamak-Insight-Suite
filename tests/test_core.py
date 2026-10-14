@@ -468,3 +468,9 @@ def test_doppler_temperature_uncertainty_rejects_negative_uncertainty():
     from tis.core import doppler_temperature_with_uncertainty_eV
     with pytest.raises(ValueError):
         doppler_temperature_with_uncertainty_eV(0.02,500.0,40.0,sigma_sigma_lambda=-0.1)
+
+
+def test_doppler_temperature_uncertainty_rejects_undefined_zero_width_case():
+    from tis.core import doppler_temperature_with_uncertainty_eV
+    with pytest.raises(ValueError, match="zero Doppler width"):
+        doppler_temperature_with_uncertainty_eV(0.0,500.0,40.0,sigma_sigma_lambda=0.001)
