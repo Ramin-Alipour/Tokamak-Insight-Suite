@@ -234,6 +234,54 @@ def integrate_time_series(
     }
 
 
+
+def resample_time_series(time_s: Any, values: Any, target_dt_s: float | None = None,
+                         max_gap_factor: float = 1.5) -> dict[str, Any]:
+    """Interpolate jittered timestamps onto a uniform grid without bridging large gaps.
+
+    This is intended for modest timestamp jitter, not recovery of missing information.
+    Downsampling is deliberately rejected because it requires a separately specified
+    anti-alias filter. A gap exceeding max_gap_factor times the target interval is also
+    rejected so interpolation cannot silently invent a long missing segment.
+    """
+    t=np.asarray(time_s,dtype=float).ravel()
+    y=np.asarray(values,dtype=float).ravel()
+    if len(t)!=len(y) or len(t)<8:
+        raise ValueError("Time and signal must have equal lengths and at least 8 samples.")
+    good=np.isfinite(t)&np.isfinite(y)
+    t,y=t[good],y[good]
+    if len(t)<8:
+        raise ValueError("At least 8 paired finite samples are required.")
+    order=np.argsort(t,kind="stable")
+    t,y=t[order],y[order]
+    dt=np.diff(t)
+    if np.any(dt<=0):
+        raise ValueError("Time stamps must be unique and strictly increasing; resolve duplicates explicitly.")
+    median_dt=float(np.median(dt))
+    target=median_dt if target_dt_s is None else float(target_dt_s)
+    if not np.isfinite(target) or target<=0:
+        raise ValueError("target_dt_s must be positive and finite.")
+    if target>median_dt*(1+1e-6):
+        raise ValueError("Downsampling is not performed by interpolation; apply and document an anti-alias filter first.")
+    if not np.isfinite(max_gap_factor) or max_gap_factor<=1:
+        raise ValueError("max_gap_factor must be finite and greater than 1.")
+    gaps=np.flatnonzero(dt>max_gap_factor*target)
+    if len(gaps):
+        preview=", ".join(f"{int(i)} ({dt[i]:.6g} s)" for i in gaps[:5])
+        raise ValueError(f"Large timestamp gaps detected at interval indices {preview}; split the record into contiguous segments instead of interpolating across gaps.")
+    n=int(np.floor((t[-1]-t[0])/target))+1
+    grid=t[0]+np.arange(n,dtype=float)*target
+    if len(grid)<8:
+        raise ValueError("Uniform grid contains fewer than 8 samples.")
+    values_uniform=np.interp(grid,t,y)
+    jitter=float(np.std(dt)/np.mean(dt)) if len(dt)>1 else 0.0
+    return {"time_s":grid,"values":values_uniform,"sample_rate_Hz":float(1.0/target),
+            "original_samples":int(len(t)),"resampled_samples":int(len(grid)),
+            "target_dt_s":target,"original_interval_jitter_std_over_mean":jitter,
+            "method":"linear interpolation to uniform grid; no extrapolation or large-gap bridging",
+            "warning":"Interpolation changes spectral amplitude/phase and does not recover information lost to jitter or missing samples; compare with unresampled data and document the method."}
+
+
 def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
     y = np.asarray(values, dtype=float).ravel()
     if time is None:
