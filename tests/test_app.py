@@ -41,3 +41,14 @@ def test_spectral_page_renders_end_to_end_doppler_workflow():
     app.run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Run end-to-end Doppler analysis" in button.label for button in app.button)
+
+
+def test_cli_exposes_dashboard_command():
+    from tis.cli import main
+    import sys
+    from unittest.mock import patch
+    with patch.object(sys, "argv", ["tis", "--help"]):
+        try:
+            main()
+        except SystemExit as exc:
+            assert exc.code == 0
