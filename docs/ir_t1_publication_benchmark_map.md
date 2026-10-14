@@ -36,11 +36,12 @@ Do not label the latter two as recovery of original experimental measurements. I
 
 ## Current implementation checkpoints
 
-- Generic spectral fitting, wavelength calibration and conditional Doppler estimates: implemented; line identification and full atomic population inference are not.
+- Generic spectral fitting, wavelength calibration, conditional Doppler estimates, peak detection and reference-line matching: implemented. Species matches can be ambiguous; a user-supplied validated line list is required, and full atomic population inference is not implemented.
 - Langmuir I–V first-pass model fitting: implemented; a compound/Gundestrup probe's full collection model is not implied.
 - Welch PSD, FFT and cross-channel analysis: implemented.
 - SVD channel decomposition and Morlet CWT: implemented in the current development branch with synthetic numerical regression tests.
 - Explicit (E\times B) drift, instantaneous particle-flux products, Reynolds-stress product and separate fluctuation covariances: implemented with sign conventions required from the analyst.
-- Reference-result comparison: implemented; it uses supplied uncertainties/tolerances and refuses to invent an agreement threshold.
+- Reference-result comparison: scalar values and full curves/time series can be compared; the workflow uses supplied uncertainties/tolerances, reports error metrics and refuses to invent an agreement threshold.
+- Baseline/treatment comparison: mean, RMS, and paired time-window changes are calculated for limiter/pressure conditions; unstable mean-percent changes are withheld near zero.
 
 **Still required for paper-level confirmation:** digitize the chosen plotted targets, preserve source coordinates and digitization uncertainty, run the matching analysis on the appropriate input (where available), and export a comparison table. A figure containing only an already-processed result is not a substitute for raw diagnostic input.
