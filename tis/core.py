@@ -1948,6 +1948,79 @@ def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
     return result
 
 
+def compare_condition_signals(
+    baseline_values: Any,
+    treatment_values: Any,
+    *,
+    time_s: Any | None = None,
+    start_s: float | None = None,
+    end_s: float | None = None,
+    baseline_mean_floor_fraction: float = 0.05,
+) -> dict[str, Any]:
+    """Compare paired baseline/treatment time series in a defined window.
+
+    Mean-based percentage change is withheld when the baseline mean is small
+    relative to its RMS, because that percentage is unstable near zero. RMS
+    percentage change is reported separately and is often more interpretable
+    for sign-changing electric fields or Reynolds-stress traces.
+    """
+    base = np.asarray(baseline_values, dtype=float).ravel()
+    treat = np.asarray(treatment_values, dtype=float).ravel()
+    if len(base) != len(treat) or len(base) < 2:
+        raise ValueError("Baseline and treatment arrays must have equal lengths and at least two samples.")
+    if not np.isfinite(baseline_mean_floor_fraction) or not 0 <= baseline_mean_floor_fraction < 1:
+        raise ValueError("baseline_mean_floor_fraction must be finite and in [0, 1).")
+    if (start_s is None) != (end_s is None):
+        raise ValueError("Provide both start_s and end_s, or neither.")
+    if start_s is not None and (not np.isfinite(start_s) or not np.isfinite(end_s) or start_s >= end_s):
+        raise ValueError("Time window must be finite with start_s < end_s.")
+    t = None
+    valid = np.isfinite(base) & np.isfinite(treat)
+    if time_s is not None:
+        t = np.asarray(time_s, dtype=float).ravel()
+        if len(t) != len(base):
+            raise ValueError("time_s must have the same length as both condition arrays.")
+        valid &= np.isfinite(t)
+        if start_s is not None:
+            valid &= (t >= start_s) & (t <= end_s)
+    elif start_s is not None:
+        raise ValueError("A time_s array is required when selecting a time window.")
+    if np.count_nonzero(valid) < 2:
+        raise ValueError("Fewer than two common finite paired samples remain in the selected window.")
+    b, q = base[valid], treat[valid]
+    delta = q - b
+    mean_b, mean_q = float(np.mean(b)), float(np.mean(q))
+    rms_b, rms_q = float(np.sqrt(np.mean(b*b))), float(np.sqrt(np.mean(q*q)))
+    std_b = float(np.std(b, ddof=1))
+    std_q = float(np.std(q, ddof=1))
+    floor = baseline_mean_floor_fraction * rms_b
+    mean_pct = None if abs(mean_b) <= floor else 100.0 * (mean_q - mean_b) / abs(mean_b)
+    rms_pct = None if rms_b <= np.finfo(float).eps else 100.0 * (rms_q - rms_b) / rms_b
+    return {
+        "baseline_mean": mean_b,
+        "treatment_mean": mean_q,
+        "mean_difference_treatment_minus_baseline": float(np.mean(delta)),
+        "mean_change_percent_relative_to_abs_baseline_mean": mean_pct,
+        "baseline_std_sample": std_b,
+        "treatment_std_sample": std_q,
+        "baseline_RMS": rms_b,
+        "treatment_RMS": rms_q,
+        "RMS_change_percent": rms_pct,
+        "baseline_median": float(np.median(b)),
+        "treatment_median": float(np.median(q)),
+        "fraction_of_paired_samples_treatment_below_baseline": float(np.mean(delta < 0)),
+        "n_paired_samples": int(np.count_nonzero(valid)),
+        "n_excluded_samples": int(len(base) - np.count_nonzero(valid)),
+        "time_window_s": None if start_s is None else [float(start_s), float(end_s)],
+        "baseline_mean_percent_change_status": "UNSTABLE_NEAR_ZERO_BASELINE" if mean_pct is None else "ASSESSED",
+        "warning": "Baseline and treatment must be comparable measurements with matched units, calibration, spatial location and processing. Percent changes are descriptive, not causal evidence; time-series autocorrelation means samples are not independent replicates.",
+        "time_s": None if t is None else t[valid],
+        "baseline_values": b,
+        "treatment_values": q,
+        "difference_values": delta,
+    }
+
+
 def ion_sound_speed_m_s(
     electron_temperature_eV: float,
     ion_temperature_eV: float,
