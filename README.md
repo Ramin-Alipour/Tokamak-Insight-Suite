@@ -50,7 +50,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
-- **Time Series & MHD:** filtering, FFT, Welch PSD, cross-correlation/coherence, phase-based mode-number estimates, and calibrated time-series integration with optional baseline subtraction.
+- **Time Series & MHD:** filtering, FFT, Welch PSD, cross-correlation/coherence, phase-based mode-number estimates, calibrated time-series integration with optional baseline subtraction, and time-frequency spectrograms.
 - **Spectral Analysis:** line fitting, spectral calibration, Doppler temperature/velocity estimates, spectral moments and line-ratio utilities.
 - **Probe Analysis:** Langmuir I–V analysis, probe summaries, triple-probe estimates and fluctuation/particle-flux utilities.
 - **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
