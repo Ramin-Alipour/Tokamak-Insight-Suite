@@ -59,7 +59,7 @@ with st.sidebar:
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
     st.caption('Reference: tokamak.pdf · 24 pages')
-    st.caption('Independent Python project · v0.3.0')
+    st.caption('Independent Python project · v0.4.0')
 
 df=st.session_state.get('tis_df')
 filename=st.session_state.get('tis_filename','')
