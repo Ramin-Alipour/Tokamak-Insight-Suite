@@ -718,8 +718,10 @@ def test_langmuir_missing_ion_range_is_reported_not_silently_omitted():
     assert result["ion_density_status"].startswith("not_estimated")
 
 
-def test_positive_interferometer_phase_has_explicit_positive_default_convention():
-    density = linear_phase_density(0.1, 10e9)
+def test_interferometer_phase_sign_is_never_assumed():
+    with pytest.raises(ValueError, match="no default is assumed"):
+        linear_phase_density(0.1, 10e9)
+    density = linear_phase_density(0.1, 10e9, sign_convention=1)
     assert density[()] > 0
 
 
