@@ -322,3 +322,11 @@ def test_spectral_calibration_rejects_mismatched_arrays():
     with pytest.raises(ValueError, match="equal length"):
         spectral_calibration([0, 1, 2], [400, 401], degree=1)
 
+def test_axisymmetric_radiated_power_rejects_negative_emissivity():
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    eps = np.ones((len(Z), len(R)))
+    eps[2, 2] = -0.1
+    with pytest.raises(ValueError, match="nonnegative"):
+        axisymmetric_radiated_power(R, Z, eps)
+
