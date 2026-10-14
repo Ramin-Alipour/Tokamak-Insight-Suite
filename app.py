@@ -71,7 +71,13 @@ def col_select(label, options, key, default=None):
     idx=options.index(default) if default in options else 0
     return st.selectbox(label,options,index=idx,key=key)
 def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
-    fig,ax=plt.subplots(figsize=(9,3.3)); ax.plot(x,y,lw=1.0)
+    # Plot a bounded number of points for responsive rendering on million-sample shots.
+    xx=np.asarray(x).ravel(); yy=np.asarray(y).ravel()
+    if len(xx)!=len(yy): raise ValueError('Plot x/y arrays must have equal lengths.')
+    if len(xx)>20000:
+        idx=np.linspace(0,len(xx)-1,20000,dtype=int)
+        xx,yy=xx[idx],yy[idx]
+    fig,ax=plt.subplots(figsize=(9,3.3)); ax.plot(xx,yy,lw=1.0)
     if logy: ax.set_yscale('log')
     ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
     if title: ax.set_title(title)
@@ -477,14 +483,14 @@ elif page=='Plasma Parameters':
     with tabs[0]:
         a,b,c=st.columns(3)
         with a: ne=st.number_input('Electron density nₑ (m⁻³)',min_value=0.0,value=1e19,format='%.6g'); ni=st.number_input('Ion density nᵢ (m⁻³; 0=quasineutral estimate)',min_value=0.0,value=0.0,format='%.6g'); te=st.number_input('Electron temperature Tₑ (eV)',min_value=0.0,value=1000.0); ti=st.number_input('Ion temperature Tᵢ (eV)',min_value=0.0,value=800.0)
-        with b: ip=st.number_input('Plasma current Iₚ (A)',min_value=0.0,value=50000.0); vl=st.number_input('Loop voltage (V)',value=1.0); R=st.number_input('Major radius R (m)',min_value=1e-9,value=.68); minor=st.number_input('Minor radius a (m)',min_value=1e-9,value=.12)
-        with c: bt=st.number_input('Toroidal field Bₜ (T)',min_value=0.0,value=1.0); mi=st.number_input('Main ion mass (amu)',min_value=1e-6,value=2.0); W=st.number_input('Stored thermal energy (J; 0=omit)',min_value=0.0,value=0.0); ploss=st.number_input('Loss power (W; 0=omit)',min_value=0.0,value=0.0)
+        with b: ip=st.number_input('Signed plasma current Iₚ (A)',value=50000.0); vl=st.number_input('Loop voltage (V)',value=1.0); R=st.number_input('Major radius R (m)',min_value=1e-9,value=.68); minor=st.number_input('Minor radius a (m)',min_value=1e-9,value=.12)
+        with c: bt=st.number_input('Signed toroidal field Bₜ (T)',value=1.0); mi=st.number_input('Main ion mass (amu)',min_value=1e-6,value=2.0); W=st.number_input('Stored thermal energy (J; 0=omit)',min_value=0.0,value=0.0); ploss=st.number_input('Loss power (W; 0=omit)',min_value=0.0,value=0.0)
         try: result=derive_parameters(ne,te,ti,ip,vl,R,minor,bt,W or None,ploss or None,ni or None,mi); st.json(result); json_download('Export parameter calculations',result,'tis_plasma_parameters.json')
         except Exception as e: st.error(str(e))
     with tabs[1]:
-        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g')
-        if st.button('Convert phase to line-integrated density'): st.metric('Approximate line density (m⁻²)',f'{float(linear_phase_density(ph,freq)):.7g}')
-        st.caption('Single line-integrated estimate only; not a radial profile reconstruction.')
+        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g'); phase_sign=st.selectbox('Instrument phase convention',[-1,1],index=0)
+        if st.button('Convert phase to line-integrated density'): st.metric('Approximate line-integrated density (m⁻²)',f'{float(linear_phase_density(ph,freq,sign_convention=phase_sign)):.7g}')
+        st.caption('Output is ∫nₑ dl in m⁻², not local density. Verify the phase-sign convention and high-frequency/unmagnetized approximation for the instrument.')
     with tabs[2]:
         st.markdown('#### O-mode reflectometry cutoff density')
         rf=st.number_input('Probe frequency (GHz)',min_value=0.001,value=60.0,key='refl_freq')
