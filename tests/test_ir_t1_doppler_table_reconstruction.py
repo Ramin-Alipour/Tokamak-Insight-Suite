@@ -61,9 +61,13 @@ def test_reconstruct_published_ir_t1_doppler_temperature_table(
     assert software_temperature_eV == pytest.approx(
         independent_temperature_eV, rel=1e-12
     ), species
-    # Table widths/masses are rounded, so the comparison is not over-tight.
+    # The paper reports B=1.68216831e8 in Eq. (16), whereas the SI constants
+    # in the physical formula give B=amu*c^2/(e*8*ln(2)) ~= 1.67982740e8.
+    # This is a ~0.139% coefficient difference; rounded FWHM/masses add small
+    # per-line deviations. Preserve that discrepancy instead of forcing the
+    # software to reproduce the paper with a physically inconsistent constant.
     assert software_temperature_eV == pytest.approx(
-        published_temperature_eV, abs=0.02
+        published_temperature_eV, rel=0.004
     ), species
 
 
