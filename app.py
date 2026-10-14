@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 import streamlit as st
 from tis import __version__
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
@@ -35,8 +35,9 @@ h1,h2,h3{color:#f0f7ff!important}
 
 def _clear_loaded_data():
     for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
-                "tis_upload_sha", "tis_upload_signature", "tis_active_source",
-                "tis_imported_at_utc", "tis_import_parameters"):
+                "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
+                "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
+                "tis_import_parameters"):
         st.session_state.pop(key, None)
     st.session_state["global_upload"] = None
 
@@ -58,16 +59,21 @@ with st.sidebar:
         import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
     if upload is not None:
         try:
-            uploaded_bytes=upload.getvalue()
-            uploaded_sha=sha256_bytes(uploaded_bytes)
+            upload_identity=f"{getattr(upload,'file_id',upload.name)}:{upload.name}:{upload.size}"
+            new_upload=upload_identity != st.session_state.get("tis_upload_identity")
+            if new_upload:
+                uploaded_bytes=upload.getvalue()
+                uploaded_sha=sha256_bytes(uploaded_bytes)
+            else:
+                uploaded_bytes=st.session_state.get("tis_upload_raw",b"")
+                uploaded_sha=st.session_state.get("tis_upload_sha","")
             delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\\t","|":"|"}
             sheet_value=import_sheet.strip()
             sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
                 "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value},sort_keys=True)
-            needs_import=(uploaded_sha != st.session_state.get("tis_upload_sha") or
-                (st.session_state.get("tis_active_source")=="upload" and
-                 import_signature != st.session_state.get("tis_upload_signature")))
+            needs_import=(new_upload or (st.session_state.get("tis_active_source")=="upload" and
+                import_signature != st.session_state.get("tis_upload_signature")))
             if needs_import:
                 frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
                                  delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
@@ -79,6 +85,9 @@ with st.sidebar:
                 st.session_state["tis_sha"]=uploaded_sha
                 st.session_state["tis_upload_sha"]=uploaded_sha
                 st.session_state["tis_upload_signature"]=import_signature
+                st.session_state["tis_upload_identity"]=upload_identity
+                st.session_state["tis_upload_raw"]=uploaded_bytes
+                st.session_state.pop("tis_analysis_history",None)
                 st.session_state["tis_active_source"]="upload"
                 st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
                 st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
@@ -119,13 +128,45 @@ def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
                 keep.extend((lo+int(np.argmin(segment)),lo+int(np.argmax(segment))))
         idx=np.asarray(sorted(set(keep)),dtype=int)
         xx,yy=xx[idx],yy[idx]
-    fig,ax=plt.subplots(figsize=(9,3.3)); ax.plot(xx,yy,lw=1.0)
+    fig=Figure(figsize=(9,3.3)); ax=fig.subplots(); ax.plot(xx,yy,lw=1.0)
     if logy: ax.set_yscale('log')
     ax.set_xlabel(xlabel); ax.set_ylabel(ylabel)
     if title: ax.set_title(title)
-    ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig); plt.close(fig)
-def download_df(label, data, name): st.download_button(label,data.to_csv(index=False).encode(),name,'text/csv')
-def json_download(label,obj,name): st.download_button(label,json.dumps(obj,indent=2,ensure_ascii=False,default=lambda x: np.asarray(x).tolist()).encode(),name,'application/json')
+    ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig)
+def _json_safe(value):
+    if isinstance(value, dict): return {str(k): _json_safe(v) for k,v in value.items()}
+    if isinstance(value, (list,tuple)): return [_json_safe(v) for v in value]
+    if isinstance(value, np.ndarray): return _json_safe(value.tolist())
+    if isinstance(value, np.integer): return int(value)
+    if isinstance(value, np.floating): return float(value) if np.isfinite(value) else None
+    if isinstance(value, float): return value if np.isfinite(value) else None
+    if isinstance(value, np.bool_): return bool(value)
+    return value
+
+def _result_summary(value):
+    if isinstance(value, dict):
+        return {str(k): _result_summary(v) for k,v in value.items()
+                if not isinstance(v,np.ndarray) or v.size<=100}
+    if isinstance(value,np.ndarray):
+        finite=value[np.isfinite(value)] if np.issubdtype(value.dtype,np.number) else np.asarray([])
+        return {"shape":list(value.shape),"dtype":str(value.dtype),"finite_count":int(finite.size),
+                "min":float(np.min(finite)) if finite.size else None,"max":float(np.max(finite)) if finite.size else None}
+    if isinstance(value,(list,tuple)) and len(value)>30:
+        return {"items":len(value),"preview":_json_safe(value[:5])}
+    return _json_safe(value)
+
+def download_df(label, data, name):
+    st.download_button(label,data.to_csv(index=False).encode(),name,'text/csv')
+
+def json_download(label,obj,name):
+    safe=_json_safe(obj)
+    payload=json.dumps(safe,indent=2,ensure_ascii=False,allow_nan=False).encode()
+    st.download_button(label,payload,name,'application/json')
+    if not any(token in name.lower() for token in ("provenance","registry","formula_registry")):
+        history=st.session_state.get("tis_analysis_history",[])
+        history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
+                  "result_summary":_result_summary(obj)}]+history
+        st.session_state["tis_analysis_history"]=history[:20]
 def need_data():
     if df is None:
         st.info('Load a diagnostic data file using the left-hand panel. The diagnostic library and formula registry remain available without a data file.')
@@ -235,6 +276,7 @@ elif page=='Public Data Access':
                 mast_filename = f"mast_{int(mast_shot)}_{mast_group}_{mast_manifest['signal']}.csv"
                 st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_active_source'] = 'mast'
+                st.session_state.pop('tis_analysis_history', None)
                 st.session_state['tis_raw'] = mast_csv
                 st.session_state['tis_filename'] = mast_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
@@ -283,6 +325,7 @@ elif page=='Public Data Access':
                 public_frame = load_table(payload, public_filename)
                 st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_active_source'] = 'public_url'
+                st.session_state.pop('tis_analysis_history', None)
                 st.session_state['tis_raw'] = payload
                 st.session_state['tis_filename'] = public_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
@@ -339,12 +382,12 @@ elif page=='Public Data Access':
             r_coords = np.asarray([float(str(col)[2:-2]) for col in efit_frame.columns[1:]], dtype=float)
             z_coords = efit_frame['z_m'].to_numpy(dtype=float)
             grid_values = efit_frame.iloc[:, 1:].to_numpy(dtype=float)
-            fig, ax = plt.subplots(figsize=(8, 4.5))
+            fig=Figure(figsize=(8,4.5)); ax=fig.subplots()
             mesh = ax.pcolormesh(r_coords, z_coords, grid_values, shading='auto')
             ax.set_xlabel('R coordinate (m)'); ax.set_ylabel('Z coordinate (m)')
             ax.set_title(f"Existing EFIT plasma-current grid · shot {efit_manifest['shot']} · t={efit_manifest['selected_time_s']:.4f} s")
             fig.colorbar(mesh, ax=ax, label='Archived plasma_current_rz value')
-            fig.tight_layout(); st.pyplot(fig); plt.close(fig)
+            fig.tight_layout(); st.pyplot(fig)
         except Exception as e:
             st.warning(f'Grid table loaded, but plot could not be rendered: {e}')
         st.dataframe(efit_frame.head(12), use_container_width=True)
@@ -396,10 +439,10 @@ elif page=='Time Series & MHD':
         if st.button('Calculate spectrogram'):
             try:
                 tf=time_frequency_spectrogram(yf,fs,nperseg=int(tf_n),noverlap=int(tf_overlap))
-                fig,ax=plt.subplots(figsize=(9,4))
+                fig=Figure(figsize=(9,4)); ax=fig.subplots()
                 mesh=ax.pcolormesh(tf['time_s'],tf['frequency_Hz'],10*np.log10(np.maximum(tf['psd'],np.finfo(float).tiny)),shading='auto')
                 ax.set_xlabel('Time (s)'); ax.set_ylabel('Frequency (Hz)'); ax.set_title('Short-time power spectral density (dB)')
-                fig.colorbar(mesh,ax=ax,label='PSD (dB re 1 unit²/Hz)'); fig.tight_layout(); st.pyplot(fig); plt.close(fig)
+                fig.colorbar(mesh,ax=ax,label='PSD (dB re 1 unit²/Hz)'); fig.tight_layout(); st.pyplot(fig)
                 download_df('Download spectrogram matrix',pd.DataFrame(tf['psd'],index=tf['frequency_Hz'],columns=[f'{v:.9g}' for v in tf['time_s']]).reset_index(names='frequency_Hz'),'tis_spectrogram.csv')
             except Exception as e: st.error(str(e))
         st.markdown('### Autocorrelation / correlation-time estimate')
@@ -544,16 +587,27 @@ elif page=='Spectral Analysis':
     else:
         energy_unit=st.radio("Energy-axis unit",["keV","eV"],horizontal=True,key="xray_energy_unit")
         ecol=col_select(f'Energy coordinate ({energy_unit})',numeric,'energy_x'); ccol=col_select('Counts / intensity',numeric,'energy_y'); bgcol=st.selectbox('Background column (optional)',['<none>']+numeric,key='energy_bg')
+        representation=st.radio("Interpretation of spectral values",["Counts per bin","Signal density per energy unit"],horizontal=True,key="spectrum_representation")
+        sigma_col=st.selectbox("Per-bin uncertainty σ (optional)",["<none>"]+numeric,key="spectrum_sigma")
+        assume_poisson=st.checkbox("Infer Poisson uncertainty from raw counts",value=False,key="spectrum_poisson",disabled=(bgcol!="<none>" and sigma_col=="<none>"))
+        bin_representation="counts_per_bin" if representation=="Counts per bin" else "density_per_eV"
+        sigma_values=None if sigma_col=="<none>" else df[sigma_col]
+        background_values=None if bgcol=="<none>" else df[bgcol]
         if st.button('Analyze energy spectrum'):
             try:
                 if mode=='X-ray energy spectrum':
                     xray_energy=np.asarray(df[ecol],dtype=float)
-                    if energy_unit=="eV":
-                        xray_energy=xray_energy/1000.0
-                    result=xray_spectrum_summary(xray_energy,df[ccol],None if bgcol=='<none>' else df[bgcol])
+                    if energy_unit=="eV": xray_energy=xray_energy/1000.0
+                    result=xray_spectrum_summary(xray_energy,df[ccol],background_values,
+                        count_uncertainty=sigma_values,assume_poisson_counts=assume_poisson,
+                        bin_representation=bin_representation)
                     result["input_energy_axis_unit"]=energy_unit
                 else:
-                    result=spectrum_moments(df[ecol],df[ccol],None if bgcol=='<none>' else df[bgcol])
+                    generic_energy=np.asarray(df[ecol],dtype=float)
+                    if energy_unit=="keV": generic_energy=generic_energy*1000.0
+                    result=spectrum_moments(generic_energy,df[ccol],background_values,
+                        count_uncertainty=sigma_values,assume_poisson_counts=assume_poisson,
+                        bin_representation=bin_representation)
                 st.json(result); json_download('Export spectrum summary',result,'tis_energy_spectrum_summary.json')
                 plot_line(df[ecol],df[ccol],ecol,ccol,'Energy spectrum')
             except Exception as e: st.error(str(e))
@@ -747,7 +801,20 @@ elif page=='Diagnostic Catalog':
 elif page=='Reports & Export':
     st.title('Reports, Provenance & Export')
     if df is None: st.info('Load a file to create a provenance record.'); st.stop()
-    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_parameters':st.session_state.get('tis_last_analysis_parameters',{}),'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance record; it does not itself certify scientific validity.'}
+    quality={}
+    for col in numeric[:100]:
+        metrics=signal_quality(pd.to_numeric(df[col],errors="coerce").to_numpy(dtype=float))
+        quality[str(col)]={k:v for k,v in metrics.items() if k!="n_total"}
+    quality_frame=pd.DataFrame(quality).T if quality else pd.DataFrame()
+    st.markdown("### Input data quality summary")
+    if not quality_frame.empty: st.dataframe(quality_frame,use_container_width=True)
+    history=st.session_state.get("tis_analysis_history",[])
+    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance and QC report; scientific validity still depends on calibration, geometry, uncertainty and model assumptions.'}
+    st.markdown("### Analysis history")
+    if history:
+        st.dataframe(pd.DataFrame([{"analysis":h["name"],"created_at_utc":h["created_at_utc"]} for h in history]),use_container_width=True)
+    else:
+        st.info("No analysis export has been generated in this session yet.")
     st.json(record); json_download('Download provenance JSON',record,'tis_provenance.json'); download_df('Export imported data CSV',df,'tis_imported_data.csv')
     st.markdown('### Session activity')
     st.write(st.session_state.get('tis_activity',[]))
