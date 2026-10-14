@@ -881,3 +881,16 @@ def test_fair_mast_zarr_open_does_not_retry_invalid_group_metadata():
     with pytest.raises(ValueError, match="group not found"):
         _open_fair_mast_zarr(fake, "https://example.invalid/test.zarr", "missing")
     assert fake.attempts == 1
+
+
+
+def test_load_parquet_rejects_excessive_uncompressed_size_before_read(monkeypatch):
+    pyarrow_parquet = pytest.importorskip("pyarrow.parquet")
+    from types import SimpleNamespace
+
+    fake_file = SimpleNamespace(
+        metadata=SimpleNamespace(num_rows=10, num_row_groups=1, total_byte_size=1001)
+    )
+    monkeypatch.setattr(pyarrow_parquet, "ParquetFile", lambda _source: fake_file)
+    with pytest.raises(ValueError, match="uncompressed-size"):
+        load_table(b"placeholder", "data.parquet", max_uncompressed_bytes=1000)
