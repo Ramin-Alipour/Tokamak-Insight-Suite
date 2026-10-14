@@ -431,3 +431,23 @@ def test_langmuir_rejects_requested_ion_fit_with_too_few_samples():
     i=np.linspace(-1,1,9)
     with pytest.raises(ValueError, match="at least 3 valid samples"):
         langmuir_iv_analysis(v,i,ion_fit_range=(100,101))
+
+
+def test_spectral_fit_reports_parameter_uncertainties():
+    x=np.linspace(500,501,301)
+    y=2.0+10.0*np.exp(-0.5*((x-500.42)/0.07)**2)
+    r=fit_spectral_line(x,y,model="Gaussian")
+    for key in ("standard_error_center","standard_error_sigma","standard_error_FWHM"):
+        assert np.isfinite(r[key])
+        assert r[key] >= 0
+    assert r["center"] == pytest.approx(500.42, abs=1e-5)
+
+
+@pytest.mark.parametrize("x,y,xmin,xmax", [
+    ([1,1,1,1,1,1,1,1], [1,2,3,4,5,6,7,8], None, None),
+    ([1,2,3,4,5,6,7,8], [1,2,3,4,5,6,7,8], 5.0, 2.0),
+    ([1,2,3,4,5,6,7,8], [1,2,3,4,5,6,7,8], float("nan"), None),
+])
+def test_spectral_fit_rejects_invalid_coordinates_and_limits(x,y,xmin,xmax):
+    with pytest.raises(ValueError):
+        fit_spectral_line(x,y,xmin=xmin,xmax=xmax,model="Gaussian")
