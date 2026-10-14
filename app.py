@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import streamlit as st
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
-from tis.data_sources import fetch_fair_mast_signal, fetch_public_table_bytes
+from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_velocity_m_s, derive_parameters,
@@ -208,6 +208,51 @@ elif page=='Public Data Access':
         except Exception as e:
             st.error(f'Public URL import failed: {e}')
             st.info('Use a direct file URL and confirm that the source permits public download.')
+
+
+    st.markdown('---')
+    st.subheader('Fetch an existing EFIT equilibrium grid')
+    st.caption('Loads the archive’s existing EFIT-derived plasma-current R–Z grid. This is an archive export, not a new equilibrium reconstruction or Grad–Shafranov solver.')
+    with st.form('fair_mast_efit_form'):
+        ef1, ef2 = st.columns(2)
+        with ef1:
+            efit_shot = st.number_input('EFIT shot number', min_value=1, value=30421, step=1, key='efit_shot')
+        with ef2:
+            efit_time = st.number_input('Requested time (s)', value=0.2, format='%.6f', key='efit_time')
+        efit_fetch_clicked = st.form_submit_button('Fetch EFIT grid')
+    if efit_fetch_clicked:
+        try:
+            with st.spinner('Reading the public EFIT R–Z grid...'):
+                efit_frame, efit_manifest = fetch_fair_mast_efit_snapshot(int(efit_shot), float(efit_time))
+                st.session_state['tis_efit_frame'] = efit_frame
+                st.session_state['tis_efit_manifest'] = efit_manifest
+        except Exception as e:
+            st.error(f'EFIT grid fetch failed: {e}')
+            st.info('Confirm that this shot has an accessible efm group and that public-data dependencies are installed.')
+    if 'tis_efit_frame' in st.session_state and 'tis_efit_manifest' in st.session_state:
+        efit_frame = st.session_state['tis_efit_frame']
+        efit_manifest = st.session_state['tis_efit_manifest']
+        st.success(f"Loaded shot {efit_manifest['shot']} · EFIT grid {efit_manifest['grid_shape_z_by_r']} at t={efit_manifest['selected_time_s']:.6f} s")
+        em1, em2, em3 = st.columns(3)
+        em1.metric('Grid points', f"{efit_frame.shape[0] * (efit_frame.shape[1] - 1):,}")
+        em2.metric('Finite grid fraction', f"{efit_manifest['finite_grid_fraction']:.1%}")
+        em3.metric('Archive quality', str(efit_manifest['source_quality']))
+        try:
+            r_coords = np.asarray([float(str(col)[2:-2]) for col in efit_frame.columns[1:]], dtype=float)
+            z_coords = efit_frame['z_m'].to_numpy(dtype=float)
+            grid_values = efit_frame.iloc[:, 1:].to_numpy(dtype=float)
+            fig, ax = plt.subplots(figsize=(8, 4.5))
+            mesh = ax.pcolormesh(r_coords, z_coords, grid_values, shading='auto')
+            ax.set_xlabel('R coordinate (m)'); ax.set_ylabel('Z coordinate (m)')
+            ax.set_title(f"Existing EFIT plasma-current grid · shot {efit_manifest['shot']} · t={efit_manifest['selected_time_s']:.4f} s")
+            fig.colorbar(mesh, ax=ax, label='Archived plasma_current_rz value')
+            fig.tight_layout(); st.pyplot(fig); plt.close(fig)
+        except Exception as e:
+            st.warning(f'Grid table loaded, but plot could not be rendered: {e}')
+        st.dataframe(efit_frame.head(12), use_container_width=True)
+        st.download_button('Download EFIT grid CSV', data=efit_frame.to_csv(index=False).encode('utf-8'), file_name=f"mast_{efit_manifest['shot']}_efit_grid.csv", mime='text/csv')
+        st.download_button('Download EFIT manifest', data=json.dumps(efit_manifest, indent=2), file_name='mast_efit_manifest.json', mime='application/json')
+        st.caption(efit_manifest['scientific_limit'])
 
 elif page=='Data Import & QC':
     st.title('Data Import & Quality Control')
