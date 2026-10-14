@@ -1118,7 +1118,7 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
 def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None,
                           count_uncertainty: Any | None = None,
                           assume_poisson_counts: bool = False,
-                          bin_representation: str = "counts_per_bin") -> dict[str, Any]:
+                          bin_representation: str = "density_per_eV") -> dict[str, Any]:
     r=spectrum_moments(energy_keV, counts, background, count_uncertainty,
                        assume_poisson_counts, bin_representation)
     r['peak_energy_keV']=r.pop('peak_energy_eV')
@@ -1126,6 +1126,9 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
     r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
     if 'integrated_counts_eV' in r:
         r['integrated_signal_keV_weighted']=r.pop('integrated_counts_eV')
+        # Retained for compatibility with existing callers; actual units follow
+        # bin_representation and the supplied energy coordinate.
+        r['integrated_counts_keV']=r['integrated_signal_keV_weighted']
     r['energy_axis_unit']='keV'
     r['note']='Energy axis is interpreted as keV. Select counts-per-bin or signal density explicitly; detector response and absolute calibration are not applied.'
     return r
