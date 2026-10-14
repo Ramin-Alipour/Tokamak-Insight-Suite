@@ -147,3 +147,59 @@ def fetch_fair_mast_signal(
         return frame, manifest
     finally:
         ds.close()
+
+
+
+def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: int = 30) -> tuple[bytes, dict[str, str]]:
+    """Download one public HTTP(S) tabular file with bounded size and provenance.
+
+    Intended for direct CSV/TXT/Parquet links such as GOLEM's public per-shot
+    exports. It deliberately does not crawl websites or scrape HTML pages.
+    """
+    from urllib.error import HTTPError, URLError
+    from urllib.parse import urlparse
+    from urllib.request import Request, urlopen
+
+    parsed = urlparse(str(url).strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Enter a direct public http:// or https:// file URL.")
+    if parsed.username or parsed.password:
+        raise ValueError("URLs containing embedded credentials are not allowed.")
+    if max_bytes < 1024:
+        raise ValueError("Maximum download size must be at least 1024 bytes.")
+
+    request = Request(
+        parsed.geturl(),
+        headers={"User-Agent": "Tokamak-Insight-Suite/0.4 (public scientific data import)"},
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            content_type = response.headers.get("Content-Type", "unknown")
+            final_url = response.geturl()
+            payload = response.read(max_bytes + 1)
+    except (HTTPError, URLError, TimeoutError) as exc:
+        raise RuntimeError(f"Public data download failed: {exc}") from exc
+
+    if len(payload) > max_bytes:
+        raise ValueError(
+            f"File exceeds the {max_bytes:,}-byte download limit; use a smaller export."
+        )
+    if not payload:
+        raise ValueError("The downloaded file is empty.")
+    preview = payload[:512].lstrip().lower()
+    if b"<html" in preview or b"<!doctype html" in preview:
+        raise ValueError(
+            "The URL returned an HTML page, not a direct data file. Use the archive's direct download URL."
+        )
+    import hashlib
+    from datetime import datetime, timezone
+
+    metadata = {
+        "source_url": str(url).strip(),
+        "final_url": final_url,
+        "content_type": content_type,
+        "downloaded_bytes": str(len(payload)),
+        "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    return payload, metadata
