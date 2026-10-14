@@ -1977,14 +1977,15 @@ def ion_sound_speed_m_s(
     }
 
 
-def mach_number_from_velocity(flow_velocity_m_s: Any, sound_speed_m_s: float) -> np.ndarray:
+def mach_number_from_velocity(flow_velocity_m_s: Any, sound_speed_m_s: float) -> float | np.ndarray:
     """Return signed Mach number from velocity and a supplied positive sound speed."""
     v = np.asarray(flow_velocity_m_s, dtype=float)
     if not np.isfinite(sound_speed_m_s) or sound_speed_m_s <= 0:
         raise ValueError("Sound speed must be positive and finite.")
     if np.any(~np.isfinite(v)):
         raise ValueError("Flow velocity must contain only finite values.")
-    return v / float(sound_speed_m_s)
+    result = v / float(sound_speed_m_s)
+    return float(result) if result.ndim == 0 else result
 
 
 def triple_probe_temperature_eV(v_difference_V: float, model_factor: float = 1.0) -> dict[str, float | str]:
