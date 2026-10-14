@@ -949,6 +949,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         if fit_range is not None:
             if len(fit_range) != 2 or not np.all(np.isfinite(np.asarray(fit_range, dtype=float))):
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.")
+            if float(fit_range[0]) >= float(fit_range[1]):
+                raise ValueError(f"{name} lower voltage limit must be smaller than its upper limit.")
     if area_m2 is None:
         ion_mass_amu = None
     elif ion_mass_amu is None:
@@ -987,7 +989,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
-            p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
+            p,cov=np.polyfit(v[m],i[m],1,cov=True)
+            out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
+            out['ion_saturation_slope_standard_error_A_per_V']=float(np.sqrt(max(cov[0,0],0.0)))
+            out['ion_saturation_intercept_standard_error_A']=float(np.sqrt(max(cov[1,1],0.0)))
+            out['ion_saturation_fit_points']=int(m.sum())
             out['ion_saturation_current_A']=float(np.median(i[m]))
         else:
             raise ValueError("ion_fit_range must contain at least 3 valid samples.")
@@ -996,11 +1002,16 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         electron_current=i-ion_baseline
         m=(v>=min(electron_fit_range))&(v<=max(electron_fit_range))&(electron_current>0)
         if m.sum()<4: raise ValueError('Electron-retarding fit range needs at least 4 points with positive current after ion-current baseline subtraction.')
-        p=np.polyfit(v[m],np.log(electron_current[m]),1); pred=np.polyval(p,v[m]); slope=float(p[0])
+        p,cov=np.polyfit(v[m],np.log(electron_current[m]),1,cov=True); pred=np.polyval(p,v[m]); slope=float(p[0])
+        slope_se=float(np.sqrt(max(cov[0,0],0.0)))
         out['electron_retarding_fit_R2']=_r2(np.log(electron_current[m]),pred)
+        out['electron_retarding_fit_points']=int(m.sum())
+        out['electron_retarding_log_slope_standard_error_per_V']=slope_se
         out['ion_current_baseline_subtracted_A']=ion_baseline
         if slope>0:
             out['electron_temperature_eV']=1.0/slope
+            out['electron_temperature_standard_uncertainty_eV']=slope_se/(slope**2)
+            out['electron_temperature_uncertainty_method']='First-order covariance propagation from log-linear fit; excludes model, calibration and sheath systematics.'
             out['electron_retarding_log_slope_per_V']=slope
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
