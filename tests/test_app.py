@@ -23,3 +23,26 @@ def test_probe_page_default_geometry_settings_do_not_crash():
     app.run()
     assert not app.exception
     assert any("Analyze probe I–V" in button.label for button in app.button)
+
+
+
+def test_time_series_requires_confirmation_for_assumed_sample_rate():
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=30)
+    app.session_state["jump"] = "Time Series & MHD"
+    app.session_state["tis_df"] = pd.DataFrame({
+        "channel_1": np.sin(np.linspace(0, 20 * np.pi, 256)),
+        "channel_2": np.cos(np.linspace(0, 20 * np.pi, 256)),
+    })
+    app.session_state["tis_raw"] = b"synthetic regression data"
+    app.session_state["tis_filename"] = "synthetic_timeseries.csv"
+    app.session_state["tis_sha"] = "test-sha256"
+    app.run()
+    assert not app.exception
+    assert any(
+        "I confirm this assumed sampling frequency" in checkbox.label
+        for checkbox in app.checkbox
+    )
+    assert any(
+        "Confirm the acquisition sampling frequency" in item.value
+        for item in app.info
+    )
