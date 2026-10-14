@@ -52,3 +52,12 @@ def test_cli_exposes_dashboard_command():
             main()
         except SystemExit as exc:
             assert exc.code == 0
+
+
+def test_p05_paper_audit_page_renders_and_flags_source_conflict():
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=30)
+    app.session_state["jump"] = "Paper Benchmarks & P05 Audit"
+    app.run()
+    assert not app.exception
+    assert app.error
+    assert any("35–45%" in str(item.value) and "20–30%" in str(item.value) for item in app.error)
