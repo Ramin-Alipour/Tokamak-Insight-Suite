@@ -1,5 +1,14 @@
 # Release notes — v0.3.0
 
+## Post-release engineering corrections
+- Corrected FFT behavior so `detrend=False` preserves the DC component instead of always removing the mean.
+- Filter cutoffs explicitly set to zero, negative, or non-finite values are now rejected rather than silently treated as omitted.
+- Spectral calibration now validates polynomial degree and matching input-array lengths before fitting.
+- Axisymmetric radiated-power integration rejects negative emissivity grids instead of returning a potentially nonphysical total.
+- Added regression tests for DC handling, invalid filter/calibration inputs, reflectometry cutoff scaling, electron-cyclotron resonance, analytic equilibrium derivatives, radiated-power integration, and synthetic heat-flux decay recovery.
+- Added a continuous integration workflow to compile sources, run the test suite, and check the Streamlit HTTP health endpoint on pushes and pull requests. These checks must pass in GitHub Actions before the changes are considered verified.
+
+
 ## Dashboard and workflow expansion
 - Redesigned the Streamlit control surface as a dark navy/blue workspace with left navigation, project/shot context, persistent data upload, quick tools, dashboard preview, and dedicated analysis pages, following the saved Tokamak Insight Suite dashboard reference.
 - Added a persistent single-session dataset workflow and data integrity hash.
