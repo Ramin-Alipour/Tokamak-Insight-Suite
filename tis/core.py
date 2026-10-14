@@ -42,10 +42,27 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("skiprows must be a nonnegative integer.")
     name = filename.lower()
     if name.endswith((".csv", ".txt")):
-        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
+        csv_data = bytes(data)
+        # Treat the selected marker as a whole-line comment prefix only. Pandas'
+        # comment= parameter truncates headers like "Ch#1" and silently changes
+        # the table schema, so never apply it inside a data/header line.
         if comment is not None:
-            kwargs["comment"] = comment
-        frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None,
+            if not isinstance(comment, str) or len(comment) != 1:
+                raise ValueError("comment must be None or a single-character whole-line comment marker.")
+            try:
+                text_data = csv_data.decode("utf-8-sig")
+            except UnicodeDecodeError as exc:
+                raise ValueError("CSV/TXT input must be UTF-8 encoded when comment filtering is enabled.") from exc
+            kept_lines = []
+            for line in text_data.splitlines(keepends=True):
+                if line.lstrip().startswith(comment):
+                    # Preserve the physical line count so skiprows retains its meaning.
+                    kept_lines.append("\\n" if line.endswith("\\n") else "")
+                else:
+                    kept_lines.append(line)
+            csv_data = "".join(kept_lines).encode("utf-8")
+        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
+        frame = pd.read_csv(io.BytesIO(csv_data), sep=delimiter or None,
                             engine="python" if delimiter is None else "c", **kwargs)
     elif name.endswith((".xlsx", ".xls")):
         if name.endswith(".xlsx"):
