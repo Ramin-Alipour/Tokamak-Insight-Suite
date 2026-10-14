@@ -6,7 +6,7 @@ from tis.core import (
     fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag, fit_spectral_line,
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
     regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality, evaluate_spectral_fit,
-    linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments,
+    linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments, resample_time_series,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
     exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram, autocorrelation_analysis,
@@ -891,3 +891,29 @@ def test_spectral_fit_reports_residual_quality_and_evaluator_matches_data():
     assert fit["fit_rmse"] < 1e-6
     assert np.allclose(predicted, y, atol=1e-5)
     assert fit["reduced_chi_square"] is None
+
+
+def test_resample_time_series_uniformizes_small_timestamp_jitter():
+    base = np.arange(100, dtype=float)*0.01
+    time = base.copy()
+    time[1::2] += 0.0002
+    signal = np.sin(2*np.pi*3*base)
+    result = resample_time_series(time, signal)
+    assert np.allclose(np.diff(result["time_s"]), result["target_dt_s"])
+    assert len(result["values"]) >= 8
+    assert "does not recover information" in result["warning"]
+
+
+def test_resample_time_series_refuses_to_bridge_large_gaps():
+    time = np.arange(100, dtype=float)*0.01
+    time[50:] += 0.05
+    signal = np.sin(2*np.pi*3*time)
+    with pytest.raises(ValueError, match="Large timestamp gaps"):
+        resample_time_series(time, signal)
+
+
+def test_resample_time_series_rejects_implicit_downsampling():
+    time = np.arange(100, dtype=float)*0.01
+    signal = np.sin(2*np.pi*3*time)
+    with pytest.raises(ValueError, match="Downsampling"):
+        resample_time_series(time, signal, target_dt_s=0.02)
