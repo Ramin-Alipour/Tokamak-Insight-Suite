@@ -414,7 +414,10 @@ elif page=='Time Series & MHD':
     st.title('Time Series, Spectral & MHD Analysis'); need_data()
     tcol=st.selectbox('Time column (or sample index)',['<sample index>']+numeric,key='ts_t')
     scol=col_select('Signal channel',numeric,'ts_s')
-    fs0=st.number_input('Sampling frequency if no time column (Hz)',min_value=1e-9,value=10000.0,format='%.8g')
+    fs0=st.number_input('Sampling frequency if no time column (Hz; required for sample-index mode)',min_value=0.0,value=0.0,format='%.8g',help='No assumed 10 kHz default: enter the actual acquisition rate when no calibrated time column is available.')
+    if tcol=='<sample index>' and fs0<=0:
+        st.warning('A sampling rate is required because no time column is selected. Enter the acquisition rate above before interpreting frequency axes.')
+        st.stop()
     c1,c2,c3=st.columns(3)
     with c1: hp=st.number_input('High-pass cutoff (0=off)',min_value=0.0,value=0.0)
     with c2: lp=st.number_input('Low-pass cutoff (0=off)',min_value=0.0,value=0.0)
@@ -633,7 +636,7 @@ elif page=='Probe Analysis':
     with c2: ifit=st.slider('Ion-saturation range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)))
     with c3: area=st.number_input('Effective collection area (m²; 0=omit density)',min_value=0.0,value=0.0,format='%.8g')
     c1,c2,c3=st.columns(3)
-    with c1: mass=st.number_input('Main ion mass (amu)',min_value=0.0,value=2.0)
+    with c1: mass=st.number_input('Main ion mass (amu; 0 = do not estimate density)',min_value=0.0,value=0.0)
     with c2: ti=st.number_input('Ion temperature (eV; model input)',min_value=0.0,value=0.0)
     with c3: sheath=st.number_input('Sheath coefficient',min_value=0.01,value=.61)
     if st.button('Analyze probe I–V',type='primary'):
@@ -654,9 +657,15 @@ elif page=='Plasma Parameters':
         try: result=derive_parameters(ne,te,ti,ip,vl,R,minor,bt,W or None,ploss or None,ni or None,mi); st.json(result); json_download('Export parameter calculations',result,'tis_plasma_parameters.json')
         except Exception as e: st.error(str(e))
     with tabs[1]:
-        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g'); phase_sign=st.selectbox('Instrument phase convention',[-1,1],index=0)
-        if st.button('Convert phase to line-integrated density'): st.metric('Approximate line-integrated density (m⁻²)',f'{float(linear_phase_density(ph,freq,sign_convention=phase_sign)):.7g}')
-        st.caption('Output is ∫nₑ dl in m⁻², not local density. Verify the phase-sign convention and high-frequency/unmagnetized approximation for the instrument.')
+        ph=st.number_input('Interferometer phase shift (rad)',value=.1); freq=st.number_input('Probe frequency (Hz)',min_value=1.0,value=140e9,format='%.8g'); phase_sign=st.selectbox('Calibrated instrument phase convention',[-1,1],index=None,placeholder='Select measured convention')
+        if st.button('Convert phase to line-integrated density'):
+            if phase_sign is None:
+                st.error('Select the sign convention from the instrument documentation/calibration; TIS will not assume a sign.')
+            else:
+                density=float(linear_phase_density(ph,freq,sign_convention=phase_sign))
+                if density<0: st.warning('The selected convention and phase produce a negative line-integrated density. Check phase sign, reference phase and calibration before interpretation.')
+                st.metric('Approximate line-integrated density (m⁻²)',f'{density:.7g}')
+        st.caption('Output is ∫nₑ dl in m⁻², not local density. Sign convention must be selected from instrument calibration; negative results are flagged.')
     with tabs[2]:
         st.markdown('#### O-mode reflectometry cutoff density')
         rf=st.number_input('Probe frequency (GHz)',min_value=0.001,value=60.0,key='refl_freq')
@@ -706,7 +715,7 @@ elif page=='Equilibrium & Reconstruction':
 
 elif page=='Tomography & Bolometry':
     st.title('Tomography & Bolometry')
-    tomo_mode=st.radio('Reconstruction workflow',['General response-matrix inversion','Axisymmetric Abel inversion','Axisymmetric radiated-power integration'],horizontal=True)
+    tomo_mode=st.radio('Reconstruction workflow',['General response-matrix inversion','Build 2-D ray geometry matrix','Axisymmetric Abel inversion','Axisymmetric radiated-power integration'],horizontal=True)
     lam=st.number_input('Tikhonov regularization λ',min_value=0.0,value=.01,format='%.8g',key='tomo_lam'); nonneg=st.checkbox('Constrain reconstructed profile to be nonnegative',value=True,key='tomo_nonneg')
     if tomo_mode=='General response-matrix inversion':
         st.write('Solve y = A x + noise using a calibrated geometry / response matrix.')
@@ -725,6 +734,26 @@ elif page=='Tomography & Bolometry':
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
                 r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
+            except Exception as e: st.error(str(e))
+    elif tomo_mode=='Build 2-D ray geometry matrix':
+        st.write('Build a path-length response matrix from straight diagnostic lines of sight crossing a rectangular (x,z) pixel grid. This is geometry-based; it does not infer detector response, attenuation or equilibrium mapping.')
+        ray_start=st.file_uploader('Ray start coordinates (CSV: x,z metres; no header)',type=['csv'],key='tomo_ray_start')
+        ray_end=st.file_uploader('Ray end coordinates (CSV: x,z metres; no header)',type=['csv'],key='tomo_ray_end')
+        x_edges_text=st.text_input('x pixel edges (m, comma-separated)','-1,0,1')
+        z_edges_text=st.text_input('z pixel edges (m, comma-separated)','-1,0,1')
+        if ray_start is not None and ray_end is not None and st.button('Build geometry response matrix',type='primary'):
+            try:
+                from tis.core import build_tomography_matrix_2d
+                starts=pd.read_csv(ray_start,header=None).to_numpy(float)
+                ends=pd.read_csv(ray_end,header=None).to_numpy(float)
+                x_edges=[float(v.strip()) for v in x_edges_text.split(',')]
+                z_edges=[float(v.strip()) for v in z_edges_text.split(',')]
+                matrix=build_tomography_matrix_2d(starts,ends,x_edges,z_edges)
+                out=pd.DataFrame(matrix,columns=[f'pixel_{i}' for i in range(matrix.shape[1])])
+                st.success(f'Built {matrix.shape[0]} rays × {matrix.shape[1]} pixels; entries are path lengths in metres.')
+                st.dataframe(out,use_container_width=True)
+                download_df('Download geometry response matrix A',out,'tis_tomography_geometry_matrix.csv')
+                json_download('Export geometry matrix metadata',{'matrix_shape':list(matrix.shape),'x_edges_m':x_edges,'z_edges_m':z_edges,'column_order':'iz * nx + ix','entry_units':'m path length','model_limit':'Straight rays through rectangular pixels only; detector response, attenuation, toroidal geometry and equilibrium mapping are not included.'},'tis_tomography_geometry_manifest.json')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Axisymmetric Abel inversion':
         btxt=st.text_input('Chord impact parameters b (m, comma-separated)','0,0.02,0.04,0.06,0.08'); ytxt=st.text_input('Line-integrated measurements (units·m, comma-separated)','1.0,0.9,0.7,0.4,0.1'); etxt=st.text_input('Radial bin edges (m, comma-separated)','0,0.02,0.04,0.06,0.08,0.10')
