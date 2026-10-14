@@ -793,14 +793,22 @@ def analyze_doppler_line_end_to_end(
             raise ValueError("Background array must be finite and match the spectrum length.")
         corrected=corrected-bg
     response_applied=False
+    response=None
     if relative_response is not None:
         response=np.asarray(relative_response,dtype=float).ravel()
         if len(response)!=len(y) or not np.all(np.isfinite(response)) or np.any(response<=0):
             raise ValueError("Relative-response array must be positive, finite, and match the spectrum length.")
         corrected=corrected/response
         response_applied=True
+    sigma_fit=None
+    if intensity_uncertainty is not None:
+        sigma_fit=np.asarray(intensity_uncertainty,dtype=float).ravel()
+        if len(sigma_fit)!=len(y) or not np.all(np.isfinite(sigma_fit)) or np.any(sigma_fit<=0):
+            raise ValueError("Intensity uncertainties must be positive, finite, and match the spectrum length.")
+        if response is not None:
+            sigma_fit=sigma_fit/response
     fit=fit_spectral_line(wavelength,corrected,fit_min_wavelength,fit_max_wavelength,model="Gaussian",
-                          sigma_y=intensity_uncertainty)
+                          sigma_y=sigma_fit)
     observed_sigma=float(fit["sigma"])
     if instrument_sigma==0 and not assume_instrument_negligible:
         raise ValueError("Provide the calibrated instrumental Gaussian sigma or explicitly justify negligible instrumental broadening.")
