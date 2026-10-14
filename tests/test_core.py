@@ -129,7 +129,7 @@ def test_signal_quality_missing():
 
 
 def test_interferometry_phase_density_finite():
-    assert np.isfinite(linear_phase_density(.1,140e9))
+    assert np.isfinite(linear_phase_density(.1,140e9,sign_convention=1))
 
 
 def test_load_csv():
