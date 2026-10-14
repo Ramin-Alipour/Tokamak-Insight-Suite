@@ -26,7 +26,7 @@
 - CI compilation, unit tests, and dashboard health checks do not validate every interactive workflow or every physical diagnostic model.
 
 
-## Unreleased engineering fixes (2026-10-14)
+## v0.4.1 engineering fixes (2026-10-14)
 - Fixed wheel metadata to include the dashboard module and bundled JSON registries; added `tis dashboard` / `tis-dashboard` launchers and clean-environment wheel smoke tests.
 - Added source-distribution and tracked-source ZIP build/verification to CI.
 - Removed the duplicate NPA catalog entry; assigned diagnostic/formula IDs and classified formula inference separately from independent-validation status.
