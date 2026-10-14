@@ -838,7 +838,8 @@ elif page=='Diagnostic Catalog':
         st.write(f'{len(entries)} entries')
         for d in entries:
             with st.expander(f"{d['diagnostic']} · {d['family']}"):
-                st.markdown(f"**Observables:** {d['quantities']}\n\n**Quantity class (M=measured, D=derived, I=inferred):** {d['status']}\n\n**Method:** {d['method']}\n\n**Limitations:** {d['caveat']}")
+                function_text=', '.join(d.get('implementation_functions',[])) or 'No direct callable workflow is mapped; registry description only.'
+                st.markdown(f"**Observables:** {d['quantities']}\n\n**Quantity class (M=measured, D=derived, I=inferred):** {d['status']}\n\n**Implementation status:** {d.get('implementation_status','Registry reference only')}\n\n**Mapped functions:** `{function_text}`\n\n**Method:** {d['method']}\n\n**Limitations:** {d['caveat']}")
         json_download('Export diagnostic registry JSON',entries,'tis_diagnostic_registry.json')
     else:
         entries=[f for f in FORMULAS if not query or query in ' '.join(str(v) for v in f.values()).lower()]
