@@ -212,6 +212,36 @@ def welch_psd(values: Any, fs: float, nperseg: int | None = None) -> tuple[np.nd
 
 
 
+
+def autocorrelation_analysis(values: Any, fs: float, max_lag_s: float | None = None) -> dict[str, Any]:
+    """Compute normalized autocorrelation and its first positive 1/e decay time."""
+    x = np.asarray(values, dtype=float).ravel()
+    if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
+        raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
+    if not np.all(np.isfinite(x)):
+        raise ValueError('Signal must contain only finite values.')
+    if max_lag_s is not None and (not np.isfinite(max_lag_s) or max_lag_s < 0):
+        raise ValueError('Maximum lag must be finite and nonnegative.')
+    x = x - np.mean(x)
+    energy = float(np.dot(x, x))
+    if energy <= np.finfo(float).eps:
+        raise ValueError('Autocorrelation is undefined for a constant or numerically flat signal.')
+    corr = signal.correlate(x, x, mode='full', method='auto')[len(x)-1:] / energy
+    lags = np.arange(len(x), dtype=float) / fs
+    if max_lag_s is not None:
+        keep = lags <= max_lag_s
+        lags, corr = lags[keep], corr[keep]
+    crossing = np.flatnonzero(corr <= np.exp(-1))
+    tau = float(lags[crossing[0]]) if len(crossing) else None
+    return {
+        'lag_s': lags,
+        'autocorrelation': corr,
+        'e_folding_time_s': tau,
+        'n_samples': int(len(x)),
+        'note': 'The first 1/e crossing is a descriptive correlation-time estimate; periodic, noisy, nonstationary or short records require careful interpretation.',
+    }
+
+
 def time_frequency_spectrogram(
     values: Any,
     fs: float,
