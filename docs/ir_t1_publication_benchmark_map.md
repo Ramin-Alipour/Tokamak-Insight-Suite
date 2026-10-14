@@ -25,6 +25,14 @@ These graph-derived averages are consistent with the paper's rounded textual des
 
 This is an **internal consistency flag, not independent validation**: the paper states that Fig. 11 velocities were calculated from the Mach-number data. Before treating this as a physical discrepancy, refine the digitization/uncertainty and verify the exact temperature used for Eq. (4), ion mass, and averaging convention. The TIS workflow now calculates this relation explicitly so the assumptions and discrepancy are visible rather than silently declaring agreement.
 
+## Figure-derived hard-X-ray result check
+
+Source: Alipour et al., *Brazilian Journal of Physics* 47, 567–574 (2017), DOI [10.1007/s13538-017-0536-6](https://doi.org/10.1007/s13538-017-0536-6), Fig. 6 (0–5 ms spectrum) and Table 1.
+
+The five visible event energies in the 0–5 ms panel were provisionally digitized as 318.68, 620.88, 673.08, 750.00 and 925.82 keV. Treating each plotted event as one count, TIS `xray_spectrum_summary(..., bin_representation="counts_per_bin")` gives a mean of **657.69 keV**. Table 1 reports 5 counts and 3301 keV total energy, corresponding to **660.20 keV**; the difference is **−0.38%**, within a 1% allowance for figure pixel/axis digitization. This is now a regression test in `tests/test_publication_figure_consistency.py`.
+
+This confirms the arithmetic/weighting path against a figure-derived spectrum and the paper's summary table; it does **not** validate detector calibration or replace the original event data.
+
 ## Evidence boundary
 
 The original IR-T1 raw diagnostic files are not included with these papers and are not assumed to be publicly available. The first reproduction pass therefore must label each reference as one of:
