@@ -24,3 +24,13 @@
 - Phase-only mode fitting cannot recover the true mode number beyond the spatial Nyquist limit without independent information or a physical prior.
 - Negative background-subtracted spectral bins require a justified noise/background treatment; they are not silently clipped.
 - CI compilation, unit tests, and dashboard health checks do not validate every interactive workflow or every physical diagnostic model.
+
+
+## Unreleased engineering fixes (2026-10-14)
+- Fixed wheel metadata to include the dashboard module and bundled JSON registries; added `tis dashboard` / `tis-dashboard` launchers and clean-environment wheel smoke tests.
+- Added source-distribution and tracked-source ZIP build/verification to CI.
+- Removed the duplicate NPA catalog entry; assigned diagnostic/formula IDs and classified formula inference separately from independent-validation status.
+- Added bounded tabular-import preflight checks and a visible report of numeric coercions.
+- Added filter-impact analysis, spectral-fit residual diagnostics, tomography matrix conditioning/coverage and optional measurement-noise Monte Carlo sensitivity, leave-one-sensor-out mode robustness, and guarded uniform-grid resampling.
+- Consolidated duplicate dashboard smoke tests and expanded UI regression coverage to click the probe-analysis action.
+- These changes improve engineering checks; they do not imply independent experimental validation of every diagnostic workflow.
