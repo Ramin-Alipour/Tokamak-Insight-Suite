@@ -261,3 +261,47 @@ def test_mode_number_requires_distinct_sensor_angles():
     from tis.core import mode_number_from_phase
     with pytest.raises(ValueError, match="distinct"):
         mode_number_from_phase([1, 1, 1], [0, 1, 2])
+
+
+# Additional signal-analysis invariants added during the v0.4.x audit.
+def test_fft_recovers_frequency_of_synthetic_single_tone():
+    from tis.core import fft_spectrum
+    fs = 2048.0
+    n = 4096
+    frequency_hz = 128.0
+    t = np.arange(n) / fs
+    signal = 2.5 * np.sin(2 * np.pi * frequency_hz * t)
+    frequencies, amplitudes = fft_spectrum(signal, fs, window="boxcar")
+    peak = int(np.argmax(amplitudes[1:]) + 1)
+    assert frequencies[peak] == pytest.approx(frequency_hz)
+    assert amplitudes[peak] == pytest.approx(2.5, rel=1e-10)
+
+
+def test_welch_psd_peak_matches_synthetic_mhd_tone():
+    from tis.core import welch_psd
+    fs = 100_000.0
+    n = 16_384
+    frequency_hz = 12_207.03125
+    t = np.arange(n) / fs
+    signal = np.sin(2 * np.pi * frequency_hz * t)
+    frequencies, psd = welch_psd(signal, fs, nperseg=4096, noverlap=2048)
+    peak = int(np.argmax(psd[1:]) + 1)
+    assert frequencies[peak] == pytest.approx(frequency_hz, abs=fs / 4096)
+    assert np.all(np.isfinite(psd))
+    assert np.all(psd >= 0)
+
+
+def test_fluctuation_flux_covariance_is_zero_for_constant_radial_velocity():
+    density = np.array([1.0, 2.0, 3.0, 4.0, 5.0]) * 1e19
+    radial_velocity = np.full(5, 12.0)
+    result = fluctuation_flux(density, radial_velocity)
+    assert result["particle_flux_covariance_m-2_s-1"] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_fluctuation_flux_uses_common_finite_sample_mask():
+    density = np.array([1.0, 2.0, np.nan, 4.0, 5.0])
+    radial_velocity = np.array([5.0, 4.0, 100.0, 2.0, 1.0])
+    result = fluctuation_flux(density, radial_velocity)
+    expected = np.mean((np.array([1.0, 2.0, 4.0, 5.0]) - 3.0) *
+                       (np.array([5.0, 4.0, 2.0, 1.0]) - 3.0))
+    assert result["particle_flux_covariance_m-2_s-1"] == pytest.approx(expected)
