@@ -26,20 +26,12 @@ def fetch_sample(output_dir: Path, max_samples: int = 70000) -> dict:
     if max_samples < 1024:
         raise ValueError("max_samples must be at least 1024")
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Resolve the archive URL from FAIR-MAST's JSON API instead of assuming
-    # a permanent S3 endpoint/path. This is the access pattern in the archive docs.
-    import urllib.request
-
-    api_url = f"https://mastapp.site/json/shots/{29790}"
-    request = urllib.request.Request(api_url, headers={"User-Agent": "Tokamak-Insight-Suite/0.3"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        shot_meta = json.loads(response.read().decode("utf-8"))
-    endpoint = shot_meta.get("endpoint_url")
-    archive_url = shot_meta.get("url")
-    if not endpoint or not archive_url:
-        raise RuntimeError(f"FAIR-MAST API response lacks endpoint_url/url: {shot_meta}")
-    shot_url = archive_url.replace("s3:/", endpoint, 1)
-    ds = xr.open_zarr(shot_url, group=DEFAULT_GROUP, consolidated=False)
+    # The FAIR-MAST documentation gives this public S3-compatible URL and
+    # opens the shot directly with xarray.open_zarr(..., group="xmo").
+    # Let xarray detect consolidated metadata when available; forcing
+    # consolidated=False can produce an empty group on this archive.
+    shot_url = DEFAULT_URL
+    ds = xr.open_zarr(shot_url, group=DEFAULT_GROUP)
     try:
         # Tolerate catalog/store revisions in coordinate and channel naming.
         time_name = next((name for name in ("time", "time1") if name in ds.variables), None)
@@ -78,7 +70,6 @@ def fetch_sample(output_dir: Path, max_samples: int = 70000) -> dict:
             "source_group": DEFAULT_GROUP,
             "signal": signal_name,
             "source_url": shot_url,
-            "metadata_api_url": api_url,
             "source_documentation": SOURCE_PAGE,
             "source_signal_class": "Raw",
             "source_units_note": "Raw source signal; interpret units/calibration using original channel metadata.",
