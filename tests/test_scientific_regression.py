@@ -12,10 +12,10 @@ import pytest
 from tis.core import (
     AMU, C_LIGHT, E_CHARGE, EPS0, M_E, MU0,
     corrected_line_ratio, derive_parameters, doppler_temperature_eV,
-    doppler_velocity_m_s, electron_cyclotron_resonance_field,
+    doppler_velocity_m_s, electron_cyclotron_resonance_field, fluctuation_flux,
     exponential_heat_flux_fit, floating_potential, integrate_profile,
     linear_phase_density, neutron_rate_from_counts, reflectometry_cutoff_density,
-    spectrum_moments, xray_spectrum_summary,
+    spectrum_moments, uncertainty_linear, xray_spectrum_summary,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS
 
@@ -117,3 +117,48 @@ def test_registry_json_files_are_valid_json():
             parsed = json.load(stream)
         assert isinstance(parsed, (list, dict))
         assert parsed
+
+
+
+def test_doppler_temperature_rejects_nonfinite_inputs():
+    with pytest.raises(ValueError):
+        doppler_temperature_eV(float("nan"), 500.0, 40.0)
+    with pytest.raises(ValueError):
+        doppler_temperature_eV(0.01, float("inf"), 40.0)
+
+
+def test_derived_parameters_reject_negative_ion_density():
+    with pytest.raises(ValueError):
+        derive_parameters(1e19, 10, 10, 1e5, 1, 1, .3, 2, ni_m3=-1)
+
+
+def test_neutron_rate_rejects_nonfinite_factors():
+    with pytest.raises(ValueError):
+        neutron_rate_from_counts(1000, float("nan"))
+    with pytest.raises(ValueError):
+        neutron_rate_from_counts(1000, 0.2, geometric_factor=float("inf"))
+
+
+def test_ecr_harmonic_must_be_a_positive_integer():
+    with pytest.raises(ValueError):
+        electron_cyclotron_resonance_field(60e9, harmonic=1.5)
+
+
+def test_uncertainty_calibration_rejects_invalid_inputs():
+    with pytest.raises(ValueError):
+        uncertainty_linear([1, 2], 1, 0, sigma_y=-0.1)
+    with pytest.raises(ValueError):
+        uncertainty_linear([1, float("nan")], 1, 0)
+
+
+def test_tomography_rejects_nonfinite_matrix_and_measurements():
+    from tis.core import regularized_tomography
+    with pytest.raises(ValueError):
+        regularized_tomography([[1, float("nan")]], [1])
+
+
+def test_fluctuation_flux_uses_common_finite_mask():
+    result = fluctuation_flux([1, 2, 3, 4], [-1, 0, 1, 2], [10, 20, float("nan"), 40])
+    assert np.isfinite(result["particle_flux_covariance_m-2_s-1"])
+    assert np.isfinite(result["electron_heat_flux_proxy_W_m-2"])
+    assert result["mean_density_m-3"] == pytest.approx(7 / 3)
