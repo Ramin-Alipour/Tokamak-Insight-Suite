@@ -26,26 +26,20 @@ def fetch_sample(output_dir: Path, max_samples: int = 70000) -> dict:
     if max_samples < 1024:
         raise ValueError("max_samples must be at least 1024")
     output_dir.mkdir(parents=True, exist_ok=True)
-    # Open the public Zarr group remotely; do not commit the full experimental data.
-    # Some remote Zarr/fsspec combinations expose an empty root when opened over HTTP.
-    # Try the explicit group URL first, then FAIR-MAST's documented group argument.
-    ds = None
-    open_errors = []
-    for opener in (
-        lambda: xr.open_zarr(f"{DEFAULT_URL.rstrip('/')}/{DEFAULT_GROUP}", consolidated=False),
-        lambda: xr.open_zarr(DEFAULT_URL, group=DEFAULT_GROUP, consolidated=False),
-    ):
-        try:
-            candidate = opener()
-            if candidate.variables:
-                ds = candidate
-                break
-            candidate.close()
-            open_errors.append("opened dataset had no variables")
-        except Exception as exc:
-            open_errors.append(f"{type(exc).__name__}: {exc}")
-    if ds is None:
-        raise RuntimeError("Could not open FAIR-MAST Zarr group; " + " | ".join(open_errors))
+    # Resolve the archive URL from FAIR-MAST's JSON API instead of assuming
+    # a permanent S3 endpoint/path. This is the access pattern in the archive docs.
+    import urllib.request
+
+    api_url = f"https://mastapp.site/json/shots/{29790}"
+    request = urllib.request.Request(api_url, headers={"User-Agent": "Tokamak-Insight-Suite/0.3"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        shot_meta = json.loads(response.read().decode("utf-8"))
+    endpoint = shot_meta.get("endpoint_url")
+    archive_url = shot_meta.get("url")
+    if not endpoint or not archive_url:
+        raise RuntimeError(f"FAIR-MAST API response lacks endpoint_url/url: {shot_meta}")
+    shot_url = archive_url.replace("s3:/", endpoint, 1)
+    ds = xr.open_zarr(shot_url, group=DEFAULT_GROUP, consolidated=False)
     try:
         # Tolerate catalog/store revisions in coordinate and channel naming.
         time_name = next((name for name in ("time", "time1") if name in ds.variables), None)
@@ -83,7 +77,7 @@ def fetch_sample(output_dir: Path, max_samples: int = 70000) -> dict:
             "shot": 29790,
             "source_group": DEFAULT_GROUP,
             "signal": signal_name,
-            "source_url": DEFAULT_URL,
+            "source_url": shot_url,\n            "metadata_api_url": api_url,
             "source_documentation": SOURCE_PAGE,
             "source_signal_class": "Raw",
             "source_units_note": "Raw source signal; interpret units/calibration using original channel metadata.",
