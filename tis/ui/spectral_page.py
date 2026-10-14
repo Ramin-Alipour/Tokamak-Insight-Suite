@@ -6,7 +6,7 @@ from tis.core import (
     spectral_calibration, polynomial_calibration, fit_spectral_line,
     evaluate_spectral_fit, analyze_doppler_line_end_to_end,
     doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s,
-    corrected_line_ratio, xray_spectrum_summary, spectrum_moments,
+    corrected_line_ratio, xray_spectrum_summary, spectrum_moments, detect_spectral_peaks, match_spectral_lines,
 )
 
 
@@ -16,8 +16,43 @@ def render_spectral_page(st, df, numeric, col_select, plot_line, json_download, 
         st.info('Load a spectrum or energy-distribution table using the left-hand panel first.')
         st.stop()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['End-to-end Doppler workflow','Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='End-to-end Doppler workflow':
+    mode=st.radio('Workflow',['End-to-end Doppler workflow','Peak detection & line identification','Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='Peak detection & line identification':
+        st.caption('Detect peaks from the measured spectrum, then optionally match their coordinates against a user-supplied validated line list. This workflow does not infer atomic identity from wavelength alone.')
+        xcol=col_select('Wavelength / spectral coordinate',numeric,'peak_id_x')
+        ycol=col_select('Measured intensity',numeric,'peak_id_y')
+        c1,c2,c3=st.columns(3)
+        with c1: prominence_fraction=st.number_input('Relative prominence threshold',min_value=0.0,value=0.01,step=0.01,format='%.6g',key='peak_id_prom_frac')
+        with c2: absolute_prominence=st.number_input('Absolute prominence override (0 = use relative)',min_value=0.0,value=0.0,format='%.8g',key='peak_id_prom_abs')
+        with c3: min_distance=st.number_input('Minimum peak spacing (same x units)',min_value=0.0,value=0.0,format='%.8g',key='peak_id_distance')
+        st.caption('The coordinate and reference line list must use identical units. Correct background and instrument response before interpreting weak/overlapping lines.')
+        if st.button('Detect spectral peaks',type='primary',key='peak_id_run'):
+            try:
+                result=detect_spectral_peaks(df[xcol],df[ycol],min_prominence=None if absolute_prominence==0 else float(absolute_prominence),prominence_fraction=float(prominence_fraction),min_distance_coordinate=float(min_distance))
+                peaks=pd.DataFrame({'peak_coordinate':result['peak_coordinate'],'peak_intensity':result['peak_intensity'],'prominence':result['prominence']})
+                st.metric('Detected peaks',result['n_detected_peaks'])
+                st.dataframe(peaks,use_container_width=True)
+                download_df('Download detected spectral peaks',peaks,'tis_detected_spectral_peaks.csv')
+                json_download('Export peak-detection settings',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_spectral_peak_detection.json')
+                ref_file=st.file_uploader('Optional reference line-list CSV (wavelength/species/transition)',type=['csv'],key='peak_id_reference_file')
+                if ref_file is not None:
+                    refs=pd.read_csv(ref_file)
+                    c1,c2,c3=st.columns(3)
+                    with c1: ref_x=st.selectbox('Reference coordinate column',list(refs.columns),key='peak_id_ref_x')
+                    with c2: ref_species=st.selectbox('Species column (optional)',['<none>']+list(refs.columns),key='peak_id_ref_species')
+                    with c3: ref_transition=st.selectbox('Transition column (optional)',['<none>']+list(refs.columns),key='peak_id_ref_transition')
+                    tolerance=st.number_input('Matching tolerance (same coordinate units)',min_value=0.000001,value=0.05,format='%.8g',key='peak_id_tolerance')
+                    if st.button('Match peaks to reference line list',key='peak_id_match'):
+                        try:
+                            matches=match_spectral_lines(result['peak_coordinate'],refs,tolerance=float(tolerance),wavelength_column=ref_x,species_column=ref_species if ref_species!='<none>' else '__no_species__',transition_column=ref_transition if ref_transition!='<none>' else '__no_transition__')
+                            st.dataframe(matches,use_container_width=True)
+                            download_df('Download line matches',matches,'tis_spectral_line_matches.csv')
+                            if (matches['match_status']=='AMBIGUOUS_MATCH').any():
+                                st.warning('Some measured peaks have multiple reference lines within the tolerance. Do not force a unique species assignment without additional spectral/atomic evidence.')
+                        except Exception as exc: st.error(f'Line matching failed: {exc}')
+            except Exception as exc:
+                st.error(f'Spectral peak detection failed: {exc}')
+    elif mode=='End-to-end Doppler workflow':
         st.caption('Unified path: raw coordinate → wavelength calibration → optional background/relative-response correction → Gaussian fit/residuals → instrument-width correction → Doppler temperature and line-of-sight velocity with stated uncertainty. Verify the atomic transition and isotope independently.')
         xcol=col_select('Raw pixel / spectral coordinate',numeric,'e2e_sp_x')
         ycol=col_select('Measured intensity',numeric,'e2e_sp_y')
