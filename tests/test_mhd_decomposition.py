@@ -60,3 +60,27 @@ def test_morlet_wavelet_rejects_frequency_support_longer_than_record():
     x = np.sin(2 * np.pi * 100 * t)
     with pytest.raises(ValueError, match="too long for this record"):
         morlet_wavelet_analysis(t, x, [100.0])
+
+def test_ir_t1_published_mhd_frequency_band_is_resolved_by_fft_and_welch():
+    """Synthetic numerical stress test at the ~44 kHz band reported for IR-T1.
+
+    This checks sampling, frequency-axis and PSD behavior at the publication's
+    frequency scale; it is not a reproduction of the paper's missing raw trace.
+    """
+    from tis.core import fft_spectrum, welch_psd
+
+    fs = 200_000.0
+    n = 10_000
+    t = np.arange(n) / fs
+    x = 0.7 * np.sin(2 * np.pi * 44_000.0 * t)
+
+    freq_fft, amplitude = fft_spectrum(x, fs, window="hann")
+    freq_psd, psd = welch_psd(x, fs, nperseg=2_000, noverlap=1_000)
+
+    fft_peak = freq_fft[np.argmax(amplitude)]
+    psd_peak = freq_psd[np.argmax(psd)]
+    integrated_variance = np.trapezoid(psd, freq_psd)
+
+    assert fft_peak == pytest.approx(44_000.0, abs=20.0)
+    assert psd_peak == pytest.approx(44_000.0, abs=100.0)
+    assert integrated_variance == pytest.approx(np.var(x), rel=0.03)
