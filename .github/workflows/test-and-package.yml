@@ -2,7 +2,7 @@ name: Test and package Tokamak Insight Suite v0.4.0
 
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -57,12 +57,17 @@ jobs:
           rm -rf /tmp/tis-package
           mkdir -p /tmp/tis-package/Tokamak_Insight_Suite
           git archive HEAD | tar -x -C /tmp/tis-package/Tokamak_Insight_Suite
+          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.3.0.zip
+          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.3.0.zip.sha256
           rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.4.0.zip
+          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.4.0.zip.sha256
           cd /tmp/tis-package
           zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip" Tokamak_Insight_Suite
 
       - name: Generate SHA-256 checksum
-        run: sha256sum "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip" > "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip.sha256"
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          sha256sum Tokamak_Insight_Suite_v0.4.0.zip > Tokamak_Insight_Suite_v0.4.0.zip.sha256
 
       - name: Upload tested source ZIP and checksum
         uses: actions/upload-artifact@v4
