@@ -2,7 +2,7 @@
 
 **سامانهٔ پایتون برای بررسی داده‌های تشخیصی توکامک، محاسبات پایهٔ فیزیک پلاسما و ثبت منشأ داده‌ها**
 
-این پروژه از ابتدا به‌عنوان یک برنامهٔ مستقل ساخته شده است. فایل مرجع اصلی آن `docs/reference/tokamak.pdf` است؛ همان سند ۲۴ صفحه‌ای موجود در Library که خانواده‌های تشخیصی، کمیت‌های قابل‌اندازه‌گیری، روابط محاسباتی و محدودیت‌های اندازه‌گیری را فهرست می‌کند. متن استخراج‌شده نیز برای جست‌وجو و ممیزی در کنار PDF ذخیره شده است.
+این پروژه یک برنامهٔ مستقل پایتون است. متن مرجع همراه مخزن در `docs/reference/tokamak_reference_extracted.txt` قرار دارد و از سند ۲۴ صفحه‌ای `tokamak.pdf` موجود در Library استخراج شده است. خود PDF در این مخزن کپی نشده است؛ بنابراین اجرای نرم‌افزار به فایل PDF وابسته نیست.
 
 ## اجرا
 
@@ -61,7 +61,6 @@ Tokamak_Insight_Suite/
 ├── tests/test_core.py
 ├── examples/sample_mhd_signal.csv
 ├── docs/
-│   ├── reference/tokamak.pdf
 │   ├── reference/tokamak_reference_extracted.txt
 │   ├── diagnostic_coverage.md
 │   └── scientific_scope.md
@@ -87,8 +86,8 @@ python -m pytest -q
 
 ## منبع دامنهٔ علمی
 
-- سند مرجع کاربر: `docs/reference/tokamak.pdf` (۲۴ صفحه؛ کپی همان فایل Library)
-- متن قابل جست‌وجو: `docs/reference/tokamak_reference_extracted.txt`
+- سند اصلی ۲۴ صفحه‌ای: `tokamak.pdf` در Library کاربر (در مخزن کپی نشده است)
+- متن استخراج‌شده همراه پروژه: `docs/reference/tokamak_reference_extracted.txt`
 - فهرست تشخیص‌ها و فرمول‌ها: `DIAGNOSTIC_REGISTRY.json` و `FORMULA_REGISTRY.json`
 
 عنوان‌های منابع بیرونی که در PDF مرجع ذکر شده‌اند، به‌عنوان سرنخ کتاب‌شناختی حفظ شده‌اند؛ وجود نام منبع در PDF به معنی اعتبارسنجی مستقل همهٔ روابط یا پیاده‌سازی آن‌ها در نرم‌افزار نیست.
