@@ -67,7 +67,7 @@ with st.sidebar:
             else:
                 uploaded_bytes=st.session_state.get("tis_upload_raw",b"")
                 uploaded_sha=st.session_state.get("tis_upload_sha","")
-            delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\\t","|":"|"}
+            delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\t","|":"|"}
             sheet_value=import_sheet.strip()
             sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
