@@ -721,3 +721,54 @@ def test_langmuir_missing_ion_range_is_reported_not_silently_omitted():
 def test_positive_interferometer_phase_has_explicit_positive_default_convention():
     density = linear_phase_density(0.1, 10e9)
     assert density[()] > 0
+
+
+def test_load_table_recovers_numeric_signal_with_a_units_row():
+    raw=b"time,signal\\ns,V\\n0,1\\n1,2\\n2,3\\n"
+    frame=load_table(raw,"instrument.csv")
+    assert pd.api.types.is_numeric_dtype(frame["signal"])
+    assert np.isnan(frame["signal"].iloc[0])
+    np.testing.assert_allclose(frame["signal"].iloc[1:].to_numpy(),[1,2,3])
+
+
+def test_load_table_enforces_byte_limit():
+    with pytest.raises(ValueError,match="import limit"):
+        load_table(b"time,signal\\n0,1\\n","sample.csv",max_bytes=8)
+
+
+def test_spectrum_moments_distinguishes_counts_per_bin_from_density():
+    energy=np.array([1.0,2.0,5.0])
+    counts=np.array([1.0,1.0,1.0])
+    by_bin=spectrum_moments(energy,counts,bin_representation="counts_per_bin")
+    density=spectrum_moments(energy,counts,bin_representation="density_per_eV")
+    assert by_bin["integrated_counts"] == pytest.approx(3.0)
+    assert density["integrated_counts_eV"] == pytest.approx(4.0)
+    assert by_bin["mean_energy_eV"] != pytest.approx(density["mean_energy_eV"])
+
+
+def test_voigt_fit_requires_enough_points_for_five_parameters():
+    x=np.linspace(-1,1,10)
+    y=1+np.exp(-x*x)
+    with pytest.raises(ValueError,match="15 valid spectral points"):
+        fit_spectral_line(x,y,model="Voigt")
+
+
+def test_duplicate_probe_voltages_are_aggregated_before_derivative():
+    voltage=np.array([-3,-2,-1,0,0,1,2,3,4],dtype=float)
+    current=np.array([-3,-2,-1,0.0,0.1,1,2,3,4],dtype=float)
+    result=probe_iv_summary(voltage,current)
+    assert np.isfinite(result["max_dIdV_A_per_V"])
+    assert np.isfinite(result["min_dIdV_A_per_V"])
+
+
+def test_heat_flux_proxy_decomposes_into_fluctuation_components():
+    from tis.core import fluctuation_flux, E_CHARGE
+    rng=np.random.default_rng(11)
+    n=1e19*(1+0.02*rng.normal(size=1000))
+    te=100*(1+0.05*rng.normal(size=1000))
+    vr=1e3*rng.normal(size=1000)
+    result=fluctuation_flux(n,vr,te)
+    total=(result["electron_heat_flux_density_fluctuation_component_W_m-2"]+
+           result["electron_heat_flux_temperature_fluctuation_component_W_m-2"]+
+           result["electron_heat_flux_triple_fluctuation_component_W_m-2"])
+    assert result["electron_heat_flux_proxy_W_m-2"] == pytest.approx(total,rel=1e-12)
