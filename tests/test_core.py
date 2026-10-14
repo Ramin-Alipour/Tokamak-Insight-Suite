@@ -963,3 +963,9 @@ def test_end_to_end_doppler_workflow_rejects_unresolved_thermal_width():
             rest_wavelength=500.0, ion_mass_amu=40.0,
             fit_min_wavelength=499.8, fit_max_wavelength=500.2,
             instrument_sigma=0.04, calibration_degree=1)
+
+
+def test_signal_quality_duplicate_fraction_means_repeated_amplitudes_not_timestamps():
+    r = signal_quality([1.0, 1.0, 2.0, 3.0])
+    assert r['duplicate_fraction'] == 0.25
+    assert 'not a timestamp-duplicate metric' in r['duplicate_fraction_definition']
