@@ -23,23 +23,40 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def load_table(data: bytes, filename: str, sheet_name: str | int = 0) -> pd.DataFrame:
+def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
+               delimiter: str | None = None, decimal: str = ".", skiprows: int = 0,
+               header: int | None | str = "infer", comment: str | None = None,
+               max_bytes: int = 100_000_000) -> pd.DataFrame:
+    """Load tabular data with explicit parsing options and bounded input size.
+
+    '#' remains an ordinary character by default, preserving headers such as Ch#1.
+    """
+    if not isinstance(data, (bytes, bytearray)):
+        raise TypeError("data must be bytes.")
+    if len(data) > max_bytes:
+        raise ValueError(f"Input exceeds the configured {max_bytes:,}-byte import limit.")
+    if decimal not in {".", ","}:
+        raise ValueError("decimal must be '.' or ','.")
+    if isinstance(skiprows, bool) or not isinstance(skiprows, int) or skiprows < 0:
+        raise ValueError("skiprows must be a nonnegative integer.")
     name = filename.lower()
-    if name.endswith(('.csv', '.txt')):
-        # CSV first; fall back to common tab/semicolon separators.
-        try:
-            frame = pd.read_csv(io.BytesIO(data), sep=None, engine='python', comment='#')
-        except Exception:
-            frame = pd.read_csv(io.BytesIO(data), comment='#')
-    elif name.endswith(('.xlsx', '.xls')):
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name)
-    elif name.endswith(('.parquet', '.pq')):
+    if name.endswith((".csv", ".txt")):
+        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
+        if comment is not None:
+            kwargs["comment"] = comment
+        frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None,
+                            engine="python" if delimiter is None else "c", **kwargs)
+    elif name.endswith((".xlsx", ".xls")):
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header)
+    elif name.endswith((".parquet", ".pq")):
         frame = pd.read_parquet(io.BytesIO(data))
     else:
-        raise ValueError('Supported formats: CSV, TXT, XLSX/XLS and Parquet (Parquet requires a compatible engine).')
+        raise ValueError("Supported formats: CSV, TXT, XLSX/XLS and Parquet.")
+    if isinstance(frame, dict):
+        raise ValueError("Select one worksheet at a time.")
     if frame.empty:
-        raise ValueError('The imported table is empty.')
-    frame.columns = [str(c).strip() or f'column_{i}' for i, c in enumerate(frame.columns)]
+        raise ValueError("The imported table is empty.")
+    frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
     return frame
 
 
@@ -146,12 +163,14 @@ def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None
     # Detect isolated dropped samples as well as globally jittery clocks.
     jitter = float(np.std(dt) / np.mean(dt)) if len(dt)>1 else 0.0
     max_gap_ratio = float(np.max(dt) / med_dt)
-    outlier_fraction = float(np.mean(np.abs(dt - med_dt) > 0.05 * med_dt))
-    if max_gap_ratio > 1.05 or outlier_fraction > 0.01 or jitter > 0.02:
+    # Quantized clocks can alternate adjacent intervals; reject likely gaps,
+    # not harmless timestamp rounding at high sample rates.
+    outlier_fraction = float(np.mean(dt > 1.5 * med_dt))
+    if max_gap_ratio > 1.5 or outlier_fraction > 0.01:
         raise ValueError(
-            "Irregular sampling or a timestamp gap was detected "
+            "A likely dropped-sample gap was detected "
             f"(std/mean={jitter:.3g}, max_dt/median_dt={max_gap_ratio:.3g}, "
-            f"intervals outside ±5%={outlier_fraction:.2%}). "
+            f"intervals >1.5× median={outlier_fraction:.2%}). "
             "Repair/resample explicitly before FFT/filtering."
         )
     return t, y, 1.0/med_dt
@@ -457,7 +476,7 @@ def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     return float(C_LIGHT*delta_lambda/lambda0)
 
 
-def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int = -1) -> np.ndarray:
+def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int = 1) -> np.ndarray:
     """Return line-integrated electron density ∫n_e dl in m⁻², not local density.
 
     sign_convention must be +1 or -1 and reflects the instrument's phase convention:
@@ -616,8 +635,10 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         if fit_range is not None:
             if len(fit_range) != 2 or not np.all(np.isfinite(np.asarray(fit_range, dtype=float))):
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.")
-    if (area_m2 is None) != (ion_mass_amu is None):
-        raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
+    if area_m2 is None:
+        ion_mass_amu = None
+    elif ion_mass_amu is None:
+        raise ValueError("ion_mass_amu is required when area_m2 is supplied.")
     if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
         raise ValueError("Collection area must be positive and finite.")
     if ion_mass_amu is not None and (not np.isfinite(ion_mass_amu) or ion_mass_amu <= 0):
@@ -639,7 +660,10 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         out['floating_potential_V']=float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
     else:
         out['floating_potential_V']=None
-    didv=np.gradient(i,v); out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
+    didv=np.gradient(i,v)
+    if not np.all(np.isfinite(didv)):
+        raise ValueError("dI/dV is non-finite; voltage values must be distinct and well-conditioned.")
+    out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
     if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
@@ -660,6 +684,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             out['electron_retarding_log_slope_per_V']=slope
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
+    if area_m2 is not None and 'ion_saturation_current_A' not in out:
+        out['ion_density_status'] = "not_estimated: provide an ion_fit_range containing at least three points"
     if area_m2 is not None and 'ion_saturation_current_A' in out:
         te_value = out.get('electron_temperature_eV')
         if te_value is None or not np.isfinite(te_value) or te_value <= 0:
@@ -702,16 +728,12 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     gaps=np.diff(np.r_[th, th[0]+2*np.pi])
     if np.any(gaps <= 1e-10):
         raise ValueError('Sensor angles must be unique modulo 2π.')
-    alias_limit=int(np.floor(np.pi/np.max(gaps) + 1e-9))
+    alias_limit=max(0, int(np.ceil(np.pi/np.max(gaps) - 1e-12)) - 1)
     if alias_limit < 1:
         raise ValueError('Sensor geometry is too sparse for an unambiguous nonzero mode estimate.')
     if max_mode_number is not None and (isinstance(max_mode_number,bool) or int(max_mode_number)!=max_mode_number or max_mode_number < 0):
         raise ValueError('max_mode_number must be a nonnegative integer when supplied.')
     limit=min(alias_limit,int(max_mode_number)) if max_mode_number is not None else alias_limit
-    # Unwrap only after spatial sorting; fit against angles shifted to start at zero.
-    ph=np.unwrap(ph)
-    th0=th-th[0]
-    X=np.column_stack([th0,np.ones_like(th0)])
     if weights is None:
         w=np.ones(len(th))
     else:
@@ -719,16 +741,25 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
         if len(w0)!=len(th) or not np.all(np.isfinite(w0)) or np.any(w0<0) or not np.any(w0>0):
             raise ValueError('Weights must be finite, nonnegative, match sensor count, and include a positive value.')
         w=w0[order]
-    coef=np.linalg.lstsq(X*np.sqrt(w[:,None]),ph*np.sqrt(w),rcond=None)[0]
-    pred=X@coef
-    n=float(coef[0])
-    if abs(n) >= limit-1e-8 and limit > 0:
-        raise ValueError(f'Estimated |n|={abs(n):.4g} is at/above the unambiguous spatial limit {limit}; mode direction/aliasing is ambiguous. Add sensors or supply a justified lower max_mode_number.')
-    residual=ph-pred
-    return {'mode_number_fit':n,'nearest_integer_mode_number':float(np.rint(n)),'phase_offset_rad':float(coef[1]),
-            'phase_fit_R2':_r2(ph,pred),'phase_rms_residual_rad':float(np.sqrt(np.average(residual**2,weights=w))),
+    # Zero-weight sensors must not participate in phase branch selection.
+    keep=w>0
+    th,ph,w=th[keep],ph[keep],w[keep]
+    if len(th)<3:
+        raise ValueError("At least three positive-weight sensors are required for mode fitting.")
+    th0=th-th[0]
+    candidates=np.arange(-limit,limit+1,dtype=int)
+    scores=np.asarray([abs(np.sum(w*np.exp(1j*(ph-n*th0))))/np.sum(w) for n in candidates])
+    n_int=int(candidates[int(np.argmax(scores))])
+    phase_offset=float(np.angle(np.sum(w*np.exp(1j*(ph-n_int*th0)))))
+    residual=np.angle(np.exp(1j*(ph-(n_int*th0+phase_offset))))
+    rms=float(np.sqrt(np.average(residual**2,weights=w)))
+    base=np.angle(np.exp(1j*(ph-phase_offset)))
+    denom=float(np.sum(w*base**2))
+    r2=float(1.0-float(np.sum(w*residual**2))/denom) if denom>np.finfo(float).eps else (1.0 if rms<1e-12 else 0.0)
+    return {'mode_number_fit':float(n_int),'nearest_integer_mode_number':float(n_int),'phase_offset_rad':phase_offset,
+            'phase_fit_R2':r2,'phase_rms_residual_rad':rms,
             'spatial_alias_limit_mode_number':limit,
-            'aliasing_note':'Modes above the spatial Nyquist limit alias to lower modes; phase-only fitting cannot identify the true aliased mode without additional geometry or a prior bound.'}
+            'aliasing_note':'Integer circular-phase search; modes above the spatial sampling limit alias and require a justified prior bound.'}
 
 
 def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
@@ -910,8 +941,8 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
     o=np.argsort(e); e,c=e[o],c[o]
     if sigma is not None: sigma=sigma[o]
     if np.any(np.diff(e) <= 0): raise ValueError('Energy coordinates must be unique after sorting.')
-    if np.any(c < 0):
-        raise ValueError('Background-subtracted spectrum contains negative bins; moments are not computed by clipping noise. Improve the background/noise model or explicitly select a justified nonnegative signal.')
+    # Signed net bins are retained after background subtraction; do not clip
+    # measured noise. Total area and variance are checked below.
     quad=np.empty_like(e)
     quad[0]=(e[1]-e[0])/2; quad[-1]=(e[-1]-e[-2])/2
     quad[1:-1]=(e[2:]-e[:-2])/2
@@ -920,6 +951,8 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
     if area<=0: raise ValueError('Integrated background-subtracted spectrum must be positive.')
     mean=float(np.sum(e*weighted)/area)
     var=float(np.sum((e-mean)**2*weighted)/area)
+    if var < -1e-10 * max(float(np.max(e*e)), 1.0):
+        raise ValueError("Net spectrum yields a negative second central moment; check background subtraction and uncertainty.")
     spread=math.sqrt(max(var,0))
     result={'integrated_counts_eV':area,'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
             'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
@@ -959,8 +992,10 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
     return {'dpsi_dR':dpsi_dR,'dpsi_dZ':dpsi_dZ,'BR_T':BR,'BZ_T':BZ,'Bp_T':BP,'Bphi_T':BT,'Btotal_T':np.sqrt(BP**2+BT**2),'note':'Uses the supplied psi convention; verify whether psi is poloidal flux or flux divided by 2π and match units/sign conventions.'}
 
 
-def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None) -> dict[str, float]:
-    r=spectrum_moments(energy_keV,counts,background)
+def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None,
+                          count_uncertainty: Any | None = None,
+                          assume_poisson_counts: bool = False) -> dict[str, Any]:
+    r=spectrum_moments(energy_keV, counts, background, count_uncertainty, assume_poisson_counts)
     r['peak_energy_keV']=r.pop('peak_energy_eV')/1.0
     r['mean_energy_keV']=r.pop('mean_energy_eV')
     r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
