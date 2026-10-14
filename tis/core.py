@@ -736,7 +736,8 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     interior=np.arange(1,len(candidates)-1)
     selected=int(interior[np.argmax(curvature[interior])])
     return {'selected_lambda':float(candidates[selected]),'candidate_lambdas':candidates,
-            'weighted_residual_norms':np.asarray(residuals),'solution_norms':np.asarray(norms),
+            'weighted_residual_norms':np.asarray(residuals),
+            'regularization_norms':np.asarray(norms),'solution_norms':np.asarray(norms),
             'discrete_log_lcurve_curvature':curvature,
             'selection_method':'maximum discrete curvature of log-weighted-residual vs log-regularization-norm L-curve',
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
