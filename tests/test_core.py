@@ -128,8 +128,10 @@ def test_signal_quality_missing():
     assert r['n_finite']==2 and r['n_missing_or_nonfinite']==1
 
 
-def test_interferometry_phase_density_finite():
-    assert np.isfinite(linear_phase_density(.1,140e9))
+def test_interferometry_phase_density_requires_explicit_sign_convention():
+    with pytest.raises(ValueError, match="explicitly selected"):
+        linear_phase_density(.1,140e9)
+    assert np.isfinite(linear_phase_density(.1,140e9,sign_convention=-1))
 
 
 def test_load_csv():
