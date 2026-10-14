@@ -36,6 +36,12 @@ def test_bundled_registries_are_valid_and_duplicate_free():
     assert len({x["id"] for x in diagnostics}) == len(diagnostics)
     assert len({x["id"] for x in formulas}) == len(formulas)
     assert all("inference_class" in x and "validation_status" in x for x in formulas)
+    # Root registries, bundled package resources and in-app catalogs must not drift.
+    from tis.catalog import DIAGNOSTICS, FORMULAS
+    assert {x["id"] for x in diagnostics} == {x["id"] for x in DIAGNOSTICS}
+    assert {x["id"] for x in formulas} == {x["id"] for x in FORMULAS}
+    assert {x["diagnostic"] for x in diagnostics} == {x["diagnostic"] for x in DIAGNOSTICS}
+    assert {x["name"] for x in formulas} == {x["name"] for x in FORMULAS}
 
 
 def test_in_app_catalog_ids_match_bundled_registry_ids():
