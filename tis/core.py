@@ -923,7 +923,7 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
             'regularization_operator_norm':regularization_norm,'response_spectral_norm':response_scale,
             'response_effective_rank':effective_rank,'response_condition_number':condition_number,
             'response_conditioning_status':conditioning_status,'response_column_coverage_fraction':coverage_fraction,
-            'linearized_uncertainty_status':'Not estimated by this solver; use noise perturbation/bootstrap and report regularization/model sensitivity.',
+            'linearized_uncertainty_status':'Uncertainty is not estimated by this solver; use noise perturbation/bootstrap and report regularization/model sensitivity.',
             'success':success,'message':message,'nonnegative':bool(nonnegative),
             'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
 
