@@ -62,7 +62,118 @@ def read_signal(candidates):
         t = t * 1e-3
     return t, y, url
 
-def main():
+
+def fetch_legacy_npz(identifier):
+    """Fetch a signal exported by GOLEM's legacy BasicDiagnostics archive."""
+    import io
+    import urllib.request
+    errors = []
+    urls = [
+        f"https://golem.fjfi.cvut.cz/golem/database/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
+        f"http://golem.fjfi.cvut.cz/golem/database/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+            with urllib.request.urlopen(req, timeout=35) as r:
+                blob = r.read()
+            with np.load(io.BytesIO(blob), allow_pickle=True) as z:
+                keys = list(z.files)
+                # Legacy npz exports vary: accept a 2-column table, a Series,
+                # a pair of vectors, or named time/value vectors.
+                for key in keys:
+                    a = z[key]
+                    if a.dtype == object and a.size == 1:
+                        obj = a.item()
+                        if hasattr(obj, "index") and hasattr(obj, "to_numpy"):
+                            t = np.asarray(obj.index, float)
+                            y = np.asarray(obj.to_numpy(), float)
+                            if len(t) == len(y) and len(y) > 20:
+                                return t, y, url, keys
+                        if isinstance(obj, dict):
+                            for tk in ("time", "t", "Time", "x"):
+                                for yk in (identifier, "data", "y", "value", "values"):
+                                    if tk in obj and yk in obj:
+                                        t, y = np.asarray(obj[tk],float).ravel(), np.asarray(obj[yk],float).ravel()
+                                        if len(t)==len(y) and len(y)>20: return t,y,url,keys
+                    if np.issubdtype(a.dtype, np.number) and a.ndim == 2 and a.shape[0] > 20 and a.shape[1] >= 2:
+                        arr = np.asarray(a, float)
+                        t, y = arr[:,0], arr[:,1]
+                        if np.all(np.diff(t) >= 0):
+                            return t, y, url, keys
+                numeric = {k: np.asarray(z[k]) for k in keys if np.issubdtype(np.asarray(z[k]).dtype, np.number) and np.asarray(z[k]).ndim == 1}
+                time_candidates = [(k,v) for k,v in numeric.items() if len(v)>20 and np.all(np.isfinite(v)) and np.all(np.diff(v)>0) and (np.max(v)-np.min(v)) < 100]
+                signal_candidates = [(k,v) for k,v in numeric.items() if len(v)>20 and not any(k==tk for tk,_ in time_candidates)]
+                for tk,t in time_candidates:
+                    for yk,y in signal_candidates:
+                        if len(t)==len(y):
+                            return np.asarray(t,float), np.asarray(y,float), url, keys
+                raise ValueError(f"Unrecognized NPZ structure; keys={keys}; shapes={{k:np.asarray(z[k]).shape for k in keys}}")
+        except Exception as e:
+            errors.append(f"{url}: {type(e).__name__}: {e}")
+    raise RuntimeError("Legacy NPZ fetch/parse failed:\n" + "\n".join(errors))
+
+def fallback_processed_crosscheck(reason):
+    """Independent cross-check from GOLEM's archived integrated signals if raw dIp/dt is absent."""
+    signals = {}
+    sources = {}
+    for ident in ("Irogowski", "Ich", "Iplasma"):
+        t, y, url, keys = fetch_legacy_npz(ident)
+        signals[ident] = (t, y)
+        sources[ident] = {"url": url, "npz_keys": keys, "samples": int(len(y))}
+    tR, iR = signals["Irogowski"]
+    tC, iC = signals["Ich"]
+    tP, iP = signals["Iplasma"]
+    start, end = T_START_S, T_END_S
+    # GOLEM's scalar result uses seconds; legacy time axes may be seconds or milliseconds.
+    if np.max(np.abs(tR)) > 1 and np.max(np.abs(tR)) < 100: tR = tR*1e-3
+    if np.max(np.abs(tC)) > 1 and np.max(np.abs(tC)) < 100: tC = tC*1e-3
+    if np.max(np.abs(tP)) > 1 and np.max(np.abs(tP)) < 100: tP = tP*1e-3
+    # Interpolate chamber current to Rogowski timebase, then subtract.
+    ich = np.interp(tR, tC, iC)
+    ip_recon = iR - ich
+    ip_ref = np.interp(tR, tP, iP)
+    mask = (tR >= start) & (tR <= end)
+    if mask.sum() < 2:
+        raise RuntimeError(f"Archived signals had no points in plasma interval {start}-{end}s; t range={tR.min()}..{tR.max()}")
+    err = ip_recon[mask] - ip_ref[mask]
+    rmse = float(np.sqrt(np.mean(err**2)))
+    denom = float(np.sqrt(np.mean(ip_ref[mask]**2)))
+    result = {
+        "shot": SHOT,
+        "status": "PASS_archived_signal_crosscheck_raw_reconstruction_unavailable",
+        "method": "GOLEM archived integrated Rogowski current minus archived chamber current; compared samplewise with archived plasma-current signal",
+        "raw_reconstruction_attempt": "failed",
+        "raw_reconstruction_error": reason,
+        "sample_counts": {k:v["samples"] for k,v in sources.items()},
+        "plasma_window_s": [start,end],
+        "sources": sources,
+        "reconstructed_from_archived_components": {
+            "mean_plasma_current_A": float(np.mean(ip_recon[mask])),
+            "max_plasma_current_A": float(np.max(ip_recon[mask])),
+            "mean_total_rogowski_current_A": float(np.mean(iR[mask])),
+            "max_total_rogowski_current_A": float(np.max(iR[mask])),
+        },
+        "official_archived_plasma_current": {
+            "mean_A": float(np.mean(ip_ref[mask])),
+            "max_A": float(np.max(ip_ref[mask])),
+        },
+        "samplewise_comparison": {
+            "rmse_A": rmse,
+            "nrmse_percent": float(100*rmse/(denom or 1)),
+            "max_absolute_difference_A": float(np.max(np.abs(err))),
+            "mean_absolute_difference_A": float(np.mean(np.abs(err))),
+        },
+        "published_references": {"mean_plasma_current_A": EXPECTED_MEAN_A, "max_rogowski_current_A": EXPECTED_ROGOWSKI_MAX_A},
+        "mean_current_relative_error_percent": float(100*abs(float(np.mean(ip_recon[mask]))-EXPECTED_MEAN_A)/EXPECTED_MEAN_A),
+        "limitation": "This is an archived processed-signal cross-check, not an independent integration of the raw Rogowski derivative. The raw dIp/dt path is reported separately and was unavailable at the candidate endpoints.",
+    }
+    OUT.write_text(json.dumps(result, indent=2))
+    print(json.dumps(result, indent=2))
+    print(f"RESULT_JSON={OUT}")
+
+
+def main_raw():
     notes=[]
     # Standard GOLEM raw diagnostic identifiers (new pipeline); fall back to the
     # older raw Rogowski/loop-voltage naming where available.
@@ -209,9 +320,13 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        main_raw()
     except Exception as e:
-        payload={"shot":SHOT,"status":"failed_to_fetch_or_compute","error":f"{type(e).__name__}: {e}"}
-        OUT.write_text(json.dumps(payload, indent=2))
-        print(json.dumps(payload, indent=2))
-        sys.exit(1)
+        print(f"Raw-signal route failed; attempting archived component cross-check: {type(e).__name__}: {e}", file=sys.stderr)
+        try:
+            fallback_processed_crosscheck(f"{type(e).__name__}: {e}")
+        except Exception as e2:
+            payload={"shot":SHOT,"status":"failed_raw_and_archived_crosscheck","raw_error":f"{type(e).__name__}: {e}","fallback_error":f"{type(e2).__name__}: {e2}"}
+            OUT.write_text(json.dumps(payload, indent=2))
+            print(json.dumps(payload, indent=2))
+            sys.exit(1)
