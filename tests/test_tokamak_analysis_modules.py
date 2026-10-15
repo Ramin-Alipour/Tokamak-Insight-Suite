@@ -38,7 +38,8 @@ def test_plasma_geometry_closed_circle():
     r=1.5+.2*np.cos(th); z=.2*np.sin(th)
     out=geometry_from_boundary(r,z)
     assert out["cross_section_area_m2"] == pytest.approx(np.pi*.2**2,rel=2e-3)
-    assert out["toroidal_volume_m3"] > 0
+    assert out["geometric_major_radius_m"] == pytest.approx(1.5, abs=2e-3)
+    assert out["toroidal_volume_m3"] == pytest.approx(2*np.pi**2*1.5*.2**2, rel=2e-3)
 
 
 def test_interferometry_line_average_density():
