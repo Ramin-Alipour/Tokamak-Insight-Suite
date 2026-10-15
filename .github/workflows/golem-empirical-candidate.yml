@@ -30,6 +30,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golem-shot-${{ inputs.shot }}-candidate
+          name: golem-shot-${{ inputs.shot || '30622' }}-candidate
           path: artifacts/golem-empirical-candidate/
           if-no-files-found: error
