@@ -782,3 +782,13 @@ def test_ion_heating_known_power_integral():
     assert out["species"] == "ion"
     assert out["peak_power_W"] == pytest.approx(4.0)
     assert out["injected_energy_J"] == pytest.approx(4.0)
+
+
+
+def test_ecrh_fundamental_resonance_field_known_frequency():
+    from tokamak_analysis.ecrh_icrh import ecrh_resonance_field, ME, E
+    frequency = 140e9
+    out = ecrh_resonance_field(frequency, harmonic=1)
+    expected = 2*np.pi*ME*frequency/E
+    assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
+    assert expected == pytest.approx(5.001, rel=2e-3)
