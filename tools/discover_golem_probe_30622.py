@@ -78,10 +78,19 @@ urls=[]
 for ident in identifiers:
     urls.append(f"{ROOT}/utils/data/{SHOT}/{ident}")
     urls.append(f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/{ident}")
-for suffix in ("bpp","lp","U_bias","U_current","probe_voltage","probe_current","PetiProbe:U_bias","PetiProbe:U_current"):
+for suffix in ("bpp","lp","U_bias","U_current","probe_voltage","probe_current","PetiProbe:U_bias","PetiProbe:U_current","nistandard","NIstandard","nistandard.txt","bpp.txt","lp.txt"):
     urls.extend([f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/{suffix}",
                  f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/{suffix}.txt",
                  f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/PetiProbe.ON/data/{suffix}"])
+urls.extend([
+    f"{ROOT}/shots/{SHOT}/nistandard", f"{ROOT}/shots/{SHOT}/nistandard.txt",
+    f"{ROOT}/shots/{SHOT}/NIstandard", f"{ROOT}/shots/{SHOT}/bpp",
+    f"{ROOT}/shots/{SHOT}/bpp.txt", f"{ROOT}/shots/{SHOT}/lp",
+    f"{ROOT}/shots/{SHOT}/lp.txt",
+    f"{ROOT}/operation/shots/{SHOT}/diagnostics/NIstandard.ON/data/nistandard",
+    f"{ROOT}/operation/shots/{SHOT}/diagnostics/NIstandard.ON/data/bpp",
+    f"{ROOT}/operation/shots/{SHOT}/diagnostics/NIstandard.ON/data/lp",
+])
 urls=list(dict.fromkeys(urls))
 
 def try_one(url):
