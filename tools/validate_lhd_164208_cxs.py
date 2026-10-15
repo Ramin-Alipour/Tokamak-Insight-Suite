@@ -206,8 +206,20 @@ def main():
         intensity_check = {"valid_frames": int(mask.sum()), "status": "PENDING", "reason": "Too few matched valid frames."}
 
     ti_checks = []
+    valid_reference_frames = [
+        i for i, ref in enumerate(official)
+        if ref.get("Ti_keV") is not None and np.isfinite(ref["Ti_keV"]) and ref["Ti_keV"] > 0
+        and raw_fits[i].get("Ti_raw_fit_keV") is not None
+        and np.isfinite(raw_fits[i]["Ti_raw_fit_keV"])
+    ]
     for target in TIME_TARGETS:
-        frame = int(np.argmin(np.abs(image_times - target)))
+        if not valid_reference_frames:
+            frame = int(np.argmin(np.abs(image_times - target)))
+        else:
+            # The nominal 3.4 s and 4.0 s points fall exactly between two
+            # frames; choose the nearest frame with a valid official Ti fit,
+            # not a zero-filled invalid fit at 3.39/3.99 s.
+            frame = min(valid_reference_frames, key=lambda i: abs(image_times[i] - target))
         raw_result = raw_fits[frame]
         ref = official[frame]
         ref_ti = ref.get("Ti_keV")
