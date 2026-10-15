@@ -34,6 +34,19 @@ jobs:
             golem_30622_rogowski_result.json
             golem_30622_rogowski.log
           if-no-files-found: warn
-      - name: Fail if raw-data reconstruction did not complete
-        if: steps.reconstruction.outcome != 'success'
-        run: exit 1
+      - name: Require a genuine raw-signal reconstruction
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path("golem_30622_rogowski_result.json")
+          if not p.exists():
+              raise SystemExit("No reconstruction result JSON was produced.")
+          result = json.loads(p.read_text())
+          status = result.get("status")
+          allowed = {"computed_from_raw_signals", "COMPUTED_raw_DAS_reconstruction"}
+          print("Scientific validation status:", status)
+          if status not in allowed:
+              raise SystemExit("Pending: raw-signal reconstruction was unavailable; archived processed-signal cross-check is not independent raw-data validation.")
+          PY
