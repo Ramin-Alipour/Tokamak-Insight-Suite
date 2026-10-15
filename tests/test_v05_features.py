@@ -405,3 +405,10 @@ def test_bolometric_tomography_builds_geometry_and_reconstructs_grid():
     assert result["emissivity_proxy_grid"].shape == (1, 2)
     assert np.all(np.isfinite(result["emissivity_proxy_grid"]))
     assert result["residual_norm"] < 1e-2
+
+
+def test_magnetic_flux_accounts_for_number_of_turns():
+    from tis.magnetic import magnetic_flux_from_voltage
+    t = np.linspace(0, 2, 101)
+    result = magnetic_flux_from_voltage(t, np.full_like(t, 3.0), turns=3)
+    assert result["flux_change_Wb"][-1] == pytest.approx(-2.0)
