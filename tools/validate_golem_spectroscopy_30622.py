@@ -223,6 +223,31 @@ if raw.get("numeric_rows", 0) >= 100:
                 "all_records": records,
             }
         report["time_resolved_line_audit"] = temporal
+        # Two strong lines define a provisional affine mapping; H-gamma is an independent check.
+        hb = temporal["H_beta"]
+        ha = temporal["H_alpha"]
+        hg = temporal["H_gamma"]
+        if hb["center_mean_nm"] is not None and ha["center_mean_nm"] is not None and hg["center_mean_nm"] is not None:
+            x1, x2 = hb["center_mean_nm"], ha["center_mean_nm"]
+            y1, y2 = 486.135, 656.281
+            slope = (y2 - y1) / (x2 - x1)
+            intercept = y1 - slope * x1
+            corrected_hg = intercept + slope * hg["center_mean_nm"]
+            residual = float(corrected_hg - 434.047)
+            report["provisional_wavelength_crosscheck"] = {
+                "calibration_lines": ["H_beta", "H_alpha"],
+                "method": "two-point affine mapping; diagnostic only, not accepted as a calibration",
+                "slope": float(slope),
+                "intercept_nm": float(intercept),
+                "independent_check_line": "H_gamma",
+                "H_gamma_observed_center_nm": hg["center_mean_nm"],
+                "H_gamma_mapped_center_nm": float(corrected_hg),
+                "H_gamma_reference_nm_approx": 434.047,
+                "H_gamma_residual_nm": residual,
+                "crosscheck_pass": bool(abs(residual) <= 0.25),
+                "decision": "DO_NOT_APPLY_CALIBRATION" if abs(residual) > 0.25 else "PROVISIONAL_ONLY",
+                "reason": "Only two lines define the affine map; H-gamma is an independent check and its residual must be acceptably small before calibration can be trusted."
+            }
         report["status"] = "PASS_SPECTRAL_LINE_SHAPE"
         report["interpretation"] = (
             "Raw spectrum was retrieved and three Balmer-region line profiles were fitted. "
