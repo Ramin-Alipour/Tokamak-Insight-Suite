@@ -547,8 +547,8 @@
     "status": "D",
     "method": "Compute from calibrated throughput and pressure under defined conditions.",
     "caveat": "Conductance, gauge position and units must be consistent.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["effective_pumping_speed_m3_s"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "MHD and turbulence",
