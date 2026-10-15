@@ -209,3 +209,14 @@ def test_average_density_known_profile_and_line_integral():
     assert out["peak_density_m3"] == pytest.approx(3e19, rel=1e-12)
     assert out["radial_average_density_m3"] == pytest.approx(2e19, rel=1e-12)
     assert out["line_average_density_m3"] == pytest.approx(3e19, rel=1e-12)
+
+
+
+def test_electron_temperature_known_profile_statistics():
+    from tokamak_analysis.electron_temperature import analyze_electron_temperature
+    out = analyze_electron_temperature([10.0, 20.0, 30.0], coordinate=[0.0, 1.0, 2.0])
+    assert out["mean_eV"] == pytest.approx(20.0)
+    assert out["median_eV"] == pytest.approx(20.0)
+    assert out["peak_eV"] == pytest.approx(30.0)
+    assert out["standard_deviation_eV"] == pytest.approx(10.0)
+    np.testing.assert_allclose(out["gradient_eV_per_coordinate"], [10.0, 10.0, 10.0])
