@@ -178,7 +178,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Pressure and beta": ["derive_parameters", "beta_metrics"],
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
-    "Noise floor and detection limit": ["hampel_despike"],
+    "Noise floor and detection limit": ["analyze_noise_floor_detection_limit", "hampel_despike"],
     "Rogowski coil": ["analyze_rogowski_current", "integrate_time_series"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
     "MHD mode/Mirnov analysis": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "cross_analysis"],
