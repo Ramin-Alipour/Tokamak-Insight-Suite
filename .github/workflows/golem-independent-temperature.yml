@@ -19,101 +19,94 @@ jobs:
           python-version: "3.12"
       - name: Install numerical dependency
         run: python -m pip install --disable-pip-version-check numpy
-      - name: Retrieve GOLEM temperature series through documented data identifiers
+      - name: Retrieve explicitly linked GOLEM temperature data products
         run: |
           python - <<'PY'
-          import hashlib, json, pathlib, re
+          import hashlib, json, pathlib
           from datetime import datetime, timezone
           from urllib.request import Request, urlopen
           import numpy as np
 
           shot = 30622
+          root = f"https://golem.fjfi.cvut.cz"
           out = pathlib.Path("golem-temperature-validation")
           out.mkdir(exist_ok=True)
-          # Identifiers and legacy storage paths are taken from the GOLEM shot-page
-          # inventory and the repository's working spectrum-acquisition strategy.
+          # These identifiers and legacy paths are copied from the actual hrefs
+          # in GOLEM's shot 30622 Data.php, not guessed diagnostic folder names.
           candidates = {
               "electron_temperature": [
-                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/spectrometr:temperature",
-                  f"https://golem.fjfi.cvut.cz/utils/data/{shot}/spectrometr:temperature",
-                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/temperature",
-                  f"http://golem.fjfi.cvut.cz/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/data/temperature",
-                  f"https://golem.fjfi.cvut.cz/operation/shots/{shot}/diagnostics/Radiation/1111Spectrometer.ON/data/temperature",
+                  f"{root}/utils/data/{shot}/electron_temperature",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/electron_temperature",
+                  f"{root}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemp.npz",
               ],
-              "spectrometer_mean_temperature": [
-                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/spectrometr:mean_temperature",
-                  f"https://golem.fjfi.cvut.cz/utils/data/{shot}/spectrometr:mean_temperature",
-                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/temperature_mean",
-                  f"http://golem.fjfi.cvut.cz/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/data/temperature",
+              "rake_probe_electron_temperature": [
+                  f"{root}/utils/data/{shot}/electron_temp_probe",
+                  f"{root}/utils/data/{shot}/electron_temp_probe.xls",
+                  f"{root}/golem/database/operation/shots/{shot}/diagnostics/ParticleFlux/1012RakeProbe.ON/Te_probe",
+              ],
+              "spectrometer_mean_estimated_temperature": [
+                  f"{root}/utils/data/{shot}/spectrometr:mean_temperature",
+                  f"{root}/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/HistoricalAnalysis/temperature",
               ],
               "published_electron_temperature_mean": [
-                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/temperature_mean",
-                  f"http://golem.fjfi.cvut.cz/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
-                  f"https://golem.fjfi.cvut.cz/operation/shots/{shot}/temperature_mean",
+                  f"{root}/utils/data/{shot}/temperature_mean",
+                  f"{root}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
               ],
           }
           report = {
-              "test": "GOLEM shot 30622 archive temperature retrieval and numerical consistency audit",
+              "test": "GOLEM shot 30622 temperature products cross-check",
               "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
               "shot": shot,
-              "published_reference_mean_eV": 20.8,
-              "reference_page": f"https://golem.fjfi.cvut.cz/shots/{shot}/Data.php",
-              "metadata": {
-                  "temperature_mean": "ElectronTemperatureMean; electron temperature [eV]",
-                  "spectrometr:temperature": "T_e [eV] per GOLEM shot-page metadata",
-                  "spectrometr:mean_temperature": "Mean estimated temperature [eV]; not automatically equivalent to Doppler Ti"
-              },
-              "scientific_caution": "This cross-check is for archive electron-temperature products only. It does not validate ion temperature from H-alpha Doppler broadening."
+              "published_electron_temperature_mean_eV": 20.8,
+              "reference_page": f"{root}/shots/{shot}/Data.php",
+              "provenance": "Data-product links matched against the actual HTML hrefs in GOLEM Data.php.",
+              "interpretation_limits": [
+                  "The 20.8 eV published scalar is electron temperature, not ion temperature.",
+                  "Rake-probe temperature is a separate diagnostic product; compare only after units, time window, and column meaning are confirmed.",
+                  "The spectrometer's 'mean estimated temperature' must not be assumed to equal H-alpha Doppler Ti without its method definition.",
+                  "No ion-temperature result is accepted from an under-resolved H-alpha line."
+              ]
           }
 
-          def parse_numeric(raw):
-              decoded = raw.decode("utf-8", errors="replace")
+          def read_numeric(raw, suffix):
+              if suffix.lower() == ".xls" or raw[:4] == b"PK\x03\x04":
+                  return None, "binary spreadsheet/NPZ requires format-specific parser"
               rows = []
-              for line in decoded.splitlines():
+              for line in raw.decode("utf-8", errors="replace").splitlines():
                   line = line.strip()
                   if not line or line.startswith(("#", "%", "//")):
                       continue
-                  vals = []
-                  for token in line.replace(",", " ").split():
-                      try:
-                          val = float(token)
-                      except ValueError:
-                          vals = []
-                          break
-                      if not np.isfinite(val):
-                          vals = []
-                          break
-                      vals.append(val)
-                  if vals:
+                  try:
+                      vals = [float(token) for token in line.replace(",", " ").split()]
+                  except ValueError:
+                      continue
+                  if vals and all(np.isfinite(vals)):
                       rows.append(vals)
               if not rows:
-                  return None
-              lengths = {len(row) for row in rows}
-              if len(lengths) != 1:
-                  # GOLEM text exports can contain metadata blocks; retain only
-                  # the most frequent numeric row width, never concatenate columns.
-                  from collections import Counter
-                  width = Counter(map(len, rows)).most_common(1)[0][0]
-                  rows = [row for row in rows if len(row) == width]
-              arr = np.asarray(rows, dtype=float)
-              return arr if arr.shape[0] >= 1 else None
+                  return None, "no numeric rows"
+              from collections import Counter
+              width = Counter(map(len, rows)).most_common(1)[0][0]
+              rows = [row for row in rows if len(row) == width]
+              return np.asarray(rows, dtype=float), None
 
           for kind, urls in candidates.items():
-              result, attempts = None, []
+              attempts, result = [], None
               for url in urls:
                   try:
-                      req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.2"})
-                      with urlopen(req, timeout=15) as response:
+                      req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.3"})
+                      with urlopen(req, timeout=12) as response:
                           raw = response.read()
-                          content_type = response.headers.get("Content-Type", "")
+                          ctype = response.headers.get("Content-Type", "")
                           final_url = response.geturl()
                       if not raw or b"<html" in raw[:1000].lower() or b"<!doctype" in raw[:1000].lower():
-                          raise ValueError("empty response or HTML, not numeric data")
-                      arr = parse_numeric(raw)
+                          raise ValueError("empty response or HTML, not data")
+                      arr, parse_error = read_numeric(raw, pathlib.Path(url.split("?", 1)[0]).suffix)
                       if arr is None:
-                          raise ValueError("no numeric rows found")
+                          attempts.append({"url": url, "status": "downloaded_unparsed", "bytes": len(raw),
+                                           "content_type": ctype, "reason": parse_error})
+                          continue
                       attempts.append({"url": url, "final_url": final_url, "status": "numeric_data",
-                                       "bytes": len(raw), "content_type": content_type,
+                                       "bytes": len(raw), "content_type": ctype,
                                        "rows": int(arr.shape[0]), "columns": int(arr.shape[1])})
                       result = (url, final_url, raw, arr)
                       break
@@ -124,48 +117,39 @@ jobs:
                   url, final_url, raw, arr = result
                   filename = f"{kind}.txt"
                   (out / filename).write_bytes(raw)
-                  # GOLEM temperature exports are expected to be a scalar series.
-                  # For multi-column exports, summarize each column separately and
-                  # do not silently assume the last column is the physical quantity.
-                  column_stats = []
-                  for col in range(arr.shape[1]):
-                      values = arr[:, col]
-                      column_stats.append({
-                          "column_index_zero_based": col,
-                          "n": int(values.size),
-                          "mean": float(np.mean(values)),
-                          "median": float(np.median(values)),
-                          "std_sample": float(np.std(values, ddof=1)) if values.size > 1 else 0.0,
-                          "min": float(np.min(values)),
-                          "max": float(np.max(values))
-                      })
                   report[kind] = {
                       "source_url": url, "final_url": final_url, "filename": filename,
                       "sha256": hashlib.sha256(raw).hexdigest(),
                       "n_rows": int(arr.shape[0]), "n_columns": int(arr.shape[1]),
-                      "column_statistics": column_stats,
-                      "unit_confirmed_from_shot_page": True
+                      "column_statistics": [
+                          {
+                              "column_index_zero_based": i,
+                              "n": int(arr[:, i].size),
+                              "mean": float(np.mean(arr[:, i])),
+                              "median": float(np.median(arr[:, i])),
+                              "std_sample": float(np.std(arr[:, i], ddof=1)) if arr.shape[0] > 1 else 0.0,
+                              "min": float(np.min(arr[:, i])),
+                              "max": float(np.max(arr[:, i]))
+                          } for i in range(arr.shape[1])
+                      ]
                   }
               else:
                   report[kind] = {"status": "not_retrieved_as_numeric_data"}
 
-          # Compare only a downloaded one-column electron-temperature product with
-          # the scalar published electron-temperature mean. Avoid mixing time and
-          # temperature columns or the separate spectrometer mean-estimated product.
+          # Compare the one-column electron-temperature series with the published
+          # mean only when the input's shape supports that interpretation.
           series = report.get("electron_temperature", {})
           if series.get("n_columns") == 1:
-              values = series["column_statistics"][0]
-              mean = values["mean"]
-              delta = mean - report["published_reference_mean_eV"]
+              mean = series["column_statistics"][0]["mean"]
+              ref = report["published_electron_temperature_mean_eV"]
               report["comparison"] = {
-                  "compared_quantity": "mean of downloaded one-column electron-temperature series",
-                  "computed_mean_eV": mean,
-                  "published_mean_eV": report["published_reference_mean_eV"],
-                  "difference_eV": delta,
-                  "absolute_difference_eV": abs(delta),
-                  "relative_difference_percent": 100 * abs(delta) / abs(report["published_reference_mean_eV"]),
+                  "computed_series_mean_eV": mean,
+                  "published_mean_eV": ref,
+                  "difference_eV": mean - ref,
+                  "absolute_difference_eV": abs(mean - ref),
+                  "relative_difference_percent": 100 * abs(mean - ref) / abs(ref),
                   "status": "numerical_consistency_only",
-                  "caution": "Confirm time window and exact averaging convention before treating this as reproduction of the published scalar."
+                  "caution": "The time window and averaging convention must match before claiming exact reproduction."
               }
               report["status"] = "cross-check-computed"
           elif series.get("n_columns", 0) > 1:
@@ -184,7 +168,7 @@ jobs:
           status = report.get("status")
           print(f"Scientific cross-check status: {status}")
           if status != "cross-check-computed":
-              print("No one-column electron-temperature series comparison was completed.")
+              print("No interpretable electron-temperature series comparison was completed.")
               sys.exit(1)
           PY
       - name: Upload reproducibility artifacts
