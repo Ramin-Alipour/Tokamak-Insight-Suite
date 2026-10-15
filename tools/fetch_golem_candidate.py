@@ -11,6 +11,8 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+
+import numpy as np
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -26,6 +28,72 @@ def get(url: str) -> tuple[bytes, str, str]:
         data = response.read()
         content_type = response.headers.get("Content-Type", "")
         return data, response.geturl(), content_type
+
+
+def analyze_hydrogen_lines(path: Path) -> dict:
+    """Check coarse Balmer-line identification against NIST air wavelengths.
+
+    This deliberately does not estimate Doppler temperature: the wavelength
+    sampling and unknown instrument line-spread function are insufficient.
+    """
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    rows = []
+    for line in lines[11:]:
+        values = np.fromstring(line, sep=" ")
+        if values.size == 30:  # wavelength + 29 individual exposures
+            rows.append(values)
+    if len(rows) < 100:
+        return {"status": "not_evaluated", "reason": "Expected wavelength plus 29 spectra table was not recognized."}
+    data = np.asarray(rows, dtype=float)
+    wavelength = data[:, 0]
+    mean_counts = np.nanmean(data[:, 1:], axis=1)
+    spacing = float(np.median(np.diff(wavelength)))
+    references = [
+        ("H_alpha", 656.281, 654.0, 660.0),
+        ("H_beta", 486.134, 484.0, 489.0),
+        ("H_gamma", 434.047, 431.0, 438.0),
+    ]
+    measured = []
+    for name, reference_nm, low_nm, high_nm in references:
+        selected = (wavelength >= low_nm) & (wavelength <= high_nm)
+        x = wavelength[selected]
+        y = mean_counts[selected]
+        if x.size < 3 or not np.all(np.isfinite(y)):
+            measured.append({"line": name, "status": "not_evaluated", "reason": "Insufficient finite samples in line window."})
+            continue
+        baseline = float(np.percentile(y, 20))
+        weights = np.clip(y - baseline, 0.0, None)
+        if float(weights.sum()) <= 0:
+            measured.append({"line": name, "status": "not_evaluated", "reason": "No positive baseline-subtracted signal."})
+            continue
+        centroid_nm = float(np.sum(x * weights) / np.sum(weights))
+        peak_index = int(np.argmax(y))
+        half_max = baseline + (float(np.max(y)) - baseline) / 2.0
+        half_indices = np.flatnonzero(y >= half_max)
+        fwhm_nm = float(x[half_indices[-1]] - x[half_indices[0]]) if half_indices.size >= 2 else None
+        offset_nm = centroid_nm - reference_nm
+        measured.append({
+            "line": name,
+            "reference_air_wavelength_nm": reference_nm,
+            "measured_centroid_nm": centroid_nm,
+            "measured_peak_nm": float(x[peak_index]),
+            "centroid_offset_nm": offset_nm,
+            "centroid_offset_in_wavelength_bins": offset_nm / spacing,
+            "observed_fwhm_nm": fwhm_nm,
+            "within_one_wavelength_bin": bool(abs(offset_nm) <= spacing),
+            "method": "mean of 29 exposures; 20th-percentile local baseline; positive-weight centroid",
+        })
+    evaluated = [item for item in measured if item.get("status") != "not_evaluated"]
+    passed = len(evaluated) == 3 and all(item["within_one_wavelength_bin"] for item in evaluated)
+    return {
+        "status": "PASS_coarse_line_identification" if passed else "FAIL_or_incomplete_coarse_line_identification",
+        "reference_source": "NIST Handbook of Basic Atomic Spectroscopic Data, hydrogen strong lines",
+        "reference_url": "https://physics.nist.gov/PhysRefData/Handbook/Tables/hydrogentable2.htm",
+        "wavelength_bin_spacing_nm": spacing,
+        "wavelength_bin_spacing_is_not_instrument_resolution": True,
+        "lines": measured,
+        "limitation": "Coarse line identification only. The unknown instrument line-spread function, sparse wavelength sampling, and unestablished calibration prevent Doppler-width or ion-temperature validation.",
+    }
 
 
 def main() -> None:
@@ -85,8 +153,19 @@ def main() -> None:
             record.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         attempts.append(record)
 
+    spectral_file = next(
+        (out / item["file"] for item in downloaded
+         if item["label"] == "spectrum_legacy_path" and (out / item["file"]).exists()),
+        None,
+    )
+    spectral_line_check = analyze_hydrogen_lines(spectral_file) if spectral_file else {
+        "status": "not_evaluated",
+        "reason": "No recognized spectrum file was downloaded.",
+    }
+
     manifest = {
         "shot": shot,
+        "spectral_line_check": spectral_line_check,
         "retrieved_utc": datetime.now(timezone.utc).isoformat(),
         "page_url": page_url,
         "final_page_url": final_page_url,
@@ -96,9 +175,10 @@ def main() -> None:
         "attempts": attempts,
         "downloaded_files": downloaded,
         "public_page_reference_temperature_eV": 20.8 if shot == 30622 else None,
-        "classification": "candidate files only; raw/calibrated/processed status not established; no empirical validation claimed",
+        "classification": "candidate data with a coarse Balmer-line identification check; no Doppler-width or temperature validation claimed",
         "acceptance_checks": [
             "Confirm downloaded file format and whether the spectrum is raw counts or corrected/calibrated data.",
+            "Check coarse H-alpha, H-beta and H-gamma line identification against NIST wavelengths; do not interpret this as Doppler-width validation.",
             "Establish temporal/spatial correspondence between spectrum and the published temperature reference.",
             "Independently derive the same observable with documented uncertainty and calculate absolute/relative discrepancy.",
             "Add the verified input and numerical comparison as a deterministic regression test before declaring validation.",
