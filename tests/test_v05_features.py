@@ -332,3 +332,20 @@ def test_magnetic_flux_workflow_uses_faraday_sign_and_initial_value():
     result = magnetic_flux_from_voltage(t, np.full_like(t, 3.0), initial_flux_Wb=0.4)
     assert result["magnetic_flux_Wb"][-1] == pytest.approx(-5.6)
     assert result["flux_change_Wb"][-1] == pytest.approx(-6.0)
+
+
+def test_gas_flow_conversion_and_inventory():
+    from tis.gas_flow import gas_flow_to_particle_inventory
+    t = np.linspace(0, 60, 61)
+    result = gas_flow_to_particle_inventory(t, np.full_like(t, 60.0))
+    assert result["integrated_moles_mol"][-1] > 0
+    assert result["integrated_particles"][-1] == pytest.approx(
+        result["integrated_moles_mol"][-1] * 6.02214076e23
+    )
+
+
+def test_effective_pumping_speed():
+    from tis.gas_flow import effective_pumping_speed_m3_s
+    assert effective_pumping_speed_m3_s(2.0, 4.0) == pytest.approx(0.5)
+    with pytest.raises(ValueError):
+        effective_pumping_speed_m3_s(1.0, 0.0)
