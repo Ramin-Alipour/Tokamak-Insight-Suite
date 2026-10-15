@@ -93,6 +93,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
     "Pressure gauges": ["analyze_pressure_gauge"],
+    "Residual gas analyzer (RGA)": ["analyze_rga_spectrum"],
     "Runaway-electron diagnostics": ["analyze_runaway_electron_signatures", "xray_spectrum_summary"],
     "Fast-ion loss detector (FILD)": ["analyze_fild_image"],
     "Fast-ion D-alpha (FIDA)": ["analyze_fida_spectrum", "fit_spectral_line"],
