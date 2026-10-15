@@ -13,11 +13,7 @@ def analyze_plasma_shape(R_m, Z_m, psi_normalized, *, boundary_level=0.95):
     if not 0<boundary_level<1: raise ValueError("boundary_level must lie between 0 and 1")
     import matplotlib.pyplot as plt
     fig,ax=plt.subplots(); cs=ax.contour(R,Z,psi,levels=[boundary_level]);
-    paths=[]
-    for collection in cs.collections:
-        for path in collection.get_paths():
-            v=path.vertices
-            if len(v)>=5: paths.append(v.copy())
+    paths=[np.asarray(seg,dtype=float) for seg in cs.allsegs[0] if len(seg)>=5]
     plt.close(fig)
     if not paths: raise ValueError("No closed/usable boundary contour found at requested level")
     contour=max(paths,key=lambda v: len(v))
