@@ -489,3 +489,12 @@ def test_line_radiation_known_spectral_integral_and_power():
     assert out["integrated_spectral_radiance"] == pytest.approx(2.0)
     assert out["peak_radiance"] == pytest.approx(2.0)
     assert out["estimated_radiant_power_W"] == pytest.approx(2.0)
+
+
+
+def test_bolometric_tomography_known_three_zone_solution():
+    from tokamak_analysis.radiation_tomography import reconstruct_emissivity
+    emissivity_expected = np.array([1.0, 2.0, 3.0])
+    out = reconstruct_emissivity(np.eye(3), emissivity_expected, regularization=0.0)
+    np.testing.assert_allclose(out["emissivity"], emissivity_expected, atol=1e-8)
+    assert out["residual_norm"] == pytest.approx(0.0, abs=1e-8)
