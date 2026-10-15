@@ -15,7 +15,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-BASE = "https://golem.fjfi.cvut.cz"\nAPI_BASE = "http://golem.fjfi.cvut.cz"
+BASE = "https://golem.fjfi.cvut.cz"
+API_BASE = "http://golem.fjfi.cvut.cz"
 USER_AGENT = "Tokamak-Insight-Suite empirical-validation inventory/1.1"
 
 
