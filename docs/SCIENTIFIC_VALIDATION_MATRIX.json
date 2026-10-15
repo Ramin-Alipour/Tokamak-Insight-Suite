@@ -273,7 +273,7 @@
       "dataset": "Zenodo record 14996664, lhdatabase.h5 (92 database rows)",
       "data_url": "https://zenodo.org/records/14996664",
       "test": "tools/validate_tcv_lh_threshold.py via .github/workflows/tcv-lh-threshold-validation.yml",
-      "workflow_run_id": 38745011347,
+      "workflow_run_id": 38745242607,
       "method": "Reproduce P_ITPA=0.049*abs(NEL20)^0.72*abs(BT)^0.8*SPLASMA^0.94 in MW and all ten Figure-4 selection masks; compute P_loss/P_ITPA and normalized uncertainty.",
       "results": {
         "database_rows": 92,
@@ -307,9 +307,19 @@
             "median_ratio": 1.80862
           }
         ],
-        "empty_groups": 6
+        "empty_groups": 6,
+        "power_balance_check": {
+          "valid_points": 78,
+          "pearson_r": 0.9949899,
+          "spearman_rho": 0.9935002,
+          "linear_slope": 0.9801451,
+          "linear_intercept_MW": -0.0423688,
+          "median_Psep_over_Ploss": 0.9190752,
+          "mean_Psep_minus_Ploss_MW": -0.0539208,
+          "status": "PASS with small systematic offset"
+        }
       },
-      "limitation": "Reproduces the published database normalization and selection logic; it is not a reanalysis of raw diagnostic signals."
+      "limitation": "Reproduces the published database normalization and selection logic; power-balance check uses the article's processed Figure-2 series, not raw diagnostic signals."
     }
   ]
 }
