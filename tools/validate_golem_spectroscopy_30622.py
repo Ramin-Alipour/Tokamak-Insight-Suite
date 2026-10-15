@@ -167,6 +167,55 @@ for key, filename in FILES.items():
     else:
         report["files"][key] = {"status": "unavailable", "attempts": errors}
 
+# Retrieve the archive's own spectrometer-derived mean-temperature product separately
+# from the electron-temperature diagnostic. The two are not assumed equivalent.
+reported_temperature_urls = [
+    f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/spectrometr/mean_temperature",
+    f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/spectrometr:mean_temperature",
+    f"https://golem.fjfi.cvut.cz/shots/{SHOT}/analysis/Radiation/1212Impurities_TO.ON/data/temperature",
+    f"https://golem.fjfi.cvut.cz/operation/shots/{SHOT}/analysis/Radiation/1212Impurities_TO.ON/data/temperature",
+]
+reported_temperature_audit = {"status": "not_retrieved", "attempts": []}
+for candidate_url in reported_temperature_urls:
+    try:
+        payload = get(candidate_url)
+        text_payload = payload.decode("utf-8", "replace")
+        if "<html" in text_payload[:500].lower() or "<!doctype" in text_payload[:500].lower():
+            raise ValueError("HTML response, not a temperature data product")
+        numeric = []
+        for line in text_payload.splitlines():
+            for token in line.replace(",", " ").split():
+                try:
+                    value = float(token)
+                    if math.isfinite(value):
+                        numeric.append(value)
+                except ValueError:
+                    pass
+        if not numeric:
+            raise ValueError("No finite numeric temperature values found")
+        OUT.joinpath("reported_spectrometer_mean_temperature.txt").write_bytes(payload)
+        reported_temperature_audit = {
+            "status": "retrieved",
+            "source_url": candidate_url,
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+            "numeric_value_count": len(numeric),
+            "values_eV_assumed_from_archive_metadata": numeric,
+            "min": float(min(numeric)),
+            "median": float(np.median(numeric)),
+            "max": float(max(numeric)),
+            "interpretation": (
+                "GOLEM archive spectrometer mean estimated temperature; do not equate with "
+                "hydrogen Doppler Ti until the diagnostic definition/species/time window is verified."
+            ),
+        }
+        break
+    except Exception as exc:
+        reported_temperature_audit["attempts"].append({
+            "url": candidate_url, "error": f"{type(exc).__name__}: {exc}"
+        })
+report["reported_spectrometer_mean_temperature_audit"] = reported_temperature_audit
+
 raw = report["files"].get("raw_spectrum", {})
 if raw.get("numeric_rows", 0) >= 100:
     try:
