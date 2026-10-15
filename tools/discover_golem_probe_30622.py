@@ -75,15 +75,15 @@ for page in pages:
             if is_probe_link or is_das_page:
                 tail=href.rstrip("/").split("/")[-1]
                 if re.fullmatch(r"[A-Za-z0-9_:/.-]{2,100}",tail): identifiers.add(tail)
-                if href.startswith(("http://","https://")): urls.append(href)
-                elif href.startswith("/"): urls.append(ROOT+href)
-                else: urls.append(final.rsplit("/",1)[0]+"/"+href)
+                if href.startswith(("http://","https://")): report.setdefault("discovered_urls",[]).append(href)
+                elif href.startswith("/"): report.setdefault("discovered_urls",[]).append(ROOT+href)
+                else: report.setdefault("discovered_urls",[]).append(final.rsplit("/",1)[0]+"/"+href)
         (OUT/f"page_{len(report['page_attempts']):02d}.html").write_bytes(raw)
     except Exception as exc:
         rec.update(status="failed",error=f"{type(exc).__name__}: {exc}")
     report["page_attempts"].append(rec)
 
-urls=[]
+urls=list(dict.fromkeys(report.get("discovered_urls", [])))
 for ident in identifiers:
     urls.append(f"{ROOT}/utils/data/{SHOT}/{ident}")
     urls.append(f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/{ident}")
