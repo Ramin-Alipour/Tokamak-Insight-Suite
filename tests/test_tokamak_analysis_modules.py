@@ -447,3 +447,11 @@ def test_xray_spectrum_known_moments():
     assert out["mean_energy_keV"] == pytest.approx(20.0)
     assert out["energy_std_keV"] == pytest.approx(np.sqrt(50.0))
     assert out["peak_energy_keV"] == pytest.approx(20.0)
+
+
+
+def test_bolometry_known_triangular_pulse_integral():
+    from tokamak_analysis.bolometry import analyze_bolometry
+    out = analyze_bolometry([0.0, 1.0, 2.0], [0.0, 2.0, 0.0])
+    assert out["time_integrated_signal_J_m2"] == pytest.approx(2.0)
+    assert out["peak_signal_W_m2"] == pytest.approx(2.0)
