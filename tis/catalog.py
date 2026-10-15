@@ -95,6 +95,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Pressure gauges": ["analyze_pressure_gauge"],
     "Residual gas analyzer (RGA)": ["analyze_rga_spectrum"],
     "Gas flow meters": ["analyze_gas_flow_meter"],
+    "Neutral pressure/recycling estimates": ["estimate_neutral_pressure_recycling"],
     "Runaway-electron diagnostics": ["analyze_runaway_electron_signatures", "xray_spectrum_summary"],
     "Fast-ion loss detector (FILD)": ["analyze_fild_image"],
     "Fast-ion D-alpha (FIDA)": ["analyze_fida_spectrum", "fit_spectral_line"],
