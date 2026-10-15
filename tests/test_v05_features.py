@@ -298,7 +298,7 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync, tis.mhd_modes
     modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
@@ -369,3 +369,14 @@ def test_channel_synchronization_recovers_known_delay():
     comparison = np.r_[np.zeros(5), reference[:-5]]
     result = estimate_channel_time_offset(t, reference, comparison, max_lag_s=0.02)
     assert result["estimated_lag_s"] == pytest.approx(-0.005, abs=0.001)
+
+
+def test_mhd_mode_workflow_recovers_known_spatial_mode():
+    from tis.mhd_modes import mhd_mode_workflow
+    n_sensors = 8
+    theta = np.arange(n_sensors) * 2 * np.pi / n_sensors
+    fs = 1000.0
+    t = np.arange(2048) / fs
+    signals = np.cos(2 * np.pi * 100 * t[None, :] - 2 * theta[:, None])
+    result = mhd_mode_workflow(theta, signals, sample_rate_Hz=fs, frequency_range_Hz=(90, 110))
+    assert result["mode_number_fit"] == pytest.approx(2, abs=0.1)
