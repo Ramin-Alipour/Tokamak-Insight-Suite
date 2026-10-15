@@ -1,0 +1,72 @@
+name: Publish tested v0.5.1 release assets
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tis-release-v051-assets
+  cancel-in-progress: false
+
+jobs:
+  test-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested main source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install '.[test]'
+
+      - name: Compile source
+        run: python -m compileall -q app.py tis tests
+
+      - name: Run complete test suite
+        run: python -m pytest -q
+
+      - name: Smoke-test Streamlit dashboard
+        run: |
+          streamlit run app.py --server.headless=true --server.port=8501 > /tmp/tis-streamlit.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              echo "Streamlit dashboard health check passed."
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/tis-streamlit.log
+          exit 1
+
+      - name: Package the tested source for v0.5.1
+        run: |
+          rm -rf /tmp/tis-package
+          mkdir -p /tmp/tis-package/Tokamak_Insight_Suite
+          git archive HEAD | tar -x -C /tmp/tis-package/Tokamak_Insight_Suite
+          cd /tmp/tis-package
+          zip -qr "$GITHUB_WORKSPACE/Tokamak-Insight-Suite-v0.5.1.zip" Tokamak_Insight_Suite
+          cd "$GITHUB_WORKSPACE"
+          sha256sum Tokamak-Insight-Suite-v0.5.1.zip > Tokamak-Insight-Suite-v0.5.1.zip.sha256
+
+      - name: Replace stale ZIP and upload tested package plus checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload v0.5.1 \
+            Tokamak-Insight-Suite-v0.5.1.zip \
+            Tokamak-Insight-Suite-v0.5.1.zip.sha256 \
+            --clobber
