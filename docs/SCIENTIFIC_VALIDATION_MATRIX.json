@@ -264,6 +264,52 @@
       "workflow_run_id": 38741657557,
       "method": "Attempt reconstruction from raw Rogowski derivative and loop-voltage signals; distinguish this from a comparison using archived processed currents.",
       "limitation": "The public endpoint did not provide the required raw signals in this run. Archived processed-signal comparison is not counted as independent raw-data validation."
+    },
+    {
+      "id": "tcv_lh_threshold_scaling_database_reproduction",
+      "status": "formula and selection reproducibility passed",
+      "reference": "TCV L-H transition threshold database and Figure-4 notebook, DOI 10.1088/1361-6587/adc8ce",
+      "source_url": "https://doi.org/10.1088/1361-6587/adc8ce",
+      "dataset": "Zenodo record 14996664, lhdatabase.h5 (92 database rows)",
+      "data_url": "https://zenodo.org/records/14996664",
+      "test": "tools/validate_tcv_lh_threshold.py via .github/workflows/tcv-lh-threshold-validation.yml",
+      "workflow_run_id": 38745011347,
+      "method": "Reproduce P_ITPA=0.049*abs(NEL20)^0.72*abs(BT)^0.8*SPLASMA^0.94 in MW and all ten Figure-4 selection masks; compute P_loss/P_ITPA and normalized uncertainty.",
+      "results": {
+        "database_rows": 92,
+        "formula_valid_rows": 92,
+        "rows_with_valid_power_and_uncertainty": 89,
+        "excluded_missing_power_shots": [
+          68719,
+          69891,
+          69892
+        ],
+        "formula_reproduction_pass": true,
+        "figure4_groups": [
+          {
+            "group": "a_D_ILH_ABEAM2",
+            "n": 6,
+            "median_ratio": 1.24117
+          },
+          {
+            "group": "a_H_ILH_ABEAM1",
+            "n": 5,
+            "median_ratio": 2.05459
+          },
+          {
+            "group": "b_D_ILH_ABEAM2",
+            "n": 12,
+            "median_ratio": 1.13748
+          },
+          {
+            "group": "b_H_ILH_ABEAM1",
+            "n": 4,
+            "median_ratio": 1.80862
+          }
+        ],
+        "empty_groups": 6
+      },
+      "limitation": "Reproduces the published database normalization and selection logic; it is not a reanalysis of raw diagnostic signals."
     }
   ]
 }
