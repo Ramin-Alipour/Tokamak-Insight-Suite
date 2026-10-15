@@ -115,8 +115,8 @@
     },
     {
       "id": "raw_ir_t1_spectrum_and_iv_curve_reconstruction",
-      "status": "not implemented",
-      "limitation": "Publicly accessible raw CCD spectra and raw probe I–V sweep data with sufficient calibration/provenance were not available for direct reconstruction in this validation run."
+      "status": "pending; matching raw measured spectrum/I-V data and corresponding processed reference not available",
+      "limitation": "Do not substitute synthetic signals or digitized figures for a raw-data validation. Revisit when a matching experimental dataset and reference output are available."
     },
     {
       "id": "mast_28830_published_density_crosscheck",
@@ -320,6 +320,20 @@
         }
       },
       "limitation": "Reproduces the published database normalization and selection logic; power-balance check uses the article's processed Figure-2 series, not raw diagnostic signals."
+    },
+    {
+      "id": "mast_bpp_raw_voltage_and_temperature_reconstruction",
+      "status": "pending; raw BPP voltage traces unavailable in the retrieved MAST archive",
+      "dataset": "MAST shot 28830 candidate",
+      "test": "tools/validate_mast_28830_published_density.py and MAST archive inventory",
+      "limitation": "The available cross-diagnostic density check is not a validation of raw BPP probe-voltage processing or Ti reconstruction. Move to another validation until a matching raw BPP trace and published processed result are found."
+    },
+    {
+      "id": "golem_30622_doppler_ion_temperature",
+      "status": "pending; spectral sampling too coarse for reliable Doppler width",
+      "dataset": "GOLEM shot 30622",
+      "test": "tools/validate_golem_30622_spectrum.py / GOLEM empirical candidate acquisition",
+      "limitation": "The retrieved wavelength grid is approximately 0.45 nm per point, too coarse to independently resolve the expected Doppler width. Coarse line identification is not counted as ion-temperature validation."
     }
   ]
 }
