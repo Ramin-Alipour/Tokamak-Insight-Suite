@@ -8,9 +8,11 @@ from __future__ import annotations
 import csv, json
 from datetime import datetime, timezone
 from pathlib import Path
-from tis.probes import fit_swept_ball_pen_ion_temperature
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tis.probes import fit_swept_ball_pen_ion_temperature
 fixture = ROOT / "validation" / "golem_bpp_31992_figure3_digitized.csv"
 outdir = ROOT / "artifacts" / "golem-bpp-31992-fit"
 outdir.mkdir(parents=True, exist_ok=True)
