@@ -567,3 +567,11 @@ def test_energetic_particle_distribution_known_bins():
     assert out["mean_energy_keV"] == pytest.approx(20.0)
     assert out["peak_energy_keV"] == pytest.approx(20.0)
     assert out["normalized"] is True
+
+
+
+def test_particle_loss_rate_known_linear_counts():
+    from tokamak_analysis.energetic_particles import particle_loss_rate
+    out = particle_loss_rate([0.0, 1.0, 2.0], [0.0, 4.0, 8.0], detection_efficiency=0.5)
+    np.testing.assert_allclose(out["loss_rate_s-1"], [8.0, 8.0, 8.0])
+    assert out["total_detected_counts"] == pytest.approx(12.0)
