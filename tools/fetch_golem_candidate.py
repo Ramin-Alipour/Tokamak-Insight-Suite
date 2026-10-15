@@ -12,7 +12,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-import numpy as np
+from statistics import median
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -30,6 +30,15 @@ def get(url: str) -> tuple[bytes, str, str]:
         return data, response.geturl(), content_type
 
 
+def _percentile(values: list[float], fraction: float) -> float:
+    ordered = sorted(values)
+    position = fraction * (len(ordered) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    weight = position - lower
+    return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+
 def analyze_hydrogen_lines(path: Path) -> dict:
     """Check coarse Balmer-line identification against NIST air wavelengths.
 
@@ -39,15 +48,17 @@ def analyze_hydrogen_lines(path: Path) -> dict:
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     rows = []
     for line in lines[11:]:
-        values = np.fromstring(line, sep=" ")
-        if values.size == 30:  # wavelength + 29 individual exposures
+        try:
+            values = [float(token) for token in line.split()]
+        except ValueError:
+            continue
+        if len(values) == 30:  # wavelength + 29 individual exposures
             rows.append(values)
     if len(rows) < 100:
         return {"status": "not_evaluated", "reason": "Expected wavelength plus 29 spectra table was not recognized."}
-    data = np.asarray(rows, dtype=float)
-    wavelength = data[:, 0]
-    mean_counts = np.nanmean(data[:, 1:], axis=1)
-    spacing = float(np.median(np.diff(wavelength)))
+    wavelength = [row[0] for row in rows]
+    mean_counts = [sum(row[1:]) / len(row[1:]) for row in rows]
+    spacing = float(median([wavelength[i + 1] - wavelength[i] for i in range(len(wavelength) - 1)]))
     references = [
         ("H_alpha", 656.281, 654.0, 660.0),
         ("H_beta", 486.134, 484.0, 489.0),
@@ -55,32 +66,35 @@ def analyze_hydrogen_lines(path: Path) -> dict:
     ]
     measured = []
     for name, reference_nm, low_nm, high_nm in references:
-        selected = (wavelength >= low_nm) & (wavelength <= high_nm)
-        x = wavelength[selected]
-        y = mean_counts[selected]
-        if x.size < 3 or not np.all(np.isfinite(y)):
-            measured.append({"line": name, "status": "not_evaluated", "reason": "Insufficient finite samples in line window."})
+        selected = [
+            (x, y) for x, y in zip(wavelength, mean_counts)
+            if low_nm <= x <= high_nm
+        ]
+        if len(selected) < 3:
+            measured.append({"line": name, "status": "not_evaluated", "reason": "Insufficient samples in line window."})
             continue
-        baseline = float(np.percentile(y, 20))
-        weights = np.clip(y - baseline, 0.0, None)
-        if float(weights.sum()) <= 0:
+        x = [item[0] for item in selected]
+        y = [item[1] for item in selected]
+        baseline = _percentile(y, 0.20)
+        weights = [max(value - baseline, 0.0) for value in y]
+        if sum(weights) <= 0:
             measured.append({"line": name, "status": "not_evaluated", "reason": "No positive baseline-subtracted signal."})
             continue
-        centroid_nm = float(np.sum(x * weights) / np.sum(weights))
-        peak_index = int(np.argmax(y))
-        half_max = baseline + (float(np.max(y)) - baseline) / 2.0
-        half_indices = np.flatnonzero(y >= half_max)
-        fwhm_nm = float(x[half_indices[-1]] - x[half_indices[0]]) if half_indices.size >= 2 else None
+        centroid_nm = sum(xi * wi for xi, wi in zip(x, weights)) / sum(weights)
+        peak_index = max(range(len(y)), key=lambda i: y[i])
+        half_max = baseline + (max(y) - baseline) / 2.0
+        half_indices = [i for i, value in enumerate(y) if value >= half_max]
+        fwhm_nm = x[half_indices[-1]] - x[half_indices[0]] if len(half_indices) >= 2 else None
         offset_nm = centroid_nm - reference_nm
         measured.append({
             "line": name,
             "reference_air_wavelength_nm": reference_nm,
             "measured_centroid_nm": centroid_nm,
-            "measured_peak_nm": float(x[peak_index]),
+            "measured_peak_nm": x[peak_index],
             "centroid_offset_nm": offset_nm,
             "centroid_offset_in_wavelength_bins": offset_nm / spacing,
             "observed_fwhm_nm": fwhm_nm,
-            "within_one_wavelength_bin": bool(abs(offset_nm) <= spacing),
+            "within_one_wavelength_bin": abs(offset_nm) <= spacing,
             "method": "mean of 29 exposures; 20th-percentile local baseline; positive-weight centroid",
         })
     evaluated = [item for item in measured if item.get("status") != "not_evaluated"]
