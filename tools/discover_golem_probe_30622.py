@@ -215,7 +215,12 @@ with ThreadPoolExecutor(max_workers=24) as pool:
     report["candidate_results"]=list(pool.map(try_one,urls))
 numeric=[x for x in report["candidate_results"] if x["status"]=="numeric_data"]
 report["numeric_candidate_count"]=len(numeric)
-report["possible_50kHz_sweeps"]=[x for x in numeric if 30000<=x.get("dominant_frequency_Hz",0)<=70000]
+report["possible_50kHz_sweeps"]=[
+    {"url":x["url"],"channels":[c for c in x.get("channel_spectra",[]) if 30000<=c.get("dominant_frequency_Hz",0)<=70000]}
+    for x in numeric if x.get("contains_30_to_70kHz_channel")
+]
 report["direct_Ti_fit_possible_from_found_channels"]=any("U_bias" in x["url"] for x in numeric) and any("U_current" in x["url"] for x in numeric)
+report["high_speed_scope_files_found"]=[x for x in numeric if "data_all" in x["url"].lower()]
+report["interpretation"]="A 50 kHz component in a scope file is only a sweep candidate; channel labels must identify bias and current before Ti fitting."
 (OUT/"report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
 print(json.dumps(report,indent=2),flush=True)
