@@ -157,18 +157,26 @@ def fallback_processed_crosscheck(reason):
     err = ip_recon[mask] - ip_ref[mask]
     rmse = float(np.sqrt(np.mean(err**2)))
     denom = float(np.sqrt(np.mean(ip_ref[mask]**2)))
+    central_start = start + 0.2*(end-start)
+    central_end = end - 0.2*(end-start)
+    central_mask = (tR >= central_start) & (tR <= central_end)
+    central_recon_mean = float(np.mean(ip_recon[central_mask]))
+    central_ref_mean = float(np.mean(ip_ref[central_mask]))
+    central_ref_error = float(100*abs(central_recon_mean-central_ref_mean)/(abs(central_ref_mean) or 1))
     result = {
         "shot": SHOT,
-        "status": "PASS_archived_signal_crosscheck_raw_reconstruction_unavailable",
+        "status": "COMPUTED_archived_signal_crosscheck_raw_reconstruction_unavailable",
         "method": "GOLEM archived integrated Rogowski current minus archived chamber current; compared samplewise with archived plasma-current signal",
         "raw_reconstruction_attempt": "failed",
         "raw_reconstruction_error": reason,
         "sample_counts": {k:v["samples"] for k,v in sources.items()},
         "plasma_window_s": [start,end],
+        "central_60_percent_window_s": [central_start, central_end],
         "sources": sources,
         "reconstructed_from_archived_components": {
             "mean_plasma_current_A": float(np.mean(ip_recon[mask])),
             "max_plasma_current_A": float(np.max(ip_recon[mask])),
+            "central_60_percent_mean_plasma_current_A": central_recon_mean,
             "mean_total_rogowski_current_A": float(np.mean(iR[mask])),
             "max_total_rogowski_current_A": float(np.max(iR[mask])),
         },
@@ -182,6 +190,9 @@ def fallback_processed_crosscheck(reason):
             "mean_absolute_A": float(np.mean(np.abs(ip_ref[mask]))),
             "max_A": float(np.max(ip_ref[mask])),
             "min_A": float(np.min(ip_ref[mask])),
+            "central_60_percent_mean_A": central_ref_mean,
+            "central_60_percent_relative_difference_percent": central_ref_error,
+            "central_60_percent_mean_vs_published_2010A_relative_error_percent": float(100*abs(central_ref_mean-EXPECTED_MEAN_A)/EXPECTED_MEAN_A),
             "full_trace_mean_absolute_A": float(np.mean(np.abs(iP))),
             "plasma_window_percentiles_A": {
                 "p10": float(np.percentile(ip_ref[mask],10)),
