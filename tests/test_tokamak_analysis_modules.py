@@ -691,3 +691,17 @@ def test_svd_known_orthogonal_signal_matrix():
     np.testing.assert_allclose(out["explained_variance_fraction"], [0.5, 0.5], atol=1e-12)
     np.testing.assert_allclose(out["reconstruction"], signals, atol=1e-12)
     assert out["residual_rms"] == pytest.approx(0.0, abs=1e-12)
+
+
+
+def test_wavelet_known_frequency_localized_power():
+    from tokamak_analysis.wavelet_analysis import analyze_wavelet
+    time = np.arange(1024)/1000.0
+    frequency = 15.625
+    signal = np.sin(2*np.pi*frequency*time)
+    out = analyze_wavelet(time, signal, frequencies_Hz=[frequency])
+    power = out["power"][0]
+    assert power.shape == time.shape
+    assert np.all(np.isfinite(power))
+    assert np.max(power) > 0
+    assert power[len(power)//2] > power[0]
