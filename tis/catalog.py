@@ -128,6 +128,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Spectral wavelength calibration": ["wavelength_calibration_workflow", "spectral_calibration"],
     "Gas flow meters": ["gas_flow_to_particle_inventory"],
     "Effective pumping speed": ["effective_pumping_speed_m3_s"],
+    "Fast bolometry": ["fast_bolometry_timeseries"],
     "Instrumental line-shape characterization": ["instrument_line_shape_workflow", "fit_spectral_line"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
 }
