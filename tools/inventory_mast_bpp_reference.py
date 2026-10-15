@@ -10,7 +10,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import xarray as xr\nimport pandas as pd\nimport numpy as np
+import xarray as xr
+import pandas as pd
+import numpy as np
 
 from tis.data_sources import FAIR_MAST_BASE
 
