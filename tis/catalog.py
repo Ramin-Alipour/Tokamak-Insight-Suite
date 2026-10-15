@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Runaway-electron diagnostics": ["analyze_runaway_electron_signatures", "xray_spectrum_summary"],
     "Fast-ion loss detector (FILD)": ["analyze_fild_image"],
     "Fast-ion D-alpha (FIDA)": ["analyze_fida_spectrum", "fit_spectral_line"],
     "Neutral particle analyzer (NPA)": ["analyze_neutral_particle_analyzer"],
