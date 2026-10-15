@@ -151,3 +151,10 @@ def test_beta_known_pressure_and_field():
     assert float(out["beta"]) == pytest.approx(expected_beta, rel=1e-12)
     assert float(out["beta_percent"]) == pytest.approx(100 * expected_beta, rel=1e-12)
     assert expected_beta == pytest.approx(2 * np.pi * 1e-4, rel=1e-12)
+
+
+
+def test_safety_factor_known_cylindrical_estimate():
+    from tokamak_analysis.safety_factor import estimate_safety_factor
+    out = estimate_safety_factor(1.5, 0.5, 2.0, 0.1)
+    assert float(out["q_cylindrical_estimate"]) == pytest.approx(60.0, rel=1e-12)
