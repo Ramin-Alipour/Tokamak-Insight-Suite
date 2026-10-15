@@ -730,3 +730,11 @@ def test_radial_transport_known_covariance():
     assert out["particle_flux_covariance_m-2_s-1"] == pytest.approx(2.5)
     assert out["density_fluctuation_rms"] == pytest.approx(np.sqrt(1.25))
     assert out["velocity_fluctuation_rms_m_s"] == pytest.approx(np.sqrt(5.0))
+
+
+
+def test_poloidal_transport_known_anticorrelation():
+    from tokamak_analysis.transport import fluctuation_transport
+    out = fluctuation_transport([1.0, 2.0, 3.0, 4.0], [8.0, 6.0, 4.0, 2.0], direction="poloidal")
+    assert out["direction"] == "poloidal"
+    assert out["particle_flux_covariance_m-2_s-1"] == pytest.approx(-2.5)
