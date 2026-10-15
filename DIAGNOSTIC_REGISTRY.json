@@ -221,8 +221,8 @@
     "status": "M→D/I",
     "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
     "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["fit_spectral_line", "wavelength_calibration_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
