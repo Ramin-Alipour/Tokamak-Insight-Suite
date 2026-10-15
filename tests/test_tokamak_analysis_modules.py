@@ -184,3 +184,12 @@ def test_x_point_known_quadratic_saddle():
     assert out["candidates"][0]["R_m"] == pytest.approx(2.0)
     assert out["candidates"][0]["Z_m"] == pytest.approx(0.0)
     assert out["candidates"][0]["hessian_determinant"] == pytest.approx(-4.0, abs=1e-10)
+
+
+
+def test_shafranov_shift_known_geometric_and_analytic_values():
+    from tokamak_analysis.shafranov_shift import shafranov_shift
+    out = shafranov_shift(1.55, 1.50, minor_radius_m=0.5, beta_p=1.0, li=1.0)
+    assert out["measured_axis_shift_m"] == pytest.approx(0.05)
+    assert out["normalized_axis_shift"] == pytest.approx(0.1)
+    assert out["large_aspect_ratio_circular_prediction_m"] == pytest.approx(0.125)
