@@ -16,7 +16,7 @@ from scipy.stats import pearsonr, spearmanr
 SHOT = 164208
 BASE = "https://exp.lhd.nifs.ac.jp/opendata/LHD/dataexplog/"
 WEBAPI = "https://exp.lhd.nifs.ac.jp/opendata/LHD/webapi.fcgi"
-DIAGNOSTICS = ("lhdcxs7_img", "lhdcxs7_prep", "lhdcxs7_cvi")
+DIAGNOSTICS = ("lhdcxs7_img", "lhdcxs7_prep", "lhdcxs7_cvi", "cxsmap7")
 OUT = Path("artifacts/lhd-164208-cxs-validation")
 LAMBDA0_NM = 529.05
 W0_NM = 529.1
@@ -134,12 +134,15 @@ def main():
     prep = parse_prep(paths["lhdcxs7_prep"])
     img_df = parse_data(paths["lhdcxs7_img"])
     cvi = parse_data(paths["lhdcxs7_cvi"])
+    cmap = parse_data(paths["cxsmap7"])
     if img_df.shape[1] != 104:
         raise ValueError(f"Unexpected raw image column count: {img_df.shape}")
     if prep.shape[1] < 27 or len(prep) != 102:
         raise ValueError(f"Unexpected CXS7 preparation shape: {prep.shape}")
     if cvi.shape[1] != 33:
         raise ValueError(f"Unexpected CXS7 processed-output shape: {cvi.shape}")
+    if cmap.shape[1] != 23:
+        raise ValueError(f"Unexpected CXSMAP7 processed-output shape: {cmap.shape}")
 
     # Raw image rows are ordered by time then x-pixel; each row contains 102 stripe values.
     global image_times
@@ -188,6 +191,33 @@ def main():
             "Vc_error_km_s": float(row.iloc[6]), "In_au": float(row.iloc[7]),
             "In_error_au": float(row.iloc[8]),
         })
+
+    # Cross-check the shared Ti/Vc fields in two official processed products.
+    # CXSMAP7's ValName metadata omits In/Iner although those values occur in the
+    # data rows after Ver; only the first seven shared fields are compared here.
+    shared_field_names = ("time_s", "R_m", "ary", "Ti_keV", "Tier_keV", "Vc_km_s", "Ver_km_s")
+    processed_product_checks = {}
+    for col, field_name in enumerate(shared_field_names):
+        left = cvi.iloc[:, col].to_numpy(dtype=float)
+        right = cmap.iloc[:, col].to_numpy(dtype=float)
+        valid_shared = np.isfinite(left) & np.isfinite(right) & (np.abs(left) < 1e9) & (np.abs(right) < 1e9)
+        if not np.any(valid_shared):
+            processed_product_checks[field_name] = {"valid_points": 0, "pass": False}
+            continue
+        absolute = np.abs(left[valid_shared] - right[valid_shared])
+        relative = absolute / np.maximum(np.abs(left[valid_shared]), 1e-12) * 100.0
+        p95 = float(np.quantile(relative, 0.95))
+        processed_product_checks[field_name] = {
+            "valid_points": int(valid_shared.sum()),
+            "max_absolute_difference": float(np.max(absolute)),
+            "p95_relative_difference_percent": p95,
+            "pass": p95 <= 1.0,
+        }
+    processed_product_consistency = {
+        "status": "PASS" if all(x.get("pass", False) for x in processed_product_checks.values()) else "PENDING",
+        "shared_fields": processed_product_checks,
+        "schema_warning": "CXSMAP7 ValName omits In and Iner although two intensity fields appear after Ver in the data rows; fields after Ver must not be interpreted by the declared names without a corrected schema.",
+    }
 
     # Compare integrated raw spectral line area with the official intensity time series.
     areas = np.array([x.get("integrated_line_area_counts_pixel", np.nan) for x in raw_fits], dtype=float)
@@ -272,6 +302,7 @@ def main():
         },
         "Ti_temperature_checks": ti_checks,
         "semantic_reference_checks": semantic_reference_checks,
+        "processed_product_consistency_check": processed_product_consistency,
         "intensity_trend_check": intensity_check,
         "interpretation_guard": {
             "field_order": "In lhdcxs7_cvi, Ti is the fourth numeric field including time/R indexing (zero-based column 3); Vc is column 5 and is in km/s.",
