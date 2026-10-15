@@ -69,10 +69,11 @@ for page in pages:
             href=link["href"]
             joined=href+" "+link["text"]
             is_probe_link=bool(re.search(r"bpp|ball.?pen|probe|nistandard|u_bias|u_current|sweep|langmuir",joined,re.I))
+            is_das_link="/DAS/" in href
             is_das_page=("DAS/0512NIstandard.ONN" in page)
-            if is_probe_link or is_das_page:
+            if is_probe_link or is_das_page or is_das_link:
                 report.setdefault("matching_links",[]).append({"page":final,**link})
-            if is_probe_link or is_das_page:
+            if is_probe_link or is_das_page or is_das_link:
                 tail=href.rstrip("/").split("/")[-1]
                 if re.fullmatch(r"[A-Za-z0-9_:/.-]{2,100}",tail): identifiers.add(tail)
                 if href.startswith(("http://","https://")): report.setdefault("discovered_urls",[]).append(href)
@@ -83,6 +84,29 @@ for page in pages:
         rec.update(status="failed",error=f"{type(exc).__name__}: {exc}")
     report["page_attempts"].append(rec)
 
+# Follow every DAQ directory linked from the shot page. This checks whether the
+# swept BPP signal is in a high-speed scope rather than the low-rate NIstandard channel.
+das_pages = list(dict.fromkeys(
+    x["href"] if x["href"].startswith(("http://","https://")) else ROOT+x["href"]
+    for x in report.get("matching_links", []) if "/DAS/" in x["href"]
+))
+report["daq_directory_attempts"] = []
+for das_page in das_pages:
+    try:
+        raw, final, ctype = get(das_page)
+        parser = TableParser()
+        parser.feed(raw.decode("utf-8","replace"))
+        report["daq_directory_attempts"].append({"url":das_page,"status":"downloaded","bytes":len(raw)})
+        (OUT / ("daq_" + hashlib.sha256(das_page.encode()).hexdigest()[:8] + ".html")).write_bytes(raw)
+        for link in parser.links:
+            href=link["href"]
+            if href.startswith(("http://","https://")): report.setdefault("discovered_urls",[]).append(href)
+            elif href.startswith("/"): report.setdefault("discovered_urls",[]).append(ROOT+href)
+            else: report.setdefault("discovered_urls",[]).append(final.rsplit("/",1)[0]+"/"+href)
+            if re.search(r"bpp|probe|u_bias|u_current|nistandard|Nidatap|channel|current|voltage",href+" "+link["text"],re.I):
+                report.setdefault("matching_links",[]).append({"page":final,**link})
+    except Exception as exc:
+        report["daq_directory_attempts"].append({"url":das_page,"status":"failed","error":f"{type(exc).__name__}: {exc}"})
 urls=list(dict.fromkeys(report.get("discovered_urls", [])))
 for ident in identifiers:
     urls.append(f"{ROOT}/utils/data/{SHOT}/{ident}")
