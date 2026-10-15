@@ -603,3 +603,15 @@ def test_vacuum_pressure_known_ramp_and_integral():
     np.testing.assert_allclose(out["pressure_rise_rate_Pa_s"], [1.0, 1.0, 1.0])
     assert out["pressure_time_integral_Pa_s"] == pytest.approx(4.0)
     np.testing.assert_allclose(out["pressure_above_base_Pa"], [0.0, 1.0, 2.0])
+
+
+
+def test_gas_puffing_known_valve_and_calibrated_flow():
+    from tokamak_analysis.gas_puffing import analyze_gas_puffing
+    out = analyze_gas_puffing(
+        [0.0, 1.0, 2.0], [0.0, 1.0, 1.0],
+        calibrated_flow_mol_s=[0.0, 2.0, 2.0],
+    )
+    assert out["integrated_valve_command_s"] == pytest.approx(1.5)
+    assert out["open_fraction"] == pytest.approx(2/3)
+    assert out["injected_amount_mol"] == pytest.approx(3.0)
