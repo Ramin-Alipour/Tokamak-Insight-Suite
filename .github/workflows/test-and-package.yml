@@ -1,4 +1,4 @@
-name: Test and package Tokamak Insight Suite v0.4.0
+name: Test and package Tokamak Insight Suite
 
 on:
   push:
@@ -57,24 +57,20 @@ jobs:
           rm -rf /tmp/tis-package
           mkdir -p /tmp/tis-package/Tokamak_Insight_Suite
           git archive HEAD | tar -x -C /tmp/tis-package/Tokamak_Insight_Suite
-          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.3.0.zip
-          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.3.0.zip.sha256
-          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.4.0.zip
-          rm -f /tmp/tis-package/Tokamak_Insight_Suite/Tokamak_Insight_Suite_v0.4.0.zip.sha256
           cd /tmp/tis-package
-          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_v0.4.0.zip" Tokamak_Insight_Suite
+          zip -qr "$GITHUB_WORKSPACE/Tokamak_Insight_Suite_${{ github.ref_name }}.zip" Tokamak_Insight_Suite
 
       - name: Generate SHA-256 checksum
         run: |
           cd "$GITHUB_WORKSPACE"
-          sha256sum Tokamak_Insight_Suite_v0.4.0.zip > Tokamak_Insight_Suite_v0.4.0.zip.sha256
+          sha256sum Tokamak_Insight_Suite_${{ github.ref_name }}.zip > Tokamak_Insight_Suite_${{ github.ref_name }}.zip.sha256
 
       - name: Upload tested source ZIP and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: tokamak-insight-suite-v0.4.0-source
+          name: tokamak-insight-suite-source
           path: |
-            Tokamak_Insight_Suite_v0.4.0.zip
-            Tokamak_Insight_Suite_v0.4.0.zip.sha256
+            Tokamak_Insight_Suite_${{ github.ref_name }}.zip
+            Tokamak_Insight_Suite_${{ github.ref_name }}.zip.sha256
           if-no-files-found: error
           retention-days: 30
