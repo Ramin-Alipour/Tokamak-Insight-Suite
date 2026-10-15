@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "VUV spectroscopy": ["analyze_vuv_spectrum", "fit_spectral_line"],
     "Visible / optical emission spectroscopy": ["analyze_optical_emission_spectrum", "fit_spectral_line", "spectral_calibration"],
     "Probe-derived density fluctuations": ["analyze_probe_density_fluctuations"],
     "Floating / plasma potential arrays": ["analyze_potential_array"],
