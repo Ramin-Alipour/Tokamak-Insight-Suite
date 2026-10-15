@@ -90,6 +90,14 @@ def fetch_legacy_npz(identifier):
                     t_end = float(np.asarray(z["t_end"]).squeeze())
                     if len(y) > 20 and np.isfinite(t_start) and np.isfinite(t_end) and t_end > t_start:
                         t = np.linspace(t_start, t_end, len(y))
+                        # Prefer the archive's explicit time axis where provided.
+                        if "axis" in keys:
+                            try:
+                                axis = np.asarray(z["axis"], float).squeeze().ravel()
+                                if len(axis) == len(y) and np.all(np.isfinite(axis)) and np.all(np.diff(axis) > 0):
+                                    t = axis
+                            except (TypeError, ValueError):
+                                pass
                         return t, y, url, keys
                 for key in keys:
                     a = z[key]
