@@ -390,6 +390,47 @@ if "time_resolved_line_audit" in report:
             "interpretation": "Descriptive stability among accepted H-alpha fits only; not an instrument-calibrated Doppler-width or ion-temperature result."
         }
 
+# Try the instrument configuration referenced by the upstream GOLEM analysis code.
+# Only a retrieved configuration file may supply an instrumental-width correction.
+config_candidates = [
+    "https://golem.fjfi.cvut.cz/shots/9867/diagnostics/Radiation/1111Spectrometer.ON/ControlSoftware/HR%2BC1886.cfg",
+    "https://golem.fjfi.cvut.cz/shots/11115/diagnostics/Radiation/1111Spectrometer.ON/ControlSoftware/HR%2BC1886.cfg",
+    "https://golem.fjfi.cvut.cz/operation/shots/9867/diagnostics/Radiation/1111Spectrometer.ON/ControlSoftware/HR%2BC1886.cfg",
+    "https://golem.fjfi.cvut.cz/operation/shots/11115/diagnostics/Radiation/1111Spectrometer.ON/ControlSoftware/HR%2BC1886.cfg",
+]
+config_audit = {"status": "instrument_config_not_retrieved", "attempts": []}
+for config_url in config_candidates:
+    try:
+        config_blob = get(config_url)
+        config_text = config_blob.decode("utf-8", "replace")
+        if "[Instrumental broadening function]" not in config_text or "width(wavelength)" not in config_text:
+            config_audit["attempts"].append({"url": config_url, "status": "not_a_recognized_instrument_config"})
+            continue
+        (OUT / "upstream_HR_C1886.cfg").write_bytes(config_blob)
+        import re
+        section = config_text.split("[Instrumental broadening function]", 1)[1].split("\\n[", 1)[0]
+        width_match = re.search(r"(?im)^width\\(wavelength\\)\\s*=\\s*(.+)$", section)
+        pairs = []
+        if width_match:
+            nums = [float(v) for v in re.findall(r"[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?", width_match.group(1))]
+            pairs = list(zip(nums[0::2], nums[1::2]))
+        if pairs:
+            inst_width = float(np.interp(656.281, [p[0] for p in pairs], [p[1] for p in pairs]))
+            config_audit = {
+                "status": "instrument_config_retrieved",
+                "source_url": config_url,
+                "sha256": hashlib.sha256(config_blob).hexdigest(),
+                "width_points_nm": [{"wavelength_nm": x, "instrumental_width_nm": y} for x, y in pairs],
+                "interpolated_instrumental_width_at_H_alpha_nm": inst_width,
+                "width_definition": "as defined in upstream GOLEM config; confirm before using as FWHM",
+                "decision": "not_applied_until_width_definition_and_same_instrument_provenance_are_confirmed"
+            }
+            break
+        config_audit["attempts"].append({"url": config_url, "status": "config_found_but_width_parse_failed"})
+    except Exception as exc:
+        config_audit["attempts"].append({"url": config_url, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
+report["instrument_config_audit"] = config_audit
+
 (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2))
 if report["status"] != "PASS_SPECTRAL_LINE_SHAPE":
