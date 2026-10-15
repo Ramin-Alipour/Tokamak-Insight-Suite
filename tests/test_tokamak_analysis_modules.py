@@ -392,12 +392,13 @@ def test_reflectometry_o_mode_cutoff_density_known_frequency():
 
 def test_density_wave_known_sinusoidal_frequency_and_rms():
     from tokamak_analysis.density_waves import analyze_density_waves
-    n_samples = 1000
+    n_samples = 1024
     time = np.arange(n_samples) / 1000.0
     amplitude = 1e18
-    density = 1e19 + amplitude*np.sin(2*np.pi*5.0*time)
+    frequency_Hz = 15.625
+    density = 1e19 + amplitude*np.sin(2*np.pi*frequency_Hz*time)
     out = analyze_density_waves(time, density)
     expected_rms = amplitude*np.sqrt(n_samples/(2*(n_samples-1)))
     assert out["rms_fluctuation"] == pytest.approx(expected_rms, rel=1e-10)
     assert out["relative_rms"] == pytest.approx(expected_rms/1e19, rel=1e-10)
-    assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(5.0)
+    assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(frequency_Hz)
