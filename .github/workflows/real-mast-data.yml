@@ -33,6 +33,8 @@ jobs:
           pip install '.[data]'
       - name: Inventory published BPP and Thomson reference shot
         run: python tools/inventory_mast_bpp_reference.py
+      - name: Compare MAST 28830 density data with published Table II
+        run: python tools/validate_mast_28830_published_density.py
       - name: Fetch public raw MAST shot and run real-data checks
         run: |
           python tools/fetch_fair_mast_sample.py --output-dir artifacts/mast-real-data
