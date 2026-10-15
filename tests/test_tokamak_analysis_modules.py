@@ -754,3 +754,12 @@ def test_energy_confinement_time_known_value_and_uncertainty():
     out = energy_confinement_time(1000.0, 500.0, uncertainty_energy_J=100.0, uncertainty_power_W=50.0)
     assert out["energy_confinement_time_s"] == pytest.approx(2.0)
     assert out["uncertainty_s"] == pytest.approx(2*np.sqrt(0.1**2+0.1**2), rel=1e-12)
+
+
+
+def test_heat_flux_known_profile_integral_and_peak():
+    from tokamak_analysis.heat_flux import analyze_heat_flux
+    out = analyze_heat_flux([0.0, 1.0, 2.0], [0.0, 2.0, 0.0])
+    assert out["peak_heat_flux_W_m2"] == pytest.approx(2.0)
+    assert out["peak_position_m"] == pytest.approx(1.0)
+    assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
