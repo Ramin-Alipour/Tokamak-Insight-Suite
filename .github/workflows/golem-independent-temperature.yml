@@ -2,8 +2,7 @@ name: GOLEM independent temperature cross-check
 
 on:
   push:
-    paths:
-      - ".github/workflows/golem-independent-temperature.yml"
+    branches: [main]
   workflow_dispatch:
 
 permissions:
