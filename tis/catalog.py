@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Thermal response/heat diffusion": ["analyze_thermal_response"],
     "Pressure gauges": ["analyze_pressure_gauge"],
     "Residual gas analyzer (RGA)": ["analyze_rga_spectrum"],
     "Gas flow meters": ["analyze_gas_flow_meter"],
