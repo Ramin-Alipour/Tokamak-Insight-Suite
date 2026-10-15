@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Magnetic flux / poloidal flux": ["integrate_magnetic_flux_surface", "magnetic_flux_from_voltage"],
     "Polarimetry / Faraday rotation": ["analyze_faraday_rotation"],
     "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)": ["solve_grad_shafranov"],
     "Poloidal-field coils / magnetic probes": ["analyze_poloidal_field"],
