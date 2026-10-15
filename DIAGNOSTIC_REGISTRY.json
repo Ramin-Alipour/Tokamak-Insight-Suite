@@ -347,8 +347,8 @@
     "status": "M→D",
     "method": "Calibrate bandwidth/response and analyze time series consistently.",
     "caveat": "Detector response and channel synchronization limit transient interpretation.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["fast_bolometry_timeseries"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
