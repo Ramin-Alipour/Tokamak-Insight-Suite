@@ -811,3 +811,12 @@ def test_rf_plasma_interaction_known_power_balance():
     assert out["unaccounted_power_W"] == pytest.approx(700.0)
     assert out["coupling_fraction"] == pytest.approx(0.7)
     assert out["unaccounted_power_uncertainty_W"] == pytest.approx(np.sqrt(150.0))
+
+
+
+def test_divertor_heat_flux_known_profile_and_power_load():
+    from tokamak_analysis.divertor_analysis import analyze_divertor_flux
+    out = analyze_divertor_flux([0.0, 1.0, 2.0], [0.0, 2.0, 0.0], surface_area_m2=3.0)
+    assert out["peak_heat_flux_W_m2"] == pytest.approx(2.0)
+    assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
+    assert out["peak_power_load_W"] == pytest.approx(6.0)
