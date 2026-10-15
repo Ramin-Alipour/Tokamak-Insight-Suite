@@ -367,8 +367,8 @@
     "status": "M→D/I",
     "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
     "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["hard_xray_spectrum_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -570,8 +570,8 @@
     "status": "D/I",
     "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
     "caveat": "Mode number needs array geometry and assumptions about mode structure.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["mhd_mode_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "MHD and turbulence",
