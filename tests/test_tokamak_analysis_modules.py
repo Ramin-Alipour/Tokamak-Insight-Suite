@@ -763,3 +763,13 @@ def test_heat_flux_known_profile_integral_and_peak():
     assert out["peak_heat_flux_W_m2"] == pytest.approx(2.0)
     assert out["peak_position_m"] == pytest.approx(1.0)
     assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
+
+
+
+def test_electron_heating_known_power_integral():
+    from tokamak_analysis.heating_analysis import analyze_heating
+    out = analyze_heating([0.0, 1.0, 2.0], [0.0, 2.0, 0.0], stored_energy_J=[10.0, 12.0, 15.0], species="electron")
+    assert out["species"] == "electron"
+    assert out["peak_power_W"] == pytest.approx(2.0)
+    assert out["injected_energy_J"] == pytest.approx(2.0)
+    assert out["stored_energy_change_J"] == pytest.approx(5.0)
