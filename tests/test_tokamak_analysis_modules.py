@@ -680,3 +680,14 @@ def test_fft_known_bin_frequency_and_amplitude():
     idx = int(np.argmin(np.abs(out["frequency_Hz"]-frequency)))
     assert out["frequency_Hz"][idx] == pytest.approx(frequency)
     assert out["amplitude"][idx] == pytest.approx(3.0, rel=1e-10)
+
+
+
+def test_svd_known_orthogonal_signal_matrix():
+    from tokamak_analysis.svd_analysis import analyze_svd
+    signals = np.array([[1.0, 0.0], [0.0, 1.0], [-1.0, 0.0], [0.0, -1.0]])
+    out = analyze_svd(signals, rank=2)
+    np.testing.assert_allclose(out["singular_values"], [np.sqrt(2.0), np.sqrt(2.0)], atol=1e-12)
+    np.testing.assert_allclose(out["explained_variance_fraction"], [0.5, 0.5], atol=1e-12)
+    np.testing.assert_allclose(out["reconstruction"], signals, atol=1e-12)
+    assert out["residual_rms"] == pytest.approx(0.0, abs=1e-12)
