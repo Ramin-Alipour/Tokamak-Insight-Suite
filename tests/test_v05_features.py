@@ -324,3 +324,11 @@ def test_hampel_does_not_flag_curvature_of_a_clean_noisy_signal():
     z = y.copy(); z[[700, 2100, 3300]] += 4.0
     assert hampel_despike(z, 11, 6.0)["n_replaced"] == 3
     assert hampel_despike(np.sin(2 * np.pi * 5 * t), 11, 6.0)["n_replaced"] == 0
+
+
+def test_magnetic_flux_workflow_uses_faraday_sign_and_initial_value():
+    from tis.magnetic import magnetic_flux_from_voltage
+    t = np.linspace(0, 2, 101)
+    result = magnetic_flux_from_voltage(t, np.full_like(t, 3.0), initial_flux_Wb=0.4)
+    assert result["magnetic_flux_Wb"][-1] == pytest.approx(-5.6)
+    assert result["flux_change_Wb"][-1] == pytest.approx(-6.0)
