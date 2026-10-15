@@ -220,3 +220,14 @@ def test_electron_temperature_known_profile_statistics():
     assert out["peak_eV"] == pytest.approx(30.0)
     assert out["standard_deviation_eV"] == pytest.approx(10.0)
     np.testing.assert_allclose(out["gradient_eV_per_coordinate"], [10.0, 10.0, 10.0])
+
+
+
+def test_ion_temperature_known_profile_statistics():
+    from tokamak_analysis.ion_temperature import analyze_ion_temperature
+    out = analyze_ion_temperature([100.0, 200.0, 300.0], coordinate=[0.0, 1.0, 2.0])
+    assert out["mean_eV"] == pytest.approx(200.0)
+    assert out["median_eV"] == pytest.approx(200.0)
+    assert out["peak_eV"] == pytest.approx(300.0)
+    assert out["standard_deviation_eV"] == pytest.approx(100.0)
+    np.testing.assert_allclose(out["gradient_eV_per_coordinate"], [100.0, 100.0, 100.0])
