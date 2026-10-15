@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Discover GOLEM shot 30622 probe signals from Data.php and known data APIs."""
 from __future__ import annotations
-import hashlib, json, re
+import hashlib, json, re, io
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -160,7 +160,7 @@ def try_one(url):
         raw,final,ctype=get(url)
         rec.update(final_url=final,content_type=ctype,bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
         decoded = raw.decode("utf-8", "replace")
-        if any(url.lower().endswith(x) for x in ("main.py", "/log", ".php")):
+        if any(url.lower().endswith(x) for x in ("main.py", "/log", ".php", "makefile", "readme", ".json", ".yaml", ".yml")):
             rec["status"] = "text_source"
             rec["text_preview"] = decoded[:5000]
             rec["relevant_lines"] = [line for line in decoded.splitlines()
@@ -168,6 +168,19 @@ def try_one(url):
             safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", url.rstrip("/").split("/")[-1])
             (OUT / f"source_{safe}_{hashlib.sha256(url.encode()).hexdigest()[:8]}.txt").write_bytes(raw)
             return rec
+        if url.lower().endswith(".npz"):
+            try:
+                archive = np.load(io.BytesIO(raw), allow_pickle=False)
+                arrays = {}
+                for key in archive.files:
+                    value = np.asarray(archive[key])
+                    arrays[key] = {"shape": list(value.shape), "dtype": str(value.dtype)}
+                rec.update(status="npz_archive", arrays=arrays)
+                (OUT / f"archive_{hashlib.sha256(url.encode()).hexdigest()[:8]}.npz").write_bytes(raw)
+                return rec
+            except Exception as exc:
+                rec.update(status="npz_unparsed", parse_error=f"{type(exc).__name__}: {exc}")
+                return rec
         try: arr=np.asarray(np.loadtxt(decoded.splitlines()))
         except Exception: arr=np.asarray([])
         if arr.size<10: rec["status"]="empty_or_non_numeric"
@@ -176,13 +189,25 @@ def try_one(url):
             safe=re.sub(r"[^A-Za-z0-9_.-]+","_",url.rstrip("/").split("/")[-1])
             (OUT/f"{safe}_{hashlib.sha256(url.encode()).hexdigest()[:8]}.txt").write_bytes(raw)
             if arr.ndim==2 and arr.shape[1]>=2 and arr.shape[0]>100:
-                t,y=arr[:,0],arr[:,1]; good=np.isfinite(t)&np.isfinite(y); t,y=t[good],y[good]
+                t=arr[:,0]
+                goodt=np.isfinite(t)
+                t=t[goodt]
                 if t.size>100 and np.all(np.diff(t)>0):
-                    dt=float(np.median(np.diff(t))); rec.update(sample_count=int(t.size),sample_rate_Hz=1/dt,duration_s=float(t[-1]-t[0]),signal_range=float(np.ptp(y)))
-                    if t.size>1000:
-                        f=np.fft.rfftfreq(t.size,dt); p=np.abs(np.fft.rfft(y-np.mean(y)))**2
-                        m=(f>=1000)&(f<=min(2e6,0.45/dt))
-                        if np.any(m): rec["dominant_frequency_Hz"]=float(f[m][np.argmax(p[m])])
+                    dt=float(np.median(np.diff(t)))
+                    rec.update(sample_count=int(t.size),sample_rate_Hz=1/dt,duration_s=float(t[-1]-t[0]))
+                    channel_spectra=[]
+                    for col in range(1,arr.shape[1]):
+                        y=arr[:,col]
+                        good=np.isfinite(arr[:,0])&np.isfinite(y)
+                        yy=y[good]
+                        if yy.size<100: continue
+                        yy=yy-np.mean(yy)
+                        f=np.fft.rfftfreq(yy.size,dt); p=np.abs(np.fft.rfft(yy))**2
+                        m=(f>=1000)&(f<=min(400e3,0.45/dt))
+                        peak=float(f[m][np.argmax(p[m])]) if np.any(m) else None
+                        channel_spectra.append({"column_index_1based_in_file":col+1,"signal_range":float(np.ptp(y[good])),"dominant_frequency_Hz":peak})
+                    rec["channel_spectra"]=channel_spectra
+                    rec["contains_30_to_70kHz_channel"]=any(30000<=x.get("dominant_frequency_Hz",0)<=70000 for x in channel_spectra)
         return rec
     except Exception as exc: return {"url":url,"status":"failed","error":f"{type(exc).__name__}: {exc}"}
 
