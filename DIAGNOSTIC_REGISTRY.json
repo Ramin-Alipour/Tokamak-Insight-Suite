@@ -273,8 +273,8 @@
     "status": "D",
     "method": "Fit known reference lines using a documented calibration function and residuals.",
     "caveat": "Calibration range, polynomial order and time drift must be assessed.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["wavelength_calibration_workflow", "spectral_calibration"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
