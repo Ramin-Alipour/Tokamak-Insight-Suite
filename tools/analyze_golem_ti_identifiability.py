@@ -155,6 +155,68 @@ for held_out in range(len(line_names)):
     })
 all_slope, all_intercept = np.polyfit(measured_centers, reference_centers, 1)
 all_calibration_residuals = (all_slope * measured_centers + all_intercept) - reference_centers
+
+# Independent multi-species wavelength-axis stress test. These GOLEM line IDs
+# are approximate plasma-line references, not lamp-standard calibration lines.
+calibration_candidates = {
+    **{name: {"reference_nm": ref, "fit": line_results[name], "kind": "Balmer"}
+       for name, (ref, _window) in lines.items()},
+    **{name: {"reference_nm": ref, "fit": proxy_results.get(name, {}), "kind": "heavy-ion plasma line"}
+       for name, (ref, _window) in proxy_lines.items()},
+}
+calibration_lines = []
+for name, item in calibration_candidates.items():
+    fit = item["fit"]
+    if ("fitted_center_nm" in fit and fit.get("fit_r_squared") is not None
+            and fit["fit_r_squared"] >= 0.8):
+        calibration_lines.append({
+            "name": name, "kind": item["kind"],
+            "measured_center_nm": float(fit["fitted_center_nm"]),
+            "reference_nm": float(item["reference_nm"]),
+            "fit_r_squared": float(fit["fit_r_squared"]),
+            "fwhm_nm": float(fit["observed_gaussian_fwhm_nm"]),
+        })
+multi_species_loo = []
+if len(calibration_lines) >= 3:
+    mx = np.array([x["measured_center_nm"] for x in calibration_lines])
+    rx = np.array([x["reference_nm"] for x in calibration_lines])
+    for held in range(len(calibration_lines)):
+        train = np.array([i for i in range(len(calibration_lines)) if i != held])
+        slope_i, intercept_i = np.polyfit(mx[train], rx[train], 1)
+        pred = float(slope_i * mx[held] + intercept_i)
+        err = pred - float(rx[held])
+        multi_species_loo.append({
+            "held_out_line": calibration_lines[held]["name"],
+            "line_kind": calibration_lines[held]["kind"],
+            "predicted_reference_nm": pred,
+            "actual_reference_nm": float(rx[held]),
+            "prediction_error_nm": err,
+            "prediction_error_in_sampling_intervals": err / step,
+            "within_one_sampling_interval": abs(err) <= step,
+        })
+    multi_species_slope, multi_species_intercept = np.polyfit(mx, rx, 1)
+    multi_species_residuals = (multi_species_slope * mx + multi_species_intercept) - rx
+    multi_species_calibration = {
+        "method": "leave-one-line-out affine fit using Balmer plus heavy-ion plasma-line centroids",
+        "lines_used": calibration_lines,
+        "line_count": len(calibration_lines),
+        "leave_one_out": multi_species_loo,
+        "all_line_slope": float(multi_species_slope),
+        "all_line_intercept_nm": float(multi_species_intercept),
+        "all_line_residuals_nm": {
+            calibration_lines[i]["name"]: float(multi_species_residuals[i])
+            for i in range(len(calibration_lines))
+        },
+        "generalizes_within_one_sampling_interval": all(x["within_one_sampling_interval"] for x in multi_species_loo),
+        "limitation": "Plasma-line centroids may be blended or shifted; this is not a lamp-standard calibration and does not calibrate the instrument LSF."
+    }
+else:
+    multi_species_calibration = {
+        "line_count": len(calibration_lines),
+        "lines_used": calibration_lines,
+        "limitation": "Fewer than three reliable line fits; independent multi-species affine calibration unavailable."
+    }
+
 report = {
     "analysis": "Balmer multi-line ion-temperature identifiability audit",
     "shot": SHOT,
@@ -169,6 +231,7 @@ report = {
     "median_sampling_interval_nm": step,
     "line_fits": line_results,
     "heavy_ion_line_width_proxies_not_independent_LSF": proxy_results,
+    "multi_species_wavelength_calibration_cross_check": multi_species_calibration,
     "wavelength_calibration_cross_check": {
         "method": "leave-one-Balmer-line-out affine calibration; two lines fit, third predicted",
         "line_centroids_used_nm": {name: float(line_results[name]["fitted_center_nm"]) for name in line_names},
