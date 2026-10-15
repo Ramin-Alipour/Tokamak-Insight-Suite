@@ -898,3 +898,15 @@ def test_measurement_uncertainty_known_summary_and_product():
     product = propagate_product_uncertainty([2.0, 3.0], [0.1, 0.2])
     assert product["value"] == pytest.approx(6.0)
     assert product["relative_uncertainty"] == pytest.approx(np.sqrt((0.1/2)**2+(0.2/3)**2))
+
+
+
+def test_channel_synchronization_known_linear_interpolation():
+    from tokamak_analysis.channel_synchronization import synchronize_channels
+    out = synchronize_channels(
+        [[0.0, 1.0, 2.0], [0.5, 1.5, 2.5]],
+        [[0.0, 10.0, 20.0], [5.0, 15.0, 25.0]],
+    )
+    np.testing.assert_allclose(out["time_s"], [1.0, 2.0])
+    np.testing.assert_allclose(out["synchronized_signals"], [[10.0, 20.0], [10.0, 20.0]])
+    assert out["channel_count"] == 2
