@@ -319,3 +319,12 @@ def test_doppler_ion_temperature_known_thermal_width():
     )
     assert out["thermal_fwhm_nm"] == pytest.approx(thermal_fwhm, rel=1e-10)
     assert out["ion_temperature_eV"] == pytest.approx(expected_Ti_eV, rel=1e-10)
+
+
+
+def test_doppler_flow_known_wavelength_shift():
+    from tokamak_analysis.doppler_flow import doppler_flow_velocity, C
+    out = doppler_flow_velocity(500.001, 500.0, uncertainty_nm=0.0001)
+    assert float(out["wavelength_shift_nm"]) == pytest.approx(0.001)
+    assert float(out["velocity_m_s"]) == pytest.approx(C * (0.001/500.0), rel=1e-12)
+    assert float(out["velocity_uncertainty_m_s"]) == pytest.approx(C * (0.0001/500.0), rel=1e-12)
