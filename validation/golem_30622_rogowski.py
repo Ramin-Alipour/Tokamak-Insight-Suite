@@ -136,8 +136,16 @@ def fetch_raw_das_signal(identifier):
     """Fetch GOLEM legacy raw NIstandard DAS signal (irog/uloop) via public data API."""
     import io, urllib.request
     errors = []
+    channel = {"irog": "2", "uloop": "0"}.get(identifier, identifier)
     urls = [
+        f"https://golem.fjfi.cvut.cz/cgi-bin/data/{SHOT}/nistandard_{identifier}.npz",
+        f"https://golem.fjfi.cvut.cz/cgi-bin/data/{SHOT}/nistandard_{channel}.npz",
+        f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/nistandard_{identifier}.npz",
+        f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/nistandard_{channel}.npz",
+        f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/{identifier}.npz",
         f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/{identifier}",
+        f"http://golem.fjfi.cvut.cz/cgi-bin/data/{SHOT}/nistandard_{identifier}.npz",
+        f"http://golem.fjfi.cvut.cz/cgi-bin/data/{SHOT}/nistandard_{channel}.npz",
         f"http://golem.fjfi.cvut.cz/utils/data/{SHOT}/{identifier}",
     ]
     for url in urls:
