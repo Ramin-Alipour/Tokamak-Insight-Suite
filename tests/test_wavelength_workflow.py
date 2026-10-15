@@ -39,5 +39,5 @@ def test_invalid_calibration_inputs_rejected(pixels, wavelengths, kwargs):
 
 
 def test_nonmonotonic_polynomial_mapping_flagged():
-    result = wavelength_calibration_workflow([0, 1, 2, 3, 4], [4, 1, 0, 1, 4], degree=2)
+    result = wavelength_calibration_workflow([0, 1, 2, 3, 4], [4.0, 1.1, 0.2, 1.3, 4.4], degree=2)
     assert not result["monotonic_over_calibration_span"]
