@@ -69,18 +69,52 @@ jobs:
               }
 
           t,I=arrays["plasma_current"]
-          if refs["plasma_start"] is not None and refs["plasma_end"] is not None:
-              mask=(t>=refs["plasma_start"])&(t<=refs["plasma_end"])
-              if mask.any():
-                  mean=float(np.mean(I[mask])); mean_abs=float(np.mean(np.abs(I[mask])))
-                  ref_mean=refs["plasma_current_mean"]
-                  cmp={"window_start_s":refs["plasma_start"],"window_end_s":refs["plasma_end"],
-                       "samples_in_window":int(mask.sum()),"measured_signed_mean_A":mean,"measured_absolute_mean_A":mean_abs}
-                  if ref_mean is not None:
-                      cmp["GOLEM_reference_mean_A"]=ref_mean
-                      cmp["signed_mean_relative_difference_percent"]=abs(mean-ref_mean)/abs(ref_mean)*100 if ref_mean else None
-                      cmp["absolute_mean_relative_difference_percent"]=abs(mean_abs-ref_mean)/abs(ref_mean)*100 if ref_mean else None
-                  out["comparisons"]["plasma_current_mean_in_published_discharge_window"]=cmp
+          ref_mean=refs["plasma_current_mean"]
+          candidates={}
+          def add_window(name, mask, definition):
+              if not mask.any():
+                  candidates[name]={"status":"EMPTY_WINDOW","definition":definition}
+                  return
+              vals=I[mask]
+              mean=float(np.mean(vals)); mean_abs=float(np.mean(np.abs(vals)))
+              item={"status":"COMPUTED","definition":definition,
+                    "window_start_s":float(t[mask][0]),"window_end_s":float(t[mask][-1]),
+                    "samples":int(mask.sum()),"signed_mean_A":mean,
+                    "absolute_mean_A":mean_abs,"positive_only_mean_A":float(np.mean(vals[vals>0])) if np.any(vals>0) else None,
+                    "positive_fraction":float(np.mean(vals>0))}
+              if ref_mean is not None:
+                  item["reference_A"]=ref_mean
+                  item["signed_relative_difference_percent"]=abs(mean-ref_mean)/abs(ref_mean)*100 if ref_mean else None
+                  item["absolute_relative_difference_percent"]=abs(mean_abs-ref_mean)/abs(ref_mean)*100 if ref_mean else None
+                  pos=vals[vals>0]
+                  item["positive_only_relative_difference_percent"]=abs(float(np.mean(pos))-ref_mean)/abs(ref_mean)*100 if ref_mean and pos.size else None
+              candidates[name]=item
+
+          t_start=refs["plasma_start"]; t_end=refs["plasma_end"]
+          if t_start is not None and t_end is not None:
+              add_window("published_start_end", (t>=t_start)&(t<=t_end),
+                         "GOLEM page plasma_start through plasma_end; reproduces current implementation")
+          # Independent window definitions expose whether the reference is a
+          # plateau/positive-current mean rather than a full signed discharge mean.
+          add_window("full_trace", np.ones(I.shape,dtype=bool), "entire archived Iplasma trace")
+          add_window("positive_current_only", I>0, "all samples with Iplasma > 0 A")
+          peak_I=float(np.max(I))
+          add_window("above_80pct_positive_peak", I>=0.8*peak_I,
+                     "samples where Iplasma >= 80% of its positive maximum")
+          add_window("above_90pct_positive_peak", I>=0.9*peak_I,
+                     "samples where Iplasma >= 90% of its positive maximum")
+          # Central 20–80% of the stated interval, avoiding ramp-up/down edges.
+          if t_start is not None and t_end is not None and t_end>t_start:
+              add_window("central_20_80pct_published_interval",
+                         (t>=t_start+0.2*(t_end-t_start))&(t<=t_start+0.8*(t_end-t_start)),
+                         "central 20–80% of GOLEM plasma_start/plasma_end interval")
+
+          out["comparisons"]["plasma_current_mean_window_diagnostics"]={
+              "GOLEM_reference_mean_A":ref_mean,
+              "published_window_start_s":t_start,"published_window_end_s":t_end,
+              "candidates":candidates,
+              "interpretation":"Compare window definitions and signed/absolute/positive-only means. Do not select a matching window as validated unless GOLEM documents that exact averaging convention."
+          }
 
           out["status"]="NUMERIC_CROSSCHECK_COMPLETE" if out["comparisons"].get("rogowski_peak") and out["comparisons"].get("plasma_current_mean_in_published_discharge_window") else "PARTIAL_NUMERIC_CROSSCHECK"
           out["method_note"]="Raw GOLEM NPZ signals were downloaded and metrics independently calculated. Mean-current comparison uses the shot page's stated plasma_start/plasma_end interval; interpretation remains conditional on the archive's documented units and interval semantics."
