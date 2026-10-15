@@ -49,3 +49,33 @@ def analyze_visible_imaging(frames, time_s, *, pixel_size_m: float, roi=None) ->
         'assumptions_and_limits': ['Pixel size must be calibrated in the plane of the image.',
             'Centroid is intensity-weighted and can be biased by background, saturation, occlusion or multiple features.',
             'Apparent image-plane speed is not automatically the plasma flow velocity.']}
+
+
+
+def analyze_fast_visible_imaging(frames, time_s, *, pixel_size_m: float, transient_sigma: float = 5.0) -> dict:
+    """Add frame-difference transient detection to visible-image centroid tracking."""
+    if not np.isfinite(transient_sigma) or transient_sigma <= 0:
+        raise ValueError("transient_sigma must be positive and finite.")
+    base = analyze_visible_imaging(frames, time_s, pixel_size_m=pixel_size_m)
+    data = np.asarray(frames, dtype=float)
+    differences = np.diff(data, axis=0)
+    abs_change = np.abs(differences)
+    frame_change = np.sqrt(np.mean(differences**2, axis=(1, 2)))
+    baseline = float(np.median(frame_change))
+    mad = float(1.4826 * np.median(np.abs(frame_change - baseline)))
+    threshold = baseline + transient_sigma * mad
+    events = np.flatnonzero(frame_change > threshold)
+    return {
+        **base,
+        "diagnostic": "Fast visible imaging",
+        "frame_difference_rms": frame_change,
+        "frame_difference_max_abs": np.max(abs_change, axis=(1, 2)),
+        "transient_frame_indices": events,
+        "transient_times_s": np.asarray(time_s, dtype=float).ravel()[events + 1],
+        "transient_threshold_rms": threshold,
+        "assumptions_and_limits": [
+            "Frame differences flag abrupt image changes, not a unique physical event type.",
+            "Camera timing, exposure, gain changes, saturation and background motion can create false detections.",
+            "Apparent centroid speed remains a projected image-plane velocity.",
+        ],
+    }
