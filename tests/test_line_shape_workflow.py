@@ -22,7 +22,7 @@ def test_line_shape_does_not_claim_automatic_deconvolution():
     y = 2 + 4 / (1 + ((x - 0.3) / 0.2) ** 2)
     result = instrument_line_shape_workflow(x, y, reference_wavelength_nm=0.3, model="Lorentzian")
     assert result["observed_fwhm_nm"] == pytest.approx(0.4, rel=0.02)
-    assert "does not" in result["interpretation"]
+    assert "intrinsic width" in result["interpretation"]
     assert result["fit_quality_status"] == "not_assessed"
 
 
