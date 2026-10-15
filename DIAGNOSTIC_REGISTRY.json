@@ -159,10 +159,10 @@
     "diagnostic": "Magnetic flux / poloidal flux",
     "quantities": "Φ_B, ψ",
     "status": "M→D/I",
-    "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
-    "caveat": "Reference surfaces and sign conventions must be recorded.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "method": "Integrate calibrated loop voltage using Faraday law with explicit polarity and baseline controls.",
+    "caveat": "Input voltage calibration, loop orientation, sensor response and reference flux must be documented; this is not equilibrium reconstruction.",
+    "implementation_functions": ["magnetic_flux_from_voltage", "integrate_time_series"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -221,8 +221,8 @@
     "status": "M→D/I",
     "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
     "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["fit_spectral_line", "wavelength_calibration_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -273,18 +273,18 @@
     "status": "D",
     "method": "Fit known reference lines using a documented calibration function and residuals.",
     "caveat": "Calibration range, polynomial order and time drift must be assessed.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["wavelength_calibration_workflow", "spectral_calibration"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
     "diagnostic": "Instrumental line-shape characterization",
     "quantities": "Instrument width and response function",
     "status": "M→D",
-    "method": "Measure a narrow reference line or use a validated instrument function.",
-    "caveat": "Do not subtract widths without a compatible convolution model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "method": "Fit a narrow reference line; report observed FWHM and nominal resolving power with fit quality.",
+    "caveat": "Observed width represents the instrument response only if intrinsic line width is negligible or known; do not subtract widths without a compatible convolution model.",
+    "implementation_functions": ["instrument_line_shape_workflow", "fit_spectral_line"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -347,8 +347,8 @@
     "status": "M→D",
     "method": "Calibrate bandwidth/response and analyze time series consistently.",
     "caveat": "Detector response and channel synchronization limit transient interpretation.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["fast_bolometry_timeseries"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -367,8 +367,8 @@
     "status": "M→D/I",
     "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
     "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["hard_xray_spectrum_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -407,8 +407,8 @@
     "status": "I",
     "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
     "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["bolometric_tomography_workflow", "build_tomography_matrix_2d", "regularized_tomography"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
@@ -527,8 +527,8 @@
     "status": "M→D",
     "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
     "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["gas_flow_to_particle_inventory"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -547,8 +547,8 @@
     "status": "D",
     "method": "Compute from calibrated throughput and pressure under defined conditions.",
     "caveat": "Conductance, gauge position and units must be consistent.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["effective_pumping_speed_m3_s"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "MHD and turbulence",
@@ -570,8 +570,8 @@
     "status": "D/I",
     "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
     "caveat": "Mode number needs array geometry and assumptions about mode structure.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["mhd_mode_workflow"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "MHD and turbulence",
@@ -857,7 +857,7 @@
     "status": "D",
     "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
     "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["estimate_channel_time_offset", "cross_correlation_lag"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   }
 ]

@@ -298,8 +298,8 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals
-    modules = (tis.core, tis.events, tis.plasma, tis.signals)
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync, tis.mhd_modes, tis.hard_xray, tis.tomography_workflow
+    modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync, tis.mhd_modes, tis.hard_xray, tis.tomography_workflow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
             assert any(hasattr(m, fn) for m in modules), f"{d['diagnostic']} maps to missing function {fn}"
@@ -324,3 +324,84 @@ def test_hampel_does_not_flag_curvature_of_a_clean_noisy_signal():
     z = y.copy(); z[[700, 2100, 3300]] += 4.0
     assert hampel_despike(z, 11, 6.0)["n_replaced"] == 3
     assert hampel_despike(np.sin(2 * np.pi * 5 * t), 11, 6.0)["n_replaced"] == 0
+
+
+def test_magnetic_flux_workflow_uses_faraday_sign_and_initial_value():
+    from tis.magnetic import magnetic_flux_from_voltage
+    t = np.linspace(0, 2, 101)
+    result = magnetic_flux_from_voltage(t, np.full_like(t, 3.0), initial_flux_Wb=0.4)
+    assert result["magnetic_flux_Wb"][-1] == pytest.approx(-5.6)
+    assert result["flux_change_Wb"][-1] == pytest.approx(-6.0)
+
+
+def test_gas_flow_conversion_and_inventory():
+    from tis.gas_flow import gas_flow_to_particle_inventory
+    t = np.linspace(0, 60, 61)
+    result = gas_flow_to_particle_inventory(t, np.full_like(t, 60.0))
+    assert result["integrated_moles_mol"][-1] > 0
+    assert result["integrated_particles"][-1] == pytest.approx(
+        result["integrated_moles_mol"][-1] * 6.02214076e23
+    )
+
+
+def test_effective_pumping_speed():
+    from tis.gas_flow import effective_pumping_speed_m3_s
+    assert effective_pumping_speed_m3_s(2.0, 4.0) == pytest.approx(0.5)
+    with pytest.raises(ValueError):
+        effective_pumping_speed_m3_s(1.0, 0.0)
+
+
+def test_fast_bolometry_timeseries_reports_known_peak():
+    from tis.fast_bolometry import fast_bolometry_timeseries
+    fs = 2000.0
+    t = np.arange(2048) / fs
+    result = fast_bolometry_timeseries(t, np.sin(2 * np.pi * 125 * t))
+    assert result["sample_rate_Hz"] == pytest.approx(fs)
+    assert result["dominant_nonzero_psd_frequency_Hz"] == pytest.approx(125, abs=2)
+
+
+def test_channel_synchronization_recovers_known_delay():
+    from tis.channel_sync import estimate_channel_time_offset
+    rng = np.random.default_rng(41)
+    fs = 1000.0
+    t = np.arange(512) / fs
+    reference = rng.normal(size=len(t))
+    comparison = np.r_[np.zeros(5), reference[:-5]]
+    result = estimate_channel_time_offset(t, reference, comparison, max_lag_s=0.02)
+    assert result["estimated_lag_s"] == pytest.approx(-0.005, abs=0.001)
+
+
+def test_mhd_mode_workflow_recovers_known_spatial_mode():
+    from tis.mhd_modes import mhd_mode_workflow
+    n_sensors = 8
+    theta = np.arange(n_sensors) * 2 * np.pi / n_sensors
+    fs = 1000.0
+    t = np.arange(2048) / fs
+    signals = np.cos(2 * np.pi * 100 * t[None, :] - 2 * theta[:, None])
+    result = mhd_mode_workflow(theta, signals, sample_rate_Hz=fs, frequency_range_Hz=(90, 110))
+    assert result["mode_number_fit"] == pytest.approx(2, abs=0.1)
+
+
+def test_hard_xray_summary_reports_counts_and_rates():
+    from tis.hard_xray import hard_xray_spectrum_workflow
+    result = hard_xray_spectrum_workflow([20, 30, 40, 50], [10, 20, 30, 40], exposure_s=2.0)
+    assert result["gross_counts_sum"] == pytest.approx(100)
+    assert result["gross_count_rate_s-1"] == pytest.approx(50)
+    assert "response" in result["interpretation"].lower()
+
+
+def test_hard_xray_rejects_too_few_energy_bins():
+    from tis.hard_xray import hard_xray_spectrum_workflow
+    with pytest.raises(ValueError):
+        hard_xray_spectrum_workflow([20, 30], [10, 20])
+
+
+def test_bolometric_tomography_builds_geometry_and_reconstructs_grid():
+    from tis.tomography_workflow import bolometric_tomography_workflow
+    result = bolometric_tomography_workflow(
+        [[0.0, 0.5]], [[2.0, 0.5]], [0.0, 1.0, 2.0], [0.0, 1.0], [3.0],
+        regularization=1e-6,
+    )
+    assert result["emissivity_proxy_grid"].shape == (1, 2)
+    assert np.all(np.isfinite(result["emissivity_proxy_grid"]))
+    assert result["residual_norm"] < 1e-2
