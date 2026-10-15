@@ -74,3 +74,11 @@ def test_invalid_input_rejected():
     from tokamak_analysis.fft_analysis import analyze_fft
     with pytest.raises(ValueError):
         analyze_fft([0,1,2,4],[1,2,3,4])
+
+
+def test_analysis_registry_resolves_every_callable():
+    from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+    assert len(ANALYSES) == 81
+    assert [x["id"] for x in ANALYSES] == list(range(1, 82))
+    for entry in ANALYSES:
+        assert callable(resolve_analysis(entry["id"]))
