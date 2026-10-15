@@ -159,10 +159,10 @@
     "diagnostic": "Magnetic flux / poloidal flux",
     "quantities": "Φ_B, ψ",
     "status": "M→D/I",
-    "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
-    "caveat": "Reference surfaces and sign conventions must be recorded.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "method": "Integrate calibrated loop voltage using Faraday law with explicit polarity and baseline controls.",
+    "caveat": "Input voltage calibration, loop orientation, sensor response and reference flux must be documented; this is not equilibrium reconstruction.",
+    "implementation_functions": ["magnetic_flux_from_voltage", "integrate_time_series"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
