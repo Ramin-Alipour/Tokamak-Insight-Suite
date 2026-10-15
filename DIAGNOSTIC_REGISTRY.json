@@ -527,8 +527,8 @@
     "status": "M→D",
     "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
     "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["gas_flow_to_particle_inventory"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
