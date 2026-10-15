@@ -298,7 +298,7 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry
     modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
@@ -349,3 +349,12 @@ def test_effective_pumping_speed():
     assert effective_pumping_speed_m3_s(2.0, 4.0) == pytest.approx(0.5)
     with pytest.raises(ValueError):
         effective_pumping_speed_m3_s(1.0, 0.0)
+
+
+def test_fast_bolometry_timeseries_reports_known_peak():
+    from tis.fast_bolometry import fast_bolometry_timeseries
+    fs = 2000.0
+    t = np.arange(2048) / fs
+    result = fast_bolometry_timeseries(t, np.sin(2 * np.pi * 125 * t))
+    assert result["sample_rate_Hz"] == pytest.approx(fs)
+    assert result["dominant_nonzero_psd_frequency_Hz"] == pytest.approx(125, abs=2)
