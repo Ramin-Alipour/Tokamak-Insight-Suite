@@ -1,0 +1,28 @@
+name: NIFS LHD repository discovery
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/discover_lhd_repository_api.py"
+      - ".github/workflows/lhd-repository-discovery.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Inspect official NIFS search pages and scripts
+        run: python tools/discover_lhd_repository_api.py
+      - name: Upload page sources and endpoint references
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lhd-repository-discovery
+          path: artifacts/lhd-repository-discovery/
+          if-no-files-found: warn
