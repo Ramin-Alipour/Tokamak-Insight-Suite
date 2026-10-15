@@ -116,6 +116,8 @@ for suffix in ("bpp","lp","U_bias","U_current","probe_voltage","probe_current","
                  f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/{suffix}.txt",
                  f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/PetiProbe.ON/data/{suffix}"])
 urls.extend([
+    f"{ROOT}/shots/{SHOT}/DAS/0918TektronixMSO58.ON/main.py",
+    f"{ROOT}/shots/{SHOT}/DAS/0918TektronixMSO58.ON/screenshot.png",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/main.py",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/log",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/00_NI%20standard.php",
@@ -172,9 +174,26 @@ def try_one(url):
             try:
                 archive = np.load(io.BytesIO(raw), allow_pickle=False)
                 arrays = {}
+                tvec = np.asarray(archive["time"], dtype=float) if "time" in archive.files else None
                 for key in archive.files:
                     value = np.asarray(archive[key])
-                    arrays[key] = {"shape": list(value.shape), "dtype": str(value.dtype)}
+                    item = {"shape": list(value.shape), "dtype": str(value.dtype)}
+                    if tvec is not None and value.ndim == 1 and value.size == tvec.size and key != "time":
+                        good = np.isfinite(tvec) & np.isfinite(value)
+                        tt, yy = tvec[good], value[good]
+                        if tt.size > 100 and np.all(np.diff(tt) > 0):
+                            dt = float(np.median(np.diff(tt)))
+                            ff = np.fft.rfftfreq(yy.size, dt)
+                            pp = np.abs(np.fft.rfft(yy - np.mean(yy)))**2
+                            band = (ff >= 1000) & (ff <= min(400e3, 0.45/dt))
+                            if np.any(band):
+                                inds = np.flatnonzero(band)
+                                top = inds[np.argsort(pp[band])[-8:][::-1]]
+                                item.update(signal_range=float(np.ptp(yy)), sample_rate_Hz=1/dt,
+                                    duration_s=float(tt[-1]-tt[0]),
+                                    dominant_frequency_Hz=float(ff[inds[np.argmax(pp[band])]]),
+                                    top_frequency_peaks_Hz=[float(ff[z]) for z in top])
+                    arrays[key] = item
                 rec.update(status="npz_archive", arrays=arrays)
                 (OUT / f"archive_{hashlib.sha256(url.encode()).hexdigest()[:8]}.npz").write_bytes(raw)
                 return rec
@@ -205,7 +224,12 @@ def try_one(url):
                         f=np.fft.rfftfreq(yy.size,dt); p=np.abs(np.fft.rfft(yy))**2
                         m=(f>=1000)&(f<=min(400e3,0.45/dt))
                         peak=float(f[m][np.argmax(p[m])]) if np.any(m) else None
-                        channel_spectra.append({"column_index_1based_in_file":col+1,"signal_range":float(np.ptp(y[good])),"dominant_frequency_Hz":peak})
+                        top_peaks=[]
+                        if yy.size>1000:
+                            inds=np.flatnonzero(m)
+                            top=inds[np.argsort(p[m])[-8:][::-1]] if np.any(m) else []
+                            top_peaks=[float(f[z]) for z in top]
+                        channel_spectra.append({"column_index_1based_in_file":col+1,"signal_range":float(np.ptp(y[good])),"dominant_frequency_Hz":peak,"top_frequency_peaks_Hz":top_peaks})
                     rec["channel_spectra"]=channel_spectra
                     rec["contains_30_to_70kHz_channel"]=any(30000<=x.get("dominant_frequency_Hz",0)<=70000 for x in channel_spectra)
         return rec
