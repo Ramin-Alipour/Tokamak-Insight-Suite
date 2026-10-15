@@ -131,3 +131,13 @@ def test_plasma_current_known_linear_ramp():
     assert out["peak_signed_current_A"] == pytest.approx(5.0)
     assert out["peak_time_s"] == pytest.approx(2.0)
     assert out["time_integral_A_s"] == pytest.approx(6.0)
+
+
+
+def test_magnetic_field_known_3_4_5_components():
+    from tokamak_analysis.magnetic_field import analyze_magnetic_field
+    out = analyze_magnetic_field(3.0, 4.0)
+    assert float(out["B_total_T"]) == pytest.approx(5.0)
+    assert float(out["field_pitch_deg"]) == pytest.approx(np.degrees(np.arctan2(4.0, 3.0)))
+    assert out["max_total_field_T"] == pytest.approx(5.0)
+    assert out["rms_total_field_T"] == pytest.approx(5.0)
