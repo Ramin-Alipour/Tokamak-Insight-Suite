@@ -423,16 +423,16 @@ for config_url in config_candidates:
         pairs = list(zip(nums[0::2], nums[1::2]))
         if pairs:
             inst_width = float(np.interp(656.281, [p[0] for p in pairs], [p[1] for p in pairs]))
-            precision_match = re.search(r"(?im)^wavelength presicion \\[nm\\]\\s*=\\s*([-+0-9.eE]+)", config_text)
-            correction_match = re.search(r"(?im)^calibration polynome correction\\s*=\\s*(.+)$", config_text)
-            correction_values = ([float(v) for v in re.findall(r"[-+]?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:[eE][-+]?\\d+)?", correction_match.group(1))]
+            precision_match = re.search(r"(?im)^wavelength presicion \[nm\]\s*=\s*([-+0-9.eE]+)", config_text)
+            correction_match = re.search(r"(?im)^calibration polynome correction\s*=\s*(.+)$", config_text)
+            correction_values = ([float(v) for v in re.findall(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?", correction_match.group(1))]
                                 if correction_match else [])
             config_audit = {
                 "status": "instrument_config_retrieved",
                 "source_url": config_url,
                 "sha256": hashlib.sha256(config_blob).hexdigest(),
-                "config_date": re.search(r"(?im)^date\\s*=\\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^date\\s*=\\s*(.+)$", config_text) else None,
-                "serial_number": re.search(r"(?im)^serial number\\s*=\\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^serial number\\s*=\\s*(.+)$", config_text) else None,
+                "config_date": re.search(r"(?im)^date\s*=\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^date\\s*=\\s*(.+)$", config_text) else None,
+                "serial_number": re.search(r"(?im)^serial number\s*=\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^serial number\\s*=\\s*(.+)$", config_text) else None,
                 "nominal_wavelength_precision_nm": float(precision_match.group(1)) if precision_match else None,
                 "calibration_polynomial_correction_coefficients": correction_values,
                 "width_points_nm": [{"wavelength_nm": x, "instrumental_width_nm": y} for x, y in pairs],
