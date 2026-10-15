@@ -58,6 +58,8 @@ This validates a real diagnostic time-series path only. Anti-aliasing is applied
 
 Public real-data archives and access notes: [Public Tokamak Data Sources](docs/public_tokamak_data_sources.md).
 
+**External empirical validation protocol:** [raw-data + independent-reference acceptance criteria, GOLEM candidates, and FAIR-MAST comparison requirements](docs/external_empirical_validation_protocol.md). Candidate datasets are not labeled validated until rawness, reference equivalence, numerical discrepancy, and reproducibility are all documented.
+
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
