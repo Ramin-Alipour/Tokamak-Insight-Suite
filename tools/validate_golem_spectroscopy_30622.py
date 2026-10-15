@@ -171,8 +171,8 @@ if raw.get("numeric_rows", 0) >= 100:
         time_header = next((line for line in (OUT / "raw_spectrum.txt").read_text(encoding="utf-8", errors="replace").splitlines()
                             if line.startswith("Time stamps [ms]:")), "")
         import re
-        time_match = re.search(r"\[(.*?)\]", time_header)
-        timestamps = [float(v) for v in time_match.group(1).split()] if time_match else []
+        timestamp_values = time_header.rsplit("[", 1)[-1].split("]", 1)[0]
+        timestamps = [float(v) for v in timestamp_values.split()] if timestamp_values else []
         temporal = {}
         for line_name, (reference, window) in lines.items():
             mask = (wavelength >= window[0]) & (wavelength <= window[1])
