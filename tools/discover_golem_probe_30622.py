@@ -202,7 +202,12 @@ def try_one(url):
                 return rec
         try: arr=np.asarray(np.loadtxt(decoded.splitlines()))
         except Exception: arr=np.asarray([])
-        if arr.size<10: rec["status"]="empty_or_non_numeric"
+        if arr.size<10:
+            try:
+                scalar = float(decoded.strip())
+                rec.update(status="numeric_scalar", value=scalar)
+            except Exception:
+                rec["status"]="empty_or_non_numeric"
         else:
             rec.update(status="numeric_data",shape=list(arr.shape),min=float(np.nanmin(arr)),max=float(np.nanmax(arr)))
             safe=re.sub(r"[^A-Za-z0-9_.-]+","_",url.rstrip("/").split("/")[-1])
