@@ -141,3 +141,13 @@ def test_magnetic_field_known_3_4_5_components():
     assert float(out["field_pitch_deg"]) == pytest.approx(np.degrees(np.arctan2(4.0, 3.0)))
     assert out["max_total_field_T"] == pytest.approx(5.0)
     assert out["rms_total_field_T"] == pytest.approx(5.0)
+
+
+
+def test_beta_known_pressure_and_field():
+    from tokamak_analysis.beta import analyze_beta
+    out = analyze_beta(1000.0, 2.0)
+    expected_beta = 2 * (4e-7 * np.pi) * 1000.0 / (2.0**2)
+    assert float(out["beta"]) == pytest.approx(expected_beta, rel=1e-12)
+    assert float(out["beta_percent"]) == pytest.approx(100 * expected_beta, rel=1e-12)
+    assert expected_beta == pytest.approx(2 * np.pi * 1e-4, rel=1e-12)
