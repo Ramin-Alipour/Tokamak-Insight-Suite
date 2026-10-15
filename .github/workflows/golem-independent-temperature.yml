@@ -42,6 +42,8 @@ jobs:
                   f"http://golem.fjfi.cvut.cz/utils/data/{shot}/electron_temperature",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp.txt",
+                  f"{root}/operation/shots/{shot}/temperature",
+                  f"{root}/operation/shots/{shot}/temperature_mean",
               ],
               "rake_probe_electron_temperature": [
                   f"{root}/cgi-bin/data/{shot}/electron_temp_probe",
@@ -53,11 +55,13 @@ jobs:
                   f"{root}/cgi-bin/data/{shot}/spectrometr:mean_temperature",
                   f"{root}/cgi-bin/data/{shot}/spectrometr/mean_temperature",
                   f"{root}/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/HistoricalAnalysis/temperature",
+                  f"{root}/operation/shots/{shot}/temperature",
               ],
               "published_electron_temperature_mean": [
                   f"{root}/cgi-bin/data/{shot}/temperature_mean",
                   f"{root}/cgi-bin/data/{shot}/ElectronTemperatureMean",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
+                  f"{root}/operation/shots/{shot}/temperature_mean",
               ],
           }
           report = {
