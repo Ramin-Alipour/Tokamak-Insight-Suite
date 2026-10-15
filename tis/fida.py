@@ -28,7 +28,7 @@ def analyze_fida_spectrum(wavelength_nm, intensity, *, fast_ion_region_nm, refer
     corrected_area = area / detector_response_factor if detector_response_factor is not None else None
     return {'diagnostic': 'Fast-ion D-alpha (FIDA)', 'feature_fit': fit,
         'reference_wavelength_nm': float(reference_wavelength_nm),
-        'line_of_sight_doppler_velocity_m_s': float(doppler_velocity_m_s(float(fit['center']), reference_wavelength_nm)),
+        'line_of_sight_doppler_velocity_m_s': float(doppler_velocity_m_s(float(fit['center']) - reference_wavelength_nm, reference_wavelength_nm)),
         'integrated_feature_signal': area, 'detector_response_corrected_signal': corrected_area,
         'background_region_median': background,
         'assumptions_and_limits': ['FIDA fast-ion interpretation requires separation from cold D-alpha and other emission components.',
