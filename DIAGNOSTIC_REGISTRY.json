@@ -407,8 +407,8 @@
     "status": "I",
     "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
     "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["bolometric_tomography_workflow", "build_tomography_matrix_2d", "regularized_tomography"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
