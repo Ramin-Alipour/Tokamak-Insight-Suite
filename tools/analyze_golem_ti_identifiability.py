@@ -80,6 +80,9 @@ def fit_line(wavelength, intensity, name, reference_nm, window):
     apparent_Ti = (fwhm / reference_nm) ** 2 * mHc2_eV / (8.0 * np.log(2.0))
     return {
         "reference_air_wavelength_nm": reference_nm,
+        "fit_amplitude": amp,
+        "fit_baseline": baseline,
+        "fit_sigma_nm": sigma,
         "fitted_center_nm": center,
         "center_offset_nm": center - reference_nm,
         "observed_gaussian_fwhm_nm": fwhm,
@@ -110,6 +113,21 @@ line_results = {
     name: fit_line(wavelength, mean_spectrum, name, ref, window)
     for name, (ref, window) in lines.items()
 }
+# Heavy-ion lines have much smaller Doppler widths than hydrogen at the same Ti.
+# Their measured widths can be used as a rough plasma-line proxy for instrumental
+# broadening, but not as an independently measured lamp LSF.
+proxy_lines = {
+    "OII_4417": (441.7, (438.0, 445.0)),
+    "NII_4899": (489.9, (487.0, 493.0)),
+    "NII_5002": (500.2, (497.0, 503.0)),
+    "OII_5392": (539.2, (536.0, 543.0)),
+}
+proxy_results = {}
+for name, (ref, window) in proxy_lines.items():
+    try:
+        proxy_results[name] = fit_line(wavelength, mean_spectrum, name, ref, window)
+    except Exception as exc:
+        proxy_results[name] = {"fit_error": f"{type(exc).__name__}: {exc}"}
 apparent = [v["doppler_only_apparent_Ti_eV_not_accepted"] for v in line_results.values()]
 min_app, max_app = min(apparent), max(apparent)
 widths = [v["observed_gaussian_fwhm_nm"] for v in line_results.values()]
@@ -150,6 +168,7 @@ report = {
     "wavelength_range_nm": [float(wavelength.min()), float(wavelength.max())],
     "median_sampling_interval_nm": step,
     "line_fits": line_results,
+    "heavy_ion_line_width_proxies_not_independent_LSF": proxy_results,
     "wavelength_calibration_cross_check": {
         "method": "leave-one-Balmer-line-out affine calibration; two lines fit, third predicted",
         "line_centroids_used_nm": {name: float(line_results[name]["fitted_center_nm"]) for name in line_names},
@@ -193,6 +212,32 @@ for inst_fwhm in [0.0, 0.3, 0.45, 0.6, 0.7, 0.8, 0.9, 1.0, 1.05, 1.1, 1.15, 1.18
         "resulting_gaussian_quadrature_Ti_eV_not_accepted": t,
         "note": "Sensitivity illustration only; assumes Gaussian broadening and omits Stark/other broadening."
     })
+proxy_widths = [
+    item["observed_gaussian_fwhm_nm"]
+    for item in proxy_results.values()
+    if "observed_gaussian_fwhm_nm" in item
+    and item.get("fit_r_squared") is not None
+    and item["fit_r_squared"] >= 0.8
+]
+if proxy_widths:
+    proxy_lsf = float(np.median(proxy_widths))
+    rem2_proxy = obs * obs - proxy_lsf * proxy_lsf
+    report["plasma_line_width_proxy_summary"] = {
+        "n_lines_used": len(proxy_widths),
+        "line_fwhm_nm": proxy_widths,
+        "median_proxy_FWHM_nm": proxy_lsf,
+        "median_proxy_FWHM_in_sampling_intervals": proxy_lsf / step,
+        "Ti_from_H_alpha_after_proxy_quadrature_eV_not_accepted": (
+            float((rem2_proxy / (lam * lam)) * mHc2_eV / (8.0 * np.log(2.0))
+                  if rem2_proxy > 0 else 0.0)
+        ),
+        "limitation": "These are plasma emission lines, not a lamp-standard LSF; blending, Stark broadening, and low sampling may bias the proxy."
+    }
+else:
+    report["plasma_line_width_proxy_summary"] = {
+        "n_lines_used": 0,
+        "limitation": "No heavy-ion line fit passed the basic fit-quality threshold."
+    }
 report["instrument_width_required_for_target_Ti_H_alpha"] = []
 for target_ti in [20.8, 50.0, 100.0, 300.0]:
     doppler_fwhm = lam * np.sqrt(8.0 * np.log(2.0) * target_ti / mHc2_eV)
