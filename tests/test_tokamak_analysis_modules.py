@@ -530,3 +530,17 @@ def test_fusion_reaction_rate_known_densities_and_volume():
     assert out["total_reactions_s-1"] == pytest.approx(3e16, rel=1e-12)
     identical = fusion_reaction_rate(2e19, 2e19, 1e-22, identical_species=True)
     assert identical["reaction_rate_density_m-3_s-1"] == pytest.approx(2e16, rel=1e-12)
+
+
+
+def test_nuclear_gamma_known_peak_and_line_match():
+    from tokamak_analysis.nuclear_gamma import analyze_gamma_spectrum
+    out = analyze_gamma_spectrum(
+        [10.0, 20.0, 30.0, 40.0, 50.0],
+        [0.0, 2.0, 5.0, 2.0, 0.0],
+        expected_lines_keV=[29.0], tolerance_keV=2.0,
+    )
+    assert len(out["peaks"]) == 1
+    assert out["peaks"][0]["energy_keV"] == pytest.approx(30.0)
+    assert out["peaks"][0]["counts"] == pytest.approx(5.0)
+    assert out["expected_line_matches"][0]["within_tolerance"] is True
