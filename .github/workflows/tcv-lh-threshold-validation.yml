@@ -1,0 +1,24 @@
+name: TCV L-H threshold scaling validation
+on:
+  push:
+    paths:
+      - "tools/validate_tcv_lh_threshold.py"
+      - ".github/workflows/tcv-lh-threshold-validation.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install numpy pandas h5py
+      - run: python tools/validate_tcv_lh_threshold.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tcv-lh-threshold-validation
+          path: artifacts/tcv-lh-threshold-validation/
