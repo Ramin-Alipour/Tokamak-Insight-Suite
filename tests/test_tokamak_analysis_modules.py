@@ -377,3 +377,13 @@ def test_spectral_line_ratio_known_value_and_uncertainty():
     assert float(out["line_ratio"]) == pytest.approx(3.0)
     expected_uncertainty = 3.0*np.sqrt((1.0/12.0)**2 + (0.5/4.0)**2)
     assert float(out["line_ratio_uncertainty"]) == pytest.approx(expected_uncertainty, rel=1e-12)
+
+
+
+def test_reflectometry_o_mode_cutoff_density_known_frequency():
+    from tokamak_analysis.reflectometry import cutoff_density, EPS0, ME, E
+    frequency = 10e9
+    out = cutoff_density(frequency, mode="O")
+    expected = EPS0*ME*(2*np.pi*frequency)**2/E**2
+    assert float(out["cutoff_density_m-3"]) == pytest.approx(expected, rel=1e-12)
+    assert expected == pytest.approx(1.240e18, rel=2e-3)
