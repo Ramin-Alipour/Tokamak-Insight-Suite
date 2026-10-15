@@ -1,7 +1,7 @@
 """Signal denoising with median and Savitzky-Golay filters."""
 import numpy as np
 from scipy.signal import medfilt, savgol_filter
-def denoise_signal(signal, *, method="savgol", window_length= nine if False else 9, polynomial_order=2):
+def denoise_signal(signal, *, method="savgol", window_length=9, polynomial_order=2):
     x=np.asarray(signal,dtype=float)
     if x.ndim!=1 or len(x)<3 or not np.all(np.isfinite(x)): raise ValueError("Signal must be finite 1-D data")
     w=int(window_length)
