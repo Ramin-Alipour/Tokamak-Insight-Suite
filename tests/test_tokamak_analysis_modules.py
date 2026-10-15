@@ -328,3 +328,15 @@ def test_doppler_flow_known_wavelength_shift():
     assert float(out["wavelength_shift_nm"]) == pytest.approx(0.001)
     assert float(out["velocity_m_s"]) == pytest.approx(C * (0.001/500.0), rel=1e-12)
     assert float(out["velocity_uncertainty_m_s"]) == pytest.approx(C * (0.0001/500.0), rel=1e-12)
+
+
+
+def test_impurity_concentration_known_emissivity_ratio():
+    from tokamak_analysis.impurity_concentration import estimate_impurity_fraction
+    out = estimate_impurity_fraction(
+        4.0, 2.0, 2.0,
+        hydrogen_line_emissivity=8.0,
+        hydrogen_excitation_coefficient=2.0,
+    )
+    assert float(out["impurity_density_estimate_m-3"]) == pytest.approx(1.0)
+    assert float(out["impurity_fraction_estimate"]) == pytest.approx(0.5)
