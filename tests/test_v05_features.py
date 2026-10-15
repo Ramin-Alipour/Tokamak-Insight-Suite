@@ -298,7 +298,7 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync, tis.mhd_modes, tis.hard_xray
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync, tis.mhd_modes, tis.hard_xray, tis.tomography_workflow
     modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
@@ -394,3 +394,14 @@ def test_hard_xray_rejects_too_few_energy_bins():
     from tis.hard_xray import hard_xray_spectrum_workflow
     with pytest.raises(ValueError):
         hard_xray_spectrum_workflow([20, 30], [10, 20])
+
+
+def test_bolometric_tomography_builds_geometry_and_reconstructs_grid():
+    from tis.tomography_workflow import bolometric_tomography_workflow
+    result = bolometric_tomography_workflow(
+        [[0.0, 0.5]], [[2.0, 0.5]], [0.0, 1.0, 2.0], [0.0, 1.0], [3.0],
+        regularization=1e-6,
+    )
+    assert result["emissivity_proxy_grid"].shape == (1, 2)
+    assert np.all(np.isfinite(result["emissivity_proxy_grid"]))
+    assert result["residual_norm"] < 1e-2
