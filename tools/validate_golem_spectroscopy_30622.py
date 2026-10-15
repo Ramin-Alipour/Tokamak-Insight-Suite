@@ -408,11 +408,11 @@ for config_url in config_candidates:
             continue
         (OUT / "upstream_HR_C1886.cfg").write_bytes(config_blob)
         import re
-        section = config_text.split("[Instrumental broadening function]", 1)[1].split("\\n[", 1)[0]
-        width_match = re.search(r"(?im)^width\\(wavelength\\)\\s*=\\s*(.+)$", section)
+        section = config_text.split("[Instrumental broadening function]", 1)[1].split("\n[", 1)[0]
+        width_match = re.search(r"(?im)^width\(wavelength\)\s*=\s*(.+)$", section)
         pairs = []
         if width_match:
-            nums = [float(v) for v in re.findall(r"[-+]?(?:\\d*\\.)?\\d+(?:[eE][-+]?\\d+)?", width_match.group(1))]
+            nums = [float(v) for v in re.findall(r"[-+]?(?:\d*\.)?\d+(?:[eE][-+]?\d+)?", width_match.group(1))]
             pairs = list(zip(nums[0::2], nums[1::2]))
         if pairs:
             inst_width = float(np.interp(656.281, [p[0] for p in pairs], [p[1] for p in pairs]))
