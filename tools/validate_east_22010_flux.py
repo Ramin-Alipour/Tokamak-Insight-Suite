@@ -116,7 +116,7 @@ def main() -> int:
     outdir.mkdir(parents=True, exist_ok=True)
     series, provenance = {}, {}
     for key, filename in FILES.items():
-        url = f"{RECORD}/preview/{filename}?include_deleted=0"
+        url = f"{RECORD}/files/{filename}?download=1"
         raw = fetch(url)
         if len(raw) > args.max_download_mb * 1024 * 1024:
             raise RuntimeError(f"{filename} exceeds --max-download-mb safety limit")
