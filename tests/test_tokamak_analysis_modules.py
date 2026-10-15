@@ -300,3 +300,22 @@ def test_doppler_spectroscopy_known_gaussian_line():
     assert out["width_fwhm_nm"] == pytest.approx(2.354820045*sigma, rel=1e-5)
     assert out["nonrelativistic_velocity_m_s"] == pytest.approx(C_M_S*(center/500.0-1.0), rel=1e-5)
     assert out["r_squared"] == pytest.approx(1.0, abs=1e-10)
+
+
+
+def test_doppler_ion_temperature_known_thermal_width():
+    from tokamak_analysis.doppler_temperature import ion_temperature_from_doppler_fwhm
+    wavelength_nm = 500.0
+    mass_amu = 40.0
+    expected_Ti_eV = 100.0
+    mass_kg = mass_amu * 1.66053906660e-27
+    sigma_v = np.sqrt(expected_Ti_eV * 1.602176634e-19 / mass_kg)
+    thermal_fwhm = 2.354820045 * wavelength_nm * sigma_v / 299792458.0
+    instrumental_fwhm = 0.02
+    observed_fwhm = np.sqrt(thermal_fwhm**2 + instrumental_fwhm**2)
+    out = ion_temperature_from_doppler_fwhm(
+        observed_fwhm, wavelength_nm, mass_amu,
+        instrumental_fwhm_nm=instrumental_fwhm,
+    )
+    assert out["thermal_fwhm_nm"] == pytest.approx(thermal_fwhm, rel=1e-10)
+    assert out["ion_temperature_eV"] == pytest.approx(expected_Ti_eV, rel=1e-10)
