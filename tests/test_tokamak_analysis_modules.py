@@ -582,3 +582,13 @@ def test_energetic_particle_flux_known_counts_and_area():
     from tokamak_analysis.energetic_particles import energetic_particle_flux
     out = energetic_particle_flux([0.0, 1.0, 2.0], [0.0, 4.0, 8.0], 2.0, efficiency=0.5)
     np.testing.assert_allclose(out["particle_flux_m-2_s-1"], [4.0, 4.0, 4.0])
+
+
+
+def test_runaway_energy_known_exponential_spectrum():
+    from tokamak_analysis.runaway_energy import estimate_runaway_energy
+    energy = np.array([10.0, 20.0, 30.0, 40.0, 50.0])
+    counts = np.exp(-energy/100.0)
+    out = estimate_runaway_energy(energy, counts)
+    assert out["exponential_slope_per_keV"] == pytest.approx(-0.01, abs=1e-12)
+    assert out["characteristic_energy_keV"] == pytest.approx(100.0, rel=1e-10)
