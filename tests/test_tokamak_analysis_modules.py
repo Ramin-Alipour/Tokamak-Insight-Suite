@@ -864,3 +864,15 @@ def test_lh_transition_known_persistent_step():
     assert out["transition_candidate_time_s"] == pytest.approx(10.0)
     assert out["baseline_median"] == pytest.approx(0.0)
     assert out["baseline_robust_sigma"] == pytest.approx(0.0)
+
+
+
+def test_signal_calibration_known_linear_transfer_function():
+    from tokamak_analysis.signal_calibration import calibrate_signal, calibration_residuals
+    out = calibrate_signal([0.0, 1.0, 2.0], [2.0, 1.0], uncertainty_raw=[0.1, 0.1, 0.1])
+    np.testing.assert_allclose(out["calibrated"], [1.0, 3.0, 5.0])
+    np.testing.assert_allclose(out["propagated_uncertainty"], [0.2, 0.2, 0.2])
+    residual = calibration_residuals([1.0, 2.0, 3.0], [1.0, 2.5, 2.5])
+    assert residual["bias"] == pytest.approx(0.0)
+    assert residual["rmse"] == pytest.approx(np.sqrt(0.5/3))
+    assert residual["max_absolute_error"] == pytest.approx(0.5)
