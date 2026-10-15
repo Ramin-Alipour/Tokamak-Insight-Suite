@@ -87,6 +87,11 @@ jobs:
               raise ValueError("Source signals differ by more than one sample: " + repr(lengths))
           print("Source sample counts:", lengths, "using common initial overlap:", n_common, flush=True)
           arrays = {k: v[:n_common] for k, v in arrays.items()}
+          window_start = 270000
+          if n_common <= window_start + 1000:
+              raise ValueError("Source files are too short for stationary-window selection")
+          arrays = {k: v[window_start:] for k, v in arrays.items()}
+          print("Selected stationary inner-plasma samples:", window_start, "to", n_common - 1, flush=True)
           ds, ps, b, delta = float(os.environ["DENSITY_SCALE"]), float(os.environ["POTENTIAL_SCALE"]), float(os.environ["B_T"]), 0.008
           ne = arrays["ne"] * ds
           vf2, vf3 = arrays["vf2"] * ps, arrays["vf3"] * ps
