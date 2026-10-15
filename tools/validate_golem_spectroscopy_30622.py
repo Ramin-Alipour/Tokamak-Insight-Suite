@@ -71,6 +71,30 @@ def parse_spectrum(path: Path):
 def gaussian_linear(x, amplitude, center, sigma, intercept, slope):
     return amplitude * np.exp(-0.5 * ((x - center) / sigma) ** 2) + intercept + slope * (x - center)
 
+def voigt_linear(x, amplitude, center, sigma, gamma, intercept, slope):
+    """Voigt profile plus linear baseline; sigma/gamma are Gaussian/Lorentz scales."""
+    from scipy.special import voigt_profile
+    return amplitude * voigt_profile(x - center, sigma, gamma) + intercept + slope * (x - center)
+
+def fit_voigt_width(x, y, window):
+    """Fit Voigt FWHM; this does not deconvolve the instrument response."""
+    baseline = float(np.percentile(y, 20))
+    center0 = float(x[int(np.argmax(y))])
+    p0 = [max(float(np.max(y)) - baseline, 1.0), center0, 0.5, 0.1, baseline, 0.0]
+    pars, covariance = curve_fit(
+        voigt_linear, x, y, p0=p0, maxfev=50000,
+        bounds=([0, window[0], 0.02, 0.0, -1e5, -1e4],
+                [1e8, window[1], 8.0, 8.0, 1e5, 1e4]),
+    )
+    amp, center, sigma, gamma, intercept, slope = [float(v) for v in pars]
+    fwhm = 0.5346 * (2.0 * gamma) + math.sqrt(0.2166 * (2.0 * gamma)**2 + (2.354820045 * sigma)**2)
+    fitted = voigt_linear(x, *pars)
+    ss_res = float(np.sum((y - fitted) ** 2))
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    return {"center_nm": center, "fwhm_nm": fwhm, "gaussian_sigma_nm": sigma,
+            "lorentz_hwhm_nm": gamma, "r_squared": 1.0 - ss_res / ss_tot if ss_tot > 0 else None,
+            "covariance_finite": bool(np.all(np.isfinite(covariance)))}
+
 def fit_line(wavelength, intensity, name, reference_nm, window):
     mask = (wavelength >= window[0]) & (wavelength <= window[1])
     x, y = wavelength[mask], intensity[mask]
@@ -223,6 +247,32 @@ if raw.get("numeric_rows", 0) >= 100:
                 "all_records": records,
             }
         report["time_resolved_line_audit"] = temporal
+        # Fit Voigt profiles to the same real H-alpha acquisitions as a model-sensitivity check.
+        ha_mask = (wavelength >= lines["H_alpha"][1][0]) & (wavelength <= lines["H_alpha"][1][1])
+        ha_x = wavelength[ha_mask]
+        voigt_records = []
+        for index in range(spectra.shape[1]):
+            yy = spectra[ha_mask, index]
+            try:
+                vf = fit_voigt_width(ha_x, yy, lines["H_alpha"][1])
+                vf.update({"acquisition": index + 1,
+                           "timestamp_ms": timestamps[index] if index < len(timestamps) else None,
+                           "accepted": bool(float(np.max(yy)) >= 500.0 and vf["r_squared"] is not None and vf["r_squared"] >= 0.90)})
+                voigt_records.append(vf)
+            except Exception as exc:
+                voigt_records.append({"acquisition": index + 1, "accepted": False, "fit_error": f"{type(exc).__name__}: {exc}"})
+        vg = [r for r in voigt_records if r.get("accepted") and r.get("fwhm_nm") is not None]
+        gg = temporal["H_alpha"]["accepted_records"]
+        gmean = float(np.mean([r["fwhm_nm"] for r in gg])) if gg else None
+        vmean = float(np.mean([r["fwhm_nm"] for r in vg])) if vg else None
+        report["H_alpha_model_sensitivity"] = {
+            "data_source": "same raw GOLEM shot 30622 acquisitions; no synthetic data",
+            "gaussian_accepted_n": len(gg), "voigt_accepted_n": len(vg),
+            "gaussian_mean_fwhm_nm": gmean, "voigt_mean_fwhm_nm": vmean,
+            "voigt_minus_gaussian_mean_fwhm_nm": (vmean-gmean) if vmean is not None and gmean is not None else None,
+            "all_voigt_fits": voigt_records,
+            "interpretation": "Model-sensitivity only; neither model separates instrument from plasma broadening."
+        }
         # Two strong lines define a provisional affine mapping; H-gamma is an independent check.
         hb = temporal["H_beta"]
         ha = temporal["H_alpha"]
@@ -306,6 +356,15 @@ if "time_resolved_line_audit" in report:
         for line_name, summary in report["time_resolved_line_audit"].items():
             for record in summary.get("all_records", []):
                 writer.writerow({"line": line_name, **{k: record.get(k) for k in fields if k != "line"}})
+    with (OUT / "ha_model_sensitivity.csv").open("w", newline="", encoding="utf-8") as handle:
+        import csv
+        fields = ["model", "acquisition", "timestamp_ms", "center_nm", "fwhm_nm", "r_squared", "accepted", "fit_error"]
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for rec in report.get("H_alpha_model_sensitivity", {}).get("all_voigt_fits", []):
+            writer.writerow({"model": "Voigt", **{k: rec.get(k) for k in fields if k != "model"}})
+        for rec in report.get("time_resolved_line_audit", {}).get("H_alpha", {}).get("all_records", []):
+            writer.writerow({"model": "Gaussian", **{k: rec.get(k) for k in fields if k != "model"}})
     # Stability metrics are descriptive; accepted fits are threshold-selected,
     # so they must not be interpreted as the full shot's temporal distribution.
     ha = report["time_resolved_line_audit"].get("H_alpha", {})
