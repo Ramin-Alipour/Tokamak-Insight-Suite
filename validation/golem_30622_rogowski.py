@@ -172,9 +172,24 @@ def fallback_processed_crosscheck(reason):
             "mean_total_rogowski_current_A": float(np.mean(iR[mask])),
             "max_total_rogowski_current_A": float(np.max(iR[mask])),
         },
+        "time_ranges_s": {
+            "Irogowski": [float(np.min(tR)), float(np.max(tR))],
+            "Ich": [float(np.min(tC)), float(np.max(tC))],
+            "Iplasma": [float(np.min(tP)), float(np.max(tP))],
+        },
         "official_archived_plasma_current": {
             "mean_A": float(np.mean(ip_ref[mask])),
+            "mean_absolute_A": float(np.mean(np.abs(ip_ref[mask]))),
             "max_A": float(np.max(ip_ref[mask])),
+            "min_A": float(np.min(ip_ref[mask])),
+            "full_trace_mean_absolute_A": float(np.mean(np.abs(iP))),
+            "plasma_window_percentiles_A": {
+                "p10": float(np.percentile(ip_ref[mask],10)),
+                "p25": float(np.percentile(ip_ref[mask],25)),
+                "p50": float(np.percentile(ip_ref[mask],50)),
+                "p75": float(np.percentile(ip_ref[mask],75)),
+                "p90": float(np.percentile(ip_ref[mask],90)),
+            },
         },
         "samplewise_comparison": {
             "rmse_A": rmse,
