@@ -170,6 +170,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Noise floor and detection limit": ["hampel_despike"],
     "Rogowski coil": ["analyze_rogowski_current", "integrate_time_series"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
+    "MHD mode/Mirnov analysis": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "cross_analysis"],
 }
 for _d in DIAGNOSTICS:
     _functions = _IMPLEMENTED_WORKFLOWS.get(_d["diagnostic"], [])
