@@ -646,3 +646,14 @@ def test_mirnov_signal_known_frequency_and_coil_conversion():
     assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(frequency)
     assert out["rms_voltage_V"] == pytest.approx(np.sqrt(1024/(2*1023)), rel=1e-10)
     np.testing.assert_allclose(out["approx_Bdot_T_s"], voltage/0.1, atol=1e-12)
+
+
+
+def test_mhd_mode_number_known_phase_winding():
+    from tokamak_analysis.mhd_modes import estimate_mode_number
+    angles = np.array([0.0, np.pi/2, np.pi, 3*np.pi/2])
+    amplitudes = np.exp(1j*2.0*angles)
+    out = estimate_mode_number(angles, amplitudes)
+    assert out["mode_number_estimate"] == pytest.approx(2.0, abs=1e-12)
+    assert out["nearest_integer_mode_number"] == 2
+    assert out["fit_residual_rms_rad"] == pytest.approx(0.0, abs=1e-12)
