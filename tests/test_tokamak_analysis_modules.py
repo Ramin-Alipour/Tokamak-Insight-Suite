@@ -413,3 +413,17 @@ def test_plasma_wave_spectrum_known_dominant_frequency():
     out = analyze_wave_signal(time, signal, nperseg=256)
     assert out["sampling_frequency_Hz"] == pytest.approx(1000.0)
     assert out["dominant_frequency_Hz"] == pytest.approx(expected_frequency)
+
+
+
+def test_hard_xray_known_background_subtraction_and_rate():
+    from tokamak_analysis.hard_xray import analyze_hard_xray
+    out = analyze_hard_xray(
+        [10.0, 20.0, 30.0], [1.0, 2.0, 1.0],
+        live_time_s=2.0, background_counts=[0.0, 1.0, 0.0],
+    )
+    np.testing.assert_allclose(out["net_counts"], [1.0, 1.0, 1.0])
+    assert out["total_net_counts"] == pytest.approx(3.0)
+    assert out["peak_energy_keV"] == pytest.approx(10.0)
+    assert out["count_weighted_mean_energy_keV"] == pytest.approx(20.0)
+    assert out["count_rate_s-1"] == pytest.approx(1.5)
