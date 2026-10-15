@@ -169,6 +169,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "ECRH": ["analyze_ecrh_power", "electron_cyclotron_resonance_field"],
     "ICRH": ["analyze_icrh_power"],
     "Lower hybrid heating/current drive": ["analyze_lower_hybrid_power"],
+    "Electron/ion heating power": ["analyze_electron_ion_heating_power"],
     "Pressure and beta": ["derive_parameters", "beta_metrics"],
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
