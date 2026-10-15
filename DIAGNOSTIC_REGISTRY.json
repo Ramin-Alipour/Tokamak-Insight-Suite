@@ -281,10 +281,10 @@
     "diagnostic": "Instrumental line-shape characterization",
     "quantities": "Instrument width and response function",
     "status": "M→D",
-    "method": "Measure a narrow reference line or use a validated instrument function.",
-    "caveat": "Do not subtract widths without a compatible convolution model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "method": "Fit a narrow reference line; report observed FWHM and nominal resolving power with fit quality.",
+    "caveat": "Observed width represents the instrument response only if intrinsic line width is negligible or known; do not subtract widths without a compatible convolution model.",
+    "implementation_functions": ["instrument_line_shape_workflow", "fit_spectral_line"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
