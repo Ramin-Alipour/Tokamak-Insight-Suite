@@ -12,13 +12,13 @@ jobs:
     steps:
       - name: Install analysis dependency
         run: python -m pip install --disable-pip-version-check numpy
-      - name: Retrieve public GOLEM current signals and references
+      - name: Retrieve and inspect public GOLEM current signals
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p validation-output
           python - <<'PY'
-          import json, urllib.request, hashlib, re
+          import json, urllib.request, hashlib, re, io
           from pathlib import Path
           import numpy as np
 
@@ -28,71 +28,46 @@ jobs:
           with urllib.request.urlopen(req, timeout=30) as r:
               html = r.read().decode("utf-8", "replace")
 
-          names = ["rogowski_current", "plasma_current"]
+          specs = {
+              "rogowski_current": "/golem/database/operation/shots/30622/basicdiagn/Irogowski.npz",
+              "plasma_current": "/golem/database/operation/shots/30622/basicdiagn/Iplasma.npz"
+          }
           out = {"shot":30622, "source_page":shot_url, "signals":{}, "reference_scalars":{}}
-          for name in names:
-              urls = [base + "/utils/data/30622/" + name, base + "/utils/data/30622/" + name + ".xls"]
-              success = False
-              attempts = []
-              for url in urls:
-                  try:
-                      req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
-                      with urllib.request.urlopen(req, timeout=30) as r:
-                          raw, ctype, final_url = r.read(), r.headers.get("Content-Type",""), r.geturl()
-                      if len(raw) < 20:
-                          raise ValueError("response too small")
-                      Path("validation-output/" + name + ".dat").write_bytes(raw)
-                      attempts.append({"url":url,"status":"downloaded","final_url":final_url,"content_type":ctype,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()})
-                      try:
-                          arr = np.genfromtxt(raw.decode("utf-8","replace").splitlines(), comments="#", invalid_raise=False)
-                          arr = np.asarray(arr)
-                          if arr.ndim == 1:
-                              arr = arr.reshape(-1,1)
-                          arr = arr[np.isfinite(arr).any(axis=1)]
-                          if arr.size == 0:
-                              raise ValueError("no numeric rows parsed")
-                          numeric = arr[:, :min(arr.shape[1], 8)]
-                          signal = numeric[:,1] if numeric.shape[1] >= 2 else numeric[:,0]
-                          signal = signal[np.isfinite(signal)]
-                          if not len(signal):
-                              raise ValueError("no finite signal values")
-                          out["signals"][name] = {
-                              "status":"PARSED", "rows":int(len(numeric)), "columns":int(numeric.shape[1]),
-                              "first_rows":numeric[:3].tolist(),
-                              "signal_column_assumption":"second column (time,value format)" if numeric.shape[1]>=2 else "only numeric column",
-                              "signal_min":float(np.min(signal)), "signal_max":float(np.max(signal)),
-                              "signal_max_abs":float(np.max(np.abs(signal))), "signal_mean":float(np.mean(signal)),
-                              "signal_median":float(np.median(signal)), "data_sha256":hashlib.sha256(raw).hexdigest()
-                          }
-                          success = True
-                          break
-                      except Exception as e:
-                          attempts[-1]["parse_error"] = repr(e)
-                  except Exception as e:
-                      attempts.append({"url":url,"status":"failed","error":repr(e)})
-              if not success:
-                  out["signals"][name] = {"status":"retrieval-or-format-unresolved","attempts":attempts}
-              else:
-                  out["signals"][name]["attempts"] = attempts
+          for name, path in specs.items():
+              url = base + path
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw, ctype, final_url = r.read(), r.headers.get("Content-Type",""), r.geturl()
+                  Path("validation-output/" + name + ".npz").write_bytes(raw)
+                  item = {"url":url,"final_url":final_url,"content_type":ctype,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
+                  with np.load(io.BytesIO(raw), allow_pickle=False) as z:
+                      item["array_keys"] = list(z.files)
+                      arrays = {}
+                      for k in z.files:
+                          a = np.asarray(z[k])
+                          arrays[k] = {"shape":list(a.shape),"dtype":str(a.dtype)}
+                          if np.issubdtype(a.dtype, np.number) and a.size:
+                              arrays[k]["min"] = float(np.nanmin(a))
+                              arrays[k]["max"] = float(np.nanmax(a))
+                              arrays[k]["max_abs"] = float(np.nanmax(np.abs(a)))
+                              if a.size <= 12:
+                                  arrays[k]["values"] = a.tolist()
+                      item["arrays"] = arrays
+                      out["signals"][name] = {"status":"DOWNLOADED_AND_INSPECTED", **item}
+              except Exception as e:
+                  out["signals"][name] = {"status":"RETRIEVAL_OR_PARSE_FAILED","url":url,"error":repr(e)}
 
+          # The scalar values and units are extracted from their named rows in the same public shot page.
           for key in ["rogowski_current_max","plasma_current_mean"]:
-              pattern = r'([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*</[^>]+>\s*<a[^>]+href=["\'][^"\']*/utils/data/30622/'+re.escape(key)+r'["\']'
+              pattern = r'<a[^>]+id=["\']'+re.escape(key)+r'["\'][^>]*>[^<]*</a>\s*\(\s*<a[^>]+href=["\'][^"\']*/utils/data/30622/'+re.escape(key)+r'["\']>([^<]+)</a>'
               m = re.search(pattern, html, re.I)
               if m:
-                  out["reference_scalars"][key] = {"value":float(m.group(1)),"source":"GOLEM shot 30622 Data.php","identifier":key}
+                  try: out["reference_scalars"][key] = {"value":float(m.group(1)),"source":"GOLEM shot 30622 Data.php"}
+                  except ValueError: pass
 
-          sig, ref = out["signals"].get("rogowski_current",{}), out["reference_scalars"].get("rogowski_current_max")
-          if sig.get("status") == "PARSED" and ref:
-              measured, expected = sig["signal_max_abs"], abs(ref["value"])
-              out["comparison"] = {
-                  "quantity":"absolute peak Rogowski current", "waveform_peak_abs":measured,
-                  "GOLEM_page_reference_max_abs":expected,
-                  "relative_difference_percent":abs(measured-expected)/expected*100 if expected else None,
-                  "note":"Interpret only after confirming the exported signal units and column layout."
-              }
-              out["status"] = "NUMERIC_COMPARISON_AVAILABLE"
-          else:
-              out["status"] = "DATA_OR_REFERENCE_UNRESOLVED"
+          out["status"] = "SIGNALS_DOWNLOADED_FOR_STRUCTURAL_INSPECTION" if any(v.get("status")=="DOWNLOADED_AND_INSPECTED" for v in out["signals"].values()) else "DATA_RETRIEVAL_FAILED"
+          out["interpretation"] = "Do not compare an arbitrary NPZ array maximum to the published scalar until the time/signal array semantics and units are confirmed."
           Path("validation-output/report.json").write_text(json.dumps(out,indent=2))
           print(json.dumps(out,indent=2))
           PY
