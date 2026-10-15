@@ -70,7 +70,7 @@ def test_reaction_rate_and_neutral_gas():
     from tokamak_analysis.fusion_rate import fusion_reaction_rate
     from tokamak_analysis.neutral_gas import neutral_density
     assert fusion_reaction_rate(1e19,1e19,1e-22)["reaction_rate_density_m-3_s-1"] > 0
-    assert neutral_density(1e-3,300)["neutral_density_m-3"] > 0
+    assert neutral_density(1e-3,300)["neutral_density_m-3"] == pytest.approx(1e-3/(1.380649e-23*300), rel=1e-12)
 
 
 def test_invalid_input_rejected():
