@@ -746,3 +746,11 @@ def test_reynolds_stress_known_velocity_covariance():
     out = reynolds_stress([1.0, 2.0, 3.0, 4.0], [2.0, 4.0, 6.0, 8.0], density_kg_m3=2.0)
     assert out["velocity_covariance_m2_s-2"] == pytest.approx(2.5)
     assert out["reynolds_stress_Pa"] == pytest.approx(5.0)
+
+
+
+def test_energy_confinement_time_known_value_and_uncertainty():
+    from tokamak_analysis.confinement import energy_confinement_time
+    out = energy_confinement_time(1000.0, 500.0, uncertainty_energy_J=100.0, uncertainty_power_W=50.0)
+    assert out["energy_confinement_time_s"] == pytest.approx(2.0)
+    assert out["uncertainty_s"] == pytest.approx(2*np.sqrt(0.1**2+0.1**2), rel=1e-12)
