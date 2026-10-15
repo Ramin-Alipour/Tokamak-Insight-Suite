@@ -30,14 +30,13 @@ jobs:
           out = pathlib.Path("golem-temperature-validation")
           out.mkdir(exist_ok=True)
           bases = [
+              "https://golem.fjfi.cvut.cz/utils/data/30622/",
               "https://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
               "https://golem.fjfi.cvut.cz/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
-              "http://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
-              "https://golem.fjfi.cvut.cz/utils/data/30622/",
           ]
           candidates = {
-              "electron_temperature": ["temperature", "spectrometr/temperature", "electron_temperature"],
-              "mean_temperature": ["mean_temperature", "temperature_mean", "spectrometr/mean_temperature"],
+              "electron_temperature": ["spectrometr:temperature", "temperature", "electron_temperature"],
+              "mean_temperature": ["spectrometr:mean_temperature", "temperature_mean", "mean_temperature"],
           }
           report = {
               "test": "GOLEM shot 30622 electron-temperature time-series cross-check",
@@ -56,17 +55,27 @@ jobs:
                   url = base + identifier
                   try:
                       req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
-                      with urlopen(req, timeout=20) as response:
+                      with urlopen(req, timeout=8) as response:
                           raw = response.read()
                           ctype = response.headers.get("Content-Type", "")
                       attempts.append({"url": url, "status": "downloaded", "bytes": len(raw), "content_type": ctype})
                       # Accept only numeric tabular data, never HTML error pages.
                       text = raw.decode("utf-8", errors="replace")
-                      arr = np.genfromtxt(text.splitlines(), comments="#", invalid_raise=False)
-                      if arr.ndim == 1:
-                          arr = arr.reshape(-1, 1)
-                      if arr.ndim == 2 and arr.shape[0] >= 3 and arr.shape[1] >= 1 and np.isfinite(arr).all():
-                          success = (url, raw, arr)
+                      numeric_rows = []
+                      for line in text.splitlines():
+                          fields = line.replace(",", " ").split()
+                          if not fields:
+                              continue
+                          try:
+                              values = [float(value) for value in fields]
+                          except ValueError:
+                              continue
+                          if all(np.isfinite(values)):
+                              numeric_rows.append(values)
+                      if numeric_rows and len({len(row) for row in numeric_rows}) == 1:
+                          arr = np.asarray(numeric_rows, dtype=float)
+                          if arr.shape[0] >= 3 and arr.shape[1] >= 1:
+                              success = (url, raw, arr)
                           break
                   except Exception as exc:
                       attempts.append({"url": url, "status": "failed", "error": repr(exc)})
