@@ -103,3 +103,19 @@ def test_equilibrium_reconstruction_zero_source_exact_solution():
     np.testing.assert_allclose(out["psi_Wb_rad"], np.zeros((3, 3)), atol=0.0)
     np.testing.assert_allclose(out["B_R_T"], np.zeros((3, 3)), atol=0.0)
     np.testing.assert_allclose(out["B_Z_T"], np.zeros((3, 3)), atol=0.0)
+
+
+
+def test_shape_reconstruction_known_circular_flux_surface():
+    from tokamak_analysis.shape_reconstruction import analyze_plasma_shape
+    R = np.linspace(1.0, 2.0, 151)
+    Z = np.linspace(-0.5, 0.5, 151)
+    RR, ZZ = np.meshgrid(R, Z)
+    psi_n = ((RR - 1.5)**2 + ZZ**2) / (0.2**2)
+    level = 0.5
+    out = analyze_plasma_shape(R, Z, psi_n, boundary_level=level)
+    expected_radius = 0.2 * np.sqrt(level)
+    assert out["geometric_major_radius_m"] == pytest.approx(1.5, abs=2e-3)
+    assert out["minor_radius_horizontal_m"] == pytest.approx(expected_radius, abs=2e-3)
+    assert out["cross_section_area_m2"] == pytest.approx(np.pi * expected_radius**2, rel=2e-2)
+    assert out["elongation_estimate"] == pytest.approx(1.0, abs=2e-2)
