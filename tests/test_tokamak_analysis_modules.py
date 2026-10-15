@@ -351,3 +351,18 @@ def test_spectral_broadening_known_quadrature_decomposition():
     )
     expected = np.sqrt(0.13**2 - 0.05**2 - 0.03**2 - 0.04**2)
     assert out["residual_gaussian_fwhm_nm"] == pytest.approx(expected, rel=1e-12)
+
+
+
+def test_spectral_line_identification_known_nearest_matches():
+    from tokamak_analysis.spectral_line_identification import identify_spectral_lines
+    out = identify_spectral_lines(
+        [500.02, 501.2], [(500.0, "A"), (501.0, "B")],
+        tolerance_nm=0.05,
+    )
+    assert out["matches"][0]["label"] == "A"
+    assert out["matches"][0]["matched"] is True
+    assert out["matches"][0]["delta_nm"] == pytest.approx(0.02)
+    assert out["matches"][1]["label"] == "B"
+    assert out["matches"][1]["matched"] is False
+    assert out["matches"][1]["delta_nm"] == pytest.approx(0.2)
