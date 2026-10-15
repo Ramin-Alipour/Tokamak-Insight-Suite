@@ -857,7 +857,7 @@
     "status": "D",
     "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
     "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": ["estimate_channel_time_offset", "cross_correlation_lag"],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   }
 ]
