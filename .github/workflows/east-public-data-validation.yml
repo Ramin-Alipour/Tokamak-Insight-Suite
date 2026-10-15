@@ -103,7 +103,7 @@ jobs:
           result = {"dataset": base, "paper_doi": "10.1088/1361-6587/ae4f20", "readme_text": readme,
                     "source_files": provenance,
                     "scales": {"density_to_m-3": ds, "potential_to_V": ps, "B_T": b, "separation_m": delta},
-                    "computed": {"mean_flux_m-2_s-1": computed_mean, "sigma_flux_after_linear_detrending_m-2_s-1": computed_sigma,
+                    "computed": {"mean_flux_m-2_s-1": computed_mean, "sigma_flux_m-2_s-1": computed_sigma,
                                  "electric_field_std_V_m": float(np.std(signal.detrend(efield), ddof=1))},
                     "published": {"mean_flux_m-2_s-1": ref_mean, "sigma_flux_m-2_s-1": ref_sigma},
                     "relative_difference_percent": {"mean": abs(computed_mean-ref_mean)/abs(ref_mean)*100,
