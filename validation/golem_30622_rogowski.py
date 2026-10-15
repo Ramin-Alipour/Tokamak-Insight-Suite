@@ -82,6 +82,15 @@ def fetch_legacy_npz(identifier):
                 keys = list(z.files)
                 # Legacy npz exports vary: accept a 2-column table, a Series,
                 # a pair of vectors, or named time/value vectors.
+                # GOLEM legacy BasicDiagnostics NPZ format stores the signal
+                # in "data" and the acquisition bounds in "t_start"/"t_end".
+                if "data" in keys and "t_start" in keys and "t_end" in keys:
+                    y = np.asarray(z["data"], float).squeeze().ravel()
+                    t_start = float(np.asarray(z["t_start"]).squeeze())
+                    t_end = float(np.asarray(z["t_end"]).squeeze())
+                    if len(y) > 20 and np.isfinite(t_start) and np.isfinite(t_end) and t_end > t_start:
+                        t = np.linspace(t_start, t_end, len(y))
+                        return t, y, url, keys
                 for key in keys:
                     a = z[key]
                     if a.dtype == object and a.size == 1:
