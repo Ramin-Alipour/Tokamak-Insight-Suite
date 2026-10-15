@@ -45,7 +45,9 @@ def test_plasma_geometry_closed_circle():
 def test_interferometry_line_average_density():
     from tokamak_analysis.interferometry import interferometry_density
     out=interferometry_density(1e-3,140e9,path_length_m=1.0)
-    assert out["line_average_density_m-3"] > 0
+    expected_line_density = 1e-3 / ((1.602176634e-19**2 / (4*np.pi*8.8541878128e-12*9.1093837139e-31*299792458.0**2)) * (299792458.0/140e9))
+    assert out["line_integrated_density_m-2"] == pytest.approx(expected_line_density, rel=1e-12)
+    assert out["line_average_density_m-3"] == pytest.approx(expected_line_density, rel=1e-12)
 
 
 def test_signal_synchronization():
