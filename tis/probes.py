@@ -116,3 +116,26 @@ def fit_swept_ball_pen_ion_temperature(
             "Check fit residuals and covariance; compare only with same-shot/time reference.",
         ],
     }
+
+
+def golem_bpp_alpha_from_toroidal_field(bt_T: float) -> dict[str, float | str]:
+    """Empirical GOLEM BPP calibration reported by Cipciar (2021).
+
+    alpha_BPP(Bt) = (-2.7 ± 0.5) * Bt[T] + (2.04 ± 0.2).
+    The coefficient is campaign/setup-specific; it must not be generalized to
+    other tokamaks or assumed valid outside the reported GOLEM magnetic-field
+    range. The returned uncertainty combines slope and intercept uncertainties
+    in quadrature, treating them as independent.
+    """
+    bt = float(bt_T)
+    if not math.isfinite(bt) or bt < 0 or bt > 1.0:
+        raise ValueError("bt_T must be finite and within the documented GOLEM range [0, 1] T.")
+    alpha = -2.7 * bt + 2.04
+    sigma = math.sqrt((0.5 * bt) ** 2 + 0.2 ** 2)
+    return {
+        "alpha_bpp": alpha,
+        "alpha_bpp_std": sigma,
+        "bt_T": bt,
+        "source": "Cipciar, Ion temperature measurement on tokamak Golem (2021), Eq. (3)",
+        "note": "Empirical GOLEM campaign calibration; confirm applicability to the specific probe/setup before using for a reported Ti.",
+    }
