@@ -575,3 +575,10 @@ def test_particle_loss_rate_known_linear_counts():
     out = particle_loss_rate([0.0, 1.0, 2.0], [0.0, 4.0, 8.0], detection_efficiency=0.5)
     np.testing.assert_allclose(out["loss_rate_s-1"], [8.0, 8.0, 8.0])
     assert out["total_detected_counts"] == pytest.approx(12.0)
+
+
+
+def test_energetic_particle_flux_known_counts_and_area():
+    from tokamak_analysis.energetic_particles import energetic_particle_flux
+    out = energetic_particle_flux([0.0, 1.0, 2.0], [0.0, 4.0, 8.0], 2.0, efficiency=0.5)
+    np.testing.assert_allclose(out["particle_flux_m-2_s-1"], [4.0, 4.0, 4.0])
