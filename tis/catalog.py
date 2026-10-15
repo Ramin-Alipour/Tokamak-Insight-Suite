@@ -126,6 +126,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Rogowski coil": ["integrate_time_series"],
     "Magnetic flux / poloidal flux": ["magnetic_flux_from_voltage", "integrate_time_series"],
     "Spectral wavelength calibration": ["wavelength_calibration_workflow", "spectral_calibration"],
+    "Gas flow meters": ["gas_flow_to_particle_inventory"],
     "Instrumental line-shape characterization": ["instrument_line_shape_workflow", "fit_spectral_line"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
 }
