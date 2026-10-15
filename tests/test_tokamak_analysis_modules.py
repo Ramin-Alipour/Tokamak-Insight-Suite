@@ -437,3 +437,13 @@ def test_soft_xray_known_baseline_subtraction_and_integral():
     np.testing.assert_allclose(out["baseline_subtracted_signal"], [0.0, 0.0, 2.0, 4.0])
     assert out["peak_by_channel"] == pytest.approx(4.0)
     assert out["integrated_signal_by_channel"] == pytest.approx(4.0)
+
+
+
+def test_xray_spectrum_known_moments():
+    from tokamak_analysis.xray_spectrum import analyze_xray_spectrum
+    out = analyze_xray_spectrum([10.0, 20.0, 30.0], [1.0, 2.0, 1.0])
+    assert out["total_counts"] == pytest.approx(4.0)
+    assert out["mean_energy_keV"] == pytest.approx(20.0)
+    assert out["energy_std_keV"] == pytest.approx(np.sqrt(50.0))
+    assert out["peak_energy_keV"] == pytest.approx(20.0)
