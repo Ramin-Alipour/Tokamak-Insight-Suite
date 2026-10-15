@@ -738,3 +738,11 @@ def test_poloidal_transport_known_anticorrelation():
     out = fluctuation_transport([1.0, 2.0, 3.0, 4.0], [8.0, 6.0, 4.0, 2.0], direction="poloidal")
     assert out["direction"] == "poloidal"
     assert out["particle_flux_covariance_m-2_s-1"] == pytest.approx(-2.5)
+
+
+
+def test_reynolds_stress_known_velocity_covariance():
+    from tokamak_analysis.transport import reynolds_stress
+    out = reynolds_stress([1.0, 2.0, 3.0, 4.0], [2.0, 4.0, 6.0, 8.0], density_kg_m3=2.0)
+    assert out["velocity_covariance_m2_s-2"] == pytest.approx(2.5)
+    assert out["reynolds_stress_Pa"] == pytest.approx(5.0)
