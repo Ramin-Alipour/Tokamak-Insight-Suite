@@ -20,6 +20,7 @@ from urllib.request import Request, urlopen
 BASE = "https://golem.fjfi.cvut.cz"
 API_BASE = "http://golem.fjfi.cvut.cz"
 USER_AGENT = "Tokamak-Insight-Suite empirical-validation inventory/1.1"
+EXPECTED_GOLEM_30622_SPECTRUM_SHA256 = "3450043b07322fc5516462cc826e53ce6e8c6bf447f61fc63b999a0755d3bc3d"
 
 
 def get(url: str) -> tuple[bytes, str, str]:
@@ -176,10 +177,23 @@ def main() -> None:
         "status": "not_evaluated",
         "reason": "No recognized spectrum file was downloaded.",
     }
+    expected_fixture_check = None
+    if shot == 30622:
+        acquired = next((item for item in downloaded if item["label"] == "spectrum_legacy_path"), None)
+        observed_sha256 = acquired.get("sha256") if acquired else None
+        expected_fixture_check = {
+            "dataset": "GOLEM shot 30622 spectrum_legacy_path",
+            "expected_sha256": EXPECTED_GOLEM_30622_SPECTRUM_SHA256,
+            "observed_sha256": observed_sha256,
+            "match": observed_sha256 == EXPECTED_GOLEM_30622_SPECTRUM_SHA256,
+            "status": "PASS" if observed_sha256 == EXPECTED_GOLEM_30622_SPECTRUM_SHA256 else "FAIL_or_unavailable",
+            "purpose": "Detect changes to the public experimental input before comparing the fixed line-centroid regression values.",
+        }
 
     manifest = {
         "shot": shot,
         "spectral_line_check": spectral_line_check,
+        "stable_fixture_check": expected_fixture_check,
         "retrieved_utc": datetime.now(timezone.utc).isoformat(),
         "page_url": page_url,
         "final_page_url": final_page_url,
@@ -202,6 +216,8 @@ def main() -> None:
     print(json.dumps(manifest, indent=2))
     if not downloaded:
         raise SystemExit("No candidate data files downloaded; this run is not an empirical-validation pass.")
+    if expected_fixture_check is not None and not expected_fixture_check["match"]:
+        raise SystemExit("GOLEM shot 30622 spectrum SHA-256 changed or the expected file was unavailable; review the new input before accepting the regression benchmark.")
 
 
 if __name__ == "__main__":
