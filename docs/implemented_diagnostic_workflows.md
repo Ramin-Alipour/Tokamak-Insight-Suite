@@ -6,7 +6,7 @@ This page records the 11 registry-only workflows advanced in this branch. "Imple
 |---|---|---|
 | Spectral wavelength calibration | `tis.workflows.wavelength_calibration_workflow` | Polynomial wavelength map, per-line residuals, RMS/MAE, monotonicity check; acceptance threshold is optional and user-supplied. |
 | Instrumental line-shape characterization | `tis.line_shape.instrument_line_shape_workflow` | Observed FWHM, nominal resolving power, fit quality; intrinsic reference-line width is not automatically deconvolved. |
-| Magnetic flux / poloidal flux change | `tis.magnetic.magnetic_flux_from_voltage` | Faraday-law integration with explicit polarity and optional baseline/drift correction; requires calibrated loop voltage and does not reconstruct equilibrium. |
+| Magnetic flux / poloidal flux change | `tis.magnetic.magnetic_flux_from_voltage` | Faraday-law integration with explicit polarity, coil turns and optional baseline/drift correction; requires calibrated loop voltage and does not reconstruct equilibrium. |
 | Gas flow meters | `tis.gas_flow.gas_flow_to_particle_inventory` | Standard-volume flow to molar/particle flow and integrated inventory; standard pressure, temperature and gas calibration are explicit. |
 | Effective pumping speed | `tis.gas_flow.effective_pumping_speed_m3_s` | Computes `S=Q/p` for throughput in Pa m³/s and pressure in Pa. |
 | Fast bolometry | `tis.fast_bolometry.fast_bolometry_timeseries` | Sampling/QC summary, optional low-pass filtering and Welch PSD; not an absolute radiated-power inversion. |
