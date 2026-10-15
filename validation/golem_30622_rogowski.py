@@ -145,7 +145,7 @@ def fetch_raw_das_signal(identifier):
             req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
             with urllib.request.urlopen(req, timeout=35) as r:
                 blob = r.read()
-            if blob[:4] == b"PK\\x03\\x04":
+            if blob[:4] == b"PK\x03\x04":
                 with np.load(io.BytesIO(blob), allow_pickle=True) as z:
                     keys = list(z.files)
                     if "data" in keys and "t_start" in keys and "t_end" in keys:
