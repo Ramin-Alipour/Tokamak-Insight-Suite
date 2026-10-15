@@ -1,0 +1,20 @@
+# Approximate plot-digitized points from Figure 3 of Cipciar (2020), shot 31992.
+# Not raw acquired samples; currents read from the published figure at roughly 5 V intervals.
+voltage_V,current_mA
+4.5,2.42
+10,2.95
+16,3.42
+21,3.90
+26,4.35
+31,4.68
+36,4.96
+41,5.25
+46,5.46
+51,5.52
+56,5.61
+61,5.66
+66,5.65
+71,5.66
+76,5.65
+81,5.67
+85,5.68
