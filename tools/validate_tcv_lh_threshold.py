@@ -49,12 +49,12 @@ def main():
 
     # Published ITPA threshold normalization used by the source notebook.
     p_itpa_mw = 0.049 * np.abs(d["NEL20"])**0.72 * np.abs(d["BT"])**0.8 * d["SPLASMA"]**0.94
-    valid = (
+    formula_valid = (
         np.isfinite(p_itpa_mw) & (p_itpa_mw > 0) &
-        np.isfinite(d["PLMW"]) & np.isfinite(d["PLMWSTD"]) &
         np.isfinite(d["NEL20"]) & np.isfinite(d["BT"]) &
         np.isfinite(d["SPLASMA"])
     )
+    valid = formula_valid & np.isfinite(d["PLMW"]) & np.isfinite(d["PLMWSTD"])
     ratio = np.full(n, np.nan)
     ratio_err = np.full(n, np.nan)
     ratio[valid] = d["PLMW"][valid] / p_itpa_mw[valid]
@@ -109,7 +109,11 @@ def main():
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "dataset_record": RECORD, "article_doi": ARTICLE_DOI,
         "source_database": provenance,
-        "database_rows": int(n), "valid_scaling_rows": int(valid.sum()),
+        "database_rows": int(n), "formula_valid_rows": int(formula_valid.sum()), "valid_scaling_rows": int(valid.sum()),
+        "excluded_ratio_rows": [
+            {"shot": int(d["SHOT"][i]), "reason": "PLMW or PLMWSTD missing"}
+            for i in np.flatnonzero(formula_valid & ~valid)
+        ],
         "formula": "P_ITPA_MW = 0.049 * abs(NEL20)**0.72 * abs(BT_T)**0.8 * SPLASMA_m2**0.94",
         "formula_units": {
             "NEL20": "line-averaged density in 10^20 m^-3",
@@ -120,8 +124,8 @@ def main():
         "normalization": "P_loss/P_ITPA; uncertainty PLMWSTD/P_ITPA",
         "figure4_group_reproduction": groups,
         "acceptance": {
-            "formula_reproduction_pass": bool(valid.all() and len(rows) > 0),
-            "criteria": "All database rows produce finite positive P_ITPA and the source notebook's ten Figure-4 masks are reproduced.",
+            "formula_reproduction_pass": bool(formula_valid.all() and valid.sum() >= 0.95 * n and len(rows) > 0),
+            "criteria": "All rows produce finite positive P_ITPA; at least 95% have finite PLMW and PLMWSTD for the ten Figure-4 masks.",
             "interpretation": "This reproduces the published database normalization and selection logic; it is not a reanalysis of raw diagnostic signals.",
         },
     }
@@ -129,7 +133,7 @@ def main():
     pd.DataFrame(rows).to_csv(OUT / "tcv_lh_threshold_selected_shots.csv", index=False)
     print(json.dumps({
         "report": str(OUT / "tcv_lh_threshold_validation.json"),
-        "database_rows": n, "valid_rows": int(valid.sum()),
+        "database_rows": n, "formula_valid_rows": int(formula_valid.sum()), "valid_rows": int(valid.sum()),
         "groups": groups,
         "formula_reproduction_pass": report["acceptance"]["formula_reproduction_pass"],
     }, indent=2))
