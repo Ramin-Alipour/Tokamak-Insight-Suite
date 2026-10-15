@@ -1,0 +1,43 @@
+name: EAST shot 22010 empirical flux comparison
+
+on:
+  workflow_dispatch:
+    inputs:
+      magnetic_field_t:
+        description: "Magnetic field at the selected probe position (paper states 1.8 T near LCFS)"
+        required: true
+        default: "1.8"
+        type: string
+  push:
+    paths:
+      - "tools/validate_east_22010_flux.py"
+      - ".github/workflows/east-public-data-validation.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  east-22010:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install numerical dependencies
+        run: python -m pip install --upgrade pip numpy scipy
+      - name: Download public EAST data and calculate flux statistics
+        env:
+          B_T: ${{ github.event.inputs.magnetic_field_t || '1.8' }}
+        run: python tools/validate_east_22010_flux.py --b-tesla "$B_T" --output-dir artifacts/east-22010-validation
+      - name: Upload raw inputs and reproducible results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: east-22010-flux-validation
+          path: artifacts/east-22010-validation/
+          if-no-files-found: warn
+          retention-days: 30
