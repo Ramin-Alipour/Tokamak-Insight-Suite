@@ -844,3 +844,11 @@ def test_divertor_particle_flux_known_profile_integral():
     out = analyze_divertor_flux([0.0, 1.0, 2.0], [0.0, 0.0, 0.0], particle_flux_m2_s=[0.0, 4.0, 0.0])
     np.testing.assert_allclose(out["particle_flux_m2_s"], [0.0, 4.0, 0.0])
     assert out["integrated_particle_flux_m_s-1"] == pytest.approx(4.0)
+
+
+
+def test_edge_field_known_linear_potential_profile():
+    from tokamak_analysis.edge_field import analyze_edge_field
+    out = analyze_edge_field([0.0, 1.0, 2.0], [10.0, 8.0, 6.0], floating_potential_V=[5.0, 4.0, 3.0])
+    np.testing.assert_allclose(out["electric_field_V_m"], [2.0, 2.0, 2.0])
+    np.testing.assert_allclose(out["plasma_minus_floating_V"], [5.0, 4.0, 3.0])
