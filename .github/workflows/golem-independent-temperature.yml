@@ -92,6 +92,18 @@ jobs:
           print(json.dumps(report, indent=2))
           # Preserve the report/artifacts even when the remote endpoint is unavailable.
           PY
+      - name: Enforce honest validation status
+        if: always()
+        run: |
+          python - <<'PY'
+          import json, pathlib, sys
+          report = json.loads(pathlib.Path("golem-temperature-validation/report.json").read_text())
+          status = report.get("status")
+          print(f"Scientific cross-check status: {status}")
+          if status != "cross-check-computed":
+              print("No numerical comparison was completed; this run must not be green as a validation.")
+              sys.exit(1)
+          PY
       - name: Upload reproducibility artifacts
         if: always()
         uses: actions/upload-artifact@v4
