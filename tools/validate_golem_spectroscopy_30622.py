@@ -273,31 +273,48 @@ if raw.get("numeric_rows", 0) >= 100:
             "all_voigt_fits": voigt_records,
             "interpretation": "Model-sensitivity only; neither model separates instrument from plasma broadening."
         }
-        # Two strong lines define a provisional affine mapping; H-gamma is an independent check.
-        hb = temporal["H_beta"]
-        ha = temporal["H_alpha"]
-        hg = temporal["H_gamma"]
-        if hb["center_mean_nm"] is not None and ha["center_mean_nm"] is not None and hg["center_mean_nm"] is not None:
-            x1, x2 = hb["center_mean_nm"], ha["center_mean_nm"]
-            y1, y2 = 486.135, 656.281
-            slope = (y2 - y1) / (x2 - x1)
-            intercept = y1 - slope * x1
-            corrected_hg = intercept + slope * hg["center_mean_nm"]
-            residual = float(corrected_hg - 434.047)
-            report["provisional_wavelength_crosscheck"] = {
-                "calibration_lines": ["H_beta", "H_alpha"],
-                "method": "two-point affine mapping; diagnostic only, not accepted as a calibration",
-                "slope": float(slope),
-                "intercept_nm": float(intercept),
-                "independent_check_line": "H_gamma",
-                "H_gamma_observed_center_nm": hg["center_mean_nm"],
-                "H_gamma_mapped_center_nm": float(corrected_hg),
-                "H_gamma_reference_nm_approx": 434.047,
-                "H_gamma_residual_nm": residual,
-                "crosscheck_pass": bool(abs(residual) <= 0.25),
-                "decision": "DO_NOT_APPLY_CALIBRATION" if abs(residual) > 0.25 else "PROVISIONAL_ONLY",
-                "reason": "Only two lines define the affine map; H-gamma is an independent check and its residual must be acceptably small before calibration can be trusted."
+        # Do not calibrate a spectrometer against plasma Balmer lines:
+        # their centers can be shifted by plasma bulk velocity, blends, opacity,
+        # and line-fitting bias. Instead report apparent Doppler velocities as a
+        # consistency diagnostic and explicitly require a lamp/reference source
+        # for wavelength calibration.
+        refs_air_nm = {"H_alpha": 656.281, "H_beta": 486.135, "H_gamma": 434.047}
+        c_km_s = 299792.458
+        velocity_audit = {}
+        for line_name, ref_nm in refs_air_nm.items():
+            center = temporal[line_name].get("center_mean_nm")
+            n_good = temporal[line_name].get("accepted_acquisitions", 0)
+            velocity_audit[line_name] = {
+                "observed_center_nm": center,
+                "reference_air_wavelength_nm_approx": ref_nm,
+                "apparent_radial_velocity_km_s": (
+                    c_km_s * (center / ref_nm - 1.0) if center is not None else None
+                ),
+                "accepted_acquisitions": n_good,
+                "total_acquisitions": temporal[line_name].get("total_acquisitions", spectra.shape[1]),
+                "usable_for_velocity_consistency": bool(center is not None and n_good >= 5),
             }
+        usable_velocities = [
+            item["apparent_radial_velocity_km_s"]
+            for item in velocity_audit.values()
+            if item["usable_for_velocity_consistency"]
+        ]
+        report["Balmer_velocity_consistency"] = {
+            "lines": velocity_audit,
+            "usable_line_count": len(usable_velocities),
+            "velocity_spread_km_s": (
+                float(max(usable_velocities) - min(usable_velocities))
+                if len(usable_velocities) >= 2 else None
+            ),
+            "wavelength_calibration_status": "NOT_ASSESSED_FROM_PLASMA_LINES",
+            "decision": "REQUIRES_EXTERNAL_WAVELENGTH_STANDARD",
+            "reason": (
+                "Plasma-emission line centers are not wavelength-calibration standards because "
+                "real plasma Doppler shifts and line-shape/systematic effects can move the centers. "
+                "H-gamma is excluded from consistency interpretation unless at least five acquisitions pass."
+            ),
+            "required_next_step": "Fit a multi-line Hg/Ar (or other certified lamp) spectrum from the same instrument setup; do not apply an affine correction inferred from H-alpha/H-beta."
+        }
         # Quantify the naive Doppler-only temperature for transparency, but never
         # label it as a measured ion temperature: instrumental broadening is unknown.
         ha_mean = temporal["H_alpha"].get("fwhm_mean_nm")
@@ -334,8 +351,8 @@ if raw.get("numeric_rows", 0) >= 100:
         report["status"] = "PASS_SPECTRAL_LINE_SHAPE"
         report["interpretation"] = (
             "Raw spectrum was retrieved and three Balmer-region line profiles were fitted. "
-            "This demonstrates a reproducible spectral-shape analysis path; it does not validate "
-            "Doppler temperature because instrument broadening and calibration uncertainty remain unresolved."
+            "Plasma-line centers are now treated as apparent Doppler-shift diagnostics, not calibration standards. "
+            "A valid Ti still requires a measured instrument LSF and sufficient spectral sampling."
         )
     except Exception as exc:
         report["status"] = "PASS_DATA_INGESTION_ONLY"
