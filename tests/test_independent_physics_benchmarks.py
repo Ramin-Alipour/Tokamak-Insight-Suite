@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from tis.core import (
-    AMU, C_LIGHT, E_CHARGE, EPS0, MU0,
+    AMU, C_LIGHT, E_CHARGE, MU0,
     doppler_temperature_eV, doppler_velocity_m_s,
     fft_spectrum, welch_psd, fluctuation_flux,
 )
@@ -78,7 +78,7 @@ def test_welch_psd_integral_recovers_variance_with_tolerance():
     rng = np.random.default_rng(741)
     x = rng.normal(0, 2.0, 131072)
     f, pxx = welch_psd(x, fs=10_000.0, nperseg=4096)
-    recovered = np.trapz(pxx, f)
+    recovered = float(np.sum(0.5 * (pxx[:-1] + pxx[1:]) * np.diff(f)))
     assert recovered == pytest.approx(np.var(x), rel=0.08)
 
 
