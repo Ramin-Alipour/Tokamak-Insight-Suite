@@ -156,15 +156,18 @@ def fit_swept_ball_pen_with_alpha_uncertainty(
     nominal = fit_swept_ball_pen_ion_temperature(
         voltage_V, current_A, alpha_bpp=alpha_bpp, **kwargs
     )
+    refit_kwargs = dict(kwargs)
+    refit_kwargs.pop("initial_ti_eV", None)
+    refit_kwargs.pop("plasma_potential_guess_V", None)
     low = fit_swept_ball_pen_ion_temperature(
         voltage_V, current_A, alpha_bpp=alpha_bpp - sigma,
         initial_ti_eV=nominal["Ti_eV"],
-        plasma_potential_guess_V=nominal["plasma_potential_V"], **kwargs
+        plasma_potential_guess_V=nominal["plasma_potential_V"], **refit_kwargs
     )
     high = fit_swept_ball_pen_ion_temperature(
         voltage_V, current_A, alpha_bpp=alpha_bpp + sigma,
         initial_ti_eV=nominal["Ti_eV"],
-        plasma_potential_guess_V=nominal["plasma_potential_V"], **kwargs
+        plasma_potential_guess_V=nominal["plasma_potential_V"], **refit_kwargs
     )
     values = [low["Ti_eV"], nominal["Ti_eV"], high["Ti_eV"]]
     nominal["alpha_bpp_std"] = sigma
