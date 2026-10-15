@@ -852,3 +852,15 @@ def test_edge_field_known_linear_potential_profile():
     out = analyze_edge_field([0.0, 1.0, 2.0], [10.0, 8.0, 6.0], floating_potential_V=[5.0, 4.0, 3.0])
     np.testing.assert_allclose(out["electric_field_V_m"], [2.0, 2.0, 2.0])
     np.testing.assert_allclose(out["plasma_minus_floating_V"], [5.0, 4.0, 3.0])
+
+
+
+def test_lh_transition_known_persistent_step():
+    from tokamak_analysis.lh_transition import detect_lh_transition
+    time = np.arange(20, dtype=float)
+    signal = np.zeros(20)
+    signal[10:] = 1.0
+    out = detect_lh_transition(time, signal, threshold_sigma=3.0, persistence=3)
+    assert out["transition_candidate_time_s"] == pytest.approx(10.0)
+    assert out["baseline_median"] == pytest.approx(0.0)
+    assert out["baseline_robust_sigma"] == pytest.approx(0.0)
