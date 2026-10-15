@@ -69,8 +69,9 @@ def fetch_legacy_npz(identifier):
     import urllib.request
     errors = []
     urls = [
+        f"https://golem.fjfi.cvut.cz/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
+        f"http://golem.fjfi.cvut.cz/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
         f"https://golem.fjfi.cvut.cz/golem/database/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
-        f"http://golem.fjfi.cvut.cz/golem/database/operation/shots/{SHOT}/basicdiagn/{identifier}.npz",
     ]
     for url in urls:
         try:
