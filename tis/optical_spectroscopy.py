@@ -36,7 +36,7 @@ def analyze_optical_emission_spectrum(wavelength_nm, intensity, line_regions, *,
         if rest is not None:
             if not np.isfinite(rest) or rest <= 0:
                 raise ValueError(f"Line region {label!r} has invalid rest_wavelength_nm.")
-            velocity = float(doppler_velocity_m_s(float(fit["center"]), float(rest)))
+            velocity = float(doppler_velocity_m_s(float(fit["center"]) - float(rest), float(rest)))
         lines.append({
             "label": label,
             "fit": fit,
