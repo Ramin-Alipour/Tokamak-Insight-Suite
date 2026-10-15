@@ -277,3 +277,12 @@ def test_multipin_probe_known_linear_potential_gradient():
     np.testing.assert_allclose(out["potential_gradient_V_m"], 10.0, atol=1e-12)
     np.testing.assert_allclose(out["electric_field_V_m"], -10.0, atol=1e-12)
     np.testing.assert_allclose(out["mean_potential_by_pin_V"], [0.5, 1.5, 2.5], atol=1e-12)
+
+
+
+def test_plasma_floating_potential_and_electric_field():
+    from tokamak_analysis.potential_analysis import analyze_potentials
+    out = analyze_potentials([10.0, 12.0, 14.0], [2.0, 3.0, 4.0], coordinate_m=[0.0, 1.0, 2.0])
+    np.testing.assert_allclose(out["difference_V"], [8.0, 9.0, 10.0])
+    assert out["mean_difference_V"] == pytest.approx(9.0)
+    np.testing.assert_allclose(out["electric_field_V_m"], [-2.0, -2.0, -2.0])
