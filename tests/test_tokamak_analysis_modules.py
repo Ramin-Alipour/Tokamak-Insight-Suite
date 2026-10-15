@@ -634,3 +634,15 @@ def test_wall_recycling_known_flux_ratio():
     from tokamak_analysis.wall_recycling import recycling_coefficient
     out = recycling_coefficient(10.0, 8.0)
     assert float(out["recycling_coefficient"]) == pytest.approx(0.8, rel=1e-12)
+
+
+
+def test_mirnov_signal_known_frequency_and_coil_conversion():
+    from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal
+    time = np.arange(1024)/1000.0
+    frequency = 15.625
+    voltage = np.sin(2*np.pi*frequency*time)
+    out = analyze_mirnov_signal(time, voltage, coil_area_m2=0.01, turns=10)
+    assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(frequency)
+    assert out["rms_voltage_V"] == pytest.approx(np.sqrt(1024/(2*1023)), rel=1e-10)
+    np.testing.assert_allclose(out["approx_Bdot_T_s"], voltage/0.1, atol=1e-12)
