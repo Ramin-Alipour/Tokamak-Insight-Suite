@@ -802,3 +802,12 @@ def test_icrh_proton_fundamental_resonance_field():
     expected = 2*np.pi*U*frequency/E
     assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
     assert expected == pytest.approx(2.63, rel=3e-3)
+
+
+
+def test_rf_plasma_interaction_known_power_balance():
+    from tokamak_analysis.rf_interaction import analyze_rf_interaction
+    out = analyze_rf_interaction(1000.0, 100.0, 200.0, uncertainty_W=[10.0, 5.0, 5.0])
+    assert out["unaccounted_power_W"] == pytest.approx(700.0)
+    assert out["coupling_fraction"] == pytest.approx(0.7)
+    assert out["unaccounted_power_uncertainty_W"] == pytest.approx(np.sqrt(150.0))
