@@ -627,3 +627,10 @@ def test_fueling_rate_known_injected_particles_and_gas_inventory():
     assert out["injected_particles"] == pytest.approx(2.0)
     assert out["peak_rate_s-1"] == pytest.approx(2.0)
     assert out["ideal_gas_inventory_particles"] == pytest.approx(1e-3*0.01/(K_B*300.0), rel=1e-12)
+
+
+
+def test_wall_recycling_known_flux_ratio():
+    from tokamak_analysis.wall_recycling import recycling_coefficient
+    out = recycling_coefficient(10.0, 8.0)
+    assert float(out["recycling_coefficient"]) == pytest.approx(0.8, rel=1e-12)
