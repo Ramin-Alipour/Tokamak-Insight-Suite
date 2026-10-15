@@ -266,3 +266,14 @@ def test_gundestrup_probe_known_first_harmonic():
     assert out["first_harmonic_amplitude_A"] == pytest.approx(5.0, abs=1e-12)
     assert out["flow_phase_rad"] == pytest.approx(np.arctan2(4.0, 3.0), abs=1e-12)
     assert out["residual_rms_A"] == pytest.approx(0.0, abs=1e-12)
+
+
+
+def test_multipin_probe_known_linear_potential_gradient():
+    from tokamak_analysis.multipin_probe import analyze_multipin_probe
+    positions = np.array([0.0, 0.1, 0.2])
+    potentials = np.array([[0.0, 1.0, 2.0], [1.0, 2.0, 3.0]])
+    out = analyze_multipin_probe([0.0, 1.0], potentials, positions)
+    np.testing.assert_allclose(out["potential_gradient_V_m"], 10.0, atol=1e-12)
+    np.testing.assert_allclose(out["electric_field_V_m"], -10.0, atol=1e-12)
+    np.testing.assert_allclose(out["mean_potential_by_pin_V"], [0.5, 1.5, 2.5], atol=1e-12)
