@@ -409,11 +409,18 @@ for config_url in config_candidates:
         (OUT / "upstream_HR_C1886.cfg").write_bytes(config_blob)
         import re
         section = config_text.split("[Instrumental broadening function]", 1)[1].split("\n[", 1)[0]
-        width_match = re.search(r"(?im)^width\(wavelength\)\s*=\s*(.+)$", section)
-        pairs = []
-        if width_match:
-            nums = [float(v) for v in re.findall(r"[-+]?(?:\d*\.)?\d+(?:[eE][-+]?\d+)?", width_match.group(1))]
-            pairs = list(zip(nums[0::2], nums[1::2]))
+        section_lines = section.splitlines()
+        width_start = next((i for i, line in enumerate(section_lines)
+                            if re.match(r"^\s*width\(wavelength\)\s*=", line, re.I)), None)
+        width_text = ""
+        if width_start is not None:
+            width_text = section_lines[width_start].split("=", 1)[1]
+            for line in section_lines[width_start + 1:]:
+                if re.match(r"^\s*[A-Za-z_][^=]*=", line):
+                    break
+                width_text += " " + line
+        nums = [float(v) for v in re.findall(r"[-+]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][-+]?\d+)?", width_text)]
+        pairs = list(zip(nums[0::2], nums[1::2]))
         if pairs:
             inst_width = float(np.interp(656.281, [p[0] for p in pairs], [p[1] for p in pairs]))
             config_audit = {
@@ -430,6 +437,49 @@ for config_url in config_candidates:
     except Exception as exc:
         config_audit["attempts"].append({"url": config_url, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
 report["instrument_config_audit"] = config_audit
+
+# If the upstream instrument-width curve is available, compute a separately
+# labelled provisional deconvolution. The old config's width is used as a
+# Gaussian-sigma-like term because the upstream fitting code adds it in quadrature.
+if config_audit.get("status") == "instrument_config_retrieved":
+    try:
+        sigma_inst = float(config_audit["interpolated_instrumental_width_at_H_alpha_nm"])
+        ha = report.get("time_resolved_line_audit", {}).get("H_alpha", {})
+        accepted = ha.get("accepted_records", [])
+        center = ha.get("center_mean_nm")
+        if accepted and center and sigma_inst >= 0:
+            per_record = []
+            for rec in accepted:
+                sigma_observed = float(rec["fwhm_nm"]) / 2.354820045
+                variance_remaining = sigma_observed**2 - sigma_inst**2
+                if variance_remaining > 0:
+                    sigma_intrinsic = math.sqrt(variance_remaining)
+                    fwhm_intrinsic = 2.354820045 * sigma_intrinsic
+                    ti = (938.27208816e6 / (8.0 * math.log(2.0))) * (fwhm_intrinsic / center)**2
+                    per_record.append({"acquisition": rec["acquisition"], "observed_fwhm_nm": rec["fwhm_nm"],
+                                       "deconvolved_fwhm_nm": fwhm_intrinsic, "provisional_Ti_eV": ti})
+            if per_record:
+                values = np.asarray([r["provisional_Ti_eV"] for r in per_record], dtype=float)
+                report["H_alpha_LSF_corrected_temperature_candidate"] = {
+                    "status": "PROVISIONAL_ONLY_NOT_VALIDATED_Ti",
+                    "instrumental_width_nm": sigma_inst,
+                    "instrumental_width_interpretation": "treated as Gaussian sigma based on the upstream code's quadrature model; not independently verified",
+                    "accepted_widths_used": len(per_record),
+                    "accepted_widths_total": len(accepted),
+                    "provisional_mean_Ti_eV": float(np.mean(values)),
+                    "provisional_sample_std_Ti_eV": float(np.std(values, ddof=1)) if len(values) > 1 else None,
+                    "per_acquisition": per_record,
+                    "limitations": [
+                        "Instrument config is dated 2011 and is not confirmed to have remained unchanged for shot 30622.",
+                        "The wavelength calibration failed the independent H-gamma check.",
+                        "Sampling is coarse and only threshold-selected H-alpha fits were used.",
+                        "This is a Doppler-only candidate; other broadening mechanisms and config uncertainty are not quantified."
+                    ]
+                }
+    except Exception as exc:
+        report["H_alpha_LSF_corrected_temperature_candidate"] = {
+            "status": "NOT_COMPUTED", "error": f"{type(exc).__name__}: {exc}"
+        }
 
 (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2))
