@@ -876,3 +876,13 @@ def test_signal_calibration_known_linear_transfer_function():
     assert residual["bias"] == pytest.approx(0.0)
     assert residual["rmse"] == pytest.approx(np.sqrt(0.5/3))
     assert residual["max_absolute_error"] == pytest.approx(0.5)
+
+
+
+def test_signal_denoising_median_removes_impulse():
+    from tokamak_analysis.denoising import denoise_signal
+    signal = np.array([0.0, 0.0, 10.0, 0.0, 0.0])
+    out = denoise_signal(signal, method="median", window_length=3)
+    np.testing.assert_allclose(out["filtered_signal"], np.zeros(5))
+    np.testing.assert_allclose(out["residual"], signal)
+    assert out["residual_rms"] == pytest.approx(np.sqrt(20.0))
