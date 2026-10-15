@@ -668,3 +668,15 @@ def test_magnetic_mode_frequency_known_sinusoid():
     out = magnetic_mode_frequency(time, signal, frequency_band_Hz=(10.0, 20.0))
     assert out["dominant_frequency_Hz"] == pytest.approx(expected_frequency)
     assert out["peak_power"] > 0
+
+
+
+def test_fft_known_bin_frequency_and_amplitude():
+    from tokamak_analysis.fft_analysis import analyze_fft
+    time = np.arange(1000)/1000.0
+    frequency = 10.0
+    signal = 3.0*np.sin(2*np.pi*frequency*time)
+    out = analyze_fft(time, signal, window="rectangular")
+    idx = int(np.argmin(np.abs(out["frequency_Hz"]-frequency)))
+    assert out["frequency_Hz"][idx] == pytest.approx(frequency)
+    assert out["amplitude"][idx] == pytest.approx(3.0, rel=1e-10)
