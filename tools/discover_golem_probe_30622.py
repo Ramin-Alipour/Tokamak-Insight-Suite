@@ -92,6 +92,15 @@ for suffix in ("bpp","lp","U_bias","U_current","probe_voltage","probe_current","
                  f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/{suffix}.txt",
                  f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/PetiProbe.ON/data/{suffix}"])
 urls.extend([
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/main.py",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/log",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/00_NI%20standard.php",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6133",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6133.txt",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6133.dat",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6132",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6132.txt",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/Nidatap_6132.dat",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/nistandard",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/nistandard.txt",
     f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/nistandard.xls",
