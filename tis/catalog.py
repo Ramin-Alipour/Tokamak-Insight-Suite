@@ -107,6 +107,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Fast bolometry": ["analyze_fast_bolometry", "regularized_tomography"],
     "Refractive-index / ray-tracing diagnostics": ["trace_o_mode_ray"],
     "Collective Thomson / coherent scattering (CTS)": ["fit_collective_scattering_spectrum"],
+    "Collective Thomson scattering (CTS)": ["fit_collective_scattering_spectrum"],
     "Microwave reflectometry": ["analyze_reflectometry_sweep", "reflectometry_cutoff_density"],
     "Laser / microwave interferometry": ["analyze_interferometry", "linear_phase_density"],
     "Instrumental line-shape characterization": ["characterize_instrument_line_shape", "fit_spectral_line"],
