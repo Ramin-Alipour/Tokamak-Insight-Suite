@@ -1,0 +1,128 @@
+name: GOLEM shot 30622 plasma-current cross-check
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/golem-current-crosscheck.yml"
+
+jobs:
+  current-crosscheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve public GOLEM current signals and references
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p validation-output
+          python - <<'PY'
+          import json, urllib.request, urllib.error, hashlib, re
+          from pathlib import Path
+          import numpy as np
+
+          base = "https://golem.fjfi.cvut.cz"
+          shot_url = base + "/shots/30622/Data.php"
+          req = urllib.request.Request(shot_url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              html = r.read().decode("utf-8", "replace")
+
+          names = ["rogowski_current", "plasma_current"]
+          out = {"shot":30622, "source_page":shot_url, "signals":{}, "reference_scalars":{}}
+          for name in names:
+              urls = [
+                  base + "/utils/data/30622/" + name,
+                  base + "/utils/data/30622/" + name + ".xls",
+              ]
+              success = False
+              attempts = []
+              for url in urls:
+                  try:
+                      req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+                      with urllib.request.urlopen(req, timeout=30) as r:
+                          raw = r.read()
+                          ctype = r.headers.get("Content-Type","")
+                          final_url = r.geturl()
+                      if len(raw) < 20:
+                          raise ValueError("response too small")
+                      Path("validation-output/" + name + ".dat").write_bytes(raw)
+                      attempts.append({"url":url,"status":"downloaded","final_url":final_url,"content_type":ctype,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()})
+                      try:
+                          arr = np.genfromtxt(raw.decode("utf-8","replace").splitlines(), comments="#", invalid_raise=False)
+                          arr = np.asarray(arr)
+                          if arr.ndim == 1:
+                              arr = arr.reshape(-1,1)
+                          arr = arr[np.isfinite(arr).any(axis=1)]
+                          if arr.size == 0:
+                              raise ValueError("no numeric rows parsed")
+                          numeric = arr[:, :min(arr.shape[1], 8)]
+                          # Treat first column as time only if multiple columns are present.
+                          signal = numeric[:,1] if numeric.shape[1] >= 2 else numeric[:,0]
+                          signal = signal[np.isfinite(signal)]
+                          if not len(signal):
+                              raise ValueError("no finite signal values")
+                          out["signals"][name] = {
+                              "status":"PARSED",
+                              "rows":int(len(numeric)),
+                              "columns":int(numeric.shape[1]),
+                              "first_rows":numeric[:3].tolist(),
+                              "signal_column_assumption":"second column (time,value format)" if numeric.shape[1]>=2 else "only numeric column",
+                              "signal_min":float(np.min(signal)),
+                              "signal_max":float(np.max(signal)),
+                              "signal_max_abs":float(np.max(np.abs(signal))),
+                              "signal_mean":float(np.mean(signal)),
+                              "signal_median":float(np.median(signal)),
+                              "data_sha256":hashlib.sha256(raw).hexdigest()
+                          }
+                          success = True
+                          break
+                      except Exception as e:
+                          attempts[-1]["parse_error"] = repr(e)
+                  except Exception as e:
+                      attempts.append({"url":url,"status":"failed","error":repr(e)})
+              if not success:
+                  out["signals"][name] = {"status":"retrieval-or-format-unresolved","attempts":attempts}
+              else:
+                  out["signals"][name]["attempts"] = attempts
+
+          # Extract scalar values only when the public page explicitly links the identifier.
+          for key in ["rogowski_current_max","plasma_current_mean","plasma_current_decay","electron_density_mean","electron_density_equilibrium"]:
+              m = re.search(r'>([^<]*)</a>\s*<a[^>]+href=["\']([^"\']*/utils/data/30622/'+re.escape(key)+r')["\']', html, re.I)
+              if not m:
+                  # Robust fallback: scalar often precedes the download link.
+                  m = re.search(r'([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*</[^>]+>\s*<a[^>]+href=["\']([^"\']*/utils/data/30622/'+re.escape(key)+r')["\']', html, re.I)
+              if m:
+                  try: out["reference_scalars"][key] = {"value":float(m.group(1)),"source":"GOLEM shot 30622 Data.php","href":m.group(2)}
+                  except: pass
+
+          # The page commonly encodes the scalar as plain text immediately before the link.
+          for key in ["rogowski_current_max","plasma_current_mean"]:
+              if key not in out["reference_scalars"]:
+                  m = re.search(r'([-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?)\s*</[^>]+>\s*<a[^>]+href=["\']([^"\']*/utils/data/30622/'+re.escape(key)+r')["\']', html, re.I)
+                  if m:
+                      out["reference_scalars"][key]={"value":float(m.group(1)),"source":"GOLEM shot 30622 Data.php","href":m.group(2)}
+
+          # Numeric comparison is only reported if the current waveform and a reference maximum are both available.
+          sig = out["signals"].get("rogowski_current",{})
+          ref = out["reference_scalars"].get("rogowski_current_max")
+          if sig.get("status") == "PARSED" and ref:
+              measured = sig["signal_max_abs"]
+              expected = abs(ref["value"])
+              out["comparison"] = {
+                  "quantity":"absolute peak Rogowski current",
+                  "waveform_peak_abs":measured,
+                  "GOLEM_page_reference_max_abs":expected,
+                  "relative_difference_percent":(abs(measured-expected)/expected*100 if expected else None),
+                  "note":"Comparison is valid only if the downloaded waveform's units and signal column match the published scalar."
+              }
+              out["status"] = "NUMERIC_COMPARISON_AVAILABLE"
+          else:
+              out["status"] = "DATA_OR_REFERENCE_UNRESOLVED"
+          Path("validation-output/report.json").write_text(json.dumps(out,indent=2))
+          print(json.dumps(out,indent=2))
+          PY
+      - name: Upload validation report and downloaded signals
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golem-current-crosscheck-30622
+          path: validation-output/
