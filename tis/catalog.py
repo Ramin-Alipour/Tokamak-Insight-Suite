@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Soft X-ray arrays": ["analyze_soft_xray_array", "regularized_tomography"],
     "Fast bolometry": ["analyze_fast_bolometry", "regularized_tomography"],
     "Refractive-index / ray-tracing diagnostics": ["trace_o_mode_ray"],
     "Collective Thomson / coherent scattering (CTS)": ["fit_collective_scattering_spectrum"],
