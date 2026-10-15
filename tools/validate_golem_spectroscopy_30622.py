@@ -261,6 +261,43 @@ if raw.get("numeric_rows", 0) >= 100:
 else:
     report["interpretation"] = "Raw spectrum could not be retrieved and parsed; no spectral result is fabricated."
 
+# Export the per-acquisition fits as a machine-readable table for independent review.
+if "time_resolved_line_audit" in report:
+    import csv
+    temporal_csv = OUT / "time_resolved_line_fits.csv"
+    with temporal_csv.open("w", newline="", encoding="utf-8") as handle:
+        fields = ["line", "acquisition", "timestamp_ms", "center_nm", "fwhm_nm",
+                  "peak_counts", "r_squared", "accepted", "fit_error"]
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for line_name, summary in report["time_resolved_line_audit"].items():
+            for record in summary.get("all_records", []):
+                writer.writerow({"line": line_name, **{k: record.get(k) for k in fields if k != "line"}})
+    # Stability metrics are descriptive; accepted fits are threshold-selected,
+    # so they must not be interpreted as the full shot's temporal distribution.
+    ha = report["time_resolved_line_audit"].get("H_alpha", {})
+    if ha.get("center_mean_nm") is not None and ha.get("fwhm_mean_nm") not in (None, 0):
+        report["H_alpha_stability_summary"] = {
+            "accepted_fits": ha.get("accepted_acquisitions"),
+            "total_fits": ha.get("total_acquisitions"),
+            "center_peak_to_peak_nm": (
+                ha["center_max_nm"] - ha["center_min_nm"]
+                if ha.get("center_max_nm") is not None and ha.get("center_min_nm") is not None else None
+            ),
+            "center_sample_std_nm": ha.get("center_sample_std_nm"),
+            "center_relative_sample_std_ppm": (
+                1e6 * ha["center_sample_std_nm"] / ha["center_mean_nm"]
+                if ha.get("center_sample_std_nm") is not None else None
+            ),
+            "fwhm_mean_nm": ha.get("fwhm_mean_nm"),
+            "fwhm_sample_std_nm": ha.get("fwhm_sample_std_nm"),
+            "fwhm_coefficient_of_variation_percent": (
+                100 * ha["fwhm_sample_std_nm"] / ha["fwhm_mean_nm"]
+                if ha.get("fwhm_sample_std_nm") is not None else None
+            ),
+            "interpretation": "Descriptive stability among accepted H-alpha fits only; not an instrument-calibrated Doppler-width or ion-temperature result."
+        }
+
 (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2))
 if report["status"] != "PASS_SPECTRAL_LINE_SHAPE":
