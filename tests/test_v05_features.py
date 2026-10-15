@@ -298,8 +298,8 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals
-    modules = (tis.core, tis.events, tis.plasma, tis.signals)
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow
+    modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
             assert any(hasattr(m, fn) for m in modules), f"{d['diagnostic']} maps to missing function {fn}"
