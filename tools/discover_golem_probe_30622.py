@@ -42,7 +42,10 @@ report={"shot":SHOT,"created_at_utc":datetime.now(timezone.utc).isoformat(),
         "purpose":"Find direct swept BPP voltage/current or determine whether only unswept probe channels are published.",
         "data_page":f"{ROOT}/shots/{SHOT}/Data.php","page_attempts":[],"matching_table_rows":[],"candidate_results":[]}
 
-pages=[f"{ROOT}/shots/{SHOT}/Data.php",f"{ROOT}/shots/{SHOT}/",f"https://golem.fjfi.cvut.cz/shots/{SHOT}/Data.php"]
+pages=[f"{ROOT}/shots/{SHOT}/Data.php",f"{ROOT}/shots/{SHOT}/",f"https://golem.fjfi.cvut.cz/shots/{SHOT}/Data.php",
+       f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/",
+       f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/data/",
+       f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/analysis.html"]
 identifiers=set(["bpp","lp","BPP","LP","U_bias","U_current","bpp_voltage","bpp_current",
     "probe_voltage","probe_current","PetiProbe:U_bias","PetiProbe:U_current","PetiProbe/U_bias",
     "PetiProbe/U_current","nistandard","electron_temperature","toroidal_field","swept_bpp",
@@ -63,12 +66,18 @@ for page in pages:
                     if re.fullmatch(r"[A-Za-z0-9_:/.-]{2,100}",cell) and re.search(r"bpp|ball.?pen|probe|nistandard|u_bias|u_current|sweep|langmuir",cell,re.I):
                         identifiers.add(cell)
         for link in parser.links:
-            joined=link["href"]+" "+link["text"]
-            if re.search(r"bpp|ball.?pen|probe|nistandard|u_bias|u_current|sweep|langmuir",joined,re.I):
+            href=link["href"]
+            joined=href+" "+link["text"]
+            is_probe_link=bool(re.search(r"bpp|ball.?pen|probe|nistandard|u_bias|u_current|sweep|langmuir",joined,re.I))
+            is_das_page=("DAS/0512NIstandard.ONN" in page)
+            if is_probe_link or is_das_page:
                 report.setdefault("matching_links",[]).append({"page":final,**link})
-                href=link["href"]
+            if is_probe_link or is_das_page:
                 tail=href.rstrip("/").split("/")[-1]
                 if re.fullmatch(r"[A-Za-z0-9_:/.-]{2,100}",tail): identifiers.add(tail)
+                if href.startswith(("http://","https://")): urls.append(href)
+                elif href.startswith("/"): urls.append(ROOT+href)
+                else: urls.append(final.rsplit("/",1)[0]+"/"+href)
         (OUT/f"page_{len(report['page_attempts']):02d}.html").write_bytes(raw)
     except Exception as exc:
         rec.update(status="failed",error=f"{type(exc).__name__}: {exc}")
@@ -83,6 +92,12 @@ for suffix in ("bpp","lp","U_bias","U_current","probe_voltage","probe_current","
                  f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/{suffix}.txt",
                  f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/PetiProbe.ON/data/{suffix}"])
 urls.extend([
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/data",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/data.txt",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/11",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/11.txt",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/nistandard",
+    f"{ROOT}/shots/{SHOT}/DAS/0512NIstandard.ONN/nistandard.txt",
     f"{ROOT}/shots/{SHOT}/nistandard", f"{ROOT}/shots/{SHOT}/nistandard.txt",
     f"{ROOT}/shots/{SHOT}/NIstandard", f"{ROOT}/shots/{SHOT}/bpp",
     f"{ROOT}/shots/{SHOT}/bpp.txt", f"{ROOT}/shots/{SHOT}/lp",
