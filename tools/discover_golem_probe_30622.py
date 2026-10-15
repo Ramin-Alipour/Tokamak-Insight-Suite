@@ -135,7 +135,16 @@ def try_one(url):
     try:
         raw,final,ctype=get(url)
         rec.update(final_url=final,content_type=ctype,bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest())
-        try: arr=np.asarray(np.loadtxt(raw.decode("utf-8","replace").splitlines()))
+        decoded = raw.decode("utf-8", "replace")
+        if any(url.lower().endswith(x) for x in ("main.py", "/log", ".php")):
+            rec["status"] = "text_source"
+            rec["text_preview"] = decoded[:5000]
+            rec["relevant_lines"] = [line for line in decoded.splitlines()
+                if re.search(r"bpp|nistandard|nidatap|data_path|filename|open\(|read\(|write\(|channel|raw", line, re.I)][:80]
+            safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", url.rstrip("/").split("/")[-1])
+            (OUT / f"source_{safe}_{hashlib.sha256(url.encode()).hexdigest()[:8]}.txt").write_bytes(raw)
+            return rec
+        try: arr=np.asarray(np.loadtxt(decoded.splitlines()))
         except Exception: arr=np.asarray([])
         if arr.size<10: rec["status"]="empty_or_non_numeric"
         else:
