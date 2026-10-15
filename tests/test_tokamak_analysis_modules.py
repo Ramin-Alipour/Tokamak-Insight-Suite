@@ -657,3 +657,14 @@ def test_mhd_mode_number_known_phase_winding():
     assert out["mode_number_estimate"] == pytest.approx(2.0, abs=1e-12)
     assert out["nearest_integer_mode_number"] == 2
     assert out["fit_residual_rms_rad"] == pytest.approx(0.0, abs=1e-12)
+
+
+
+def test_magnetic_mode_frequency_known_sinusoid():
+    from tokamak_analysis.magnetic_mode_frequency import magnetic_mode_frequency
+    time = np.arange(1024)/1000.0
+    expected_frequency = 15.625
+    signal = np.sin(2*np.pi*expected_frequency*time)
+    out = magnetic_mode_frequency(time, signal, frequency_band_Hz=(10.0, 20.0))
+    assert out["dominant_frequency_Hz"] == pytest.approx(expected_frequency)
+    assert out["peak_power"] > 0
