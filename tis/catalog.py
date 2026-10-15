@@ -130,7 +130,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
     "Noise floor and detection limit": ["hampel_despike"],
-    "Rogowski coil": ["integrate_time_series"],
+    "Rogowski coil": ["analyze_rogowski_current", "integrate_time_series"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
 }
 for _d in DIAGNOSTICS:
