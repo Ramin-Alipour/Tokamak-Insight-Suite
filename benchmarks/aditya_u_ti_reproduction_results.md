@@ -48,3 +48,13 @@ Thus, the article's reported central value is numerically consistent with using 
 Code and regression checks:
 - `benchmarks/aditya_u_ti_reproduction.py`
 - `tests/test_aditya_u_ti_reproduction.py`
+
+
+## Second-paper scale check: START tokamak
+
+Carolan et al. (1998) describe the C⁵⁺ line near 529.05 nm and state that a typical Gaussian FWHM is about 0.2 nm for an ion temperature of about 300 eV. Applying the same Doppler-FWHM formula to that approximate width gives:
+
+- Recalculated `Ti ≈ 288.1 eV`
+- Difference from the approximate 300 eV value: `-4.0%`
+
+This is a useful independent scale check at higher temperature. It is not a fit to digitized/raw counts because the width in the article is stated approximately and no machine-readable spectrum was found in the available article copy. Code: `benchmarks/start_published_width_check.py`.
