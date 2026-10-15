@@ -93,9 +93,9 @@ jobs:
           arrays = {k: v[window_start:] for k, v in arrays.items()}
           print("Selected stationary inner-plasma samples:", window_start, "to", n_common - 1, flush=True)
           ds, ps, b, delta = float(os.environ["DENSITY_SCALE"]), float(os.environ["POTENTIAL_SCALE"]), float(os.environ["B_T"]), 0.008
-          ne = arrays["ne"] * ds
+          ne = signal.detrend(arrays["ne"] * ds, type="linear")
           vf2, vf3 = arrays["vf2"] * ps, arrays["vf3"] * ps
-          efield = (vf3-vf2)/delta
+          efield = signal.detrend((vf3-vf2)/delta, type="linear")
           flux = ne*efield/b
           flux_dt = signal.detrend(flux, type="linear")
           computed_mean, computed_sigma = float(np.mean(flux)), float(np.std(flux_dt, ddof=1))
