@@ -15,7 +15,7 @@ import xarray as xr
 from tis.data_sources import FAIR_MAST_BASE
 
 SHOT = 28830
-GROUPS = ("arp", "ayc", "xmo")
+GROUPS = ("alp", "arp", "ayc", "efm")
 
 
 def main() -> None:
