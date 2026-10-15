@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Hydrogen Balmer / Balmer-alpha spectroscopy": ["analyze_balmer_spectroscopy", "analyze_optical_emission_spectrum"],
     "Charge-exchange spectroscopy": ["analyze_charge_exchange_spectroscopy", "analyze_cxrs_line"],
     "VUV spectroscopy": ["analyze_vuv_spectrum", "fit_spectral_line"],
     "Visible / optical emission spectroscopy": ["analyze_optical_emission_spectrum", "fit_spectral_line", "spectral_calibration"],
