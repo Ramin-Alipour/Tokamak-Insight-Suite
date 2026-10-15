@@ -8,8 +8,8 @@ def hard_xray_spectrum_workflow(energy_keV: Any, counts: Any, *, background_coun
     """Summarize a hard-X-ray pulse-height spectrum without response unfolding."""
     energy = np.asarray(energy_keV, dtype=float).ravel()
     signal = np.asarray(counts, dtype=float).ravel()
-    if len(energy) != len(signal) or len(energy) < 2:
-        raise ValueError('Energy and count arrays must have equal lengths and at least two bins.')
+    if len(energy) != len(signal) or len(energy) < 3:
+        raise ValueError('Energy and count arrays must have equal lengths and at least three bins.')
     if not np.all(np.isfinite(energy)) or not np.all(np.isfinite(signal)):
         raise ValueError('Energy and counts must be finite.')
     if np.any(energy <= 0) or np.any(signal < 0):
