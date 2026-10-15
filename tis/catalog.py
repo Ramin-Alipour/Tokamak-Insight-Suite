@@ -132,6 +132,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Channel synchronization": ["estimate_channel_time_offset", "cross_correlation_lag"],
     "MHD mode / Mirnov analysis": ["mhd_mode_workflow", "mode_number_from_channels"],
     "Hard X-ray detector": ["hard_xray_spectrum_workflow"],
+    "Bolometric tomography": ["bolometric_tomography_workflow", "build_tomography_matrix_2d", "regularized_tomography"],
     "Instrumental line-shape characterization": ["instrument_line_shape_workflow", "fit_spectral_line"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
 }
