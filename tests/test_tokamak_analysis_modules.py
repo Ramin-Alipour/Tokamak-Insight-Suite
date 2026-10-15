@@ -792,3 +792,13 @@ def test_ecrh_fundamental_resonance_field_known_frequency():
     expected = 2*np.pi*ME*frequency/E
     assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
     assert expected == pytest.approx(5.001, rel=2e-3)
+
+
+
+def test_icrh_proton_fundamental_resonance_field():
+    from tokamak_analysis.ecrh_icrh import icrh_resonance_field, U, E
+    frequency = 40e6
+    out = icrh_resonance_field(frequency, ion_mass_amu=1.0, charge_state=1, harmonic=1)
+    expected = 2*np.pi*U*frequency/E
+    assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
+    assert expected == pytest.approx(4.18, rel=3e-3)
