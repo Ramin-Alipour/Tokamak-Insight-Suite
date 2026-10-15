@@ -35,22 +35,29 @@ jobs:
           # in GOLEM's shot 30622 Data.php, not guessed diagnostic folder names.
           candidates = {
               "electron_temperature": [
-                  f"{root}/utils/data/{shot}/electron_temperature",
+                  f"{root}/cgi-bin/data/{shot}/electron_temperature",
+                  f"{root}/cgi-bin/data/{shot}/electron_temperature.txt",
+                  f"{root}/cgi-bin/data/{shot}/ElectronTemp",
+                  f"{root}/utils/data/{shot}/electron_temperature.txt",
                   f"http://golem.fjfi.cvut.cz/utils/data/{shot}/electron_temperature",
-                  f"{root}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemp.npz",
+                  f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp",
+                  f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp.txt",
               ],
               "rake_probe_electron_temperature": [
+                  f"{root}/cgi-bin/data/{shot}/electron_temp_probe",
+                  f"{root}/cgi-bin/data/{shot}/electron_temp_probe.txt",
                   f"{root}/utils/data/{shot}/electron_temp_probe",
-                  f"{root}/utils/data/{shot}/electron_temp_probe.xls",
-                  f"{root}/golem/database/operation/shots/{shot}/diagnostics/ParticleFlux/1012RakeProbe.ON/Te_probe",
+                  f"{root}/operation/shots/{shot}/diagnostics/ParticleFlux/1012RakeProbe.ON/Te_probe",
               ],
               "spectrometer_mean_estimated_temperature": [
-                  f"{root}/utils/data/{shot}/spectrometr:mean_temperature",
-                  f"{root}/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/HistoricalAnalysis/temperature",
+                  f"{root}/cgi-bin/data/{shot}/spectrometr:mean_temperature",
+                  f"{root}/cgi-bin/data/{shot}/spectrometr/mean_temperature",
+                  f"{root}/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/HistoricalAnalysis/temperature",
               ],
               "published_electron_temperature_mean": [
-                  f"{root}/utils/data/{shot}/temperature_mean",
-                  f"{root}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
+                  f"{root}/cgi-bin/data/{shot}/temperature_mean",
+                  f"{root}/cgi-bin/data/{shot}/ElectronTemperatureMean",
+                  f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
               ],
           }
           report = {
