@@ -286,3 +286,17 @@ def test_plasma_floating_potential_and_electric_field():
     np.testing.assert_allclose(out["difference_V"], [8.0, 9.0, 10.0])
     assert out["mean_difference_V"] == pytest.approx(9.0)
     np.testing.assert_allclose(out["electric_field_V_m"], [-2.0, -2.0, -2.0])
+
+
+
+def test_doppler_spectroscopy_known_gaussian_line():
+    from tokamak_analysis.doppler_spectroscopy import analyze_doppler_spectrum, C_M_S
+    wavelength = np.linspace(499.8, 500.2, 401)
+    center = 500.05
+    sigma = 0.02
+    intensity = 1.0 + 10.0*np.exp(-0.5*((wavelength-center)/sigma)**2)
+    out = analyze_doppler_spectrum(wavelength, intensity, rest_wavelength_nm=500.0)
+    assert out["center_nm"] == pytest.approx(center, abs=1e-7)
+    assert out["width_fwhm_nm"] == pytest.approx(2.354820045*sigma, rel=1e-5)
+    assert out["nonrelativistic_velocity_m_s"] == pytest.approx(C_M_S*(center/500.0-1.0), rel=1e-5)
+    assert out["r_squared"] == pytest.approx(1.0, abs=1e-10)
