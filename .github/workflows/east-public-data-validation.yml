@@ -6,12 +6,12 @@ on:
       density_scale:
         description: "Provisional conversion of ne file units to m^-3"
         required: true
-        default: "1e21"
+        default: "1e19"
         type: string
       potential_scale:
         description: "Provisional conversion of floating-potential file units to V"
         required: true
-        default: "40"
+        default: "1"
         type: string
       magnetic_field_t:
         description: "Magnetic field near LCFS, T"
@@ -39,8 +39,8 @@ jobs:
         run: python -m pip install --upgrade pip numpy scipy
       - name: Fetch README and measured data, calculate comparison
         env:
-          DENSITY_SCALE: ${{ github.event.inputs.density_scale || '1e21' }}
-          POTENTIAL_SCALE: ${{ github.event.inputs.potential_scale || '40' }}
+          DENSITY_SCALE: ${{ github.event.inputs.density_scale || '1e19' }}
+          POTENTIAL_SCALE: ${{ github.event.inputs.potential_scale || '1' }}
           B_T: ${{ github.event.inputs.magnetic_field_t || '1.8' }}
         run: |
           python - <<'PY'
