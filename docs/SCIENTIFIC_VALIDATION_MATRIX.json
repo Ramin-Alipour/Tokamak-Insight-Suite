@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "purpose": "Evidence-based scientific validation status; a passing software test is not equivalent to device validation.",
-  "reference_commit_tested": "ec89e3b66c04a6e4af89c69b94690144184111d4",
+  "reference_commit_tested": "601b6beba95e7a6f536d524dd0d459202ab56c4b",
   "test_results": {
     "complete_suite": {
       "status": "PASS",
@@ -147,6 +147,44 @@
         "within_tolerance": true
       },
       "limitation": "Provisional only: the paper does not state the exact time averaging interval for Table II. The public FAIR-MAST Level-1 data expose reciprocating-probe position but not the paper's raw BPP and LP voltage traces, so its Eq. (3) cannot be independently reconstructed. The line-density spread is temporal variability, not a documented instrument calibration uncertainty."
+    },
+    {
+      "id": "golem_30622_balmer_line_identification",
+      "status": "coarse line identification passed; not Doppler validation",
+      "reference": "NIST Handbook of Basic Atomic Spectroscopic Data, hydrogen strong lines",
+      "source_url": "https://physics.nist.gov/PhysRefData/Handbook/Tables/hydrogentable2.htm",
+      "dataset": "GOLEM shot 30622, Ocean Optics HR+C1886 spectrometer, 29 exposures",
+      "data_url": "https://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/spectra.txt_Data_.txt",
+      "data_sha256": "3450043b07322fc5516462cc826e53ce6e8c6bf447f61fc63b999a0755d3bc3d",
+      "test": "tools/fetch_golem_candidate.py::analyze_hydrogen_lines, run by .github/workflows/golem-empirical-candidate.yml",
+      "method": "Average the 29 exposures; subtract the 20th-percentile local baseline; calculate positive-weight centroids for H-alpha, H-beta and H-gamma; compare to NIST nominal air wavelengths. Public input SHA-256 is locked to prevent silent dataset changes.",
+      "results": {
+        "wavelength_bin_spacing_nm": 0.4500000000000455,
+        "H_alpha": {
+          "reference_nm": 656.281,
+          "measured_centroid_nm": 656.6616220315851,
+          "offset_nm": 0.38062203158517605,
+          "offset_in_bins": 0.8458267368558613,
+          "observed_fwhm_nm": 0.9020000000000437
+        },
+        "H_beta": {
+          "reference_nm": 486.134,
+          "measured_centroid_nm": 486.25629546006314,
+          "offset_nm": 0.1222954600631283,
+          "offset_in_bins": 0.27176768902914655,
+          "observed_fwhm_nm": 0.9209999999999923
+        },
+        "H_gamma": {
+          "reference_nm": 434.047,
+          "measured_centroid_nm": 434.3042998321714,
+          "offset_nm": 0.25729983217138397,
+          "offset_in_bins": 0.57177740482524,
+          "observed_fwhm_nm": 1.3899999999999864
+        },
+        "acceptance_rule": "Each centroid must be within one wavelength bin of the NIST reference.",
+        "result": "All three Balmer line centroids meet the one-bin criterion."
+      },
+      "limitation": "The 0.45 nm wavelength-bin spacing is not the optical instrument resolution. Instrument line-spread function, calibration uncertainty, and raw/corrected processing status are not established. This validates only coarse line identification; it does not validate Doppler broadening, ion temperature, or the GOLEM page's 20.8 eV temperature value."
     }
   ]
 }
