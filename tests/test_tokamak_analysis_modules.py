@@ -836,3 +836,11 @@ def test_wall_sputtering_known_yield():
     from tokamak_analysis.divertor_analysis import sputtering_yield
     out = sputtering_yield(1e20, 2e19)
     assert out["sputtering_yield_atoms_per_ion"] == pytest.approx(0.2, rel=1e-12)
+
+
+
+def test_divertor_particle_flux_known_profile_integral():
+    from tokamak_analysis.divertor_analysis import analyze_divertor_flux
+    out = analyze_divertor_flux([0.0, 1.0, 2.0], [0.0, 0.0, 0.0], particle_flux_m2_s=[0.0, 4.0, 0.0])
+    np.testing.assert_allclose(out["particle_flux_m2_s"], [0.0, 4.0, 0.0])
+    assert out["integrated_particle_flux_m_s-1"] == pytest.approx(4.0)
