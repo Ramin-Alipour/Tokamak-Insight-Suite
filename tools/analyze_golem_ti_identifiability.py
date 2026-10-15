@@ -185,13 +185,23 @@ h_alpha = line_results["H_alpha"]
 obs = h_alpha["observed_gaussian_fwhm_nm"]
 lam = h_alpha["reference_air_wavelength_nm"]
 mHc2_eV = 1.00784 * 931.49410242e6
-for inst_fwhm in [0.0, 0.3, 0.45, 0.6, 0.7, 0.8, 0.9, 1.0, 1.05, 1.1]:
+for inst_fwhm in [0.0, 0.3, 0.45, 0.6, 0.7, 0.8, 0.9, 1.0, 1.05, 1.1, 1.15, 1.18, 1.19, 1.2]:
     rem2 = obs * obs - inst_fwhm * inst_fwhm
     t = (rem2 / (lam * lam)) * mHc2_eV / (8.0 * np.log(2.0)) if rem2 > 0 else None
     report["instrument_width_sensitivity_H_alpha"].append({
         "assumed_instrument_FWHM_nm_not_measured": inst_fwhm,
         "resulting_gaussian_quadrature_Ti_eV_not_accepted": t,
         "note": "Sensitivity illustration only; assumes Gaussian broadening and omits Stark/other broadening."
+    })
+report["instrument_width_required_for_target_Ti_H_alpha"] = []
+for target_ti in [20.8, 50.0, 100.0, 300.0]:
+    doppler_fwhm = lam * np.sqrt(8.0 * np.log(2.0) * target_ti / mHc2_eV)
+    required_lsf = float(np.sqrt(max(obs * obs - doppler_fwhm * doppler_fwhm, 0.0)))
+    report["instrument_width_required_for_target_Ti_H_alpha"].append({
+        "target_Ti_eV": target_ti,
+        "expected_Doppler_FWHM_nm": float(doppler_fwhm),
+        "required_instrument_FWHM_nm": required_lsf,
+        "interpretation": "Required Gaussian LSF if the entire excess width is Doppler broadening; sensitivity calculation, not a measured calibration."
     })
 (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2), flush=True)
