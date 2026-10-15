@@ -248,6 +248,39 @@ if raw.get("numeric_rows", 0) >= 100:
                 "decision": "DO_NOT_APPLY_CALIBRATION" if abs(residual) > 0.25 else "PROVISIONAL_ONLY",
                 "reason": "Only two lines define the affine map; H-gamma is an independent check and its residual must be acceptably small before calibration can be trusted."
             }
+        # Quantify the naive Doppler-only temperature for transparency, but never
+        # label it as a measured ion temperature: instrumental broadening is unknown.
+        ha_mean = temporal["H_alpha"].get("fwhm_mean_nm")
+        ha_center = temporal["H_alpha"].get("center_mean_nm")
+        if ha_mean is not None and ha_center:
+            # T[eV] = m_H c^2 / (8 ln 2) * (FWHM/lambda)^2
+            # This is only the apparent Doppler-only value before instrumental deconvolution.
+            hydrogen_rest_energy_eV = 938.27208816e6
+            apparent_ti_eV = (hydrogen_rest_energy_eV / (8.0 * math.log(2.0))) * (ha_mean / ha_center) ** 2
+            relative_width_std = (
+                temporal["H_alpha"]["fwhm_sample_std_nm"] / ha_mean
+                if temporal["H_alpha"].get("fwhm_sample_std_nm") is not None else None
+            )
+            report["H_alpha_apparent_doppler_temperature"] = {
+                "apparent_temperature_eV": float(apparent_ti_eV),
+                "width_mean_nm": ha_mean,
+                "center_mean_nm": ha_center,
+                "width_sample_std_nm": temporal["H_alpha"].get("fwhm_sample_std_nm"),
+                "approximate_uncertainty_from_fit_scatter_eV": (
+                    float(2.0 * apparent_ti_eV * relative_width_std)
+                    if relative_width_std is not None else None
+                ),
+                "physical_status": "NOT_A_VALID_ION_TEMPERATURE",
+                "reason": "Observed H-alpha FWHM includes unknown instrumental line-spread broadening; sampling is coarse (median 0.45 nm/pixel), only 6/29 fits pass selection, and no measured instrument LSF is available. Do not report this apparent value as Ti.",
+                "required_next_step": "Measure or retrieve the instrument line-spread function at H-alpha, then deconvolve in variance space and propagate wavelength/fit/LSF uncertainty."
+            }
+        # Keep line-center offsets explicit so calibration failure is visible in the report.
+        report["Balmer_line_center_offsets"] = {
+            "H_alpha_nm": float(temporal["H_alpha"]["center_mean_nm"] - 656.281) if temporal["H_alpha"].get("center_mean_nm") is not None else None,
+            "H_beta_nm": float(temporal["H_beta"]["center_mean_nm"] - 486.135) if temporal["H_beta"].get("center_mean_nm") is not None else None,
+            "H_gamma_nm": float(temporal["H_gamma"]["center_mean_nm"] - 434.047) if temporal["H_gamma"].get("center_mean_nm") is not None else None,
+            "interpretation": "Offsets are diagnostic only; H-gamma is weak and the two-line affine calibration failed its independent H-gamma check."
+        }
         report["status"] = "PASS_SPECTRAL_LINE_SHAPE"
         report["interpretation"] = (
             "Raw spectrum was retrieved and three Balmer-region line profiles were fitted. "
