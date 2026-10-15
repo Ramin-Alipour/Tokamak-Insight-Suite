@@ -147,6 +147,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "X-ray spectroscopy": ["xray_spectrum_summary"],
     "Target/divertor heat flux": ["eich_heat_flux_fit", "exponential_heat_flux_fit"],
     "Calibration curve and uncertainty": ["linear_calibration", "polynomial_calibration", "uncertainty_linear"],
+    "Spectral wavelength calibration": ["spectral_calibration"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality"],
     "Correlation / cross-correlation": ["cross_analysis", "cross_correlation_lag"],
     "Spectral transfer / coherence": ["cross_analysis"],
