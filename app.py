@@ -17,7 +17,7 @@ from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapsh
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
-    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, spectral_calibration, probe_iv_summary,
+    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, spectral_calibration, doppler_temperature_from_fwhm_eV, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
@@ -714,9 +714,9 @@ elif page=='Spectral Analysis':
                 sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g')
                 mass=st.number_input('Ion mass (amu; enter the actual emitting species)',min_value=0.0,value=0.0,key='doppler_mass_amu')
                 sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g')
-                inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g')
+                inst=st.number_input('Instrument FWHM (same x unit; from independent calibration)',min_value=0.0,value=0.0,format='%.8g')
                 assume_inst_negligible=st.checkbox('Assume instrumental broadening is negligible (must be independently justified)',value=False,key='doppler_inst_negligible')
-                sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
+                sigma_inst=st.number_input('Instrument FWHM uncertainty',min_value=0.0,value=0.0,format='%.8g')
                 if st.button('Estimate Doppler quantities'):
                     if lam0 is None:
                         st.error('Enter the independently known rest wavelength; using the fitted center would force the velocity to zero.')
@@ -743,16 +743,19 @@ elif page=='Spectral Analysis':
                                 "independently measured instrument line-spread function."
                             )
                         else:
-                            sig2=float(fit['sigma'])**2-inst**2
-                            if sig2<=0:
-                                st.error('Instrument width equals/exceeds observed Gaussian sigma.')
-                            else:
-                                sigma_doppler=float(np.sqrt(sig2))
-                                sigma_obs_unc=float(fit.get('standard_error_sigma',0.0))
-                                sigma_doppler_unc=float(np.sqrt((float(fit['sigma'])/sigma_doppler*sigma_obs_unc)**2+(inst/sigma_doppler*sigma_inst)**2))
-                                thermal=doppler_temperature_with_uncertainty_eV(sigma_doppler,lam0,mass,sigma_doppler_unc,sigma_lam0,sigma_mass)
+                            try:
+                                thermal=doppler_temperature_from_fwhm_eV(
+                                    observed_fwhm=float(fit['FWHM']),
+                                    lambda0=float(lam0),
+                                    mass_amu=float(mass),
+                                    instrumental_fwhm=float(inst),
+                                    sigma_observed_fwhm=float(fit.get('standard_error_sigma',0.0))*np.sqrt(8.0*np.log(2.0)),
+                                    sigma_instrumental_fwhm=float(sigma_inst),
+                                )
                                 velocity=doppler_velocity_with_uncertainty_m_s(float(fit['center']),lam0,float(fit.get('standard_error_center',0.0)),sigma_lam0)
-                                st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_temperature_standard_uncertainty':thermal['relative_standard_uncertainty'],'line_of_sight_velocity_m_s':velocity['line_of_sight_velocity_m_s'],'line_of_sight_velocity_standard_uncertainty_m_s':velocity['standard_uncertainty_m_s'],'temperature_uncertainty_method':thermal['uncertainty_method'],'velocity_uncertainty_method':velocity['uncertainty_method'],'assumptions':'Gaussian Doppler broadening; Zeeman splitting, fine structure, line blends, non-Gaussian instrument response and systematic/model uncertainty are not included.'})
+                                st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_temperature_standard_uncertainty':thermal['relative_standard_uncertainty'],'observed_fwhm':thermal['observed_fwhm'],'instrumental_fwhm':thermal['instrumental_fwhm'],'corrected_doppler_fwhm':thermal['doppler_fwhm'],'line_of_sight_velocity_m_s':velocity['line_of_sight_velocity_m_s'],'line_of_sight_velocity_standard_uncertainty_m_s':velocity['standard_uncertainty_m_s'],'temperature_uncertainty_method':'First-order propagation of independent observed/instrument FWHM uncertainties; excludes systematic uncertainty.','assumptions':thermal['warning']})
+                            except Exception as e:
+                                st.error(f'Ion temperature withheld: {e}')
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
     elif mode=='Line-ratio analysis':
