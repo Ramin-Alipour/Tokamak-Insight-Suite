@@ -254,3 +254,15 @@ def test_ball_pen_probe_known_signals():
     assert out["peak_to_peak_V"] == pytest.approx(4.0)
     np.testing.assert_allclose(out["potential_difference_V"], [1.0, 2.0, 3.0])
     assert out["mean_potential_difference_V"] == pytest.approx(2.0)
+
+
+
+def test_gundestrup_probe_known_first_harmonic():
+    from tokamak_analysis.gundestrup_probe import analyze_gundestrup
+    angles = np.array([0.0, np.pi/2, np.pi, 3*np.pi/2])
+    currents = 2.0 + 3.0*np.cos(angles) + 4.0*np.sin(angles)
+    out = analyze_gundestrup(angles, currents)
+    assert out["offset_current_A"] == pytest.approx(2.0, abs=1e-12)
+    assert out["first_harmonic_amplitude_A"] == pytest.approx(5.0, abs=1e-12)
+    assert out["flow_phase_rad"] == pytest.approx(np.arctan2(4.0, 3.0), abs=1e-12)
+    assert out["residual_rms_A"] == pytest.approx(0.0, abs=1e-12)
