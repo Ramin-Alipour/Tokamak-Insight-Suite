@@ -47,7 +47,7 @@ def analyze_cxrs_line(
             "Observed line width is unresolved by the supplied instrumental width; "
             "ion temperature is not identifiable from this fit."
         )
-    velocity = doppler_velocity_m_s(center, rest_wavelength_nm)
+    velocity = doppler_velocity_m_s(center - rest_wavelength_nm, rest_wavelength_nm)
     temp = doppler_temperature_from_fwhm_eV(
         observed_fwhm=observed_fwhm,
         lambda0=rest_wavelength_nm,
