@@ -194,7 +194,7 @@
       "dataset": "NIFS/Zenodo record 18473625; raw ne, vf2 and vf3 series",
       "data_url": "https://zenodo.org/records/18473625",
       "test": "tools/validate_east_22010_flux.py via .github/workflows/east-public-data-validation.yml",
-      "workflow_run_id": 38741427573,
+      "workflow_run_id": 38749053836,
       "method": "Use published stationary sample interval 275000-309600 at 2 MHz; independently detrend density and both potential signals with a fourth-order polynomial; calculate Gamma=ne_fluct*(vf3_fluct-vf2_fluct)/(Delta*B).",
       "results": {
         "sample_window_inclusive": [
@@ -221,7 +221,7 @@
         "published_flux_skewness": 2.5,
         "flux_kurtosis_pearson": 13.1894,
         "published_flux_kurtosis_pearson": 13.5,
-        "result": "All seven prespecified numerical checks pass."
+        "result": "All seven prespecified numerical checks pass; rerun 2026-10-15: mean flux +0.969%, flux sigma +1.278%, density fluctuation sigma +1.562%, vf2 sigma +0.120%, vf3 sigma +0.081%, skewness -0.777%, Pearson kurtosis -2.301%."
       },
       "limitation": "Validates this shot and stated preprocessing path; it does not validate all diagnostics or all analysis methods in the suite."
     },
