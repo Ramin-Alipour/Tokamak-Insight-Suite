@@ -2,22 +2,6 @@ name: EAST shot 22010 empirical flux comparison
 
 on:
   workflow_dispatch:
-    inputs:
-      density_scale:
-        description: "Provisional conversion of ne file units to m^-3"
-        required: true
-        default: "1e19"
-        type: string
-      potential_scale:
-        description: "Provisional conversion of floating-potential file units to V"
-        required: true
-        default: "1"
-        type: string
-      magnetic_field_t:
-        description: "Magnetic field near LCFS, T"
-        required: true
-        default: "1.8"
-        type: string
   push:
     paths:
       - "tools/validate_east_22010_flux.py"
@@ -37,87 +21,8 @@ jobs:
           python-version: "3.12"
       - name: Install numerical dependencies
         run: python -m pip install --upgrade pip numpy scipy
-      - name: Fetch README and measured data, calculate comparison
-        env:
-          DENSITY_SCALE: ${{ github.event.inputs.density_scale || '1e19' }}
-          POTENTIAL_SCALE: ${{ github.event.inputs.potential_scale || '1' }}
-          B_T: ${{ github.event.inputs.magnetic_field_t || '1.8' }}
-        run: |
-          python - <<'PY'
-          import hashlib, json, urllib.request, zipfile
-          import xml.etree.ElementTree as ET
-          from io import BytesIO
-          from pathlib import Path
-          import os
-          import numpy as np
-          from scipy import signal
-          base = "https://zenodo.org/records/18473625"
-          out = Path("artifacts/east-22010-validation")
-          out.mkdir(parents=True, exist_ok=True)
-          def get(url):
-              req = urllib.request.Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation"})
-              with urllib.request.urlopen(req, timeout=60) as r:
-                  return r.read()
-          readme_url = base + "/files/readme%20-%20EAST%20tokamak%20plasma%20probe%20data.docx?download=1"
-          doc = get(readme_url)
-          (out / "dataset_readme.docx").write_bytes(doc)
-          with zipfile.ZipFile(BytesIO(doc)) as z:
-              root = ET.fromstring(z.read("word/document.xml"))
-          ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
-          paras = ["".join(p.itertext()).strip() for p in root.findall(".//w:p", ns)]
-          readme = "\n".join(p for p in paras if p)
-          (out / "dataset_readme.txt").write_text(readme, encoding="utf-8")
-          print("DATASET README\n" + readme, flush=True)
-          arrays, provenance = {}, {}
-          for key in ("ne", "vf2", "vf3"):
-              name = "22010" + key + ".txt"
-              url = base + "/files/" + name + "?download=1"
-              raw = get(url)
-              (out / name).write_bytes(raw)
-              x = np.asarray(np.loadtxt(BytesIO(raw), dtype=float)).squeeze()
-              if x.ndim != 1 or len(x) < 100 or not np.all(np.isfinite(x)):
-                  raise ValueError("Invalid data series " + name)
-              arrays[key] = x
-              provenance[key] = {"url": url, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
-                                 "samples": int(len(x)), "min": float(x.min()), "max": float(x.max()),
-                                 "mean": float(x.mean()), "std": float(x.std(ddof=1))}
-          lengths = {k: len(v) for k, v in arrays.items()}
-          n_common = min(lengths.values())
-          if max(lengths.values()) - n_common > 1:
-              raise ValueError("Source signals differ by more than one sample: " + repr(lengths))
-          print("Source sample counts:", lengths, "using common initial overlap:", n_common, flush=True)
-          arrays = {k: v[:n_common] for k, v in arrays.items()}
-          window_start = 270000
-          if n_common <= window_start + 1000:
-              raise ValueError("Source files are too short for stationary-window selection")
-          arrays = {k: v[window_start:] for k, v in arrays.items()}
-          print("Selected stationary inner-plasma samples:", window_start, "to", n_common - 1, flush=True)
-          ds, ps, b, delta = float(os.environ["DENSITY_SCALE"]), float(os.environ["POTENTIAL_SCALE"]), float(os.environ["B_T"]), 0.008
-          ne = signal.detrend(arrays["ne"] * ds, type="linear")
-          vf2, vf3 = arrays["vf2"] * ps, arrays["vf3"] * ps
-          efield = signal.detrend((vf3-vf2)/delta, type="linear")
-          flux = ne*efield/b
-          flux_dt = signal.detrend(flux, type="linear")
-          computed_mean, computed_sigma = float(np.mean(flux)), float(np.std(flux, ddof=1))
-          ref_mean, ref_sigma = 1.3e20, 2.6e20
-          result = {"dataset": base, "paper_doi": "10.1088/1361-6587/ae4f20", "readme_text": readme,
-                    "source_files": provenance,
-                    "scales": {"density_to_m-3": ds, "potential_to_V": ps, "B_T": b, "separation_m": delta}, "selected_window": {"start_sample": window_start, "end_sample": n_common-1, "sample_count": len(flux), "duration_ms": len(flux)/2e6*1000},
-                    "computed": {"mean_flux_m-2_s-1": computed_mean, "sigma_flux_m-2_s-1": computed_sigma,
-                                 "electric_field_std_V_m": float(np.std(efield, ddof=1)), "density_mean_m-3": float(np.mean(arrays["ne"] * ds)), "density_fluctuation_std_m-3": float(np.std(ne, ddof=1)), "vf2_std_V": float(np.std(vf2, ddof=1))},
-                    "published": {"mean_flux_m-2_s-1": ref_mean, "sigma_flux_m-2_s-1": ref_sigma},
-                    "relative_difference_percent": {"mean": abs(computed_mean-ref_mean)/abs(ref_mean)*100,
-                                                    "sigma": abs(computed_sigma-ref_sigma)/ref_sigma*100},
-                    "acceptance": {"empirical_validation_pass": False,
-                                   "reason": "Scale factors are provisional and inferred, not yet independently confirmed from the dataset README; linear detrending may not reproduce the paper's exact window and preprocessing."}}
-          (out / "east_22010_validation.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
-          np.savetxt(out / "east_22010_flux.csv", np.column_stack([np.arange(len(flux)), ne, vf2, vf3, efield, flux, flux_dt]),
-                     delimiter=",", header="sample,ne_m-3,vf2_V,vf3_V,electric_field_V_m,flux_m-2_s-1,flux_detrended_m-2_s-1", comments="")
-          print(json.dumps({"samples": len(flux), "computed_mean_flux": computed_mean, "published_mean_flux": ref_mean,
-                            "computed_sigma_flux": computed_sigma, "published_sigma_flux": ref_sigma,
-                            "relative_difference_percent": result["relative_difference_percent"],
-                            "acceptance": result["acceptance"]}, indent=2), flush=True)
-          PY
+      - name: Reconstruct published EAST flux statistics
+        run: python tools/validate_east_22010_flux.py --output-dir artifacts/east-22010-validation
       - name: Upload raw inputs and results
         if: always()
         uses: actions/upload-artifact@v4
