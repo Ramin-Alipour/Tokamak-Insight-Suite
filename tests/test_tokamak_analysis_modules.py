@@ -820,3 +820,12 @@ def test_divertor_heat_flux_known_profile_and_power_load():
     assert out["peak_heat_flux_W_m2"] == pytest.approx(2.0)
     assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
     assert out["peak_power_load_W"] == pytest.approx(6.0)
+
+
+
+def test_plasma_facing_component_known_heat_load():
+    from tokamak_analysis.divertor_analysis import analyze_divertor_flux
+    out = analyze_divertor_flux([0.0, 1.0], [1.0, 3.0], surface_area_m2=0.5)
+    assert out["peak_heat_flux_W_m2"] == pytest.approx(3.0)
+    assert out["peak_power_load_W"] == pytest.approx(1.5)
+    assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
