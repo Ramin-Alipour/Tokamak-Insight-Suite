@@ -18,7 +18,7 @@ Shukla et al., “Poloidal Rotation and Edge Ion Temperature Measurements Using 
 
 For a Gaussian Doppler FWHM, assuming the quoted width is the Doppler-only width:
 
-`T_i = (m_i c^2 / (8 ln 2, e)) (\Delta\lambda_D/\lambda_0)^2`
+`Ti_eV = [m_i * c^2 / (8 * ln(2) * e)] * (FWHM_D / lambda_0)^2`
 
 Using carbon mass 12 u, `lambda0 = 464.74 nm`, and `Delta_lambda_D = 0.0652 nm`:
 
