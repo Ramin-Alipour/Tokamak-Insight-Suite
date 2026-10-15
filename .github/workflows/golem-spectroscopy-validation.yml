@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install spectral-fit dependencies
+        run: python -m pip install --disable-pip-version-check numpy scipy
       - name: Fetch and audit public GOLEM spectroscopy products
         run: python tools/validate_golem_spectroscopy_30622.py
       - name: Upload report and retrieved data
