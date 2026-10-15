@@ -13,7 +13,6 @@ import math
 C_M_S = 299_792_458.0
 E_CHARGE_J = 1.602_176_634e-19
 AMU_KG = 1.660_539_066_60e-27
-BOLTZMANN_J_K = 1.380_649e-23
 
 
 @dataclass(frozen=True)
@@ -72,7 +71,6 @@ def doppler_temperature_eV(
 
     doppler_nm = math.sqrt(obs_nm * obs_nm - inst_nm * inst_nm)
     mass_kg = mass_amu * AMU_KG
-    lam_m = lam_nm * 1e-9
     width_ratio = doppler_nm / lam_nm
     temp_ev = (mass_kg * C_M_S**2 / E_CHARGE_J) * width_ratio**2 / (8 * math.log(2))
 
