@@ -886,3 +886,15 @@ def test_signal_denoising_median_removes_impulse():
     np.testing.assert_allclose(out["filtered_signal"], np.zeros(5))
     np.testing.assert_allclose(out["residual"], signal)
     assert out["residual_rms"] == pytest.approx(np.sqrt(20.0))
+
+
+
+def test_measurement_uncertainty_known_summary_and_product():
+    from tokamak_analysis.measurement_uncertainty import uncertainty_summary, propagate_product_uncertainty
+    summary = uncertainty_summary([10.0, 12.0, 14.0], [1.0, 2.0, 2.0])
+    assert summary["mean"] == pytest.approx(12.0)
+    assert summary["mean_standard_uncertainty"] == pytest.approx(1.0)
+    assert summary["expanded_uncertainty_k2"] == pytest.approx(2.0)
+    product = propagate_product_uncertainty([2.0, 3.0], [0.1, 0.2])
+    assert product["value"] == pytest.approx(6.0)
+    assert product["relative_uncertainty"] == pytest.approx(np.sqrt((0.1/2)**2+(0.2/3)**2))
