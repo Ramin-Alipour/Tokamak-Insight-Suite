@@ -271,6 +271,7 @@ def main():
             "ion_temperature_formula": "Ti = (12*u*c^2 in keV) * (sigma_Doppler/lambda0)^2",
         },
         "Ti_temperature_checks": ti_checks,
+        "semantic_reference_checks": semantic_reference_checks,
         "intensity_trend_check": intensity_check,
         "interpretation_guard": {
             "field_order": "In lhdcxs7_cvi, Ti is the fourth numeric field including time/R indexing (zero-based column 3); Vc is column 5 and is in km/s.",
