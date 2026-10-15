@@ -570,7 +570,7 @@
     "status": "D/I",
     "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
     "caveat": "Mode number needs array geometry and assumptions about mode structure.",
-    "implementation_functions": ["mhd_mode_workflow"],
+    "implementation_functions": ["mhd_mode_workflow", "mode_number_from_channels"],
     "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
