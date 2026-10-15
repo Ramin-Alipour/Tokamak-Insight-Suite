@@ -498,3 +498,15 @@ def test_bolometric_tomography_known_three_zone_solution():
     out = reconstruct_emissivity(np.eye(3), emissivity_expected, regularization=0.0)
     np.testing.assert_allclose(out["emissivity"], emissivity_expected, atol=1e-8)
     assert out["residual_norm"] == pytest.approx(0.0, abs=1e-8)
+
+
+
+def test_neutron_flux_known_linear_count_rate():
+    from tokamak_analysis.neutron_flux import analyze_neutron_flux
+    out = analyze_neutron_flux(
+        [0.0, 1.0, 2.0], [0.0, 10.0, 20.0],
+        efficiency=0.5, effective_area_m2=0.2,
+    )
+    np.testing.assert_allclose(out["count_rate_s-1"], [10.0, 10.0, 10.0])
+    assert out["total_counts"] == pytest.approx(30.0)
+    np.testing.assert_allclose(out["flux_estimate_m-2_s-1"], [100.0, 100.0, 100.0])
