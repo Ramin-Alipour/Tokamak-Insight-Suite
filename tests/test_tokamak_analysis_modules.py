@@ -158,3 +158,15 @@ def test_safety_factor_known_cylindrical_estimate():
     from tokamak_analysis.safety_factor import estimate_safety_factor
     out = estimate_safety_factor(1.5, 0.5, 2.0, 0.1)
     assert float(out["q_cylindrical_estimate"]) == pytest.approx(60.0, rel=1e-12)
+
+
+
+def test_magnetic_axis_known_grid_minimum():
+    from tokamak_analysis.magnetic_axis import locate_magnetic_axis
+    R = np.array([1.0, 1.5, 2.0])
+    Z = np.array([-1.0, 0.0, 1.0])
+    psi = np.array([[3.0, 2.0, 3.0], [2.0, 0.0, 2.0], [3.0, 2.0, 3.0]])
+    out = locate_magnetic_axis(R, Z, psi)
+    assert out["R_axis_m"] == pytest.approx(1.5)
+    assert out["Z_axis_m"] == pytest.approx(0.0)
+    assert out["psi_axis_Wb_rad"] == pytest.approx(0.0)
