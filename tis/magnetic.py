@@ -162,3 +162,57 @@ def analyze_poloidal_field(
             "q estimate uses q≈r*B_t/(R*B_p), a simplified large-aspect-ratio circular approximation; zero B_p yields undefined q.",
         ],
     }
+
+
+
+def analyze_rogowski_current(
+    time_s,
+    coil_voltage_V,
+    *,
+    mutual_inductance_H: float,
+    polarity_sign: int = 1,
+    initial_current_A: float = 0.0,
+    baseline_start_s: float | None = None,
+    baseline_end_s: float | None = None,
+    drift_start_s: float | None = None,
+    drift_end_s: float | None = None,
+) -> dict:
+    """Integrate calibrated Rogowski-coil voltage to estimate plasma current.
+
+    Uses V_coil = M dI/dt with an explicit polarity convention. Voltage must
+    already be calibrated; the mutual inductance must include the actual coil
+    and integrator transfer function. Baseline/drift windows must be true
+    zero-current or known-zero derivative intervals.
+    """
+    if not np.isfinite(mutual_inductance_H) or mutual_inductance_H <= 0:
+        raise ValueError("mutual_inductance_H must be positive and finite.")
+    if isinstance(polarity_sign, (bool, np.bool_)) or polarity_sign not in (-1, 1):
+        raise ValueError("polarity_sign must be -1 or +1.")
+    if not np.isfinite(initial_current_A):
+        raise ValueError("initial_current_A must be finite.")
+    t = np.asarray(time_s, dtype=float).ravel()
+    voltage = np.asarray(coil_voltage_V, dtype=float).ravel()
+    if len(t) != len(voltage) or len(t) < 2:
+        raise ValueError("Time and coil voltage must have equal lengths of at least two.")
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(voltage)):
+        raise ValueError("Time and coil voltage must be finite.")
+    result = integrate_time_series(
+        t, voltage, scale=float(polarity_sign) / mutual_inductance_H,
+        initial_value=float(initial_current_A),
+        baseline_start_s=baseline_start_s, baseline_end_s=baseline_end_s,
+        drift_start_s=drift_start_s, drift_end_s=drift_end_s,
+    )
+    current = np.asarray(result["integrated_signal"], dtype=float)
+    return {
+        **result,
+        "plasma_current_A": current,
+        "current_change_A": current - float(initial_current_A),
+        "initial_current_A": float(initial_current_A),
+        "mutual_inductance_H": float(mutual_inductance_H),
+        "polarity_sign": int(polarity_sign),
+        "assumptions_and_limits": [
+            "Coil voltage and mutual inductance/integrator transfer function must be calibrated.",
+            "Integration drift and baseline correction require physically valid zero/reference windows.",
+            "Offset, saturation, bandwidth and non-ideal integrator response are not inferred by this routine.",
+        ],
+    }
