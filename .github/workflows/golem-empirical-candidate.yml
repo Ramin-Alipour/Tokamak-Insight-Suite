@@ -23,7 +23,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Fetch shot page and explicitly linked candidate files
-        run: python tools/fetch_golem_candidate.py --shot "${{ inputs.shot }}" --output-dir artifacts/golem-empirical-candidate
+        env:
+          GOLEM_SHOT: ${{ inputs.shot || '30622' }}
+        run: python tools/fetch_golem_candidate.py --shot "$GOLEM_SHOT" --output-dir artifacts/golem-empirical-candidate
       - name: Upload provenance and candidate files
         if: always()
         uses: actions/upload-artifact@v4
