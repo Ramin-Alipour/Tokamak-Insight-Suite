@@ -402,3 +402,14 @@ def test_density_wave_known_sinusoidal_frequency_and_rms():
     assert out["rms_fluctuation"] == pytest.approx(expected_rms, rel=1e-10)
     assert out["relative_rms"] == pytest.approx(expected_rms/1e19, rel=1e-10)
     assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(frequency_Hz)
+
+
+
+def test_plasma_wave_spectrum_known_dominant_frequency():
+    from tokamak_analysis.plasma_wave_spectrum import analyze_wave_signal
+    time = np.arange(1024)/1000.0
+    expected_frequency = 15.625
+    signal = 2.0*np.sin(2*np.pi*expected_frequency*time)
+    out = analyze_wave_signal(time, signal, nperseg=256)
+    assert out["sampling_frequency_Hz"] == pytest.approx(1000.0)
+    assert out["dominant_frequency_Hz"] == pytest.approx(expected_frequency)
