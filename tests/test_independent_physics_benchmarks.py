@@ -121,3 +121,63 @@ def test_langmuir_electron_retarding_branch_recovers_known_temperature():
     )
     assert result["electron_temperature_eV"] == pytest.approx(te_eV, rel=1e-6)
     assert result["ion_saturation_current_A"] == pytest.approx(-1e-3, abs=1e-14)
+
+
+def test_ir_t1_published_doppler_widths_reproduce_reported_ion_temperatures():
+    """Reproduce Tables VI–VII in Alipour et al., AIP Advances 7, 115303 (2017).
+
+    DOI: https://doi.org/10.1063/1.4990869
+    The paper reports measured and resolution FWHM values, their quadrature-subtracted
+    Doppler FWHM, and ion temperatures. The raw CCD spectra are not publicly included;
+    this is an independent reproduction of published tabulated values, not a refit
+    of the original spectra.
+    """
+    from tis.core import doppler_temperature_eV
+
+    # Species, lambda0 [nm], mass [amu], measured FWHM [nm],
+    # resolution FWHM [nm], published Doppler FWHM [nm], published Ti [eV].
+    rows = [
+        ("N III", 409.731, 14.0, 0.0637, 0.04003, 0.04955, 34.44),
+        ("O V", 412.390, 16.0, 0.0838, 0.04005, 0.07361, 85.75),
+        ("Cr I", 425.434, 52.0, 0.0413, 0.04015, 0.00968, 4.53),
+        ("C II", 426.700, 12.0, 0.0645, 0.04016, 0.05047, 28.24),
+        ("Mo I", 427.726, 96.0, 0.0408, 0.04017, 0.00714, 4.50),
+        ("O II", 441.490, 16.0, 0.0631, 0.04027, 0.04858, 32.59),
+        ("Ar II", 443.018, 40.0, 0.0483, 0.04028, 0.02665, 24.35),
+        ("N II", 444.703, 14.0, 0.0644, 0.04029, 0.05024, 30.06),
+        ("Ni I", 446.264, 58.7, 0.0419, 0.04031, 0.01144, 6.48),
+        ("Ti I", 453.323, 47.9, 0.0415, 0.04036, 0.00966, 3.66),
+        ("C III", 464.742, 12.0, 0.0789, 0.04044, 0.06775, 42.90),
+        ("Mn I", 476.237, 55.0, 0.0423, 0.04053, 0.01211, 5.98),
+        ("O IV", 479.825, 16.0, 0.0861, 0.04058, 0.07594, 67.41),
+        ("W I", 484.382, 183.8, 0.0410, 0.04059, 0.00578, 4.41),
+        ("Fe I", 537.149, 55.8, 0.0426, 0.04098, 0.01164, 4.40),
+    ]
+    fwhm_to_sigma = 2.0 * np.sqrt(2.0 * np.log(2.0))
+    for species, lambda0, mass, measured, resolution, published_doppler, published_ti in rows:
+        reconstructed_doppler = np.sqrt(measured**2 - resolution**2)
+        assert reconstructed_doppler == pytest.approx(published_doppler, abs=2.0e-5), species
+        calculated_ti = doppler_temperature_eV(
+            published_doppler / fwhm_to_sigma, lambda0, mass
+        )
+        # Table values are rounded; tolerance is fixed at 0.5% before comparison.
+        assert calculated_ti == pytest.approx(published_ti, rel=0.005), species
+
+
+def test_ir_t1_published_probe_flow_is_consistent_with_reported_mach_number():
+    """Cross-check the paper's Te≈14 eV, M_parallel≈0.5 and flow≈17 km/s.
+
+    DOI: https://doi.org/10.1063/1.4994037. This is a reported-value consistency
+    check, not a validation of I–V fitting because the original sweep data are unavailable.
+    """
+    from tis.core import derive_parameters
+
+    result = derive_parameters(
+        ne_m3=1.0e19, te_eV=14.0, ti_eV=0.0, ip_A=1.0e4,
+        vloop_V=1.0, major_radius_m=0.45, minor_radius_m=0.125,
+        bt_T=0.8, ion_mass_amu=1.0,
+    )
+    velocity_from_reported_mach = 0.5 * result["ion_sound_speed_approx_m_s"]
+    assert velocity_from_reported_mach == pytest.approx(18.3e3, rel=0.02)
+    # Published mean flow is about 17 km/s; allow 10% for rounded mean Mach/parameters.
+    assert velocity_from_reported_mach == pytest.approx(17.0e3, rel=0.10)
