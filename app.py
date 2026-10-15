@@ -725,7 +725,25 @@ elif page=='Spectral Analysis':
                     elif inst==0 and not assume_inst_negligible:
                         st.error('Enter the calibrated instrument width, or explicitly justify the negligible-instrument-width assumption.')
                     else:
-                        sig2=float(fit['sigma'])**2-inst**2
+                        # Do not infer a thermal width from an under-sampled line.
+                        # A Gaussian optimizer can return sub-pixel widths even when
+                        # the detector sampling does not resolve the physical profile.
+                        _sx=np.asarray(pd.to_numeric(df[xcol],errors='coerce'),dtype=float)
+                        _sx=np.sort(_sx[np.isfinite(_sx)])
+                        _steps=np.diff(_sx)
+                        _steps=_steps[np.isfinite(_steps)&(_steps>0)]
+                        _median_step=float(np.median(_steps)) if len(_steps) else float('nan')
+                        _observed_fwhm=float(fit.get('FWHM',float('nan')))
+                        if not np.isfinite(_median_step) or _observed_fwhm < 3.0*_median_step:
+                            st.error(
+                                f"Temperature withheld: the fitted FWHM ({_observed_fwhm:.6g} in the x-axis unit) "
+                                f"is not resolved by the sampling (median spacing {_median_step:.6g}; "
+                                "require at least 3 samples across FWHM for this workflow). "
+                                "Use a genuinely wavelength-calibrated, higher-resolution spectrum and "
+                                "independently measured instrument line-spread function."
+                            )
+                        else:
+                            sig2=float(fit['sigma'])**2-inst**2
                         if sig2<=0:
                             st.error('Instrument width equals/exceeds observed Gaussian sigma.')
                         else:
