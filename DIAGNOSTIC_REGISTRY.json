@@ -160,7 +160,7 @@
     "quantities": "Φ_B, ψ",
     "status": "M→D/I",
     "method": "Integrate calibrated loop voltage using Faraday law with explicit polarity and baseline controls.",
-    "caveat": "Input voltage calibration, loop orientation, sensor response and reference flux must be documented; this is not equilibrium reconstruction.",
+    "caveat": "Input voltage calibration, loop turns/orientation, sensor response and reference flux must be documented; this is not equilibrium reconstruction.",
     "implementation_functions": ["magnetic_flux_from_voltage", "integrate_time_series"],
     "implementation_status": "Implemented numerical workflow (see limits)"
   },
