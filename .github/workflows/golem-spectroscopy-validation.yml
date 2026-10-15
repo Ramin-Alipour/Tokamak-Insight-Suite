@@ -1,0 +1,25 @@
+name: GOLEM spectroscopy data validation
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "tools/validate_golem_spectroscopy_30622.py"
+      - ".github/workflows/golem-spectroscopy-validation.yml"
+jobs:
+  public-data-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch and audit public GOLEM spectroscopy products
+        run: python tools/validate_golem_spectroscopy_30622.py
+      - name: Upload report and retrieved data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golem-spectroscopy-30622-validation
+          path: artifacts/golem-spectroscopy-30622/
+          if-no-files-found: warn
