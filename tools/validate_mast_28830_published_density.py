@@ -61,17 +61,26 @@ def main() -> None:
                 "radius_m": float(row["radius_m"]),
                 "te_eV": float(row["te_eV"]),
                 "ne_m3": float(row["ne_m3"]),
+                "ne_error_m3": float(row["ne_error"]) if "ne_error" in row and np.isfinite(row["ne_error"]) else float("nan"),
             })
     if len(nearest_rows) < 5:
         raise ValueError("Fewer than five finite Thomson samples within 1 cm of R=1.38 m.")
     near_edge = pd.DataFrame(nearest_rows)
     measured_edge_density = float(near_edge["ne_m3"].median())
     measured_edge_te = float(near_edge["te_eV"].median())
+    edge_measurement_error = float(near_edge["ne_error_m3"].median())
+    edge_temporal_mad = float(np.median(np.abs(near_edge["ne_m3"] - measured_edge_density)))
+    edge_temporal_sigma = 1.4826 * edge_temporal_mad
     measured_line_density = float(
         interferometer.loc[
             np.isfinite(interferometer["line_density_raw"]), "line_density_raw"
         ].median()
     )
+    line_values = interferometer.loc[
+        np.isfinite(interferometer["line_density_raw"]), "line_density_raw"
+    ].to_numpy(dtype=float)
+    line_temporal_mad = float(np.median(np.abs(line_values - measured_line_density)))
+    line_temporal_sigma = 1.4826 * line_temporal_mad
     edge_rel = relative_difference(measured_edge_density, REFERENCE["edge_density_m3"])
     line_rel = relative_difference(
         measured_line_density, REFERENCE["line_integrated_density_m2"]
@@ -105,6 +114,14 @@ def main() -> None:
             "edge_density_m3": measured_edge_density,
             "edge_temperature_eV_median": measured_edge_te,
             "line_integrated_density_m2": measured_line_density,
+        },
+        "uncertainty_and_variability": {
+            "edge_density_median_reported_ne_error_m3": edge_measurement_error,
+            "edge_density_temporal_robust_sigma_m3": edge_temporal_sigma,
+            "edge_density_discrepancy_over_reported_error": (measured_edge_density - REFERENCE["edge_density_m3"]) / edge_measurement_error,
+            "line_density_temporal_robust_sigma_m2": line_temporal_sigma,
+            "line_density_discrepancy_over_temporal_robust_sigma": (measured_line_density - REFERENCE["line_integrated_density_m2"]) / line_temporal_sigma,
+            "note": "The edge-density uncertainty is the archive's ne_error at the selected radial channel. The line-density spread is temporal variability, not a separately documented instrument calibration uncertainty.",
         },
         "comparison": {
             "edge_density_relative_difference": edge_rel,
