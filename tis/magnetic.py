@@ -103,3 +103,62 @@ def analyze_toroidal_field(
             "Optional 1/R scaling assumes a vacuum-like toroidal field and does not represent full equilibrium geometry.",
         ],
     }
+
+
+
+def analyze_poloidal_field(
+    signal,
+    *,
+    calibration_T_per_unit: float,
+    offset_T: float = 0.0,
+    toroidal_field_T=None,
+    minor_radius_m=None,
+    major_radius_m=None,
+) -> dict:
+    """Calibrate a poloidal-field signal and optionally calculate a q estimate.
+
+    The safety-factor estimate q≈r*B_t/(R*B_p) is only a large-aspect-ratio,
+    approximately circular local estimate. A full profile requires equilibrium
+    reconstruction and must not be inferred from a single local field channel.
+    """
+    x = np.asarray(signal, dtype=float)
+    if x.size == 0 or not np.all(np.isfinite(x)):
+        raise ValueError("signal must contain finite values.")
+    if not np.isfinite(calibration_T_per_unit) or calibration_T_per_unit == 0:
+        raise ValueError("calibration_T_per_unit must be finite and nonzero.")
+    if not np.isfinite(offset_T):
+        raise ValueError("offset_T must be finite.")
+    bp = x * calibration_T_per_unit + offset_T
+    q_estimate = None
+    supplied = (toroidal_field_T is not None, minor_radius_m is not None, major_radius_m is not None)
+    if any(supplied) and not all(supplied):
+        raise ValueError("toroidal_field_T, minor_radius_m and major_radius_m must be supplied together.")
+    if all(supplied):
+        bt = np.asarray(toroidal_field_T, dtype=float)
+        radius = np.asarray(minor_radius_m, dtype=float)
+        major = np.asarray(major_radius_m, dtype=float)
+        if not all(np.all(np.isfinite(a)) for a in (bt, radius, major)):
+            raise ValueError("Field and radii for q estimate must be finite.")
+        if np.any(radius < 0) or np.any(major <= 0) or np.any(bt < 0):
+            raise ValueError("minor radius and toroidal field must be nonnegative; major radius positive.")
+        try:
+            bp_broadcast, bt_broadcast, r_broadcast, R_broadcast = np.broadcast_arrays(bp, bt, radius, major)
+        except ValueError as exc:
+            raise ValueError("Poloidal field, toroidal field and radii must be broadcast-compatible.") from exc
+        q_estimate = np.divide(
+            r_broadcast * bt_broadcast, R_broadcast * bp_broadcast,
+            out=np.full_like(bp_broadcast, np.nan, dtype=float),
+            where=np.abs(bp_broadcast) > np.finfo(float).eps,
+        )
+    return {
+        "diagnostic": "Poloidal-field coils / magnetic probes",
+        "poloidal_field_T": bp,
+        "approximate_safety_factor_q": q_estimate,
+        "calibration_T_per_unit": float(calibration_T_per_unit),
+        "offset_T": float(offset_T),
+        "assumptions_and_limits": [
+            "Calibration coefficient and offset must be established for the actual sensor and electronics.",
+            "Local poloidal-field measurements do not determine a complete magnetic equilibrium.",
+            "q estimate uses q≈r*B_t/(R*B_p), a simplified large-aspect-ratio circular approximation; zero B_p yields undefined q.",
+        ],
+    }
