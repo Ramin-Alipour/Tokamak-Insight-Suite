@@ -78,7 +78,7 @@ def test_welch_psd_integral_recovers_variance_with_tolerance():
     rng = np.random.default_rng(741)
     x = rng.normal(0, 2.0, 131072)
     f, pxx = welch_psd(x, fs=10_000.0, nperseg=4096)
-    recovered = np.trapezoid(pxx, f)
+    recovered = np.trapz(pxx, f)
     assert recovered == pytest.approx(np.var(x), rel=0.08)
 
 
