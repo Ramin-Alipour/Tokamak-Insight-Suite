@@ -37,7 +37,22 @@ def parse_numeric_series(raw: bytes, name: str) -> np.ndarray:
         raise ValueError(f"{name}: non-finite values are present; refusing silent deletion")
     return values
 
-def extract_docx_text(raw: bytes) -> str:\n    import zipfile, xml.etree.ElementTree as ET\n    with zipfile.ZipFile(__import__("io").BytesIO(raw)) as archive:\n        xml = archive.read("word/document.xml")\n    root = ET.fromstring(xml)\n    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}\n    return "\\n".join("".join(node.itertext()).strip() for node in root.findall(".//w:p", ns) if "".join(node.itertext()).strip())\n\ndef conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1.5,
+def extract_docx_text(raw: bytes) -> str:
+    import zipfile
+    import xml.etree.ElementTree as ET
+    from io import BytesIO
+    with zipfile.ZipFile(BytesIO(raw)) as archive:
+        xml = archive.read('word/document.xml')
+    root = ET.fromstring(xml)
+    ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+    paragraphs = []
+    for node in root.findall('.//w:p', ns):
+        paragraph = ''.join(node.itertext()).strip()
+        if paragraph:
+            paragraphs.append(paragraph)
+    return chr(10).join(paragraphs)
+
+def conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1.5,
                         half_window: int = 200) -> dict:
     """Event-triggered conditional average of y around positive/negative x excursions."""
     x0 = signal.detrend(np.asarray(x, dtype=float), type="linear")
