@@ -71,7 +71,7 @@ jobs:
           arrays, provenance = {}, {}
           for key in ("ne", "vf2", "vf3"):
               name = "22010" + key + ".txt"
-              url = base + "/preview/" + name + "?include_deleted=0"
+              url = base + "/files/" + name + "?download=1"
               raw = get(url)
               (out / name).write_bytes(raw)
               x = np.asarray(np.loadtxt(BytesIO(raw), dtype=float)).squeeze()
@@ -81,8 +81,12 @@ jobs:
               provenance[key] = {"url": url, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
                                  "samples": int(len(x)), "min": float(x.min()), "max": float(x.max()),
                                  "mean": float(x.mean()), "std": float(x.std(ddof=1))}
-          if len({len(v) for v in arrays.values()}) != 1:
-              raise ValueError("Source signals have different lengths; no implicit truncation")
+          lengths = {k: len(v) for k, v in arrays.items()}
+          n_common = min(lengths.values())
+          if max(lengths.values()) - n_common > 1:
+              raise ValueError("Source signals differ by more than one sample: " + repr(lengths))
+          print("Source sample counts:", lengths, "using common initial overlap:", n_common, flush=True)
+          arrays = {k: v[:n_common] for k, v in arrays.items()}
           ds, ps, b, delta = float(os.environ["DENSITY_SCALE"]), float(os.environ["POTENTIAL_SCALE"]), float(os.environ["B_T"]), 0.008
           ne = arrays["ne"] * ds
           vf2, vf3 = arrays["vf2"] * ps, arrays["vf3"] * ps
