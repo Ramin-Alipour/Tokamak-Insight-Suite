@@ -46,3 +46,17 @@ python tools/validate_lhd_164208_cxs.py
 ```
 
 The validation deliberately separates the passing intensity check, the single passing Ti point, and the pending Ti point. It does not claim that the entire Doppler-temperature method is validated.
+
+
+## Cross-product consistency and schema check
+
+The shared fields in the NIFS `lhdcxs7_cvi` and `cxsmap7` products were compared row-for-row across 40,400 time-radius points. Time, radius, and fit-quality code matched exactly. The 95th-percentile relative differences were:
+
+- (T_i): 0.00154%.
+- (T_i) uncertainty: 0.00144%.
+- (V_c): 0.00135%.
+- (V_c) uncertainty: 0.00164%.
+
+This cross-product consistency check passes. It confirms the processed values are internally consistent; it does not independently validate the raw spectral-width reconstruction.
+
+A schema defect was also detected in `cxsmap7`: its declared `ValName` omits the `In` and `Iner` fields present in the data rows after `Ver`. The validation therefore compares only the seven fields whose positions are confirmed by both products and does not interpret later columns from the stale names.
