@@ -423,20 +423,47 @@ for config_url in config_candidates:
         pairs = list(zip(nums[0::2], nums[1::2]))
         if pairs:
             inst_width = float(np.interp(656.281, [p[0] for p in pairs], [p[1] for p in pairs]))
+            precision_match = re.search(r"(?im)^wavelength presicion \\[nm\\]\\s*=\\s*([-+0-9.eE]+)", config_text)
+            correction_match = re.search(r"(?im)^calibration polynome correction\\s*=\\s*(.+)$", config_text)
+            correction_values = ([float(v) for v in re.findall(r"[-+]?(?:\\d+\\.\\d*|\\.\\d+|\\d+)(?:[eE][-+]?\\d+)?", correction_match.group(1))]
+                                if correction_match else [])
             config_audit = {
                 "status": "instrument_config_retrieved",
                 "source_url": config_url,
                 "sha256": hashlib.sha256(config_blob).hexdigest(),
+                "config_date": re.search(r"(?im)^date\\s*=\\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^date\\s*=\\s*(.+)$", config_text) else None,
+                "serial_number": re.search(r"(?im)^serial number\\s*=\\s*(.+)$", config_text).group(1).strip() if re.search(r"(?im)^serial number\\s*=\\s*(.+)$", config_text) else None,
+                "nominal_wavelength_precision_nm": float(precision_match.group(1)) if precision_match else None,
+                "calibration_polynomial_correction_coefficients": correction_values,
                 "width_points_nm": [{"wavelength_nm": x, "instrumental_width_nm": y} for x, y in pairs],
                 "interpolated_instrumental_width_at_H_alpha_nm": inst_width,
-                "width_definition": "as defined in upstream GOLEM config; confirm before using as FWHM",
-                "decision": "not_applied_until_width_definition_and_same_instrument_provenance_are_confirmed"
+                "width_definition": "treated as Gaussian sigma because upstream code adds this term in quadrature; verify for current shot",
+                "decision": "used_for_provisional_candidate_only; not accepted as shot-specific calibration"
             }
             break
         config_audit["attempts"].append({"url": config_url, "status": "config_found_but_width_parse_failed"})
     except Exception as exc:
         config_audit["attempts"].append({"url": config_url, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
 report["instrument_config_audit"] = config_audit
+crosscheck = report.get("provisional_wavelength_crosscheck", {})
+nominal_precision = config_audit.get("nominal_wavelength_precision_nm")
+if crosscheck.get("H_gamma_residual_nm") is not None and nominal_precision is not None:
+    residual_abs = abs(float(crosscheck["H_gamma_residual_nm"]))
+    report["wavelength_calibration_spec_check"] = {
+        "instrument_config_source": config_audit.get("source_url"),
+        "instrument_config_date": config_audit.get("config_date"),
+        "instrument_serial_number": config_audit.get("serial_number"),
+        "nominal_wavelength_precision_nm": nominal_precision,
+        "independent_H_gamma_residual_nm": float(crosscheck["H_gamma_residual_nm"]),
+        "residual_within_historical_nominal_precision": bool(residual_abs <= nominal_precision),
+        "strict_0p25nm_check_passed": bool(residual_abs <= 0.25),
+        "decision": "CONSISTENT_WITH_HISTORICAL_NOMINAL_SPEC_ONLY" if residual_abs <= nominal_precision else "OUTSIDE_HISTORICAL_NOMINAL_SPEC",
+        "limitations": [
+            "The config is dated 2011 while the measured shot is from 2019.",
+            "Nominal wavelength precision is not a substitute for a same-session calibration-lamp fit.",
+            "The H-gamma line is weak; this check is not an independent calibration certificate."
+        ]
+    }
 
 # If the upstream instrument-width curve is available, compute a separately
 # labelled provisional deconvolution. The old config's width is used as a
