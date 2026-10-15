@@ -15,7 +15,8 @@ from scipy import signal
 RECORD = "https://zenodo.org/records/18473625"
 FILES = {"ne": "22010ne.txt", "vf2": "22010vf2.txt", "vf3": "22010vf3.txt"}
 PAPER_DOI = "10.1088/1361-6587/ae4f20"
-PUBLISHED_SIGMA_FLUX = 2.6e21  # m^-2 s^-1; article figure 14 caption, approximate
+PUBLISHED_MEAN_FLUX = 1.3e20  # m^-2 s^-1; article figure 11 caption
+PUBLISHED_SIGMA_FLUX = 2.6e20  # m^-2 s^-1; article figure 11 caption
 
 def fetch(url: str, timeout: float = 60.0) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": "Tokamak-Insight-Suite/empirical-validation"})
@@ -65,8 +66,8 @@ def conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", default="artifacts/east-22010-validation")
-    parser.add_argument("--b-tesla", type=float, required=True,
-                        help="Shot-local magnetic field in tesla from paper/metadata; no default is guessed.")
+    parser.add_argument("--b-tesla", type=float, default=1.8,
+                        help="Magnetic field in tesla; default 1.8 T is the paper-stated value near LCFS (override for selected radial position).")
     parser.add_argument("--separation-m", type=float, default=0.008,
                         help="vf2-vf3 probe separation (paper: 8 mm).")
     parser.add_argument("--sign", type=int, choices=(-1, 1), default=1,
@@ -115,7 +116,9 @@ def main() -> int:
             "electric_field_V_per_m_std": float(np.std(signal.detrend(electric_field), ddof=1)),
             "flux_mean_after_detrend_m-2_s-1": float(np.mean(flux_detrended)),
             "flux_sigma_after_detrend_m-2_s-1": sigma_flux,
+            "published_flux_mean_m-2_s-1": PUBLISHED_MEAN_FLUX,
             "published_flux_sigma_m-2_s-1": PUBLISHED_SIGMA_FLUX,
+            "mean_absolute_relative_difference_percent": abs(float(np.mean(flux_detrended)) - PUBLISHED_MEAN_FLUX) / abs(PUBLISHED_MEAN_FLUX) * 100.0,
             "absolute_relative_difference_percent": relative_difference,
             "flux_finite_fraction": float(np.mean(np.isfinite(flux)))},
         "conditional_averages": conditional_average(flux_detrended, flux_detrended),
@@ -127,7 +130,7 @@ def main() -> int:
         for i in range(len(flux)):
             f.write(f"{i},{ne[i]:.12g},{vf2[i]:.12g},{vf3[i]:.12g},{electric_field[i]:.12g},{flux[i]:.12g},{flux_detrended[i]:.12g}\n")
     print(json.dumps({"report": str(outdir / "east_22010_validation.json"), "samples": len(flux),
-        "sigma_flux_computed": sigma_flux, "sigma_flux_published": PUBLISHED_SIGMA_FLUX,
+        "sigma_flux_computed": sigma_flux, "sigma_flux_published": PUBLISHED_SIGMA_FLUX, "mean_flux_published": PUBLISHED_MEAN_FLUX,
         "relative_difference_percent": relative_difference, "empirical_validation_pass": False}, indent=2))
     return 0
 
