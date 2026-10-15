@@ -229,7 +229,20 @@ def try_one(url):
                             inds=np.flatnonzero(m)
                             top=inds[np.argsort(p[m])[-8:][::-1]] if np.any(m) else []
                             top_peaks=[float(f[z]) for z in top]
-                        channel_spectra.append({"column_index_1based_in_file":col+1,"signal_range":float(np.ptp(y[good])),"dominant_frequency_Hz":peak,"top_frequency_peaks_Hz":top_peaks})
+                        window_peaks = {}
+                        for win_name, lo_t, hi_t in [("preplasma",0.002,0.004),("plasma",0.008,0.015)]:
+                            wm = good & (arr[:,0] >= lo_t) & (arr[:,0] <= hi_t)
+                            yw = y[wm]
+                            if yw.size > 500:
+                                yw = yw - np.mean(yw)
+                                fw = np.fft.rfftfreq(yw.size, dt)
+                                pw = np.abs(np.fft.rfft(yw))**2
+                                mw = (fw >= 10000) & (fw <= min(400e3, 0.45/dt))
+                                if np.any(mw):
+                                    wi = np.flatnonzero(mw)
+                                    ti = wi[np.argsort(pw[mw])[-8:][::-1]]
+                                    window_peaks[win_name] = [float(fw[z]) for z in ti]
+                        channel_spectra.append({"column_index_1based_in_file":col+1,"signal_range":float(np.ptp(y[good])),"dominant_frequency_Hz":peak,"top_frequency_peaks_Hz":top_peaks,"windowed_frequency_peaks_Hz":window_peaks})
                     rec["channel_spectra"]=channel_spectra
                     rec["contains_30_to_70kHz_channel"]=any(30000<=x.get("dominant_frequency_Hz",0)<=70000 for x in channel_spectra)
         return rec
