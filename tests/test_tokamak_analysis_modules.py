@@ -705,3 +705,18 @@ def test_wavelet_known_frequency_localized_power():
     assert np.all(np.isfinite(power))
     assert np.max(power) > 0
     assert power[len(power)//2] > power[0]
+
+
+
+def test_turbulence_known_rms_and_cross_covariance():
+    from tokamak_analysis.turbulence import analyze_turbulence
+    n = 1000
+    time = np.arange(n)/1000.0
+    fluctuation = np.sin(2*np.pi*10.0*time)
+    a = 10.0 + fluctuation
+    b = 2.0*fluctuation
+    out = analyze_turbulence(time, a, b)
+    assert out["mean"] == pytest.approx(10.0, abs=1e-12)
+    assert out["rms_fluctuation"] == pytest.approx(np.sqrt(n/(2*(n-1))), rel=1e-10)
+    assert out["relative_rms"] == pytest.approx(np.sqrt(n/(2*(n-1)))/10.0, rel=1e-10)
+    assert out["cross_covariance"] == pytest.approx(1.0, abs=1e-12)
