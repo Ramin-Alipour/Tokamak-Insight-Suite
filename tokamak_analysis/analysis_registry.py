@@ -72,7 +72,7 @@ ANALYSES = [
     {"id":66,"name":"Electron Heating Analysis","module":"heating_analysis","function":"analyze_heating"},
     {"id":67,"name":"Ion Heating Analysis","module":"heating_analysis","function":"analyze_heating"},
     {"id":68,"name":"ECRH Analysis","module":"ecrh_icrh","function":"ecrh_resonance_field"},
-    {"id":69,"name":"ICRH Analysis","module":"heating_analysis","function":"analyze_heating"},
+    {"id":69,"name":"ICRH Analysis","module":"ecrh_icrh","function":"icrh_resonance_field"},
     {"id":70,"name":"RF-Plasma Interaction Analysis","module":"rf_interaction","function":"analyze_rf_interaction"},
     {"id":71,"name":"Divertor Heat Flux","module":"divertor_analysis","function":"analyze_divertor_flux"},
     {"id":72,"name":"Plasma-Facing Component Heat Load","module":"divertor_analysis","function":"analyze_divertor_flux"},
