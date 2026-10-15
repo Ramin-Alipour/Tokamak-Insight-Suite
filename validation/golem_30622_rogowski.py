@@ -131,6 +131,159 @@ def fetch_legacy_npz(identifier):
             errors.append(f"{url}: {type(e).__name__}: {e}")
     raise RuntimeError("Legacy NPZ fetch/parse failed:\n" + "\n".join(errors))
 
+
+def fetch_raw_das_signal(identifier):
+    """Fetch GOLEM legacy raw NIstandard DAS signal (irog/uloop) via public data API."""
+    import io, urllib.request
+    errors = []
+    urls = [
+        f"https://golem.fjfi.cvut.cz/utils/data/{SHOT}/{identifier}",
+        f"http://golem.fjfi.cvut.cz/utils/data/{SHOT}/{identifier}",
+    ]
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+            with urllib.request.urlopen(req, timeout=35) as r:
+                blob = r.read()
+            if blob[:4] == b"PK\\x03\\x04":
+                with np.load(io.BytesIO(blob), allow_pickle=True) as z:
+                    keys = list(z.files)
+                    if "data" in keys and "t_start" in keys and "t_end" in keys:
+                        y = np.asarray(z["data"], float).squeeze().ravel()
+                        t0 = float(np.asarray(z["t_start"]).squeeze())
+                        t1 = float(np.asarray(z["t_end"]).squeeze())
+                        t = np.linspace(t0, t1, len(y))
+                        if "axis" in keys:
+                            try:
+                                axis = np.asarray(z["axis"], float).squeeze().ravel()
+                                if len(axis)==len(y) and np.all(np.isfinite(axis)) and np.all(np.diff(axis)>0):
+                                    t = axis
+                            except (TypeError, ValueError):
+                                pass
+                        return t, y, url, {"format":"npz","keys":keys,"samples":len(y)}
+            # Some legacy endpoints return a tab/comma-separated two-column table.
+            df = pd.read_csv(io.BytesIO(blob), sep=None, engine="python", header=None, comment="#")
+            df = df.iloc[:,:2].apply(pd.to_numeric, errors="coerce").dropna()
+            if len(df) > 20 and df.shape[1] >= 2:
+                t, y = df.iloc[:,0].to_numpy(float), df.iloc[:,1].to_numpy(float)
+                if np.max(np.abs(t)) > 1 and np.max(np.abs(t)) < 100:
+                    t *= 1e-3
+                return t, y, url, {"format":"text-table","samples":len(y)}
+            raise ValueError(f"Unrecognized response: {len(blob)} bytes, prefix={blob[:32]!r}")
+        except Exception as e:
+            errors.append(f"{url}: {type(e).__name__}: {e}")
+    raise RuntimeError("Raw DAS acquisition failed:\\n" + "\\n".join(errors))
+
+def raw_legacy_reconstruction(reason):
+    """Reconstruct Ip from raw irog/uloop, with archived signals used only to resolve polarity and score output."""
+    # Raw channels: irog is dI_(p+ch)/dt in volts; uloop is the loop-voltage channel.
+    tr, dIraw, ur, rmeta = fetch_raw_das_signal("irog")
+    tu, Uraw, uu, umeta = fetch_raw_das_signal("uloop")
+    # Use archived calibrated traces for objective polarity checks and final comparison.
+    refs = {}
+    refmeta = {}
+    for ident in ("Irogowski","Ich","Iplasma"):
+        tt, yy, src, keys = fetch_legacy_npz(ident)
+        if np.max(np.abs(tt)) > 1 and np.max(np.abs(tt)) < 100:
+            tt = tt*1e-3
+        refs[ident] = (tt, yy)
+        refmeta[ident] = {"url":src,"samples":len(yy),"npz_keys":keys}
+    for name, tt in (("irog",tr),("uloop",tu)):
+        if np.max(np.abs(tt)) > 1 and np.max(np.abs(tt)) < 100:
+            if name=="irog": tr=tt*1e-3
+            else: tu=tt*1e-3
+    # GOLEM shot-30622 metadata: current drive starts at 5 ms, K=5.3e6 A/(V s),
+    # R_ch=9.7 mOhm, L_ch=1.2 uH, and Uloop calibration=5.5.
+    tcd = 0.005
+    K = 5.3e6
+    R = 9.7e-3
+    L = 1.2e-6
+    Uloop_cal = 5.5
+    t0, t1 = T_START_S, T_END_S
+    baseline = tr < (tcd - 1e-4)
+    if baseline.sum() < 10:
+        baseline = tr < tcd
+    if baseline.sum() < 5:
+        raise RuntimeError("Raw irog signal has insufficient pre-current-drive baseline samples.")
+    offset = float(np.mean(dIraw[baseline]))
+    dI = dIraw - offset
+    dI[tr <= tcd] = 0.0
+    total_candidates = []
+    t_refR, refR = refs["Irogowski"]
+    maskR = (t_refR >= t0) & (t_refR <= t1)
+    for polarity in (1.0,-1.0):
+        total = cumulative_trapezoid(polarity*dI, x=tr, initial=0.0)*K
+        pred = np.interp(t_refR[maskR], tr, total)
+        target = refR[maskR]
+        total_candidates.append((float(np.sqrt(np.mean((pred-target)**2))), polarity, total))
+    total_rmse, irog_polarity, total = min(total_candidates, key=lambda x:x[0])
+    # Calibrate and orient raw loop voltage against archived Ich, then solve the chamber RL equation.
+    t_refC, refC = refs["Ich"]
+    maskC = (t_refC >= t0) & (t_refC <= t1)
+    ich_candidates = []
+    for polarity in (1.0,-1.0):
+        u_interp = interp1d(tu, polarity*Uraw*Uloop_cal, bounds_error=False,
+                            fill_value=(polarity*Uraw[0]*Uloop_cal, polarity*Uraw[-1]*Uloop_cal))
+        def rhs(t, y):
+            return [(float(u_interp(t))-R*y[0])/L]
+        sol = solve_ivp(rhs, (float(tu[0]),float(tu[-1])), [0.0], t_eval=tu,
+                        rtol=1e-7, atol=1e-8, max_step=max(np.median(np.diff(tu))*5,1e-7))
+        if not sol.success:
+            continue
+        ich_model = sol.y[0]
+        pred = np.interp(t_refC[maskC], tu, ich_model)
+        target = refC[maskC]
+        ich_candidates.append((float(np.sqrt(np.mean((pred-target)**2))), polarity, ich_model))
+    if not ich_candidates:
+        raise RuntimeError("Could not solve chamber-current ODE for raw loop voltage.")
+    ich_rmse, uloop_polarity, ich = min(ich_candidates, key=lambda x:x[0])
+    ip = total - np.interp(tr,tu,ich)
+    t_refP, refP = refs["Iplasma"]
+    mask = (tr >= t0) & (tr <= t1)
+    central_start, central_end = t0+0.2*(t1-t0), t1-0.2*(t1-t0)
+    central = (tr >= central_start) & (tr <= central_end)
+    pred = np.interp(t_refP[(t_refP>=t0)&(t_refP<=t1)], tr, ip)
+    target = refP[(t_refP>=t0)&(t_refP<=t1)]
+    err = pred-target
+    rmse = float(np.sqrt(np.mean(err**2)))
+    denom = float(np.sqrt(np.mean(target**2)))
+    result = {
+        "shot": SHOT,
+        "status": "COMPUTED_raw_DAS_reconstruction",
+        "method": "Raw NIstandard irog integration + raw uloop calibration + chamber RL ODE; polarity selected by minimum error against archived component signals",
+        "raw_csv_route_error": reason,
+        "raw_inputs": {"irog": {"url":ur,**rmeta}, "uloop": {"url":uu,**umeta}},
+        "archived_reference_inputs": refmeta,
+        "parameters": {"t_current_drive_s":tcd,"K_Rogowski_A_per_Vs":K,"Uloop_calibration":Uloop_cal,"R_chamber_ohm":R,"L_chamber_H":L,"irog_offset_removed_V":offset,"irog_polarity":irog_polarity,"uloop_polarity":uloop_polarity},
+        "plasma_window_s":[t0,t1],
+        "central_60_percent_window_s":[central_start,central_end],
+        "raw_reconstruction": {
+            "total_current_max_A":float(np.max(total[mask])),
+            "plasma_current_mean_A":float(np.mean(ip[mask])),
+            "plasma_current_max_A":float(np.max(ip[mask])),
+            "central_60_percent_mean_A":float(np.mean(ip[central])),
+        },
+        "archived_plasma_current": {
+            "mean_A":float(np.mean(refP[(t_refP>=t0)&(t_refP<=t1)])),
+            "max_A":float(np.max(refP[(t_refP>=t0)&(t_refP<=t1)])),
+            "central_60_percent_mean_A":float(np.mean(refP[(t_refP>=central_start)&(t_refP<=central_end)])),
+            "published_scalar_mean_A":EXPECTED_MEAN_A,
+            "central_mean_relative_error_to_published_scalar_percent":float(100*abs(float(np.mean(ip[central]))-EXPECTED_MEAN_A)/EXPECTED_MEAN_A),
+        },
+        "reference_fit_checks": {
+            "total_current_vs_archived_Irogowski_rmse_A":total_rmse,
+            "chamber_current_vs_archived_Ich_rmse_A":ich_rmse,
+            "plasma_current_vs_archived_Iplasma_rmse_A":rmse,
+            "plasma_current_vs_archived_Iplasma_nrmse_percent":float(100*rmse/(denom or 1)),
+            "plasma_current_mean_relative_difference_percent":float(100*abs(float(np.mean(ip[mask]))-float(np.mean(refP[(t_refP>=t0)&(t_refP<=t1)])))/(abs(float(np.mean(refP[(t_refP>=t0)&(t_refP<=t1)]))) or 1)),
+        },
+        "interpretation": "This run uses the raw archived irog and uloop channels. Polarity is selected by matching each reconstructed component to its corresponding archived calibrated signal; these are validation anchors, not independent sign conventions.",
+    }
+    OUT.write_text(json.dumps(result,indent=2))
+    print(json.dumps(result,indent=2))
+    print(f"RESULT_JSON={OUT}")
+
+
 def fallback_processed_crosscheck(reason):
     """Independent cross-check from GOLEM's archived integrated signals if raw dIp/dt is absent."""
     signals = {}
@@ -367,10 +520,15 @@ if __name__ == "__main__":
         main_raw()
     except Exception as e:
         print(f"Raw-signal route failed; attempting archived component cross-check: {type(e).__name__}: {e}", file=sys.stderr)
+        raw_reason = f"{type(e).__name__}: {e}"
         try:
-            fallback_processed_crosscheck(f"{type(e).__name__}: {e}")
+            raw_legacy_reconstruction(raw_reason)
         except Exception as e2:
-            payload={"shot":SHOT,"status":"failed_raw_and_archived_crosscheck","raw_error":f"{type(e).__name__}: {e}","fallback_error":f"{type(e2).__name__}: {e2}"}
-            OUT.write_text(json.dumps(payload, indent=2))
-            print(json.dumps(payload, indent=2))
-            sys.exit(1)
+            print(f"Raw legacy DAS route failed; falling back to archived processed-current cross-check: {type(e2).__name__}: {e2}", file=sys.stderr)
+            try:
+                fallback_processed_crosscheck(f"{raw_reason}; raw DAS error: {type(e2).__name__}: {e2}")
+            except Exception as e3:
+                payload={"shot":SHOT,"status":"failed_raw_and_archived_crosscheck","raw_csv_error":raw_reason,"raw_das_error":f"{type(e2).__name__}: {e2}","fallback_error":f"{type(e3).__name__}: {e3}"}
+                OUT.write_text(json.dumps(payload, indent=2))
+                print(json.dumps(payload, indent=2))
+                sys.exit(1)
