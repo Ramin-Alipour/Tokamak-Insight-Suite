@@ -592,3 +592,14 @@ def test_runaway_energy_known_exponential_spectrum():
     out = estimate_runaway_energy(energy, counts)
     assert out["exponential_slope_per_keV"] == pytest.approx(-0.01, abs=1e-12)
     assert out["characteristic_energy_keV"] == pytest.approx(100.0, rel=1e-10)
+
+
+
+def test_vacuum_pressure_known_ramp_and_integral():
+    from tokamak_analysis.vacuum_pressure import analyze_vacuum_pressure
+    out = analyze_vacuum_pressure([0.0, 1.0, 2.0], [1.0, 2.0, 3.0], base_pressure_Pa=1.0)
+    assert out["peak_pressure_Pa"] == pytest.approx(3.0)
+    assert out["mean_pressure_Pa"] == pytest.approx(2.0)
+    np.testing.assert_allclose(out["pressure_rise_rate_Pa_s"], [1.0, 1.0, 1.0])
+    assert out["pressure_time_integral_Pa_s"] == pytest.approx(4.0)
+    np.testing.assert_allclose(out["pressure_above_base_Pa"], [0.0, 1.0, 2.0])
