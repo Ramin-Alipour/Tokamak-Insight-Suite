@@ -89,7 +89,7 @@ def analyze_toroidal_field(
         radius = np.asarray(evaluation_radius_m, dtype=float)
         if radius.size == 0 or not np.all(np.isfinite(radius)) or np.any(radius <= 0):
             raise ValueError("evaluation_radius_m must contain positive finite radii.")
-        radius_field = field * reference_radius_m / radius
+        radius_field = np.expand_dims(field, axis=-1) * reference_radius_m / radius
     return {
         "diagnostic": "Toroidal-field coils / magnetic probes",
         "toroidal_field_T": field,
