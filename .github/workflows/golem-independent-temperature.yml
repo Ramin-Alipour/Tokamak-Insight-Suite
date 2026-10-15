@@ -29,10 +29,15 @@ jobs:
 
           out = pathlib.Path("golem-temperature-validation")
           out.mkdir(exist_ok=True)
-          base = "https://golem.fjfi.cvut.cz/utils/data/30622/"
+          bases = [
+              "https://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
+              "https://golem.fjfi.cvut.cz/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
+              "http://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
+              "https://golem.fjfi.cvut.cz/utils/data/30622/",
+          ]
           candidates = {
-              "electron_temperature": ["electron_temperature", "spectrometr/temperature", "spectrometr%2Ftemperature"],
-              "mean_temperature": ["spectrometr/mean_temperature", "spectrometr%2Fmean_temperature", "temperature_mean"],
+              "electron_temperature": ["temperature", "spectrometr/temperature", "electron_temperature"],
+              "mean_temperature": ["mean_temperature", "temperature_mean", "spectrometr/mean_temperature"],
           }
           report = {
               "test": "GOLEM shot 30622 electron-temperature time-series cross-check",
@@ -46,7 +51,8 @@ jobs:
           for kind, ids in candidates.items():
               success = None
               attempts = []
-              for identifier in ids:
+              for base in bases:
+                for identifier in ids:
                   url = base + identifier
                   try:
                       req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
@@ -57,11 +63,15 @@ jobs:
                       # Accept only numeric tabular data, never HTML error pages.
                       text = raw.decode("utf-8", errors="replace")
                       arr = np.genfromtxt(text.splitlines(), comments="#", invalid_raise=False)
-                      if arr.ndim == 2 and arr.shape[0] >= 3 and arr.shape[1] >= 2 and np.isfinite(arr[:, :2]).all():
+                      if arr.ndim == 1:
+                          arr = arr.reshape(-1, 1)
+                      if arr.ndim == 2 and arr.shape[0] >= 3 and arr.shape[1] >= 1 and np.isfinite(arr).all():
                           success = (url, raw, arr)
                           break
                   except Exception as exc:
                       attempts.append({"url": url, "status": "failed", "error": repr(exc)})
+                if success:
+                    break
               report.setdefault("retrieval_attempts", {})[kind] = attempts
               if success:
                   url, raw, arr = success
@@ -71,10 +81,11 @@ jobs:
                   report[kind] = {
                       "source_url": url, "filename": filename, "sha256": hashlib.sha256(raw).hexdigest(),
                       "n_rows": int(arr.shape[0]), "n_columns": int(arr.shape[1]),
-                      "time_or_x_first": float(arr[0, 0]), "time_or_x_last": float(arr[-1, 0]),
+                      "first_coordinate_or_sample": float(arr[0, 0]), "last_coordinate_or_sample": float(arr[-1, 0]),
                       "value_mean": float(np.mean(y)), "value_median": float(np.median(y)),
                       "value_std": float(np.std(y, ddof=1)), "value_min": float(np.min(y)),
-                      "value_max": float(np.max(y)), "finite_fraction": float(np.isfinite(arr).mean())
+                      "value_max": float(np.max(y)), "finite_fraction": float(np.isfinite(arr).mean()),
+                      "coordinate_semantics": "first column is time only if confirmed by source format; otherwise sample/index coordinate"
                   }
               else:
                   report[kind] = {"status": "not_retrieved_as_numeric_table"}
