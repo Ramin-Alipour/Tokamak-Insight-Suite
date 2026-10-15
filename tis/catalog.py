@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Floating / plasma potential arrays": ["analyze_potential_array"],
     "Ion saturation current": ["analyze_ion_saturation_current", "langmuir_iv_analysis"],
     "Gundestrup / compound directional probe": ["analyze_gundestrup_probe"],
     "Ball-pen probe": ["analyze_ball_pen_probe"],
