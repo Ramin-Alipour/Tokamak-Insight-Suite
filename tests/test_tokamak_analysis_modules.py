@@ -829,3 +829,10 @@ def test_plasma_facing_component_known_heat_load():
     assert out["peak_heat_flux_W_m2"] == pytest.approx(3.0)
     assert out["peak_power_load_W"] == pytest.approx(1.5)
     assert out["integrated_heat_flux_W_m"] == pytest.approx(2.0)
+
+
+
+def test_wall_sputtering_known_yield():
+    from tokamak_analysis.divertor_analysis import sputtering_yield
+    out = sputtering_yield(1e20, 2e19)
+    assert out["sputtering_yield_atoms_per_ion"] == pytest.approx(0.2, rel=1e-12)
