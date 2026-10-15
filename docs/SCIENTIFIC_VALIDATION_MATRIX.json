@@ -185,6 +185,85 @@
         "result": "All three Balmer line centroids meet the one-bin criterion."
       },
       "limitation": "The 0.45 nm wavelength-bin spacing is not the optical instrument resolution. Instrument line-spread function, calibration uncertainty, and raw/corrected processing status are not established. This validates only coarse line identification; it does not validate Doppler broadening, ion temperature, or the GOLEM page's 20.8 eV temperature value."
+    },
+    {
+      "id": "east_22010_raw_particle_flux_reconstruction",
+      "status": "empirical validation passed",
+      "reference": "EAST shot 22010 turbulence and particle-flux results, DOI 10.1088/1361-6587/ae4f20",
+      "source_url": "https://doi.org/10.1088/1361-6587/ae4f20",
+      "dataset": "NIFS/Zenodo record 18473625; raw ne, vf2 and vf3 series",
+      "data_url": "https://zenodo.org/records/18473625",
+      "test": "tools/validate_east_22010_flux.py via .github/workflows/east-public-data-validation.yml",
+      "workflow_run_id": 38741427573,
+      "method": "Use published stationary sample interval 275000-309600 at 2 MHz; independently detrend density and both potential signals with a fourth-order polynomial; calculate Gamma=ne_fluct*(vf3_fluct-vf2_fluct)/(Delta*B).",
+      "results": {
+        "sample_window_inclusive": [
+          275000,
+          309600
+        ],
+        "sample_rate_hz": 2000000,
+        "density_fluctuation_sigma_m3": 396092000000000000,
+        "published_density_fluctuation_sigma_m3": 390000000000000000,
+        "density_sigma_relative_difference_percent": 1.562,
+        "vf2_fluctuation_sigma_V": 7.90947,
+        "published_vf2_sigma_V": 7.9,
+        "vf2_sigma_relative_difference_percent": 0.12,
+        "vf3_fluctuation_sigma_V": 6.80548,
+        "published_vf3_sigma_V": 6.8,
+        "vf3_sigma_relative_difference_percent": 0.081,
+        "flux_mean_m2_s": 131260000000000000000,
+        "published_flux_mean_m2_s": 130000000000000000000,
+        "flux_mean_relative_difference_percent": 0.969,
+        "flux_sigma_m2_s": 263324000000000000000,
+        "published_flux_sigma_m2_s": 260000000000000000000,
+        "flux_sigma_relative_difference_percent": 1.278,
+        "flux_skewness": 2.48058,
+        "published_flux_skewness": 2.5,
+        "flux_kurtosis_pearson": 13.1894,
+        "published_flux_kurtosis_pearson": 13.5,
+        "result": "All seven prespecified numerical checks pass."
+      },
+      "limitation": "Validates this shot and stated preprocessing path; it does not validate all diagnostics or all analysis methods in the suite."
+    },
+    {
+      "id": "lhd_164208_cxs7_raw_spectrum_and_processed_product_consistency",
+      "status": "partial validation; absolute Ti reconstruction pending at one reference time",
+      "reference": "NIFS LHD analyzed-data products lhdcxs7_img, lhdcxs7_prep, lhdcxs7_cvi and cxsmap7",
+      "source_url": "https://exp.lhd.nifs.ac.jp/opendata/LHD/dataexplog/",
+      "dataset": "LHD shot 164208, CXS7; raw 400-frame spectral images and two official processed products",
+      "test": "tools/validate_lhd_164208_cxs.py via .github/workflows/lhd-164208-cxs-validation.yml",
+      "workflow_run_id": 38744258622,
+      "method": "Download measured spectral images and official outputs from NIFS; fit a single Gaussian plus linear baseline to the background-subtracted spectrum; compare the shared Ti/Vc fields between processed products and correlate raw fitted line area with official In.",
+      "results": {
+        "processed_product_matched_points": 40400,
+        "time_R_ary_exact_match": true,
+        "Ti_max_absolute_difference_keV": 0.0004183233,
+        "Ti_p95_relative_difference_percent": 0.0015351,
+        "Vc_max_absolute_difference_km_s": 0.0228643,
+        "Vc_p95_relative_difference_percent": 0.0013536,
+        "intensity_time_series_valid_frames": 80,
+        "intensity_pearson_r": 0.9487669,
+        "intensity_spearman_rho": 0.9696671,
+        "Ti_raw_fit_at_3_41_keV": 1.515485,
+        "Ti_official_at_3_41_keV": 1.632816,
+        "Ti_difference_at_3_41_percent": 7.186,
+        "Ti_raw_fit_at_4_01_keV": 2.983309,
+        "Ti_official_at_4_01_keV": 3.800392,
+        "Ti_difference_at_4_01_percent": 21.5,
+        "candidate_2_76_value_field": "Vc_km_s, not Ti_keV; at 3.41 s and R=3.5974 m",
+        "candidate_4_38_value_field": "Vc_km_s, not Ti_keV; at 4.01 s and R=4.6311 m",
+        "result": "Processed-product consistency and raw intensity trend pass; raw Ti fit passes at 3.41 s and remains pending at 4.01 s."
+      },
+      "limitation": "The exact NIFS spectral fitting/background treatment has not been reproduced. The cxsmap7 ValName metadata omits In/Iner although the data rows contain those fields, so only shared fields through Ver are compared. The values 2.76 and 4.38 are velocity values in km/s, not ion temperatures in keV."
+    },
+    {
+      "id": "golem_30622_rogowski_raw_current_reconstruction",
+      "status": "pending; raw-signal path unavailable",
+      "dataset": "GOLEM shot 30622",
+      "test": "validation/golem_30622_rogowski.py via .github/workflows/golem-30622-rogowski.yml",
+      "workflow_run_id": 38741657557,
+      "method": "Attempt reconstruction from raw Rogowski derivative and loop-voltage signals; distinguish this from a comparison using archived processed currents.",
+      "limitation": "The public endpoint did not provide the required raw signals in this run. Archived processed-signal comparison is not counted as independent raw-data validation."
     }
   ]
 }
