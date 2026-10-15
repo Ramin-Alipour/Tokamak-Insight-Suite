@@ -544,3 +544,15 @@ def test_nuclear_gamma_known_peak_and_line_match():
     assert out["peaks"][0]["energy_keV"] == pytest.approx(30.0)
     assert out["peaks"][0]["counts"] == pytest.approx(5.0)
     assert out["expected_line_matches"][0]["within_tolerance"] is True
+
+
+
+def test_runaway_electron_known_threshold_event():
+    from tokamak_analysis.runaway_electrons import analyze_runaway_events
+    out = analyze_runaway_events([0.0, 1.0, 2.0, 3.0, 4.0], [0.0, 0.0, 5.0, 5.0, 0.0], threshold=4.0)
+    assert out["event_count"] == 1
+    assert out["events"][0]["start_s"] == pytest.approx(2.0)
+    assert out["events"][0]["end_s"] == pytest.approx(3.0)
+    assert out["events"][0]["duration_s"] == pytest.approx(1.0)
+    assert out["events"][0]["peak_signal"] == pytest.approx(5.0)
+    assert out["above_threshold_fraction"] == pytest.approx(0.4)
