@@ -615,3 +615,15 @@ def test_gas_puffing_known_valve_and_calibrated_flow():
     assert out["integrated_valve_command_s"] == pytest.approx(1.5)
     assert out["open_fraction"] == pytest.approx(2/3)
     assert out["injected_amount_mol"] == pytest.approx(3.0)
+
+
+
+def test_fueling_rate_known_injected_particles_and_gas_inventory():
+    from tokamak_analysis.fueling_rate import analyze_fueling_rate, K_B
+    out = analyze_fueling_rate(
+        [0.0, 1.0, 2.0], [0.0, 2.0, 0.0],
+        gas_temperature_K=300.0, pressure_Pa=1e-3, volume_m3=0.01,
+    )
+    assert out["injected_particles"] == pytest.approx(2.0)
+    assert out["peak_rate_s-1"] == pytest.approx(2.0)
+    assert out["ideal_gas_inventory_particles"] == pytest.approx(1e-3*0.01/(K_B*300.0), rel=1e-12)
