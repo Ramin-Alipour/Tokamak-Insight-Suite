@@ -583,7 +583,7 @@ if config_audit.get("status") == "instrument_config_retrieved":
         ha = report.get("time_resolved_line_audit", {}).get("H_alpha", {})
         accepted = ha.get("accepted_records", [])
         center = ha.get("center_mean_nm")
-        if accepted and center and sigma_inst >= 0:
+        if accepted and center and sigma_inst >= 0 and report.get("H_alpha_apparent_doppler_temperature", {}).get("fwhm_sampling_intervals", 0.0) >= 4.0:
             per_record = []
             for rec in accepted:
                 sigma_observed = float(rec["fwhm_nm"]) / 2.354820045
@@ -612,6 +612,14 @@ if config_audit.get("status") == "instrument_config_retrieved":
                         "This is a Doppler-only candidate; other broadening mechanisms and config uncertainty are not quantified."
                     ]
                 }
+        else:
+            report["H_alpha_LSF_corrected_temperature_candidate"] = {
+                "status": "REJECTED_UNDER_RESOLVED_LINE",
+                "provisional_mean_Ti_eV": None,
+                "reason": "The measured H-alpha FWHM spans fewer than four wavelength-sampling intervals; applying a historical LSF correction to this under-resolved fit would manufacture a temperature.",
+                "fwhm_sampling_intervals": report.get("H_alpha_apparent_doppler_temperature", {}).get("fwhm_sampling_intervals"),
+                "required_next_step": "Use higher-resolution raw spectra and a same-setup instrumental line-spread measurement."
+            }
     except Exception as exc:
         report["H_alpha_LSF_corrected_temperature_candidate"] = {
             "status": "NOT_COMPUTED", "error": f"{type(exc).__name__}: {exc}"
