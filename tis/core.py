@@ -538,6 +538,53 @@ def doppler_temperature_eV(sigma_lambda: float, lambda0: float, mass_amu: float)
     return float((mass_amu*AMU*C_LIGHT**2/E_CHARGE)*(sigma_lambda/lambda0)**2)
 
 
+
+def doppler_temperature_from_fwhm_eV(
+    observed_fwhm: float, lambda0: float, mass_amu: float,
+    instrumental_fwhm: float = 0.0,
+    sigma_observed_fwhm: float = 0.0,
+    sigma_instrumental_fwhm: float = 0.0,
+) -> dict[str, float | str]:
+    """Calculate ion temperature from FWHM values in the same wavelength unit.
+
+    Gaussian line profiles are assumed. Instrument broadening is removed in
+    quadrature in FWHM space (equivalent to doing so in Gaussian sigma space).
+    A nonzero instrumental width must be measured independently. The returned
+    uncertainty propagates independent width uncertainties only and excludes
+    calibration and model systematics.
+    """
+    vals = [observed_fwhm, lambda0, mass_amu, instrumental_fwhm,
+            sigma_observed_fwhm, sigma_instrumental_fwhm]
+    if not np.all(np.isfinite(vals)):
+        raise ValueError("All FWHM, wavelength, mass and uncertainty inputs must be finite.")
+    if observed_fwhm <= 0 or lambda0 <= 0 or mass_amu <= 0 or instrumental_fwhm < 0:
+        raise ValueError("Observed FWHM, wavelength and mass must be positive; instrument FWHM must be nonnegative.")
+    if sigma_observed_fwhm < 0 or sigma_instrumental_fwhm < 0:
+        raise ValueError("FWHM uncertainties must be nonnegative.")
+    if observed_fwhm <= instrumental_fwhm:
+        raise ValueError("Observed FWHM does not exceed instrumental FWHM; Doppler width is unresolved.")
+    doppler_fwhm = float(np.sqrt(observed_fwhm**2 - instrumental_fwhm**2))
+    gaussian_sigma = doppler_fwhm / np.sqrt(8.0 * np.log(2.0))
+    sigma_width_unc = np.sqrt(
+        (observed_fwhm / doppler_fwhm * sigma_observed_fwhm)**2
+        + (instrumental_fwhm / doppler_fwhm * sigma_instrumental_fwhm)**2
+    ) / np.sqrt(8.0 * np.log(2.0))
+    thermal = doppler_temperature_with_uncertainty_eV(
+        gaussian_sigma, lambda0, mass_amu, sigma_width_unc
+    )
+    return {
+        "temperature_eV": thermal["temperature_eV"],
+        "standard_uncertainty_eV": thermal["standard_uncertainty_eV"],
+        "observed_fwhm": float(observed_fwhm),
+        "instrumental_fwhm": float(instrumental_fwhm),
+        "doppler_fwhm": doppler_fwhm,
+        "doppler_gaussian_sigma": float(gaussian_sigma),
+        "relative_standard_uncertainty": thermal["relative_standard_uncertainty"],
+        "method": "Gaussian FWHM quadrature deconvolution followed by Doppler temperature calculation",
+        "warning": "Uncertainty excludes wavelength calibration, instrument line-spread model, blends, Stark/Zeeman broadening and other systematics.",
+    }
+
+
 def doppler_temperature_with_uncertainty_eV(
     sigma_lambda: float, lambda0: float, mass_amu: float,
     sigma_sigma_lambda: float = 0.0, sigma_lambda0: float = 0.0,
