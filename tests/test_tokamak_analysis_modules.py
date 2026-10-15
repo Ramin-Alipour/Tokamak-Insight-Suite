@@ -477,3 +477,15 @@ def test_visible_imaging_known_dark_frame_correction():
     assert out["roi_mean_intensity"] == pytest.approx(1.5)
     assert out["roi_max_intensity"] == pytest.approx(3.0)
     assert out["roi_integrated_intensity"] == pytest.approx(6.0)
+
+
+
+def test_line_radiation_known_spectral_integral_and_power():
+    from tokamak_analysis.line_radiation import analyze_line_radiation
+    out = analyze_line_radiation(
+        [1.0, 2.0, 3.0], [0.0, 2.0, 0.0],
+        solid_angle_sr=0.5, area_m2=2.0,
+    )
+    assert out["integrated_spectral_radiance"] == pytest.approx(2.0)
+    assert out["peak_radiance"] == pytest.approx(2.0)
+    assert out["estimated_radiant_power_W"] == pytest.approx(2.0)
