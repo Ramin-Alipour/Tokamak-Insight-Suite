@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "tools/analyze_golem_ti_identifiability.py"
+      - "tools/discover_golem_bpp_31992.py"
       - ".github/workflows/golem-ti-identifiability.yml"
   workflow_dispatch:
 
@@ -24,11 +25,13 @@ jobs:
         run: python -m pip install --disable-pip-version-check numpy scipy
       - name: Analyze all Balmer lines and instrument-width sensitivity
         run: python tools/analyze_golem_ti_identifiability.py
-      - name: Upload raw spectrum and reproducible analysis
+      - name: Discover raw swept BPP voltage/current signals for published Ti benchmark
+        run: python tools/discover_golem_bpp_31992.py
+      - name: Upload reproducible analyses and BPP signal discovery
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: golem-30622-ti-identifiability
-          path: artifacts/golem-ti-identifiability/
+          name: golem-ti-and-bpp-validation
+          path: artifacts/
           if-no-files-found: warn
           retention-days: 30
