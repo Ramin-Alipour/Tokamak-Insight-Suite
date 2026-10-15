@@ -232,6 +232,27 @@ def main():
             "status": "PASS" if diff is not None and np.isfinite(diff) and diff <= 10 else "PENDING",
         })
 
+    # Detect a common field/unit mix-up: values near 2.76 and 4.38 occur in
+    # the official Vc column (km/s), not in the Ti column (keV).
+    semantic_reference_checks = []
+    for target, candidate_value in ((3.4, 2.76), (4.0, 4.38)):
+        valid_times = sorted({float(x["time_s"]) for x in official
+                              if x.get("Ti_keV") is not None and x["Ti_keV"] > 0})
+        matched_time = min(valid_times, key=lambda t: abs(t - target)) if valid_times else float(image_times[np.argmin(np.abs(image_times-target))])
+        rows = cvi[np.isclose(cvi.iloc[:, 0].to_numpy(dtype=float), matched_time)]
+        if rows.empty:
+            semantic_reference_checks.append({"requested_time_s": target, "candidate_value": candidate_value, "status": "PENDING"})
+            continue
+        row = rows.iloc[int(np.argmin(np.abs(rows.iloc[:, 5].to_numpy(dtype=float) - candidate_value)))]
+        vc = float(row.iloc[5])
+        semantic_reference_checks.append({
+            "requested_time_s": target, "matched_time_s": matched_time,
+            "candidate_value": candidate_value, "matched_R_m": float(row.iloc[1]),
+            "official_Ti_keV": float(row.iloc[3]), "official_Vc_km_s": vc,
+            "Vc_relative_difference_percent": abs(vc-candidate_value)/abs(candidate_value)*100,
+            "status": "FIELD_UNIT_MISMATCH_CONFIRMED" if abs(vc-candidate_value)/abs(candidate_value)*100 <= 1.0 else "UNCONFIRMED",
+        })
+
     report = {
         "title": "LHD shot 164208 CXS7 raw-spectrum cross-check",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
@@ -253,7 +274,7 @@ def main():
         "intensity_trend_check": intensity_check,
         "interpretation_guard": {
             "field_order": "In lhdcxs7_cvi, Ti is the fourth numeric field including time/R indexing (zero-based column 3); Vc is column 5 and is in km/s.",
-            "status": "Ti width reconstruction remains PENDING where the raw Gaussian fit differs by >10%; no result is relabelled or tuned to the reference.",
+            "status": "Ti width reconstruction remains PENDING where the raw Gaussian fit differs by >10%; candidate values near 2.76 and 4.38 are checked against the explicitly labelled Vc_km_s column and are not treated as Ti.",
         },
         "time_series": [
             {"time_s": float(image_times[i]), "raw_line_area": areas[i] if np.isfinite(areas[i]) else None,
