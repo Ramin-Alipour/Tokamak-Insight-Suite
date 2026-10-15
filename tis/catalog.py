@@ -92,11 +92,11 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
-    "Thermal response/heat diffusion": ["analyze_thermal_response"],
+    "Thermal response / heat diffusion": ["analyze_thermal_response"],
     "Pressure gauges": ["analyze_pressure_gauge"],
     "Residual gas analyzer (RGA)": ["analyze_rga_spectrum"],
     "Gas flow meters": ["analyze_gas_flow_meter"],
-    "Neutral pressure/recycling estimates": ["estimate_neutral_pressure_recycling"],
+    "Neutral pressure / recycling estimates": ["estimate_neutral_pressure_recycling"],
     "Effective pumping speed": ["analyze_effective_pumping_speed"],
     "Runaway-electron diagnostics": ["analyze_runaway_electron_signatures", "xray_spectrum_summary"],
     "Fast-ion loss detector (FILD)": ["analyze_fild_image"],
@@ -166,15 +166,15 @@ _IMPLEMENTED_WORKFLOWS = {
     "Disruption analysis": ["current_quench_analysis"],
     "Energy confinement": ["derive_parameters", "ipb98y2_confinement_time", "h_factor"],
     "Energy balance": ["analyze_energy_balance", "derive_parameters"],
-    "NBI power": ["analyze_nbi_power"],
-    "ECRH": ["analyze_ecrh_power", "electron_cyclotron_resonance_field"],
-    "ICRH": ["analyze_icrh_power"],
+    "Neutral beam injection (NBI) power": ["analyze_nbi_power"],
+    "Electron cyclotron heating (ECRH)": ["analyze_ecrh_power", "electron_cyclotron_resonance_field"],
+    "Ion cyclotron heating (ICRH)": ["analyze_icrh_power"],
     "Lower hybrid heating/current drive": ["analyze_lower_hybrid_power"],
     "Electron/ion heating power": ["analyze_electron_ion_heating_power"],
-    "Thermocouples/embedded sensors": ["analyze_thermocouple"],
-    "Surface erosion/deposition": ["analyze_surface_erosion_deposition"],
-    "Wall impurity/dust monitoring": ["analyze_wall_dust_population"],
-    "Strike-point/hot-spot tracking": ["analyze_strike_point_tracking"],
+    "Thermocouples / embedded sensors": ["analyze_thermocouple"],
+    "Surface erosion / deposition": ["analyze_surface_erosion_deposition"],
+    "Wall impurity / dust monitoring": ["analyze_wall_dust_population"],
+    "Strike-point / hot-spot tracking": ["analyze_strike_point_tracking"],
     "Pressure and beta": ["derive_parameters", "beta_metrics"],
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
@@ -182,8 +182,8 @@ _IMPLEMENTED_WORKFLOWS = {
     "Noise floor and detection limit": ["analyze_noise_floor_detection_limit", "hampel_despike"],
     "Rogowski coil": ["analyze_rogowski_current", "integrate_time_series"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
-    "MHD mode/Mirnov analysis": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "cross_analysis"],
-    "Particle flux/effective diffusion": ["analyze_particle_transport", "fluctuation_flux"],
+    "MHD mode / Mirnov analysis": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "cross_analysis"],
+    "Particle flux and effective diffusion": ["analyze_particle_transport", "fluctuation_flux"],
 }
 for _d in DIAGNOSTICS:
     _functions = _IMPLEMENTED_WORKFLOWS.get(_d["diagnostic"], [])
