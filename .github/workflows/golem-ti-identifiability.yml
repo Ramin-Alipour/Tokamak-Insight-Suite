@@ -6,6 +6,7 @@ on:
     paths:
       - "tools/analyze_golem_ti_identifiability.py"
       - "tools/discover_golem_bpp_31992.py"
+      - "tools/acquire_golem_bpp_35362.py"
       - "tools/validate_bpp_ti_published_figure.py"
       - "tis/probes.py"
       - "validation/golem_bpp_31992_figure3_digitized.csv"
@@ -33,6 +34,8 @@ jobs:
         run: python tools/validate_bpp_ti_published_figure.py
       - name: Analyze all Balmer lines and instrument-width sensitivity
         run: python tools/analyze_golem_ti_identifiability.py
+      - name: Acquire actual swept BPP signals from GOLEM shot 35362
+        run: python tools/acquire_golem_bpp_35362.py
       - name: Discover raw swept BPP voltage/current signals for published Ti benchmark
         run: python tools/discover_golem_bpp_31992.py
       - name: Upload reproducible analyses and BPP signal discovery
