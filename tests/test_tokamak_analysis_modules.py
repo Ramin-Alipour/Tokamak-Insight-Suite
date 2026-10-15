@@ -82,3 +82,24 @@ def test_analysis_registry_resolves_every_callable():
     assert [x["id"] for x in ANALYSES] == list(range(1, 81))
     for entry in ANALYSES:
         assert callable(resolve_analysis(entry["id"]))
+
+
+
+def test_equilibrium_reconstruction_zero_source_exact_solution():
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium
+    R = np.array([1.0, 1.5, 2.0])
+    Z = np.array([-0.5, 0.0, 0.5])
+    boundary = np.zeros((3, 3))
+    out = reconstruct_equilibrium(
+        R, Z, boundary,
+        psi_profile=[0.0, 1.0],
+        pressure_gradient_Pa_per_Wb=[0.0, 0.0],
+        ffprime_T2=[0.0, 0.0],
+        max_iterations=10,
+        tolerance=1e-12,
+    )
+    assert out["converged"] is True
+    assert out["iterations"] == 1
+    np.testing.assert_allclose(out["psi_Wb_rad"], np.zeros((3, 3)), atol=0.0)
+    np.testing.assert_allclose(out["B_R_T"], np.zeros((3, 3)), atol=0.0)
+    np.testing.assert_allclose(out["B_Z_T"], np.zeros((3, 3)), atol=0.0)
