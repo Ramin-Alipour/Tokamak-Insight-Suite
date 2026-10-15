@@ -13,7 +13,10 @@ from urllib.error import URLError, HTTPError
 
 SHOT = 30622
 BASES = [
+    # The GOLEM SpectrometerControl.py public example documents this HTTP endpoint.
+    f"http://golem.fjfi.cvut.cz/operation/shots/{SHOT}/diagnostics/Radiation/1111Spectrometer.ON/data/",
     f"https://golem.fjfi.cvut.cz/operation/shots/{SHOT}/diagnostics/Radiation/1111Spectrometer.ON/data/",
+    f"http://golem.fjfi.cvut.cz/shots/{SHOT}/diagnostics/Radiation/1111Spectrometer.ON/data/",
     f"https://golem.fjfi.cvut.cz/shots/{SHOT}/diagnostics/Radiation/1111Spectrometer.ON/data/",
 ]
 FILES = {
