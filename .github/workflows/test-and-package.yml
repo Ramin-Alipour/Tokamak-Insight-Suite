@@ -2,6 +2,7 @@ name: Test and package Tokamak Insight Suite v0.4.0
 
 on:
   push:
+    branches: ["merge-v050-review"]
     tags: ["v*"]
   workflow_dispatch:
 
