@@ -340,3 +340,14 @@ def test_impurity_concentration_known_emissivity_ratio():
     )
     assert float(out["impurity_density_estimate_m-3"]) == pytest.approx(1.0)
     assert float(out["impurity_fraction_estimate"]) == pytest.approx(0.5)
+
+
+
+def test_spectral_broadening_known_quadrature_decomposition():
+    from tokamak_analysis.spectral_broadening import decompose_gaussian_linewidth
+    out = decompose_gaussian_linewidth(
+        0.13, instrumental_fwhm_nm=0.05,
+        natural_fwhm_nm=0.03, zeeman_fwhm_equivalent_nm=0.04,
+    )
+    expected = np.sqrt(0.13**2 - 0.05**2 - 0.03**2 - 0.04**2)
+    assert out["residual_gaussian_fwhm_nm"] == pytest.approx(expected, rel=1e-12)
