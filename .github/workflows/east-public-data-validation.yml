@@ -98,7 +98,7 @@ jobs:
           efield = signal.detrend((vf3-vf2)/delta, type="linear")
           flux = ne*efield/b
           flux_dt = signal.detrend(flux, type="linear")
-          computed_mean, computed_sigma = float(np.mean(flux)), float(np.std(flux_dt, ddof=1))
+          computed_mean, computed_sigma = float(np.mean(flux)), float(np.std(flux, ddof=1))
           ref_mean, ref_sigma = 1.3e20, 2.6e20
           result = {"dataset": base, "paper_doi": "10.1088/1361-6587/ae4f20", "readme_text": readme,
                     "source_files": provenance,
