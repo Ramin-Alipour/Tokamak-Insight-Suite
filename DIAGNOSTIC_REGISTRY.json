@@ -6,8 +6,10 @@
     "status": "M→D/I",
     "method": "Fit calibrated scattered-light spectrum using instrument response and scattering model.",
     "caveat": "Laser energy, absolute calibration, stray light, collection geometry and spectral response are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_thomson_spectrum"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Plasma parameters",
@@ -29,8 +31,10 @@
     "status": "M→D/I",
     "method": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
     "caveat": "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_ece_channels"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Plasma parameters",
@@ -39,8 +43,10 @@
     "status": "M→D/I",
     "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
     "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_cxrs_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Plasma parameters",
@@ -62,8 +68,10 @@
     "status": "M→D/I",
     "method": "Fit molecular band structure and compare populations with an appropriate model.",
     "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_molecular_boltzmann_plot"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Plasma parameters",
@@ -72,8 +80,10 @@
     "status": "M→I",
     "method": "Fit a scattering spectrum using the correct collective/non-collective model.",
     "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "invert_thomson_distribution"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -82,8 +92,10 @@
     "status": "M→D",
     "method": "Apply calibration and geometry-specific field-coil relation.",
     "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_toroidal_field"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -92,8 +104,10 @@
     "status": "M→D/I",
     "method": "Calibrate field probes and combine with equilibrium reconstruction.",
     "caveat": "Local fields alone do not determine a full equilibrium.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_poloidal_field"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -118,6 +132,7 @@
     "method": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
     "caveat": "Integration constants, loop area/orientation and bandwidth matter.",
     "implementation_functions": [
+      "magnetic_flux_from_voltage",
       "integrate_time_series"
     ],
     "implementation_status": "Implemented numerical workflow (see limits)"
@@ -130,6 +145,7 @@
     "method": "Integrate calibrated Rogowski output with documented integrator response.",
     "caveat": "Offset drift, saturation, bandwidth and calibration are critical.",
     "implementation_functions": [
+      "analyze_rogowski_current",
       "integrate_time_series"
     ],
     "implementation_status": "Implemented numerical workflow (see limits)"
@@ -141,8 +157,10 @@
     "status": "I",
     "method": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
     "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "solve_grad_shafranov"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -151,8 +169,10 @@
     "status": "M→D/I",
     "method": "Invert rotation with wavelength, density and line-of-sight geometry model.",
     "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_faraday_rotation"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Magnetic and equilibrium",
@@ -161,8 +181,11 @@
     "status": "M→D/I",
     "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
     "caveat": "Reference surfaces and sign conventions must be recorded.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "integrate_magnetic_flux_surface",
+      "magnetic_flux_from_voltage"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -171,8 +194,10 @@
     "status": "M→D/I",
     "method": "Use collector-current balance and a configuration-specific correction validated for the probe.",
     "caveat": "Do not universally equate raw ball-pen voltage with plasma potential.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_ball_pen_probe"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -181,8 +206,10 @@
     "status": "M→D/I",
     "method": "Fit angular current response with probe-specific collection/sheath model.",
     "caveat": "Probe orientation, geometry, bias, collisionality and electrical isolation matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_gundestrup_probe"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -191,8 +218,11 @@
     "status": "M→D/I",
     "method": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
     "caveat": "Not a standalone density measurement without assumptions.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_ion_saturation_current",
+      "langmuir_iv_analysis"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -201,8 +231,10 @@
     "status": "M→D/I",
     "method": "Calibrate channels and derive spatial potential gradients using known geometry.",
     "caveat": "Potential gradients require spatial calibration and consistent time alignment.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_potential_array"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Electrostatic probes",
@@ -211,8 +243,10 @@
     "status": "M→D/I",
     "method": "Use calibrated probe response and a validated conversion from current/voltage to density.",
     "caveat": "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_probe_density_fluctuations"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -221,8 +255,12 @@
     "status": "M→D/I",
     "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
     "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_optical_emission_spectrum",
+      "fit_spectral_line",
+      "spectral_calibration"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -231,8 +269,11 @@
     "status": "M→D/I",
     "method": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
     "caveat": "Detector response and atomic rates are often dominant uncertainties.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_vuv_spectrum",
+      "fit_spectral_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -253,8 +294,11 @@
     "status": "M→D/I",
     "method": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
     "caveat": "Neutral density and atomic rates can dominate inference.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_charge_exchange_spectroscopy",
+      "analyze_cxrs_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -263,8 +307,11 @@
     "status": "M→D/I",
     "method": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
     "caveat": "Line intensity is not a direct particle flux without a collisional-radiative model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_balmer_spectroscopy",
+      "analyze_optical_emission_spectrum"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Spectroscopy",
@@ -283,8 +330,11 @@
     "status": "M→D",
     "method": "Measure a narrow reference line or use a validated instrument function.",
     "caveat": "Do not subtract widths without a compatible convolution model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "characterize_instrument_line_shape",
+      "fit_spectral_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -293,8 +343,11 @@
     "status": "M→D",
     "method": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
     "caveat": "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_interferometry",
+      "linear_phase_density"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -303,8 +356,11 @@
     "status": "M→D/I",
     "method": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
     "caveat": "Mode identification, ray/beam effects and equilibrium assumptions are essential.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_reflectometry_sweep",
+      "reflectometry_cutoff_density"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -313,8 +369,10 @@
     "status": "M→I",
     "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
     "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "fit_collective_scattering_spectrum"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Density and refractive diagnostics",
@@ -323,8 +381,10 @@
     "status": "M→I",
     "method": "Solve propagation through a spatially varying refractive index.",
     "caveat": "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "trace_o_mode_ray"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -347,8 +407,11 @@
     "status": "M→D",
     "method": "Calibrate bandwidth/response and analyze time series consistently.",
     "caveat": "Detector response and channel synchronization limit transient interpretation.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_fast_bolometry",
+      "regularized_tomography"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -357,8 +420,11 @@
     "status": "M→D/I",
     "method": "Calibrate channels and combine with geometry/model for reconstruction.",
     "caveat": "Signals depend on spectral response, impurity mix and detector sightlines.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_soft_xray_array",
+      "regularized_tomography"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -367,8 +433,11 @@
     "status": "M→D/I",
     "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
     "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_hard_xray_spectrum",
+      "xray_spectrum_summary"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -377,8 +446,10 @@
     "status": "M→D/I",
     "method": "Apply geometric calibration and image segmentation/tracking.",
     "caveat": "Line integration, brightness thresholds and viewing geometry affect interpretation.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_visible_imaging"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -387,8 +458,11 @@
     "status": "M→D",
     "method": "Track calibrated image features across synchronized frames.",
     "caveat": "Apparent velocity is line-of-sight projected and affected by exposure/time resolution.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_fast_visible_imaging",
+      "analyze_visible_imaging"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -397,8 +471,10 @@
     "status": "M→D/I",
     "method": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
     "caveat": "Emissivity, reflections, viewing angle and thermal properties are critical.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_ir_thermography"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Radiation and imaging",
@@ -407,8 +483,11 @@
     "status": "I",
     "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
     "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "regularized_tomography",
+      "build_tomography_matrix_2d"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
@@ -417,8 +496,10 @@
     "status": "M→D/I",
     "method": "Apply efficiency, dead-time, geometry and background corrections.",
     "caveat": "Neutron scattering and source anisotropy can affect absolute yield.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_neutron_yield_monitor"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
@@ -427,8 +508,11 @@
     "status": "M→D/I",
     "method": "Unfold detector response or fit spectrum with a forward model.",
     "caveat": "Unfolding is ill-conditioned and must include response and uncertainty.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_neutron_spectrometry",
+      "regularized_tomography"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
@@ -437,8 +521,11 @@
     "status": "M→I",
     "method": "Reconstruct from multiple sightlines or imaging response.",
     "caveat": "Sparse viewing and scattering make inversion uncertain.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_neutron_tomography",
+      "regularized_tomography"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Neutron and nuclear",
@@ -447,8 +534,11 @@
     "status": "M→D/I",
     "method": "Calibrate energy and efficiency; fit peaks and background.",
     "caveat": "Pile-up, dead time, shielding and activation backgrounds matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_gamma_spectrum",
+      "polynomial_calibration"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Fast particles",
@@ -457,8 +547,10 @@
     "status": "M→I",
     "method": "Use calibrated response and neutralization/charge-exchange forward model.",
     "caveat": "Sightline integration and atomic cross sections are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_neutral_particle_analyzer"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Fast particles",
@@ -467,8 +559,11 @@
     "status": "M→I",
     "method": "Separate thermal/background emission and compare calibrated spectra with forward model.",
     "caveat": "Atomic physics, beam geometry, background and phase-space sensitivity matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_fida_spectrum",
+      "fit_spectral_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Fast particles",
@@ -477,8 +572,10 @@
     "status": "M→I",
     "method": "Fit frequency-shifted scattered spectrum using plasma response model.",
     "caveat": "Calibration, scattering geometry and background rejection are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "fit_collective_scattering_spectrum"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Fast particles",
@@ -487,8 +584,10 @@
     "status": "M→D/I",
     "method": "Calibrate scintillator/particle response and compare to orbit-following model.",
     "caveat": "Detector geometry and magnetic equilibrium are needed for energy/pitch inference.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_fild_image"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Fast particles",
@@ -497,8 +596,11 @@
     "status": "M→D/I",
     "method": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
     "caveat": "Radiation is a proxy, not a direct measurement of runaway population.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_runaway_electron_signatures",
+      "xray_spectrum_summary"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -507,8 +609,10 @@
     "status": "M→D",
     "method": "Apply gauge-specific calibration and gas sensitivity corrections.",
     "caveat": "Gauge type, gas species, location and operating range matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_pressure_gauge"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -517,8 +621,10 @@
     "status": "M→D/I",
     "method": "Apply mass-sensitivity and cracking-pattern corrections.",
     "caveat": "Species cross-sensitivity, fragmentation and calibration are essential.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_rga_spectrum"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -527,8 +633,10 @@
     "status": "M→D",
     "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
     "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_gas_flow_meter"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Gas, pressure and fueling",
@@ -547,8 +655,10 @@
     "status": "D",
     "method": "Compute from calibrated throughput and pressure under defined conditions.",
     "caveat": "Conductance, gauge position and units must be consistent.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_effective_pumping_speed"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "MHD and turbulence",
@@ -667,8 +777,11 @@
     "status": "D/I",
     "method": "Construct a time-resolved power balance with explicit sign convention.",
     "caveat": "Missing channels and derivative noise can dominate inferred losses.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_energy_balance",
+      "derive_parameters"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Transport and confinement",
@@ -733,8 +846,10 @@
     "status": "M→I",
     "method": "Combine calibrated RF power with propagation/absorption/current-drive model.",
     "caveat": "Deposition and driven current are model-dependent.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_lower_hybrid_power"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Heating and RF",
@@ -743,8 +858,10 @@
     "status": "I",
     "method": "Infer from power balance and transport model.",
     "caveat": "Needs source partition, exchange terms and time-dependent energy balance.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_electron_ion_heating_power"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   },
   {
     "family": "Plasma-facing components",
@@ -831,6 +948,7 @@
     "method": "Estimate from background/no-signal data using a stated detection criterion.",
     "caveat": "Detection limit depends on bandwidth, false-positive rate and averaging.",
     "implementation_functions": [
+      "analyze_noise_floor_detection_limit",
       "hampel_despike"
     ],
     "implementation_status": "Implemented numerical workflow (see limits)"
@@ -857,7 +975,10 @@
     "status": "D",
     "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
     "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_functions": [
+      "analyze_channel_synchronization",
+      "cross_correlation_lag"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)"
   }
 ]
