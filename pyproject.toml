@@ -20,7 +20,7 @@ data = ["xarray>=2024.1,<2025.0", "zarr>=2.16,<3", "fsspec>=2024.2", "aiohttp>=3
 tis = "tis.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["tis*"]
+include = ["tis*", "tokamak_analysis*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
