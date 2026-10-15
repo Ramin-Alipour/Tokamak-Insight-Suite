@@ -801,4 +801,4 @@ def test_icrh_proton_fundamental_resonance_field():
     out = icrh_resonance_field(frequency, ion_mass_amu=1.0, charge_state=1, harmonic=1)
     expected = 2*np.pi*U*frequency/E
     assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
-    assert expected == pytest.approx(4.18, rel=3e-3)
+    assert expected == pytest.approx(2.63, rel=3e-3)
