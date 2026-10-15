@@ -19,68 +19,89 @@ jobs:
           python-version: "3.12"
       - name: Install numerical dependency
         run: python -m pip install --disable-pip-version-check numpy
-      - name: Retrieve GOLEM shot data and compare temperature summary
+      - name: Retrieve GOLEM temperature series and compare with published shot summary
         run: |
           python - <<'PY'
-          import hashlib, json, math, pathlib, time
+          import hashlib, json, pathlib, re
           from datetime import datetime, timezone
           from urllib.request import Request, urlopen
           import numpy as np
 
           out = pathlib.Path("golem-temperature-validation")
           out.mkdir(exist_ok=True)
+          # GOLEM's Data.php lists the canonical Pygolem identifiers and file names.
+          # Try the public shot-level diagnostics paths as well as legacy aliases.
           bases = [
+              "https://golem.fjfi.cvut.cz/shots/30622/Diagnostics/Spectrometer/",
+              "https://golem.fjfi.cvut.cz/shots/30622/Diagnostics/Spectrometer/data/",
+              "https://golem.fjfi.cvut.cz/shots/30622/diagnostics/Spectrometer/",
+              "https://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Spectrometer.ON/data/",
               "https://golem.fjfi.cvut.cz/utils/data/30622/",
-              "https://golem.fjfi.cvut.cz/operation/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
-              "https://golem.fjfi.cvut.cz/shots/30622/diagnostics/Radiation/1111Spectrometer.ON/data/",
           ]
           candidates = {
-              "electron_temperature": ["spectrometr:temperature", "temperature", "electron_temperature"],
-              "mean_temperature": ["spectrometr:mean_temperature", "temperature_mean", "mean_temperature"],
+              "electron_temperature": [
+                  "temperature", "temperature.txt", "ElectronTemp", "ElectronTemp.txt",
+                  "spectrometr:temperature", "electron_temperature", "electron_temperature.txt"
+              ],
+              "mean_temperature": [
+                  "mean_temperature", "mean_temperature.txt", "temperature_mean",
+                  "temperature_mean.txt", "spectrometr:mean_temperature"
+              ],
           }
           report = {
-              "test": "GOLEM shot 30622 electron-temperature time-series cross-check",
+              "test": "GOLEM shot 30622 electron-temperature time-series consistency cross-check",
               "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
               "shot": 30622,
               "reference_mean_eV": 20.8,
               "reference_source": "https://golem.fjfi.cvut.cz/shots/30622/Data.php",
-              "note": "The published shot-page scalar may be produced by the same diagnostic pipeline; this is a consistency cross-check, not independent end-to-end validation unless provenance confirms method equivalence."
+              "reference_parameter": "temperature_mean (ElectronTemperatureMean), electron temperature [eV]",
+              "note": "This checks consistency with the shot-page summary, not independent end-to-end validation. Electron temperature is not ion temperature."
           }
-          retrieved = {}
+
+          def parse_numeric_table(raw):
+              decoded = raw.decode("utf-8", errors="replace")
+              rows = []
+              for line in decoded.splitlines():
+                  fields = line.replace(",", " ").split()
+                  if not fields:
+                      continue
+                  try:
+                      vals = [float(re.sub(r"^[^0-9+-.]*", "", token)) for token in fields]
+                  except (ValueError, TypeError):
+                      continue
+                  if vals and all(np.isfinite(vals)):
+                      rows.append(vals)
+              if not rows:
+                  return None
+              lengths = {len(row) for row in rows}
+              if len(lengths) != 1:
+                  return None
+              arr = np.asarray(rows, dtype=float)
+              return arr if arr.shape[0] >= 3 else None
+
           for kind, ids in candidates.items():
               success = None
               attempts = []
               for base in bases:
-                for identifier in ids:
-                  url = base + identifier
-                  try:
-                      req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
-                      with urlopen(req, timeout=8) as response:
-                          raw = response.read()
-                          ctype = response.headers.get("Content-Type", "")
-                      attempts.append({"url": url, "status": "downloaded", "bytes": len(raw), "content_type": ctype})
-                      # Accept only numeric tabular data, never HTML error pages.
-                      text = raw.decode("utf-8", errors="replace")
-                      numeric_rows = []
-                      for line in text.splitlines():
-                          fields = line.replace(",", " ").split()
-                          if not fields:
-                              continue
-                          try:
-                              values = [float(value) for value in fields]
-                          except ValueError:
-                              continue
-                          if all(np.isfinite(values)):
-                              numeric_rows.append(values)
-                      if numeric_rows and len({len(row) for row in numeric_rows}) == 1:
-                          arr = np.asarray(numeric_rows, dtype=float)
-                          if arr.shape[0] >= 3 and arr.shape[1] >= 1:
+                  for identifier in ids:
+                      url = base + identifier
+                      try:
+                          req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.1"})
+                          with urlopen(req, timeout=8) as response:
+                              raw = response.read()
+                              ctype = response.headers.get("Content-Type", "")
+                          arr = parse_numeric_table(raw)
+                          attempts.append({
+                              "url": url, "status": "numeric_table" if arr is not None else "downloaded_non_numeric",
+                              "bytes": len(raw), "content_type": ctype
+                          })
+                          if arr is not None:
                               success = (url, raw, arr)
-                          break
-                  except Exception as exc:
-                      attempts.append({"url": url, "status": "failed", "error": repr(exc)})
-                if success:
-                    break
+                              break
+                      except Exception as exc:
+                          attempts.append({"url": url, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
+                  if success:
+                      break
               report.setdefault("retrieval_attempts", {})[kind] = attempts
               if success:
                   url, raw, arr = success
@@ -88,29 +109,39 @@ jobs:
                   (out / filename).write_bytes(raw)
                   y = arr[:, -1]
                   report[kind] = {
-                      "source_url": url, "filename": filename, "sha256": hashlib.sha256(raw).hexdigest(),
-                      "n_rows": int(arr.shape[0]), "n_columns": int(arr.shape[1]),
-                      "first_coordinate_or_sample": float(arr[0, 0]), "last_coordinate_or_sample": float(arr[-1, 0]),
-                      "value_mean": float(np.mean(y)), "value_median": float(np.median(y)),
-                      "value_std": float(np.std(y, ddof=1)), "value_min": float(np.min(y)),
-                      "value_max": float(np.max(y)), "finite_fraction": float(np.isfinite(arr).mean()),
-                      "coordinate_semantics": "first column is time only if confirmed by source format; otherwise sample/index coordinate"
+                      "source_url": url,
+                      "filename": filename,
+                      "sha256": hashlib.sha256(raw).hexdigest(),
+                      "n_rows": int(arr.shape[0]),
+                      "n_columns": int(arr.shape[1]),
+                      "first_coordinate_or_sample": float(arr[0, 0]),
+                      "last_coordinate_or_sample": float(arr[-1, 0]),
+                      "value_mean_eV_assumed_from_GOLEM_metadata": float(np.mean(y)),
+                      "value_median": float(np.median(y)),
+                      "value_std_sample": float(np.std(y, ddof=1)),
+                      "value_min": float(np.min(y)),
+                      "value_max": float(np.max(y)),
+                      "finite_fraction": float(np.isfinite(arr).mean()),
+                      "unit_and_time_axis_verified": False
                   }
               else:
                   report[kind] = {"status": "not_retrieved_as_numeric_table"}
+
           series = report.get("electron_temperature", {})
-          if "value_mean" in series:
-              delta = series["value_mean"] - report["reference_mean_eV"]
+          if "value_mean_eV_assumed_from_GOLEM_metadata" in series:
+              mean = series["value_mean_eV_assumed_from_GOLEM_metadata"]
+              delta = mean - report["reference_mean_eV"]
               report["comparison"] = {
-                  "series_mean_minus_reference_eV": delta,
+                  "series_mean_minus_published_mean_eV": delta,
                   "absolute_difference_eV": abs(delta),
                   "relative_difference_percent": 100 * abs(delta) / abs(report["reference_mean_eV"]),
-                  "interpretation": "Comparable only if the downloaded series uses eV and the same time window/weighting as the scalar reference."
+                  "interpretation": "Numerical consistency only; confirm column semantics, units, and averaging window before calling it a validated comparison."
               }
-          report["status"] = "cross-check-computed" if "comparison" in report else "retrieval-or-format-unresolved"
+              report["status"] = "cross-check-computed"
+          else:
+              report["status"] = "retrieval-or-format-unresolved"
           (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
           print(json.dumps(report, indent=2))
-          # Preserve the report/artifacts even when the remote endpoint is unavailable.
           PY
       - name: Enforce honest validation status
         if: always()
