@@ -455,3 +455,14 @@ def test_bolometry_known_triangular_pulse_integral():
     out = analyze_bolometry([0.0, 1.0, 2.0], [0.0, 2.0, 0.0])
     assert out["time_integrated_signal_J_m2"] == pytest.approx(2.0)
     assert out["peak_signal_W_m2"] == pytest.approx(2.0)
+
+
+
+def test_radiation_tomography_identity_response_exact_solution():
+    from tokamak_analysis.radiation_tomography import reconstruct_emissivity
+    A = np.eye(2)
+    y = np.array([2.0, 3.0])
+    out = reconstruct_emissivity(A, y, regularization=0.0)
+    np.testing.assert_allclose(out["emissivity"], y, atol=1e-8)
+    np.testing.assert_allclose(out["synthetic_measurements"], y, atol=1e-8)
+    assert out["residual_norm"] == pytest.approx(0.0, abs=1e-8)
