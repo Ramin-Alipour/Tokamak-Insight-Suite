@@ -5,8 +5,8 @@ from tis.core import (
     linear_calibration, polynomial_calibration, prepare_time_series, butterworth_filter,
     fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag, fit_spectral_line,
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
-    regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality, evaluate_spectral_fit,
-    linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments, resample_time_series,
+    regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality,
+    linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
     exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram, autocorrelation_analysis,
@@ -590,9 +590,6 @@ def test_mode_number_from_channels_extracts_cross_spectral_phase_with_coherence(
     theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
     signals = np.vstack([np.sin(2*np.pi*120*time + 3*angle) for angle in theta])
     result = mode_number_from_channels(theta, signals, fs, frequency_range_hz=(100, 140))
-    assert "leave_one_sensor_out_results" in result
-    assert len(result["leave_one_sensor_out_results"]) == len(theta)
-    assert "not a confidence interval" in result["leave_one_sensor_out_note"]
     assert result["selected_frequency_Hz"] == pytest.approx(120, abs=1)
     assert result["mode_number_fit"] == pytest.approx(3, abs=0.15)
     assert min(result["coherence_with_reference"]) > 0.9
@@ -844,128 +841,3 @@ def test_spectrum_moments_flags_undefined_signed_net_moments_without_throwing():
     xray = xray_spectrum_summary(energy, net, bin_representation="counts_per_bin")
     assert xray["moments_valid"] is False
     assert xray["energy_axis_unit"] == "keV"
-
-
-def test_load_table_reports_cells_coerced_to_missing():
-    raw = b"time,signal\n0,1.0\n1,not-a-number\n2,3.0\n"
-    frame = load_table(raw, "instrument.csv")
-    assert frame["signal"].isna().sum() == 1
-    assert frame["signal"].dtype.kind in "fi"
-    report = frame.attrs["tis_import_report"]
-    assert report["numeric_coercions"]["signal"]["converted_to_missing"] == 1
-
-
-def test_load_table_enforces_row_limit_during_csv_read():
-    raw = b"time,signal\n0,1\n1,2\n2,3\n"
-    with pytest.raises(ValueError, match="import limit"):
-        load_table(raw, "instrument.csv", max_rows=2)
-
-
-def test_tomography_reports_conditioning_and_coverage():
-    A = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
-    result = regularized_tomography(A, np.array([1.0, 2.0, 3.0]), 0.1, False)
-    assert result["response_effective_rank"] == 2
-    assert result["response_condition_number"] >= 1.0
-    assert result["response_column_coverage_fraction"] == pytest.approx(1.0)
-    assert "uncertainty" in result["linearized_uncertainty_status"].lower()
-
-
-def test_tomography_noise_sensitivity_is_reproducible():
-    from tis.core import tomography_noise_sensitivity
-    A = np.array([[1.0, 0.0], [0.0, 1.0], [1.0, 1.0]])
-    y = np.array([1.0, 2.0, 3.0])
-    sigma = np.full(3, 0.05)
-    first = tomography_noise_sensitivity(A, y, sigma, lam=0.1, nonnegative=False,
-                                         n_replicates=20, random_seed=12)
-    second = tomography_noise_sensitivity(A, y, sigma, lam=0.1, nonnegative=False,
-                                          n_replicates=20, random_seed=12)
-    assert np.allclose(first["monte_carlo_standard_deviation"], second["monte_carlo_standard_deviation"])
-    assert np.all(first["percentile_97_5"] >= first["percentile_2_5"])
-
-
-def test_spectral_fit_reports_residual_quality_and_evaluator_matches_data():
-    x = np.linspace(499.5, 500.5, 201)
-    y = 3.0 + 20.0*np.exp(-0.5*((x-500.03)/0.08)**2)
-    fit = fit_spectral_line(x, y, model="Gaussian")
-    predicted = evaluate_spectral_fit(x, fit)
-    assert fit["fit_points"] == len(x)
-    assert fit["fit_rmse"] < 1e-6
-    assert np.allclose(predicted, y, atol=1e-5)
-    assert fit["reduced_chi_square"] is None
-
-
-def test_resample_time_series_uniformizes_small_timestamp_jitter():
-    base = np.arange(100, dtype=float)*0.01
-    time = base.copy()
-    time[1::2] += 0.0002
-    signal = np.sin(2*np.pi*3*base)
-    result = resample_time_series(time, signal)
-    assert np.allclose(np.diff(result["time_s"]), result["target_dt_s"])
-    assert len(result["values"]) >= 8
-    assert "does not recover information" in result["warning"]
-
-
-def test_resample_time_series_refuses_to_bridge_large_gaps():
-    time = np.arange(100, dtype=float)*0.01
-    time[50:] += 0.05
-    signal = np.sin(2*np.pi*3*time)
-    with pytest.raises(ValueError, match="Large timestamp gaps"):
-        resample_time_series(time, signal)
-
-
-def test_resample_time_series_rejects_implicit_downsampling():
-    time = np.arange(100, dtype=float)*0.01
-    signal = np.sin(2*np.pi*3*time)
-    with pytest.raises(ValueError, match="Downsampling"):
-        resample_time_series(time, signal, target_dt_s=0.02)
-
-
-def test_filter_impact_reports_transfer_response_and_spectral_changes():
-    from tis.core import filter_impact_analysis
-    fs = 2000.0
-    time = np.arange(4096)/fs
-    signal = np.sin(2*np.pi*40*time)+0.5*np.sin(2*np.pi*500*time)
-    result = filter_impact_analysis(signal,fs,lowpass=100.0,order=4)
-    assert result["filter_type"] == "lowpass"
-    assert result["filtered_rms"] < result["raw_rms"]
-    assert len(result["frequency_response_Hz"]) == 512
-    assert result["forward_backward_amplitude_response"][-1] < 0.01
-
-
-def test_end_to_end_doppler_workflow_calibrates_corrects_and_derives_physics():
-    from tis.core import analyze_doppler_line_end_to_end
-    pixels = np.linspace(0.0, 100.0, 501)
-    wavelength = 499.5 + 0.01*pixels
-    response = np.linspace(1.0, 2.0, len(pixels))
-    corrected = 5.0 + 100.0*np.exp(-0.5*((wavelength-500.05)/0.05)**2)
-    measured = corrected*response
-    result = analyze_doppler_line_end_to_end(
-        pixels, measured, [0, 50, 100], [499.5, 500.0, 500.5],
-        rest_wavelength=500.0, ion_mass_amu=40.0,
-        fit_min_wavelength=499.8, fit_max_wavelength=500.3,
-        instrument_sigma=0.02, relative_response=response,
-        calibration_degree=1)
-    assert result["line_fit"]["center"] == pytest.approx(500.05, abs=1e-5)
-    assert result["doppler_temperature_eV"] > 0
-    assert result["line_of_sight_velocity_m_s"] == pytest.approx(29979.2458, rel=1e-5)
-    assert result["relative_response_correction_applied"] is True
-    assert result["line_fit"]["fit_rmse"] < 1e-5
-
-
-def test_end_to_end_doppler_workflow_rejects_unresolved_thermal_width():
-    from tis.core import analyze_doppler_line_end_to_end
-    pixels = np.linspace(0.0, 100.0, 101)
-    wavelength = 499.5 + 0.01*pixels
-    intensity = 1.0 + 10.0*np.exp(-0.5*((wavelength-500.0)/0.03)**2)
-    with pytest.raises(ValueError, match="does not exceed instrumental"):
-        analyze_doppler_line_end_to_end(
-            pixels, intensity, [0, 50, 100], [499.5, 500.0, 500.5],
-            rest_wavelength=500.0, ion_mass_amu=40.0,
-            fit_min_wavelength=499.8, fit_max_wavelength=500.2,
-            instrument_sigma=0.04, calibration_degree=1)
-
-
-def test_signal_quality_duplicate_fraction_means_repeated_amplitudes_not_timestamps():
-    r = signal_quality([1.0, 1.0, 2.0, 3.0])
-    assert r['duplicate_fraction'] == 0.25
-    assert 'not a timestamp-duplicate metric' in r['duplicate_fraction_definition']

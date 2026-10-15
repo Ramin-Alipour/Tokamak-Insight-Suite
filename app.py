@@ -7,18 +7,20 @@ import pandas as pd
 from matplotlib.figure import Figure
 import streamlit as st
 from tis import __version__
-from tis.ui.time_series_page import render_time_series_page
-from tis.ui.spectral_page import render_spectral_page
-from tis.ui.validation_page import render_validation_page
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
+from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
+from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_star, spitzer_resistivity,
+    larmor_radii_and_speeds, coulomb_logarithm_electron, shaping_surface_area, q95_iter_formula)
+from tis.report import build_html_report, figure_to_png_base64
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
-    prepare_time_series, resample_time_series, butterworth_filter, filter_impact_analysis, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
-    fit_spectral_line, evaluate_spectral_fit, analyze_doppler_line_end_to_end, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
-    uncertainty_linear, regularized_tomography, select_tikhonov_lambda, tomography_noise_sensitivity, spectral_calibration, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux, compare_condition_signals, drift_transport_from_fields, electric_field_from_potential_difference,
-    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts, morlet_wavelet_analysis, svd_mode_decomposition,
-    equilibrium_grid_derivatives, xray_spectrum_summary, ion_sound_speed_m_s, mach_number_from_velocity, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
+    prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
+    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
+    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, spectral_calibration, probe_iv_summary,
+    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
+    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
+    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
 st.markdown('''<style>
@@ -60,6 +62,7 @@ with st.sidebar:
         import_delimiter=st.selectbox("CSV/TXT delimiter",["Auto-detect",",",";","Tab","|"],index=0,key="import_delimiter")
         import_comment=st.selectbox("Comment marker",["None","#","%"],index=0,key="import_comment")
         import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
+        import_encoding=st.selectbox("Text encoding",["Auto (UTF-8 → Windows-1252 → Latin-1)","utf-8","cp1252","latin-1","utf-16"],index=0,key="import_encoding")
         import_drop_units=st.checkbox("Drop first data row if it contains units (e.g. V / s)",value=False,key="import_drop_units")
     if upload is not None:
         try:
@@ -75,18 +78,21 @@ with st.sidebar:
             sheet_value=import_sheet.strip()
             sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
-                "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units)},sort_keys=True)
+                "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units),"encoding":import_encoding},sort_keys=True)
             needs_import=(new_upload or (st.session_state.get("tis_active_source")=="upload" and
                 import_signature != st.session_state.get("tis_upload_signature")))
             if needs_import:
                 frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
                                  delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
-                                 skiprows=int(import_skiprows),comment=None if import_comment=="None" else import_comment)
+                                 skiprows=int(import_skiprows),comment=None if import_comment=="None" else import_comment,
+                                 encoding=None if import_encoding.startswith("Auto") else import_encoding)
                 if import_drop_units:
                     if len(frame)<2: raise ValueError("Cannot drop a units row because the table has fewer than two rows.")
                     frame=frame.iloc[1:].reset_index(drop=True)
                     for column in frame.columns:
-                        frame[column]=pd.to_numeric(frame[column],errors="ignore")
+                        converted=pd.to_numeric(frame[column],errors="coerce")
+                        # Keep a column numeric only if the conversion lost no non-empty cell.
+                        if int(converted.notna().sum())==int(frame[column].notna().sum()): frame[column]=converted
                 st.session_state.pop("tis_source_manifest",None)
                 st.session_state["tis_raw"]=uploaded_bytes
                 st.session_state["tis_filename"]=upload.name
@@ -100,14 +106,15 @@ with st.sidebar:
                 st.session_state["tis_active_source"]="upload"
                 st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
                 st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
-                    "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units)}
+                    "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units),
+                    "encoding_requested":import_encoding,"encoding_used":frame.attrs.get("encoding")}
         except Exception as e:
             st.error(f"Import failed: {e}")
     if 'tis_df' in st.session_state:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
         st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
     st.divider()
-    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Spectral Analysis','Probe Analysis','Plasma Parameters','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reference Results Validation','Reports & Export']
+    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
@@ -182,19 +189,30 @@ def json_download(label,obj,name):
     payload=json.dumps(safe,indent=2,ensure_ascii=False,allow_nan=False).encode()
     st.download_button(label,payload,name,'application/json')
     if not any(token in name.lower() for token in ("provenance","registry","formula_registry")):
+        import hashlib
         history=st.session_state.get("tis_analysis_history",[])
-        history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
-                  "page":page,"parameter_snapshot":_parameter_snapshot(),
-                  "result_summary":_result_summary(obj)}]+history
-        st.session_state["tis_analysis_history"]=history[:20]
+        digest=hashlib.sha256(payload).hexdigest()
+        # Streamlit reruns the script on every widget change; only log a result once.
+        if not any(h.get("name")==name and h.get("result_sha256")==digest for h in history):
+            history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
+                      "page":page,"parameter_snapshot":_parameter_snapshot(),"result_sha256":digest,
+                      "result_summary":_result_summary(obj)}]+history
+            st.session_state["tis_analysis_history"]=history[:50]
+def add_report_section(title, results, fig=None, notes=""):
+    """Remember a result (and optional figure) so it appears in the HTML report. Replaces any previous section of the same title."""
+    sections=[x for x in st.session_state.get('tis_report_sections',[]) if x['title']!=title]
+    sections.append({'title':title,'results':_json_safe(results),'notes':notes,
+                     'figures':[figure_to_png_base64(fig)] if fig is not None else []})
+    st.session_state['tis_report_sections']=sections[-30:]
 def need_data():
     if df is None:
         st.info('Load a diagnostic data file using the left-hand panel. The diagnostic library and formula registry remain available without a data file.')
         st.stop()
 
 @st.cache_data(show_spinner=False, max_entries=3)
-def cached_prepare_time_series(time_values, signal_values, sample_rate):
-    return prepare_time_series(time_values, signal_values, sample_rate)
+def cached_prepare_time_series(time_values, signal_values, sample_rate, gap_policy="error"):
+    t_, y_, fs_, report_ = prepare_time_series_robust(time_values, signal_values, sample_rate, gap_policy)
+    return t_, y_, fs_, report_
 
 @st.cache_data(show_spinner=False, max_entries=3)
 def cached_filter(values, fs, highpass, lowpass, order):
@@ -419,11 +437,6 @@ elif page=='Data Import & QC':
     st.title('Data Import & Quality Control')
     if df is None: st.info('Use the upload control in the left panel. Raw input is preserved and never overwritten.'); st.stop()
     st.success(f'{filename}: {len(df):,} rows × {len(df.columns)} columns')
-    import_report = df.attrs.get("tis_import_report", {})
-    coercions = import_report.get("numeric_coercions", {})
-    if coercions:
-        st.warning("Some non-empty cells were converted to missing numeric values. Review this report before analysis.")
-        st.json(coercions)
     m1,m2,m3,m4=st.columns(4); m1.metric('Rows',f'{len(df):,}'); m2.metric('Columns',len(df.columns)); m3.metric('Numeric columns',len(numeric)); m4.metric('SHA-256',sha[:12]+'…')
     st.dataframe(df.head(50),use_container_width=True)
     st.markdown('### Quality audit')
@@ -436,9 +449,337 @@ elif page=='Data Import & QC':
     download_df('Export imported table CSV',df,'tis_imported_data.csv')
 
 elif page=='Time Series & MHD':
-    render_time_series_page(st, df, numeric, col_select, plot_line, json_download, download_df, cached_prepare_time_series, cached_fft, cached_welch)
+    st.title('Time Series, Spectral & MHD Analysis'); need_data()
+    tcol=st.selectbox('Time column (or sample index)',['<sample index>']+numeric,key='ts_t')
+    scol=col_select('Signal channel',numeric,'ts_s')
+    fs0=st.number_input('Sampling frequency if no time column (Hz; required for sample-index mode)',min_value=0.0,value=0.0,format='%.8g',help='No assumed 10 kHz default: enter the actual acquisition rate when no calibrated time column is available.')
+    if tcol=='<sample index>' and fs0<=0:
+        st.warning('A sampling rate is required because no time column is selected. Enter the acquisition rate above before interpreting frequency axes.')
+        st.stop()
+    gap_policy=st.selectbox('Irregular sampling / gap policy',['error','longest_segment','interpolate'],index=0,key='ts_gap_policy',
+        format_func=lambda v:{'error':'Reject (strict)','longest_segment':'Keep longest gap-free segment (no interpolation)','interpolate':'Interpolate short gaps, keep longest finite run'}[v],
+        help='Strict mode refuses gappy records. The other modes are explicit repairs and are recorded in the on-page report.')
+    c1,c2,c3=st.columns(3)
+    with c1: hp=st.number_input('High-pass cutoff (0=off)',min_value=0.0,value=0.0)
+    with c2: lp=st.number_input('Low-pass cutoff (0=off)',min_value=0.0,value=0.0)
+    with c3: order=st.slider('Butterworth order',1,8,3)
+    try:
+        t,y,fs,prep_report=cached_prepare_time_series(None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float),pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float),fs0,gap_policy)
+        yf=cached_filter(y,fs,hp or None,lp or None,order)
+    except Exception as e:
+        st.error(f'Time-series preparation failed: {e}')
+        if tcol!='<sample index>':
+            try:
+                with st.expander('Sampling audit of the selected time column'):
+                    st.json(sampling_audit(pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)))
+                st.info('If gaps are real (burst acquisition, dropped samples), choose a gap policy above instead of editing the data by hand.')
+            except Exception: pass
+        st.stop()
+    if prep_report.get('modified'): st.warning('Data were repaired before analysis: '+prep_report.get('note','')+f" (policy: {prep_report['gap_policy']}).")
+    if tcol!='<sample index>':
+        with st.expander('Sampling audit'):
+            st.json(sampling_audit(t))
+    with st.expander('Optional: despike (Hampel) before analysis'):
+        st.caption('Removes isolated glitches only. Real transients such as ELMs are removed too if the window is short, so this is OFF by default.')
+        if st.checkbox('Apply Hampel despiking to the analysis channel',value=False,key='ts_despike'):
+            dw=st.number_input('Window (odd samples)',min_value=3,max_value=2001,value=11,step=2,key='ts_despike_w'); ds=st.number_input('Threshold (robust σ)',min_value=1.0,value=6.0,key='ts_despike_s')
+            try:
+                dres=hampel_despike(y,int(dw),float(ds)); y=dres['values']; yf=cached_filter(y,fs,hp or None,lp or None,order)
+                st.info(f"Replaced {dres['n_replaced']} sample(s). {dres['method']}")
+            except Exception as e: st.error(str(e))
+
+    x1,x2,x3=st.columns(3); x1.metric('Finite samples',len(y)); x2.metric('Sampling rate',f'{fs:.6g} Hz'); x3.metric('Nyquist',f'{fs/2:.6g} Hz')
+    plot_line(t,y,'Time (s)',scol,'Raw signal'); plot_line(t,yf,'Time (s)',scol,'Filtered signal')
+    st.markdown('### Welch PSD settings')
+    wc1,wc2,wc3=st.columns(3)
+    with wc1: welch_n=st.number_input('Segment length (samples)',min_value=8,max_value=int(len(y)),value=min(4096,int(len(y))),step=1,key='welch_nperseg')
+    with wc2: welch_overlap=st.number_input('Overlap (samples)',min_value=0,max_value=max(0,int(welch_n)-1),value=int(welch_n)//2,step=1,key='welch_overlap')
+    with wc3: welch_window=st.selectbox('Window',['hann','hamming','blackman','boxcar','bartlett'],index=0,key='welch_window')
+    fft_window=st.selectbox('FFT amplitude window',['hann','flattop','hamming','blackman','boxcar'],index=0,key='fft_window')
+    f,amp=cached_fft(yf,fs,fft_window)
+    st.caption(f'FFT window: {fft_window}; amplitude scaling uses the selected window coherent gain. Flat-top is available for reduced off-bin amplitude bias.')
+    fp,psd=cached_welch(yf,fs,int(welch_n),int(welch_overlap),welch_window)
+    st.caption(f'Welch nominal frequency-bin spacing: {fs/int(welch_n):.6g} Hz; overlap: {int(welch_overlap)/int(welch_n):.0%}.')
+    plot_line(f,amp,'Frequency (Hz)','Amplitude','FFT amplitude'); plot_line(fp,np.maximum(psd,np.finfo(float).tiny),'Frequency (Hz)','PSD (unit²/Hz)','Welch PSD',True)
+    st.markdown('### Time-frequency spectrogram')
+    tf_n=st.number_input('Spectrogram segment length',min_value=8,max_value=int(len(y)),value=min(256,int(len(y))),step=1,key='tf_n')
+    tf_overlap=st.number_input('Segment overlap (samples)',min_value=0,max_value=int(tf_n)-1,value=int(tf_n)//2,step=1,key='tf_overlap')
+    if st.button('Calculate spectrogram'):
+        try:
+            tf=time_frequency_spectrogram(yf,fs,nperseg=int(tf_n),noverlap=int(tf_overlap))
+            fig=Figure(figsize=(9,4)); ax=fig.subplots()
+            mesh=ax.pcolormesh(tf['time_s'],tf['frequency_Hz'],10*np.log10(np.maximum(tf['psd'],np.finfo(float).tiny)),shading='auto')
+            ax.set_xlabel('Time (s)'); ax.set_ylabel('Frequency (Hz)'); ax.set_title('Short-time power spectral density (dB)')
+            fig.colorbar(mesh,ax=ax,label='PSD (dB re 1 unit²/Hz)'); fig.tight_layout(); st.pyplot(fig)
+            download_df('Download spectrogram matrix',pd.DataFrame(tf['psd'],index=tf['frequency_Hz'],columns=[f'{v:.9g}' for v in tf['time_s']]).reset_index(names='frequency_Hz'),'tis_spectrogram.csv')
+        except Exception as e: st.error(str(e))
+    st.markdown('### Autocorrelation / correlation-time estimate')
+    max_lag=st.number_input('Maximum autocorrelation lag (s)',min_value=0.0,value=min(0.1,float(t[-1]-t[0])),max_value=float(t[-1]-t[0]),format='%.8g',key='acf_max_lag')
+    if st.button('Analyze autocorrelation'):
+        try:
+            acf=autocorrelation_analysis(yf,fs,max_lag_s=max_lag)
+            st.metric('First 1/e correlation time',f"{acf['e_folding_time_s']:.6g} s" if acf['e_folding_time_s'] is not None else 'Not reached in selected lag range')
+            plot_line(acf['lag_s'],acf['autocorrelation'],'Lag (s)','Normalized autocorrelation','Autocorrelation')
+            download_df('Download autocorrelation',pd.DataFrame({'lag_s':acf['lag_s'],'autocorrelation':acf['autocorrelation']}),'tis_autocorrelation.csv')
+        except Exception as e: st.error(str(e))
+    download_df('Download filtered series',pd.DataFrame({'time_s':t,'raw':y,'filtered':yf}),'tis_timeseries.csv')
+    download_df('Download FFT',pd.DataFrame({'frequency_Hz':f,'amplitude':amp}),'tis_fft.csv'); download_df('Download PSD',pd.DataFrame({'frequency_Hz':fp,'psd':psd}),'tis_welch_psd.csv')
+    st.markdown('### Cross-channel coherence / phase / delay')
+    others=[c for c in numeric if c!=scol]
+    if others:
+        other=st.selectbox('Second synchronized channel',others,key='cross_other')
+        # Apply one shared validity mask before any NaN removal so samples remain paired.
+        raw_x=pd.to_numeric(df[scol],errors='coerce').to_numpy(dtype=float)
+        raw_y=pd.to_numeric(df[other],errors='coerce').to_numpy(dtype=float)
+        raw_t=None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)
+        common=np.isfinite(raw_x)&np.isfinite(raw_y)
+        if raw_t is not None: common &= np.isfinite(raw_t)
+        tx=None if raw_t is None else raw_t[common]
+        try:
+            _,x_pair,fs_pair=prepare_time_series(tx,raw_x[common],fs0)
+            _,y_pair,fs2=prepare_time_series(tx,raw_y[common],fs0)
+            if len(x_pair)==len(y_pair) and np.isclose(fs_pair,fs2) and np.isclose(fs,fs_pair):
+                x_pair_f=butterworth_filter(x_pair,fs_pair,hp or None,lp or None,order)
+                y2f=butterworth_filter(y_pair,fs2,hp or None,lp or None,order)
+                xa=cross_analysis(x_pair_f,y2f,fs_pair)
+                lags,corr,lag=cross_correlation_lag(x_pair_f,y2f,fs_pair)
+                st.caption('Both channels use the same timestamp-validity mask and the same filter settings. Lag convention: a y-channel delayed relative to x gives a negative lag.')
+                st.metric('Peak absolute-correlation lag',f'{lag:.6g} s')
+                plot_line(xa['frequency_Hz'],xa['coherence'],'Frequency (Hz)','Coherence','Magnitude-squared coherence')
+                plot_line(xa['frequency_Hz'],xa['coherence_95pct_null_threshold'],'Frequency (Hz)','Coherence threshold','Approximate 95% null threshold')
+                plot_line(xa['frequency_Hz'],xa['cross_phase_rad'],'Frequency (Hz)','Phase (rad)','Cross phase φy−φx')
+                plot_line(xa['frequency_Hz'],xa['phase_standard_error_approx_rad'],'Frequency (Hz)','Phase SE (rad)','Approximate cross-phase standard error')
+                st.caption('Uncertainty curves use nominal Welch segment count; 50% overlap reduces independent averages, so treat them as diagnostics rather than exact confidence intervals.')
+                plot_line(lags,corr,'Lag (s)','Correlation','Cross-correlation')
+                download_df('Download cross-channel results',pd.DataFrame(xa),'tis_cross_analysis.csv')
+            else: st.warning('Channels need aligned timestamps and compatible sampling rates.')
+        except Exception as e: st.warning(f'Cross-channel analysis unavailable: {e}')
+    st.markdown('### Mode number from synchronized sensor channels')
+    st.caption('Select at least three synchronized channels in sensor order and enter their toroidal/poloidal angles. Relative phases are extracted from cross spectra and weighted by coherence.')
+    mode_channels=st.multiselect('Sensor signal channels',numeric,default=[],key='mode_sensor_channels')
+    mode_angles=st.text_input('Sensor angles θ (radians, same order as channels)','0,0.785398,1.570796,2.356194,3.141593,3.926991,4.712389,5.497787',key='mode_sensor_angles')
+    mode_coh=st.slider('Minimum coherence with reference sensor',0.0,1.0,0.2,0.05,key='mode_min_coherence')
+    mode_conv=st.selectbox('Mode-number sign convention',['wave_cos_wt_minus_n_theta','phase_equals_n_theta'],index=0,key='mode_convention',
+        help='wave_cos_wt_minus_n_theta: n>0 for a wave cos(ωt−nθ) travelling toward +θ (the usual convention). phase_equals_n_theta: raw fit of cross-phase = +nθ (opposite sign).')
+    if st.button('Extract phases and fit mode number'):
+        try:
+            if len(mode_channels)<3: raise ValueError('Select at least three sensor channels.')
+            angles=np.asarray([float(z.strip()) for z in mode_angles.split(',')],dtype=float)
+            if len(angles)!=len(mode_channels): raise ValueError('The number of sensor angles must match the selected channels.')
+            raw_signals=np.column_stack([pd.to_numeric(df[name],errors='coerce').to_numpy(dtype=float) for name in mode_channels])
+            raw_times=None if tcol=='<sample index>' else pd.to_numeric(df[tcol],errors='coerce').to_numpy(dtype=float)
+            valid=np.all(np.isfinite(raw_signals),axis=1)
+            if raw_times is not None: valid &= np.isfinite(raw_times)
+            t_common=None if raw_times is None else raw_times[valid]
+            clean=[]
+            fs_common=None
+            for j in range(raw_signals.shape[1]):
+                _,yj,fsj=prepare_time_series(t_common,raw_signals[valid,j],fs0)
+                if fs_common is not None and not np.isclose(fsj,fs_common): raise ValueError('Sensor channels do not share a common sampling rate.')
+                fs_common=fsj; clean.append(yj)
+            result=mode_number_from_channels(angles,np.vstack(clean),fs_common,min_coherence=mode_coh,convention=mode_conv)
+            st.json(result)
+            json_download('Export channel-derived mode fit',result,'tis_mode_number_from_channels.json')
+        except Exception as e: st.error(str(e))
+    with st.expander('Advanced: fit already-extracted phases'):
+        ang=st.text_input('Sensor angles θ (radians, comma-separated)','0,1.5707963,3.1415927,4.712389',key='manual_mode_angles')
+        phs=st.text_input('Measured phase (radians, comma-separated)','0,1.5707963,3.1415927,4.712389',key='manual_mode_phases')
+        if st.button('Fit supplied phases',key='fit_manual_mode'):
+            try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')],convention=mode_conv))
+            except Exception as e: st.error(str(e))
+    st.markdown('### Calibrated signal integration')
+    st.caption('Useful for derivative-type diagnostics such as pickup coils or Rogowski signals only when the sensor scale, offset/baseline, bandwidth and initial condition are known. The software does not infer these calibrations.')
+    int_scale=st.number_input('Integration input scale',value=1.0,format='%.8g',key='int_scale')
+    int_initial=st.number_input('Integrated initial value',value=0.0,format='%.8g',key='int_initial')
+    use_baseline=st.checkbox('Subtract mean over a baseline interval',value=False,key='int_use_baseline')
+    if use_baseline:
+        tmin=float(np.min(t)); tmax=float(np.max(t))
+        b1,b2=st.columns(2)
+        with b1: baseline_start=st.number_input('Baseline start (s)',value=tmin, min_value=tmin, max_value=tmax, key='int_baseline_start')
+        with b2: baseline_end=st.number_input('Baseline end (s)',value=min(tmin+(tmax-tmin)*0.1,tmax), min_value=tmin, max_value=tmax, key='int_baseline_end')
+    else:
+        baseline_start=baseline_end=None
+    drift_start=drift_end=None
+    if use_baseline and st.checkbox('Also remove linear drift using a post-event quiet window',value=False,key='int_use_drift'):
+        d1,d2=st.columns(2)
+        with d1: drift_start=st.number_input('Post window start (s)',value=max(tmin,tmax-(tmax-tmin)*0.1),min_value=tmin,max_value=tmax,key='int_drift_start')
+        with d2: drift_end=st.number_input('Post window end (s)',value=tmax,min_value=tmin,max_value=tmax,key='int_drift_end')
+        st.caption('Assumes the true signal is ≈0 in both windows, so any difference of their means is instrument drift (linear in time).')
+    if st.button('Integrate calibrated signal'):
+        try:
+            integrated=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
+            st.json({k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}})
+            plot_line(t,integrated['integrated_signal'],'Time (s)','Integrated signal','Cumulative calibrated integral')
+            out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':integrated['calibrated_signal'],'integrated_signal':integrated['integrated_signal']})
+            download_df('Download integrated series',out,'tis_integrated_timeseries.csv')
+            json_download('Export integration manifest',{k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}},'tis_integration_manifest.json')
+        except Exception as e: st.error(str(e))
+
+elif page=='Events & Transients':
+    st.title('Events & Transients: ELMs, Sawteeth, Current Quench'); need_data()
+    st.caption('Statistical detectors with robust (MAD) thresholds. Always confirm detections against the raw trace; ELM type, pellets and disruptions are not classified.')
+    kind=st.radio('Analysis',['ELMs (Dα / divertor emission)','Sawteeth (core SXR / ECE)','Current quench (Iₚ)'],horizontal=True,key='ev_kind')
+    ev_t=col_select('Time column (s)',numeric,'ev_t'); ev_y=col_select('Signal',[c for c in numeric if c!=ev_t] or numeric,'ev_y')
+    tv=pd.to_numeric(df[ev_t],errors='coerce').to_numpy(dtype=float); yv=pd.to_numeric(df[ev_y],errors='coerce').to_numpy(dtype=float)
+    fin=np.isfinite(tv)&np.isfinite(yv); tv,yv=tv[fin],yv[fin]
+    if len(tv)<32: st.error('Too few finite samples.'); st.stop()
+    t_lo,t_hi=float(tv.min()),float(tv.max())
+    win=st.slider('Analysis window (s)',t_lo,t_hi,(t_lo,t_hi),key='ev_window') if t_hi>t_lo else (t_lo,t_hi)
+    m=(tv>=win[0])&(tv<=win[1]); tw,yw=tv[m],yv[m]
+    if kind.startswith('ELMs'):
+        nsig=st.number_input('Detection threshold (robust σ above baseline)',min_value=1.0,value=5.0,key='ev_elm_sigma')
+        if st.button('Detect ELMs',type='primary'):
+            try:
+                r=detect_elms(tw,yw,n_sigmas=float(nsig))
+                fig=Figure(figsize=(9,3.3)); ax=fig.subplots(); ax.plot(tw,yw,lw=.7); ax.plot(r['event_times_s'],np.interp(r['event_times_s'],tw,yw),'rv',ms=4,label=f"{r['n_elms']} ELMs"); ax.set_xlabel('Time (s)'); ax.set_ylabel(ev_y); ax.legend(); ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig)
+                summary={k:v for k,v in r.items() if k not in {'event_times_s','amplitudes_above_baseline','instantaneous_frequency_Hz','instantaneous_frequency_time_s'}}
+                st.json(summary)
+                out=pd.DataFrame({'elm_time_s':r['event_times_s'],'amplitude_above_baseline':r['amplitudes_above_baseline']}); download_df('Download ELM list',out,'tis_elm_events.csv')
+                json_download('Export ELM analysis',summary,'tis_elm_analysis.json'); add_report_section('ELM detection',summary,fig)
+            except Exception as e: st.error(str(e))
+    elif kind.startswith('Sawteeth'):
+        nsig=st.number_input('Detection threshold (robust σ of −dS/dt)',min_value=1.0,value=5.0,key='ev_saw_sigma')
+        if st.button('Detect sawtooth crashes',type='primary'):
+            try:
+                r=detect_sawteeth(tw,yw,n_sigmas=float(nsig))
+                fig=Figure(figsize=(9,3.3)); ax=fig.subplots(); ax.plot(tw,yw,lw=.7); ax.plot(r['crash_times_s'],np.interp(r['crash_times_s'],tw,yw),'rv',ms=5,label=f"{r['n_crashes']} crashes"); ax.set_xlabel('Time (s)'); ax.set_ylabel(ev_y); ax.legend(); ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig)
+                summary={k:v for k,v in r.items() if k not in {'crash_times_s','crash_amplitudes','max_drop_rates_per_s'}}
+                st.json(summary)
+                out=pd.DataFrame({'crash_time_s':r['crash_times_s'],'crash_amplitude':r['crash_amplitudes'],'max_drop_rate_per_s':r['max_drop_rates_per_s']}); download_df('Download crash list',out,'tis_sawtooth_events.csv')
+                json_download('Export sawtooth analysis',summary,'tis_sawtooth_analysis.json'); add_report_section('Sawtooth analysis',summary,fig)
+            except Exception as e: st.error(str(e))
+    else:
+        i0=st.number_input('Reference (flat-top) current, A (0 = 95th percentile of |Iₚ|)',min_value=0.0,value=0.0,format='%.8g',key='ev_cq_i0')
+        if st.button('Analyze current quench',type='primary'):
+            try:
+                r=current_quench_analysis(tw,yw,reference_current_A=i0 or None)
+                fig=Figure(figsize=(9,3.3)); ax=fig.subplots(); ax.plot(tw,yw,lw=.8)
+                for k in ('t_upper_s','t_lower_s'):
+                    if r.get(k) is not None: ax.axvline(r[k],color='r',ls='--',lw=.8)
+                ax.set_xlabel('Time (s)'); ax.set_ylabel(ev_y); ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig)
+                st.json(r); json_download('Export current-quench analysis',r,'tis_current_quench.json'); add_report_section('Current quench',r,fig)
+            except Exception as e: st.error(str(e))
+
+elif page=='Confinement & Scalings':
+    st.title('Confinement, Scalings & Dimensionless Parameters')
+    st.caption('Textbook and empirical relations (IPB98(y,2), Martin-08 L–H threshold, ITER q95 formula, Troyon β_N, collisionality). Use volume/line averages; these are comparison tools, not device-validated predictions.')
+    tabs=st.tabs(['Confinement summary','β, collisionality, resistivity'])
+    with tabs[0]:
+        a,b,c=st.columns(3)
+        with a:
+            cs_ip=st.number_input('Plasma current Iₚ (A)',min_value=1.0,value=1.0e6,format='%.6g',key='cs_ip'); cs_bt=st.number_input('Toroidal field Bₜ (T)',min_value=0.01,value=1.0,key='cs_bt'); cs_mass=st.number_input('Main ion mass (amu)',min_value=1.0,value=2.0,key='cs_mass')
+        with b:
+            cs_R=st.number_input('Major radius R (m)',min_value=0.01,value=0.9,key='cs_R'); cs_a=st.number_input('Minor radius a (m)',min_value=0.005,value=0.55,key='cs_a'); cs_k=st.number_input('Elongation κ',min_value=1.0,value=1.8,key='cs_k')
+        with c:
+            cs_ne=st.number_input('Line-averaged nₑ (m⁻³)',min_value=1e15,value=4e19,format='%.6g',key='cs_ne'); cs_p=st.number_input('Net loss power P_loss (W)',min_value=1.0,value=2.0e6,format='%.6g',key='cs_p'); cs_W=st.number_input('Thermal stored energy W (J; 0 = omit)',min_value=0.0,value=0.0,format='%.6g',key='cs_W')
+        cs_d=st.number_input('Triangularity δ',min_value=-1.0,max_value=1.0,value=0.3,key='cs_d')
+        if st.button('Compute confinement summary',type='primary'):
+            try:
+                res=confinement_summary(ip_A=cs_ip,bt_T=cs_bt,r_m=cs_R,a_m=cs_a,kappa=cs_k,ne_line_avg_m3=cs_ne,p_loss_W=cs_p,mass_amu=cs_mass,stored_energy_J=cs_W or None,delta=cs_d)
+                st.json(res); json_download('Export confinement summary',res,'tis_confinement_summary.json'); add_report_section('Confinement summary',res)
+            except Exception as e: st.error(str(e))
+    with tabs[1]:
+        a,b=st.columns(2)
+        with a:
+            pb_ne=st.number_input('nₑ (m⁻³)',min_value=1e10,value=5e19,format='%.6g',key='pb_ne'); pb_te=st.number_input('Tₑ (eV)',min_value=0.1,value=1000.0,key='pb_te'); pb_ti=st.number_input('Tᵢ (eV)',min_value=0.1,value=800.0,key='pb_ti'); pb_z=st.number_input('Z_eff',min_value=1.0,value=1.5,key='pb_z')
+        with b:
+            pb_ip=st.number_input('Iₚ (A)',min_value=1.0,value=1.0e6,format='%.6g',key='pb_ip'); pb_bt=st.number_input('Bₜ (T)',min_value=0.01,value=1.0,key='pb_bt'); pb_R=st.number_input('R (m)',min_value=0.01,value=0.9,key='pb_R'); pb_a=st.number_input('a (m)',min_value=0.005,value=0.55,key='pb_a'); pb_k=st.number_input('κ',min_value=1.0,value=1.8,key='pb_k'); pb_q=st.number_input('Safety factor q (for ν*)',min_value=0.1,value=3.0,key='pb_q')
+        if st.button('Compute dimensionless parameters',type='primary'):
+            try:
+                res={'beta':beta_metrics(pb_ne,pb_te,pb_ti,pb_ip,pb_bt,pb_a,pb_k),
+                     'coulomb_logarithm':coulomb_logarithm_electron(pb_ne,pb_te),
+                     'nu_star_electron':collisionality_nu_star(pb_ne,pb_te,pb_q,pb_R,pb_a),
+                     'spitzer':spitzer_resistivity(pb_te,pb_z,ne_m3=pb_ne),
+                     'gyro_radii_and_speeds':larmor_radii_and_speeds(pb_te,pb_ti,pb_bt,pb_ne)}
+                st.json(res); json_download('Export dimensionless parameters',res,'tis_dimensionless_parameters.json'); add_report_section('Dimensionless parameters',res)
+            except Exception as e: st.error(str(e))
+
 elif page=='Spectral Analysis':
-    render_spectral_page(st, df, numeric, col_select, plot_line, json_download, download_df)
+    st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
+    st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
+    mode=st.radio('Workflow',['Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='Optical / emission line':
+        xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
+        model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
+        if st.button('Fit spectral line'):
+            try:
+                fit_sigma=None if sigma_col=='<none>' else pd.to_numeric(df[sigma_col],errors='coerce')
+                st.session_state['tis_spectral_fit']={'xcol':xcol,'ycol':ycol,'model':model,'sigma_col':sigma_col,'fit':fit_spectral_line(df[xcol],df[ycol],xmin,xmax,model,sigma_y=fit_sigma)}
+            except Exception as e: st.error(str(e))
+        saved=st.session_state.get('tis_spectral_fit')
+        if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model and saved.get('sigma_col')==sigma_col:
+            fit=saved['fit']; st.json(fit)
+            if model=='Gaussian':
+                lam0=st.number_input('Known rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=None,placeholder='Enter reference wavelength',key='doppler_rest_wavelength')
+                sigma_lam0=st.number_input('Rest-wavelength uncertainty',min_value=0.0,value=0.0,format='%.8g')
+                mass=st.number_input('Ion mass (amu; enter the actual emitting species)',min_value=0.0,value=0.0,key='doppler_mass_amu')
+                sigma_mass=st.number_input('Ion-mass uncertainty (amu)',min_value=0.0,value=0.0,format='%.8g')
+                inst=st.number_input('Instrument sigma (same x unit)',min_value=0.0,value=0.0,format='%.8g')
+                assume_inst_negligible=st.checkbox('Assume instrumental broadening is negligible (must be independently justified)',value=False,key='doppler_inst_negligible')
+                sigma_inst=st.number_input('Instrument-sigma uncertainty',min_value=0.0,value=0.0,format='%.8g')
+                if st.button('Estimate Doppler quantities'):
+                    if lam0 is None:
+                        st.error('Enter the independently known rest wavelength; using the fitted center would force the velocity to zero.')
+                    elif mass<=0:
+                        st.error('Enter the actual emitting-ion mass. No isotope is assumed by default.')
+                    elif inst==0 and not assume_inst_negligible:
+                        st.error('Enter the calibrated instrument width, or explicitly justify the negligible-instrument-width assumption.')
+                    else:
+                        sig2=float(fit['sigma'])**2-inst**2
+                        if sig2<=0:
+                            st.error('Instrument width equals/exceeds observed Gaussian sigma.')
+                        else:
+                            sigma_doppler=float(np.sqrt(sig2))
+                            sigma_obs_unc=float(fit.get('standard_error_sigma',0.0))
+                            sigma_doppler_unc=float(np.sqrt((float(fit['sigma'])/sigma_doppler*sigma_obs_unc)**2+(inst/sigma_doppler*sigma_inst)**2))
+                            thermal=doppler_temperature_with_uncertainty_eV(sigma_doppler,lam0,mass,sigma_doppler_unc,sigma_lam0,sigma_mass)
+                            velocity=doppler_velocity_with_uncertainty_m_s(float(fit['center']),lam0,float(fit.get('standard_error_center',0.0)),sigma_lam0)
+                            st.json({'doppler_temperature_eV':thermal['temperature_eV'],'doppler_temperature_standard_uncertainty_eV':thermal['standard_uncertainty_eV'],'relative_temperature_standard_uncertainty':thermal['relative_standard_uncertainty'],'line_of_sight_velocity_m_s':velocity['line_of_sight_velocity_m_s'],'line_of_sight_velocity_standard_uncertainty_m_s':velocity['standard_uncertainty_m_s'],'temperature_uncertainty_method':thermal['uncertainty_method'],'velocity_uncertainty_method':velocity['uncertainty_method'],'assumptions':'Gaussian Doppler broadening; Zeeman splitting, fine structure, line blends, non-Gaussian instrument response and systematic/model uncertainty are not included.'})
+            plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
+            json_download('Export fit JSON',fit,'tis_spectral_fit.json')
+    elif mode=='Line-ratio analysis':
+        st.caption('Enter background-subtracted line intensities and relative instrument responses. Atomic modelling is needed to infer Te, ne or impurity concentration.')
+        c1,c2=st.columns(2)
+        with c1: i1=st.number_input('Line 1 intensity',min_value=0.0,value=1000.0); r1=st.number_input('Relative response at line 1',min_value=0.000001,value=1.0)
+        with c2: i2=st.number_input('Line 2 intensity',min_value=0.000001,value=500.0); r2=st.number_input('Relative response at line 2',min_value=0.000001,value=1.0)
+        if st.button('Calculate corrected line ratio'):
+            try: result=corrected_line_ratio(i1,i2,r1,r2); st.json(result); json_download('Export line-ratio result',result,'tis_line_ratio.json')
+            except Exception as e: st.error(str(e))
+    elif mode=='Wavelength calibration':
+        rawcol=col_select('Raw pixel / coordinate',numeric,'cal_raw'); pix=st.text_input('Reference pixel coordinates','100,500,900'); wav=st.text_input('Reference wavelengths','500,550,600'); deg=st.slider('Polynomial degree',1,5,1)
+        if st.button('Calculate calibration'):
+            try:
+                r=spectral_calibration([float(x) for x in pix.split(',')],[float(x) for x in wav.split(',')],deg); st.json(r)
+                calibrated=polynomial_calibration(df[rawcol],[float(v) for v in r['coefficients_high_to_low']]); out=pd.DataFrame({'raw_coordinate':df[rawcol],'calibrated_wavelength':calibrated}); st.dataframe(out.head(20)); download_df('Download calibrated spectrum coordinates',out,'tis_calibrated_wavelength.csv'); json_download('Export calibration fit JSON',r,'tis_wavelength_calibration.json')
+            except Exception as e: st.error(str(e))
+    else:
+        energy_unit=st.radio("Energy-axis unit",["keV","eV"],horizontal=True,key="xray_energy_unit")
+        ecol=col_select(f'Energy coordinate ({energy_unit})',numeric,'energy_x'); ccol=col_select('Counts / intensity',numeric,'energy_y'); bgcol=st.selectbox('Background column (optional)',['<none>']+numeric,key='energy_bg')
+        representation=st.radio("Interpretation of spectral values",["Counts per bin","Signal density per energy unit"],horizontal=True,key="spectrum_representation")
+        sigma_col=st.selectbox("Per-bin uncertainty σ (optional)",["<none>"]+numeric,key="spectrum_sigma")
+        assume_poisson=st.checkbox("Infer Poisson uncertainty from raw counts",value=False,key="spectrum_poisson",disabled=(bgcol!="<none>" and sigma_col=="<none>"))
+        bin_representation="counts_per_bin" if representation=="Counts per bin" else "density_per_eV"
+        sigma_values=None if sigma_col=="<none>" else df[sigma_col]
+        background_values=None if bgcol=="<none>" else df[bgcol]
+        if st.button('Analyze energy spectrum'):
+            try:
+                if mode=='X-ray energy spectrum':
+                    xray_energy=np.asarray(df[ecol],dtype=float)
+                    if energy_unit=="eV": xray_energy=xray_energy/1000.0
+                    result=xray_spectrum_summary(xray_energy,df[ccol],background_values,
+                        count_uncertainty=sigma_values,assume_poisson_counts=assume_poisson,
+                        bin_representation=bin_representation)
+                    result["input_energy_axis_unit"]=energy_unit
+                else:
+                    generic_energy=np.asarray(df[ecol],dtype=float)
+                    if energy_unit=="keV": generic_energy=generic_energy*1000.0
+                    result=spectrum_moments(generic_energy,df[ccol],background_values,
+                        count_uncertainty=sigma_values,assume_poisson_counts=assume_poisson,
+                        bin_representation=bin_representation)
+                st.json(result); json_download('Export spectrum summary',result,'tis_energy_spectrum_summary.json')
+                plot_line(df[ecol],df[ccol],ecol,ccol,'Energy spectrum')
+            except Exception as e: st.error(str(e))
+
 elif page=='Probe Analysis':
     st.title('Langmuir, Ball-Pen & Probe Analysis'); need_data()
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
@@ -452,9 +793,11 @@ elif page=='Probe Analysis':
     with c1: mass=st.number_input('Main ion mass (amu; 0 = do not estimate density)',min_value=0.0,value=0.0)
     with c2: ti=st.number_input('Ion temperature (eV; model input)',min_value=0.0,value=0.0)
     with c3: sheath=st.number_input('Sheath coefficient',min_value=0.01,value=.61)
+    cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
+        help='electron_positive: ion-saturation current is negative (default). ion_positive: collected ion current is positive; it is flipped internally.')
     if st.button('Analyze probe I–V',type='primary'):
         try:
-            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,area or None,mass or None,ti,sheath)
+            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,area or None,mass or None,ti,sheath,current_convention=cur_conv)
             st.json(result); plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V'); json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
     st.warning('The automated fit is a first-pass estimate. Confirm sweep polarity, fit windows, saturation regions, magnetic-field effects and the probe/sheath model before interpreting Te or density.')
@@ -510,6 +853,14 @@ elif page=='Equilibrium & Reconstruction':
     if df is not None: st.info('For grid data, upload separate arrays as CSV files below. R and Z must be physical coordinates in metres.')
     Rfile=st.file_uploader('R coordinate array CSV',type=['csv'],key='eq_R'); Zfile=st.file_uploader('Z coordinate array CSV',type=['csv'],key='eq_Z'); Pfile=st.file_uploader('Poloidal-flux grid ψ(R,Z) CSV',type=['csv'],key='eq_P')
     bt=st.number_input('Toroidal field input Bφ (T)',value=1.0)
+    if df is not None and 'z_m' in df.columns:
+        st.markdown('**Or use the loaded table as the grid** (format: `z_m` plus one `R=…_m` column per radius, as exported by TIS).')
+        is_psi=st.checkbox('I confirm the loaded grid is poloidal flux ψ(R,Z) (NOT a current-density or other field)',value=False,key='eq_grid_is_psi')
+        if st.button('Calculate field from loaded grid',disabled=not is_psi,key='eq_from_table'):
+            try:
+                g=grid_from_table(df); out=equilibrium_grid_derivatives(g['R_m'],g['Z_m'],g['grid'],bt)
+                st.json({'grid_shape':list(g['grid'].shape),'Bpol_min_T':float(np.nanmin(out['Bp_T'])),'Bpol_max_T':float(np.nanmax(out['Bp_T'])),'note':out['note']})
+            except Exception as e: st.error(str(e))
     if Rfile and Zfile and Pfile and st.button('Calculate magnetic-field grid'):
         try:
             Rv=pd.read_csv(Rfile,header=None).to_numpy(float).ravel(); Zv=pd.read_csv(Zfile,header=None).to_numpy(float).ravel(); psi=pd.read_csv(Pfile,header=None).to_numpy(float)
@@ -534,8 +885,6 @@ elif page=='Tomography & Bolometry':
         st.write('Solve y = A x + noise using a calibrated geometry / response matrix.')
         Afile=st.file_uploader('Response / geometry matrix A (CSV, no header)',type=['csv'],key='tomo_A'); yfile=st.file_uploader('Measurements y (CSV, one column)',type=['csv'],key='tomo_y'); sigfile=st.file_uploader('Measurement standard uncertainties σ (optional CSV column)',type=['csv'],key='tomo_sigma')
         auto_lambda=st.checkbox('Select λ using an L-curve curvature heuristic',value=False,key='tomo_auto_lambda')
-        noise_mc=st.checkbox('Propagate supplied measurement uncertainties by Monte Carlo',value=False,key='tomo_noise_mc',help='Requires one positive standard uncertainty per measurement. Does not include geometry or model error.')
-        noise_replicates=st.number_input('Monte Carlo replicates',min_value=20,max_value=1000,value=100,step=20,key='tomo_noise_replicates')
         if Afile and yfile and st.button('Run regularized reconstruction',type='primary'):
             try:
                 A=pd.read_csv(Afile,header=None).to_numpy(float); y=pd.read_csv(yfile,header=None).to_numpy(float).ravel()
@@ -549,17 +898,6 @@ elif page=='Tomography & Bolometry':
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
                 r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
-                if noise_mc:
-                    if sigma is None:
-                        st.warning('Monte Carlo uncertainty requires a supplied σ file with one positive standard uncertainty per measurement.')
-                    else:
-                        mc=tomography_noise_sensitivity(A,y,sigma,lambda_used,nonneg,n_replicates=int(noise_replicates))
-                        mc_frame=pd.DataFrame({'basis_or_voxel_index':np.arange(len(mc['baseline_solution'])),'baseline_solution':mc['baseline_solution'],'mc_mean':mc['monte_carlo_mean'],'mc_std':mc['monte_carlo_standard_deviation'],'percentile_2_5':mc['percentile_2_5'],'percentile_97_5':mc['percentile_97_5']})
-                        st.markdown('#### Measurement-noise sensitivity')
-                        st.caption(mc['noise_model']+' Excluded: '+mc['excluded_uncertainties'])
-                        st.dataframe(mc_frame,use_container_width=True)
-                        download_df('Download Monte Carlo uncertainty CSV',mc_frame,'tis_tomography_uncertainty.csv')
-                        json_download('Export Monte Carlo uncertainty metadata',{k:v for k,v in mc.items() if not isinstance(v,np.ndarray)},'tis_tomography_uncertainty.json')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Build 2-D ray geometry matrix':
         st.write('Build a path-length response matrix from straight diagnostic lines of sight crossing a rectangular (x,z) pixel grid. This is geometry-based; it does not infer detector response, attenuation or equilibrium mapping.')
@@ -611,7 +949,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Baseline vs treatment comparison','E×B transport & Reynolds stress','Ion sound speed & Mach consistency','MHD SVD decomposition','Morlet wavelet time-frequency','Data-driven correlation matrix','Triple-probe temperature'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature'])
     if workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
@@ -636,197 +974,6 @@ elif page=='Advanced Analysis':
                 r=spectrum_moments(df[e],df[c],None if bg=='<none>' else df[bg],count_uncertainty=sigma,assume_poisson_counts=poisson)
                 st.json(r); json_download('Export energy moments',r,'tis_energy_moments.json')
             except Exception as ex: st.error(str(ex))
-    elif workflow=='Baseline vs treatment comparison':
-        st.write('Compare baseline and treatment traces for limiter bias/location or gas-pressure conditions. Mean and RMS changes are separate; mean percentage change is withheld when the baseline mean is near zero.')
-        if df is None or len(numeric)<2:
-            st.info('Load a table containing matched baseline and treatment result columns.')
-        else:
-            time_col=st.selectbox('Time coordinate for optional windowing/plotting',['<sample index>']+numeric,key='condition_time_col')
-            choices=[c for c in numeric if c!=time_col]
-            baseline_col=col_select('Baseline/control result',choices,'condition_baseline')
-            treatment_col=col_select('Treatment/bias/pressure result',[c for c in choices if c!=baseline_col],'condition_treatment')
-            use_window=st.checkbox('Restrict to a defined time window',value=False,key='condition_use_window')
-            if use_window and time_col=='<sample index>':
-                st.warning('Select an actual time column to define a physical time window. Sample-index windowing is not enabled here.')
-            if use_window and time_col!='<sample index>':
-                tv=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
-                finite_t=tv[np.isfinite(tv)]
-                if len(finite_t)<2:
-                    st.error('The selected time column has fewer than two finite values.')
-                    use_window=False
-                else:
-                    c1,c2=st.columns(2)
-                    with c1: start_s=st.number_input('Window start',value=float(np.min(finite_t)),format='%.8g',key='condition_start')
-                    with c2: end_s=st.number_input('Window end',value=float(np.max(finite_t)),format='%.8g',key='condition_end')
-            else:
-                start_s=end_s=None
-            floor_fraction=st.number_input('Near-zero baseline mean guard (fraction of baseline RMS)',min_value=0.0,max_value=0.5,value=0.05,step=0.01,key='condition_mean_floor')
-            if st.button('Compare conditions',type='primary',key='condition_compare_run'):
-                try:
-                    base=pd.to_numeric(df[baseline_col],errors='coerce').to_numpy(float)
-                    treat=pd.to_numeric(df[treatment_col],errors='coerce').to_numpy(float)
-                    t=None if time_col=='<sample index>' else pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
-                    result=compare_condition_signals(base,treat,time_s=t,start_s=start_s if use_window and t is not None else None,end_s=end_s if use_window and t is not None else None,baseline_mean_floor_fraction=float(floor_fraction))
-                    st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
-                    out=pd.DataFrame({'baseline':result['baseline_values'],'treatment':result['treatment_values'],'difference_treatment_minus_baseline':result['difference_values']})
-                    if result['time_s'] is not None: out.insert(0,'time_s',result['time_s'])
-                    else: out.insert(0,'sample_index',np.arange(len(out)))
-                    st.line_chart(out.set_index(out.columns[0])[['baseline','treatment']])
-                    st.line_chart(out.set_index(out.columns[0])[['difference_treatment_minus_baseline']])
-                    st.dataframe(out.head(100),use_container_width=True)
-                    download_df('Download condition comparison series',out,'tis_condition_comparison.csv')
-                    st.warning(result['warning'])
-                except Exception as e: st.error(f'Condition comparison failed: {e}')
-    elif workflow=='E×B transport & Reynolds stress':
-        st.write('Calculate E×B drift, particle flux and Reynolds-stress products. The software can use calibrated E-field channels or derive fields from paired probe potentials.')
-        if df is None or len(numeric)<3:
-            st.info('Load synchronized numeric density and electric-field/potential channels.')
-        else:
-            ncol=col_select('Ion density nᵢ (m⁻³)',numeric,'transport_n')
-            available=[c for c in numeric if c!=ncol]
-            field_options=['Already calibrated E-field channels']+(['Compute from potential pairs'] if len(available)>=4 else [])
-            field_source=st.radio('Electric-field source',field_options,horizontal=True,key='transport_field_source')
-            if field_source=='Already calibrated E-field channels':
-                ercol=col_select('Radial electric field Eᵣ (V/m)',available,'transport_er')
-                epcol=col_select('Poloidal electric field Eₚ (V/m)',[c for c in available if c!=ercol],'transport_ep')
-            else:
-                st.caption('Uses E = s·(V_b − V_a)/Δx. Select sign and physical probe separation from the article/device coordinate convention.')
-                r1=col_select('Radial-pair potential Vᵣ₁ (V)',available,'transport_r1')
-                r2=col_select('Radial-pair potential Vᵣ₂ (V)',[c for c in available if c!=r1],'transport_r2')
-                p1=col_select('Poloidal-pair potential Vₚ₁ (V)',[c for c in available if c not in [r1,r2]],'transport_p1')
-                p2=col_select('Poloidal-pair potential Vₚ₂ (V)',[c for c in available if c not in [r1,r2,p1]],'transport_p2')
-                c1,c2=st.columns(2)
-                with c1: dr=st.number_input('Radial probe separation Δr (m)',min_value=0.0,value=0.0,format='%.8g',key='transport_dr',help='Enter the measured probe separation; zero is intentionally invalid.')
-                with c2: dp=st.number_input('Poloidal probe separation Δθ (m)',min_value=0.0,value=0.0,format='%.8g',key='transport_dp',help='Enter the measured probe separation; zero is intentionally invalid.')
-                c1,c2=st.columns(2)
-                with c1: sr_field=st.selectbox('Radial E-field sign sᵣ',[-1,1],index=None,placeholder='Select convention',key='transport_sr_field')
-                with c2: sp_field=st.selectbox('Poloidal E-field sign sₚ',[-1,1],index=None,placeholder='Select convention',key='transport_sp_field')
-            bt=st.number_input('Toroidal magnetic field Bₜ (T)',value=0.0,format='%.8g',key='transport_bt',help='Enter the measured toroidal field for the discharge; no device value is assumed.')
-            c1,c2=st.columns(2)
-            with c1: sr=st.selectbox('Sign for vᵣ = sᵣ Eₚ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sr')
-            with c2: sp=st.selectbox('Sign for vₚ = sₚ Eᵣ/Bₜ',[-1,1],index=None,placeholder='Select documented convention',key='transport_sp')
-            st.caption('Inputs must be calibrated, synchronized and in SI units. Match the target paper’s sign conventions, probe locations, filtering, time window and averaging definition.')
-            if st.button('Calculate E×B transport',type='primary',key='transport_run'):
-                try:
-                    if sr is None or sp is None: raise ValueError('Select both velocity sign conventions from the target paper or diagnostic geometry.')
-                    if field_source=='Already calibrated E-field channels':
-                        er_values=pd.to_numeric(df[ercol],errors='coerce').to_numpy(float)
-                        ep_values=pd.to_numeric(df[epcol],errors='coerce').to_numpy(float)
-                    else:
-                        if sr_field is None or sp_field is None: raise ValueError('Select both electric-field gradient signs from the target paper or probe coordinate convention.')
-                        er_values=electric_field_from_potential_difference(df[r1],df[r2],float(dr),field_sign=int(sr_field))
-                        ep_values=electric_field_from_potential_difference(df[p1],df[p2],float(dp),field_sign=int(sp_field))
-                    density_values=pd.to_numeric(df[ncol],errors='coerce').to_numpy(float)
-                    result=drift_transport_from_fields(density_values,er_values,ep_values,float(bt),radial_velocity_sign=int(sr),poloidal_velocity_sign=int(sp))
-                    st.json({k:v for k,v in result.items() if not isinstance(v,np.ndarray)})
-                    valid_mask=np.isfinite(density_values) & np.isfinite(er_values) & np.isfinite(ep_values)
-                    out=pd.DataFrame({'density_m-3':density_values[valid_mask],'E_r_V_m':er_values[valid_mask],'E_p_V_m':ep_values[valid_mask]})
-                    for key in ['radial_velocity_m_s','poloidal_velocity_m_s','radial_particle_flux_m-2_s-1','poloidal_particle_flux_m-2_s-1','reynolds_stress_velocity_product_m2_s-2']:
-                        out[key]=result[key]
-                    st.dataframe(out.head(50),use_container_width=True)
-                    download_df('Download E×B transport time series',out,'tis_exb_transport.csv')
-                    json_download('Export E×B transport metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_exb_transport_metadata.json')
-                    st.warning(result['warning'])
-                except Exception as e: st.error(f'E×B transport analysis failed: {e}')
-    elif workflow=='Ion sound speed & Mach consistency':
-        st.write('Check the sound-speed and flow-Mach relation used in the IR-T1 compound-probe paper: cₛ = sqrt[e(Tₑ + Tᵢ)/mᵢ] and M = V/cₛ.')
-        st.caption('Reference: Alipour et al., RSI 88, 093516 (2017), DOI 10.1063/1.4994037, Eqs. (3)–(4), Figs. 10(a) and 11(a). Defaults are provisional graph-digitized whole-discharge means (M≈0.511 and V≈17.57 km/s), not raw measurements; replace them with values and uncertainty appropriate to your comparison.')
-        c1,c2,c3=st.columns(3)
-        with c1: te=st.number_input('Electron temperature Tₑ (eV)',min_value=0.0,value=14.0,format='%.8g',key='mach_te')
-        with c2: ti=st.number_input('Ion temperature Tᵢ (eV)',min_value=0.0,value=2.8,format='%.8g',key='mach_ti')
-        with c3: mass=st.number_input('Ion mass (amu)',min_value=0.0,value=1.0073,format='%.8g',key='mach_mass')
-        c1,c2=st.columns(2)
-        with c1: velocity=st.number_input('Reference parallel velocity (km/s)',value=17.57,format='%.8g',key='mach_velocity')
-        with c2: ref_mach=st.number_input('Reference parallel Mach number',value=0.511,format='%.8g',key='mach_reference')
-        if st.button('Check sound-speed / Mach consistency',type='primary',key='mach_check'):
-            try:
-                cs_result=ion_sound_speed_m_s(float(te),float(ti),float(mass))
-                cs=cs_result['ion_sound_speed_m_s']
-                derived_mach=float(mach_number_from_velocity(float(velocity)*1000.0,cs))
-                predicted_velocity=float(ref_mach)*cs/1000.0
-                delta_v=float(velocity)-predicted_velocity
-                st.json({
-                    'ion_sound_speed_km_s':cs/1000.0,
-                    'Mach_from_reference_velocity':derived_mach,
-                    'reference_Mach_number':float(ref_mach),
-                    'velocity_predicted_from_reference_Mach_km_s':predicted_velocity,
-                    'reference_velocity_km_s':float(velocity),
-                    'velocity_difference_km_s':delta_v,
-                    'velocity_relative_difference_percent':100.0*delta_v/predicted_velocity if predicted_velocity else None,
-                    'sound_speed_equation':cs_result['formula'],
-                    'source':'Alipour et al., RSI 88, 093516 (2017), Figs. 10(a), 11(a), Eq. (4)',
-                })
-                st.warning('This is an internal consistency check, not independent validation: the paper states that the velocity curve is calculated from the Mach curve. A mismatch flags the assumed temperatures, ion mass, averaging window, figure digitization or equation implementation for review.')
-            except Exception as e: st.error(f'Mach consistency check failed: {e}')
-    elif workflow=='MHD SVD decomposition':
-        st.write('SVD of synchronized diagnostic channels. This extracts data-driven temporal components and channel patterns; mode index is not automatically a physical poloidal mode number.')
-        if df is None or len(numeric)<2:
-            st.info('Load at least two synchronized numeric diagnostic channels.')
-        else:
-            time_col=st.selectbox('Time column for plotting (optional)',['<sample index>']+numeric,key='svd_time_col')
-            channel_options=[c for c in numeric if c!=time_col]
-            chosen=st.multiselect('Synchronized channels (same units preferred)',channel_options,default=channel_options[:min(4,len(channel_options))],key='svd_channels')
-            center=st.checkbox('Subtract each channel mean',value=True,key='svd_center')
-            standardize=st.checkbox('Standardize channels to unit variance (use when scales/units differ)',value=False,key='svd_standardize')
-            modes=st.number_input('Number of modes to return (0 = all)',min_value=0,max_value=1000,value=0,key='svd_n_modes')
-            if st.button('Run SVD decomposition',type='primary',key='svd_run'):
-                try:
-                    if len(chosen)<2: raise ValueError('Select at least two channels.')
-                    matrix=df[chosen].apply(pd.to_numeric,errors='coerce').to_numpy(float)
-                    if not np.all(np.isfinite(matrix)): raise ValueError('Selected channels contain missing/non-finite values; align and handle them explicitly before SVD.')
-                    if time_col=='<sample index>':
-                        xaxis=np.arange(len(matrix),dtype=float); xlabel='Sample index'
-                    else:
-                        xaxis=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
-                        if not np.all(np.isfinite(xaxis)) or np.any(np.diff(xaxis)<=0): raise ValueError('Time values must be finite, strictly increasing and aligned with all selected channels.')
-                        dt=np.diff(xaxis)
-                        jitter=float(np.std(dt)/np.mean(dt))
-                        if jitter>0.01: raise ValueError(f'Timestamp interval jitter is {jitter:.2%}; resample or segment the data before SVD.')
-                        xlabel='Time (s)'
-                    result=svd_mode_decomposition(matrix,center=center,standardize=standardize,n_modes=None if int(modes)==0 else int(modes))
-                    frame=pd.DataFrame({'mode':np.arange(1,len(result['singular_values'])+1),'singular_value':result['singular_values'],'energy_fraction':result['energy_fraction'],'cumulative_energy_fraction':result['cumulative_energy_fraction']})
-                    st.dataframe(frame,use_container_width=True)
-                    fig=Figure(figsize=(9,3)); ax=fig.subplots(); ax.bar(frame['mode'],frame['energy_fraction']); ax.set_xlabel('SVD mode'); ax.set_ylabel('Fraction of processed variance'); st.pyplot(fig)
-                    for i in range(min(3,result['principal_components'].shape[1])):
-                        plot_line(xaxis,result['principal_components'][:,i],xlabel,f'PC {i+1}','SVD principal component')
-                    mode_frame=pd.DataFrame(result['channel_modes'],index=chosen,columns=[f'mode_{i+1}' for i in range(result['channel_modes'].shape[1])]).reset_index(names='channel')
-                    download_df('Download SVD channel modes',mode_frame,'tis_svd_channel_modes.csv')
-                    download_df('Download SVD principal components',pd.DataFrame({'time_or_sample':xaxis,**{f'PC_{i+1}':result['principal_components'][:,i] for i in range(result['principal_components'].shape[1])}}),'tis_svd_principal_components.csv')
-                    json_download('Export SVD analysis metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_svd_metadata.json')
-                    st.caption(result['interpretation'])
-                except Exception as e: st.error(f'SVD analysis failed: {e}')
-    elif workflow=='Morlet wavelet time-frequency':
-        st.write('Complex Morlet continuous wavelet transform for time-localized MHD/fluctuation frequencies. Use a calibrated, uniformly sampled time base.')
-        if df is None or not numeric:
-            st.info('Load a numeric time-series file first.')
-        else:
-            time_col=st.selectbox('Time column (or sample index)',['<sample index>']+numeric,key='wavelet_time_col')
-            signal_col=col_select('Signal channel',numeric,'wavelet_signal_col')
-            fs=st.number_input('Sampling frequency for sample-index mode (Hz)',min_value=0.0,value=0.0,format='%.8g',key='wavelet_fs')
-            c1,c2,c3=st.columns(3)
-            with c1: fmin=st.number_input('Minimum wavelet frequency (Hz)',min_value=0.001,value=100.0,format='%.8g',key='wavelet_fmin')
-            with c2: fmax=st.number_input('Maximum wavelet frequency (Hz)',min_value=0.002,value=10000.0,format='%.8g',key='wavelet_fmax')
-            with c3: nfreq=st.number_input('Frequency bins',min_value=8,max_value=256,value=64,key='wavelet_nfreq')
-            omega0=st.number_input('Morlet omega0',min_value=5.0,value=6.0,step=0.5,key='wavelet_omega0')
-            if st.button('Run Morlet wavelet analysis',type='primary',key='wavelet_run'):
-                try:
-                    y=pd.to_numeric(df[signal_col],errors='coerce').to_numpy(float)
-                    if time_col=='<sample index>':
-                        if fs<=0: raise ValueError('Enter the actual sampling frequency; no default is assumed.')
-                        t=np.arange(len(y),dtype=float)/fs
-                    else:
-                        t=pd.to_numeric(df[time_col],errors='coerce').to_numpy(float)
-                    result=morlet_wavelet_analysis(t,y,np.linspace(float(fmin),float(fmax),int(nfreq)),omega0=float(omega0))
-                    fig=Figure(figsize=(10,4)); ax=fig.subplots()
-                    masked=np.ma.masked_where(result['edge_affected'],result['power'])
-                    mesh=ax.pcolormesh(result['time_s'],result['frequencies_Hz'],masked,shading='auto')
-                    ax.set_xlabel('Time (s)'); ax.set_ylabel('Frequency (Hz)'); ax.set_title('Morlet wavelet power (relative)')
-                    fig.colorbar(mesh,ax=ax,label='|CWT coefficient|²'); st.pyplot(fig)
-                    st.warning(result['warning'])
-                    out=pd.DataFrame(result['power'].T,columns=[f'{v:.8g}_Hz' for v in result['frequencies_Hz']]); out.insert(0,'time_s',result['time_s'])
-                    download_df('Download wavelet power CSV',out,'tis_morlet_wavelet_power.csv')
-                    json_download('Export wavelet analysis metadata',{k:v for k,v in result.items() if not isinstance(v,np.ndarray)},'tis_morlet_wavelet_metadata.json')
-                except Exception as e: st.error(f'Wavelet analysis failed: {e}')
     elif workflow=='Triple-probe temperature':
         vd=st.number_input('Measured triple-probe voltage difference (V)',min_value=0.000001,value=10.0); mf=st.number_input('Model correction factor',min_value=0.000001,value=1.0)
         if st.button('Estimate triple-probe Te'):
@@ -840,9 +987,6 @@ elif page=='Advanced Analysis':
             st.bar_chart(mat.iloc[0].drop(mat.columns[0],errors="ignore").rename("Pearson r"))
             st.caption(f"Pearson correlation coefficients with reference channel {mat.columns[0]!r}; these are not a spatial profile.")
             download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
-
-elif page=='Reference Results Validation':
-    render_validation_page()
 
 elif page=='Diagnostic Catalog':
     st.title('Diagnostic Knowledge Base')
@@ -861,9 +1005,8 @@ elif page=='Diagnostic Catalog':
         entries=[f for f in FORMULAS if not query or query in ' '.join(str(v) for v in f.values()).lower()]
         st.write(f'{len(entries)} formula entries')
         for f in entries:
-            with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inference class:** {f.get('inference_class', f['status'])}\n\n**Validation status:** {f.get('validation_status', 'Not independently validated as a complete diagnostic workflow')}\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Assumptions:** {f['assumptions']}")
+            with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Status:** {f['status']}\n\n**Assumptions:** {f['assumptions']}")
         json_download('Export formula registry JSON',entries,'tis_formula_registry.json')
-
 
 elif page=='Reports & Export':
     st.title('Reports, Provenance & Export')
@@ -883,6 +1026,11 @@ elif page=='Reports & Export':
     else:
         st.info("No analysis export has been generated in this session yet.")
     st.json(record); json_download('Download provenance JSON',record,'tis_provenance.json'); download_df('Export imported data CSV',df,'tis_imported_data.csv')
+    st.markdown('### Human-readable report')
+    sections=st.session_state.get('tis_report_sections',[])
+    st.caption(f'{len(sections)} result section(s) collected this session (ELM/sawtooth/quench and confinement analyses add themselves; run them first).')
+    html_report=build_html_report(_json_safe(record),sections)
+    st.download_button('Download HTML report',html_report.encode('utf-8'),'tis_report.html','text/html')
     st.markdown('### Session activity')
     st.write(st.session_state.get('tis_activity',[]))
 

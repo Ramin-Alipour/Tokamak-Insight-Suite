@@ -1,9 +1,12 @@
-## v0.4.3 — Release hardening (2026-10-14)
-- Removed the article-specific benchmark panel and its embedded reference values from the application.
-- Development validation uses external test inputs; reference datasets are not bundled with the release.
-- Passing numerical tests demonstrates code behavior, not independent physical validation.
+# Release notes — v0.5.0
 
-## v0.4.0 historical notes
+Adds event analysis (ELM / sawtooth / current quench), standard tokamak scalings and dimensionless parameters,
+explicit gap/spike handling, drift-corrected integration and HTML reports, and fixes the defects listed in
+CHANGELOG.md. **Validation level:** all new routines are unit-tested against analytic or ITER-design reference
+values and synthetic ground truth. They are *not* validated against experimental shots of a specific device.
+The Streamlit UI was exercised page-by-page with a headless stand-in and by unit tests, but not in a real browser.
+
+# Release notes — v0.4.0
 
 ## Scientific correctness and security fixes
 - Added direct cross-spectral phase extraction from synchronized multi-sensor channels with coherence weighting; manual phase fitting remains available as an advanced path.
@@ -29,15 +32,3 @@
 - Phase-only mode fitting cannot recover the true mode number beyond the spatial Nyquist limit without independent information or a physical prior.
 - Negative background-subtracted spectral bins require a justified noise/background treatment; they are not silently clipped.
 - CI compilation, unit tests, and dashboard health checks do not validate every interactive workflow or every physical diagnostic model.
-
-
-## v0.4.2 engineering fixes (2026-10-14)
-- Fixed wheel metadata to include the dashboard module and bundled JSON registries; added `tis dashboard` / `tis-dashboard` launchers and clean-environment wheel smoke tests.
-- Added source-distribution and tracked-source ZIP build/verification to CI.
-- Removed the duplicate NPA catalog entry; assigned diagnostic/formula IDs and classified formula inference separately from independent-validation status.
-- Added bounded tabular-import preflight checks and a visible report of numeric coercions.
-- Added filter-impact analysis, spectral-fit residual diagnostics, tomography matrix conditioning/coverage and optional measurement-noise Monte Carlo sensitivity, leave-one-sensor-out mode robustness, and guarded uniform-grid resampling.
-- Consolidated duplicate dashboard smoke tests and expanded UI regression coverage to click the probe-analysis action.
-- These changes improve engineering checks; they do not imply independent experimental validation of every diagnostic workflow.
-
-- Added an end-to-end optical Doppler workflow that calibrates raw spectral coordinates, optionally subtracts background and corrects relative response, fits a Gaussian with residual diagnostics, corrects instrumental width, and reports conditional Doppler temperature/line-of-sight velocity uncertainties.

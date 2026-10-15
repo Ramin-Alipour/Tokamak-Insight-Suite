@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tokamak-insight-suite"
-version = "0.4.3"
+version = "0.5.0"
 description = "Provenance-aware analysis tools and diagnostic reference registry for tokamak plasma measurements"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
-dependencies = ["streamlit>=1.36", "numpy>=1.26", "pandas>=2.1", "scipy>=1.11", "matplotlib>=3.8", "openpyxl>=3.1", "xlrd>=2.0.1", "pyarrow>=15"]
+license = {text = "MIT"}
+dependencies = ["streamlit>=1.36", "numpy>=1.26", "pandas>=2.1", "scipy>=1.11", "matplotlib>=3.8", "openpyxl>=3.1", "pyarrow>=15"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
@@ -18,17 +18,9 @@ data = ["xarray>=2024.1,<2025.0", "zarr>=2.16,<3", "fsspec>=2024.2", "aiohttp>=3
 
 [project.scripts]
 tis = "tis.cli:main"
-tis-dashboard = "tis.cli:dashboard_main"
-
-[tool.setuptools]
-py-modules = ["app"]
-include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["tis*"]
-
-[tool.setuptools.package-data]
-tis = ["data/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

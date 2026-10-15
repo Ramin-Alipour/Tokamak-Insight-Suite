@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0 — 2026-10-15
+
+### Bugs fixed
+- **pandas ≥ 3 crash:** the "drop units row" import option used `pd.to_numeric(errors="ignore")`, which pandas 3 removed; replaced by a loss-free coercion.
+- **Text encodings:** CSV/TXT import failed on Windows-1252/Latin-1 files (e.g. `Température`, `µs`). Import now tries UTF-8 (BOM-tolerant) → Windows-1252 → Latin-1, accepts an explicit encoding, and records the encoding actually used in provenance.
+- **Mode-number sign:** the fitted `n` had the opposite sign to the usual wave convention cos(ωt − nθ) and this was undocumented. Both fitting functions now take an explicit `convention`, report it in the result, and the UI defaults to the usual convention (the library default is unchanged for backward compatibility).
+- **Langmuir analysis:** electron temperature now carries a statistical standard error; an `ion_positive` current convention is supported (previously failed with an unhelpful "needs 4 points" error); a positive ion-saturation current now raises a sign warning.
+- **Analysis history** was re-appended on every Streamlit rerun (duplicates); now de-duplicated by result hash and logged with its SHA-256.
+- **Registry drift:** `DIAGNOSTIC_REGISTRY.json` was stale (duplicate NPA entry, no implementation status) and disagreed with `catalog.py`. Regenerated and guarded by a test.
+- **Docker image** did not install the optional data dependencies, so the Public Data Access page could not work in the container; it now installs `.[data]`.
+- CI packaging workflow no longer references stale v0.3.0/v0.4.0 file names.
+- Removed a duplicated AppTest module.
+
+### New capabilities
+- **Events & Transients page / `tis.events`:** ELM detection (rolling-median baseline, MAD threshold + prominence), sawtooth crash/period/amplitude detection (with spurious-peak rejection), current-quench analysis with the ITER 80 %→20 % convention and runaway-plateau detection; interval statistics.
+- **Confinement & Scalings page / `tis.plasma`:** Greenwald fraction, q*, ITER-formula q95, β_t/β_p/β_N, collisionality ν*ₑ, Coulomb logarithm, Spitzer resistivity, gyro-radii/Alfvén speed, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold, triple product. Checked against ITER design values in tests.
+- **Gap handling / `tis.signals`:** sampling audit, explicit gap policies (strict / longest segment / interpolate short gaps), uniform resampling that never invents data inside long gaps, Hampel despiking, polynomial detrending.
+- **Linear drift correction** for time-series integration (pre- and post-shot quiet windows).
+- **Self-contained HTML report** with provenance, results and figures (all text escaped).
+- `tis events` and `tis scalings` CLI commands; loaded `z_m`/`R=…_m` grid tables can be used on the Equilibrium page (with an explicit "this is ψ" confirmation).
+
+### Known limitations (unchanged or still open)
+See README → "Scientific scope and limitations" and RELEASE_NOTES.
+
 ## 0.4.0 — 2026-10-14
 
 ### Correctness and scientific safeguards

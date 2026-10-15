@@ -1,7 +1,7 @@
 cff-version: 1.2.0
 message: "If you use Tokamak Insight Suite in published work, cite this software."
 title: "Tokamak Insight Suite"
-version: "0.4.2"
+version: 0.5.0
 date-released: 2026-10-14
 authors:
   - family-names: Alipour

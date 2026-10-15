@@ -1,6 +1,6 @@
 # Tokamak Insight Suite (TIS)
 
-**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.4.3**.
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.5.0**.
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
@@ -13,26 +13,22 @@ python -m venv .venv
 # Windows: .venv\Scripts\activate
 # Linux/macOS: source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -e .
-# Optional extras: pip install -e '.[test,excel,data]'
-tis dashboard
-# Equivalent from a source checkout: streamlit run app.py
+pip install -r requirements.txt
+# Optional extras: pip install '.[test,excel,data]'
+streamlit run app.py
 ```
 
 On Windows, `run_windows.bat` is also provided. On Linux/macOS, use `bash run_unix.sh`.
 
-## Install a built wheel (including the dashboard)
-
-The wheel installs the `app` dashboard module, the `tis` CLI, and bundled registry JSON resources. From the directory containing the release wheel:
+## Command line
 
 ```bash
-python -m pip install ./tokamak_insight_suite-0.4.3-py3-none-any.whl
-tis dashboard
-# CLI remains usable independently:
-tis catalog --kind both --output-dir ./tis-catalog
+tis qc data.csv                     # column audit + SHA-256
+tis fft data.csv --signal b1 --time t
+tis events data.csv --kind elm --time t --signal d_alpha
+tis events data.csv --kind quench --time t --signal ip
+tis scalings --ip-A 1e6 --bt-T 1 --r-m 0.9 --a-m 0.55 --kappa 1.8 --ne-line-avg-m3 4e19 --p-loss-W 2e6
 ```
-
-CI builds the wheel and source distribution, installs the wheel in a clean virtual environment outside the checkout, checks the installed module/resources/CLI, and launches the installed dashboard health endpoint. This tests package completeness, not the scientific validity of every analysis workflow.
 
 ## Run with Docker
 
@@ -66,15 +62,16 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
 - **Time Series & MHD:** filtering, FFT, configurable Welch PSD, cross-correlation/coherence, channel-derived coherence-weighted mode-number estimates, calibrated time-series integration with optional baseline subtraction, time-frequency spectrograms, and autocorrelation/correlation-time estimates.
-- **Spectral Analysis:** line fitting and residual diagnostics, wavelength calibration, an end-to-end Doppler workflow (background/relative-response correction, Gaussian fit, instrument-width correction, and propagated temperature/LOS-velocity uncertainties), spectral moments and line-ratio utilities.
+- **Spectral Analysis:** line fitting, spectral calibration, Doppler temperature/velocity estimates, spectral moments and line-ratio utilities.
 - **Probe Analysis:** Langmuir I–V analysis, probe summaries, triple-probe estimates and fluctuation/particle-flux utilities.
 - **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
 - **Equilibrium & Reconstruction:** derivatives of an input flux grid and profile analysis; Public Data Access can fetch and plot an existing FAIR-MAST EFIT `plasma_current_rz` grid without claiming to reconstruct equilibrium.
 - **Tomography & Bolometry:** uncertainty-weighted regularized tomography with optional L-curve λ selection, Abel reconstruction, axisymmetric radiated-power integration, and Eich-like or simple-exponential target heat-flux fitting.
 - **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
+- **Events & Transients:** ELM detection and repetition statistics, sawtooth crash detection (period, amplitude), plasma-current-quench analysis (ITER 80 %→20 % convention). Statistical detectors; always confirm against the raw trace.
+- **Confinement & Scalings:** Greenwald fraction, q95 (ITER formula), β_t/β_p/β_N, ν*ₑ, Spitzer resistivity, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold. Empirical comparison tools, not device-validated predictions.
+- **Signal conditioning:** explicit gap policies, Hampel despiking, drift-corrected integration. Every repair is reported.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
-- **Reference Results Validation:** compare TIS outputs with paper/device reference values using supplied uncertainties or explicit tolerances; rows without a criterion remain unassessed. Protocol: `docs/reference_result_validation.md`.
-- **IR-T1 paper benchmark map:** six user-relevant IR-T1 publications are mapped to their main plotted results, equations, and evidence requirements in `docs/ir_t1_publication_benchmark_map.md`.
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
 ## Tests and CI

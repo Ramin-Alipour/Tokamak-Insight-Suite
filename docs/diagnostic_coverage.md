@@ -4,7 +4,7 @@ The original third-party PDF is not redistributed in this repository. A limited 
 
 This map follows the source document's final diagnostic-family index. “Registry” means an explanatory catalog entry exists; “implemented workflow” means a generic analysis operation is executable in this release. It does not imply every listed observable is solved from raw detector data.
 
-| # | Source family | TIS coverage in v0.4.0 |
+| # | Source family | TIS coverage in v0.5.0 |
 |---:|---|---|
 | 1 | Magnetic measurements | Generic time-series/FFT/cross-channel tools plus calibrated signal integration with optional baseline subtraction; device-specific transfer functions remain user-supplied |
 | 2 | Equilibrium reconstruction | Registry only; specialized Grad–Shafranov solver not included |
@@ -40,6 +40,11 @@ This map follows the source document's final diagnostic-family index. “Registr
 ## Design rule
 Where the source requires an inverse problem, machine geometry, atomic rates, sheath models, instrument response, or specialized equilibrium/orbit solvers, the program documents the requirement instead of claiming a direct measurement or inventing missing physics.
 
-
-## Status semantics (updated 2026-10-14)
-Registry entries are reference metadata unless a callable workflow is explicitly mapped. Formula records now separate `inference_class` from `validation_status`; no formula is labelled independently validated merely because a unit test exists. Thomson scattering forward modelling and a general Grad–Shafranov equilibrium solver remain reference-only/model-dependent entries, not claimed as implemented end-to-end workflows.
+## Addendum (v0.5.0): workflows added beyond the 30-family map
+| Topic | Implementation | Limits |
+|---|---|---|
+| ELM / transient detection | `tis.events.detect_elms` | Statistical detector; no ELM-type classification |
+| Sawtooth analysis | `tis.events.detect_sawteeth` | Needs a core channel inside the inversion radius |
+| Disruption analysis | `tis.events.current_quench_analysis` | Quench timing from I_p only; no thermal-quench/precursor classifier |
+| Energy confinement / scalings | `tis.plasma` (IPB98(y,2), H98, Martin-08, q95, β_N, ν*) | Empirical scalings for conventional tokamaks; comparison only |
+| Gap/spike handling | `tis.signals` | Interpolation attenuates content near Nyquist |

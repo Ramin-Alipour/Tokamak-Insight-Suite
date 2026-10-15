@@ -283,7 +283,7 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
             pin_destination(newurl)
             return super().redirect_request(req,fp,code,msg,headers,newurl)
 
-    request=Request(parsed.geturl(),headers={"User-Agent":"Tokamak-Insight-Suite/0.4 (public scientific data import)"})
+    request=Request(parsed.geturl(),headers={"User-Agent":"Tokamak-Insight-Suite/0.5 (public scientific data import)"})
     opener=build_opener(ProxyHandler({}),PinnedHTTPHandler(),PinnedHTTPSHandler(),SafeRedirectHandler())
     try:
         with opener.open(request,timeout=timeout) as response:

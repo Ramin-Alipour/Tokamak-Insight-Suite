@@ -2,7 +2,6 @@
 Catalog entries describe observables and analysis pathways; they are not universal calibrations.
 """
 from __future__ import annotations
-import re
 
 # M = directly measured; D = derived from calibrated measurements; I = model-dependent inference.
 _RAW = [
@@ -89,14 +88,12 @@ _RAW = [
 ]
 
 DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","caveat"), row)) for row in _RAW]
-for _i, _d in enumerate(DIAGNOSTICS, start=1):
-    _d["id"] = "diag-" + re.sub(r"[^a-z0-9]+", "-", _d["diagnostic"].lower()).strip("-")
 
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
     "Langmuir probe": ["langmuir_iv_analysis", "probe_iv_summary"],
-    "Ion temperature from Doppler spectroscopy": ["analyze_doppler_line_end_to_end", "fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
+    "Ion temperature from Doppler spectroscopy": ["fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels"],
     "Flux loops": ["integrate_time_series"],
     "Interferometer": ["linear_phase_density"],
@@ -118,6 +115,16 @@ _IMPLEMENTED_WORKFLOWS = {
     "Tomography inverse problem": ["regularized_tomography", "build_tomography_matrix_2d"],
     "Abel inversion": ["abel_reconstruction"],
     "Radiated power": ["axisymmetric_radiated_power"],
+    "ELM / transient event detection": ["detect_elms", "interval_statistics"],
+    "Sawtooth analysis": ["detect_sawteeth", "interval_statistics"],
+    "Disruption analysis": ["current_quench_analysis"],
+    "Energy confinement": ["derive_parameters", "ipb98y2_confinement_time", "h_factor"],
+    "Pressure and beta": ["derive_parameters", "beta_metrics"],
+    "Greenwald density reference": ["derive_parameters", "greenwald"],
+    "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
+    "Noise floor and detection limit": ["hampel_despike"],
+    "Rogowski coil": ["integrate_time_series"],
+    "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels", "integrate_time_series"],
 }
 for _d in DIAGNOSTICS:
     _functions = _IMPLEMENTED_WORKFLOWS.get(_d["diagnostic"], [])
@@ -164,23 +171,9 @@ FORMULAS = [
 {"name":"Continuity / particle balance","equation":"dN/dt=Ṅ_in−Ṅ_out+S−L","inputs":"Stored particles, input/output and source/loss rates","output":"particles/s","assumptions":"Define volume and avoid double-counting source/loss terms."},
 ]
 
-def _formula_classification(name: str) -> str:
-    n = name.lower()
-    if any(k in n for k in ("inverse problem", "tomograph", "abel", "bolometr", "reconstruction", "continuity / particle balance")):
-        return "inverse_problem_or_model_inference"
-    if any(k in n for k in ("greenwald", "ohmic power approximation", "ion sound speed", "safety factor large-aspect", "confinement time", "particle confinement", "gas pumping", "radiated power fraction", "integrated surface power", "apparent feature speed")):
-        return "model_dependent_estimate"
-    if any(k in n for k in ("rms signal", "nyquist frequency", "gaussian fwhm", "electron plasma frequency", "electron plasma angular frequency", "electron cyclotron frequency", "debye length", "debye parameter", "magnetic energy density", "faraday induction", "doppler line-of-sight velocity", "ion temperature from gaussian doppler sigma", "plasma frequency from density", "electron thermal pressure", "ion thermal pressure", "total thermal pressure", "line-integrated electron density", "cross-correlation lag", "magnitude-squared coherence", "relative fluctuation level")):
-        return "derived_quantity"
-    return "reference_only"
-
-
-for _i, _f in enumerate(FORMULAS, start=1):
+for _f in FORMULAS:
+    _f.setdefault("status", "D")
     _f.setdefault("category", "Core physics")
-    _f["id"] = "formula-" + re.sub(r"[^a-z0-9]+", "-", _f["name"].lower()).strip("-")
-    _f["inference_class"] = _formula_classification(_f["name"])
-    _f["status"] = _f["inference_class"]
-    _f["validation_status"] = "Not independently validated as a complete diagnostic workflow"
 
 def diagnostic_families():
     return sorted({d["family"] for d in DIAGNOSTICS})

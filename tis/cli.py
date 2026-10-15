@@ -2,9 +2,6 @@
 from __future__ import annotations
 import argparse
 import json
-import importlib.util
-import subprocess
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -12,27 +9,21 @@ from .catalog import DIAGNOSTICS, FORMULAS
 from .core import load_table, signal_quality, prepare_time_series, fft_spectrum, welch_psd, sha256_bytes
 
 
-def dashboard_main(streamlit_args: list[str] | None = None) -> int:
-    """Launch the installed Streamlit dashboard; optional arguments pass to Streamlit."""
-    spec = importlib.util.find_spec("app")
-    if spec is None or not spec.origin:
-        raise SystemExit("Dashboard module 'app' is not installed. Reinstall tokamak-insight-suite with dashboard dependencies.")
-    args = list(sys.argv[1:] if streamlit_args is None else streamlit_args)
-    if args and args[0] == "--":
-        args = args[1:]
-    return subprocess.call([sys.executable, "-m", "streamlit", "run", spec.origin, *args])
-
-
 def main() -> int:
     parser=argparse.ArgumentParser(prog='tis',description='Tokamak Insight Suite command-line tools')
     sub=parser.add_subparsers(dest='command',required=True)
-    dashboard_parser=sub.add_parser('dashboard',help='Launch the Streamlit dashboard')
-    dashboard_parser.add_argument('streamlit_args',nargs=argparse.REMAINDER,help='Optional arguments passed to Streamlit after --')
     p=sub.add_parser('qc',help='Audit columns and write a JSON report'); p.add_argument('input'); p.add_argument('--output',default='tis_qc.json')
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True); p.add_argument('--time'); p.add_argument('--fs',type=float,default=None); p.add_argument('--output',default='tis_fft.csv')
     p=sub.add_parser('catalog',help='Export diagnostic/formula registry JSON'); p.add_argument('--kind',choices=['diagnostics','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
+    p=sub.add_parser('events',help='Detect ELMs / sawtooth crashes or analyse a current quench'); p.add_argument('input'); p.add_argument('--kind',choices=['elm','sawtooth','quench'],required=True); p.add_argument('--time',required=True); p.add_argument('--signal',required=True); p.add_argument('--n-sigmas',type=float,default=None); p.add_argument('--output',default='tis_events.json')
+    p=sub.add_parser('scalings',help='Confinement summary: Greenwald, q95, IPB98(y,2), H98, Martin-08 L-H threshold')
+    for flag in ('ip-A','bt-T','r-m','a-m','kappa','ne-line-avg-m3','p-loss-W'): p.add_argument('--'+flag,type=float,required=True)
+    p.add_argument('--mass-amu',type=float,default=2.0); p.add_argument('--stored-energy-J',type=float,default=None); p.add_argument('--delta',type=float,default=0.0); p.add_argument('--output',default='tis_scalings.json')
     args=parser.parse_args()
-    if args.command=='dashboard': return dashboard_main(args.streamlit_args)
+    if args.command=='scalings':
+        from .plasma import confinement_summary
+        res=confinement_summary(ip_A=args.ip_A,bt_T=args.bt_T,r_m=args.r_m,a_m=args.a_m,kappa=args.kappa,ne_line_avg_m3=args.ne_line_avg_m3,p_loss_W=args.p_loss_W,mass_amu=args.mass_amu,stored_energy_J=args.stored_energy_J,delta=args.delta)
+        Path(args.output).write_text(json.dumps(res,indent=2,ensure_ascii=False,default=float)+'\n',encoding='utf-8'); print(f'Wrote {Path(args.output).resolve()}'); return 0
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
         if args.kind in ('diagnostics','both'):(out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(DIAGNOSTICS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
@@ -46,6 +37,20 @@ def main() -> int:
             if pd.api.types.is_numeric_dtype(frame[col]): report['quality'][str(col)]=signal_quality(frame[col].to_numpy())
         Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=str)+'\n',encoding='utf-8')
         print(f"Audited {len(frame)} rows × {len(frame.columns)} columns; report: {Path(args.output).resolve()}"); return 0
+    if args.command=='events':
+        from .events import detect_elms, detect_sawteeth, current_quench_analysis
+        for col in (args.time,args.signal):
+            if col not in frame.columns: raise SystemExit(f"Column {col!r} not found. Available: {list(frame.columns)}")
+        tt=pd.to_numeric(frame[args.time],errors='coerce').to_numpy(); yy=pd.to_numeric(frame[args.signal],errors='coerce').to_numpy()
+        kw={} if args.n_sigmas is None else {'n_sigmas':args.n_sigmas}
+        res={'elm':lambda:detect_elms(tt,yy,**kw),'sawtooth':lambda:detect_sawteeth(tt,yy,**kw),'quench':lambda:current_quench_analysis(tt,yy)}[args.kind]()
+        def _js(v):
+            if isinstance(v,np.ndarray): return v.tolist()
+            if isinstance(v,(np.floating,np.integer)): return v.item()
+            raise TypeError(type(v))
+        report={'input':Path(args.input).name,'sha256':sha256_bytes(data),'kind':args.kind,'result':res}
+        Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=_js)+'\n',encoding='utf-8')
+        print(f"{args.kind}: wrote {Path(args.output).resolve()}"); return 0
     if args.signal not in frame.columns: raise SystemExit(f"Signal column {args.signal!r} not found. Available: {list(frame.columns)}")
     t=None if not args.time else pd.to_numeric(frame[args.time],errors='coerce').to_numpy()
     tt,yy,fs=prepare_time_series(t,pd.to_numeric(frame[args.signal],errors='coerce').to_numpy(),args.fs)

@@ -26,17 +26,15 @@ def sha256_bytes(data: bytes) -> str:
 def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                delimiter: str | None = None, decimal: str = ".", skiprows: int = 0,
                header: int | None | str = "infer", comment: str | None = None,
+               encoding: str | None = None,
                max_bytes: int = 100_000_000, max_rows: int = 10_000_000,
                max_uncompressed_bytes: int = 500_000_000) -> pd.DataFrame:
-    """Load a table with preflight limits and an explicit report of numeric coercions.
+    """Load tabular data with explicit parsing options and bounded input size.
 
-    Raw bytes remain caller-owned and unchanged. Limits are checked before full
-    materialization wherever the format exposes trustworthy metadata.
+    '#' remains an ordinary character by default, preserving headers such as Ch#1.
     """
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("data must be bytes.")
-    if max_bytes <= 0 or max_rows <= 0 or max_uncompressed_bytes <= 0:
-        raise ValueError("Import limits must be positive.")
     if len(data) > max_bytes:
         raise ValueError(f"Input exceeds the configured {max_bytes:,}-byte import limit.")
     if decimal not in {".", ","}:
@@ -45,85 +43,47 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("skiprows must be a nonnegative integer.")
     name = filename.lower()
     if name.endswith((".csv", ".txt")):
-        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header,
-                  "nrows": max_rows + 1}
+        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
         if comment is not None:
             kwargs["comment"] = comment
-        frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None,
-                            engine="python" if delimiter is None else "c", **kwargs)
+        # Instrument exports are frequently Windows-1252/Latin-1 (e.g. 'Température',
+        # 'µs'). Try strict UTF-8 (BOM-tolerant) first, then fall back, and record
+        # which encoding was actually used so the choice is part of provenance.
+        candidates = [encoding] if encoding else ["utf-8-sig", "cp1252", "latin-1"]
+        frame = None; used_encoding = None; last_exc = None
+        for enc in candidates:
+            try:
+                frame = pd.read_csv(io.BytesIO(data), sep=delimiter or None, encoding=enc,
+                                    engine="python" if delimiter is None else "c", **kwargs)
+                used_encoding = enc
+                break
+            except UnicodeDecodeError as exc:
+                last_exc = exc
+        if frame is None:
+            raise ValueError(f"Could not decode the text file with encoding(s) {candidates}: {last_exc}")
+        frame.attrs["encoding"] = used_encoding
     elif name.endswith((".xlsx", ".xls")):
         if name.endswith(".xlsx"):
             import zipfile
             try:
                 with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                    members = archive.infolist()
-                    expanded = sum(member.file_size for member in members)
-                    if len(members) > 2000 or expanded > max_uncompressed_bytes:
+                    members=archive.infolist()
+                    expanded=sum(member.file_size for member in members)
+                    if len(members)>2000 or expanded>max_uncompressed_bytes:
                         raise ValueError("Excel archive exceeds the safe member-count or uncompressed-size limit.")
-                    if any(m.compress_size > 0 and m.file_size / m.compress_size > 1000 for m in members):
+                    if any(member.compress_size>0 and member.file_size/member.compress_size>1000 for member in members):
                         raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
-                from openpyxl import load_workbook
-                book = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-                try:
-                    if sheet_name == 0:
-                        sheet = book.worksheets[0]
-                    elif isinstance(sheet_name, int):
-                        if sheet_name < 0 or sheet_name >= len(book.worksheets):
-                            raise ValueError("Requested worksheet index is out of range.")
-                        sheet = book.worksheets[sheet_name]
-                    else:
-                        if sheet_name not in book.sheetnames:
-                            raise ValueError(f"Worksheet {sheet_name!r} was not found.")
-                        sheet = book[sheet_name]
-                    if sheet.max_row and sheet.max_row > max_rows + skiprows + 1:
-                        raise ValueError(f"Worksheet exceeds the configured {max_rows:,}-row import limit.")
-                    if sheet.max_column and sheet.max_column > 100_000:
-                        raise ValueError("Worksheet exceeds the configured column limit.")
-                finally:
-                    book.close()
             except zipfile.BadZipFile as exc:
                 raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
-        else:
-            try:
-                import xlrd
-            except ImportError as exc:
-                raise ValueError("Reading legacy .xls requires the optional 'xlrd' dependency.") from exc
-            try:
-                book = xlrd.open_workbook(file_contents=bytes(data), on_demand=True)
-                try:
-                    if isinstance(sheet_name, int):
-                        if sheet_name < 0 or sheet_name >= book.nsheets:
-                            raise ValueError("Requested worksheet index is out of range.")
-                        sheet = book.sheet_by_index(sheet_name)
-                    else:
-                        sheet = book.sheet_by_name(sheet_name)
-                    if sheet.nrows > max_rows + skiprows + 1:
-                        raise ValueError(f"Worksheet exceeds the configured {max_rows:,}-row import limit.")
-                    if sheet.ncols > 100_000:
-                        raise ValueError("Worksheet exceeds the configured column limit.")
-                finally:
-                    book.release_resources()
-            except ValueError:
-                raise
-            except Exception as exc:
-                raise ValueError("Could not safely inspect the legacy XLS workbook.") from exc
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header,
-                              nrows=max_rows + 1, engine="openpyxl" if name.endswith(".xlsx") else "xlrd")
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header)
     elif name.endswith((".parquet", ".pq")):
         import pyarrow.parquet as pq
         try:
-            parquet_file = pq.ParquetFile(io.BytesIO(data))
-            metadata = parquet_file.metadata
-            if metadata.num_rows > max_rows or metadata.num_row_groups > 10000:
+            parquet_file=pq.ParquetFile(io.BytesIO(data))
+            if parquet_file.metadata.num_rows>max_rows or parquet_file.metadata.num_row_groups>10000:
                 raise ValueError("Parquet file exceeds the configured row or row-group limit.")
-            expanded = sum(metadata.row_group(i).total_byte_size for i in range(metadata.num_row_groups))
-            if expanded > max_uncompressed_bytes:
-                raise ValueError("Parquet file exceeds the configured uncompressed-size limit.")
-            if metadata.num_columns > 100_000:
-                raise ValueError("Parquet file exceeds the configured column limit.")
         except (ValueError, OSError) as exc:
-            if isinstance(exc, ValueError):
-                raise
+            if isinstance(exc, ValueError): raise
             raise ValueError("Could not safely inspect Parquet metadata.") from exc
         frame = pd.read_parquet(io.BytesIO(data))
     else:
@@ -132,27 +92,18 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("Select one worksheet at a time.")
     if frame.empty:
         raise ValueError("The imported table is empty.")
-    if len(frame) > max_rows:
+    if len(frame)>max_rows:
         raise ValueError(f"Table exceeds the configured {max_rows:,}-row import limit.")
     frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
-    coercions = {}
+    # Recover mostly numeric instrument columns containing a unit row or a few
+    # malformed cells. Those cells become NaN and remain visible to QC.
     for col in frame.columns:
         if not pd.api.types.is_numeric_dtype(frame[col]):
             candidate = pd.to_numeric(frame[col], errors="coerce")
             nonempty = int(frame[col].notna().sum())
             numeric_count = int(candidate.notna().sum())
-            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= (2.0 / 3.0):
-                converted = int((frame[col].notna() & candidate.isna()).sum())
-                if converted:
-                    coercions[str(col)] = {"converted_to_missing": converted, "nonempty_before": nonempty}
+            if nonempty >= 2 and numeric_count >= 2 and numeric_count / nonempty >= 0.67:
                 frame[col] = candidate
-    frame.attrs["tis_import_report"] = {
-        "filename": filename,
-        "input_bytes": len(data),
-        "numeric_coercions": coercions,
-        "row_limit": max_rows,
-        "uncompressed_byte_limit": max_uncompressed_bytes,
-    }
     return frame
 
 
@@ -168,9 +119,7 @@ def signal_quality(values: Any) -> dict[str, Any]:
         'median': float(np.median(v)), 'min': float(np.min(v)), 'max': float(np.max(v)),
         'rms_including_dc': float(np.sqrt(np.mean(v*v))), 'peak_to_peak': float(np.ptp(v)),
         'relative_rms_fluctuation': float(np.std(v)/abs(np.mean(v))) if abs(np.mean(v))>np.finfo(float).eps else None,
-        # Counts repeated amplitudes, not duplicate timestamps; timestamp checks use the time column.
         'duplicate_fraction': float((len(v)-len(np.unique(v)))/len(v)),
-        'duplicate_fraction_definition': 'fraction of repeated exact signal values among finite samples; not a timestamp-duplicate metric',
     }
 
 
@@ -194,11 +143,19 @@ def integrate_time_series(
     initial_value: float = 0.0,
     baseline_start_s: float | None = None,
     baseline_end_s: float | None = None,
+    drift_start_s: float | None = None,
+    drift_end_s: float | None = None,
 ) -> dict[str, Any]:
     """Integrate a calibrated time trace by the trapezoidal rule, optionally subtracting a measured baseline.
 
     The scale converts input units to the derivative/integrand units required by the user.
     This utility does not infer a sensor transfer function or physical calibration.
+
+    Optional linear drift correction: when both a pre-shot baseline window
+    (baseline_start_s..baseline_end_s) and a post-shot window (drift_start_s..drift_end_s)
+    are given, the offset is assumed to drift linearly between the centres of the two
+    windows and the interpolated offset is subtracted before integration. This is the
+    standard remedy for integrator/pickup drift when the true signal is ~0 in both windows.
     """
     t = np.asarray(time_s, dtype=float).ravel()
     y = np.asarray(values, dtype=float).ravel()
@@ -212,8 +169,13 @@ def integrate_time_series(
         raise ValueError('Scale and initial value must be finite.')
     if (baseline_start_s is None) != (baseline_end_s is None):
         raise ValueError('Specify both baseline start and end, or neither.')
+    if (drift_start_s is None) != (drift_end_s is None):
+        raise ValueError('Specify both drift-window start and end, or neither.')
+    if drift_start_s is not None and baseline_start_s is None:
+        raise ValueError('Linear drift correction needs the pre-shot baseline window as well.')
     calibrated = y * float(scale)
     baseline = 0.0
+    drift_rate = None
     if baseline_start_s is not None:
         if not np.isfinite(baseline_start_s) or not np.isfinite(baseline_end_s) or baseline_start_s >= baseline_end_s:
             raise ValueError('Baseline interval must be finite with start < end.')
@@ -221,7 +183,20 @@ def integrate_time_series(
         if np.count_nonzero(mask) < 2:
             raise ValueError('Baseline interval must include at least two samples.')
         baseline = float(np.mean(calibrated[mask]))
-        calibrated = calibrated - baseline
+        if drift_start_s is not None:
+            if not np.isfinite(drift_start_s) or not np.isfinite(drift_end_s) or drift_start_s >= drift_end_s:
+                raise ValueError('Drift window must be finite with start < end.')
+            mask2 = (t >= drift_start_s) & (t <= drift_end_s)
+            if np.count_nonzero(mask2) < 2:
+                raise ValueError('Drift window must include at least two samples.')
+            t1 = float(np.mean(t[mask])); t2 = float(np.mean(t[mask2]))
+            if t2 <= t1:
+                raise ValueError('The post-shot drift window must lie after the baseline window.')
+            b2 = float(np.mean(calibrated[mask2]))
+            drift_rate = (b2 - baseline) / (t2 - t1)
+            calibrated = calibrated - (baseline + drift_rate * (t - t1))
+        else:
+            calibrated = calibrated - baseline
     integrated = float(initial_value) + integrate.cumulative_trapezoid(calibrated, t, initial=0.0)
     return {
         'time_s': t,
@@ -229,59 +204,12 @@ def integrate_time_series(
         'integrated_signal': integrated,
         'scale': float(scale),
         'baseline_offset_in_calibrated_units': baseline,
+        'linear_drift_rate_calibrated_units_per_s': drift_rate,
         'initial_value': float(initial_value),
         'n_samples': int(len(t)),
         'method': 'cumulative trapezoidal integration',
         'note': 'The result is physically meaningful only when the input signal, scale, baseline interval, sensor response and initial condition are appropriate for the diagnostic.',
     }
-
-
-
-def resample_time_series(time_s: Any, values: Any, target_dt_s: float | None = None,
-                         max_gap_factor: float = 1.5) -> dict[str, Any]:
-    """Interpolate jittered timestamps onto a uniform grid without bridging large gaps.
-
-    This is intended for modest timestamp jitter, not recovery of missing information.
-    Downsampling is deliberately rejected because it requires a separately specified
-    anti-alias filter. A gap exceeding max_gap_factor times the target interval is also
-    rejected so interpolation cannot silently invent a long missing segment.
-    """
-    t=np.asarray(time_s,dtype=float).ravel()
-    y=np.asarray(values,dtype=float).ravel()
-    if len(t)!=len(y) or len(t)<8:
-        raise ValueError("Time and signal must have equal lengths and at least 8 samples.")
-    good=np.isfinite(t)&np.isfinite(y)
-    t,y=t[good],y[good]
-    if len(t)<8:
-        raise ValueError("At least 8 paired finite samples are required.")
-    order=np.argsort(t,kind="stable")
-    t,y=t[order],y[order]
-    dt=np.diff(t)
-    if np.any(dt<=0):
-        raise ValueError("Time stamps must be unique and strictly increasing; resolve duplicates explicitly.")
-    median_dt=float(np.median(dt))
-    target=median_dt if target_dt_s is None else float(target_dt_s)
-    if not np.isfinite(target) or target<=0:
-        raise ValueError("target_dt_s must be positive and finite.")
-    if target>median_dt*(1+1e-6):
-        raise ValueError("Downsampling is not performed by interpolation; apply and document an anti-alias filter first.")
-    if not np.isfinite(max_gap_factor) or max_gap_factor<=1:
-        raise ValueError("max_gap_factor must be finite and greater than 1.")
-    gaps=np.flatnonzero(dt>max_gap_factor*target)
-    if len(gaps):
-        preview=", ".join(f"{int(i)} ({dt[i]:.6g} s)" for i in gaps[:5])
-        raise ValueError(f"Large timestamp gaps detected at interval indices {preview}; split the record into contiguous segments instead of interpolating across gaps.")
-    n=int(np.floor((t[-1]-t[0])/target))+1
-    grid=t[0]+np.arange(n,dtype=float)*target
-    if len(grid)<8:
-        raise ValueError("Uniform grid contains fewer than 8 samples.")
-    values_uniform=np.interp(grid,t,y)
-    jitter=float(np.std(dt)/np.mean(dt)) if len(dt)>1 else 0.0
-    return {"time_s":grid,"values":values_uniform,"sample_rate_Hz":float(1.0/target),
-            "original_samples":int(len(t)),"resampled_samples":int(len(grid)),
-            "target_dt_s":target,"original_interval_jitter_std_over_mean":jitter,
-            "method":"linear interpolation to uniform grid; no extrapolation or large-gap bridging",
-            "warning":"Interpolation changes spectral amplitude/phase and does not recover information lost to jitter or missing samples; compare with unresampled data and document the method."}
 
 
 def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
@@ -357,55 +285,6 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
     else: wn, btype = lowpass, 'lowpass'
     sos = signal.butter(int(order), wn, btype=btype, fs=fs, output='sos')
     return signal.sosfiltfilt(sos, x)
-
-
-
-def filter_impact_analysis(values: Any, fs: float, highpass: float | None = None,
-                           lowpass: float | None = None, order: int = 3,
-                           window: str = "hann") -> dict[str, Any]:
-    """Apply the selected zero-phase Butterworth filter and quantify signal/spectral changes."""
-    x=np.asarray(values,dtype=float).ravel()
-    filtered=butterworth_filter(x,fs,highpass,lowpass,order)
-    freq_raw,amp_raw=fft_spectrum(x,fs,window=window)
-    freq_filt,amp_filt=fft_spectrum(filtered,fs,window=window)
-    if not np.array_equal(freq_raw,freq_filt):
-        raise RuntimeError("Raw and filtered FFT grids unexpectedly differ.")
-    valid=freq_raw>0
-    if not np.any(valid):
-        raise ValueError("Signal contains no positive-frequency FFT bins.")
-    raw_idx=int(np.flatnonzero(valid)[np.argmax(amp_raw[valid])])
-    filtered_idx=int(np.flatnonzero(valid)[np.argmax(amp_filt[valid])])
-    response_frequency=np.array([],dtype=float)
-    response_amplitude=np.array([],dtype=float)
-    if highpass is not None or lowpass is not None:
-        nyq=fs/2
-        if highpass is not None and lowpass is not None:
-            wn=[highpass,lowpass]; btype="bandpass"
-        elif highpass is not None:
-            wn=highpass; btype="highpass"
-        else:
-            wn=lowpass; btype="lowpass"
-        sos=signal.butter(int(order),wn,btype=btype,fs=fs,output="sos")
-        response_frequency,h=signal.sosfreqz(sos,worN=512,fs=fs)
-        # sosfiltfilt is forward-backward, so its steady-state amplitude response is |H|².
-        response_amplitude=np.abs(h)**2
-    return {
-        "filtered_signal":filtered,
-        "sampling_frequency_Hz":float(fs),
-        "filter_type":"none" if highpass is None and lowpass is None else ("bandpass" if highpass is not None and lowpass is not None else "highpass" if highpass is not None else "lowpass"),
-        "highpass_cutoff_Hz":highpass,"lowpass_cutoff_Hz":lowpass,"butterworth_order":int(order),
-        "zero_phase_method":"second-order-section forward-backward filtering",
-        "raw_rms":float(np.sqrt(np.mean(x*x))),
-        "filtered_rms":float(np.sqrt(np.mean(filtered*filtered))),
-        "rms_change_fraction":float((np.sqrt(np.mean(filtered*filtered))-np.sqrt(np.mean(x*x)))/max(np.sqrt(np.mean(x*x)),np.finfo(float).tiny)),
-        "raw_dominant_frequency_Hz":float(freq_raw[raw_idx]),
-        "raw_dominant_amplitude":float(amp_raw[raw_idx]),
-        "filtered_dominant_frequency_Hz":float(freq_filt[filtered_idx]),
-        "filtered_dominant_amplitude":float(amp_filt[filtered_idx]),
-        "frequency_response_Hz":response_frequency,
-        "forward_backward_amplitude_response":response_amplitude,
-        "interpretation_warning":"Filtering changes amplitudes and spectral content; dominant peak comparison is descriptive and does not validate cutoff choice. Edge transients and nonstationarity must be assessed.",
-    }
 
 
 def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = True) -> tuple[np.ndarray, np.ndarray]:
@@ -559,43 +438,6 @@ def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = N
     return lags,corr,float(lags[idx])
 
 
-
-def _spectral_fit_diagnostics(observed: np.ndarray, predicted: np.ndarray,
-                              sigma: np.ndarray | None, parameter_count: int) -> dict[str, Any]:
-    residual=observed-predicted
-    dof=max(0,len(observed)-parameter_count)
-    result={"fit_points":int(len(observed)),
-            "fit_degrees_of_freedom":int(dof),
-            "fit_rmse":float(np.sqrt(np.mean(residual**2))),
-            "fit_residual_std":float(np.std(residual,ddof=1)) if len(residual)>1 else 0.0,
-            "fit_residual_mean":float(np.mean(residual))}
-    if sigma is not None and dof>0:
-        result["reduced_chi_square"]=float(np.sum((residual/sigma)**2)/dof)
-        result["reduced_chi_square_interpretation"]="Meaningful only if sigma values are calibrated independent 1-sigma uncertainties and the model assumptions hold."
-    else:
-        result["reduced_chi_square"]=None
-    return result
-
-
-def evaluate_spectral_fit(x: Any, fit: dict[str, Any]) -> np.ndarray:
-    """Evaluate a supported fitted line shape on coordinates, for residual plots."""
-    xx=np.asarray(x,dtype=float)
-    model=str(fit.get("model","")).lower()
-    baseline=float(fit["baseline"])
-    center=float(fit["center"])
-    if model=="gaussian":
-        return baseline+float(fit["amplitude"])*np.exp(-0.5*((xx-center)/float(fit["sigma"]))**2)
-    if model=="lorentzian":
-        width=float(fit["half_width_at_half_max"])
-        return baseline+float(fit["amplitude"])/(1.0+((xx-center)/width)**2)
-    if model=="voigt":
-        sigma=float(fit["gaussian_sigma"])
-        gamma=float(fit["lorentzian_HWHM"])
-        peak=float(voigt_profile(0,sigma,gamma))
-        return baseline+float(fit["amplitude_peak"])*voigt_profile(xx-center,sigma,gamma)/max(peak,np.finfo(float).eps)
-    raise ValueError("Fit model must be Gaussian, Lorentzian, or Voigt.")
-
-
 def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | None = None, model: str = 'Gaussian', sigma_y: Any | None = None) -> dict[str, float | str]:
     xx, yy = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
     if (xmin is not None and not np.isfinite(xmin)) or (xmax is not None and not np.isfinite(xmax)):
@@ -648,7 +490,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
         se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Gaussian','baseline':b,'amplitude':a,'center':c,'sigma':s,'FWHM':float(width),'area_above_baseline':float(a*s*np.sqrt(2*np.pi)),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_sigma':float(se[3]),
-                'standard_error_FWHM':float(2*np.sqrt(2*np.log(2))*se[3]), **_spectral_fit_diagnostics(yy,pred,sigma_fit,4)}
+                'standard_error_FWHM':float(2*np.sqrt(2*np.log(2))*se[3])}
     if model=='lorentzian':
         def fn(z,b,a,c,g): return b+a/(1+((z-c)/g)**2)
         p0=[baseline0,amp0,center0,max(step,span/20)]
@@ -661,7 +503,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
             raise ValueError("Lorentzian fit covariance is singular or non-finite; inspect fit range and signal-to-noise.")
         b,a,c,g=map(float,p); pred=fn(xx,*p); se=np.sqrt(np.maximum(np.diag(cov),0.0))
         return {'model':'Lorentzian','baseline':b,'amplitude':a,'center':c,'half_width_at_half_max':g,'FWHM':2*g,'area_above_baseline':float(np.pi*a*g),'r_squared':_r2(yy,pred),'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None,
-                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3]), **_spectral_fit_diagnostics(yy,pred,sigma_fit,4)}
+                'standard_error_baseline':float(se[0]),'standard_error_amplitude':float(se[1]),'standard_error_center':float(se[2]),'standard_error_HWHM':float(se[3]),'standard_error_FWHM':float(2*se[3])}
     if model=='voigt':
         def fn(z,b,a,c,s,g): return b+a*voigt_profile(z-c,s,g)/max(voigt_profile(0,s,g),np.finfo(float).eps)
         p0=[baseline0,amp0,center0,max(step,span/30),max(step,span/30)]
@@ -681,7 +523,7 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
                 'FWHM':fwhm,'area_above_baseline':area,'r_squared':_r2(yy,pred),
                 'standard_error_baseline':float(se[0]),'standard_error_amplitude_peak':float(se[1]),'standard_error_center':float(se[2]),
                 'standard_error_gaussian_sigma':float(se[3]),'standard_error_lorentzian_HWHM':float(se[4]),
-                'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None, **_spectral_fit_diagnostics(yy,pred,sigma_fit,5)}
+                'line_polarity':polarity,'uncertainty_weighted_fit':sigma_fit is not None}
     raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
 
 
@@ -752,108 +594,6 @@ def doppler_velocity_m_s(delta_lambda: float, lambda0: float) -> float:
     if not np.all(np.isfinite([delta_lambda, lambda0])) or lambda0 <= 0:
         raise ValueError('Wavelength shift must be finite and rest wavelength positive.')
     return float(C_LIGHT*delta_lambda/lambda0)
-
-
-
-def analyze_doppler_line_end_to_end(
-    raw_coordinate: Any, intensity: Any,
-    reference_pixels: Any, reference_wavelengths: Any,
-    rest_wavelength: float, ion_mass_amu: float,
-    fit_min_wavelength: float, fit_max_wavelength: float,
-    instrument_sigma: float, instrument_sigma_uncertainty: float = 0.0,
-    rest_wavelength_uncertainty: float = 0.0, ion_mass_uncertainty_amu: float = 0.0,
-    background: Any | None = None, relative_response: Any | None = None,
-    intensity_uncertainty: Any | None = None, calibration_degree: int = 1,
-    assume_instrument_negligible: bool = False,
-) -> dict[str, Any]:
-    """End-to-end calibrated Gaussian Doppler-line analysis with explicit corrections.
-
-    The emitting line and ion species must be identified by the analyst. Calibration
-    residual is reported but not silently treated as a full calibration covariance.
-    Relative response and background uncertainty are not propagated in this version.
-    """
-    x=np.asarray(raw_coordinate,dtype=float).ravel()
-    y=np.asarray(intensity,dtype=float).ravel()
-    if len(x)!=len(y) or len(x)<7:
-        raise ValueError("Coordinate and intensity arrays must have equal length and at least 7 samples.")
-    if not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
-        raise ValueError("Coordinate and intensity arrays must be finite; clean missing samples explicitly.")
-    if not np.all(np.isfinite([rest_wavelength,ion_mass_amu,fit_min_wavelength,fit_max_wavelength,
-                               instrument_sigma,instrument_sigma_uncertainty,rest_wavelength_uncertainty,
-                               ion_mass_uncertainty_amu])):
-        raise ValueError("Physical inputs and uncertainties must be finite.")
-    if rest_wavelength<=0 or ion_mass_amu<=0 or fit_min_wavelength>=fit_max_wavelength:
-        raise ValueError("Rest wavelength and ion mass must be positive; fit minimum must be below maximum.")
-    if min(instrument_sigma,instrument_sigma_uncertainty,rest_wavelength_uncertainty,ion_mass_uncertainty_amu)<0:
-        raise ValueError("Instrument width and all uncertainties must be nonnegative.")
-    calibration=spectral_calibration(reference_pixels,reference_wavelengths,degree=calibration_degree)
-    wavelength=polynomial_calibration(x,calibration["coefficients_high_to_low"])
-    sorted_wavelength=wavelength[np.argsort(x,kind="stable")]
-    delta_wavelength=np.diff(sorted_wavelength)
-    if not (np.all(delta_wavelength>0) or np.all(delta_wavelength<0)):
-        raise ValueError("Wavelength calibration is not monotonic over the supplied spectrum; inspect reference points and polynomial degree.")
-    corrected=y.copy()
-    if background is not None:
-        bg=np.asarray(background,dtype=float).ravel()
-        if len(bg)!=len(y) or not np.all(np.isfinite(bg)):
-            raise ValueError("Background array must be finite and match the spectrum length.")
-        corrected=corrected-bg
-    response_applied=False
-    response=None
-    if relative_response is not None:
-        response=np.asarray(relative_response,dtype=float).ravel()
-        if len(response)!=len(y) or not np.all(np.isfinite(response)) or np.any(response<=0):
-            raise ValueError("Relative-response array must be positive, finite, and match the spectrum length.")
-        corrected=corrected/response
-        response_applied=True
-    sigma_fit=None
-    if intensity_uncertainty is not None:
-        sigma_fit=np.asarray(intensity_uncertainty,dtype=float).ravel()
-        if len(sigma_fit)!=len(y) or not np.all(np.isfinite(sigma_fit)) or np.any(sigma_fit<=0):
-            raise ValueError("Intensity uncertainties must be positive, finite, and match the spectrum length.")
-        if response is not None:
-            sigma_fit=sigma_fit/response
-    fit=fit_spectral_line(wavelength,corrected,fit_min_wavelength,fit_max_wavelength,model="Gaussian",
-                          sigma_y=sigma_fit)
-    observed_sigma=float(fit["sigma"])
-    if instrument_sigma==0 and not assume_instrument_negligible:
-        raise ValueError("Provide the calibrated instrumental Gaussian sigma or explicitly justify negligible instrumental broadening.")
-    corrected_variance=observed_sigma**2-instrument_sigma**2
-    if corrected_variance<=0:
-        raise ValueError("Observed Gaussian width does not exceed instrumental width; thermal Doppler width is unresolved.")
-    doppler_sigma=float(np.sqrt(corrected_variance))
-    observed_sigma_unc=float(fit["standard_error_sigma"])
-    doppler_sigma_unc=float(np.sqrt((observed_sigma/doppler_sigma*observed_sigma_unc)**2+
-                                    (instrument_sigma/doppler_sigma*instrument_sigma_uncertainty)**2))
-    temperature=doppler_temperature_with_uncertainty_eV(
-        doppler_sigma,rest_wavelength,ion_mass_amu,doppler_sigma_unc,
-        rest_wavelength_uncertainty,ion_mass_uncertainty_amu)
-    velocity=doppler_velocity_with_uncertainty_m_s(
-        float(fit["center"]),rest_wavelength,float(fit["standard_error_center"]),
-        rest_wavelength_uncertainty)
-    return {
-        "wavelength_calibration":calibration,
-        "line_fit":fit,
-        "line_identification":"User-supplied rest wavelength and ion mass; automatic atomic line identification is not performed.",
-        "rest_wavelength":float(rest_wavelength),
-        "ion_mass_amu":float(ion_mass_amu),
-        "background_subtracted":background is not None,
-        "relative_response_correction_applied":response_applied,
-        "instrument_sigma":float(instrument_sigma),
-        "instrument_sigma_uncertainty":float(instrument_sigma_uncertainty),
-        "corrected_thermal_doppler_sigma":doppler_sigma,
-        "corrected_thermal_doppler_sigma_standard_uncertainty":doppler_sigma_unc,
-        "doppler_temperature_eV":temperature["temperature_eV"],
-        "doppler_temperature_standard_uncertainty_eV":temperature["standard_uncertainty_eV"],
-        "line_of_sight_velocity_m_s":velocity["line_of_sight_velocity_m_s"],
-        "line_of_sight_velocity_standard_uncertainty_m_s":velocity["standard_uncertainty_m_s"],
-        "calibration_rms_residual_in_wavelength_units":calibration["rms_residual"],
-        "uncertainty_scope":"First-order fit and supplied-input uncertainties only; calibration-coefficient covariance, response/background uncertainty, line blends, atomic structure, Zeeman splitting, non-Gaussian instrument response and model systematics are excluded.",
-        "assumptions":["Gaussian isolated line","Gaussian instrument width removed in quadrature","Non-relativistic Doppler velocity","Analyst has verified the emitting transition and isotope","Calibration references span the fitted line region"],
-        "calibrated_wavelength":wavelength,
-        "corrected_intensity":corrected,
-        "fitted_intensity":evaluate_spectral_fit(wavelength,fit),
-    }
 
 
 def linear_phase_density(phase_rad: Any, frequency_hz: float, sign_convention: int | None = None) -> np.ndarray:
@@ -1008,26 +748,10 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
     residual=A@x-y
     weighted_residual=residual if sigma is None else residual/sigma
     regularization_norm=float(np.linalg.norm(operator@x))
-    column_norms=np.linalg.norm(Aw,axis=0)
-    coverage_fraction=float(np.count_nonzero(column_norms>np.finfo(float).eps)/A.shape[1])
-    if min(Aw.shape) <= 512:
-        singular_values=np.linalg.svd(Aw,compute_uv=False)
-        tol=(singular_values[0] if len(singular_values) else 0.0)*max(Aw.shape)*np.finfo(float).eps
-        effective_rank=int(np.count_nonzero(singular_values>tol))
-        condition_number=(float(singular_values[0]/singular_values[-1])
-                          if len(singular_values) and singular_values[-1]>tol else float("inf"))
-        conditioning_status="SVD diagnostic computed"
-    else:
-        effective_rank=None
-        condition_number=None
-        conditioning_status="Not computed automatically for large response matrices; inspect rank/conditioning with a matrix-free diagnostic."
     return {'solution':x,'residual':residual,'residual_norm':float(np.linalg.norm(residual)),
             'weighted_residual_norm':float(np.linalg.norm(weighted_residual)),
             'regularization':float(lam),'regularization_order':int(regularization_order),
             'regularization_operator_norm':regularization_norm,'response_spectral_norm':response_scale,
-            'response_effective_rank':effective_rank,'response_condition_number':condition_number,
-            'response_conditioning_status':conditioning_status,'response_column_coverage_fraction':coverage_fraction,
-            'linearized_uncertainty_status':'Uncertainty is not estimated by this solver; use noise perturbation/bootstrap and report regularization/model sensitivity.',
             'success':success,'message':message,'nonnegative':bool(nonnegative),
             'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
 
@@ -1059,175 +783,6 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
             'discrete_log_lcurve_curvature':curvature,
             'selection_method':'maximum discrete curvature of log-weighted-residual vs log-regularization-norm L-curve',
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
-
-
-
-def tomography_noise_sensitivity(
-    A: Any, y: Any, measurement_sigma: Any, lam: float = 1e-2,
-    nonnegative: bool = True, regularization_order: int = 1,
-    n_replicates: int = 100, random_seed: int = 0,
-) -> dict[str, Any]:
-    """Monte Carlo sensitivity of a regularized reconstruction to stated measurement noise.
-
-    This propagates only the supplied independent Gaussian measurement errors. It does
-    not include geometry/model error, correlated noise, calibration uncertainty, or
-    regularization-selection uncertainty, and is not a complete posterior interval.
-    """
-    matrix=np.asarray(A,dtype=float)
-    values=np.asarray(y,dtype=float).ravel()
-    sigma=np.asarray(measurement_sigma,dtype=float).ravel()
-    if matrix.ndim!=2 or matrix.shape[0]!=len(values) or len(sigma)!=len(values):
-        raise ValueError("A, y, and measurement_sigma dimensions are inconsistent.")
-    if not np.all(np.isfinite(matrix)) or not np.all(np.isfinite(values)):
-        raise ValueError("A and y must contain only finite values.")
-    if not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
-        raise ValueError("measurement_sigma must contain positive finite standard uncertainties.")
-    if isinstance(n_replicates,bool) or int(n_replicates)!=n_replicates or not 20<=n_replicates<=1000:
-        raise ValueError("n_replicates must be an integer from 20 to 1000.")
-    base=regularized_tomography(matrix,values,lam,nonnegative,measurement_sigma=sigma,
-                                regularization_order=regularization_order)
-    rng=np.random.default_rng(random_seed)
-    draws=np.empty((int(n_replicates),matrix.shape[1]),dtype=float)
-    for i in range(int(n_replicates)):
-        perturbed=values+rng.normal(0.0,sigma)
-        draws[i]=regularized_tomography(matrix,perturbed,lam,nonnegative,
-                                        measurement_sigma=sigma,
-                                        regularization_order=regularization_order)["solution"]
-    return {
-        "baseline_solution":base["solution"],
-        "monte_carlo_mean":np.mean(draws,axis=0),
-        "monte_carlo_standard_deviation":np.std(draws,axis=0,ddof=1),
-        "percentile_2_5":np.percentile(draws,2.5,axis=0),
-        "percentile_97_5":np.percentile(draws,97.5,axis=0),
-        "n_replicates":int(n_replicates),
-        "random_seed":int(random_seed),
-        "noise_model":"Independent Gaussian measurement errors using supplied per-measurement standard uncertainties.",
-        "excluded_uncertainties":"Geometry/response-matrix error, correlated noise, calibration/systematic errors, model mismatch, and lambda-selection uncertainty.",
-    }
-
-
-def detect_spectral_peaks(
-    coordinate: Any,
-    intensity: Any,
-    *,
-    min_prominence: float | None = None,
-    prominence_fraction: float = 0.01,
-    min_distance_coordinate: float = 0.0,
-) -> dict[str, Any]:
-    """Detect emission/spectrum peaks with a local quadratic sub-sample estimate.
-
-    Coordinate and intensity must use the same paired samples. Coordinates are
-    sorted; duplicates are rejected. A prominence threshold is required either
-    explicitly or as a fraction of the measured intensity range. The algorithm
-    detects peaks, not atomic species; identification needs an external line list.
-    """
-    x = np.asarray(coordinate, dtype=float).ravel()
-    y = np.asarray(intensity, dtype=float).ravel()
-    if len(x) != len(y) or len(x) < 5:
-        raise ValueError("Coordinate and intensity must have equal lengths and at least five samples.")
-    finite = np.isfinite(x) & np.isfinite(y)
-    x, y = x[finite], y[finite]
-    if len(x) < 5:
-        raise ValueError("At least five finite coordinate-intensity pairs are required.")
-    order = np.argsort(x)
-    x, y = x[order], y[order]
-    if np.any(np.diff(x) <= 0):
-        raise ValueError("Spectral coordinates must be unique.")
-    if not np.isfinite(prominence_fraction) or prominence_fraction < 0:
-        raise ValueError("prominence_fraction must be finite and nonnegative.")
-    if not np.isfinite(min_distance_coordinate) or min_distance_coordinate < 0:
-        raise ValueError("min_distance_coordinate must be finite and nonnegative.")
-    dynamic_range = float(np.ptp(y))
-    prominence = prominence_fraction * dynamic_range if min_prominence is None else float(min_prominence)
-    if not np.isfinite(prominence) or prominence < 0:
-        raise ValueError("min_prominence must be finite and nonnegative.")
-    dx = float(np.median(np.diff(x)))
-    distance_samples = max(1, int(np.ceil(min_distance_coordinate / dx))) if min_distance_coordinate > 0 else 1
-    indices, properties = signal.find_peaks(y, prominence=prominence, distance=distance_samples)
-    peak_x, peak_y = [], []
-    for idx in indices:
-        xp, yp = float(x[idx]), float(y[idx])
-        if 0 < idx < len(x) - 1:
-            coeff = np.polyfit(x[idx-1:idx+2], y[idx-1:idx+2], 2)
-            if coeff[0] < 0:
-                vertex = -coeff[1] / (2.0 * coeff[0])
-                if x[idx-1] <= vertex <= x[idx+1]:
-                    xp = float(vertex)
-                    yp = float(np.polyval(coeff, vertex))
-        peak_x.append(xp)
-        peak_y.append(yp)
-    return {
-        "peak_coordinate": np.asarray(peak_x, dtype=float),
-        "peak_intensity": np.asarray(peak_y, dtype=float),
-        "prominence": np.asarray(properties.get("prominences", []), dtype=float),
-        "sample_indices_sorted": indices,
-        "n_finite_samples": int(len(x)),
-        "n_detected_peaks": int(len(indices)),
-        "min_prominence_used": float(prominence),
-        "min_distance_coordinate": float(min_distance_coordinate),
-        "note": "Sub-sample quadratic peak positions are estimates; resolution, line overlap, baseline, noise and instrument response still limit identification. Atomic labels require an external validated line list.",
-    }
-
-
-def match_spectral_lines(
-    measured_coordinates: Any,
-    reference_lines: pd.DataFrame,
-    *,
-    tolerance: float,
-    wavelength_column: str = "wavelength_nm",
-    species_column: str = "species",
-    transition_column: str = "transition",
-) -> pd.DataFrame:
-    """Match measured spectral peak coordinates against a user-supplied line list."""
-    measured = np.asarray(measured_coordinates, dtype=float).ravel()
-    if not np.all(np.isfinite(measured)):
-        raise ValueError("Measured peak coordinates must be finite.")
-    if not np.isfinite(tolerance) or tolerance <= 0:
-        raise ValueError("Matching tolerance must be positive and finite.")
-    if not isinstance(reference_lines, pd.DataFrame) or wavelength_column not in reference_lines.columns:
-        raise ValueError(f"Reference line table must contain {wavelength_column!r}.")
-    ref = pd.to_numeric(reference_lines[wavelength_column], errors="coerce").to_numpy(float)
-    valid = np.isfinite(ref)
-    if not np.any(valid):
-        raise ValueError("Reference line table has no finite wavelength values.")
-    refs = reference_lines.loc[valid].reset_index(drop=True).copy()
-    ref_values = ref[valid]
-    rows = []
-    for observed in measured:
-        diff = np.abs(ref_values - observed)
-        order = np.argsort(diff)
-        candidates = [int(i) for i in order if diff[i] <= tolerance]
-        if not candidates:
-            rows.append({
-                "measured_coordinate": float(observed),
-                "matched_coordinate": np.nan,
-                "coordinate_difference": np.nan,
-                "species": None,
-                "transition": None,
-                "candidate_count_within_tolerance": 0,
-                "candidate_lines": "",
-                "match_status": "NO_MATCH_WITHIN_TOLERANCE",
-            })
-            continue
-        best = candidates[0]
-        species = str(refs.iloc[best][species_column]) if species_column in refs.columns and pd.notna(refs.iloc[best][species_column]) else ""
-        transition = str(refs.iloc[best][transition_column]) if transition_column in refs.columns and pd.notna(refs.iloc[best][transition_column]) else ""
-        descriptions = []
-        for i in candidates:
-            sp = str(refs.iloc[i][species_column]) if species_column in refs.columns and pd.notna(refs.iloc[i][species_column]) else "unknown"
-            tr = str(refs.iloc[i][transition_column]) if transition_column in refs.columns and pd.notna(refs.iloc[i][transition_column]) else ""
-            descriptions.append(f"{sp} {tr} ({ref_values[i]:.8g})".strip())
-        rows.append({
-            "measured_coordinate": float(observed),
-            "matched_coordinate": float(ref_values[best]),
-            "coordinate_difference": float(observed - ref_values[best]),
-            "species": species or None,
-            "transition": transition or None,
-            "candidate_count_within_tolerance": int(len(candidates)),
-            "candidate_lines": "; ".join(descriptions),
-            "match_status": "AMBIGUOUS_MATCH" if len(candidates) > 1 else "MATCH",
-        })
-    return pd.DataFrame(rows)
 
 
 def spectral_calibration(raw_pixel: Any, reference_wavelength: Any, degree: int = 1) -> dict[str, Any]:
@@ -1268,14 +823,20 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
 def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[float,float] | None = None,
                          ion_fit_range: tuple[float,float] | None = None, area_m2: float | None = None,
                          ion_mass_amu: float | None = None, ti_eV: float = 0.0,
-                         sheath_factor: float = 0.61, gamma_i: float = 1.0) -> dict[str, Any]:
-    """Analyze a single Langmuir I-V sweep with explicit model-input validation."""
+                         sheath_factor: float = 0.61, gamma_i: float = 1.0,
+                         current_convention: str = "electron_positive") -> dict[str, Any]:
+    """Analyze a single Langmuir I-V sweep with explicit model-input validation.
+
+    current_convention: "electron_positive" (default; ion saturation current is negative)
+    or "ion_positive" (collected-ion current is positive, as in many probe circuits); the
+    latter is flipped internally so the analysis always works in the electron-positive form.
+    """
+    if current_convention not in {"electron_positive", "ion_positive"}:
+        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
         if fit_range is not None:
             if len(fit_range) != 2 or not np.all(np.isfinite(np.asarray(fit_range, dtype=float))):
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.")
-            if float(fit_range[0]) >= float(fit_range[1]):
-                raise ValueError(f"{name} lower voltage limit must be smaller than its upper limit.")
     if area_m2 is None:
         ion_mass_amu = None
     elif ion_mass_amu is None:
@@ -1287,6 +848,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if not np.all(np.isfinite([ti_eV, sheath_factor, gamma_i])) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0:
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
+    if current_convention=="ion_positive": i=-i
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
     if len(v)<8: raise ValueError('At least 8 valid voltage points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
@@ -1314,11 +876,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
-            p,cov=np.polyfit(v[m],i[m],1,cov=True)
-            out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
-            out['ion_saturation_slope_standard_error_A_per_V']=float(np.sqrt(max(cov[0,0],0.0)))
-            out['ion_saturation_intercept_standard_error_A']=float(np.sqrt(max(cov[1,1],0.0)))
-            out['ion_saturation_fit_points']=int(m.sum())
+            p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
             out['ion_saturation_current_A']=float(np.median(i[m]))
         else:
             raise ValueError("ion_fit_range must contain at least 3 valid samples.")
@@ -1327,16 +885,17 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         electron_current=i-ion_baseline
         m=(v>=min(electron_fit_range))&(v<=max(electron_fit_range))&(electron_current>0)
         if m.sum()<4: raise ValueError('Electron-retarding fit range needs at least 4 points with positive current after ion-current baseline subtraction.')
-        p,cov=np.polyfit(v[m],np.log(electron_current[m]),1,cov=True); pred=np.polyval(p,v[m]); slope=float(p[0])
-        slope_se=float(np.sqrt(max(cov[0,0],0.0)))
+        if m.sum()>=5:
+            p,pcov=np.polyfit(v[m],np.log(electron_current[m]),1,cov=True); slope_se=float(np.sqrt(max(pcov[0,0],0.0)))
+        else:
+            p=np.polyfit(v[m],np.log(electron_current[m]),1); slope_se=None
+        pred=np.polyval(p,v[m]); slope=float(p[0])
         out['electron_retarding_fit_R2']=_r2(np.log(electron_current[m]),pred)
-        out['electron_retarding_fit_points']=int(m.sum())
-        out['electron_retarding_log_slope_standard_error_per_V']=slope_se
         out['ion_current_baseline_subtracted_A']=ion_baseline
         if slope>0:
             out['electron_temperature_eV']=1.0/slope
-            out['electron_temperature_standard_uncertainty_eV']=slope_se/(slope**2)
-            out['electron_temperature_uncertainty_method']='First-order covariance propagation from log-linear fit; excludes model, calibration and sheath systematics.'
+            out['electron_temperature_standard_error_eV']=(slope_se/slope**2) if slope_se is not None else None
+            out['electron_temperature_uncertainty_note']='Statistical (unweighted log-linear fit) only; excludes fit-window choice, sheath expansion and RF/noise systematics.'
             out['electron_retarding_log_slope_per_V']=slope
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
@@ -1352,6 +911,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         out['ion_sound_speed_m_s']=cs
         out['ion_density_estimate_m-3']=abs(out['ion_saturation_current_A'])/denom if denom>0 else None
         out['ion_density_model']='n_i≈|I_isat|/(sheath_factor·e·A·c_s); depends on sheath model, geometry and ion temperature.'
+    out['current_convention']=current_convention
+    if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
+        out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention.'
     out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
     return out
 
@@ -1365,133 +927,31 @@ def floating_potential(voltage: Any, current: Any) -> float | None:
     return float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
 
 
-
-def svd_mode_decomposition(
-    signals: Any,
-    *,
-    center: bool = True,
-    standardize: bool = False,
-    n_modes: int | None = None,
-) -> dict[str, Any]:
-    """Decompose synchronized multi-channel signals using SVD.
-
-    Input shape is (time samples, channels). Principal components are U*S;
-    spatial/channel modes are columns of V. SVD signs are mathematically
-    arbitrary. Energy fractions describe variance/energy in the processed
-    matrix, not a universal physical energy unless the channel units/scales
-    and weighting justify that interpretation.
-    """
-    x = np.asarray(signals, dtype=float)
-    if x.ndim != 2 or min(x.shape) < 2:
-        raise ValueError("signals must be a 2-D array with at least 2 samples and 2 channels.")
-    if not np.all(np.isfinite(x)):
-        raise ValueError("SVD input must be finite; align and handle missing samples explicitly.")
-    if isinstance(n_modes, bool) or (n_modes is not None and (not isinstance(n_modes, (int, np.integer)) or n_modes < 1)):
-        raise ValueError("n_modes must be a positive integer or None.")
-    mean = np.mean(x, axis=0) if center else np.zeros(x.shape[1], dtype=float)
-    processed = x - mean
-    scale = np.ones(x.shape[1], dtype=float)
-    if standardize:
-        scale = np.std(processed, axis=0, ddof=0)
-        if np.any(~np.isfinite(scale)) or np.any(scale <= np.finfo(float).eps):
-            raise ValueError("Cannot standardize a constant or numerically constant channel.")
-        processed = processed / scale
-    U, singular_values, Vh = np.linalg.svd(processed, full_matrices=False)
-    total = float(np.sum(singular_values ** 2))
-    energy = singular_values ** 2 / total if total > 0 else np.zeros_like(singular_values)
-    count = len(singular_values) if n_modes is None else min(int(n_modes), len(singular_values))
-    pcs = U[:, :count] * singular_values[:count]
-    modes = Vh[:count, :].T
-    reconstruction_processed = pcs @ modes.T
-    reconstruction = reconstruction_processed * scale + mean
-    return {
-        "principal_components": pcs,
-        "channel_modes": modes,
-        "singular_values": singular_values[:count],
-        "all_singular_values": singular_values,
-        "energy_fraction": energy[:count],
-        "cumulative_energy_fraction": np.cumsum(energy[:count]),
-        "mean_by_channel": mean,
-        "scale_by_channel": scale,
-        "reconstruction": reconstruction,
-        "n_samples": int(x.shape[0]),
-        "n_channels": int(x.shape[1]),
-        "n_modes_returned": int(count),
-        "centered": bool(center),
-        "standardized": bool(standardize),
-        "interpretation": "SVD modes are data-driven basis components; mode index is not automatically a physical poloidal/toroidal mode number. Sign is arbitrary. Channel scaling and synchronization affect the decomposition.",
-    }
-
-
-def morlet_wavelet_analysis(
-    time_s: Any,
-    values: Any,
-    frequencies_hz: Any,
-    *,
-    omega0: float = 6.0,
-) -> dict[str, Any]:
-    """Compute a complex Morlet CWT on a uniformly sampled finite time series.
-
-    Frequencies are explicitly supplied in Hz and must lie below Nyquist.
-    Returned power is |coefficient|^2 in the chosen normalization; it is best
-    used for relative time-frequency structure, not absolute spectral power.
-    Edge coefficients are flagged because wavelet support is truncated there.
-    """
-    t, y, fs = prepare_time_series(time_s, values)
-    freq = np.asarray(frequencies_hz, dtype=float).ravel()
-    if len(freq) < 1 or not np.all(np.isfinite(freq)) or np.any(freq <= 0) or np.any(np.diff(freq) <= 0):
-        raise ValueError("frequencies_hz must be finite, positive and strictly increasing.")
-    if freq[-1] >= fs / 2:
-        raise ValueError("Wavelet frequencies must be below the Nyquist frequency.")
-    if not np.isfinite(omega0) or omega0 < 5:
-        raise ValueError("omega0 must be finite and >= 5 to limit the Morlet wavelet's DC component.")
-    dt = 1.0 / fs
-    centered = y - np.mean(y)
-    coefficients = np.empty((len(freq), len(y)), dtype=complex)
-    edge_mask = np.zeros((len(freq), len(y)), dtype=bool)
-    for i, f_hz in enumerate(freq):
-        scale_samples = omega0 / (2.0 * np.pi * f_hz * dt)
-        half_width = max(4, int(np.ceil(4.0 * scale_samples)))
-        if half_width >= len(y) // 2:
-            raise ValueError(
-                f"Wavelet support at {f_hz:g} Hz is too long for this record; "
-                "raise the minimum frequency or provide a longer time series."
-            )
-        tau = np.arange(-half_width, half_width + 1, dtype=float) / scale_samples
-        wavelet = (np.pi ** -0.25) * np.exp(1j * omega0 * tau) * np.exp(-0.5 * tau ** 2)
-        wavelet = wavelet / np.sqrt(scale_samples)
-        wavelet = wavelet - np.mean(wavelet)
-        norm = np.sqrt(np.sum(np.abs(wavelet) ** 2))
-        if norm <= np.finfo(float).eps:
-            raise ValueError("Degenerate wavelet at the selected frequency; adjust frequency grid.")
-        wavelet = wavelet / norm
-        coefficients[i] = signal.fftconvolve(centered, np.conjugate(wavelet[::-1]), mode="same")
-        edge = min(half_width, len(y) // 2)
-        if edge:
-            edge_mask[i, :edge] = True
-            edge_mask[i, -edge:] = True
-    return {
-        "time_s": t,
-        "frequencies_Hz": freq,
-        "coefficients": coefficients,
-        "power": np.abs(coefficients) ** 2,
-        "edge_affected": edge_mask,
-        "sample_rate_Hz": float(fs),
-        "omega0": float(omega0),
-        "normalization": "unit-energy discrete Morlet kernels; power is relative |coefficient|^2, not calibrated PSD",
-        "warning": "Interpret time-frequency power away from flagged edges. The transform assumes uniform sampling and is sensitive to the selected frequency grid and wavelet normalization.",
-    }
+_MODE_CONVENTIONS = {
+    # relative phase (sensor - reference, scipy CSD) = +n * theta
+    "phase_equals_n_theta": 1,
+    # wave cos(omega*t - n*theta): propagating toward +theta has n>0; CSD phase = -n*theta
+    "wave_cos_wt_minus_n_theta": -1,
+}
 
 
 def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None = None,
-                           max_mode_number: int | None = None) -> dict[str, float | str | int]:
+                           max_mode_number: int | None = None,
+                           convention: str = "phase_equals_n_theta") -> dict[str, float | str | int]:
     """Fit spatial phase after sorting sensors by angle; report the sampling alias limit.
 
     Phase-only data cannot distinguish aliased modes (for example n=7 and n=1
     on six equally spaced sensors). Supply a physically justified max_mode_number
     to reject unsupported modes; a mode at the spatial Nyquist limit is ambiguous.
     Optional weights should be coherence or inverse-variance weights.
+
+    Sign convention (explicit, because it is the most common source of sign errors):
+    "phase_equals_n_theta" (default) fits phase = +n*theta. For phases obtained from
+    scipy cross-spectra of a wave cos(omega*t - n*theta) this returns -n, so choose
+    "wave_cos_wt_minus_n_theta" to obtain +n for a wave propagating toward +theta.
     """
+    if convention not in _MODE_CONVENTIONS:
+        raise ValueError(f"convention must be one of {sorted(_MODE_CONVENTIONS)}.")
     th=np.asarray(theta_rad,float).ravel(); ph=np.asarray(phase_rad,float).ravel()
     if len(th)!=len(ph) or len(th)<3 or not np.all(np.isfinite(th)) or not np.all(np.isfinite(ph)):
         raise ValueError('Provide at least 3 paired finite sensor angles and phases.')
@@ -1533,7 +993,7 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     n_int=int(candidates[int(np.argmax(scores))])
     if abs(n_int)>limit:
         raise ValueError(
-            f"Spatial phase pattern is consistent with boundary/aliased mode n={n_int}; "
+            f"Spatial phase pattern is consistent with boundary/aliased mode n={_MODE_CONVENTIONS[convention]*n_int} ({convention}); "
             f"the largest unambiguous integer mode for active sensor geometry is {limit}."
         )
     phase_offset=float(np.angle(np.sum(w*np.exp(1j*(ph-n_int*th0)))))
@@ -1542,7 +1002,8 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
     base=np.angle(np.exp(1j*(ph-phase_offset)))
     denom=float(np.sum(w*base**2))
     r2=float(1.0-float(np.sum(w*residual**2))/denom) if denom>np.finfo(float).eps else (1.0 if rms<1e-12 else 0.0)
-    return {'mode_number_fit':float(n_int),'nearest_integer_mode_number':float(n_int),'phase_offset_rad':phase_offset,
+    sgn=_MODE_CONVENTIONS[convention]
+    return {'mode_number_fit':float(sgn*n_int),'nearest_integer_mode_number':float(sgn*n_int),'sign_convention':convention,'phase_offset_rad':phase_offset,
             'phase_fit_R2':r2,'phase_rms_residual_rad':rms,
             'spatial_alias_limit_mode_number':limit,
             'aliasing_note':'Integer circular-phase search; modes above the spatial sampling limit alias and require a justified prior bound.'}
@@ -1550,7 +1011,8 @@ def mode_number_from_phase(theta_rad: Any, phase_rad: Any, weights: Any | None =
 
 def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
                               frequency_range_hz: tuple[float, float] | None = None,
-                              min_coherence: float = 0.2) -> dict[str, Any]:
+                              min_coherence: float = 0.2,
+                              convention: str = "phase_equals_n_theta") -> dict[str, Any]:
     """Extract relative cross-spectral phases from synchronized sensor traces and fit a mode number.
 
     The first sensor is the phase reference. The dominant shared spectral peak is selected
@@ -1612,29 +1074,8 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
             "Increase record length or choose a physically justified frequency band."
         )
     weights = np.where(weights >= effective_threshold, weights, 0.0)
-    fit = mode_number_from_phase(theta, phases, weights=weights)
-    leave_one_out=[]
-    if len(theta)>=4:
-        for omitted in range(len(theta)):
-            keep=np.arange(len(theta))!=omitted
-            try:
-                trial=mode_number_from_phase(theta[keep],np.asarray(phases)[keep],
-                                             weights=weights[keep])
-                leave_one_out.append({"omitted_sensor_index":int(omitted),
-                                      "mode_number":int(trial["mode_number_fit"]),
-                                      "phase_rms_residual_rad":float(trial["phase_rms_residual_rad"])})
-            except ValueError as exc:
-                leave_one_out.append({"omitted_sensor_index":int(omitted),"mode_number":None,
-                                      "phase_rms_residual_rad":None,"failure":str(exc)})
-    else:
-        leave_one_out=[{"status":"Not evaluated: at least four sensors are required for leave-one-out robustness."}]
-    valid_loo=[entry["mode_number"] for entry in leave_one_out if entry.get("mode_number") is not None]
+    fit = mode_number_from_phase(theta, phases, weights=weights, convention=convention)
     fit.update({
-        "leave_one_sensor_out_results":leave_one_out,
-        "leave_one_sensor_out_stability_fraction":(
-            float(np.mean(np.asarray(valid_loo)==int(fit["mode_number_fit"])))
-            if len(valid_loo)==len(theta) else None),
-        "leave_one_sensor_out_note":"Robustness to one sensor at a time; not a confidence interval and does not correct geometric aliasing.",
         "selected_frequency_Hz": peak_frequency,
         "sensor_phase_rad_relative_to_first": [float(v) for v in phases],
         "coherence_with_reference": [float(v) for v in coherences],
@@ -1646,99 +1087,6 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
         "phase_extraction_method": "cross-spectral phase relative to first sensor; coherence-weighted integer circular fit",
     })
     return fit
-
-
-
-def electric_field_from_potential_difference(
-    potential_a_V: Any,
-    potential_b_V: Any,
-    separation_m: float,
-    *,
-    field_sign: int = -1,
-) -> np.ndarray:
-    """Compute E = field_sign * (V_b - V_a) / separation in SI units.
-
-    The default field_sign=-1 corresponds to E=-grad(V) for a coordinate
-    increasing from probe a to probe b. Choose +1 only when the paper/device
-    coordinate convention explicitly requires it. Missing values are preserved.
-    """
-    va = np.asarray(potential_a_V, dtype=float).ravel()
-    vb = np.asarray(potential_b_V, dtype=float).ravel()
-    if len(va) != len(vb) or len(va) < 1:
-        raise ValueError("Potential channels must have equal nonzero lengths.")
-    if not np.isfinite(separation_m) or separation_m == 0:
-        raise ValueError("Probe separation must be finite and nonzero.")
-    if isinstance(field_sign, bool) or field_sign not in (-1, 1):
-        raise ValueError("field_sign must be +1 or -1.")
-    return int(field_sign) * (vb - va) / float(separation_m)
-
-
-def drift_transport_from_fields(
-    density_m3: Any,
-    radial_electric_field_V_m: Any,
-    poloidal_electric_field_V_m: Any,
-    toroidal_field_T: float,
-    *,
-    radial_velocity_sign: int = 1,
-    poloidal_velocity_sign: int = 1,
-) -> dict[str, Any]:
-    """Derive E×B drift velocities, instantaneous particle fluxes and Reynolds stress.
-
-    Uses the explicitly selected convention
-      v_r = radial_velocity_sign * E_p / B_t
-      v_p = poloidal_velocity_sign * E_r / B_t.
-    The signs depend on coordinate orientation and the paper/device convention;
-    they are never inferred. Inputs must be synchronized arrays in SI units.
-    Both the time-mean product and fluctuation covariance are reported because
-    <n v> = <n><v> + <n~ v~>; these are not interchangeable.
-    """
-    n = np.asarray(density_m3, dtype=float).ravel()
-    er = np.asarray(radial_electric_field_V_m, dtype=float).ravel()
-    ep = np.asarray(poloidal_electric_field_V_m, dtype=float).ravel()
-    if len(n) != len(er) or len(n) != len(ep) or len(n) < 2:
-        raise ValueError("Density and both electric-field arrays must have equal lengths and at least two samples.")
-    if not np.isfinite(toroidal_field_T) or toroidal_field_T == 0:
-        raise ValueError("Toroidal magnetic field must be finite and nonzero.")
-    if radial_velocity_sign not in (-1, 1) or poloidal_velocity_sign not in (-1, 1):
-        raise ValueError("Velocity sign conventions must each be +1 or -1.")
-    valid = np.isfinite(n) & np.isfinite(er) & np.isfinite(ep)
-    if np.count_nonzero(valid) < 2:
-        raise ValueError("At least two common finite synchronized samples are required.")
-    n, er, ep = n[valid], er[valid], ep[valid]
-    vr = radial_velocity_sign * ep / float(toroidal_field_T)
-    vp = poloidal_velocity_sign * er / float(toroidal_field_T)
-    gamma_r = n * vr
-    gamma_p = n * vp
-    reynolds = vr * vp
-    def covariance(a: np.ndarray, b: np.ndarray) -> float:
-        return float(np.mean((a - np.mean(a)) * (b - np.mean(b))))
-    return {
-        "radial_velocity_m_s": vr,
-        "poloidal_velocity_m_s": vp,
-        "radial_particle_flux_m-2_s-1": gamma_r,
-        "poloidal_particle_flux_m-2_s-1": gamma_p,
-        "reynolds_stress_velocity_product_m2_s-2": reynolds,
-        "mean_radial_velocity_m_s": float(np.mean(vr)),
-        "mean_poloidal_velocity_m_s": float(np.mean(vp)),
-        "mean_radial_particle_flux_m-2_s-1": float(np.mean(gamma_r)),
-        "mean_poloidal_particle_flux_m-2_s-1": float(np.mean(gamma_p)),
-        "mean_reynolds_stress_velocity_product_m2_s-2": float(np.mean(reynolds)),
-        "radial_particle_flux_fluctuation_covariance_m-2_s-1": covariance(n, vr),
-        "poloidal_particle_flux_fluctuation_covariance_m-2_s-1": covariance(n, vp),
-        "reynolds_stress_fluctuation_covariance_m2_s-2": covariance(vr, vp),
-        "n_common_finite_samples": int(np.count_nonzero(valid)),
-        "toroidal_field_T": float(toroidal_field_T),
-        "radial_velocity_sign": int(radial_velocity_sign),
-        "poloidal_velocity_sign": int(poloidal_velocity_sign),
-        "equations": {
-            "radial_velocity": "v_r = radial_velocity_sign * E_p / B_t",
-            "poloidal_velocity": "v_p = poloidal_velocity_sign * E_r / B_t",
-            "radial_particle_flux": "Gamma_r(t) = n_i(t) * v_r(t)",
-            "poloidal_particle_flux": "Gamma_p(t) = n_i(t) * v_p(t)",
-            "reynolds_stress": "R(t) = v_r(t) * v_p(t)",
-        },
-        "warning": "Electric fields and density must be calibrated, spatially defined and synchronized. Coordinate orientation determines velocity signs. Mean instantaneous products and fluctuation covariances are both reported and must not be conflated.",
-    }
 
 
 def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | None = None) -> dict[str, float]:
@@ -2074,119 +1422,6 @@ def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
     return result
 
 
-def compare_condition_signals(
-    baseline_values: Any,
-    treatment_values: Any,
-    *,
-    time_s: Any | None = None,
-    start_s: float | None = None,
-    end_s: float | None = None,
-    baseline_mean_floor_fraction: float = 0.05,
-) -> dict[str, Any]:
-    """Compare paired baseline/treatment time series in a defined window.
-
-    Mean-based percentage change is withheld when the baseline mean is small
-    relative to its RMS, because that percentage is unstable near zero. RMS
-    percentage change is reported separately and is often more interpretable
-    for sign-changing electric fields or Reynolds-stress traces.
-    """
-    base = np.asarray(baseline_values, dtype=float).ravel()
-    treat = np.asarray(treatment_values, dtype=float).ravel()
-    if len(base) != len(treat) or len(base) < 2:
-        raise ValueError("Baseline and treatment arrays must have equal lengths and at least two samples.")
-    if not np.isfinite(baseline_mean_floor_fraction) or not 0 <= baseline_mean_floor_fraction < 1:
-        raise ValueError("baseline_mean_floor_fraction must be finite and in [0, 1).")
-    if (start_s is None) != (end_s is None):
-        raise ValueError("Provide both start_s and end_s, or neither.")
-    if start_s is not None and (not np.isfinite(start_s) or not np.isfinite(end_s) or start_s >= end_s):
-        raise ValueError("Time window must be finite with start_s < end_s.")
-    t = None
-    valid = np.isfinite(base) & np.isfinite(treat)
-    if time_s is not None:
-        t = np.asarray(time_s, dtype=float).ravel()
-        if len(t) != len(base):
-            raise ValueError("time_s must have the same length as both condition arrays.")
-        valid &= np.isfinite(t)
-        if start_s is not None:
-            valid &= (t >= start_s) & (t <= end_s)
-    elif start_s is not None:
-        raise ValueError("A time_s array is required when selecting a time window.")
-    if np.count_nonzero(valid) < 2:
-        raise ValueError("Fewer than two common finite paired samples remain in the selected window.")
-    b, q = base[valid], treat[valid]
-    delta = q - b
-    mean_b, mean_q = float(np.mean(b)), float(np.mean(q))
-    rms_b, rms_q = float(np.sqrt(np.mean(b*b))), float(np.sqrt(np.mean(q*q)))
-    std_b = float(np.std(b, ddof=1))
-    std_q = float(np.std(q, ddof=1))
-    floor = baseline_mean_floor_fraction * rms_b
-    mean_pct = None if abs(mean_b) <= floor else 100.0 * (mean_q - mean_b) / abs(mean_b)
-    rms_pct = None if rms_b <= np.finfo(float).eps else 100.0 * (rms_q - rms_b) / rms_b
-    return {
-        "baseline_mean": mean_b,
-        "treatment_mean": mean_q,
-        "mean_difference_treatment_minus_baseline": float(np.mean(delta)),
-        "mean_change_percent_relative_to_abs_baseline_mean": mean_pct,
-        "baseline_std_sample": std_b,
-        "treatment_std_sample": std_q,
-        "baseline_RMS": rms_b,
-        "treatment_RMS": rms_q,
-        "RMS_change_percent": rms_pct,
-        "baseline_median": float(np.median(b)),
-        "treatment_median": float(np.median(q)),
-        "fraction_of_paired_samples_treatment_below_baseline": float(np.mean(delta < 0)),
-        "n_paired_samples": int(np.count_nonzero(valid)),
-        "n_excluded_samples": int(len(base) - np.count_nonzero(valid)),
-        "time_window_s": None if start_s is None else [float(start_s), float(end_s)],
-        "baseline_mean_percent_change_status": "UNSTABLE_NEAR_ZERO_BASELINE" if mean_pct is None else "ASSESSED",
-        "warning": "Baseline and treatment must be comparable measurements with matched units, calibration, spatial location and processing. Percent changes are descriptive, not causal evidence; time-series autocorrelation means samples are not independent replicates.",
-        "time_s": None if t is None else t[valid],
-        "baseline_values": b,
-        "treatment_values": q,
-        "difference_values": delta,
-    }
-
-
-def ion_sound_speed_m_s(
-    electron_temperature_eV: float,
-    ion_temperature_eV: float,
-    ion_mass_amu: float,
-) -> dict[str, float | str]:
-    """Calculate the ion-acoustic speed using the IR-T1 compound-probe paper's Eq. (4).
-
-    c_s = sqrt(e * (T_e + T_i) / m_i), where temperatures are in eV and
-    mass is supplied in amu. This is the stated paper model, not a universal
-    sound-speed formula for every plasma regime.
-    """
-    vals = (electron_temperature_eV, ion_temperature_eV, ion_mass_amu)
-    if not all(np.isfinite(v) for v in vals):
-        raise ValueError("Temperatures and ion mass must be finite.")
-    if electron_temperature_eV <= 0 or ion_temperature_eV < 0 or ion_mass_amu <= 0:
-        raise ValueError("Electron temperature and ion mass must be positive; ion temperature must be nonnegative.")
-    mass_kg = float(ion_mass_amu) * AMU
-    speed = float(np.sqrt(E_CHARGE * (float(electron_temperature_eV) + float(ion_temperature_eV)) / mass_kg))
-    return {
-        "ion_sound_speed_m_s": speed,
-        "electron_temperature_eV": float(electron_temperature_eV),
-        "ion_temperature_eV": float(ion_temperature_eV),
-        "ion_mass_amu": float(ion_mass_amu),
-        "ion_mass_kg": mass_kg,
-        "formula": "c_s = sqrt(e * (T_e + T_i) / m_i)",
-        "assumption": "Matches the simplified ion-acoustic-speed relation used in the IR-T1 compound-probe paper; verify the paper's temperature and isotope assumptions before comparison.",
-    }
-
-
-def mach_number_from_velocity(flow_velocity_m_s: Any, sound_speed_m_s: float) -> float | np.ndarray:
-    """Return signed Mach number from velocity and a supplied positive sound speed."""
-    v = np.asarray(flow_velocity_m_s, dtype=float)
-    if not np.isfinite(sound_speed_m_s) or sound_speed_m_s <= 0:
-        raise ValueError("Sound speed must be positive and finite.")
-    if np.any(~np.isfinite(v)):
-        raise ValueError("Flow velocity must contain only finite values.")
-    result = v / float(sound_speed_m_s)
-    return float(result) if result.ndim == 0 else result
-
-
 def triple_probe_temperature_eV(v_difference_V: float, model_factor: float = 1.0) -> dict[str, float | str]:
     """First-order triple-probe Te estimate under a user-selected idealized exponential-current model."""
     if not np.isfinite(v_difference_V) or v_difference_V<=0 or not np.isfinite(model_factor) or model_factor<=0:
@@ -2218,3 +1453,33 @@ def corrected_line_ratio(intensity_1: float, intensity_2: float, response_1: flo
     if not all(np.isfinite(v) for v in vals) or intensity_1<0 or intensity_2<=0 or response_1<=0 or response_2<=0: raise ValueError('Intensities must be nonnegative (line 2 positive) and instrument responses positive and finite.')
     ratio=float((intensity_1/response_1)/(intensity_2/response_2))
     return {'raw_intensity_ratio':float(intensity_1/intensity_2),'instrument_response_corrected_ratio':ratio,'response_1':float(response_1),'response_2':float(response_2),'note':'A physical Te/ne/impurity inference requires validated atomic emissivity coefficients or a collisional-radiative model; this routine only corrects the measured ratio for supplied responses.'}
+
+
+def grid_from_table(frame: pd.DataFrame, z_column: str = "z_m") -> dict[str, np.ndarray]:
+    """Parse a wide grid table (one z column + one column per R value) into R, Z and a (nZ, nR) array.
+
+    Accepts the format TIS itself exports for FAIR-MAST EFIT grids: columns named 'R=0.123_m' (or plain
+    numbers). The function only reshapes; it makes no claim about what the grid physically represents.
+    """
+    if z_column not in frame.columns:
+        raise ValueError(f"Column {z_column!r} (vertical coordinate) not found.")
+    r_cols = [c for c in frame.columns if c != z_column]
+    if len(r_cols) < 3 or len(frame) < 3:
+        raise ValueError("A grid needs at least 3 R columns and 3 Z rows.")
+    r_vals = []
+    for c in r_cols:
+        text = str(c).strip()
+        if text.upper().startswith("R="):
+            text = text[2:]
+        if text.lower().endswith("_m"):
+            text = text[:-2]
+        try:
+            r_vals.append(float(text))
+        except ValueError as exc:
+            raise ValueError(f"Cannot parse an R coordinate from column name {c!r}.") from exc
+    z = pd.to_numeric(frame[z_column], errors="coerce").to_numpy(dtype=float)
+    grid = frame[r_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
+    r = np.asarray(r_vals, dtype=float)
+    order_r = np.argsort(r); order_z = np.argsort(z)
+    return {"R_m": r[order_r], "Z_m": z[order_z], "grid": grid[np.ix_(order_z, order_r)]}
+

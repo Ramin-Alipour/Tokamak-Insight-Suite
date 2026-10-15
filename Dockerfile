@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY . .
-RUN python -m pip install --upgrade pip && pip install -r requirements.txt
+# '.[data]' = xarray/zarr/fsspec so the Public Data Access page works inside the image.
+RUN python -m pip install --upgrade pip && pip install ".[data]"
 RUN useradd --create-home --uid 10001 tis && chown -R tis:tis /app
 USER tis
 EXPOSE 8501

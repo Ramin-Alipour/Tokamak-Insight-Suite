@@ -5,3 +5,6 @@ __pycache__
 *.py[cod]
 *.log
 .DS_Store
+docs/design_reference_dashboard.png
+tests
+.github
