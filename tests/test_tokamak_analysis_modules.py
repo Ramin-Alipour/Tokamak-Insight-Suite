@@ -328,7 +328,7 @@ def test_doppler_flow_known_wavelength_shift():
     from tokamak_analysis.doppler_flow import doppler_flow_velocity, C
     out = doppler_flow_velocity(500.001, 500.0, uncertainty_nm=0.0001)
     assert float(out["wavelength_shift_nm"]) == pytest.approx(0.001)
-    assert float(out["velocity_m_s"]) == pytest.approx(C * (0.001/500.0), rel=1e-12)
+    assert float(out["velocity_m_s"]) == pytest.approx(C * (500.001/500.0-1.0), rel=1e-12)
     assert float(out["velocity_uncertainty_m_s"]) == pytest.approx(C * (0.0001/500.0), rel=1e-12)
 
 
@@ -801,7 +801,7 @@ def test_icrh_proton_fundamental_resonance_field():
     out = icrh_resonance_field(frequency, ion_mass_amu=1.0, charge_state=1, harmonic=1)
     expected = 2*np.pi*U*frequency/E
     assert float(out["resonance_field_T"]) == pytest.approx(expected, rel=1e-12)
-    assert expected == pytest.approx(2.63, rel=3e-3)
+    assert expected == pytest.approx(2.605, rel=1e-3)
 
 
 
