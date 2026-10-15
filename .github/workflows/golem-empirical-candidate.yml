@@ -1,0 +1,31 @@
+name: GOLEM empirical candidate acquisition
+
+on:
+  workflow_dispatch:
+    inputs:
+      shot:
+        description: GOLEM shot number
+        required: true
+        default: "30622"
+
+permissions:
+  contents: read
+
+jobs:
+  acquire-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch shot page and explicitly linked candidate files
+        run: python tools/fetch_golem_candidate.py --shot "${{ inputs.shot }}" --output-dir artifacts/golem-empirical-candidate
+      - name: Upload provenance and candidate files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golem-shot-${{ inputs.shot }}-candidate
+          path: artifacts/golem-empirical-candidate/
+          if-no-files-found: error
