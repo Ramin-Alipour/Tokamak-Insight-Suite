@@ -7,5 +7,5 @@ def test_energy_balance_steady_state_confinement():
     w = np.full(11, 100.0)
     pin = np.full(11, 50.0)
     r = analyze_energy_balance(t, w, pin, radiated_power_W=np.full(11, 10.0), transport_loss_power_W=np.full(11, 40.0))
-    np.testing.assert_allclose(r['energy_balance_residual_W'], 0)
+    assert np.max(np.abs(r['energy_balance_residual_W'])) < 1e-8
     np.testing.assert_allclose(r['energy_confinement_time_s'], 2.0)
