@@ -1,0 +1,122 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Evidence-based scientific validation status; a passing software test is not equivalent to device validation.",
+  "reference_commit_tested": "fcff1136803c86915c65140fbca83c5bfe0a3a08",
+  "test_results": {
+    "complete_suite": {
+      "status": "PASS",
+      "python_versions": [
+        "3.10",
+        "3.11",
+        "3.12"
+      ],
+      "tests_passed": 248,
+      "coverage_percent": 76
+    },
+    "real_mast_data_integration": {
+      "status": "PASS",
+      "shot_29790": {
+        "signal": "xmo/omaha_1lz",
+        "samples": 70000,
+        "sampling_rate_hz": 100000,
+        "welch_peak_frequency_hz": 19836.425781230162,
+        "calibration": "raw; units unspecified"
+      },
+      "shot_30421": {
+        "signals": [
+          "amc/plasma_current",
+          "ane/density"
+        ],
+        "efit_grid_shape": [
+          65,
+          65
+        ],
+        "calibration": "archive values not treated as calibrated physical measurements"
+      }
+    },
+    "dashboard_smoke_test": "PASS"
+  },
+  "benchmarks": [
+    {
+      "id": "ir_t1_doppler_tables_vi_vii",
+      "status": "independently reproduced",
+      "reference": "Alipour, Ghoranneviss & Salar Elahi, AIP Advances 7, 115303 (2017), DOI 10.1063/1.4990869",
+      "source_url": "https://doi.org/10.1063/1.4990869",
+      "test": "tests/test_independent_physics_benchmarks.py::test_ir_t1_published_doppler_widths_reproduce_reported_ion_temperatures",
+      "cases": 15,
+      "method": "Quadrature subtraction of published measured and resolution FWHM; convert Doppler FWHM to Gaussian sigma; compute Ti with the code's Doppler relation; compare to published Table VII.",
+      "tolerance": "Published Ti values within 0.5%; reconstructed Doppler FWHM within 2e-5 nm.",
+      "limitation": "Original CCD line-profile samples are not available in the paper text, so this reproduces tabulated results rather than refitting the raw spectrum. Not device validation."
+    },
+    {
+      "id": "ir_t1_probe_reported_flow_consistency",
+      "status": "independently reproduced",
+      "reference": "Alipour et al., Review of Scientific Instruments 88, 093516 (2017), DOI 10.1063/1.4994037",
+      "source_url": "https://doi.org/10.1063/1.4994037",
+      "test": "tests/test_independent_physics_benchmarks.py::test_ir_t1_published_probe_flow_is_consistent_with_reported_mach_number",
+      "method": "Calculate ion sound speed from reported Te≈14 eV and hydrogen ion mass; compare M_parallel≈0.5 times sound speed with reported mean flow ≈17 km/s.",
+      "tolerance": "10% on the rounded reported flow value.",
+      "limitation": "Published summary values only; raw I–V sweeps and channel-level calibration are unavailable. This is not validation of I–V fitting or density extraction."
+    },
+    {
+      "id": "spectral_line_gaussian_fit",
+      "status": "synthetic-benchmark",
+      "test": "tests/test_independent_physics_benchmarks.py::test_gaussian_spectral_fit_recovers_known_line_center_and_width",
+      "cases": 1,
+      "method": "Recover exact synthetic Gaussian center, sigma, and FWHM.",
+      "limitation": "Does not validate line identification, blends, wavelength calibration, instrument-function deconvolution, or experimental uncertainties."
+    },
+    {
+      "id": "langmuir_iv_fit",
+      "status": "synthetic-benchmark",
+      "test": "tests/test_independent_physics_benchmarks.py::test_langmuir_electron_retarding_branch_recovers_known_temperature",
+      "cases": 1,
+      "method": "Recover Te from a generated exponential electron-retarding branch and fixed ion-current baseline.",
+      "limitation": "Does not validate a real probe sweep, sheath model, fit-window sensitivity, collection geometry, or density estimate."
+    },
+    {
+      "id": "signal_processing_analytic",
+      "status": "synthetic-benchmark",
+      "tests": [
+        "tests/test_independent_physics_benchmarks.py",
+        "tests/test_core.py"
+      ],
+      "method": "Analytic sine FFT amplitude/frequency, Welch variance normalization, covariance flux, finite-value checks and filter behavior.",
+      "limitation": "Synthetic signal correctness does not establish calibrated MHD mode identification or a physical transport result."
+    },
+    {
+      "id": "public_mast_raw_data_pipeline",
+      "status": "unit-tested",
+      "tests": [
+        "tools/fetch_fair_mast_multidiag.py",
+        "tools/fetch_fair_mast_efit.py"
+      ],
+      "method": "Fetch fixed public shots/signals, check finite samples and monotonic time, run FFT/Welch/filter, and export an EFIT grid snapshot.",
+      "limitation": "Raw signals have unspecified units/calibration; grid dimensions and finite values alone do not validate EFIT flux semantics or an equilibrium reconstruction."
+    },
+    {
+      "id": "plasma_formulae_and_scalings",
+      "status": "unit-tested",
+      "tests": [
+        "tests/test_scientific_regression.py",
+        "tests/test_independent_physics_benchmarks.py"
+      ],
+      "method": "Independent numerical checks for Greenwald density, beta metrics, IPB98(y,2), Martin 2008 L-H threshold, pressure, Debye length and related formula invariants.",
+      "limitation": "Empirical scalings require the stated units, regimes and averaging conventions; no universal device-specific predictive validation is claimed."
+    },
+    {
+      "id": "device_specific_mhd_mode_and_transport",
+      "status": "synthetic-benchmark",
+      "tests": [
+        "tests/test_core.py",
+        "tests/test_scientific_regression.py"
+      ],
+      "limitation": "No independently sourced calibrated multichannel phase/mode reference has yet been reproduced."
+    },
+    {
+      "id": "raw_ir_t1_spectrum_and_iv_curve_reconstruction",
+      "status": "not implemented",
+      "limitation": "Publicly accessible raw CCD spectra and raw probe I–V sweep data with sufficient calibration/provenance were not available for direct reconstruction in this validation run."
+    }
+  ]
+}
