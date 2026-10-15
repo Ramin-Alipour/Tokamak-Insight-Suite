@@ -242,6 +242,37 @@ def main():
         and raw_fits[i].get("Ti_raw_fit_keV") is not None
         and np.isfinite(raw_fits[i]["Ti_raw_fit_keV"])
     ]
+    # Quantify whether disagreement is a single-frame anomaly or a systematic
+    # width/calibration issue. Do not tune a scale factor against the reference.
+    ti_series = []
+    for i in valid_reference_frames:
+        raw_ti = float(raw_fits[i]["Ti_raw_fit_keV"])
+        ref_ti = float(official[i]["Ti_keV"])
+        ti_series.append({
+            "frame_index": int(i), "time_s": float(image_times[i]),
+            "R_m": float(official[i].get("R_m", radius)),
+            "raw_Ti_keV": raw_ti, "official_Ti_keV": ref_ti,
+            "relative_difference_percent": abs(raw_ti-ref_ti)/ref_ti*100.0,
+            "ratio_raw_over_official": raw_ti/ref_ti,
+            "fit_rmse_counts": raw_fits[i].get("fit_rmse_counts"),
+            "line_area": raw_fits[i].get("integrated_line_area_counts_pixel"),
+        })
+    if len(ti_series) >= 5:
+        raw_arr = np.array([x["raw_Ti_keV"] for x in ti_series])
+        ref_arr = np.array([x["official_Ti_keV"] for x in ti_series])
+        ratio_arr = raw_arr/ref_arr
+        ti_series_summary = {
+            "n": len(ti_series),
+            "pearson_r": float(pearsonr(raw_arr, ref_arr).statistic),
+            "spearman_rho": float(spearmanr(raw_arr, ref_arr).statistic),
+            "median_ratio_raw_over_official": float(np.median(ratio_arr)),
+            "ratio_p10_p90": [float(np.quantile(ratio_arr,.1)),float(np.quantile(ratio_arr,.9))],
+            "median_absolute_relative_difference_percent": float(np.median([x["relative_difference_percent"] for x in ti_series])),
+            "fraction_within_10_percent": float(np.mean(np.array([x["relative_difference_percent"] for x in ti_series]) <= 10)),
+            "status": "PASS" if abs(np.median(ratio_arr)-1)<=0.10 and np.median([x["relative_difference_percent"] for x in ti_series])<=10 else "PENDING",
+        }
+    else:
+        ti_series_summary = {"n":len(ti_series),"status":"PENDING","reason":"Fewer than five matched Ti points"}
     for target in TIME_TARGETS:
         if not valid_reference_frames:
             frame = int(np.argmin(np.abs(image_times - target)))
@@ -300,7 +331,7 @@ def main():
             "instrumental_width": "0.130 mm * 0.7242 nm/mm; treated as FWHM and deconvolved in quadrature",
             "ion_temperature_formula": "Ti = (12*u*c^2 in keV) * (sigma_Doppler/lambda0)^2",
         },
-        "Ti_temperature_checks": ti_checks,
+        "Ti_temperature_checks": ti_checks,\n        "Ti_full_series_check": ti_series_summary,\n        "Ti_full_series_points": ti_series,
         "semantic_reference_checks": semantic_reference_checks,
         "processed_product_consistency_check": processed_product_consistency,
         "intensity_trend_check": intensity_check,
@@ -326,7 +357,7 @@ def main():
                        "official_Ti_keV": x["official_processed"].get("Ti_keV"),
                        "relative_difference_percent": x["relative_Ti_difference_percent"], "status": x["status"]}
                       for x in ti_checks],
-        "intensity_check": intensity_check,
+        "intensity_check": intensity_check,\n        "Ti_full_series_check": ti_series_summary,
     }, indent=2))
 
 
