@@ -90,3 +90,34 @@ def test_fluctuation_flux_covariance_includes_common_finite_samples_only():
     mask = np.isfinite(n) & np.isfinite(v) & np.isfinite(t)
     expected = np.mean((n[mask]-n[mask].mean())*(v[mask]-v[mask].mean()))
     assert r["particle_flux_covariance_m-2_s-1"] == pytest.approx(expected, rel=1e-12)
+
+
+
+def test_gaussian_spectral_fit_recovers_known_line_center_and_width():
+    # Independent synthetic spectrum with exact Gaussian parameters and flat baseline.
+    center_nm, sigma_nm, amplitude, baseline = 500.0, 0.025, 120.0, 7.0
+    wavelength = np.linspace(499.85, 500.15, 601)
+    intensity = baseline + amplitude*np.exp(-0.5*((wavelength-center_nm)/sigma_nm)**2)
+    fit = __import__("tis.core", fromlist=["fit_spectral_line"]).fit_spectral_line(
+        wavelength, intensity, model="Gaussian"
+    )
+    assert fit["center"] == pytest.approx(center_nm, abs=1e-8)
+    assert fit["sigma"] == pytest.approx(sigma_nm, rel=1e-6)
+    assert fit["FWHM"] == pytest.approx(2*np.sqrt(2*np.log(2))*sigma_nm, rel=1e-6)
+
+
+def test_langmuir_electron_retarding_branch_recovers_known_temperature():
+    # Idealized Maxwellian electron-retarding branch: I_e ∝ exp(V/Te), with Te in eV.
+    from tis.core import langmuir_iv_analysis
+    te_eV = 20.0
+    voltage = np.linspace(-20.0, 30.0, 501)
+    current = np.full_like(voltage, -1e-3)
+    electron_branch = voltage >= 0
+    current[electron_branch] += 2e-5*np.exp(voltage[electron_branch]/te_eV)
+    result = langmuir_iv_analysis(
+        voltage, current,
+        ion_fit_range=(-20.0, -2.0),
+        electron_fit_range=(0.0, 30.0),
+    )
+    assert result["electron_temperature_eV"] == pytest.approx(te_eV, rel=1e-6)
+    assert result["ion_saturation_current_A"] == pytest.approx(-1e-3, abs=1e-14)
