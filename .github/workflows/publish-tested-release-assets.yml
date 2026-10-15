@@ -66,6 +66,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if gh release view v0.5.1 --json assets --jq '.assets[].name' | grep -Fxq 'Tokamak-Insight-Suite-v0.5.0.zip'; then
+            gh release delete-asset v0.5.1 Tokamak-Insight-Suite-v0.5.0.zip --yes
+          fi
           gh release upload v0.5.1 \
             Tokamak-Insight-Suite-v0.5.1.zip \
             Tokamak-Insight-Suite-v0.5.1.zip.sha256 \
