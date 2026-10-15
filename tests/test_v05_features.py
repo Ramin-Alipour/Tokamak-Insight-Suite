@@ -298,7 +298,7 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
-    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry
+    import tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow, tis.fast_bolometry, tis.channel_sync
     modules = (tis.core, tis.events, tis.plasma, tis.signals, tis.workflows, tis.line_shape, tis.magnetic, tis.gas_flow)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
@@ -358,3 +358,14 @@ def test_fast_bolometry_timeseries_reports_known_peak():
     result = fast_bolometry_timeseries(t, np.sin(2 * np.pi * 125 * t))
     assert result["sample_rate_Hz"] == pytest.approx(fs)
     assert result["dominant_nonzero_psd_frequency_Hz"] == pytest.approx(125, abs=2)
+
+
+def test_channel_synchronization_recovers_known_delay():
+    from tis.channel_sync import estimate_channel_time_offset
+    rng = np.random.default_rng(41)
+    fs = 1000.0
+    t = np.arange(512) / fs
+    reference = rng.normal(size=len(t))
+    comparison = np.r_[np.zeros(5), reference[:-5]]
+    result = estimate_channel_time_offset(t, reference, comparison, max_lag_s=0.02)
+    assert result["estimated_lag_s"] == pytest.approx(-0.005, abs=0.001)
