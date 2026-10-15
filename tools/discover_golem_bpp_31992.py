@@ -39,7 +39,11 @@ pages = [
     f"{ROOT}/shots/{SHOT}/Diagnostics/BallPenProbe/",
     f"{ROOT}/shots/{SHOT}/Diagnostics/ParticleFlux/BallPenProbe/",
     f"{ROOT}/shots/{SHOT}/Diagnostics/PetiProbe/",
+    f"{ROOT}/shots/{SHOT}/diagnostics/",
     f"{ROOT}/shots/{SHOT}/diagnostics/ParticleFlux/",
+    f"{ROOT}/shots/{SHOT}/Diagnostics/Probe/",
+    f"{ROOT}/shots/{SHOT}/Diagnostics/ParticleFlux/BPP/",
+    f"{ROOT}/shots/{SHOT}/Diagnostics/BPP/",
 ]
 report = {"shot": SHOT, "reference": REFERENCE, "created_at_utc": datetime.now(timezone.utc).isoformat(),
           "page_attempts": [], "discovered_probe_links": [], "signal_attempts": []}
@@ -74,9 +78,14 @@ bases = [
     f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/BallPenProbe.ON/data/",
     f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/1012RakeProbe.ON/data/",
     f"{ROOT}/operation/shots/{SHOT}/diagnostics/ParticleFlux/1111BallPenProbe.ON/data/",
+    f"{ROOT}/utils/data/{SHOT}/",
+    f"{ROOT}/utils/data/{SHOT}/BPP/",
+    f"{ROOT}/utils/data/{SHOT}/PetiProbe/",
 ]
 names = ["U_bias", "U_current", "I", "V", "voltage", "current", "bpp", "lp",
-         "U_bias.txt", "U_current.txt", "U_bias.csv", "U_current.csv"]
+         "U_bias.txt", "U_current.txt", "U_bias.csv", "U_current.csv",
+         "PetiProbe:U_bias", "PetiProbe:U_current", "bpp:U_bias", "bpp:U_current",
+         "U_bias.npy", "U_current.npy"]
 candidates = []
 for link in report["discovered_probe_links"]:
     href = link["href"]
@@ -95,6 +104,10 @@ def fetch_signal(url):
         else:
             try:
                 arr = np.loadtxt(raw.decode("utf-8", "replace").splitlines())
+                if np.size(arr) < 8:
+                    rec.update(status="empty_or_too_short", content_type=ctype, bytes=len(raw), final_url=final,
+                               shape=list(np.shape(arr)))
+                    return rec
                 rec.update(status="numeric_payload", content_type=ctype, bytes=len(raw), final_url=final,
                            shape=list(arr.shape), sha256=hashlib.sha256(raw).hexdigest())
                 filename = re.sub(r"[^A-Za-z0-9_.-]+", "_", url.rstrip("/").split("/")[-1]) or "signal"
@@ -113,6 +126,7 @@ report["summary"] = {
     "probe_links_found": len(report["discovered_probe_links"]),
     "numeric_signals_found": sum(x["status"] == "numeric_payload" for x in report["signal_attempts"]),
     "raw_signals_available_for_fit": sum(x["status"] == "numeric_payload" for x in report["signal_attempts"]) >= 2,
+    "warning": "An empty one-byte response is not a raw signal and is never counted as numeric data.",
 }
 (OUT / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
 print(json.dumps(report, indent=2), flush=True)
