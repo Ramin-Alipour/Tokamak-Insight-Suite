@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "purpose": "Evidence-based scientific validation status; a passing software test is not equivalent to device validation.",
-  "reference_commit_tested": "fcff1136803c86915c65140fbca83c5bfe0a3a08",
+  "reference_commit_tested": "ec89e3b66c04a6e4af89c69b94690144184111d4",
   "test_results": {
     "complete_suite": {
       "status": "PASS",
@@ -117,6 +117,36 @@
       "id": "raw_ir_t1_spectrum_and_iv_curve_reconstruction",
       "status": "not implemented",
       "limitation": "Publicly accessible raw CCD spectra and raw probe I–V sweep data with sufficient calibration/provenance were not available for direct reconstruction in this validation run."
+    },
+    {
+      "id": "mast_28830_published_density_crosscheck",
+      "status": "provisional quantitative cross-check",
+      "reference": "Walkden et al., Profile measurements in the plasma edge of MAST using a ball pen probe, arXiv:1411.7298, Table II",
+      "source_url": "https://arxiv.org/abs/1411.7298",
+      "dataset": "UKAEA FAIR-MAST Level-1, shot 28830; AYC Thomson-derived profiles and ANE interferometer density",
+      "data_url": "https://s3.echo.stfc.ac.uk/mast/level1/shots/28830.zarr",
+      "test": "tools/validate_mast_28830_published_density.py",
+      "method": "Compare the archived median Thomson density at the nearest channel to R=1.38 m and archived interferometer line density against the rounded published values over 0.15–0.25 s; report signed relative discrepancies and uncertainty/temporal-spread ratios.",
+      "results": {
+        "time_window_s": [
+          0.15,
+          0.25
+        ],
+        "thomson_time_slices": 24,
+        "interferometer_samples": 5000,
+        "published_edge_density_m3": 8000000000000000000,
+        "archived_edge_density_m3": 7698182833117856000,
+        "edge_density_relative_difference": -0.037727145860268034,
+        "archived_median_ne_error_m3": 799593305582075900,
+        "edge_density_discrepancy_over_reported_error": -0.37746334889889044,
+        "published_line_density_m2": 110000000000000000000,
+        "archived_line_density_m2": 108083061735683000000,
+        "line_density_relative_difference": -0.017426711493790926,
+        "line_density_discrepancy_over_temporal_robust_sigma": -0.36883183064962954,
+        "acceptance_tolerance_relative": 0.1,
+        "within_tolerance": true
+      },
+      "limitation": "Provisional only: the paper does not state the exact time averaging interval for Table II. The public FAIR-MAST Level-1 data expose reciprocating-probe position but not the paper's raw BPP and LP voltage traces, so its Eq. (3) cannot be independently reconstructed. The line-density spread is temporal variability, not a documented instrument calibration uncertainty."
     }
   ]
 }
