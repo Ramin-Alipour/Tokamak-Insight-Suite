@@ -183,6 +183,7 @@ def main() -> int:
         "generated_utc": datetime.now(timezone.utc).isoformat(), "dataset_record": RECORD, "paper_doi": PAPER_DOI,
         "readme_url": README_URL, "dataset_readme_text": readme_text, "dataset_readme_error": readme_error,
         "method": {"source_files": FILES, "sample_window_inclusive": [start_sample, end_sample],
+            "sample_count_expected": end_sample - start_sample + 1,
             "sample_rate_hz": 2000000, "density_scale_to_m-3": args.density_scale,
             "electric_field_formula": "E23=(detrend4(vf3)-detrend4(vf2))/Delta",
             "particle_flux_formula": "Gamma=detrend4(ne)*E23/B",
