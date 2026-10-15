@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tis.probes import fit_swept_ball_pen_ion_temperature
+from tis.probes import fit_swept_ball_pen_ion_temperature, golem_bpp_alpha_from_toroidal_field
 
 
 def _bpp_model(v, ti=21.0, phi=7.15, isat_plus=3.08, slope=0.003, alpha=0.6):
@@ -39,3 +39,9 @@ def test_swept_bpp_fit_is_consistent_with_digitized_published_curve():
     # tolerance and must not be presented as raw-data reproduction.
     assert 15.0 <= result["Ti_eV"] <= 30.0
     assert abs(result["Ti_eV"] - 21.0) <= 10.0
+
+
+def test_golem_bpp_alpha_uses_reported_field_calibration_and_uncertainty():
+    result = golem_bpp_alpha_from_toroidal_field(0.3)
+    assert abs(result["alpha_bpp"] - 1.23) < 1e-12
+    assert abs(result["alpha_bpp_std"] - np.sqrt((0.5 * 0.3) ** 2 + 0.2 ** 2)) < 1e-12
