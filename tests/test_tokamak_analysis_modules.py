@@ -243,3 +243,14 @@ def test_langmuir_probe_known_linear_iv_curve():
     assert out["floating_potential_V"] == pytest.approx(0.0)
     assert out["ion_saturation_current_A"] == pytest.approx(-2.0)
     assert out["electron_saturation_current_A"] == pytest.approx(2.0)
+
+
+
+def test_ball_pen_probe_known_signals():
+    from tokamak_analysis.ball_pen_probe import analyze_ball_pen_probe
+    out = analyze_ball_pen_probe([0.0, 1.0, 2.0], [2.0, 4.0, 6.0], [1.0, 2.0, 3.0])
+    assert out["mean_V"] == pytest.approx(4.0)
+    assert out["std_V"] == pytest.approx(2.0)
+    assert out["peak_to_peak_V"] == pytest.approx(4.0)
+    np.testing.assert_allclose(out["potential_difference_V"], [1.0, 2.0, 3.0])
+    assert out["mean_potential_difference_V"] == pytest.approx(2.0)
