@@ -19,7 +19,7 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
-from scipy import signal
+from scipy import signal, stats
 
 RECORD = "https://zenodo.org/records/18473625"
 FILES = {"ne": "22010ne.txt", "vf2": "22010vf2.txt", "vf3": "22010vf3.txt"}
@@ -99,14 +99,14 @@ def conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", default="artifacts/east-22010-validation")
-    parser.add_argument("--b-tesla", type=float, default=1.8,
-                        help="Magnetic field in tesla; override for the relevant radial position.")
-    parser.add_argument("--separation-m", type=float, default=0.008,
-                        help="vf2-vf3 probe separation in metres (paper-stated 8 mm).")
-    parser.add_argument("--sign", type=int, choices=(-1, 1), default=1,
-                        help="Sign convention multiplier for E=(vf3-vf2)/separation.")
+    parser.add_argument("--density-scale", type=float, default=1e19, help="Conversion from archived density units to m^-3; cross-checked against the paper.")
+    parser.add_argument("--b-tesla", type=float, default=1.8, help="Magnetic field near the LCFS, as stated in the paper.")
+    parser.add_argument("--separation-m", type=float, default=0.008, help="vf2-vf3 probe separation in metres (paper: 8 mm).")
+    parser.add_argument("--sign", type=int, choices=(-1, 1), default=1, help="Sign convention multiplier for E=(vf3-vf2)/separation.")
     parser.add_argument("--max-download-mb", type=float, default=200)
     args = parser.parse_args()
+    if not math.isfinite(args.density_scale) or args.density_scale <= 0:
+        parser.error("--density-scale must be finite and > 0")
     if not math.isfinite(args.b_tesla) or args.b_tesla <= 0:
         parser.error("--b-tesla must be finite and > 0")
     if not math.isfinite(args.separation_m) or args.separation_m <= 0:
@@ -122,29 +122,55 @@ def main() -> int:
             raise RuntimeError(f"{filename} exceeds --max-download-mb safety limit")
         (outdir / filename).write_bytes(raw)
         series[key] = parse_numeric_series(raw, filename)
-        provenance[key] = {
-            "url": url, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
-            "samples": int(series[key].size), "min": float(np.min(series[key])),
-            "max": float(np.max(series[key])), "mean": float(np.mean(series[key])),
-            "std_sample": float(np.std(series[key], ddof=1)),
-        }
+        provenance[key] = {"url": url, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest(),
+            "samples": int(series[key].size), "min": float(np.min(series[key])), "max": float(np.max(series[key])),
+            "mean": float(np.mean(series[key])), "std_sample": float(np.std(series[key], ddof=1))}
 
-    lengths = {len(x) for x in series.values()}
-    if len(lengths) != 1:
-        raise ValueError(f"Signal lengths differ; no implicit truncation: "
-                         f"{ {k: len(v) for k, v in series.items()} }")
-    ne, vf2, vf3 = (series[k] for k in ("ne", "vf2", "vf3"))
-    electric_field = args.sign * (vf3 - vf2) / args.separation_m
-    flux = ne * electric_field / args.b_tesla
+    # Published stationary reference interval: samples 275000-309600 inclusive, at 2 MHz.
+    start_sample, end_sample = 275000, 309600
+    if any(len(v) <= end_sample for v in series.values()):
+        raise ValueError("Source files do not cover the published sample interval.")
+    ne_raw = series["ne"][start_sample:end_sample + 1] * args.density_scale
+    vf2_raw = series["vf2"][start_sample:end_sample + 1]
+    vf3_raw = series["vf3"][start_sample:end_sample + 1]
+    if not (len(ne_raw) == len(vf2_raw) == len(vf3_raw) == end_sample - start_sample + 1):
+        raise ValueError("Signal slices do not align over the published interval.")
+
+    # Remove fourth-order polynomial trends from each measured signal before the product.
+    x = np.linspace(-1.0, 1.0, len(ne_raw))
+    def remove_fourth_order_trend(values):
+        values = np.asarray(values, dtype=float)
+        return values - np.polyval(np.polyfit(x, values, deg=4), x)
+    ne_fluct = remove_fourth_order_trend(ne_raw)
+    vf2_fluct = remove_fourth_order_trend(vf2_raw)
+    vf3_fluct = remove_fourth_order_trend(vf3_raw)
+    electric_field = args.sign * (vf3_fluct - vf2_fluct) / args.separation_m
+    flux = ne_fluct * electric_field / args.b_tesla
     flux_detrended = signal.detrend(flux, type="linear")
 
-    # The published mean is compared with the raw derived flux, not the
-    # detrended series (whose mean is near zero by construction).
-    mean_flux = float(np.mean(flux))
-    sigma_flux = float(np.std(flux, ddof=1))
-    sigma_flux_detrended = float(np.std(flux_detrended, ddof=1))
-    readme_text = ""
-    readme_error = None
+    measured = {
+        "flux_mean_m-2_s-1": float(np.mean(flux)),
+        "flux_sigma_m-2_s-1": float(np.std(flux, ddof=1)),
+        "density_fluctuation_sigma_m-3": float(np.std(ne_fluct, ddof=1)),
+        "vf2_fluctuation_sigma_V": float(np.std(vf2_fluct, ddof=1)),
+        "vf3_fluctuation_sigma_V": float(np.std(vf3_fluct, ddof=1)),
+        "flux_skewness": float(stats.skew(flux, bias=False)),
+        "flux_kurtosis_pearson": float(stats.kurtosis(flux, fisher=False, bias=False)),
+    }
+    references = {
+        "flux_mean_m-2_s-1": PUBLISHED_MEAN_FLUX, "flux_sigma_m-2_s-1": PUBLISHED_SIGMA_FLUX,
+        "density_fluctuation_sigma_m-3": 3.9e17, "vf2_fluctuation_sigma_V": 7.9,
+        "vf3_fluctuation_sigma_V": 6.8, "flux_skewness": 2.5, "flux_kurtosis_pearson": 13.5,
+    }
+    tolerances = {key: (5.0 if key not in ("flux_skewness", "flux_kurtosis_pearson") else 10.0) for key in references}
+    checks = {}
+    for key, reference in references.items():
+        diff = abs(measured[key] - reference) / abs(reference) * 100.0
+        checks[key] = {"measured": measured[key], "published": reference, "relative_difference_percent": diff,
+                       "tolerance_percent": tolerances[key], "pass": diff <= tolerances[key]}
+    empirical_pass = all(item["pass"] for item in checks.values())
+
+    readme_text, readme_error = "", None
     try:
         readme_raw = fetch(README_URL)
         readme_text = extract_docx_text(readme_raw)
@@ -152,65 +178,35 @@ def main() -> int:
     except Exception as exc:
         readme_error = f"{type(exc).__name__}: {exc}"
 
-    mean_difference = abs(mean_flux - PUBLISHED_MEAN_FLUX) / abs(PUBLISHED_MEAN_FLUX) * 100
-    sigma_difference = abs(sigma_flux - PUBLISHED_SIGMA_FLUX) / abs(PUBLISHED_SIGMA_FLUX) * 100
     report = {
-        "title": "EAST shot 22010: measured-series particle-flux statistics",
-        "generated_utc": datetime.now(timezone.utc).isoformat(),
-        "dataset_record": RECORD,
-        "paper_doi": PAPER_DOI,
-        "readme_url": README_URL,
-        "dataset_readme_text": readme_text,
-        "dataset_readme_error": readme_error,
-        "method": {
-            "density_series": FILES["ne"],
-            "potential_series": [FILES["vf2"], FILES["vf3"]],
-            "electric_field_formula": "E23=sign*(vf3-vf2)/Delta",
-            "particle_flux_formula": "Gamma=ne*E23/B",
-            "probe_separation_m": args.separation_m,
-            "magnetic_field_T_supplied": args.b_tesla,
-            "sign_multiplier": args.sign,
-            "statistics": "raw mean and sample standard deviation; detrended standard deviation also reported",
-            "limitation": "Unit scaling and exact preprocessing must be confirmed against the dataset documentation and paper.",
-        },
+        "title": "EAST shot 22010: raw-data reconstruction of turbulent particle-flux statistics",
+        "generated_utc": datetime.now(timezone.utc).isoformat(), "dataset_record": RECORD, "paper_doi": PAPER_DOI,
+        "readme_url": README_URL, "dataset_readme_text": readme_text, "dataset_readme_error": readme_error,
+        "method": {"source_files": FILES, "sample_window_inclusive": [start_sample, end_sample],
+            "sample_rate_hz": 2000000, "density_scale_to_m-3": args.density_scale,
+            "electric_field_formula": "E23=(detrend4(vf3)-detrend4(vf2))/Delta",
+            "particle_flux_formula": "Gamma=detrend4(ne)*E23/B",
+            "detrending": "Independent fourth-order polynomial trend removal for ne, vf2, vf3 over the published stationary interval",
+            "probe_separation_m": args.separation_m, "magnetic_field_T": args.b_tesla, "sign_multiplier": args.sign,
+            "scale_crosscheck": "Density and potential fluctuation standard deviations are compared with published values."},
         "source_files": provenance,
-        "derived": {
-            "samples": int(len(flux)),
-            "electric_field_V_per_m_mean": float(np.mean(electric_field)),
-            "electric_field_V_per_m_std": float(np.std(electric_field, ddof=1)),
-            "flux_mean_raw_m-2_s-1": mean_flux,
-            "flux_sigma_raw_m-2_s-1": sigma_flux,
-            "flux_sigma_detrended_m-2_s-1": sigma_flux_detrended,
-            "published_flux_mean_m-2_s-1": PUBLISHED_MEAN_FLUX,
-            "published_flux_sigma_m-2_s-1": PUBLISHED_SIGMA_FLUX,
-            "mean_relative_difference_percent": mean_difference,
-            "sigma_raw_relative_difference_percent": sigma_difference,
-            "flux_finite_fraction": float(np.mean(np.isfinite(flux))),
-        },
-        "conditional_averages": conditional_average(flux_detrended, flux_detrended),
-        "acceptance": {
-            "numeric_comparison_computed": True,
-            "empirical_validation_pass": False,
-            "reason": "Pending confirmation of source units, correct B at the probe position, sign convention, and matching paper preprocessing.",
-        },
+        "computed": {"samples": len(flux), "window_duration_ms": len(flux) / 2000000 * 1000,
+            **measured, "electric_field_sigma_V_m": float(np.std(electric_field, ddof=1)),
+            "flux_sigma_after_linear_detrend_m-2_s-1": float(np.std(flux_detrended, ddof=1))},
+        "published_reference": references, "comparison": checks,
+        "acceptance": {"empirical_validation_pass": empirical_pass,
+            "reason": "Pass requires flux statistics and independent signal statistics to agree within prespecified tolerances."},
     }
     (outdir / "east_22010_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     with (outdir / "east_22010_flux.csv").open("w", encoding="utf-8") as f:
-        f.write("sample,ne,vf2,vf3,electric_field_V_m,flux_raw_m-2_s-1,flux_detrended_m-2_s-1\n")
+        f.write("sample,ne_raw_m-3,ne_fluct_m-3,vf2_raw_V,vf2_fluct_V,vf3_raw_V,vf3_fluct_V,electric_field_V_m,flux_m-2_s-1,flux_linear_detrended_m-2_s-1\\n")
         for i in range(len(flux)):
-            f.write(f"{i},{ne[i]:.12g},{vf2[i]:.12g},{vf3[i]:.12g},"
-                    f"{electric_field[i]:.12g},{flux[i]:.12g},{flux_detrended[i]:.12g}\n")
-    print(json.dumps({
-        "report": str(outdir / "east_22010_validation.json"),
-        "samples": len(flux), "flux_mean_raw": mean_flux,
-        "flux_sigma_raw": sigma_flux, "flux_sigma_detrended": sigma_flux_detrended,
-        "published_mean": PUBLISHED_MEAN_FLUX, "published_sigma": PUBLISHED_SIGMA_FLUX,
-        "mean_relative_difference_percent": mean_difference,
-        "sigma_raw_relative_difference_percent": sigma_difference,
-        "empirical_validation_pass": False,
-    }, indent=2))
+            f.write(f"{start_sample+i},{ne_raw[i]:.12g},{ne_fluct[i]:.12g},{vf2_raw[i]:.12g},{vf2_fluct[i]:.12g},{vf3_raw[i]:.12g},{vf3_fluct[i]:.12g},{electric_field[i]:.12g},{flux[i]:.12g},{flux_detrended[i]:.12g}\\n")
+    print(json.dumps({"report": str(outdir / "east_22010_validation.json"), "samples": len(flux),
+        "computed": measured, "published": references,
+        "relative_difference_percent": {k: v["relative_difference_percent"] for k, v in checks.items()},
+        "empirical_validation_pass": empirical_pass}, indent=2))
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
