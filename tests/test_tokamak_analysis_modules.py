@@ -510,3 +510,13 @@ def test_neutron_flux_known_linear_count_rate():
     np.testing.assert_allclose(out["count_rate_s-1"], [10.0, 10.0, 10.0])
     assert out["total_counts"] == pytest.approx(30.0)
     np.testing.assert_allclose(out["flux_estimate_m-2_s-1"], [100.0, 100.0, 100.0])
+
+
+
+def test_neutron_spectrum_known_background_corrected_moments():
+    from tokamak_analysis.neutron_spectrum import analyze_neutron_spectrum
+    out = analyze_neutron_spectrum([1.0, 2.0, 3.0], [1.0, 2.0, 1.0], background=[0.0, 1.0, 0.0])
+    np.testing.assert_allclose(out["net_counts"], [1.0, 1.0, 1.0])
+    assert out["peak_energy_keV"] == pytest.approx(1.0)
+    assert out["mean_energy_keV"] == pytest.approx(2.0)
+    assert out["total_counts"] == pytest.approx(3.0)
