@@ -346,7 +346,7 @@ if raw.get("numeric_rows", 0) >= 100:
             "H_alpha_nm": float(temporal["H_alpha"]["center_mean_nm"] - 656.281) if temporal["H_alpha"].get("center_mean_nm") is not None else None,
             "H_beta_nm": float(temporal["H_beta"]["center_mean_nm"] - 486.135) if temporal["H_beta"].get("center_mean_nm") is not None else None,
             "H_gamma_nm": float(temporal["H_gamma"]["center_mean_nm"] - 434.047) if temporal["H_gamma"].get("center_mean_nm") is not None else None,
-            "interpretation": "Offsets are diagnostic only; H-gamma is weak and the two-line affine calibration failed its independent H-gamma check."
+            "interpretation": "Offsets are descriptive only; plasma-emission line centers are not wavelength-calibration standards and H-gamma is statistically weak."
         }
         report["status"] = "PASS_SPECTRAL_LINE_SHAPE"
         report["interpretation"] = (
@@ -548,7 +548,7 @@ if config_audit.get("status") == "instrument_config_retrieved":
                     "per_acquisition": per_record,
                     "limitations": [
                         "Instrument config is dated 2011 and is not confirmed to have remained unchanged for shot 30622.",
-                        "The wavelength calibration failed the independent H-gamma check.",
+                        "No same-session certified wavelength-standard spectrum was available; the 2011 correction is historical only.",
                         "Sampling is coarse and only threshold-selected H-alpha fits were used.",
                         "This is a Doppler-only candidate; other broadening mechanisms and config uncertainty are not quantified."
                     ]
