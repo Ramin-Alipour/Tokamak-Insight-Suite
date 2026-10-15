@@ -23,8 +23,8 @@ def analyze_fast_bolometry(time_s, channel_signals, response_matrix, voxel_volum
     for idx, row in enumerate(y):
         row_sigma = None if sigma is None else (sigma if sigma.ndim == 1 else sigma[idx])
         fit = regularized_tomography(A, row, lam=regularization, nonnegative=True, measurement_sigma=row_sigma, regularization_order=2)
-        emissivity.append(np.asarray(fit['reconstruction'], dtype=float))
-        residual_rms.append(float(fit.get('residual_rms', np.sqrt(np.mean((A @ np.asarray(fit['reconstruction']) - row)**2)))))
+        emissivity.append(np.asarray(fit['solution'], dtype=float))
+        residual_rms.append(float(fit.get('residual_rms', np.sqrt(np.mean((A @ np.asarray(fit['solution']) - row)**2)))))
     eps = np.asarray(emissivity)
     power = eps @ volume
     return {'diagnostic': 'Fast bolometry', 'time_s': t, 'emissivity_reconstruction': eps,
