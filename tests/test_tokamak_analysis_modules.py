@@ -194,3 +194,18 @@ def test_shafranov_shift_known_geometric_and_analytic_values():
     assert out["measured_axis_shift_m"] == pytest.approx(0.05)
     assert out["normalized_axis_shift"] == pytest.approx(0.1)
     assert out["large_aspect_ratio_circular_prediction_m"] == pytest.approx(0.125)
+
+
+
+def test_average_density_known_profile_and_line_integral():
+    from tokamak_analysis.average_density import analyze_average_density
+    out = analyze_average_density(
+        density_profile_m3=[1e19, 2e19, 3e19],
+        radius_m=[0.0, 1.0, 2.0],
+        line_integrated_density_m2=6e19,
+        chord_length_m=2.0,
+    )
+    assert out["sample_mean_density_m3"] == pytest.approx(2e19, rel=1e-12)
+    assert out["peak_density_m3"] == pytest.approx(3e19, rel=1e-12)
+    assert out["radial_average_density_m3"] == pytest.approx(2e19, rel=1e-12)
+    assert out["line_average_density_m3"] == pytest.approx(3e19, rel=1e-12)
