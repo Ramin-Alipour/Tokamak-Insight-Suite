@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, platform, sys
+import json, platform, sys, importlib
 from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
@@ -7,6 +7,7 @@ import pandas as pd
 from matplotlib.figure import Figure
 import streamlit as st
 from tis import __version__
+from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -970,8 +971,35 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature'])
-    if workflow=='Calibration & uncertainty':
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Registered analysis modules'])
+    if workflow=='Registered analysis modules':
+        selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
+        entry=next(x for x in ANALYSES if x['id']==selected_id)
+        fn=resolve_analysis(selected_id)
+        import inspect
+        st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
+        st.code(str(inspect.signature(fn)),language='python')
+        st.write('Enter keyword arguments as JSON. To use an uploaded numeric column, set a value to {"column": "exact column name"}. Other values can be numbers, booleans, strings, lists, or nested arrays as required by the selected function.')
+        arg_text=st.text_area('Function arguments (JSON)',value='{}',height=180,key='registered_analysis_args')
+        if st.button('Run registered analysis',key='run_registered_analysis'):
+            try:
+                args=json.loads(arg_text)
+                if not isinstance(args,dict): raise ValueError('Arguments must be a JSON object keyed by function parameter name.')
+                def resolve_value(value):
+                    if isinstance(value,dict) and set(value)=={'column'}:
+                        col=value['column']
+                        if df is None: raise ValueError('Upload a data file before referencing columns.')
+                        if col not in df.columns: raise ValueError(f'Unknown data column: {col}')
+                        return pd.to_numeric(df[col],errors='raise').to_numpy(dtype=float)
+                    if isinstance(value,list): return [resolve_value(v) for v in value]
+                    if isinstance(value,dict): return {k:resolve_value(v) for k,v in value.items()}
+                    return value
+                result=fn(**{k:resolve_value(v) for k,v in args.items()})
+                st.success('Analysis executed.')
+                st.write(result)
+                st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat()}])[-100:]
+            except Exception as e: st.error(f'Analysis failed: {e}')
+    elif workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
         if df is None: st.info('Load a data file to calibrate a numeric channel.')
         else:
