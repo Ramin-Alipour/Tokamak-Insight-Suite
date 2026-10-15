@@ -16,7 +16,7 @@ RECORD = "https://zenodo.org/records/18473625"
 FILES = {"ne": "22010ne.txt", "vf2": "22010vf2.txt", "vf3": "22010vf3.txt"}
 PAPER_DOI = "10.1088/1361-6587/ae4f20"
 PUBLISHED_MEAN_FLUX = 1.3e20  # m^-2 s^-1; article figure 11 caption
-PUBLISHED_SIGMA_FLUX = 2.6e20  # m^-2 s^-1; article figure 11 caption
+PUBLISHED_SIGMA_FLUX = 2.6e20  # m^-2 s^-1; article figure 11 caption\nREADME_URL = f"{RECORD}/files/readme%20-%20EAST%20tokamak%20plasma%20probe%20data.docx?download=1"
 
 def fetch(url: str, timeout: float = 60.0) -> bytes:
     request = urllib.request.Request(url, headers={"User-Agent": "Tokamak-Insight-Suite/empirical-validation"})
@@ -37,7 +37,7 @@ def parse_numeric_series(raw: bytes, name: str) -> np.ndarray:
         raise ValueError(f"{name}: non-finite values are present; refusing silent deletion")
     return values
 
-def conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1.5,
+def extract_docx_text(raw: bytes) -> str:\n    import zipfile, xml.etree.ElementTree as ET\n    with zipfile.ZipFile(__import__("io").BytesIO(raw)) as archive:\n        xml = archive.read("word/document.xml")\n    root = ET.fromstring(xml)\n    ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}\n    return "\\n".join("".join(node.itertext()).strip() for node in root.findall(".//w:p", ns) if "".join(node.itertext()).strip())\n\ndef conditional_average(x: np.ndarray, y: np.ndarray, threshold_sigma: float = 1.5,
                         half_window: int = 200) -> dict:
     """Event-triggered conditional average of y around positive/negative x excursions."""
     x0 = signal.detrend(np.asarray(x, dtype=float), type="linear")
@@ -82,7 +82,7 @@ def main() -> int:
     outdir = Path(args.output_dir); outdir.mkdir(parents=True, exist_ok=True)
     series, provenance = {}, {}
     for key, filename in FILES.items():
-        url = f"{RECORD}/files/{filename}?download=1"
+        url = f"{RECORD}/preview/{filename}?include_deleted=0"
         raw = fetch(url)
         if len(raw) > args.max_download_mb * 1024 * 1024:
             raise RuntimeError(f"{filename} exceeds --max-download-mb safety limit")
@@ -104,7 +104,7 @@ def main() -> int:
     report = {
         "title": "EAST shot 22010: measured-series particle-flux statistics",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
-        "dataset_record": RECORD, "paper_doi": PAPER_DOI,
+        "dataset_record": RECORD, "paper_doi": PAPER_DOI,\n        "dataset_readme_text": readme_text,
         "method": {"density_series": FILES["ne"], "potential_series": [FILES["vf2"], FILES["vf3"]],
             "electric_field_formula": "E23=(vf3-vf2)/Delta", "particle_flux_formula": "F=ne*E23/B",
             "detrending": "linear detrend of constructed flux before standard deviation",
