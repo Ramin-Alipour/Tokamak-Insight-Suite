@@ -126,6 +126,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Rogowski coil": ["integrate_time_series"],
     "Magnetic flux / poloidal flux": ["magnetic_flux_from_voltage", "integrate_time_series"],
     "Spectral wavelength calibration": ["wavelength_calibration_workflow", "spectral_calibration"],
+    "Visible / optical emission spectroscopy": ["fit_spectral_line", "wavelength_calibration_workflow"],
     "Gas flow meters": ["gas_flow_to_particle_inventory"],
     "Effective pumping speed": ["effective_pumping_speed_m3_s"],
     "Fast bolometry": ["fast_bolometry_timeseries"],
