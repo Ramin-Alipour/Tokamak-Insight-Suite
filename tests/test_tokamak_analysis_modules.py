@@ -231,3 +231,15 @@ def test_ion_temperature_known_profile_statistics():
     assert out["peak_eV"] == pytest.approx(300.0)
     assert out["standard_deviation_eV"] == pytest.approx(100.0)
     np.testing.assert_allclose(out["gradient_eV_per_coordinate"], [100.0, 100.0, 100.0])
+
+
+
+def test_langmuir_probe_known_linear_iv_curve():
+    from tokamak_analysis.probe_analysis import analyze_probe_voltage_current
+    V = np.array([-2.0, -1.0, 0.0, 1.0, 2.0])
+    I = V.copy()
+    out = analyze_probe_voltage_current(V, I)
+    np.testing.assert_allclose(out["dI_dV_S"], np.ones(5), atol=1e-12)
+    assert out["floating_potential_V"] == pytest.approx(0.0)
+    assert out["ion_saturation_current_A"] == pytest.approx(-2.0)
+    assert out["electron_saturation_current_A"] == pytest.approx(2.0)
