@@ -445,6 +445,39 @@ for config_url in config_candidates:
     except Exception as exc:
         config_audit["attempts"].append({"url": config_url, "status": "failed", "error": f"{type(exc).__name__}: {exc}"})
 report["instrument_config_audit"] = config_audit
+# Apply the historical config's wavelength-correction polynomial separately from
+# the H-alpha/H-beta fitted affine map; retain the nominal precision caveat.
+coeffs = config_audit.get("calibration_polynomial_correction_coefficients", [])
+if coeffs and "time_resolved_line_audit" in report:
+    refs = {"H_alpha": 656.281, "H_beta": 486.135, "H_gamma": 434.047}
+    config_corrected = {}
+    precision = config_audit.get("nominal_wavelength_precision_nm")
+    for line_name, reference in refs.items():
+        center = report["time_resolved_line_audit"].get(line_name, {}).get("center_mean_nm")
+        if center is None:
+            config_corrected[line_name] = {"status": "no_accepted_line_center"}
+            continue
+        corrected = float(center)
+        for power, coefficient in enumerate(coeffs):
+            corrected += coefficient * float(center) ** power
+        residual = corrected - reference
+        config_corrected[line_name] = {
+            "observed_center_nm": float(center),
+            "config_corrected_center_nm": corrected,
+            "reference_nm_approx": reference,
+            "residual_nm": residual,
+            "within_historical_nominal_precision": bool(precision is not None and abs(residual) <= precision)
+        }
+    report["historical_config_wavelength_correction_check"] = {
+        "config_date": config_audit.get("config_date"),
+        "serial_number": config_audit.get("serial_number"),
+        "polynomial_coefficients": coeffs,
+        "nominal_precision_nm": precision,
+        "lines": config_corrected,
+        "decision": "HISTORICAL_CORRECTION_COMPARED_NOT_A_SHOT_SPECIFIC_CALIBRATION",
+        "limitations": ["The correction is from a 2011 config, not a same-session lamp exposure.",
+                        "The nominal precision is coarse and does not replace independent calibration data."]
+    }
 crosscheck = report.get("provisional_wavelength_crosscheck", {})
 nominal_precision = config_audit.get("nominal_wavelength_precision_nm")
 if crosscheck.get("H_gamma_residual_nm") is not None and nominal_precision is not None:
