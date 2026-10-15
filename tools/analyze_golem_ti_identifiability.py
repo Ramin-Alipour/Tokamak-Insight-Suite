@@ -165,10 +165,19 @@ calibration_candidates = {
        for name, (ref, _window) in proxy_lines.items()},
 }
 calibration_lines = []
+excluded_calibration_lines = []
 for name, item in calibration_candidates.items():
     fit = item["fit"]
     if ("fitted_center_nm" in fit and fit.get("fit_r_squared") is not None
             and fit["fit_r_squared"] >= 0.8):
+        center_error = float(fit["fitted_center_nm"]) - float(item["reference_nm"])
+        if abs(center_error) > 1.5 * step:
+            excluded_calibration_lines.append({
+                "name": name, "center_offset_nm": center_error,
+                "offset_in_sampling_intervals": center_error / step,
+                "reason": "Centroid mismatch exceeds 1.5 sampling intervals; likely wrong line ID or blend."
+            })
+            continue
         calibration_lines.append({
             "name": name, "kind": item["kind"],
             "measured_center_nm": float(fit["fitted_center_nm"]),
@@ -199,6 +208,7 @@ if len(calibration_lines) >= 3:
     multi_species_calibration = {
         "method": "leave-one-line-out affine fit using Balmer plus heavy-ion plasma-line centroids",
         "lines_used": calibration_lines,
+        "excluded_lines": excluded_calibration_lines,
         "line_count": len(calibration_lines),
         "leave_one_out": multi_species_loo,
         "all_line_slope": float(multi_species_slope),
@@ -214,6 +224,7 @@ else:
     multi_species_calibration = {
         "line_count": len(calibration_lines),
         "lines_used": calibration_lines,
+        "excluded_lines": excluded_calibration_lines,
         "limitation": "Fewer than three reliable line fits; independent multi-species affine calibration unavailable."
     }
 
