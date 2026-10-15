@@ -166,6 +166,63 @@ if raw.get("numeric_rows", 0) >= 100:
             "noise_rms_counts_header": 10.6,
             "analysis": "Gaussian plus linear-background fits to the mean of all recorded acquisitions",
         }
+        # Time-resolved audit: reject noise-dominated acquisitions instead of
+        # treating a numerically converged fit as a detected line.
+        time_header = next((line for line in (OUT / "raw_spectrum.txt").read_text(encoding="utf-8", errors="replace").splitlines()
+                            if line.startswith("Time stamps [ms]:")), "")
+        import re
+        time_match = re.search(r"\[(.*?)\]", time_header)
+        timestamps = [float(v) for v in time_match.group(1).split()] if time_match else []
+        temporal = {}
+        for line_name, (reference, window) in lines.items():
+            mask = (wavelength >= window[0]) & (wavelength <= window[1])
+            x = wavelength[mask]
+            records = []
+            for index in range(spectra.shape[1]):
+                y = spectra[mask, index]
+                baseline = float(np.percentile(y, 20))
+                center0 = float(x[int(np.argmax(y))])
+                try:
+                    pars, _ = curve_fit(
+                        gaussian_linear, x, y,
+                        p0=[max(float(np.max(y)) - baseline, 1.0), center0, 0.7, baseline, 0.0],
+                        maxfev=30000,
+                        bounds=([0, window[0], 0.08, -1e5, -1e4],
+                                [1e7, window[1], 8.0, 1e5, 1e4]),
+                    )
+                    amp, center, sigma, intercept, slope = [float(v) for v in pars]
+                    fitted = gaussian_linear(x, *pars)
+                    ss_res = float(np.sum((y - fitted) ** 2))
+                    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+                    r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else None
+                    records.append({
+                        "acquisition": index + 1,
+                        "timestamp_ms": timestamps[index] if index < len(timestamps) else None,
+                        "center_nm": center,
+                        "fwhm_nm": 2.354820045 * sigma,
+                        "peak_counts": amp + intercept,
+                        "r_squared": r2,
+                        "accepted": bool((amp + intercept) >= 500.0 and r2 is not None and r2 >= 0.90),
+                    })
+                except Exception as exc:
+                    records.append({"acquisition": index + 1, "fit_error": type(exc).__name__, "accepted": False})
+            good = [r for r in records if r.get("accepted")]
+            centers = np.array([r["center_nm"] for r in good], dtype=float)
+            widths = np.array([r["fwhm_nm"] for r in good], dtype=float)
+            temporal[line_name] = {
+                "selection_rule": "fitted peak >= 500 counts and R-squared >= 0.90",
+                "accepted_acquisitions": len(good),
+                "total_acquisitions": len(records),
+                "center_mean_nm": float(np.mean(centers)) if len(centers) else None,
+                "center_sample_std_nm": float(np.std(centers, ddof=1)) if len(centers) > 1 else None,
+                "center_min_nm": float(np.min(centers)) if len(centers) else None,
+                "center_max_nm": float(np.max(centers)) if len(centers) else None,
+                "fwhm_mean_nm": float(np.mean(widths)) if len(widths) else None,
+                "fwhm_sample_std_nm": float(np.std(widths, ddof=1)) if len(widths) > 1 else None,
+                "accepted_records": good,
+                "all_records": records,
+            }
+        report["time_resolved_line_audit"] = temporal
         report["status"] = "PASS_SPECTRAL_LINE_SHAPE"
         report["interpretation"] = (
             "Raw spectrum was retrieved and three Balmer-region line profiles were fitted. "
