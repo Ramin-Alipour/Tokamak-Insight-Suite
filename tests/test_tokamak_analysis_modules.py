@@ -520,3 +520,13 @@ def test_neutron_spectrum_known_background_corrected_moments():
     assert out["peak_energy_keV"] == pytest.approx(1.0)
     assert out["mean_energy_keV"] == pytest.approx(2.0)
     assert out["total_counts"] == pytest.approx(3.0)
+
+
+
+def test_fusion_reaction_rate_known_densities_and_volume():
+    from tokamak_analysis.fusion_rate import fusion_reaction_rate
+    out = fusion_reaction_rate(2e19, 3e19, 1e-22, volume_m3=0.5)
+    assert out["reaction_rate_density_m-3_s-1"] == pytest.approx(6e16, rel=1e-12)
+    assert out["total_reactions_s-1"] == pytest.approx(3e16, rel=1e-12)
+    identical = fusion_reaction_rate(2e19, 2e19, 1e-22, identical_species=True)
+    assert identical["reaction_rate_density_m-3_s-1"] == pytest.approx(2e16, rel=1e-12)
