@@ -22,7 +22,7 @@ def analyze_soft_xray_array(time_s, channel_signals, response_matrix, *, regular
         fit = regularized_tomography(A, row, lam=regularization, nonnegative=True, measurement_sigma=row_sigma, regularization_order=2)
         solution = np.asarray(fit['solution'], dtype=float)
         recon.append(solution)
-        residual.append(float(np.sqrt(np.mean((A @ solution - row)**2)))))
+        residual.append(float(np.sqrt(np.mean((A @ solution - row)**2))))
     eps = np.asarray(recon)
     return {'diagnostic': 'Soft X-ray arrays', 'time_s': t, 'emissivity_reconstruction': eps,
         'peak_emissivity_by_time': np.max(eps, axis=1), 'peak_cell_by_time': np.argmax(eps, axis=1),
