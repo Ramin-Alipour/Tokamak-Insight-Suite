@@ -4,7 +4,7 @@ Each module exposes explicit numerical functions. Instrument calibration,
 diagnostic geometry and model-dependent assumptions must be supplied by users.
 """
 __all__ = [
-    "average_density", "ball_pen_probe", "beta", "bolometry", "channel_synchronization",
+    "analysis_registry", "average_density", "ball_pen_probe", "beta", "bolometry", "channel_synchronization",
     "confinement", "denoising", "density_waves", "divertor_analysis", "doppler_flow",
     "doppler_spectroscopy", "doppler_temperature", "ecrh_icrh", "edge_field",
     "electron_temperature", "energetic_particles", "equilibrium_reconstruction",
