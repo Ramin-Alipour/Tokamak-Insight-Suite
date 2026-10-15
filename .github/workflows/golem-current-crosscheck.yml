@@ -29,46 +29,36 @@ jobs:
               html = r.read().decode("utf-8", "replace")
 
           specs = {
-              "rogowski_current": [
-                  "/operation/shots/30622/basicdiagn/Irogowski.npz",
-                  "/golem/database/operation/shots/30622/basicdiagn/Irogowski.npz"
-              ],
-              "plasma_current": [
-                  "/operation/shots/30622/basicdiagn/Iplasma.npz",
-                  "/golem/database/operation/shots/30622/basicdiagn/Iplasma.npz"
-              ]
+              "rogowski_current": "/operation/shots/30622/basicdiagn/Irogowski.npz",
+              "plasma_current": "/operation/shots/30622/basicdiagn/Iplasma.npz"
           }
           out = {"shot":30622, "source_page":shot_url, "signals":{}, "reference_scalars":{}}
-          for name, paths in specs.items():
-              attempts = []
-              for path in paths:
-                  url = base + path
-                  try:
-                      req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
-                      with urllib.request.urlopen(req, timeout=30) as r:
-                          raw, ctype, final_url = r.read(), r.headers.get("Content-Type",""), r.geturl()
-                      if len(raw) < 20:
-                          raise ValueError("response too small")
-                      Path("validation-output/" + name + ".npz").write_bytes(raw)
-                      item = {"url":url,"final_url":final_url,"content_type":ctype,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
-                      with np.load(io.BytesIO(raw), allow_pickle=False) as z:
-                          item["array_keys"] = list(z.files)
-                          arrays = {}
-                          for k in z.files:
-                              a = np.asarray(z[k])
-                              arrays[k] = {"shape":list(a.shape),"dtype":str(a.dtype)}
-                              if np.issubdtype(a.dtype, np.number) and a.size:
-                                  arrays[k]["min"] = float(np.nanmin(a))
-                                  arrays[k]["max"] = float(np.nanmax(a))
-                                  arrays[k]["max_abs"] = float(np.nanmax(np.abs(a)))
-                                  if a.size <= 12: arrays[k]["values"] = a.tolist()
-                          item["arrays"] = arrays
-                      out["signals"][name] = {"status":"DOWNLOADED_AND_INSPECTED", **item}
-                      break
-                  except Exception as e:
-                      attempts.append({"url":url,"error":repr(e)})
-              else:
-                  out["signals"][name] = {"status":"RETRIEVAL_FAILED","attempts":attempts}
+          for name, path in specs.items():
+              url = base + path
+              try:
+                  req = urllib.request.Request(url, headers={"User-Agent":"Tokamak-Insight-Suite-validation/1.0"})
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      raw, ctype, final_url = r.read(), r.headers.get("Content-Type",""), r.geturl()
+                  Path("validation-output/" + name + ".npz").write_bytes(raw)
+                  item = {"url":url,"final_url":final_url,"content_type":ctype,"bytes":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
+                  # These legacy GOLEM NPZ files contain object arrays; the source is the official GOLEM shot archive.
+                  with np.load(io.BytesIO(raw), allow_pickle=True) as z:
+                      item["array_keys"] = list(z.files)
+                      arrays = {}
+                      for k in z.files:
+                          a = np.asarray(z[k])
+                          arrays[k] = {"shape":list(a.shape),"dtype":str(a.dtype)}
+                          if np.issubdtype(a.dtype, np.number) and a.size:
+                              arrays[k]["min"] = float(np.nanmin(a))
+                              arrays[k]["max"] = float(np.nanmax(a))
+                              arrays[k]["max_abs"] = float(np.nanmax(np.abs(a)))
+                              if a.size <= 12: arrays[k]["values"] = a.tolist()
+                          elif a.dtype == object:
+                              arrays[k]["object_preview"] = repr(a.tolist())[:1000]
+                      item["arrays"] = arrays
+                  out["signals"][name] = {"status":"DOWNLOADED_AND_INSPECTED", **item}
+              except Exception as e:
+                  out["signals"][name] = {"status":"RETRIEVAL_OR_PARSE_FAILED","url":url,"error":repr(e)}
 
           for key in ["rogowski_current_max","plasma_current_mean"]:
               pattern = r'<a[^>]+id=["\']'+re.escape(key)+r'["\'][^>]*>[^<]*</a>\s*\(\s*<a[^>]+href=["\'][^"\']*/utils/data/30622/'+re.escape(key)+r'["\']>([^<]+)</a>'
@@ -77,8 +67,8 @@ jobs:
                   try: out["reference_scalars"][key] = {"value":float(m.group(1)),"source":"GOLEM shot 30622 Data.php"}
                   except ValueError: pass
 
-          out["status"] = "SIGNALS_DOWNLOADED_FOR_STRUCTURAL_INSPECTION" if any(v.get("status")=="DOWNLOADED_AND_INSPECTED" for v in out["signals"].values()) else "DATA_RETRIEVAL_FAILED"
-          out["interpretation"] = "Do not compare an arbitrary NPZ array maximum to the published scalar until time/signal array semantics and units are confirmed."
+          out["status"] = "SIGNALS_DOWNLOADED_AND_INSPECTED" if any(v.get("status")=="DOWNLOADED_AND_INSPECTED" for v in out["signals"].values()) else "DATA_RETRIEVAL_FAILED"
+          out["interpretation"] = "This run inspects the archive structure and numeric arrays. Peak-current agreement is not claimed unless the time/current arrays and units are identified."
           Path("validation-output/report.json").write_text(json.dumps(out,indent=2))
           print(json.dumps(out,indent=2))
           PY
