@@ -14,6 +14,7 @@ import pandas as pd
 RECORD = "https://zenodo.org/records/14996664"
 ARTICLE_DOI = "10.1088/1361-6587/adc8ce"
 DATABASE_URL = f"{RECORD}/files/lhdatabase.h5?download=1"
+LH_DATA_URL = f"{RECORD}/files/LH_DATA.h5?download=1"
 OUT = Path("artifacts/tcv-lh-threshold-validation")
 
 
@@ -42,6 +43,8 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     db_path = OUT / "lhdatabase.h5"
     provenance = download(DATABASE_URL, db_path)
+    lh_path = OUT / "LH_DATA.h5"
+    lh_provenance = download(LH_DATA_URL, lh_path)
     d = load_fields(db_path)
     n = len(d["SHOT"])
     if any(len(v) != n for v in d.values()):
@@ -104,11 +107,51 @@ def main():
                 "ratio_uncertainty": float(ratio_err[i]),
             })
 
+    # Reproduce the source notebook's Figure-2 power-balance comparison.
+    with h5py.File(lh_path, "r") as h5:
+        fig2 = h5["/data/fig2"]
+        ploss = np.asarray(fig2["PLMW"]).reshape(-1)
+        psep = np.asarray(fig2["PSEP"]).reshape(-1)
+        out_shot = np.asarray(fig2["OUT_SHOT"]).reshape(-1)
+        out_time = np.asarray(fig2["OUT_TIME"]).reshape(-1)
+    balance_mask = np.isfinite(ploss) & np.isfinite(psep) & (ploss > 0.2)
+    if int(balance_mask.sum()) >= 5:
+        xp, yp = ploss[balance_mask], psep[balance_mask]
+        slope, intercept = np.polyfit(xp, yp, 1)
+        pearson_r = float(np.corrcoef(xp, yp)[0, 1])
+        rank_x = pd.Series(xp).rank(method="average").to_numpy()
+        rank_y = pd.Series(yp).rank(method="average").to_numpy()
+        spearman_rho = float(np.corrcoef(rank_x, rank_y)[0, 1])
+        ratio = yp / xp
+        power_balance_check = {
+            "valid_points": int(balance_mask.sum()),
+            "pearson_r": pearson_r,
+            "spearman_rho": spearman_rho,
+            "linear_slope": float(slope),
+            "linear_intercept_MW": float(intercept),
+            "mean_Psep_minus_Ploss_MW": float(np.mean(yp - xp)),
+            "median_Psep_over_Ploss": float(np.median(ratio)),
+            "absolute_difference_MW_p50_p90_max": [
+                float(np.quantile(np.abs(yp-xp), 0.50)),
+                float(np.quantile(np.abs(yp-xp), 0.90)),
+                float(np.max(np.abs(yp-xp))),
+            ],
+            "status": "PASS" if pearson_r >= 0.98 and 0.90 <= slope <= 1.10 and 0.85 <= np.median(ratio) <= 1.15 else "PENDING",
+        }
+        balance_rows = [{
+            "shot": int(out_shot[i]), "time_s": float(out_time[i]),
+            "P_loss_MW": float(ploss[i]), "P_sep_MW": float(psep[i]),
+            "P_sep_over_P_loss": float(psep[i]/ploss[i]),
+        } for i in np.flatnonzero(balance_mask)]
+    else:
+        power_balance_check = {"valid_points": int(balance_mask.sum()), "status": "PENDING"}
+        balance_rows = []
+
     report = {
         "title": "TCV L-H threshold scaling reproducibility",
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "dataset_record": RECORD, "article_doi": ARTICLE_DOI,
-        "source_database": provenance,
+        "source_database": provenance, "figure2_power_balance_source": lh_provenance,
         "database_rows": int(n), "formula_valid_rows": int(formula_valid.sum()), "valid_scaling_rows": int(valid.sum()),
         "excluded_ratio_rows": [
             {"shot": int(d["SHOT"][i]), "reason": "PLMW or PLMWSTD missing"}
@@ -122,20 +165,23 @@ def main():
             "PLMW": "loss power in MW",
         },
         "normalization": "P_loss/P_ITPA; uncertainty PLMWSTD/P_ITPA",
-        "figure4_group_reproduction": groups,
+        "figure4_group_reproduction": groups, "figure2_power_balance_check": power_balance_check,
         "acceptance": {
             "formula_reproduction_pass": bool(formula_valid.all() and valid.sum() >= 0.95 * n and len(rows) > 0),
+            "power_balance_consistency_pass": power_balance_check.get("status") == "PASS",
             "criteria": "All rows produce finite positive P_ITPA; at least 95% have finite PLMW and PLMWSTD for the ten Figure-4 masks.",
             "interpretation": "This reproduces the published database normalization and selection logic; it is not a reanalysis of raw diagnostic signals.",
         },
     }
     (OUT / "tcv_lh_threshold_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     pd.DataFrame(rows).to_csv(OUT / "tcv_lh_threshold_selected_shots.csv", index=False)
+    pd.DataFrame(balance_rows).to_csv(OUT / "tcv_power_balance_points.csv", index=False)
     print(json.dumps({
         "report": str(OUT / "tcv_lh_threshold_validation.json"),
         "database_rows": n, "formula_valid_rows": int(formula_valid.sum()), "valid_rows": int(valid.sum()),
         "groups": groups,
         "formula_reproduction_pass": report["acceptance"]["formula_reproduction_pass"],
+        "power_balance_check": power_balance_check,
     }, indent=2))
 
 
