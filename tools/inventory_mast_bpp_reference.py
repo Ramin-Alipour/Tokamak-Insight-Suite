@@ -10,12 +10,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import xarray as xr
+import xarray as xr\nimport pandas as pd\nimport numpy as np
 
 from tis.data_sources import FAIR_MAST_BASE
 
 SHOT = 28830
-GROUPS = ("alp", "arp", "ayc", "efm")
+GROUPS = ("arp", "ayc", "efm", "ane")
 
 
 def main() -> None:
@@ -49,6 +49,24 @@ def main() -> None:
                 },
                 coordinates=list(ds.coords),
             )
+            # Preserve measured profiles and independent diagnostics for offline
+            # comparison against the paper's tabulated shot-28830 values.
+            if group == "ayc" and all(name in ds for name in ("time", "radius", "te", "ne")):
+                t = np.asarray(ds["time"].values, dtype=float)
+                radius = np.asarray(ds["radius"].values, dtype=float)
+                te = np.asarray(ds["te"].values, dtype=float)
+                ne = np.asarray(ds["ne"].values, dtype=float)
+                te_err = np.asarray(ds["te_error"].values, dtype=float) if "te_error" in ds else np.full_like(te, np.nan)
+                ne_err = np.asarray(ds["ne_error"].values, dtype=float) if "ne_error" in ds else np.full_like(ne, np.nan)
+                rows = []
+                for it, time_s in enumerate(t):
+                    for ir in range(radius.shape[-1]):
+                        rows.append((time_s, ir, radius[it, ir], te[it, ir], te_err[it, ir], ne[it, ir], ne_err[it, ir]))
+                pd.DataFrame(rows, columns=["time_s", "radial_index", "radius_m", "te_eV", "te_error_eV", "ne_m3", "ne_error"]).to_csv(out / "mast_28830_thomson_profiles.csv", index=False)
+            if group == "ane" and "density" in ds:
+                time_name = next((name for name in ("time", "time1") if name in ds and ds[name].ndim == 1), None)
+                if time_name is not None:
+                    pd.DataFrame({"time_s": np.asarray(ds[time_name].values, dtype=float), "line_density_raw": np.asarray(ds["density"].values, dtype=float)}).to_csv(out / "mast_28830_interferometer_density.csv", index=False)
         except Exception as exc:
             item["error"] = f"{type(exc).__name__}: {exc}"
         finally:
