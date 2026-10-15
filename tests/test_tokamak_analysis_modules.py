@@ -170,3 +170,17 @@ def test_magnetic_axis_known_grid_minimum():
     assert out["R_axis_m"] == pytest.approx(1.5)
     assert out["Z_axis_m"] == pytest.approx(0.0)
     assert out["psi_axis_Wb_rad"] == pytest.approx(0.0)
+
+
+
+def test_x_point_known_quadratic_saddle():
+    from tokamak_analysis.x_point import find_x_point_candidates
+    R = np.array([1.0, 2.0, 3.0])
+    Z = np.array([-1.0, 0.0, 1.0])
+    RR, ZZ = np.meshgrid(R, Z)
+    psi = (RR - 2.0)**2 - ZZ**2
+    out = find_x_point_candidates(R, Z, psi)
+    assert out["count"] == 1
+    assert out["candidates"][0]["R_m"] == pytest.approx(2.0)
+    assert out["candidates"][0]["Z_m"] == pytest.approx(0.0)
+    assert out["candidates"][0]["hessian_determinant"] == pytest.approx(-4.0, abs=1e-10)
