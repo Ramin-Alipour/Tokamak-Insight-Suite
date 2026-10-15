@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Poloidal-field coils / magnetic probes": ["analyze_poloidal_field"],
     "Toroidal-field coils / magnetic probes": ["analyze_toroidal_field"],
     "Thomson spectral distribution analysis": ["invert_thomson_distribution"],
     "Molecular spectroscopy": ["analyze_molecular_boltzmann_plot"],
