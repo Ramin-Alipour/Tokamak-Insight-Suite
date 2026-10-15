@@ -102,9 +102,9 @@ jobs:
           ref_mean, ref_sigma = 1.3e20, 2.6e20
           result = {"dataset": base, "paper_doi": "10.1088/1361-6587/ae4f20", "readme_text": readme,
                     "source_files": provenance,
-                    "scales": {"density_to_m-3": ds, "potential_to_V": ps, "B_T": b, "separation_m": delta},
+                    "scales": {"density_to_m-3": ds, "potential_to_V": ps, "B_T": b, "separation_m": delta}, "selected_window": {"start_sample": window_start, "end_sample": n_common-1, "sample_count": len(flux), "duration_ms": len(flux)/2e6*1000},
                     "computed": {"mean_flux_m-2_s-1": computed_mean, "sigma_flux_m-2_s-1": computed_sigma,
-                                 "electric_field_std_V_m": float(np.std(signal.detrend(efield), ddof=1))},
+                                 "electric_field_std_V_m": float(np.std(efield, ddof=1)), "density_mean_m-3": float(np.mean(arrays["ne"] * ds)), "density_fluctuation_std_m-3": float(np.std(ne, ddof=1)), "vf2_std_V": float(np.std(vf2, ddof=1))},
                     "published": {"mean_flux_m-2_s-1": ref_mean, "sigma_flux_m-2_s-1": ref_sigma},
                     "relative_difference_percent": {"mean": abs(computed_mean-ref_mean)/abs(ref_mean)*100,
                                                     "sigma": abs(computed_sigma-ref_sigma)/ref_sigma*100},
