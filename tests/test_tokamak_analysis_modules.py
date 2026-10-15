@@ -720,3 +720,13 @@ def test_turbulence_known_rms_and_cross_covariance():
     assert out["rms_fluctuation"] == pytest.approx(np.sqrt(n/(2*(n-1))), rel=1e-10)
     assert out["relative_rms"] == pytest.approx(np.sqrt(n/(2*(n-1)))/10.0, rel=1e-10)
     assert out["cross_covariance"] == pytest.approx(1.0, abs=1e-12)
+
+
+
+def test_radial_transport_known_covariance():
+    from tokamak_analysis.transport import fluctuation_transport
+    out = fluctuation_transport([1.0, 2.0, 3.0, 4.0], [2.0, 4.0, 6.0, 8.0], direction="radial")
+    assert out["direction"] == "radial"
+    assert out["particle_flux_covariance_m-2_s-1"] == pytest.approx(2.5)
+    assert out["density_fluctuation_rms"] == pytest.approx(np.sqrt(1.25))
+    assert out["velocity_fluctuation_rms_m_s"] == pytest.approx(np.sqrt(5.0))
