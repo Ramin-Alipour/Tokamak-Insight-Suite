@@ -172,6 +172,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Electron/ion heating power": ["analyze_electron_ion_heating_power"],
     "Thermocouples/embedded sensors": ["analyze_thermocouple"],
     "Surface erosion/deposition": ["analyze_surface_erosion_deposition"],
+    "Wall impurity/dust monitoring": ["analyze_wall_dust_population"],
     "Pressure and beta": ["derive_parameters", "beta_metrics"],
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
