@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from tis.core import (
-    linear_calibration, polynomial_calibration, prepare_time_series, butterworth_filter,
+    linear_calibration, polynomial_calibration, prepare_time_series, butterworth_filter, doppler_temperature_from_fwhm_eV,
     fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag, fit_spectral_line,
     doppler_temperature_eV, doppler_velocity_m_s, derive_parameters, uncertainty_linear,
     regularized_tomography, spectral_calibration, probe_iv_summary, signal_quality,
@@ -841,3 +841,35 @@ def test_spectrum_moments_flags_undefined_signed_net_moments_without_throwing():
     xray = xray_spectrum_summary(energy, net, bin_representation="counts_per_bin")
     assert xray["moments_valid"] is False
     assert xray["energy_axis_unit"] == "keV"
+
+
+
+def test_published_aditya_u_fwhm_reproduces_reported_ion_temperature():
+    # Published C-ion line: lambda=464.74 nm, FWHM=0.0652 nm.
+    result = doppler_temperature_from_fwhm_eV(
+        observed_fwhm=0.0652, lambda0=464.74, mass_amu=12.0
+    )
+    assert result["temperature_eV"] == pytest.approx(39.675, rel=2e-3)
+
+
+def test_fwhm_instrument_deconvolution_recovers_reference_temperature():
+    from tis.doppler_temperature import doppler_fwhm_nm_for_temperature
+    expected = 40.1
+    wavelength = 464.74
+    mass = 12.0
+    instrument = 0.039
+    doppler = doppler_fwhm_nm_for_temperature(wavelength, mass, expected)
+    observed = np.sqrt(doppler**2 + instrument**2)
+    result = doppler_temperature_from_fwhm_eV(
+        observed_fwhm=observed, lambda0=wavelength, mass_amu=mass,
+        instrumental_fwhm=instrument,
+    )
+    assert result["temperature_eV"] == pytest.approx(expected, rel=1e-10)
+
+
+def test_fwhm_method_rejects_unresolved_line():
+    with pytest.raises(ValueError, match="unresolved"):
+        doppler_temperature_from_fwhm_eV(
+            observed_fwhm=0.04, lambda0=656.28, mass_amu=1.0,
+            instrumental_fwhm=0.04,
+        )
