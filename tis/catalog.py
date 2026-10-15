@@ -92,6 +92,7 @@ DIAGNOSTICS = [dict(zip(("family","diagnostic","quantities","status","method","c
 # Function mapping is deliberately conservative: a catalog entry is not an
 # implemented end-to-end diagnostic unless a callable analysis workflow exists.
 _IMPLEMENTED_WORKFLOWS = {
+    "Thomson scattering": ["analyze_thomson_spectrum"],
     "Langmuir probe": ["langmuir_iv_analysis", "probe_iv_summary"],
     "Ion temperature from Doppler spectroscopy": ["fit_spectral_line", "doppler_temperature_with_uncertainty_eV"],
     "Mirnov / pickup coils": ["fft_spectrum", "welch_psd", "mode_number_from_channels"],
