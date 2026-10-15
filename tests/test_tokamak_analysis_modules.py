@@ -366,3 +366,12 @@ def test_spectral_line_identification_known_nearest_matches():
     assert out["matches"][1]["label"] == "B"
     assert out["matches"][1]["matched"] is False
     assert out["matches"][1]["delta_nm"] == pytest.approx(0.2)
+
+
+
+def test_spectral_line_ratio_known_value_and_uncertainty():
+    from tokamak_analysis.spectral_line_ratio import analyze_line_ratio
+    out = analyze_line_ratio(12.0, 4.0, uncertainty_numerator=1.0, uncertainty_denominator=0.5)
+    assert float(out["line_ratio"]) == pytest.approx(3.0)
+    expected_uncertainty = 3.0*np.sqrt((1.0/12.0)**2 + (0.5/4.0)**2)
+    assert float(out["line_ratio_uncertainty"]) == pytest.approx(expected_uncertainty, rel=1e-12)
