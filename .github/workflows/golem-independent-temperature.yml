@@ -1,0 +1,101 @@
+name: GOLEM independent temperature cross-check
+
+on:
+  push:
+    paths:
+      - ".github/workflows/golem-independent-temperature.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  golem-temperature:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Retrieve GOLEM shot data and compare temperature summary
+        run: |
+          python - <<'PY'
+          import hashlib, json, math, pathlib, time
+          from datetime import datetime, timezone
+          from urllib.request import Request, urlopen
+          import numpy as np
+
+          out = pathlib.Path("golem-temperature-validation")
+          out.mkdir(exist_ok=True)
+          base = "https://golem.fjfi.cvut.cz/utils/data/30622/"
+          candidates = {
+              "electron_temperature": ["electron_temperature", "spectrometr/temperature", "spectrometr%2Ftemperature"],
+              "mean_temperature": ["spectrometr/mean_temperature", "spectrometr%2Fmean_temperature", "temperature_mean"],
+          }
+          report = {
+              "test": "GOLEM shot 30622 electron-temperature time-series cross-check",
+              "retrieved_at_utc": datetime.now(timezone.utc).isoformat(),
+              "shot": 30622,
+              "reference_mean_eV": 20.8,
+              "reference_source": "https://golem.fjfi.cvut.cz/shots/30622/Data.php",
+              "note": "The published shot-page scalar may be produced by the same diagnostic pipeline; this is a consistency cross-check, not independent end-to-end validation unless provenance confirms method equivalence."
+          }
+          retrieved = {}
+          for kind, ids in candidates.items():
+              success = None
+              attempts = []
+              for identifier in ids:
+                  url = base + identifier
+                  try:
+                      req = Request(url, headers={"User-Agent": "Tokamak-Insight-Suite-validation/1.0"})
+                      with urlopen(req, timeout=20) as response:
+                          raw = response.read()
+                          ctype = response.headers.get("Content-Type", "")
+                      attempts.append({"url": url, "status": "downloaded", "bytes": len(raw), "content_type": ctype})
+                      # Accept only numeric tabular data, never HTML error pages.
+                      text = raw.decode("utf-8", errors="replace")
+                      arr = np.genfromtxt(text.splitlines(), comments="#", invalid_raise=False)
+                      if arr.ndim == 2 and arr.shape[0] >= 3 and arr.shape[1] >= 2 and np.isfinite(arr[:, :2]).all():
+                          success = (url, raw, arr)
+                          break
+                  except Exception as exc:
+                      attempts.append({"url": url, "status": "failed", "error": repr(exc)})
+              report.setdefault("retrieval_attempts", {})[kind] = attempts
+              if success:
+                  url, raw, arr = success
+                  filename = kind + ".txt"
+                  (out / filename).write_bytes(raw)
+                  y = arr[:, -1]
+                  report[kind] = {
+                      "source_url": url, "filename": filename, "sha256": hashlib.sha256(raw).hexdigest(),
+                      "n_rows": int(arr.shape[0]), "n_columns": int(arr.shape[1]),
+                      "time_or_x_first": float(arr[0, 0]), "time_or_x_last": float(arr[-1, 0]),
+                      "value_mean": float(np.mean(y)), "value_median": float(np.median(y)),
+                      "value_std": float(np.std(y, ddof=1)), "value_min": float(np.min(y)),
+                      "value_max": float(np.max(y)), "finite_fraction": float(np.isfinite(arr).mean())
+                  }
+              else:
+                  report[kind] = {"status": "not_retrieved_as_numeric_table"}
+          series = report.get("electron_temperature", {})
+          if "value_mean" in series:
+              delta = series["value_mean"] - report["reference_mean_eV"]
+              report["comparison"] = {
+                  "series_mean_minus_reference_eV": delta,
+                  "absolute_difference_eV": abs(delta),
+                  "relative_difference_percent": 100 * abs(delta) / abs(report["reference_mean_eV"]),
+                  "interpretation": "Comparable only if the downloaded series uses eV and the same time window/weighting as the scalar reference."
+              }
+          report["status"] = "cross-check-computed" if "comparison" in report else "retrieval-or-format-unresolved"
+          (out / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+          print(json.dumps(report, indent=2))
+          # Preserve the report/artifacts even when the remote endpoint is unavailable.
+          PY
+      - name: Upload reproducibility artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golem-shot-30622-temperature-cross-check
+          path: golem-temperature-validation/
+          if-no-files-found: warn
+          retention-days: 30
