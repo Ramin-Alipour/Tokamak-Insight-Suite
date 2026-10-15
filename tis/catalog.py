@@ -165,6 +165,7 @@ _IMPLEMENTED_WORKFLOWS = {
     "Disruption analysis": ["current_quench_analysis"],
     "Energy confinement": ["derive_parameters", "ipb98y2_confinement_time", "h_factor"],
     "Energy balance": ["analyze_energy_balance", "derive_parameters"],
+    "NBI power": ["analyze_nbi_power"],
     "Pressure and beta": ["derive_parameters", "beta_metrics"],
     "Greenwald density reference": ["derive_parameters", "greenwald"],
     "Sampling / aliasing audit": ["prepare_time_series", "signal_quality", "sampling_audit", "resample_uniform"],
