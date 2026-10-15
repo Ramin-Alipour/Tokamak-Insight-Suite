@@ -199,9 +199,9 @@ def main() -> int:
     }
     (outdir / "east_22010_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     with (outdir / "east_22010_flux.csv").open("w", encoding="utf-8") as f:
-        f.write("sample,ne_raw_m-3,ne_fluct_m-3,vf2_raw_V,vf2_fluct_V,vf3_raw_V,vf3_fluct_V,electric_field_V_m,flux_m-2_s-1,flux_linear_detrended_m-2_s-1\\n")
+        f.write("sample,ne_raw_m-3,ne_fluct_m-3,vf2_raw_V,vf2_fluct_V,vf3_raw_V,vf3_fluct_V,electric_field_V_m,flux_m-2_s-1,flux_linear_detrended_m-2_s-1\n")
         for i in range(len(flux)):
-            f.write(f"{start_sample+i},{ne_raw[i]:.12g},{ne_fluct[i]:.12g},{vf2_raw[i]:.12g},{vf2_fluct[i]:.12g},{vf3_raw[i]:.12g},{vf3_fluct[i]:.12g},{electric_field[i]:.12g},{flux[i]:.12g},{flux_detrended[i]:.12g}\\n")
+            f.write(f"{start_sample+i},{ne_raw[i]:.12g},{ne_fluct[i]:.12g},{vf2_raw[i]:.12g},{vf2_fluct[i]:.12g},{vf3_raw[i]:.12g},{vf3_fluct[i]:.12g},{electric_field[i]:.12g},{flux[i]:.12g},{flux_detrended[i]:.12g}\n")
     print(json.dumps({"report": str(outdir / "east_22010_validation.json"), "samples": len(flux),
         "computed": measured, "published": references,
         "relative_difference_percent": {k: v["relative_difference_percent"] for k, v in checks.items()},
