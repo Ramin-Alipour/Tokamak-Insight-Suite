@@ -139,3 +139,36 @@ def golem_bpp_alpha_from_toroidal_field(bt_T: float) -> dict[str, float | str]:
         "source": "Cipciar, Ion temperature measurement on tokamak Golem (2021), Eq. (3)",
         "note": "Empirical GOLEM campaign calibration; confirm applicability to the specific probe/setup before using for a reported Ti.",
     }
+
+
+def fit_swept_ball_pen_with_alpha_uncertainty(
+    voltage_V, current_A, *, alpha_bpp: float, alpha_bpp_std: float, **kwargs
+) -> dict[str, Any]:
+    """Fit swept BPP Ti and quantify sensitivity to the empirical alpha calibration.
+
+    Reports the nominal fit and the range obtained by refitting at alpha ± 1 sigma.
+    This is a sensitivity envelope, not a full joint posterior or a replacement for
+    uncertainty from raw-signal cleanup, hysteresis, and branch selection.
+    """
+    sigma = float(alpha_bpp_std)
+    if not math.isfinite(sigma) or sigma < 0:
+        raise ValueError("alpha_bpp_std must be finite and nonnegative.")
+    nominal = fit_swept_ball_pen_ion_temperature(
+        voltage_V, current_A, alpha_bpp=alpha_bpp, **kwargs
+    )
+    low = fit_swept_ball_pen_ion_temperature(
+        voltage_V, current_A, alpha_bpp=alpha_bpp - sigma,
+        initial_ti_eV=nominal["Ti_eV"],
+        plasma_potential_guess_V=nominal["plasma_potential_V"], **kwargs
+    )
+    high = fit_swept_ball_pen_ion_temperature(
+        voltage_V, current_A, alpha_bpp=alpha_bpp + sigma,
+        initial_ti_eV=nominal["Ti_eV"],
+        plasma_potential_guess_V=nominal["plasma_potential_V"], **kwargs
+    )
+    values = [low["Ti_eV"], nominal["Ti_eV"], high["Ti_eV"]]
+    nominal["alpha_bpp_std"] = sigma
+    nominal["Ti_range_from_alpha_plusminus_1sigma_eV"] = [float(min(values)), float(max(values))]
+    nominal["Ti_alpha_sensitivity_half_range_eV"] = float((max(values) - min(values)) / 2.0)
+    nominal["alpha_uncertainty_treatment"] = "Refit at alpha - 1 sigma and alpha + 1 sigma; not a joint confidence interval."
+    return nominal
