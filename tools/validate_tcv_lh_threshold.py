@@ -112,8 +112,6 @@ def main():
         fig2 = h5["/data/fig2"]
         ploss = np.asarray(fig2["PLMW"]).reshape(-1)
         psep = np.asarray(fig2["PSEP"]).reshape(-1)
-        out_shot = np.asarray(fig2["OUT_SHOT"]).reshape(-1)
-        out_time = np.asarray(fig2["OUT_TIME"]).reshape(-1)
     balance_mask = np.isfinite(ploss) & np.isfinite(psep) & (ploss > 0.2)
     if int(balance_mask.sum()) >= 5:
         xp, yp = ploss[balance_mask], psep[balance_mask]
@@ -139,7 +137,7 @@ def main():
             "status": "PASS" if pearson_r >= 0.98 and 0.90 <= slope <= 1.10 and 0.85 <= np.median(ratio) <= 1.15 else "PENDING",
         }
         balance_rows = [{
-            "shot": int(out_shot[i]), "time_s": float(out_time[i]),
+            "row_index": int(i),
             "P_loss_MW": float(ploss[i]), "P_sep_MW": float(psep[i]),
             "P_sep_over_P_loss": float(psep[i]/ploss[i]),
         } for i in np.flatnonzero(balance_mask)]
