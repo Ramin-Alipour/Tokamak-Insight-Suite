@@ -364,31 +364,41 @@ if raw.get("numeric_rows", 0) >= 100:
             ),
             "required_next_step": "Fit a multi-line Hg/Ar (or other certified lamp) spectrum from the same instrument setup; do not apply an affine correction inferred from H-alpha/H-beta."
         }
-        # Quantify the naive Doppler-only temperature for transparency, but never
-        # label it as a measured ion temperature: instrumental broadening is unknown.
+        # Resolution-aware temperature gate. A converged curve_fit is not proof
+        # that a line width is resolved: require >=4 wavelength intervals across
+        # the fitted FWHM before converting it to a temperature.
         ha_mean = temporal["H_alpha"].get("fwhm_mean_nm")
         ha_center = temporal["H_alpha"].get("center_mean_nm")
+        sampling_nm = float(np.median(np.diff(wavelength)))
+        ha_fwhm_samples = ha_mean / sampling_nm if ha_mean is not None and sampling_nm > 0 else 0.0
         if ha_mean is not None and ha_center:
-            # T[eV] = m_H c^2 / (8 ln 2) * (FWHM/lambda)^2
-            # This is only the apparent Doppler-only value before instrumental deconvolution.
             hydrogen_rest_energy_eV = 938.27208816e6
             apparent_ti_eV = (hydrogen_rest_energy_eV / (8.0 * math.log(2.0))) * (ha_mean / ha_center) ** 2
             relative_width_std = (
                 temporal["H_alpha"]["fwhm_sample_std_nm"] / ha_mean
                 if temporal["H_alpha"].get("fwhm_sample_std_nm") is not None else None
             )
+            resolved = ha_fwhm_samples >= 4.0
             report["H_alpha_apparent_doppler_temperature"] = {
-                "apparent_temperature_eV": float(apparent_ti_eV),
+                "apparent_temperature_eV": float(apparent_ti_eV) if resolved else None,
+                "diagnostic_unresolved_width_temperature_eV": float(apparent_ti_eV),
                 "width_mean_nm": ha_mean,
                 "center_mean_nm": ha_center,
+                "median_sampling_interval_nm": sampling_nm,
+                "fwhm_sampling_intervals": float(ha_fwhm_samples),
+                "minimum_intervals_required": 4.0,
                 "width_sample_std_nm": temporal["H_alpha"].get("fwhm_sample_std_nm"),
                 "approximate_uncertainty_from_fit_scatter_eV": (
                     float(2.0 * apparent_ti_eV * relative_width_std)
-                    if relative_width_std is not None else None
+                    if resolved and relative_width_std is not None else None
                 ),
-                "physical_status": "NOT_A_VALID_ION_TEMPERATURE",
-                "reason": "Observed H-alpha FWHM includes unknown instrumental line-spread broadening; sampling is coarse (median 0.45 nm/pixel), only 6/29 fits pass selection, and no measured instrument LSF is available. Do not report this apparent value as Ti.",
-                "required_next_step": "Measure or retrieve the instrument line-spread function at H-alpha, then deconvolve in variance space and propagate wavelength/fit/LSF uncertainty."
+                "physical_status": "UNRESOLVED_NO_TEMPERATURE_RESULT" if not resolved else "APPARENT_ONLY_INSTRUMENT_UNCORRECTED",
+                "reason": (
+                    "FWHM is represented by fewer than four wavelength intervals; the fitted width is under-resolved and must not be converted to a physical Ti."
+                    if not resolved else
+                    "The line is sampled adequately, but the result is still apparent until a shot-specific instrumental line-spread function is removed."
+                ),
+                "required_next_step": "Acquire higher-resolution calibrated spectra and a same-setup lamp line-spread function; then fit the convolved plasma-plus-instrument profile."
             }
         # Keep line-center offsets explicit so calibration failure is visible in the report.
         report["Balmer_line_center_offsets"] = {
