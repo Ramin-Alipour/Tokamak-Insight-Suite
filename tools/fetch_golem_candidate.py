@@ -15,13 +15,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-BASE = "https://golem.fjfi.cvut.cz"
+BASE = "https://golem.fjfi.cvut.cz"\nAPI_BASE = "http://golem.fjfi.cvut.cz"
 USER_AGENT = "Tokamak-Insight-Suite empirical-validation inventory/1.1"
 
 
 def get(url: str) -> tuple[bytes, str, str]:
     req = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(req, timeout=45) as response:
+    with urlopen(req, timeout=20) as response:
         data = response.read()
         content_type = response.headers.get("Content-Type", "")
         return data, response.geturl(), content_type
@@ -43,18 +43,18 @@ def main() -> None:
     # accepts identifiers under /utils/data/<shot>/<identifier>[.txt].
     # Try both documented identifiers and legacy operation-directory paths.
     candidates = [
-        ("spectrum_identifier", f"{BASE}/utils/data/{shot}/spectra.txt_Data_.txt"),
-        ("spectrum_identifier_no_extension", f"{BASE}/utils/data/{shot}/spectra.txt_Data_"),
-        ("spectrum_config_identifier", f"{BASE}/utils/data/{shot}/spectrometr:data"),
-        ("calibrated_spectrum_identifier", f"{BASE}/utils/data/{shot}/spectrometr:data_calib"),
-        ("calibrated_spectrum_database_path", f"{BASE}/golem/database/operation/shots/{shot}/diagnostics/Radiation/1111Spectrometer.ON/data/spectrum_calibrated"),
+        ("spectrum_identifier", f"{API_BASE}/utils/data/{shot}/spectra.txt_Data_.txt"),
+        ("spectrum_identifier_no_extension", f"{API_BASE}/utils/data/{shot}/spectra.txt_Data_"),
+        ("spectrum_config_identifier", f"{API_BASE}/utils/data/{shot}/spectrometr:data"),
+        ("calibrated_spectrum_identifier", f"{API_BASE}/utils/data/{shot}/spectrometr:data_calib"),
+        ("calibrated_spectrum_database_path", f"{API_BASE}/golem/database/operation/shots/{shot}/diagnostics/Radiation/1111Spectrometer.ON/data/spectrum_calibrated"),
         ("spectrum_legacy_path", f"{BASE}/operation/shots/{shot}/diagnostics/Radiation/1111Spectrometer.ON/data/spectra.txt_Data_.txt"),
-        ("impurity_temperature_identifier", f"{BASE}/utils/data/{shot}/spectrometr:temperature"),
-        ("impurity_temperature_xls", f"{BASE}/utils/data/{shot}/spectrometr:temperature.xls"),
-        ("impurity_temperature_database_path", f"{BASE}/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/data/temperature"),
-        ("electron_temperature_mean_database_path", f"{BASE}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean"),
-        ("temperature_identifier", f"{BASE}/utils/data/{shot}/temperature"),
-        ("temperature_mean_identifier", f"{BASE}/utils/data/{shot}/temperature_mean"),
+        ("impurity_temperature_identifier", f"{API_BASE}/utils/data/{shot}/spectrometr:temperature"),
+        ("impurity_temperature_xls", f"{API_BASE}/utils/data/{shot}/spectrometr:temperature.xls"),
+        ("impurity_temperature_database_path", f"{API_BASE}/golem/database/operation/shots/{shot}/analysis/Radiation/1212Impurities_TO.ON/data/temperature"),
+        ("electron_temperature_mean_database_path", f"{API_BASE}/golem/database/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean"),
+        ("temperature_identifier", f"{API_BASE}/utils/data/{shot}/temperature"),
+        ("temperature_mean_identifier", f"{API_BASE}/utils/data/{shot}/temperature_mean"),
         ("temperature_legacy_path", f"{BASE}/operation/shots/{shot}/temperature"),
         ("temperature_mean_legacy_path", f"{BASE}/operation/shots/{shot}/temperature_mean"),
     ]
