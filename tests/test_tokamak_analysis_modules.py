@@ -556,3 +556,14 @@ def test_runaway_electron_known_threshold_event():
     assert out["events"][0]["duration_s"] == pytest.approx(1.0)
     assert out["events"][0]["peak_signal"] == pytest.approx(5.0)
     assert out["above_threshold_fraction"] == pytest.approx(0.4)
+
+
+
+def test_energetic_particle_distribution_known_bins():
+    from tokamak_analysis.energetic_particles import analyze_energy_distribution
+    out = analyze_energy_distribution([10.0, 20.0, 30.0], [1.0, 2.0, 1.0])
+    np.testing.assert_allclose(out["distribution"], [0.25, 0.5, 0.25])
+    assert out["total_counts"] == pytest.approx(4.0)
+    assert out["mean_energy_keV"] == pytest.approx(20.0)
+    assert out["peak_energy_keV"] == pytest.approx(20.0)
+    assert out["normalized"] is True
