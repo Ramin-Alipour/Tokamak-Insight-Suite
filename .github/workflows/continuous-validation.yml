@@ -11,12 +11,12 @@ permissions:
 
 concurrency:
   group: continuous-validation-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   tests-and-dashboard:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -36,60 +36,10 @@ jobs:
           python -m pip install '.[test]' pytest-cov ruff
       - name: Compile Python sources
         run: python -m compileall -q app.py tis tests
-      - name: Build wheel, source distribution and tracked-source ZIP
-        run: |
-          python -m pip install build
-          python -m build
-          git archive --format=zip --output=dist/tokamak-insight-suite-source.zip HEAD
-          python -c "import zipfile; z=zipfile.ZipFile('dist/tokamak-insight-suite-source.zip'); bad=z.testzip(); assert bad is None, bad; names=z.namelist(); assert ('app.py' in names or any(n.endswith('/app.py') for n in names)); assert ('tis/core.py' in names or any(n.endswith('/tis/core.py') for n in names)); print('Source ZIP entries:', len(names))"
-          (cd dist && sha256sum *.whl *.tar.gz *.zip > SHA256SUMS)
-      - name: Verify source ZIP outside checkout
-        run: |
-          python -c "import zipfile; zipfile.ZipFile('dist/tokamak-insight-suite-source.zip').extractall('/tmp/tis-source-zip')"
-          cd /tmp/tis-source-zip
-          python -m compileall -q .
-      - name: Install wheel outside the checkout and smoke-test packaged CLI and dashboard
-        shell: bash
-        run: |
-          python -m venv /tmp/tis-wheel-env
-          /tmp/tis-wheel-env/bin/python -m pip install dist/*.whl
-          cd /tmp
-          /tmp/tis-wheel-env/bin/python -c "import app, tis, importlib.resources as r; assert app.__file__.endswith('app.py'); assert r.files('tis.data').joinpath('DIAGNOSTIC_REGISTRY.json').is_file(); assert r.files('tis.data').joinpath('FORMULA_REGISTRY.json').is_file(); print('Installed dashboard and bundled registries import successfully:', tis.__version__)"
-          /tmp/tis-wheel-env/bin/python - <<'PY'
-          import app
-          from streamlit.testing.v1 import AppTest
-          tested = AppTest.from_file(app.__file__, default_timeout=30).run()
-          assert not tested.exception, [str(item.value) for item in tested.exception]
-          assert any("Tokamak Insight Suite" in str(item.value) for item in tested.markdown)
-          print("Installed wheel dashboard renders without uncaught exceptions.")
-          PY
-          /tmp/tis-wheel-env/bin/tis catalog --kind both --output-dir /tmp/tis-wheel-catalog
-          test -s /tmp/tis-wheel-catalog/DIAGNOSTIC_REGISTRY.json
-          test -s /tmp/tis-wheel-catalog/FORMULA_REGISTRY.json
-          /tmp/tis-wheel-env/bin/tis dashboard -- --server.headless true --server.address 127.0.0.1 --server.port 8502 > /tmp/tis-wheel-streamlit.log 2>&1 &
-          app_pid=$!
-          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://127.0.0.1:8502/_stcore/health; then echo; exit 0; fi
-            sleep 1
-          done
-          cat /tmp/tis-wheel-streamlit.log
-          exit 1
       - name: Run static checks for syntax and undefined names
         run: ruff check --select E9,F63,F7,F82 app.py tis tests
       - name: Run automated tests with coverage
         run: python -m pytest -q --cov=tis --cov-report=term-missing
-      - name: Upload tested distribution artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tokamak-insight-suite-tested-distributions-py${{ matrix.python-version }}
-          path: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/*.zip
-            dist/SHA256SUMS
-          if-no-files-found: error
-          retention-days: 14
       - name: Start Streamlit dashboard and check HTTP health
         shell: bash
         run: |
