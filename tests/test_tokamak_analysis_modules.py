@@ -119,3 +119,15 @@ def test_shape_reconstruction_known_circular_flux_surface():
     assert out["minor_radius_horizontal_m"] == pytest.approx(expected_radius, abs=2e-3)
     assert out["cross_section_area_m2"] == pytest.approx(np.pi * expected_radius**2, rel=2e-2)
     assert out["elongation_estimate"] == pytest.approx(1.0, abs=2e-2)
+
+
+
+def test_plasma_current_known_linear_ramp():
+    from tokamak_analysis.plasma_current import analyze_plasma_current
+    time_s = np.array([0.0, 1.0, 2.0])
+    current_A = np.array([1.0, 3.0, 5.0])
+    out = analyze_plasma_current(time_s, current_A)
+    np.testing.assert_allclose(out["dIp_dt_A_s"], [2.0, 2.0, 2.0], atol=1e-12)
+    assert out["peak_signed_current_A"] == pytest.approx(5.0)
+    assert out["peak_time_s"] == pytest.approx(2.0)
+    assert out["time_integral_A_s"] == pytest.approx(6.0)
