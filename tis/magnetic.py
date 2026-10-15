@@ -216,3 +216,63 @@ def analyze_rogowski_current(
             "Offset, saturation, bandwidth and non-ideal integrator response are not inferred by this routine.",
         ],
     }
+
+
+
+def integrate_magnetic_flux_surface(
+    normal_field_T,
+    area_element_m2,
+    *,
+    field_uncertainty_T=None,
+    area_uncertainty_m2=None,
+) -> dict:
+    """Integrate normal magnetic field over supplied surface area elements.
+
+    Φ = Σ B_normal ΔA. Geometry and field arrays must refer to matching cells;
+    field orientation/sign convention is supplied by the caller.
+    """
+    b = np.asarray(normal_field_T, dtype=float)
+    area = np.asarray(area_element_m2, dtype=float)
+    if b.size == 0 or area.size == 0 or not np.all(np.isfinite(b)) or not np.all(np.isfinite(area)):
+        raise ValueError("Field and area arrays must be nonempty and finite.")
+    if np.any(area < 0):
+        raise ValueError("Area elements must be nonnegative.")
+    try:
+        b, area = np.broadcast_arrays(b, area)
+    except ValueError as exc:
+        raise ValueError("Field and area arrays must be broadcast-compatible.") from exc
+    flux = float(np.sum(b * area))
+    uncertainty = None
+    if field_uncertainty_T is not None or area_uncertainty_m2 is not None:
+        var = np.zeros_like(b, dtype=float)
+        if field_uncertainty_T is not None:
+            ub = np.asarray(field_uncertainty_T, dtype=float)
+            if not np.all(np.isfinite(ub)) or np.any(ub < 0):
+                raise ValueError("Field uncertainty must be finite and nonnegative.")
+            try:
+                ub = np.broadcast_to(ub, b.shape)
+            except ValueError as exc:
+                raise ValueError("Field uncertainty must be broadcast-compatible.") from exc
+            var += (area * ub) ** 2
+        if area_uncertainty_m2 is not None:
+            ua = np.asarray(area_uncertainty_m2, dtype=float)
+            if not np.all(np.isfinite(ua)) or np.any(ua < 0):
+                raise ValueError("Area uncertainty must be finite and nonnegative.")
+            try:
+                ua = np.broadcast_to(ua, b.shape)
+            except ValueError as exc:
+                raise ValueError("Area uncertainty must be broadcast-compatible.") from exc
+            var += (b * ua) ** 2
+        uncertainty = float(np.sqrt(np.sum(var)))
+    return {
+        "diagnostic": "Magnetic flux / poloidal flux",
+        "magnetic_flux_Wb": flux,
+        "standard_uncertainty_Wb": uncertainty,
+        "n_surface_elements": int(b.size),
+        "formula": "Phi = sum(B_normal * area_element)",
+        "assumptions_and_limits": [
+            "Normal-field orientation and surface geometry must be consistently defined.",
+            "Uncertainty assumes independent field and area errors unless covariance is handled externally.",
+            "A single surface integral does not reconstruct a full poloidal-flux map ψ(R,Z).",
+        ],
+    }
