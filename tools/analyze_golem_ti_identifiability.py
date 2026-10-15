@@ -113,6 +113,30 @@ line_results = {
 apparent = [v["doppler_only_apparent_Ti_eV_not_accepted"] for v in line_results.values()]
 min_app, max_app = min(apparent), max(apparent)
 widths = [v["observed_gaussian_fwhm_nm"] for v in line_results.values()]
+
+# Independent leave-one-line-out affine wavelength-calibration check:
+# use two Balmer centroids to calibrate, then predict the third reference line.
+line_names = list(lines)
+measured_centers = np.array([line_results[name]["fitted_center_nm"] for name in line_names])
+reference_centers = np.array([line_results[name]["reference_air_wavelength_nm"] for name in line_names])
+loo_calibration = []
+for held_out in range(len(line_names)):
+    training = np.array([i for i in range(len(line_names)) if i != held_out])
+    slope, intercept = np.polyfit(measured_centers[training], reference_centers[training], 1)
+    predicted = float(slope * measured_centers[held_out] + intercept)
+    error = predicted - float(reference_centers[held_out])
+    loo_calibration.append({
+        "held_out_line": line_names[held_out],
+        "training_lines": [line_names[i] for i in training],
+        "affine_slope": float(slope),
+        "affine_intercept_nm": float(intercept),
+        "predicted_reference_nm": predicted,
+        "prediction_error_nm": error,
+        "prediction_error_in_sampling_intervals": error / step,
+        "within_one_sampling_interval": abs(error) <= step,
+    })
+all_slope, all_intercept = np.polyfit(measured_centers, reference_centers, 1)
+all_calibration_residuals = (all_slope * measured_centers + all_intercept) - reference_centers
 report = {
     "analysis": "Balmer multi-line ion-temperature identifiability audit",
     "shot": SHOT,
@@ -126,6 +150,17 @@ report = {
     "wavelength_range_nm": [float(wavelength.min()), float(wavelength.max())],
     "median_sampling_interval_nm": step,
     "line_fits": line_results,
+    "wavelength_calibration_cross_check": {
+        "method": "leave-one-Balmer-line-out affine calibration; two lines fit, third predicted",
+        "line_centroids_used_nm": {name: float(line_results[name]["fitted_center_nm"]) for name in line_names},
+        "reference_wavelengths_nm": {name: float(line_results[name]["reference_air_wavelength_nm"]) for name in line_names},
+        "leave_one_out_predictions": loo_calibration,
+        "all_line_fit_slope": float(all_slope),
+        "all_line_fit_intercept_nm": float(all_intercept),
+        "all_line_residuals_nm": {name: float(all_calibration_residuals[i]) for i, name in enumerate(line_names)},
+        "calibration_generalizes_within_one_sampling_interval": all(item["within_one_sampling_interval"] for item in loo_calibration),
+        "limitation": "Only three broad, sparsely sampled plasma lines are available; this is a stress test, not a substitute for a lamp-standard wavelength calibration."
+    },
     "multi_line_doppler_consistency": {
         "apparent_Ti_min_eV_not_accepted": min_app,
         "apparent_Ti_max_eV_not_accepted": max_app,
