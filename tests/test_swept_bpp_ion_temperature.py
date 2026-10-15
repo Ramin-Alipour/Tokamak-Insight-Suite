@@ -5,7 +5,11 @@ from pathlib import Path
 
 import numpy as np
 
-from tis.probes import fit_swept_ball_pen_ion_temperature, golem_bpp_alpha_from_toroidal_field
+from tis.probes import (
+    fit_swept_ball_pen_ion_temperature,
+    fit_swept_ball_pen_with_alpha_uncertainty,
+    golem_bpp_alpha_from_toroidal_field,
+)
 
 
 def _bpp_model(v, ti=21.0, phi=7.15, isat_plus=3.08, slope=0.003, alpha=0.6):
@@ -45,3 +49,17 @@ def test_golem_bpp_alpha_uses_reported_field_calibration_and_uncertainty():
     result = golem_bpp_alpha_from_toroidal_field(0.3)
     assert abs(result["alpha_bpp"] - 1.23) < 1e-12
     assert abs(result["alpha_bpp_std"] - np.sqrt((0.5 * 0.3) ** 2 + 0.2 ** 2)) < 1e-12
+
+
+def test_alpha_uncertainty_refits_temperature_envelope():
+    voltage = np.linspace(10.0, 85.0, 40)
+    current = _bpp_model(voltage)
+    result = fit_swept_ball_pen_with_alpha_uncertainty(
+        voltage, current, alpha_bpp=0.6, alpha_bpp_std=0.1,
+        fit_min_voltage_V=10.0, initial_ti_eV=21.0,
+        plasma_potential_guess_V=7.15,
+    )
+    assert abs(result["Ti_eV"] - 21.0) < 0.1
+    lo, hi = result["Ti_range_from_alpha_plusminus_1sigma_eV"]
+    assert lo <= result["Ti_eV"] <= hi
+    assert result["alpha_uncertainty_treatment"].startswith("Refit")
