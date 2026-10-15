@@ -6,6 +6,10 @@ on:
     paths:
       - "tools/analyze_golem_ti_identifiability.py"
       - "tools/discover_golem_bpp_31992.py"
+      - "tools/validate_bpp_ti_published_figure.py"
+      - "tis/probes.py"
+      - "validation/golem_bpp_31992_figure3_digitized.csv"
+      - "tests/test_swept_bpp_ion_temperature.py"
       - ".github/workflows/golem-ti-identifiability.yml"
   workflow_dispatch:
 
@@ -22,7 +26,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install numerical dependencies
-        run: python -m pip install --disable-pip-version-check numpy scipy
+        run: python -m pip install --disable-pip-version-check numpy scipy pytest
+      - name: Test swept BPP Ti fitter
+        run: python -m pytest -q tests/test_swept_bpp_ion_temperature.py
+      - name: Compare BPP fit with published GOLEM shot 31992 figure
+        run: python tools/validate_bpp_ti_published_figure.py
       - name: Analyze all Balmer lines and instrument-width sensitivity
         run: python tools/analyze_golem_ti_identifiability.py
       - name: Discover raw swept BPP voltage/current signals for published Ti benchmark
