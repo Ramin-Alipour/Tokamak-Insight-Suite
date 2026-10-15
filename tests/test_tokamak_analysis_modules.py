@@ -466,3 +466,14 @@ def test_radiation_tomography_identity_response_exact_solution():
     np.testing.assert_allclose(out["emissivity"], y, atol=1e-8)
     np.testing.assert_allclose(out["synthetic_measurements"], y, atol=1e-8)
     assert out["residual_norm"] == pytest.approx(0.0, abs=1e-8)
+
+
+
+def test_visible_imaging_known_dark_frame_correction():
+    from tokamak_analysis.visible_imaging import analyze_visible_image
+    image = np.array([[1.0, 2.0], [3.0, 4.0]])
+    out = analyze_visible_image(image, dark_frame=np.ones((2, 2)))
+    np.testing.assert_allclose(out["corrected_image"], [[0.0, 1.0], [2.0, 3.0]])
+    assert out["roi_mean_intensity"] == pytest.approx(1.5)
+    assert out["roi_max_intensity"] == pytest.approx(3.0)
+    assert out["roi_integrated_intensity"] == pytest.approx(6.0)
