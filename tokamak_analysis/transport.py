@@ -22,14 +22,18 @@ def radial_diffusive_particle_flux(diffusion_coefficient_m2_s, radial_density_gr
     """Radial Fick-law flux Gamma_r=-D_r*d<n>/dr."""
     D,g=np.broadcast_arrays(np.asarray(diffusion_coefficient_m2_s,dtype=float),np.asarray(radial_density_gradient_m4,dtype=float))
     if not np.all(np.isfinite(D)) or not np.all(np.isfinite(g)) or np.any(D<0): raise ValueError("Diffusivity non-negative and inputs finite")
-    flux=-D*g\n    return {"particle_flux_m-2_s-1":flux,"radial_particle_flux_m-2_s-1":flux,\n            "equation":"Gamma_r=-D_r*d<n>/dr","units":"m^-2 s^-1"}
+    flux=-D*g
+    return {"particle_flux_m-2_s-1":flux,"radial_particle_flux_m-2_s-1":flux,
+            "equation":"Gamma_r=-D_r*d<n>/dr","units":"m^-2 s^-1"}
 
 
 def poloidal_diffusive_particle_flux(diffusion_coefficient_m2_s, poloidal_density_gradient_m4):
     """Poloidal Fick-law flux Gamma_theta=-D_theta*d<n>/dtheta_phys."""
     D,g=np.broadcast_arrays(np.asarray(diffusion_coefficient_m2_s,dtype=float),np.asarray(poloidal_density_gradient_m4,dtype=float))
     if not np.all(np.isfinite(D)) or not np.all(np.isfinite(g)) or np.any(D<0): raise ValueError("Diffusivity non-negative and inputs finite")
-    flux=-D*g\n    return {"particle_flux_m-2_s-1":flux,"poloidal_particle_flux_m-2_s-1":flux,\n            "equation":"Gamma_theta=-D_theta*d<n>/dtheta_phys","units":"m^-2 s^-1"}
+    flux=-D*g
+    return {"particle_flux_m-2_s-1":flux,"poloidal_particle_flux_m-2_s-1":flux,
+            "equation":"Gamma_theta=-D_theta*d<n>/dtheta_phys","units":"m^-2 s^-1"}
 
 
 def turbulent_momentum_flux(v_radial_m_s, v_poloidal_m_s, mass_density_kg_m3):
