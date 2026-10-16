@@ -20,6 +20,7 @@ def analyze_neutron_flux(time_s, counts, *, efficiency=None, effective_area_m2=N
         rate=c/bin_width
         total_counts=float(np.sum(c))
         rate_method="counts divided by supplied live time" if live_time_s is not None else "counts divided by local time-bin width estimated from time coordinates"
+    out={"time_s":t,"counts":c,"count_rate_s-1":rate,"total_counts":total_counts,"count_rate_method":rate_method}
     if efficiency is not None or effective_area_m2 is not None:
         if efficiency is None or effective_area_m2 is None: raise ValueError("Provide detector efficiency and effective area")
         eff=float(efficiency); area=float(effective_area_m2)
