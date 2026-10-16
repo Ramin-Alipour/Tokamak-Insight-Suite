@@ -1020,3 +1020,12 @@ def test_dedicated_plasma_area_and_volume_relations():
     volume=axisymmetric_volume_from_boundary(R,Z)
     assert area["cross_section_area_m2"] == pytest.approx(np.pi*0.2**2,rel=1e-5)
     assert volume["toroidal_volume_m3"] == pytest.approx(2*np.pi**2*1.5*0.2**2,rel=1e-5)
+
+
+def test_cylindrical_volume_average_density_relation():
+    from tokamak_analysis.average_density import cylindrical_volume_average_density
+    r=np.linspace(0.0,1.0,1001)
+    constant=cylindrical_volume_average_density(r,np.full_like(r,3e19))
+    assert constant["volume_average_density_m3"] == pytest.approx(3e19,rel=1e-12)
+    linear=cylindrical_volume_average_density(r,2e19*(1-r))
+    assert linear["volume_average_density_m3"] == pytest.approx(2e19/3,rel=1e-6)
