@@ -8,6 +8,7 @@ from matplotlib.figure import Figure
 import streamlit as st
 from tis import __version__
 from tis.project import AnalysisRun, Project, ProjectStore
+from tis.ui.catalog_page import render_catalog_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
@@ -1039,31 +1040,7 @@ elif page=='Advanced Analysis':
             download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
 
 elif page=='Diagnostic Catalog':
-    st.title('Diagnostic Knowledge Base')
-    view=st.radio('Catalog',['Diagnostic families','Formula reference'],horizontal=True)
-    query=st.text_input('Search by diagnostic, observable, formula, method or caveat','').strip().lower()
-    if view=='Diagnostic families':
-        fam=st.selectbox('Diagnostic family',['All families']+diagnostic_families())
-        entries=[d for d in DIAGNOSTICS if (fam=='All families' or d['family']==fam) and (not query or query in ' '.join(str(v) for v in d.values()).lower())]
-        st.write(f'{len(entries)} entries')
-        for d in entries:
-            with st.expander(f"{d['diagnostic']} · {d['family']}"):
-                function_text=', '.join(d.get('implementation_functions',[])) or 'No direct callable workflow is mapped; registry description only.'
-                contract=d.get('execution_contract', {})
-                level=contract.get('execution_level','reference_only')
-                completeness=contract.get('completeness','incomplete')
-                inputs=contract.get('input_specs',[])
-                outputs=contract.get('output_specs',[])
-                st.markdown(f"**Observables:** {d['quantities']}\n\n**Quantity class (M=measured, D=derived, I=inferred):** {d['status']}\n\n**Execution level:** `{level}`\n\n**Contract completeness:** {completeness}\n\n**Declared inputs / outputs:** {len(inputs)} / {len(outputs)}\n\n**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics',False) and completeness=='complete' else 'Not claimed'}\n\n**Implementation status:** {d.get('implementation_status','Registry reference only')}\n\n**Mapped functions:** `{function_text}`\n\n**Method:** {d['method']}\n\n**Limitations:** {d['caveat']}")
-        json_download('Export diagnostic registry JSON',entries,'tis_diagnostic_registry.json')
-    else:
-        entries=[f for f in FORMULAS if not query or query in ' '.join(str(v) for v in f.values()).lower()]
-        st.write(f'{len(entries)} formula entries')
-        for f in entries:
-            with st.expander(f['name']):
-                execution=f.get('execution_contract',{})
-                st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Status:** {f['status']}\n\n**Implementation link:** {execution.get('implementation_link_status','not_mapped')}\n\n**Assumptions:** {f['assumptions']}\n\n**Execution note:** {execution.get('note','No implementation link declared.')}")
-        json_download('Export formula registry JSON',entries,'tis_formula_registry.json')
+    render_catalog_page(st, DIAGNOSTICS, FORMULAS, diagnostic_families, json_download)
 
 elif page=='Project Manager':
     st.title('Research Project Manager')
