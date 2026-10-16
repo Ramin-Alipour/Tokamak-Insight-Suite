@@ -6,11 +6,16 @@ def shafranov_shift(R_axis_m,R_geometric_m,*,minor_radius_m=None,elongation=None
     out={"measured_axis_shift_m":float(R_axis_m-R_geometric_m),"absolute_shift_m":float(abs(R_axis_m-R_geometric_m))}
     if minor_radius_m is not None:
         a=float(minor_radius_m)
-        if not np.isfinite(a) or a<=0: raise ValueError("minor_radius_m must be positive")
+        if not np.isfinite(a) or a<=0: raise ValueError("minor_radius_m must be finite and positive")
         out["normalized_axis_shift"]=out["measured_axis_shift_m"]/a
+    if elongation is not None:
+        kappa=float(elongation)
+        if not np.isfinite(kappa) or kappa<=0: raise ValueError("elongation must be finite and positive")
+        out["elongation_supplied"]=kappa
+        out["analytic_prediction_uses_elongation"]=False
     if beta_p is not None and li is not None:
         bp=float(beta_p); internal=float(li)
-        if not np.isfinite(bp) or not np.isfinite(internal): raise ValueError("beta_p and li must be finite")
+        if not np.isfinite(bp) or not np.isfinite(internal) or bp<0 or internal<0: raise ValueError("beta_p and li must be finite and non-negative")
         out["large_aspect_ratio_circular_prediction_m"]=minor_radius_m**2/(2*R_geometric_m)*(bp+internal/2-0.5) if minor_radius_m is not None else None
     out["caveat"]="The radius difference is a geometric estimate; analytic prediction assumes simplified equilibrium geometry."
     return out
