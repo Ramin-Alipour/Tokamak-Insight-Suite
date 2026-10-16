@@ -14,3 +14,16 @@ def find_x_point_candidates(R_m,Z_m,psi_Wb_rad,*,gradient_tolerance=None):
                 h=d2psi_dz2*d2psi_dr2-d2psi_drdz**2
                 if h<0: candidates.append({"R_m":float(R[i]),"Z_m":float(Z[j]),"psi_Wb_rad":float(p[j,i]),"hessian_determinant":float(h)})
     return {"candidates":candidates,"count":len(candidates),"caveat":"Grid-based saddle candidates only; separatrix topology and equilibrium boundary conditions must be checked."}
+
+def classify_flux_critical_point(d2psi_dR2, d2psi_dZ2, d2psi_dRdZ):
+    """Classify a 2-D flux critical point by Hessian determinant D=psi_RR*psi_ZZ-psi_RZ^2."""
+    rr,zz,rz=map(float,(d2psi_dR2,d2psi_dZ2,d2psi_dRdZ))
+    if not np.all(np.isfinite([rr,zz,rz])): raise ValueError("Hessian components must be finite")
+    determinant=rr*zz-rz**2
+    trace=rr+zz
+    if determinant<0: kind="saddle (X-point candidate)"
+    elif determinant>0 and trace>0: kind="local minimum"
+    elif determinant>0 and trace<0: kind="local maximum"
+    else: kind="degenerate or inconclusive"
+    return {"hessian_determinant":determinant,"hessian_trace":trace,"classification":kind,
+            "equation":"D=psi_RR*psi_ZZ-(psi_RZ)^2; D<0 implies saddle"}
