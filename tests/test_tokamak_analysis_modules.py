@@ -1183,3 +1183,11 @@ def test_axisymmetric_emissivity_radiated_power_relation():
     a=0.2; R0=1.5; eps=100.0; r=np.linspace(0.0,a,2001)
     out=radiated_power_from_axisymmetric_emissivity(r,np.full_like(r,eps),R0)
     assert out["total_radiated_power_W"] == pytest.approx(eps*2*np.pi**2*R0*a**2,rel=1e-6)
+
+
+def test_abel_projection_constant_emissivity():
+    from tokamak_analysis.radiation_tomography import abel_project_axisymmetric_emissivity
+    r=np.linspace(0.0,1.0,10001); eps=3.0; p=np.array([0.2,0.5])
+    out=abel_project_axisymmetric_emissivity(r,np.full_like(r,eps),p)
+    expected=2*eps*np.sqrt(1-p**2)
+    np.testing.assert_allclose(out["line_integrated_emissivity_W_m2"],expected,rtol=0.03)
