@@ -4,6 +4,7 @@ def estimate_safety_factor(R_m, minor_radius_m, B_toroidal_T, B_poloidal_T, *, q
     R=np.asarray(R_m,dtype=float); a=np.asarray(minor_radius_m,dtype=float); bt=np.asarray(B_toroidal_T,dtype=float); bp=np.asarray(B_poloidal_T,dtype=float)
     if any(not np.all(np.isfinite(x)) for x in (R,a,bt,bp)) or np.any(R<=0) or np.any(a<=0) or np.any(bp<=0): raise ValueError("Geometry and field values must be finite; R, a and Bp positive")
     R, a, bt, bp = np.broadcast_arrays(R, a, bt, bp)
+    if np.any(a>=R): raise ValueError("Minor radius must be smaller than major radius")
     q=a*bt/(R*bp)
     out={"q_cylindrical_estimate":q,"equation":"q(r) approximately r*B_t/(R*B_p) for circular, large-aspect-ratio geometry","caveat":"Approximate circular large-aspect-ratio estimate only; accurate q(r) requires equilibrium flux-surface integration with consistent local major radius and poloidal field."}
     if q_profile is not None:
