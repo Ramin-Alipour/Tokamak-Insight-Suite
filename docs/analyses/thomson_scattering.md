@@ -42,6 +42,7 @@ The module rejects a fit when the fitted width does not exceed the supplied inst
 - Fitted spectrum and residual arrays
 - Residual sum of squares; chi-square and reduced chi-square only when per-sample uncertainties are supplied
 - R-squared and fit covariance
+- Optional integrated collected power and its fit uncertainty when the signal is calibrated in W/nm
 - Explicit model assumptions and limitations
 
 The reported temperature uncertainty does not include uncertainty in laser wavelength, scattering angle, or instrument width. A covariance-based fit uncertainty is not a complete measurement uncertainty budget.
