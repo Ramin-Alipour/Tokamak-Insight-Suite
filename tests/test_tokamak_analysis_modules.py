@@ -1106,3 +1106,9 @@ def test_impurity_fraction_line_ratio_relation():
     from tokamak_analysis.impurity_concentration import impurity_fraction_from_line_ratio
     out=impurity_fraction_from_line_ratio(4.0,10.0,2.0,5.0)
     assert out["impurity_to_hydrogen_density_ratio"] == pytest.approx(1.0)
+
+
+def test_voigt_fwhm_approximation_limits():
+    from tokamak_analysis.spectral_broadening import voigt_fwhm_approximation
+    assert voigt_fwhm_approximation(2.0,0.0)["voigt_fwhm_approx_nm"] == pytest.approx(2.0)
+    assert voigt_fwhm_approximation(0.0,2.0)["voigt_fwhm_approx_nm"] == pytest.approx(2.0,rel=2e-4)
