@@ -30,6 +30,8 @@ def estimate_channel_time_lag(reference_time_s, reference_signal, target_time_s,
     grid=start+np.arange(grid_count)*dt
     if len(grid)<3: raise ValueError("Insufficient overlapping time interval")
     a=np.interp(grid,t1,x1); b=np.interp(grid,t2,x2); a=a-np.mean(a); b=b-np.mean(b)
+    if np.linalg.norm(a)<=np.finfo(float).tiny or np.linalg.norm(b)<=np.finfo(float).tiny:
+        raise ValueError("Relative delay is undefined for a constant or zero-variance channel")
     corr=correlate(b,a,mode="full",method="auto"); lags=correlation_lags(len(b),len(a),mode="full")
     lag=int(lags[np.argmax(corr)])
     return {"target_delay_relative_to_reference_s":float(lag*dt),"lag_samples":lag,"sample_interval_s":dt,
