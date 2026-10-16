@@ -3,11 +3,13 @@ import numpy as np
 def energy_confinement_time(stored_energy_J, net_heating_power_W, *, uncertainty_energy_J=None, uncertainty_power_W=None):
     W=np.asarray(stored_energy_J,dtype=float); P=np.asarray(net_heating_power_W,dtype=float)
     if not np.all(np.isfinite(W)) or not np.all(np.isfinite(P)) or np.any(W<0) or np.any(P<=0): raise ValueError("Stored energy nonnegative and net power positive")
+    W,P=np.broadcast_arrays(W,P)
     tau=W/P; out={"energy_confinement_time_s":tau}
     if uncertainty_energy_J is not None or uncertainty_power_W is not None:
         if uncertainty_energy_J is None or uncertainty_power_W is None: raise ValueError("Provide both uncertainties")
         sW=np.asarray(uncertainty_energy_J,dtype=float); sP=np.asarray(uncertainty_power_W,dtype=float)
-        try: sW,sP=np.broadcast_arrays(sW,W); sP=np.broadcast_to(sP,P.shape)
+        if not np.all(np.isfinite(sW)) or not np.all(np.isfinite(sP)) or np.any(sW<0) or np.any(sP<0): raise ValueError("Uncertainties must be finite and non-negative")
+        try: sW=np.broadcast_to(sW,W.shape); sP=np.broadcast_to(sP,P.shape)
         except ValueError as exc: raise ValueError("Uncertainties must be broadcast-compatible with stored energy and power") from exc
         out["uncertainty_s"]=np.sqrt((sW/P)**2+(W*sP/P**2)**2)
     out["caveat"]="Net heating power must consistently include auxiliary input, radiation, transport and other relevant losses."
