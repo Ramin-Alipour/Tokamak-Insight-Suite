@@ -16,13 +16,13 @@ def test_cylindrical_safety_factor_uses_minor_over_major_radius():
 
 
 def test_neutron_flux_treats_input_as_binned_counts_by_default():
-    result = analyze_neutron_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0])
+    result = analyze_neutron_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0], timestamp_semantics="bin_centers")
     np.testing.assert_allclose(result["count_rate_s-1"], [10.0, 20.0, 30.0])
     assert result["total_counts"] == 60.0
 
 
 def test_neutron_flux_supports_cumulative_counters_explicitly():
-    result = analyze_neutron_flux([0.0, 1.0, 2.0], [0.0, 10.0, 30.0], counts_are_cumulative=True)
+    result = analyze_neutron_flux([0.0, 1.0, 2.0], [0.0, 10.0, 30.0], counts_are_cumulative=True, timestamp_semantics="counter_read_times")
     assert result["total_counts"] == 30.0
     np.testing.assert_allclose(result["count_rate_s-1"], [10.0, 15.0, 20.0])
 
