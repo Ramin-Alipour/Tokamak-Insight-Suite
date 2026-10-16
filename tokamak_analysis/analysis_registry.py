@@ -75,7 +75,7 @@ ANALYSES = [
     {"id":69,"name":"ICRH Analysis","module":"ecrh_icrh","function":"icrh_resonance_field"},
     {"id":70,"name":"RF-Plasma Interaction Analysis","module":"rf_interaction","function":"analyze_rf_interaction"},
     {"id":71,"name":"Divertor Heat Flux","module":"divertor_analysis","function":"analyze_divertor_flux"},
-    {"id":72,"name":"Plasma-Facing Component Heat Load","module":"divertor_analysis","function":"analyze_divertor_flux"},
+    {"id":72,"name":"Plasma-Facing Component Heat Load","module":"divertor_analysis","function":"plasma_facing_component_heat_load"},
     {"id":73,"name":"Wall Erosion and Sputtering","module":"divertor_analysis","function":"sputtering_yield"},
     {"id":74,"name":"Divertor Particle Flux","module":"divertor_analysis","function":"analyze_divertor_particle_flux"},
     {"id":75,"name":"Edge Potential and Electric Field","module":"edge_field","function":"analyze_edge_field"},
