@@ -11,3 +11,14 @@ def analyze_bolometry(time_s, channel_power_W_m2, *, channel_weights=None):
         out["weighted_total_signal"]=p@w; out["weighted_integral"]=float(np.trapezoid(p@w,t))
     out["caveat"]="Bolometer power requires detector calibration, view factors and geometric inversion; channel sums alone are not total plasma radiated power."
     return out
+
+def radiated_power_from_axisymmetric_emissivity(radius_m, emissivity_W_m3, major_radius_m):
+    """Integrate toroidally symmetric emissivity: P_rad=4*pi^2*R0*integral(epsilon(r)*r dr)."""
+    r=np.asarray(radius_m,dtype=float); eps=np.asarray(emissivity_W_m3,dtype=float); R0=float(major_radius_m)
+    if r.ndim!=1 or eps.shape!=r.shape or len(r)<2 or not np.all(np.isfinite(r)) or not np.all(np.isfinite(eps)) or not np.isfinite(R0):
+        raise ValueError("Radius and emissivity must be finite matching 1-D arrays; major radius finite")
+    if np.any(np.diff(r)<=0) or not np.isclose(r[0],0.0,atol=1e-12) or r[-1]<=0 or np.any(eps<0) or R0<=r[-1]:
+        raise ValueError("Require increasing radius from zero, non-negative emissivity, and R0 greater than minor radius")
+    power=4*np.pi**2*R0*float(np.trapezoid(eps*r,r))
+    return {"total_radiated_power_W":power,"equation":"P_rad=4*pi^2*R0*integral_0^a epsilon(r)*r dr",
+            "assumption":"Axisymmetric circular torus and emissivity uniform on each flux surface."}
