@@ -276,3 +276,12 @@ def test_lh_transition_rejects_invalid_baseline_window():
     t = np.arange(12, dtype=float)
     with pytest.raises(ValueError, match="finite increasing bounds"):
         detect_lh_transition(t, np.zeros(12), baseline_window=(8.0, 2.0))
+
+
+def test_channel_lag_sign_is_positive_when_target_is_delayed():
+    from tokamak_analysis.channel_synchronization import estimate_channel_time_lag
+    t = np.arange(20, dtype=float)
+    reference = np.zeros(20); reference[5] = 1.0
+    target = np.zeros(20); target[7] = 1.0
+    result = estimate_channel_time_lag(t, reference, t, target)
+    assert result["target_delay_relative_to_reference_s"] == pytest.approx(2.0)
