@@ -115,3 +115,11 @@ def test_divertor_particle_flux_entry_does_not_require_heat_flux():
     result = resolve_analysis(74)([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
     assert result["peak_particle_flux_m2_s"] == 2.0
     assert result["integrated_particle_flux_m_s-1"] == pytest.approx(3.0)
+
+
+def test_pfc_heat_load_entry_requires_area_and_reports_peak_load():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    result = resolve_analysis(72)([0.0, 1.0], [10.0, 20.0], 3.0)
+    assert result["peak_power_load_W"] == pytest.approx(60.0)
+    assert result["surface_area_m2"] == 3.0
