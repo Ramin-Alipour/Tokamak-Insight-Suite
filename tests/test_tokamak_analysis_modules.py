@@ -1304,3 +1304,46 @@ def test_mirnov_faraday_law_relation():
     t=np.linspace(0.0,1.0,101); n=10; area=0.01; slope=2.0
     out=magnetic_perturbation_from_mirnov_voltage(t,np.full_like(t,-n*area*slope),n,area)
     np.testing.assert_allclose(out["delta_B_T"],slope*t,rtol=1e-12,atol=1e-12)
+
+
+def test_helical_mhd_mode_phase_relation():
+    from tokamak_analysis.mhd_modes import helical_mode_phase
+    out=helical_mode_phase(2,1,np.pi,0.0,2*np.pi,0.5)
+    assert out["helical_phase_rad"] == pytest.approx(2*np.pi- np.pi)
+
+
+def test_mode_frequency_from_phase_slope():
+    from tokamak_analysis.magnetic_mode_frequency import frequency_from_unwrapped_phase
+    t=np.linspace(0,1,101); f=25.0
+    out=frequency_from_unwrapped_phase(t,2*np.pi*f*t)
+    assert out["mode_frequency_Hz"] == pytest.approx(f,rel=1e-12)
+
+
+def test_fft_frequency_resolution_relation():
+    from tokamak_analysis.fft_analysis import frequency_resolution_Hz
+    t=np.linspace(0,2,201)
+    assert frequency_resolution_Hz(t)["frequency_resolution_Hz"] == pytest.approx(0.5)
+
+
+def test_svd_truncation_error_relation():
+    from tokamak_analysis.svd_analysis import svd_truncation_frobenius_error
+    out=svd_truncation_frobenius_error([5.0,3.0,1.0],1)
+    assert out["minimum_frobenius_error"] == pytest.approx(np.sqrt(10.0))
+    assert out["retained_energy_fraction"] == pytest.approx(25/35)
+
+
+def test_morlet_time_frequency_scales_relation():
+    from tokamak_analysis.wavelet_analysis import morlet_time_frequency_scales
+    out=morlet_time_frequency_scales(100.0,6.0)
+    assert out["time_frequency_product"] == pytest.approx(1/(2*np.pi),rel=1e-14)
+
+
+def test_turbulence_mixing_length_relation():
+    from tokamak_analysis.turbulence import mixing_length_diffusivity
+    assert mixing_length_diffusivity(1000.0,10.0)["mixing_length_diffusivity_m2_s"] == pytest.approx(10.0)
+
+
+def test_radial_and_poloidal_fick_law_relations():
+    from tokamak_analysis.transport import radial_diffusive_particle_flux, poloidal_diffusive_particle_flux
+    assert radial_diffusive_particle_flux(2.0,-3.0)["radial_particle_flux_m2_s"] == pytest.approx(6.0)
+    assert poloidal_diffusive_particle_flux(4.0,2.0)["poloidal_particle_flux_m2_s"] == pytest.approx(-8.0)
