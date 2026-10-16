@@ -192,3 +192,16 @@ def test_bolometric_tomography_has_diagnostic_specific_entry_point():
     result = resolve_analysis(39)([[1.0, 0.0], [0.0, 1.0]], [2.0, 3.0], regularization=0.0)
     assert result["diagnostic_type"] == "bolometric tomography"
     np.testing.assert_allclose(result["emissivity"], [2.0, 3.0], atol=1e-6)
+
+
+def test_x_point_detection_does_not_duplicate_a_single_saddle():
+    from tokamak_analysis.x_point import find_x_point_candidates
+
+    R = np.linspace(1.0, 3.0,  nine := 9)
+    Z = np.linspace(-1.0, 1.0, nine)
+    RR, ZZ = np.meshgrid(R, Z)
+    psi = (RR - 2.0) ** 2 - ZZ ** 2
+    result = find_x_point_candidates(R, Z, psi, gradient_tolerance=1e-10)
+    assert result["count"] == 1
+    assert result["candidates"][0]["R_m"] == pytest.approx(2.0)
+    assert result["candidates"][0]["Z_m"] == pytest.approx(0.0)
