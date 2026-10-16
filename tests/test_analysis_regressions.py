@@ -185,3 +185,10 @@ def test_volume_and_cross_section_registry_entries_are_distinct():
     area = resolve_analysis(12)(R, Z)
     assert volume["toroidal_volume_m3"] == pytest.approx(4 * np.pi)
     assert area["cross_section_area_m2"] == pytest.approx(1.0)
+
+
+def test_bolometric_tomography_has_diagnostic_specific_entry_point():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+    result = resolve_analysis(39)([[1.0, 0.0], [0.0, 1.0]], [2.0, 3.0], regularization=0.0)
+    assert result["diagnostic_type"] == "bolometric tomography"
+    np.testing.assert_allclose(result["emissivity"], [2.0, 3.0], atol=1e-6)
