@@ -256,3 +256,9 @@ def test_runaway_energy_fit_rejects_non_decaying_spectrum():
     from tokamak_analysis.runaway_energy import estimate_runaway_energy
     with pytest.raises(ValueError, match="non-negative log-slope"):
         estimate_runaway_energy([10.0, 20.0, 30.0, 40.0], [1.0, 2.0, 3.0, 4.0])
+
+
+def test_zero_magnetic_signal_has_no_dominant_mode_frequency():
+    from tokamak_analysis.magnetic_mode_frequency import magnetic_mode_frequency
+    result = magnetic_mode_frequency(np.arange(16, dtype=float), np.zeros(16))
+    assert result["dominant_frequency_Hz"] is None
