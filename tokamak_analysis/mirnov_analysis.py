@@ -24,10 +24,17 @@ def analyze_mirnov_signal(time_s, voltage_V, *, coil_area_m2=None, turns=None):
 
 def magnetic_perturbation_from_mirnov_voltage(time_s, coil_voltage_V, turns, coil_area_m2, *, initial_delta_B_T=0.0):
     """Faraday law for a fixed coil: V=-N*A*dB/dt; integrate to recover delta-B."""
-    t=np.asarray(time_s,dtype=float); v=np.asarray(coil_voltage_V,dtype=float); n=int(turns); area=float(coil_area_m2); b0=float(initial_delta_B_T)
+    t=np.asarray(time_s,dtype=float); v=np.asarray(coil_voltage_V,dtype=float)
+    try:
+        turns_value=float(turns); area=float(coil_area_m2); b0=float(initial_delta_B_T)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Turns must be a positive integer; area positive and initial field finite") from exc
     if t.ndim!=1 or v.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)) or np.any(np.diff(t)<=0):
         raise ValueError("Need finite matching voltage/time arrays and increasing time")
-    if n<1 or not np.isfinite(area) or area<=0 or not np.isfinite(b0): raise ValueError("Turns and area must be positive; initial field finite")
+    if (not np.isfinite(turns_value) or turns_value<1 or not turns_value.is_integer()
+            or not np.isfinite(area) or area<=0 or not np.isfinite(b0)):
+        raise ValueError("Turns must be a positive integer; area positive and initial field finite")
+    n=int(turns_value)
     dbdt=-v/(n*area); increments=0.5*(dbdt[1:]+dbdt[:-1])*np.diff(t)
     db=np.r_[b0,b0+np.cumsum(increments)]
     return {"delta_B_T":db,"dB_dt_T_s":dbdt,"equation":"V=-N*A*dB/dt; delta_B=integral(-V/(N*A) dt)",
