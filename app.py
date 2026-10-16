@@ -9,6 +9,7 @@ import streamlit as st
 from tis import __version__
 from tis.project import AnalysisRun, Project, ProjectStore
 from tis.ui.catalog_page import render_catalog_page
+from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
@@ -1043,73 +1044,8 @@ elif page=='Diagnostic Catalog':
     render_catalog_page(st, DIAGNOSTICS, FORMULAS, diagnostic_families, json_download)
 
 elif page=='Project Manager':
-    st.title('Research Project Manager')
-    st.caption('Save and reopen project metadata and analysis history independently of browser/session state.')
-    uploaded_project=st.file_uploader('Open TIS project JSON',type=['json'],key='tis_project_upload')
-    if st.button('Load project',key='tis_load_project',disabled=uploaded_project is None):
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                source_path=Path(temp_dir)/'uploaded-project.json'
-                source_path.write_bytes(uploaded_project.getvalue())
-                loaded_project=ProjectStore.load(source_path)
-            st.session_state['tis_active_project']=loaded_project
-            st.success(f"Loaded project: {loaded_project.title} ({len(loaded_project.analysis_runs)} saved analysis runs)")
-        except Exception as exc:
-            st.error(f"Project could not be loaded: {exc}")
-    active_project=st.session_state.get('tis_active_project')
-    if active_project is not None:
-        st.markdown('### Open project')
-        st.write({'title':active_project.title,'project_id':active_project.project_id,
-                  'saved_shots':len(active_project.shots),'saved_analysis_runs':len(active_project.analysis_runs),
-                  'updated_at':active_project.updated_at})
-        if active_project.analysis_runs:
-            st.dataframe(pd.DataFrame([{'analysis':run.analysis_name,'status':run.status,
-                'algorithm_version':run.algorithm_version,'created_at':run.created_at,
-                'warnings':'; '.join(run.warnings)} for run in active_project.analysis_runs]),
-                use_container_width=True)
-    st.markdown('### Save current workspace')
-    st.caption('The project records source file references and SHA-256 metadata; large raw files are not embedded in the project JSON.')
-    if st.button('Prepare project export',key='tis_prepare_project_export'):
-        try:
-            active_project=st.session_state.get('tis_active_project')
-            if active_project is None:
-                active_project=Project(title=project,shots=([{'shot_id':shot}] if shot else []))
-                history=list(st.session_state.get('tis_analysis_history',[]))
-                for item in reversed(history):
-                    active_project.add_run(AnalysisRun(
-                        analysis_name=str(item.get('name','Unnamed UI result')),
-                        inputs={'source_filename':filename or None,'shot_id':shot or None},
-                        settings=item.get('parameter_snapshot',{}),
-                        algorithm_version=__version__,
-                        outputs=item.get('result_summary',{}),
-                        input_provenance={'source_sha256':sha or None,
-                                          'source_manifest':st.session_state.get('tis_source_manifest'),
-                                          'import_parameters':st.session_state.get('tis_import_parameters')},
-                        warnings=('UI history stores a result summary, not necessarily full numeric arrays.',),
-                        status='warning'))
-            if project and project != 'Untitled tokamak analysis':\n                active_project.title=project
-            active_project.metadata.update({
-                'software':'Tokamak Insight Suite','software_version':__version__,
-                'current_shot_id':shot or None,'analyst':analyst or None,
-                'source_filename':filename or None,'source_sha256':sha or None,
-                'source_manifest':st.session_state.get('tis_source_manifest'),
-                'import_parameters':st.session_state.get('tis_import_parameters'),
-                'project_export_note':'Raw source data is referenced by provenance and is not embedded.'})
-            with tempfile.TemporaryDirectory() as temp_dir:
-                target=Path(temp_dir)/'tokamak-insight-project.tis-project.json'
-                ProjectStore.save(active_project,target)
-                project_bytes=target.read_bytes()
-            st.session_state['tis_active_project']=active_project
-            st.session_state['tis_project_export_bytes']=project_bytes
-            st.success(f"Project prepared with {len(active_project.analysis_runs)} analysis run(s).")
-        except Exception as exc:
-            st.error(f"Project export failed: {exc}")
-    project_bytes=st.session_state.get('tis_project_export_bytes')
-    if project_bytes:
-        st.download_button('Download project JSON',data=project_bytes,
-            file_name='tokamak-insight-project.tis-project.json',mime='application/json',
-            key='tis_download_project_json')
-    st.info('A saved project preserves settings, result summaries, algorithm version, units where recorded, warnings and provenance. Raw data must remain available at its recorded source path for exact reruns.')
+    render_project_page(st, session_state=st.session_state, project_title=project, shot_id=shot,
+        analyst=analyst, filename=filename, source_sha256=sha, software_version=__version__)
 
 elif page=='Reports & Export':
     st.title('Reports, Provenance & Export')
