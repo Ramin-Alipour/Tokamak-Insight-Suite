@@ -10,3 +10,12 @@ def analyze_vacuum_pressure(time_s, pressure_Pa, *, base_pressure_Pa=None):
         if base<0 or not np.isfinite(base): raise ValueError("Base pressure must be nonnegative")
         out["pressure_above_base_Pa"]=p-base
     return out
+
+def pressure_rate_from_gas_load(gas_throughput_Pa_m3_s, pumping_speed_m3_s, pressure_Pa, chamber_volume_m3):
+    """Lumped vacuum balance: V*dP/dt=Q-S*P."""
+    Q,S,P,V=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (gas_throughput_Pa_m3_s,pumping_speed_m3_s,pressure_Pa,chamber_volume_m3)])
+    if any(not np.all(np.isfinite(v)) for v in (Q,S,P,V)) or np.any(Q<0) or np.any(S<0) or np.any(P<0) or np.any(V<=0):
+        raise ValueError("Gas load, pumping speed and pressure non-negative; volume positive; all finite")
+    dpdt=(Q-S*P)/V
+    return {"pressure_rate_Pa_s":dpdt,"equation":"dP/dt=(Q-S*P)/V",
+            "assumption":"Well-mixed fixed-volume chamber with constant pumping speed and gas throughput."}
