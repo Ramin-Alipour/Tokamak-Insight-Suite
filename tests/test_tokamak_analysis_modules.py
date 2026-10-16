@@ -1133,3 +1133,11 @@ def test_interferometer_forward_inverse_phase_relation():
     phase=phase_shift_from_line_density(line_density,frequency)["phase_shift_rad"]
     recovered=interferometry_density(phase,frequency)["line_integrated_density_m-2"]
     assert recovered == pytest.approx(line_density,rel=1e-12)
+
+
+def test_o_mode_reflectometry_dispersion_relation():
+    from tokamak_analysis.reflectometry import density_from_o_mode_refractive_index, cutoff_density
+    f=60e9; n=0.6
+    out=density_from_o_mode_refractive_index(f,n)
+    cutoff=cutoff_density(f,mode="O")["cutoff_density_m-3"]
+    assert out["electron_density_m3"] == pytest.approx(cutoff*(1-n**2),rel=1e-14)
