@@ -183,15 +183,15 @@ def density_from_thomson_scattered_power(
     single-band relation neglects spectral-response integration and relativistic
     spectral-shape effects.
     """
-    ps, pi, length, omega, eta = np.broadcast_arrays(
+    ps, pi, length, theta, omega, eta = np.broadcast_arrays(
         np.asarray(scattered_power_W, dtype=float),
         np.asarray(incident_power_W, dtype=float),
         np.asarray(interaction_length_m, dtype=float),
+        np.asarray(scattering_angle_rad, dtype=float),
         np.asarray(collection_solid_angle_sr, dtype=float),
         np.asarray(optical_efficiency, dtype=float),
     )
-    theta = np.asarray(scattering_angle_rad, dtype=float)
-    if not all(np.all(np.isfinite(x)) for x in (ps, pi, length, omega, eta, theta)):
+    if not all(np.all(np.isfinite(x)) for x in (ps, pi, length, theta, omega, eta)):
         raise ValueError("All inputs must be finite")
     if np.any(ps < 0) or np.any(pi <= 0) or np.any(length <= 0) or np.any(omega <= 0):
         raise ValueError("Scattered power must be nonnegative; incident power, length, and solid angle must be positive")
