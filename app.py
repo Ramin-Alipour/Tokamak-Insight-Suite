@@ -1,5 +1,5 @@
 from __future__ import annotations
-import json, platform, sys, tempfile
+import json, platform, sys
 from datetime import datetime, timezone
 from pathlib import Path
 import numpy as np
@@ -7,7 +7,6 @@ import pandas as pd
 from matplotlib.figure import Figure
 import streamlit as st
 from tis import __version__
-from tis.project import AnalysisRun, Project, ProjectStore
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
