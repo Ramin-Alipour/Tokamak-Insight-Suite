@@ -23,3 +23,16 @@ def analyze_magnetic_field(B_toroidal_T, B_poloidal_T, *, R_m=None, B_radial_T=N
         out["B_poloidal_from_components_T"]=np.hypot(br,bz)
     out["caveat"]="Toroidal-field R-scaling is only a large-aspect-ratio vacuum approximation; do not apply it to arbitrary shaped-plasma fields without justification."
     return out
+
+def toroidal_field_vacuum_scaling(Bt_ref_T, R_ref_m, R_m):
+    """Large-aspect-ratio vacuum toroidal-field relation Bt(R)=Bt_ref*R_ref/R."""
+    bt0=float(Bt_ref_T); r0=float(R_ref_m); r=np.asarray(R_m,dtype=float)
+    if not np.isfinite(bt0) or not np.isfinite(r0) or r0<=0:
+        raise ValueError("Reference field must be finite and reference radius positive")
+    if not np.all(np.isfinite(r)) or np.any(r<=0):
+        raise ValueError("R_m must contain finite positive major radii")
+    bt=bt0*r0/r
+    return {"R_m":r.copy(),"B_toroidal_T":bt,
+            "equation":"Bt(R)*R=constant; Bt(R)=Bt_ref*R_ref/R",
+            "Bt_times_R_T_m":bt*r,
+            "caveat":"Vacuum 1/R scaling; plasma currents, coils, ferromagnetic structures, and non-ideal geometry can alter the field."}
