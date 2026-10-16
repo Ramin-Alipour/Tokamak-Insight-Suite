@@ -11,7 +11,7 @@ def analyze_xray_spectrum(energy_keV, counts, *, background=None):
         net=np.maximum(c-b,0)
     total=np.sum(net); mean=float(np.sum(e*net)/total) if total>0 else float("nan")
     variance=float(np.sum((e-mean)**2*net)/total) if total>0 else float("nan")
-    return {"energy_keV":e,"net_counts":net,"total_counts":float(total),"mean_energy_keV":mean,"energy_std_keV":float(np.sqrt(max(variance,0))) if np.isfinite(variance) else float("nan"),"peak_energy_keV":float(e[np.argmax(net)]),"caveat":"Detector response unfolding and energy calibration must be applied for physical photon spectra."}
+    return {"energy_keV":e,"net_counts":net,"total_counts":float(total),"mean_energy_keV":mean,"energy_std_keV":float(np.sqrt(max(variance,0))) if np.isfinite(variance) else float("nan"),"peak_energy_keV":float(e[np.argmax(net)]) if total>0 else None,"caveat":"Detector response unfolding and energy calibration must be applied for physical photon spectra."}
 
 def electron_temperature_from_xray_continuum(energy_keV, counts, *, fit_range_keV=None):
     """Estimate continuum slope using I(E)~exp(-E/Te): Te_keV=-1/slope of ln(counts)."""
