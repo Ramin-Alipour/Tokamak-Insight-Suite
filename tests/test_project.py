@@ -1,0 +1,40 @@
+import json
+import numpy as np
+import pytest
+from tis.project import AnalysisRun, Project, ProjectError, ProjectStore
+
+def test_project_roundtrip_persists_reproducible_run(tmp_path):
+    run = AnalysisRun(analysis_name="FFT power spectrum",
+        inputs={"signal_ref": "signals/shot-12.csv"},
+        settings={"window": "hann", "nperseg": 256}, algorithm_version="0.5.1",
+        outputs={"frequency_Hz": np.array([0.0, 10.0]), "peak_Hz": 10.0},
+        input_provenance={"shot_id": 12, "sha256": "source-digest"},
+        units={"frequency_Hz": "Hz", "peak_Hz": "Hz"},
+        warnings=("synthetic test input",), status="warning")
+    project = Project(title="reproducibility test", shots=[{"shot_id": 12}])
+    project.add_run(run)
+    path = ProjectStore.save(project, tmp_path / "test.tis-project.json")
+    restored = ProjectStore.load(path)
+    assert restored.title == project.title
+    assert restored.analysis_runs[0].run_id == run.run_id
+    assert restored.analysis_runs[0].algorithm_version == "0.5.1"
+    assert restored.analysis_runs[0].outputs["frequency_Hz"] == [0.0, 10.0]
+    assert restored.analysis_runs[0].warnings == ["synthetic test input"]
+
+def test_project_detects_tampering(tmp_path):
+    path = ProjectStore.save(Project(title="integrity test"), tmp_path / "project.json")
+    payload = json.loads(path.read_text())
+    payload["title"] = "tampered"
+    path.write_text(json.dumps(payload))
+    with pytest.raises(ProjectError, match="integrity"):
+        ProjectStore.load(path)
+
+def test_project_compares_runs_in_requested_order():
+    project = Project(title="comparison")
+    first = AnalysisRun("density", {}, {}, "1", outputs={"n": 1})
+    second = AnalysisRun("temperature", {}, {}, "1", outputs={"T": 10})
+    project.add_run(first)
+    project.add_run(second)
+    assert [x.analysis_name for x in project.compare_runs([second.run_id, first.run_id])] == ["temperature", "density"]
+    with pytest.raises(ProjectError, match="Unknown analysis run"):
+        project.compare_runs(["not-a-run"])
