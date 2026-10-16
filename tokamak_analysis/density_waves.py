@@ -11,7 +11,9 @@ def analyze_density_waves(time_s,density_m3,*,band_Hz=None):
     if band_Hz is not None:
         lo,hi=map(float,band_Hz)
         if not np.all(np.isfinite([lo,hi])) or lo<0 or hi<=lo: raise ValueError("Frequency band must have finite increasing non-negative bounds")
-        m=(f>=lo)&(f<=hi); out["band_power"]=float(getattr(np, "trapezoid", np.trapz)(p[m],f[m])) if np.count_nonzero(m)>1 else 0.0
+        m=(f>=lo)&(f<=hi); bin_count=int(np.count_nonzero(m)); out["band_power_bin_count"]=bin_count
+        out["band_power"]=float(getattr(np, "trapezoid", np.trapz)(p[m],f[m])) if bin_count>1 else None
+        if bin_count<=1: out["band_power_note"]="Insufficient spectral bins to integrate this band; zero power is not inferred."
     return out
 
 def wave_phase_velocity(frequency_Hz, wavelength_m):
