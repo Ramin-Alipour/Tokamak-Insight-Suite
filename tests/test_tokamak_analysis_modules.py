@@ -963,3 +963,11 @@ def test_rogowski_voltage_current_physical_relation():
     out=current_from_rogowski_voltage(t,np.full_like(t,M*slope),M,initial_current_A=10.0)
     np.testing.assert_allclose(out["current_A"],10.0+slope*t,rtol=1e-12,atol=1e-10)
     np.testing.assert_allclose(out["dIp_dt_A_s"],slope,rtol=1e-12)
+
+
+def test_toroidal_vacuum_field_scaling_relation():
+    from tokamak_analysis.magnetic_field import toroidal_field_vacuum_scaling
+    r=np.array([1.0,2.0,4.0])
+    out=toroidal_field_vacuum_scaling(3.0,2.0,r)
+    np.testing.assert_allclose(out["B_toroidal_T"],[6.0,3.0,1.5],rtol=1e-14)
+    np.testing.assert_allclose(out["Bt_times_R_T_m"],6.0,rtol=1e-14)
