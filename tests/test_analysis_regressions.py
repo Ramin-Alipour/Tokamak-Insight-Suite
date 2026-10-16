@@ -130,3 +130,12 @@ def test_energetic_particle_flux_uses_binned_counts_per_bin_width():
 
     result = energetic_particle_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0], 2.0, efficiency=0.5)
     np.testing.assert_allclose(result["particle_flux_m-2_s-1"], [10.0, 20.0, 30.0])
+
+
+def test_plasma_current_distinguishes_signed_peak_from_absolute_peak():
+    from tokamak_analysis.plasma_current import analyze_plasma_current
+
+    result = analyze_plasma_current([0.0, 1.0, 2.0], [-5.0, 2.0, 3.0])
+    assert result["peak_signed_current_A"] == pytest.approx(3.0)
+    assert result["peak_absolute_current_A"] == pytest.approx(5.0)
+    assert result["current_at_peak_absolute_magnitude_A"] == pytest.approx(-5.0)
