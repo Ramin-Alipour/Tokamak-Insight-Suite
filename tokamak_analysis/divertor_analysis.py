@@ -36,3 +36,14 @@ def total_pfc_power_from_surface_profile(position_m, heat_flux_W_m2, toroidal_ra
     if s.ndim!=1 or q.shape!=s.shape or R.shape!=s.shape or len(s)<2 or any(not np.all(np.isfinite(v)) for v in (s,q,R)) or np.any(np.diff(s)<=0) or np.any(q<0) or np.any(R<=0):
         raise ValueError("Require matching finite profiles, increasing position, nonnegative heat flux and positive radius")
     return {"total_pfc_power_W":float(np.trapezoid(q*2*np.pi*R,s)),"equation":"P=integral q(s)*2*pi*R(s) ds"}
+
+
+def divertor_ion_particle_flux_from_sheath(ion_density_m3, ion_temperature_eV, ion_mass_amu):
+    """Bohm-sheath particle flux estimate Gamma_i=n_i*c_s, c_s=sqrt(e*Ti_eV/m_i)."""
+    ni,ti,mass=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (ion_density_m3,ion_temperature_eV,ion_mass_amu)])
+    if any(not np.all(np.isfinite(v)) for v in (ni,ti,mass)) or np.any(ni<0) or np.any(ti<0) or np.any(mass<=0):
+        raise ValueError("Density and temperature non-negative, ion mass positive; inputs finite")
+    cs=np.sqrt(ti*1.602176634e-19/(mass*1.66053906660e-27))
+    return {"sound_speed_m_s":cs,"divertor_ion_particle_flux_m2_s":ni*cs,
+            "equation":"Gamma_i~=n_i*c_s; c_s=sqrt(e*Ti_eV/m_i)",
+            "assumption":"Simplified Bohm-sheath estimate; electron-temperature contribution and sheath transmission factors may be required for the chosen regime."}
