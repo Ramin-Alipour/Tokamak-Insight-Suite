@@ -1076,7 +1076,6 @@ elif page=='Project Manager':
                 source_path.write_bytes(uploaded_project.getvalue())
                 loaded_project=ProjectStore.load(source_path)
             st.session_state['tis_active_project']=loaded_project
-            st.session_state['project']=loaded_project.title
             st.success(f"Loaded project: {loaded_project.title} ({len(loaded_project.analysis_runs)} saved analysis runs)")
         except Exception as exc:
             st.error(f"Project could not be loaded: {exc}")
@@ -1111,7 +1110,7 @@ elif page=='Project Manager':
                                           'import_parameters':st.session_state.get('tis_import_parameters')},
                         warnings=('UI history stores a result summary, not necessarily full numeric arrays.',),
                         status='warning'))
-            active_project.title=project or active_project.title
+            if project and project != 'Untitled tokamak analysis':\n                active_project.title=project
             active_project.metadata.update({
                 'software':'Tokamak Insight Suite','software_version':__version__,
                 'current_shot_id':shot or None,'analyst':analyst or None,
