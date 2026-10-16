@@ -6,7 +6,8 @@ def analyze_wave_signal(time_s, signal, *, nperseg=None):
     if t.ndim!=1 or y.shape!=t.shape or len(t)<8 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)) or np.any(np.diff(t)<=0): raise ValueError("Need matching finite signals and increasing time")
     dt=float(np.median(np.diff(t)))
     if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform time sampling required")
-    fs=1/dt; n=min(len(y),int(nperseg or min(256,len(y))))
+    fs=1/dt; n=min(len(y),int(min(256,len(y)) if nperseg is None else nperseg))
+    if n<2: raise ValueError("nperseg must be at least 2")
     f,p=welch(y-np.mean(y),fs=fs,nperseg=n)
     f2,tt,sxx=spectrogram(y,fs=fs,nperseg=n)
     idx=int(np.argmax(p[1:])+1) if len(p)>1 else 0
