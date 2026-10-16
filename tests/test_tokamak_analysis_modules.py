@@ -1062,3 +1062,11 @@ def test_gundestrup_calibrated_mach_relation():
     out=calibrated_mach_from_current_harmonics(2.0,0.4,0.5)
     assert out["first_harmonic_fraction"] == pytest.approx(0.2)
     assert out["projected_mach_number"] == pytest.approx(0.4)
+
+
+def test_exb_drift_physical_relation():
+    from tokamak_analysis.multipin_probe import exb_drift_velocity
+    out=exb_drift_velocity(0.0,2.0,0.0,0.0,0.0,4.0)
+    assert out["v_exb_x_m_s"] == pytest.approx(0.5)
+    assert out["v_exb_y_m_s"] == pytest.approx(0.0)
+    assert out["v_exb_z_m_s"] == pytest.approx(0.0)
