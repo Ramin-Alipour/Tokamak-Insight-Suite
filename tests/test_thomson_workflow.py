@@ -33,6 +33,8 @@ def test_thomson_workflow_preserves_sorted_uncertainties():
     assert np.all(np.isfinite(out["density_gradient_uncertainty_m-4"]))
     assert np.all(np.isfinite(out["temperature_gradient_uncertainty_eV_m-1"]))
     assert np.all(np.isfinite(out["density_scale_length_uncertainty_m"]))
+    assert np.all(np.isfinite(out["density_normalized_gradient_uncertainty_m-1"]))
+    assert np.all(np.isfinite(out["temperature_normalized_gradient_uncertainty_m-1"]))
     assert out["summary"].density_line_average_uncertainty_m3 is not None
     assert out["summary"].temperature_line_average_uncertainty_ev is not None
     assert out["summary"].density_volume_average_uncertainty_m3 is not None
