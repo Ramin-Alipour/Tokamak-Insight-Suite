@@ -932,3 +932,16 @@ def test_thomson_scattering_physical_density_relation_known_answer():
     assert out["electron_density_m3"] == pytest.approx(ne, rel=1e-12)
     assert out["model_scattered_power_W"] == pytest.approx(scattered, rel=1e-12)
     assert dsigma == pytest.approx(0.5 * (2.8179403262e-15)**2, rel=1e-12)
+
+
+def test_grad_shafranov_physical_relation_known_quadratic_solution():
+    from tokamak_analysis.equilibrium_reconstruction import grad_shafranov_physical_relation
+    R = np.array([1.0, 2.0, 3.0])
+    Z = np.array([-1.0, 0.0, 1.0])
+    RR, ZZ = np.meshgrid(R, Z)
+    psi = RR**2 + ZZ**2
+    zeros = np.zeros_like(psi)
+    out = grad_shafranov_physical_relation(R, Z, psi, zeros, zeros)
+    np.testing.assert_allclose(out["grad_shafranov_operator_Wb_rad_m-2"], 2.0, atol=1e-10)
+    np.testing.assert_allclose(out["physical_source_Wb_rad_m-2"], 0.0, atol=0.0)
+    np.testing.assert_allclose(out["equation_residual_Wb_rad_m-2"], 2.0, atol=1e-10)
