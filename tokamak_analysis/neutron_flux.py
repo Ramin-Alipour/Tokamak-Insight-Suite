@@ -12,3 +12,13 @@ def analyze_neutron_flux(time_s, counts, *, efficiency=None, effective_area_m2=N
         out["flux_estimate_m-2_s-1"]=rate/(eff*area)
     out["caveat"]="Flux estimate requires detector geometry, efficiency, background, dead-time, and energy-response corrections."
     return out
+
+def neutron_flux_from_integrated_counts(counts, live_time_s, detector_efficiency, effective_area_m2):
+    """Integrated-count flux estimator Phi=N/(T*epsilon*A) with Poisson counting uncertainty."""
+    n,t,eff,area=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (counts,live_time_s,detector_efficiency,effective_area_m2)])
+    if any(not np.all(np.isfinite(v)) for v in (n,t,eff,area)) or np.any(n<0) or np.any(t<=0) or np.any(eff<=0) or np.any(eff>1) or np.any(area<=0):
+        raise ValueError("Counts non-negative; time/area positive; efficiency in (0,1]; inputs finite")
+    denom=t*eff*area
+    return {"neutron_flux_m2_s":n/denom,"poisson_uncertainty_m2_s":np.sqrt(n)/denom,
+            "equation":"Phi=N/(T*epsilon*A); sigma_Phi=sqrt(N)/(T*epsilon*A)",
+            "assumption":"Poisson counting statistics and constant efficiency/area over live time; background and dead-time corrections must be applied separately."}
