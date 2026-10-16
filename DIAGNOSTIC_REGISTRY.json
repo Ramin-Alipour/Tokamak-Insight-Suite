@@ -55,7 +55,7 @@
           "unit": "m",
           "description": "Optional positive major radius; enables approximate circular large-aspect-ratio volume-weighted averages.",
           "required": false,
-          "minimum": 0
+          "minimum": 1e-15
         }
       ],
       "output_specs": [
