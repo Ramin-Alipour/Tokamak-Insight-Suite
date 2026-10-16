@@ -1055,3 +1055,10 @@ def test_ball_pen_calibrated_plasma_potential_relation():
     from tokamak_analysis.ball_pen_probe import plasma_potential_from_ball_pen
     out=plasma_potential_from_ball_pen(20.0,10.0,0.6)
     assert out["plasma_potential_V"] == pytest.approx(26.0)
+
+
+def test_gundestrup_calibrated_mach_relation():
+    from tokamak_analysis.gundestrup_probe import calibrated_mach_from_current_harmonics
+    out=calibrated_mach_from_current_harmonics(2.0,0.4,0.5)
+    assert out["first_harmonic_fraction"] == pytest.approx(0.2)
+    assert out["projected_mach_number"] == pytest.approx(0.4)
