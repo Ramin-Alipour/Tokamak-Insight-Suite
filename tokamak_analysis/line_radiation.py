@@ -17,3 +17,10 @@ def analyze_line_radiation(wavelength_nm, calibrated_radiance, *, integration_ra
         out["estimated_radiant_power_W"]=integral*om*area
     out["caveat"]="Radiant power estimate requires consistent spectral units and calibrated collection geometry; line-of-sight integration is not local emissivity."
     return out
+
+def photon_energy_from_wavelength_eV(wavelength_nm):
+    """Photon energy-wavelength relation E_gamma=hc/lambda."""
+    lam=np.asarray(wavelength_nm,dtype=float)
+    if not np.all(np.isfinite(lam)) or np.any(lam<=0): raise ValueError("Wavelength must be finite and positive")
+    H=6.62607015e-34; C=299792458.0; E=1.602176634e-19
+    return {"photon_energy_eV":H*C/(lam*1e-9)/E,"equation":"E_gamma[eV]=h*c/(lambda[m]*e)"}
