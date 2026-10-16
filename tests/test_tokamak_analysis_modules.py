@@ -1366,3 +1366,23 @@ def test_transient_energy_decay_confinement_relation():
 def test_fourier_conductive_heat_flux_relation():
     from tokamak_analysis.heat_flux import conductive_heat_flux_from_gradient
     assert conductive_heat_flux_from_gradient(5.0,2.0)["conductive_heat_flux_W_m2"] == pytest.approx(-10.0)
+
+
+def test_electron_ion_heating_partition_relations():
+    from tokamak_analysis.heating_analysis import electron_heating_power_from_partition, ion_heating_power_from_partition
+    assert electron_heating_power_from_partition(1000.0,0.3)["electron_heating_power_W"] == pytest.approx(300.0)
+    assert ion_heating_power_from_partition(1000.0,0.3)["ion_heating_power_W"] == pytest.approx(700.0)
+
+
+def test_relativistic_ecrh_resonance_relation():
+    from tokamak_analysis.ecrh_icrh import relativistic_ecrh_resonance_field, ecrh_resonance_field
+    base=ecrh_resonance_field(140e9)["resonance_field_T"]
+    shifted=relativistic_ecrh_resonance_field(140e9,gamma_factor=2.0)["resonance_field_T"]
+    assert shifted == pytest.approx(2*base,rel=1e-14)
+
+
+def test_rf_power_balance_relation():
+    from tokamak_analysis.ecrh_icrh import rf_power_balance
+    out=rf_power_balance(1000.0,100.0,50.0)
+    assert out["net_delivered_power_W"] == pytest.approx(850.0)
+    assert out["reflection_fraction"] == pytest.approx(0.1)
