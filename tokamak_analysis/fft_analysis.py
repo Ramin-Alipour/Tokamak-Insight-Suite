@@ -21,7 +21,8 @@ def frequency_resolution_Hz(time_s):
     t=np.asarray(time_s,dtype=float)
     if t.ndim!=1 or len(t)<2 or not np.all(np.isfinite(t)) or np.any(np.diff(t)<=0):
         raise ValueError("Time must be finite, 1-D, length >=2, strictly increasing")
-    duration=float(t[-1]-t[0])
-    if duration<=0: raise ValueError("Record duration must be positive")
-    return {"frequency_resolution_Hz":1.0/duration,"record_duration_s":duration,
-            "equation":"delta_f approximately 1/T_record"}
+    intervals=np.diff(t); dt=float(np.median(intervals))
+    if not np.allclose(intervals,dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform sampling required for FFT frequency resolution")
+    sample_span=float(t[-1]-t[0]); effective_duration=len(t)*dt
+    return {"frequency_resolution_Hz":1.0/effective_duration,"record_duration_s":effective_duration,"sample_time_span_s":sample_span,
+            "equation":"delta_f=fs/N=1/(N*dt); DFT effective record duration is N*dt"}
