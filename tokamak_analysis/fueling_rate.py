@@ -15,7 +15,7 @@ def analyze_fueling_rate(time_s, particle_rate_s, *, gas_temperature_K=None, pre
 def fueling_efficiency_from_particle_inventory(retained_particles, injected_particles):
     """Particle fueling efficiency eta_f=N_retained/N_injected."""
     retained,injected=np.broadcast_arrays(np.asarray(retained_particles,dtype=float),np.asarray(injected_particles,dtype=float))
-    if not np.all(np.isfinite(retained)) or not np.all(np.isfinite(injected)) or np.any(retained<0) or np.any(injected<=0):
-        raise ValueError("Retained inventory non-negative and injected inventory positive; inputs finite")
+    if not np.all(np.isfinite(retained)) or not np.all(np.isfinite(injected)) or np.any(retained<0) or np.any(injected<=0) or np.any(retained>injected):
+        raise ValueError("Require finite 0 <= retained inventory <= positive injected inventory")
     return {"fueling_efficiency":retained/injected,"equation":"eta_f=N_retained/N_injected",
             "caveat":"Retained inventory must be independently inferred with consistent time windows and particle accounting."}
