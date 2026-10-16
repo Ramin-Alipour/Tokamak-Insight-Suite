@@ -17,7 +17,8 @@ def test_formula_catalogue_is_loaded_from_canonical_formula_registry():
     assert all(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS)
 
 def test_package_and_runtime_versions_are_consistent():
-    import tomllib
+    import re
     from tis import __version__
-    metadata = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    assert metadata["project"]["version"] == __version__
+    metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert re.search(r'(?m)^version = "([^"]+)"
+, metadata).group(1) == __version__
