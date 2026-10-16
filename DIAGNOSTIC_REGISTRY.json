@@ -131,7 +131,7 @@
         "thomson_spectrum.fit_thomson_spectrum"
       ],
       "raw_data_to_physics": false,
-      "note": "Overall analysis remains incomplete: the scoped raw-spectrum temperature fit is available, but density inversion from spectral amplitude and more general collective/relativistic/non-Maxwellian models are not implemented.",
+      "note": "Overall analysis remains incomplete until the declared workflows and automated tests are confirmed end-to-end. Direct density inference from uncalibrated spectral amplitude and more general collective, relativistic, or non-Maxwellian spectral models are not implemented.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
