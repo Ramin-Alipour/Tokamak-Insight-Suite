@@ -984,6 +984,8 @@ elif page=='Advanced Analysis':
         st.code(str(inspect.signature(fn)),language='python')
         st.write('Enter keyword arguments as JSON. To use an uploaded numeric column, set a value to {"column": "exact column name"}. Other values can be numbers, booleans, strings, lists, or nested arrays as required by the selected function.')
         arg_text=st.text_area('Function arguments (JSON)',value='{}',height=180,key='registered_analysis_args')
+        reference_text=st.text_area('Optional independent reference result (JSON)',value='',height=100,key='registered_analysis_reference',help='Use a result from a publication, another code, or an independently processed version of the same data. Leave blank if unavailable.')
+        reference_description=st.text_input('Reference source / method (optional)',value='',key='registered_analysis_reference_description')
         if st.button('Run registered analysis',key='run_registered_analysis'):
             try:
                 args=json.loads(arg_text)
@@ -1001,6 +1003,11 @@ elif page=='Advanced Analysis':
                 st.success('Analysis executed.')
                 st.write(result)
                 st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
+                reference_result = None
+                if reference_text.strip():
+                    reference_result = json.loads(reference_text)
+                    if not isinstance(reference_result, (dict, list, int, float, str, bool)) and reference_result is not None:
+                        raise ValueError('Reference result must be valid JSON.')
                 contribution = build_contribution_bundle(
                     analysis_id=int(entry['id']),
                     analysis_name=str(entry['name']),
@@ -1012,6 +1019,8 @@ elif page=='Advanced Analysis':
                     tokamak=str(st.session_state.get('tis_source_manifest', {}).get('tokamak', '') or '') or None,
                     shot_id=shot or st.session_state.get('tis_source_manifest', {}).get('shot'),
                     diagnostic=str(entry['name']),
+                    reference_result=reference_result,
+                    reference_description=reference_description.strip() or None,
                     researcher_notes="Review metadata and scientific assumptions before sharing.",
                 )
                 st.download_button(
