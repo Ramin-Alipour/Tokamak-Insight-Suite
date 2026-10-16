@@ -8,7 +8,9 @@ def magnetic_mode_frequency(time_s, signal, *, frequency_band_Hz=None):
     if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform sampling required")
     f,p=welch(x-np.mean(x),fs=1/dt,nperseg=min(2048,len(x))); m=f>0
     if frequency_band_Hz is not None:
-        lo,hi=map(float,frequency_band_Hz); m &= (f>=lo)&(f<=hi)
+        lo,hi=map(float,frequency_band_Hz)
+        if not np.all(np.isfinite([lo,hi])) or lo<0 or hi<=lo: raise ValueError("Frequency band must have finite increasing non-negative bounds")
+        m &= (f>=lo)&(f<=hi)
     if not np.any(m): raise ValueError("No frequency bins in requested range")
     inds=np.flatnonzero(m); idx=inds[np.argmax(p[m])]
     return {"dominant_frequency_Hz":float(f[idx]),"frequency_Hz":f,"power_spectral_density":p,"peak_power":float(p[idx])}
