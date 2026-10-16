@@ -20,13 +20,13 @@ def propagate_covariance(jacobian: Any, covariance: Any) -> dict[str, np.ndarray
         raise UncertaintyError("covariance must be symmetric")
     C = 0.5 * (C + C.T)
     eigenvalues = np.linalg.eigvalsh(C)
-    scale = max(1.0, float(np.max(np.abs(eigenvalues))))
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
     if float(np.min(eigenvalues)) < -1e-10 * scale:
         raise UncertaintyError("covariance must be positive semidefinite")
     result = J @ C @ J.T
     result = 0.5 * (result + result.T)
     diagonal = np.diag(result)
-    if np.any(diagonal < -1e-10 * max(1.0, float(np.max(np.abs(diagonal))))):
+    if np.any(diagonal < -1e-10 * max(float(np.max(np.abs(diagonal))), np.finfo(float).tiny)):
         raise UncertaintyError("propagated covariance has negative diagonal values")
     return {"covariance": result, "standard_uncertainty": np.sqrt(np.maximum(diagonal, 0.0)),
             "method": "first-order covariance propagation; local linearization"}
