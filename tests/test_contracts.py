@@ -7,7 +7,8 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     contracts = get_diagnostic_contracts()
     assert len(contracts) == 80
     assert len({item.name for item in contracts}) == 80
-    assert all(item.completeness == "incomplete" for item in contracts)
+    assert sum(item.completeness == "complete" for item in contracts) == 1
+    assert all(item.completeness in {"incomplete", "complete"} for item in contracts)
     assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 59
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 21
     assert not any(item.supports_raw_data for item in contracts)
