@@ -8,7 +8,7 @@ def analyze_fueling_rate(time_s, particle_rate_s, *, gas_temperature_K=None, pre
     if any(x is not None for x in (gas_temperature_K,pressure_Pa,volume_m3)):
         if any(x is None for x in (gas_temperature_K,pressure_Pa,volume_m3)): raise ValueError("Provide temperature, pressure and volume together")
         T,P,V=map(float,(gas_temperature_K,pressure_Pa,volume_m3))
-        if min(T,P,V)<=0: raise ValueError("Temperature, pressure and volume must be positive")
+        if not np.all(np.isfinite([T,P,V])) or min(T,P,V)<=0: raise ValueError("Temperature, pressure and volume must be finite and positive")
         out["ideal_gas_inventory_particles"]=P*V/(K_B*T)
     return out
 
