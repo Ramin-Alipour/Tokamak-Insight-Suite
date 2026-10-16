@@ -19,3 +19,13 @@ def analyze_wavelet(time_s, signal, *, frequencies_Hz=None, wavelet_width=6.0):
         coefficients.append(fftconvolve(centered,np.conjugate(wave[::-1]),mode="same")/max(norm,np.finfo(float).tiny))
     coef=np.asarray(coefficients)
     return {"time_s":t,"frequencies_Hz":f,"coefficients":coef,"power":np.abs(coef)**2,"caveat":"Finite-window edge effects and wavelet-width choice affect interpretation."}
+
+
+def morlet_time_frequency_scales(center_frequency_Hz, wavelet_width):
+    """Gaussian Morlet scales for this implementation: sigma_t=width/(2*pi*f), sigma_f=1/(2*pi*sigma_t)."""
+    f,w=np.broadcast_arrays(np.asarray(center_frequency_Hz,dtype=float),np.asarray(wavelet_width,dtype=float))
+    if any(not np.all(np.isfinite(v)) for v in (f,w)) or np.any(f<=0) or np.any(w<=0):
+        raise ValueError("Frequency and wavelet width must be finite and positive")
+    sigma_t=w/(2*np.pi*f); sigma_f=1/(2*np.pi*sigma_t)
+    return {"time_std_s":sigma_t,"frequency_std_Hz":sigma_f,"time_frequency_product":sigma_t*sigma_f,
+            "equation":"sigma_t=width/(2*pi*f); sigma_f=1/(2*pi*sigma_t)"}
