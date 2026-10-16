@@ -7,7 +7,7 @@
 1. **Calibrated profile analysis** (tokamak_analysis.thomson_workflow.analyze_thomson_profile): computes profile extrema, line averages, optional approximate volume averages, radial gradients, normalized gradients, and local scale lengths from already-calibrated electron-density and electron-temperature profiles.
 2. **Raw spectral-shape temperature fit** (tokamak_analysis.thomson_spectrum.fit_thomson_spectrum): fits a Gaussian Doppler profile plus a linear local background, deconvolves a known Gaussian instrument width, and estimates electron temperature for a non-collective, non-relativistic Maxwellian model.
 
-The single-band helper density_from_thomson_scattered_power estimates density from calibrated collected power and specified geometry. It is separate from the spectral-shape fit. The spectral-fit amplitude is **not** a density measurement. The power-based density helper also supports first-order propagation of optional independent 1-sigma uncertainties for measured power, incident power, interaction length, scattering angle, collection solid angle, and optical efficiency. The dashboard exposes this as a separate calibrated scattered-power density workflow, including optional uncertainty inputs.
+The single-band helper density_from_thomson_scattered_power estimates density from calibrated collected power and specified geometry. The spectral fit can optionally integrate its Gaussian component to collected power only when the signal is explicitly declared to be calibrated spectral power density in W/nm. The spectral-fit amplitude itself is **not** a density measurement. The power-based density helper also supports first-order propagation of optional independent 1-sigma uncertainties for measured power, incident power, interaction length, scattering angle, collection solid angle, and optical efficiency. The dashboard can pass the integrated spectral power and its fit uncertainty directly into this density calculation. The dashboard exposes this as a separate calibrated scattered-power density workflow, including optional uncertainty inputs.
 
 ## Raw spectrum input contract
 
@@ -76,7 +76,7 @@ print(fit["electron_temperature_eV"], fit["electron_temperature_uncertainty_eV"]
 - Assumes a Gaussian instrument line-spread function with known standard deviation.
 - Uses a locally linear background; it does not perform full stray-light or spectral-response calibration.
 - Does not fit collective spectra, relativistic/non-Maxwellian spectra, or non-Gaussian instrument responses.
-- Does not infer density from spectral amplitude. Absolute density needs calibrated laser power, interaction length, differential cross-section, collection solid angle, optical efficiency, and appropriate spectral-band treatment.
+- Does not infer density from uncalibrated spectral amplitude. Absolute density needs calibrated spectral power density or collected power, laser power, interaction length, differential cross-section, collection solid angle, optical efficiency, and appropriate spectral-band treatment.
 - Synthetic tests establish numerical recovery for the stated model only; they do not constitute independent experimental validation.
 
 ## Completion gate
