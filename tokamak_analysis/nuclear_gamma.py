@@ -10,3 +10,12 @@ def analyze_gamma_spectrum(energy_keV, counts, *, expected_lines_keV=None, toler
             target=float(line); idx=int(np.argmin(abs(e-target)))
             matches.append({"expected_keV":target,"observed_bin_keV":float(e[idx]),"counts":float(c[idx]),"within_tolerance":bool(abs(e[idx]-target)<=tol)})
     return {"peaks":peaks,"expected_line_matches":matches,"tolerance_keV":tol,"caveat":"Peak assignment is preliminary; detector calibration, efficiency, background, and nuclear-line databases are needed."}
+
+def activity_from_gamma_peak_rate(net_peak_count_rate_s, full_energy_peak_efficiency, emission_probability):
+    """Gamma spectroscopy activity relation A=R_peak/(epsilon_peak*I_gamma)."""
+    rate,eff,prob=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (net_peak_count_rate_s,full_energy_peak_efficiency,emission_probability)])
+    if any(not np.all(np.isfinite(v)) for v in (rate,eff,prob)) or np.any(rate<0) or np.any(eff<=0) or np.any(eff>1) or np.any(prob<=0) or np.any(prob>1):
+        raise ValueError("Rate non-negative; efficiency and emission probability in (0,1]; all finite")
+    activity=rate/(eff*prob)
+    return {"activity_Bq":activity,"equation":"A=R_peak/(epsilon_peak*I_gamma)",
+            "assumption":"Requires net peak count rate, absolute full-energy peak efficiency, emission probability, and geometry/self-attenuation corrections."}
