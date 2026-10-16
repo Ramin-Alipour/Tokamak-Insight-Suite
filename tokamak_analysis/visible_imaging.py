@@ -10,7 +10,7 @@ def analyze_visible_image(image, *, roi=None, dark_frame=None, flat_field=None):
         corrected-=d
     if flat_field is not None:
         f=np.asarray(flat_field,dtype=float)
-        if f.shape!=im.shape or not np.all(np.isfinite(f)) or np.any(f==0): raise ValueError("Flat field must match image and be nonzero")
+        if f.shape!=im.shape or not np.all(np.isfinite(f)) or np.any(f<=0): raise ValueError("Flat field must match image and be finite positive")
         corrected=corrected/f
     region=corrected
     if roi is not None:
