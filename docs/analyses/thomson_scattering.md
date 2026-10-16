@@ -7,7 +7,7 @@
 1. **Calibrated profile analysis** (tokamak_analysis.thomson_workflow.analyze_thomson_profile): computes profile extrema, line averages, optional approximate volume averages, radial gradients, normalized gradients, and local scale lengths from already-calibrated electron-density and electron-temperature profiles.
 2. **Raw spectral-shape temperature fit** (tokamak_analysis.thomson_spectrum.fit_thomson_spectrum): fits a Gaussian Doppler profile plus a linear local background, deconvolves a known Gaussian instrument width, and estimates electron temperature for a non-collective, non-relativistic Maxwellian model.
 
-The single-band helper density_from_thomson_scattered_power estimates density from calibrated collected power and specified geometry. It is separate from the spectral-shape fit. The spectral-fit amplitude is **not** a density measurement.
+The single-band helper density_from_thomson_scattered_power estimates density from calibrated collected power and specified geometry. It is separate from the spectral-shape fit. The spectral-fit amplitude is **not** a density measurement. The power-based density helper also supports first-order propagation of optional independent 1-sigma uncertainties for measured power, incident power, interaction length, scattering angle, collection solid angle, and optical efficiency.
 
 ## Raw spectrum input contract
 
