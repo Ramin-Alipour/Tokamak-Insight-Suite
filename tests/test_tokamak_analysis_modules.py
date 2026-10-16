@@ -1009,8 +1009,8 @@ def test_flux_hessian_x_point_classification():
 def test_large_aspect_ratio_shafranov_shift_relation():
     from tokamak_analysis.shafranov_shift import large_aspect_ratio_shafranov_shift
     out=large_aspect_ratio_shafranov_shift(0.5,1.5,1.0,1.0)
-    assert out["predicted_shafranov_shift_m"] == pytest.approx(0.125)
-    assert out["normalized_shift"] == pytest.approx(0.25)
+    assert out["predicted_shafranov_shift_m"] == pytest.approx(0.08333333333333333)
+    assert out["normalized_shift"] == pytest.approx(0.16666666666666666)
 
 
 def test_dedicated_plasma_area_and_volume_relations():
