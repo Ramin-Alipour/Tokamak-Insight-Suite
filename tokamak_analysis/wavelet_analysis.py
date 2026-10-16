@@ -7,7 +7,7 @@ def analyze_wavelet(time_s, signal, *, frequencies_Hz=None, wavelet_width=6.0):
     dt=float(np.median(np.diff(t)))
     if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform sampling required")
     f=np.asarray(frequencies_Hz if frequencies_Hz is not None else np.geomspace(1/(len(t)*dt),0.45/dt,64),dtype=float)
-    if f.ndim!=1 or len(f)<1 or not np.all(np.isfinite(f)) or np.any(f<=0) or np.any(f>=0.5/dt): raise ValueError("Frequencies must lie between zero and Nyquist")
+    if f.ndim!=1 or len(f)<1 or not np.all(np.isfinite(f)) or np.any(f<=0) or np.any(f>=0.5/dt) or np.any(np.diff(f)<=0): raise ValueError("Frequencies must be finite, strictly increasing, and between zero and Nyquist")
     if not np.isfinite(wavelet_width) or wavelet_width<=0: raise ValueError("wavelet_width must be positive")
     centered=x-np.mean(x); coefficients=[]
     for freq in f:
