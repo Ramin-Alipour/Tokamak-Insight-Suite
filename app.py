@@ -12,6 +12,7 @@ from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -976,8 +977,69 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Registered analysis modules'])
-    if workflow=='Thomson raw-spectrum temperature fit':
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Registered analysis modules'])
+    if workflow=='Thomson calibrated profile analysis':
+        st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
+        st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
+        if df is None or len(numeric) < 3:
+            st.info('Load a table with radius, electron-density, and electron-temperature columns.')
+        else:
+            radius_col=col_select('Radius / minor-radius coordinate (m)',numeric,'tis_thomson_profile_radius')
+            density_col=col_select('Electron density (m⁻³)',numeric,'tis_thomson_profile_density')
+            temperature_col=col_select('Electron temperature (eV)',numeric,'tis_thomson_profile_temperature')
+            uncertainty_options=['(none)']+list(numeric)
+            density_uncertainty_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_profile_density_unc')
+            temperature_uncertainty_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_profile_temperature_unc')
+            use_volume_average=st.checkbox('Calculate approximate volume-weighted averages',value=False,key='tis_thomson_profile_volume')
+            major_radius=None
+            if use_volume_average:
+                major_radius=st.number_input('Major radius (m)',min_value=0.000001,value=1.0,format='%.6f',key='tis_thomson_profile_major_radius')
+            if st.button('Analyze calibrated Thomson profiles',type='primary',key='run_thomson_profile'):
+                try:
+                    required_cols=[radius_col,density_col,temperature_col]
+                    if len(set(required_cols))!=3:
+                        raise ValueError('Radius, density, and temperature must use different columns.')
+                    for optional_col in (density_uncertainty_col,temperature_uncertainty_col):
+                        if optional_col!='(none)' and optional_col in required_cols:
+                            raise ValueError('Uncertainty columns must differ from radius, density, and temperature columns.')
+                    radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
+                    density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
+                    temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)
+                    density_uncertainty=None if density_uncertainty_col=='(none)' else pd.to_numeric(df[density_uncertainty_col],errors='raise').to_numpy(dtype=float)
+                    temperature_uncertainty=None if temperature_uncertainty_col=='(none)' else pd.to_numeric(df[temperature_uncertainty_col],errors='raise').to_numpy(dtype=float)
+                    profile=analyze_thomson_profile(
+                        radius_values,density_values,temperature_values,
+                        density_uncertainty_m3=density_uncertainty,
+                        temperature_uncertainty_ev=temperature_uncertainty,
+                        major_radius_m=major_radius,
+                    )
+                    summary=profile['summary']
+                    st.success('Calibrated Thomson profile analysis completed.')
+                    metric_cols=st.columns(2)
+                    metric_cols[0].metric('Peak electron density',f"{summary.density_peak_m3:.4g} m⁻³")
+                    metric_cols[1].metric('Peak electron temperature',f"{summary.temperature_peak_ev:.4g} eV")
+                    profile_frame=pd.DataFrame({
+                        'Radius (m)':profile['radius_m'],
+                        'Electron density (m⁻³)':profile['density_m3'],
+                        'Electron temperature (eV)':profile['temperature_eV'],
+                        'Density gradient (m⁻⁴)':profile['density_gradient_m-4'],
+                        'Temperature gradient (eV/m)':profile['temperature_gradient_eV_m-1'],
+                        'Density scale length (m)':profile['density_scale_length_m'],
+                        'Temperature scale length (m)':profile['temperature_scale_length_m'],
+                    })
+                    st.markdown('**Radial profiles**')
+                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron density (m⁻³)']])
+                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron temperature (eV)']])
+                    st.markdown('**Gradients and local scale lengths**')
+                    st.dataframe(profile_frame,use_container_width=True,hide_index=True)
+                    download_df('Download Thomson profile results',profile_frame,'tis_thomson_profile_results.csv')
+                    profile_json={k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in profile.items() if k!='summary'}
+                    profile_json['summary']=dict(vars(summary))
+                    json_download('Export Thomson profile summary',profile_json,'tis_thomson_profile_summary.json')
+                    st.caption('Pointwise uncertainties are retained, but uncertainties on gradients, extrema, and averages are not currently propagated.')
+                except Exception as e:
+                    st.error(str(e))
+    elif workflow=='Thomson raw-spectrum temperature fit':
         st.markdown('Fit a calibrated Thomson-scattering spectrum with a non-relativistic Gaussian Doppler model and a linear local background.')
         st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. This mode estimates electron temperature only; it does not infer density from spectral amplitude.')
         if df is None or len(numeric) < 2:
