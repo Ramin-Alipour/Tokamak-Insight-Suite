@@ -17,3 +17,22 @@ def sputtering_yield(incident_ions_s, sputtered_atoms_s):
     inc=float(incident_ions_s); sput=float(sputtered_atoms_s)
     if not np.isfinite(inc) or not np.isfinite(sput) or inc<=0 or sput<0: raise ValueError("Incident rate positive and sputtered rate nonnegative")
     return {"sputtering_yield_atoms_per_ion":sput/inc}
+
+def sheath_heat_flux_to_divertor(ne_m3, Te_eV, ion_mass_amu, sheath_heat_transmission, Bp_T, Btotal_T):
+    """Approximate target heat flux q_t=gamma_s*n_e*Te*e*c_s*(B_p/B), c_s=sqrt(e*Te/m_i)."""
+    ne,te,mass,gamma,bp,bt=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (ne_m3,Te_eV,ion_mass_amu,sheath_heat_transmission,Bp_T,Btotal_T)])
+    if any(not np.all(np.isfinite(v)) for v in (ne,te,mass,gamma,bp,bt)) or np.any(ne<0) or np.any(te<0) or np.any(mass<=0) or np.any(gamma<0) or np.any(bp<0) or np.any(bt<=0) or np.any(bp>bt):
+        raise ValueError("Invalid density, temperature, mass, sheath factor or magnetic fields")
+    e=1.602176634e-19; u=1.66053906660e-27
+    cs=np.sqrt(e*te/(mass*u)); qpar=gamma*ne*te*e*cs; qtarget=qpar*bp/bt
+    return {"sound_speed_m_s":cs,"parallel_sheath_heat_flux_W_m2":qpar,"target_heat_flux_W_m2":qtarget,
+            "equation":"q_target~=gamma_s*n_e*Te_eV*e*c_s*(B_p/B), c_s=sqrt(e*Te_eV/m_i)",
+            "assumption":"Simplified sheath-limited mapping; neglects Ti contribution, flux expansion geometry, radiation and cross-field transport."}
+
+
+def total_pfc_power_from_surface_profile(position_m, heat_flux_W_m2, toroidal_radius_m):
+    """Axisymmetric surface power integral P=integral q(s)*2*pi*R(s) ds."""
+    s=np.asarray(position_m,dtype=float); q=np.asarray(heat_flux_W_m2,dtype=float); R=np.asarray(toroidal_radius_m,dtype=float)
+    if s.ndim!=1 or q.shape!=s.shape or R.shape!=s.shape or len(s)<2 or any(not np.all(np.isfinite(v)) for v in (s,q,R)) or np.any(np.diff(s)<=0) or np.any(q<0) or np.any(R<=0):
+        raise ValueError("Require matching finite profiles, increasing position, nonnegative heat flux and positive radius")
+    return {"total_pfc_power_W":float(np.trapezoid(q*2*np.pi*R,s)),"equation":"P=integral q(s)*2*pi*R(s) ds"}
