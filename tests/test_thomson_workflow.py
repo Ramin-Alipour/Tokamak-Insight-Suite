@@ -78,3 +78,36 @@ def test_thomson_volume_average_rejects_signed_radius_coordinate():
     profile = build_profile([-0.2, 0.0, 0.2], [1e19, 2e19, 1e19], [20.0, 40.0, 20.0])
     with pytest.raises(ValueError, match="non-negative minor-radius"):
         profile_summary(profile, major_radius_m=1.0)
+
+
+
+def test_thomson_power_density_propagates_independent_input_uncertainties():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    out = density_from_thomson_scattered_power(
+        scattered_power_W=1.0e-9,
+        incident_power_W=2.0,
+        interaction_length_m=0.15,
+        scattering_angle_rad=np.pi / 2,
+        collection_solid_angle_sr=1.0e-3,
+        optical_efficiency=0.7,
+        scattered_power_uncertainty_W=0.02e-9,
+        incident_power_uncertainty_W=0.02,
+        interaction_length_uncertainty_m=0.001,
+        scattering_angle_uncertainty_rad=0.01,
+        collection_solid_angle_uncertainty_sr=0.02e-3,
+        optical_efficiency_uncertainty=0.01,
+    )
+    assert out["electron_density_m3"] > 0
+    assert 0 < out["electron_density_uncertainty_m3"] < out["electron_density_m3"]
+    assert "first-order propagation" in out["uncertainty_model"].lower()
+
+
+def test_thomson_power_density_rejects_negative_input_uncertainty():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        density_from_thomson_scattered_power(
+            1.0e-9, 2.0, 0.15, np.pi / 2, 1.0e-3,
+            scattered_power_uncertainty_W=-1.0e-12,
+        )
