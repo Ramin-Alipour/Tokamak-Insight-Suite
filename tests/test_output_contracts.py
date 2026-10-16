@@ -9,7 +9,7 @@ from tokamak_analysis.divertor_analysis import analyze_divertor_particle_flux
 
 def test_neutron_flux_uses_one_canonical_key_and_keeps_legacy_alias():
     result = analyze_neutron_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0],
-                                  efficiency=0.5, effective_area_m2=2.0)
+                                  timestamp_semantics="bin_centers", efficiency=0.5, effective_area_m2=2.0)
     np.testing.assert_allclose(result["neutron_flux_m-2_s-1"], result["flux_estimate_m-2_s-1"])
     integrated = neutron_flux_from_integrated_counts(100, 10, 0.5, 2.0)
     np.testing.assert_allclose(integrated["neutron_flux_m-2_s-1"], integrated["flux_estimate_m-2_s-1"])
