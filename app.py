@@ -1054,17 +1054,36 @@ elif page=='Advanced Analysis':
                     st.error(str(e))
     elif workflow=='Thomson raw-spectrum temperature fit':
         st.markdown('Fit a calibrated Thomson-scattering spectrum with a non-relativistic Gaussian Doppler model and a linear local background.')
-        st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. This mode estimates electron temperature only; it does not infer density from spectral amplitude.')
+        st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. Density can be estimated only if the signal is calibrated as spectral power density in W/nm and the optical geometry is supplied.')
         if df is None or len(numeric) < 2:
             st.info('Load a table with wavelength and measured spectral-signal columns to run this analysis.')
         else:
             wavelength_col=col_select('Wavelength (nm)',numeric,'tis_thomson_wavelength_col')
-            signal_col=col_select('Measured spectral signal (detector units)',numeric,'tis_thomson_signal_col')
+            signal_col=col_select('Measured spectral signal',numeric,'tis_thomson_signal_col')
             laser_wavelength_nm=st.number_input('Laser wavelength (nm)',min_value=0.000001,value=532.0,format='%.6f',key='tis_thomson_laser_nm')
             scattering_angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,format='%.3f',key='tis_thomson_angle_deg')
             instrument_sigma_nm=st.number_input('Gaussian instrument sigma (nm)',min_value=0.000001,value=0.05,format='%.6f',key='tis_thomson_instrument_sigma')
             uncertainty_options=['(none)']+list(numeric)
-            uncertainty_col=st.selectbox('Optional signal standard-uncertainty column',uncertainty_options,key='tis_thomson_uncertainty_col')
+            uncertainty_col=st.selectbox('Optional signal standard-uncertainty column (same units as signal)',uncertainty_options,key='tis_thomson_uncertainty_col')
+            spectral_power_calibrated=st.checkbox('Signal is calibrated spectral power density (W/nm); also estimate electron density',value=False,key='tis_thomson_spectral_power_calibrated')
+            power_geometry={}
+            propagate_geometry=False
+            if spectral_power_calibrated:
+                st.caption('The fitted Gaussian area is treated as collected power in W. Use this option only when the signal axis is absolutely calibrated in W/nm over the relevant spectral band.')
+                incident_power=st.number_input('Incident laser power (W)',min_value=0.000001,value=2.0,format='%.6e',key='tis_thomson_spectral_incident_power')
+                interaction_length=st.number_input('Effective interaction length (m)',min_value=0.000001,value=0.15,format='%.6f',key='tis_thomson_spectral_interaction_length')
+                collection_solid_angle=st.number_input('Collection solid angle (sr)',min_value=0.000000001,value=1.0e-3,format='%.6e',key='tis_thomson_spectral_solid_angle')
+                optical_efficiency=st.number_input('Total optical efficiency (0–1)',min_value=0.000001,max_value=1.0,value=0.7,format='%.6f',key='tis_thomson_spectral_efficiency')
+                propagate_geometry=st.checkbox('Also propagate optical-geometry uncertainties',value=False,key='tis_thomson_spectral_propagate_geometry')
+                power_geometry={'incident_power_W':incident_power,'interaction_length_m':interaction_length,'collection_solid_angle_sr':collection_solid_angle,'optical_efficiency':optical_efficiency}
+                if propagate_geometry:
+                    power_geometry.update({
+                        'incident_power_uncertainty_W':st.number_input('Incident-power uncertainty (W)',min_value=0.0,value=0.02,format='%.6e',key='tis_thomson_spectral_u_incident'),
+                        'interaction_length_uncertainty_m':st.number_input('Interaction-length uncertainty (m)',min_value=0.0,value=0.001,format='%.6f',key='tis_thomson_spectral_u_length'),
+                        'scattering_angle_uncertainty_rad':float(np.deg2rad(st.number_input('Scattering-angle uncertainty (degrees)',min_value=0.0,value=0.5,format='%.3f',key='tis_thomson_spectral_u_angle'))),
+                        'collection_solid_angle_uncertainty_sr':st.number_input('Collection-solid-angle uncertainty (sr)',min_value=0.0,value=2.0e-5,format='%.6e',key='tis_thomson_spectral_u_solid'),
+                        'optical_efficiency_uncertainty':st.number_input('Optical-efficiency uncertainty',min_value=0.0,value=0.01,format='%.6f',key='tis_thomson_spectral_u_efficiency'),
+                    })
             if st.button('Fit Thomson spectrum and estimate electron temperature',type='primary',key='run_thomson_spectrum_fit'):
                 try:
                     if wavelength_col==signal_col:
@@ -1082,12 +1101,41 @@ elif page=='Advanced Analysis':
                         scattering_angle_rad=float(np.deg2rad(scattering_angle_deg)),
                         instrument_sigma_nm=float(instrument_sigma_nm),
                         signal_uncertainty=signal_uncertainty,
+                        spectral_power_density_calibrated=spectral_power_calibrated,
                     )
                     st.success('Thomson spectral fit completed.')
                     st.metric('Electron temperature',f"{fit['electron_temperature_eV']:.4g} eV",
                               delta=f"± {fit['electron_temperature_uncertainty_eV']:.3g} eV (fit uncertainty)")
                     st.metric('Reduced chi-square',
                               'Not available without signal uncertainties' if fit['reduced_chi_square'] is None else f"{fit['reduced_chi_square']:.4g}")
+                    density_summary=None
+                    if spectral_power_calibrated:
+                        st.metric('Integrated collected scattered power',f"{fit['integrated_scattered_power_W']:.4g} W",
+                                  delta=f"± {fit['integrated_scattered_power_uncertainty_W']:.3g} W (fit uncertainty)")
+                        density_args={}
+                        power_unc=float(fit['integrated_scattered_power_uncertainty_W'])
+                        if np.isfinite(power_unc) and power_unc>=0:
+                            density_args['scattered_power_uncertainty_W']=power_unc
+                        elif propagate_geometry:
+                            st.warning('The spectral fit did not provide a finite integrated-power uncertainty; only the supplied geometry uncertainties will be propagated.')
+                        if not propagate_geometry:
+                            # At minimum, retain the fitted-area uncertainty when it is finite.
+                            pass
+                        density_result=density_from_thomson_scattered_power(
+                            scattered_power_W=fit['integrated_scattered_power_W'],
+                            incident_power_W=power_geometry['incident_power_W'],
+                            interaction_length_m=power_geometry['interaction_length_m'],
+                            scattering_angle_rad=float(np.deg2rad(scattering_angle_deg)),
+                            collection_solid_angle_sr=power_geometry['collection_solid_angle_sr'],
+                            optical_efficiency=power_geometry['optical_efficiency'],
+                            **{k:v for k,v in power_geometry.items() if k.endswith('_uncertainty_W') or k.endswith('_uncertainty_m') or k.endswith('_uncertainty_sr') or k.endswith('_uncertainty_rad') or k=='optical_efficiency_uncertainty'},
+                            **density_args,
+                        )
+                        density_value=float(np.asarray(density_result['electron_density_m3']).item())
+                        st.metric('Electron density',f'{density_value:.4g} m⁻³')
+                        if 'electron_density_uncertainty_m3' in density_result:
+                            st.metric('Electron-density uncertainty',f"± {float(np.asarray(density_result['electron_density_uncertainty_m3']).item()):.4g} m⁻³")
+                        density_summary={k:(v.item() if isinstance(v,np.ndarray) and v.ndim==0 else v) for k,v in density_result.items()}
                     fit_frame=pd.DataFrame({
                         'Wavelength (nm)':wavelength_values,
                         'Measured signal':signal_values,
@@ -1100,6 +1148,8 @@ elif page=='Advanced Analysis':
                     st.line_chart(fit_frame.set_index('Wavelength (nm)')[['Residual']])
                     download_df('Download Thomson spectrum fit and residuals',fit_frame,'tis_thomson_spectrum_fit.csv')
                     summary={k:v for k,v in fit.items() if k not in {'fitted_spectrum','residual','fit_covariance'}}
+                    if density_summary is not None:
+                        summary['calibrated_power_density_estimate']=density_summary
                     json_download('Export Thomson fit summary',summary,'tis_thomson_spectrum_fit.json')
                     with st.expander('Model assumptions and limitations'):
                         for item in fit['assumptions']: st.markdown(f'- {item}')
