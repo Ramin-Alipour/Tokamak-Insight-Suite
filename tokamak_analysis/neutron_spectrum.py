@@ -9,7 +9,7 @@ def analyze_neutron_spectrum(energy_keV, counts, *, background=None):
         if b.shape!=c.shape or not np.all(np.isfinite(b)) or np.any(b<0): raise ValueError("Invalid background")
         net=np.maximum(c-b,0)
     total=np.sum(net); mean=float(np.sum(e*net)/total) if total else float("nan")
-    return {"energy_keV":e,"net_counts":net,"peak_energy_keV":float(e[np.argmax(net)]),"mean_energy_keV":mean,"total_counts":float(total),"caveat":"Detector unfolding and neutron-response calibration are required for a physical incident neutron spectrum."}
+    return {"energy_keV":e,"net_counts":net,"peak_energy_keV":float(e[np.argmax(net)]) if total>0 else None,"mean_energy_keV":mean,"total_counts":float(total),"caveat":"Detector unfolding and neutron-response calibration are required for a physical incident neutron spectrum."}
 
 def neutron_energy_from_time_of_flight_keV(flight_path_m, flight_time_s, *, neutron_mass_kg=1.67492749804e-27):
     """Non-relativistic neutron TOF relation E=0.5*m*(L/t)^2, returned in keV."""
