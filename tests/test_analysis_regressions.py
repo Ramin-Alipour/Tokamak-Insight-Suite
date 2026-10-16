@@ -66,3 +66,11 @@ def test_fft_one_sided_amplitude_does_not_double_nyquist_bin():
     signal = (-1.0) ** np.arange(8)
     result = analyze_fft(time, signal, detrend=False, window="rectangular")
     assert result["amplitude"][-1] == pytest.approx(1.0)
+
+
+def test_fft_frequency_resolution_uses_n_times_sample_interval():
+    from tokamak_analysis.fft_analysis import frequency_resolution_Hz
+
+    time = np.arange(8, dtype=float) * 0.25
+    result = frequency_resolution_Hz(time)
+    assert result["frequency_resolution_Hz"] == pytest.approx(0.5)
