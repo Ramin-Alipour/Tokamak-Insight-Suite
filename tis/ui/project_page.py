@@ -48,7 +48,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 for item in reversed(history):
                     active_project.add_run(AnalysisRun(
                         analysis_name=str(item.get("name", "Unnamed UI result")),
-                        inputs={"source_filename": filename or None, "shot_id": shot_id or None},
+                        inputs={"source_filename": item.get("source_filename"), "shot_id": item.get("shot_id")},
                         settings=item.get("parameter_snapshot", {}),
                         algorithm_version=str(item.get("algorithm_version", software_version)),
                         outputs=item.get("result_summary", {}),
