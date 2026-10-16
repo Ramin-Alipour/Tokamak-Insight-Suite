@@ -1347,3 +1347,22 @@ def test_radial_and_poloidal_fick_law_relations():
     from tokamak_analysis.transport import radial_diffusive_particle_flux, poloidal_diffusive_particle_flux
     assert radial_diffusive_particle_flux(2.0,-3.0)["radial_particle_flux_m2_s"] == pytest.approx(6.0)
     assert poloidal_diffusive_particle_flux(4.0,2.0)["poloidal_particle_flux_m2_s"] == pytest.approx(-8.0)
+
+
+def test_turbulent_momentum_flux_relation():
+    from tokamak_analysis.transport import turbulent_momentum_flux
+    out=turbulent_momentum_flux([1.0,2.0,3.0],[3.0,2.0,1.0],2.0)
+    assert out["velocity_covariance_m2_s2"] == pytest.approx(-2/3)
+    assert out["turbulent_momentum_flux_Pa"] == pytest.approx(4/3)
+
+
+def test_transient_energy_decay_confinement_relation():
+    from tokamak_analysis.confinement import confinement_time_from_energy_decay
+    t=np.linspace(0.0,2.0,101); tau=0.4; W=100*np.exp(-t/tau)
+    out=confinement_time_from_energy_decay(t,W)
+    assert out["energy_decay_confinement_time_s"] == pytest.approx(tau,rel=1e-12)
+
+
+def test_fourier_conductive_heat_flux_relation():
+    from tokamak_analysis.heat_flux import conductive_heat_flux_from_gradient
+    assert conductive_heat_flux_from_gradient(5.0,2.0)["conductive_heat_flux_W_m2"] == pytest.approx(-10.0)
