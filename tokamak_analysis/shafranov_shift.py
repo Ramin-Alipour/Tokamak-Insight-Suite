@@ -14,3 +14,13 @@ def shafranov_shift(R_axis_m,R_geometric_m,*,minor_radius_m=None,elongation=None
         out["large_aspect_ratio_circular_prediction_m"]=minor_radius_m**2/(2*R_geometric_m)*(bp+internal/2) if minor_radius_m is not None else None
     out["caveat"]="The radius difference is a geometric estimate; analytic prediction assumes simplified equilibrium geometry."
     return out
+
+def large_aspect_ratio_shafranov_shift(minor_radius_m, major_radius_m, beta_p, internal_inductance):
+    """Circular large-aspect-ratio estimate: Delta_R ~= a^2/(2 R0)*(beta_p + li/2)."""
+    a,R0,bp,li=map(float,(minor_radius_m,major_radius_m,beta_p,internal_inductance))
+    if not np.all(np.isfinite([a,R0,bp,li])) or a<=0 or R0<=0 or bp<0 or li<0:
+        raise ValueError("Require finite positive radii and non-negative beta_p and li")
+    shift=a*a/(2*R0)*(bp+li/2)
+    return {"predicted_shafranov_shift_m":shift,"normalized_shift":shift/a,
+            "equation":"Delta_R ~= a^2/(2*R0)*(beta_p + li/2)",
+            "caveat":"Approximate circular, large-aspect-ratio expression; shaping and profile conventions affect the coefficient."}
