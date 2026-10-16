@@ -29,6 +29,11 @@ def test_thomson_workflow_preserves_sorted_uncertainties():
     )
     np.testing.assert_allclose(out["density_uncertainty_m3"], [1e18, 2e18])
     np.testing.assert_allclose(out["temperature_uncertainty_eV"], [1, 2])
+    assert np.all(np.isfinite(out["density_gradient_uncertainty_m-4"]))
+    assert np.all(np.isfinite(out["temperature_gradient_uncertainty_eV_m-1"]))
+    assert np.all(np.isfinite(out["density_scale_length_uncertainty_m"]))
+    assert out["summary"].density_line_average_uncertainty_m3 is not None
+    assert out["summary"].temperature_line_average_uncertainty_ev is not None
 
 
 def test_thomson_differential_cross_section_limits_and_symmetry():
