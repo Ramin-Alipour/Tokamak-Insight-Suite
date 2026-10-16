@@ -8,13 +8,14 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     assert len(contracts) == 80
     assert len({item.name for item in contracts}) == 80
     assert all(item.completeness == "incomplete" for item in contracts)
-    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 60
-    assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 20
+    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 59
+    assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 21
     assert not any(item.supports_raw_data for item in contracts)
 
 def test_reference_only_entry_does_not_claim_end_to_end_processing():
     contract = get_diagnostic_contract("Thomson scattering")
-    assert contract.level is ExecutionLevel.REFERENCE_ONLY
+    assert contract.level is ExecutionLevel.ANALYSIS_PIPELINE
+    assert contract.completeness == "complete"
     assert not contract.raw_data_to_physics
     assert not contract.supports_raw_data
 
