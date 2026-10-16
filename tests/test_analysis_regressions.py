@@ -74,3 +74,11 @@ def test_fft_frequency_resolution_uses_n_times_sample_interval():
     time = np.arange(8, dtype=float) * 0.25
     result = frequency_resolution_Hz(time)
     assert result["frequency_resolution_Hz"] == pytest.approx(0.5)
+
+
+def test_confinement_uncertainty_handles_zero_stored_energy():
+    from tokamak_analysis.confinement import energy_confinement_time
+
+    result = energy_confinement_time(0.0, 10.0, uncertainty_energy_J=2.0, uncertainty_power_W=1.0)
+    assert result["energy_confinement_time_s"] == 0.0
+    assert result["uncertainty_s"] == pytest.approx(0.2)
