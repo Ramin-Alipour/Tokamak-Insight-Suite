@@ -2,7 +2,7 @@
 import numpy as np
 def analyze_divertor_flux(position_m, heat_flux_W_m2, *, particle_flux_m2_s=None, surface_area_m2=None):
     x=np.asarray(position_m,dtype=float); q=np.asarray(heat_flux_W_m2,dtype=float)
-    if x.ndim!=1 or q.shape!=x.shape or len(x)<2 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(q)) or np.any(np.diff(x)<=0): raise ValueError("Invalid divertor profile")
+    if x.ndim!=1 or q.shape!=x.shape or len(x)<2 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(q)) or np.any(np.diff(x)<=0) or np.any(q<0): raise ValueError("Divertor heat flux must be finite, non-negative, and ordered by increasing position")
     out={"position_m":x,"heat_flux_W_m2":q,"peak_heat_flux_W_m2":float(np.max(q)),"integrated_heat_flux_W_m":float(getattr(np, "trapezoid", np.trapz)(q,x))}
     if particle_flux_m2_s is not None:
         g=np.asarray(particle_flux_m2_s,dtype=float)
