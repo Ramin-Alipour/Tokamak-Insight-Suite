@@ -3,11 +3,11 @@ import numpy as np
 E=1.602176634e-19; ME=9.1093837139e-31; U=1.66053906660e-27
 def ecrh_resonance_field(frequency_Hz, harmonic=1):
     f=np.asarray(frequency_Hz,dtype=float); h=int(harmonic)
-    if not np.all(np.isfinite(f)) or np.any(f<=0) or h<1: raise ValueError("Positive frequency and harmonic required")
+    if not np.all(np.isfinite(f)) or np.any(f<=0) or not np.isfinite(harmonic) or h!=harmonic or h<1: raise ValueError("Frequency must be positive and harmonic a positive integer")
     return {"resonance_field_T":2*np.pi*ME*f/(E*h),"harmonic":h,"caveat":"Relativistic and Doppler shifts are not included."}
 def icrh_resonance_field(frequency_Hz, ion_mass_amu, charge_state=1, harmonic=1):
     f=np.asarray(frequency_Hz,dtype=float); mass=float(ion_mass_amu); charge=int(charge_state); h=int(harmonic)
-    if not np.all(np.isfinite(f)) or np.any(f<=0) or not np.isfinite(mass) or mass<=0 or charge<1 or h<1:
+    if not np.all(np.isfinite(f)) or np.any(f<=0) or not np.isfinite(mass) or mass<=0 or not np.isfinite(charge_state) or charge!=charge_state or not np.isfinite(harmonic) or h!=harmonic or charge<1 or h<1:
         raise ValueError("Frequency, ion mass, charge state, and harmonic must be positive and finite")
     field=2*np.pi*(mass*U)*f/(E*charge*h)
     return {"resonance_field_T":field,"ion_mass_amu":mass,"charge_state":charge,"harmonic":h,"caveat":"Uses the nonrelativistic ion-cyclotron resonance condition; species and harmonic must match the experiment."}
