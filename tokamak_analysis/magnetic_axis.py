@@ -6,7 +6,7 @@ def locate_magnetic_axis(R_m,Z_m,psi_Wb_rad,*,axis_type="minimum"):
     if np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("R and Z must be strictly increasing")
     if axis_type not in ("minimum","maximum"): raise ValueError("axis_type must be minimum or maximum")
     j,i=np.unravel_index(np.argmin(p) if axis_type=="minimum" else np.argmax(p),p.shape)
-    return {"R_axis_m":float(R[i]),"Z_axis_m":float(Z[j]),"psi_axis_Wb_rad":float(p[j,i]),"grid_index":(int(j),int(i)),"method":"grid extremum","caveat":"Grid extremum is a first estimate; refine with local fitting and equilibrium constraints."}
+    return {"R_axis_m":float(R[i]),"Z_axis_m":float(Z[j]),"psi_axis_Wb_rad":float(p[j,i]),"grid_index":(int(j),int(i)),"on_grid_boundary":bool(i==0 or i==len(R)-1 or j==0 or j==len(Z)-1),"method":"grid extremum","caveat":"Grid extremum is a first estimate; a boundary extremum is not a reliable magnetic-axis location. Refine with local fitting and equilibrium constraints."}
 
 def quadratic_magnetic_axis_refinement(R_m, Z_m, psi_Wb_rad, *, axis_type="minimum"):
     """Refine a gridded flux extremum by fitting a local 2-D quadratic surface."""
