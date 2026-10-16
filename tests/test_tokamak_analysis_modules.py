@@ -1070,3 +1070,9 @@ def test_exb_drift_physical_relation():
     assert out["v_exb_x_m_s"] == pytest.approx(0.5)
     assert out["v_exb_y_m_s"] == pytest.approx(0.0)
     assert out["v_exb_z_m_s"] == pytest.approx(0.0)
+
+
+def test_floating_potential_current_balance_relation():
+    from tokamak_analysis.potential_analysis import floating_potential_from_saturation_currents
+    out=floating_potential_from_saturation_currents(20.0,5.0,np.e**2,1.0)
+    assert out["floating_potential_V"] == pytest.approx(10.0)
