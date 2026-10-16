@@ -1,52 +1,44 @@
 """Binned energetic-particle distribution and loss/flux estimates."""
 import numpy as np
+from .counting import count_rate_from_timestamps
 def analyze_energy_distribution(energy_keV, counts, *, normalize=True):
     e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
     if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(e<0) or np.any(c<0): raise ValueError("Energy and counts must be finite, nonnegative 1-D arrays")
     total=float(np.sum(c)); dist=c/total if normalize and total>0 else c.copy()
     return {"energy_keV":e,"distribution":dist,"total_counts":total,"mean_energy_keV":float(np.sum(e*c)/total) if total>0 else float("nan"),"peak_energy_keV":float(e[np.argmax(c)]) if total>0 else None,"normalized":bool(normalize and total>0)}
-def particle_loss_rate(time_s, loss_counts, *, detection_efficiency=1.0, live_time_s=None, counts_are_cumulative=False):
-    t=np.asarray(time_s,dtype=float); c=np.asarray(loss_counts,dtype=float); eff=float(detection_efficiency)
-    if t.ndim!=1 or c.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(c)) or np.any(np.diff(t)<=0) or np.any(c<0) or not np.isfinite(eff) or not 0<eff<=1:
-        raise ValueError("Invalid time/counts/efficiency")
-    if counts_are_cumulative:
-        if live_time_s is not None or np.any(np.diff(c)<0):
-            raise ValueError("Cumulative counts must be nondecreasing and cannot use live_time_s")
-        rate=np.gradient(c,t,edge_order=2 if len(t)>2 else 1)
-        total=float(c[-1]-c[0])
-        method="derivative of cumulative counter"
-    else:
-        width=np.gradient(t) if live_time_s is None else np.asarray(live_time_s,dtype=float)
-        if not np.all(np.isfinite(width)) or np.any(width<=0):
-            raise ValueError("Live times/bin widths must be finite and positive")
-        try: width=np.broadcast_to(width,c.shape)
-        except ValueError as exc: raise ValueError("live_time_s must be scalar or match loss_counts") from exc
-        rate=c/width
-        total=float(np.sum(c))
-        method="counts divided by supplied live time" if live_time_s is not None else "counts divided by estimated time-bin width"
-    return {"loss_rate_s-1":rate/eff,"total_detected_counts":total,"rate_method":method,
-            "caveat":"Absolute particle loss requires detector efficiency, acceptance, background and dead-time corrections."}
+def particle_loss_rate(time_s, loss_counts, *, detection_efficiency=1.0, live_time_s=None,
+                     counts_are_cumulative=False, timestamp_semantics=None):
+    """Estimate detector-corrected particle loss rate from binned or cumulative counts."""
+    eff = float(detection_efficiency)
+    if not np.isfinite(eff) or not 0 < eff <= 1:
+        raise ValueError("detection_efficiency must be finite and in (0, 1]")
+    result = count_rate_from_timestamps(
+        time_s, loss_counts, timestamp_semantics=timestamp_semantics,
+        counts_are_cumulative=counts_are_cumulative, live_time_s=live_time_s)
+    return {"loss_rate_s-1": result["count_rate_s-1"] / eff,
+            "total_detected_counts": result["total_counts"],
+            "timestamp_semantics": result["timestamp_semantics"],
+            "counts_are_cumulative": result["counts_are_cumulative"],
+            "rate_method": result["count_rate_method"],
+            "caveat": "Absolute particle loss requires detector efficiency, acceptance, background and dead-time corrections."}
 
 
-def energetic_particle_flux(time_s, counts, effective_area_m2, *, efficiency=1.0, live_time_s=None, counts_are_cumulative=False):
-    t=np.asarray(time_s,dtype=float); c=np.asarray(counts,dtype=float); area=float(effective_area_m2); eff=float(efficiency)
-    if t.ndim!=1 or c.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(c)) or np.any(np.diff(t)<=0) or np.any(c<0) or not np.isfinite(area) or area<=0 or not np.isfinite(eff) or not 0<eff<=1:
-        raise ValueError("Invalid time, counts, area or efficiency")
-    if counts_are_cumulative:
-        if live_time_s is not None or np.any(np.diff(c)<0):
-            raise ValueError("Cumulative counts must be nondecreasing and cannot use live_time_s")
-        rate=np.gradient(c,t,edge_order=2 if len(t)>2 else 1)
-        method="derivative of cumulative counter"
-    else:
-        width=np.gradient(t) if live_time_s is None else np.asarray(live_time_s,dtype=float)
-        if not np.all(np.isfinite(width)) or np.any(width<=0):
-            raise ValueError("Live times/bin widths must be finite and positive")
-        try: width=np.broadcast_to(width,c.shape)
-        except ValueError as exc: raise ValueError("live_time_s must be scalar or match counts") from exc
-        rate=c/width
-        method="counts divided by supplied live time" if live_time_s is not None else "counts divided by estimated time-bin width"
-    return {"particle_flux_m-2_s-1":rate/(area*eff),"count_rate_method":method,
-            "caveat":"Flux requires validated detector geometry, efficiency, background, dead-time and response corrections."}
+def energetic_particle_flux(time_s, counts, effective_area_m2, *, efficiency=1.0,
+                            live_time_s=None, counts_are_cumulative=False,
+                            timestamp_semantics=None):
+    """Estimate particle flux from binned counts or cumulative counter readings."""
+    area, eff = float(effective_area_m2), float(efficiency)
+    if not np.isfinite(area) or area <= 0 or not np.isfinite(eff) or not 0 < eff <= 1:
+        raise ValueError("effective_area_m2 must be positive and efficiency in (0, 1]")
+    result = count_rate_from_timestamps(
+        time_s, counts, timestamp_semantics=timestamp_semantics,
+        counts_are_cumulative=counts_are_cumulative, live_time_s=live_time_s)
+    flux = result["count_rate_s-1"] / (area * eff)
+    return {"particle_flux_m-2_s-1": flux, "particle_flux_m2_s": flux,
+            "time_s": result["time_s"], "count_rate_method": result["count_rate_method"],
+            "timestamp_semantics": result["timestamp_semantics"],
+            "counts_are_cumulative": result["counts_are_cumulative"],
+            "caveat": "Flux requires validated detector geometry, efficiency, background, dead-time and response corrections."}
 
 def relativistic_kinetic_energy_keV(momentum_kg_m_s, particle_mass_kg):
     """Relativistic kinetic energy K=sqrt((pc)^2+(mc^2)^2)-mc^2."""
