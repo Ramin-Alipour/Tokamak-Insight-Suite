@@ -96,6 +96,14 @@ def weighted_mean(values: Iterable[float], uncertainties: Iterable[float]) -> fl
     return float(np.sum(w * y) / np.sum(w))
 
 
+def _trapezoid(y, x):
+    """Version-compatible trapezoidal integration for the declared NumPy range."""
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    return integrate(y, x)
+
+
 def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None) -> ThomsonSummary:
     """Summarize measured profiles.
 
@@ -104,7 +112,7 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
     This is a geometric approximation, not a full equilibrium reconstruction.
     """
     r, ne, te = profile.radius_m, profile.density_m3, profile.temperature_ev
-    ne_line = float(np.trapezoid(ne, r) / (r[-1] - r[0]))
+    ne_line = float(_trapezoid(ne, r) / (r[-1] - r[0]))
     te_line = float(np.trapezoid(te, r) / (r[-1] - r[0]))
     ne_vol = te_vol = None
     if major_radius_m is not None:
