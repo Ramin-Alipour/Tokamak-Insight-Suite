@@ -22,7 +22,7 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert entry["name"] == "Thomson Scattering"
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
-    assert contract["completeness"] == "complete"
+    assert contract["completeness"] == "incomplete"
     assert contract["raw_data_to_physics"] is False
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"radius_m", "density_m3", "temperature_ev"} <= set(inputs)
@@ -30,5 +30,6 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["density_m3"]["unit"] == "m^-3"
     assert inputs["temperature_ev"]["unit"] == "eV"
     assert inputs["major_radius_m"]["minimum"] > 0
-    assert any("raw scattered-light spectra" in item for item in contract["limitations"])
+    assert any("Gaussian" in item for item in contract["limitations"])
+    assert "thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
     assert callable(resolve_analysis(1))
