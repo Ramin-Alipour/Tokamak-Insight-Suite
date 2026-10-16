@@ -6,7 +6,9 @@ def analyze_fft(time_s, signal, *, detrend=True, window="hann"):
     dt=float(np.median(np.diff(t)))
     if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform sampling required")
     y=x-np.mean(x) if detrend else x.copy()
-    if window=="hann": w=np.hanning(len(y))
+    if window=="hann":
+        if len(y)<3: raise ValueError("Hann window requires at least 3 samples")
+        w=np.hanning(len(y))
     elif window=="rectangular": w=np.ones(len(y))
     else: raise ValueError("window must be hann or rectangular")
     spec=np.fft.rfft(y*w); f=np.fft.rfftfreq(len(y),dt)
