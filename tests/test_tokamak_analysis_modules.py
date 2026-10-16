@@ -996,3 +996,10 @@ def test_quadratic_magnetic_axis_refinement_known_offgrid_minimum():
     assert out["R_axis_m"] == pytest.approx(1.43,abs=1e-10)
     assert out["Z_axis_m"] == pytest.approx(0.13,abs=1e-10)
     assert out["psi_axis_Wb_rad"] == pytest.approx(4.0,abs=1e-10)
+
+
+def test_flux_hessian_x_point_classification():
+    from tokamak_analysis.x_point import classify_flux_critical_point
+    out=classify_flux_critical_point(2.0,-2.0,0.0)
+    assert out["hessian_determinant"] == pytest.approx(-4.0)
+    assert out["classification"] == "saddle (X-point candidate)"
