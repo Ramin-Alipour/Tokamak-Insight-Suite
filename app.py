@@ -981,6 +981,24 @@ elif page=='Advanced Analysis':
         fn=resolve_analysis(selected_id)
         import inspect
         st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
+        contract = entry.get('execution_contract', {})
+        status = 'Complete within declared scope' if contract.get('completeness') == 'complete' else 'Incomplete / limited scope'
+        st.info(f"Execution status: {status}")
+        with st.expander('Scientific contract: inputs, outputs and limitations', expanded=(selected_id == 1)):
+            st.write(contract.get('algorithm', 'No algorithm description declared.'))
+            if contract.get('input_specs'):
+                st.markdown('**Required and optional inputs**')
+                st.dataframe(pd.DataFrame(contract['input_specs']), use_container_width=True, hide_index=True)
+            if contract.get('output_specs'):
+                st.markdown('**Outputs**')
+                st.dataframe(pd.DataFrame(contract['output_specs']), use_container_width=True, hide_index=True)
+            if contract.get('assumptions'):
+                st.markdown('**Assumptions**')
+                for item in contract['assumptions']: st.markdown(f'- {item}')
+            if contract.get('limitations'):
+                st.markdown('**Scientific limitations**')
+                for item in contract['limitations']: st.warning(item)
+            st.caption('“Complete” refers only to the explicitly declared scope; it does not imply raw-instrument processing or independent experimental validation.')
         st.code(str(inspect.signature(fn)),language='python')
         st.write('Enter keyword arguments as JSON. To use an uploaded numeric column, set a value to {"column": "exact column name"}. Other values can be numbers, booleans, strings, lists, or nested arrays as required by the selected function.')
         arg_text=st.text_area('Function arguments (JSON)',value='{}',height=180,key='registered_analysis_args')
@@ -1002,6 +1020,16 @@ elif page=='Advanced Analysis':
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.write(result)
+                if selected_id == 1 and isinstance(result, dict) and {'radius_m', 'density_m3', 'temperature_eV'} <= set(result):
+                    profile_frame = pd.DataFrame({'Radius (m)': result['radius_m'], 'Electron density (m^-3)': result['density_m3'], 'Electron temperature (eV)': result['temperature_eV']})
+                    st.markdown('**Electron-density profile**')
+                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron density (m^-3)']])
+                    st.markdown('**Electron-temperature profile**')
+                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron temperature (eV)']])
+                    if 'density_gradient_m-4' in result:
+                        st.markdown('**Radial gradients**')
+                        gradients = pd.DataFrame({'Radius (m)': result['radius_m'], 'Density gradient (m^-4)': result['density_gradient_m-4'], 'Temperature gradient (eV/m)': result['temperature_gradient_eV_m-1']})
+                        st.dataframe(gradients, use_container_width=True, hide_index=True)
                 st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
                 reference_result = None
                 if reference_text.strip():
