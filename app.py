@@ -1036,7 +1036,7 @@ elif page=='Advanced Analysis':
                     profile_json={k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in profile.items() if k!='summary'}
                     profile_json['summary']=dict(vars(summary))
                     json_download('Export Thomson profile summary',profile_json,'tis_thomson_profile_summary.json')
-                    st.caption('Pointwise uncertainties are retained, but uncertainties on gradients, extrema, and averages are not currently propagated.')
+                    st.caption('Independent pointwise uncertainties are propagated through gradients, normalized gradients, scale lengths, and averages. Peak-location uncertainty is not estimated; model and calibration uncertainties are separate.')
                 except Exception as e:
                     st.error(str(e))
     elif workflow=='Thomson raw-spectrum temperature fit':
