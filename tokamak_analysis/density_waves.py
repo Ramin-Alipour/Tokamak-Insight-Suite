@@ -10,7 +10,7 @@ def analyze_density_waves(time_s,density_m3,*,band_Hz=None):
     out={"frequency_Hz":f,"power_spectral_density":p,"rms_fluctuation":float(np.std(n,ddof=1)),"relative_rms":float(np.std(n,ddof=1)/abs(np.mean(n))) if np.mean(n)!=0 else float("nan")}
     if band_Hz is not None:
         lo,hi=map(float,band_Hz)
-        if lo<0 or hi<=lo: raise ValueError("Invalid frequency band")
+        if not np.all(np.isfinite([lo,hi])) or lo<0 or hi<=lo: raise ValueError("Frequency band must have finite increasing non-negative bounds")
         m=(f>=lo)&(f<=hi); out["band_power"]=float(getattr(np, "trapezoid", np.trapz)(p[m],f[m])) if np.count_nonzero(m)>1 else 0.0
     return out
 
