@@ -11,3 +11,14 @@ def analyze_fft(time_s, signal, *, detrend=True, window="hann"):
     else: raise ValueError("window must be hann or rectangular")
     spec=np.fft.rfft(y*w); f=np.fft.rfftfreq(len(y),dt); amp=2*np.abs(spec)/max(np.sum(w),np.finfo(float).tiny)
     return {"frequency_Hz":f,"amplitude":amp,"phase_rad":np.angle(spec),"sampling_frequency_Hz":1/dt,"window":window}
+
+
+def frequency_resolution_Hz(time_s):
+    """Finite-record Fourier frequency spacing: delta_f=1/T_record."""
+    t=np.asarray(time_s,dtype=float)
+    if t.ndim!=1 or len(t)<2 or not np.all(np.isfinite(t)) or np.any(np.diff(t)<=0):
+        raise ValueError("Time must be finite, 1-D, length >=2, strictly increasing")
+    duration=float(t[-1]-t[0])
+    if duration<=0: raise ValueError("Record duration must be positive")
+    return {"frequency_resolution_Hz":1.0/duration,"record_duration_s":duration,
+            "equation":"delta_f approximately 1/T_record"}
