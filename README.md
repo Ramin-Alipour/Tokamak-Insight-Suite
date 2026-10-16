@@ -1,6 +1,6 @@
 # Tokamak Insight Suite (TIS)
 
-**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source release: **v0.5.0**.
+**Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source version: **v0.5.1**. See `docs/architecture/` for execution contracts, the canonical measurement model and reproducible project persistence.
 
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
