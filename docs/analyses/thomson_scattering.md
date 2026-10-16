@@ -14,11 +14,11 @@ The single-band helper density_from_thomson_scattered_power estimates density fr
 | Input | Unit | Requirement |
 |---|---|---|
 | wavelength_nm | nm | One-dimensional, finite, strictly increasing calibrated wavelength axis; at least 7 samples |
-| signal | detector units | One-dimensional finite measured signal, same length as wavelength |
+| signal | detector units by default; W/nm when calibrated-power mode is enabled | One-dimensional finite measured signal, same length as wavelength |
 | laser_wavelength_nm | nm | Positive finite laser wavelength |
 | scattering_angle_rad | rad | In (0, pi] |
 | instrument_sigma_nm | nm | Positive known Gaussian instrumental standard deviation |
-| signal_uncertainty | detector units | Optional positive finite 1-sigma uncertainty for every signal sample |
+| signal_uncertainty | same units as signal | Optional positive finite 1-sigma uncertainty for every signal sample |
 
 The fitted model is a Gaussian Doppler-broadened profile plus a linear background. Instrumental broadening is removed in quadrature:
 
