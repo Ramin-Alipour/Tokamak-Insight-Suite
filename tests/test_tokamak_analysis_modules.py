@@ -1125,3 +1125,11 @@ def test_boltzmann_line_ratio_temperature_relation():
     te=10.0; delta=5.0; pref=4.0; ratio=pref*np.exp(-delta/te)
     out=boltzmann_temperature_from_line_ratio(ratio,pref,delta)
     assert out["excitation_temperature_eV"] == pytest.approx(te,rel=1e-14)
+
+
+def test_interferometer_forward_inverse_phase_relation():
+    from tokamak_analysis.interferometry import phase_shift_from_line_density, interferometry_density
+    line_density=2e19; frequency=140e9
+    phase=phase_shift_from_line_density(line_density,frequency)["phase_shift_rad"]
+    recovered=interferometry_density(phase,frequency)["line_integrated_density_m-2"]
+    assert recovered == pytest.approx(line_density,rel=1e-12)
