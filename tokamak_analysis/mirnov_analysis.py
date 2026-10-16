@@ -10,8 +10,15 @@ def analyze_mirnov_signal(time_s, voltage_V, *, coil_area_m2=None, turns=None):
     inds=inds[np.argsort(p[inds])[::-1]][:8]
     out={"frequency_Hz":f,"power_spectral_density":p,"dominant_peaks_Hz":f[inds],"rms_voltage_V":float(np.std(v,ddof=1))}
     if coil_area_m2 is not None or turns is not None:
-        if coil_area_m2 is None or turns is None or not np.isfinite(float(coil_area_m2)) or float(coil_area_m2)<=0 or int(turns)<1: raise ValueError("Finite positive coil area and positive turns required together")
-        out["approx_Bdot_T_s"]=-v/(int(turns)*float(coil_area_m2))
+        try:
+            area = float(coil_area_m2)
+            turns_value = float(turns)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Finite positive coil area and positive integer turns required together") from exc
+        if (coil_area_m2 is None or turns is None or not np.isfinite(area) or area <= 0
+                or not np.isfinite(turns_value) or turns_value < 1 or not turns_value.is_integer()):
+            raise ValueError("Finite positive coil area and positive integer turns required together")
+        out["approx_Bdot_T_s"]=-v/(int(turns_value)*area)
     out["caveat"]="Coil transfer function, orientation, integration constant and calibration are not corrected automatically."
     return out
 
