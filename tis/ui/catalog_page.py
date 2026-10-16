@@ -6,12 +6,14 @@ from typing import Callable, Iterable, Mapping, Any
 def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                         formulas: Iterable[Mapping[str, Any]],
                         diagnostic_families: Callable[[], list[str]],
-                        json_download: Callable[[str, Any, str], None]) -> None:
+                        json_download: Callable[[str, Any, str], None],
+                        analyses: Iterable[Mapping[str, Any]] = ()) -> None:
     """Render the catalogue from canonical registry records."""
     diagnostics = list(diagnostics)
     formulas = list(formulas)
+    analyses = list(analyses)
     st.title("Diagnostic Knowledge Base")
-    view = st.radio("Catalog", ["Diagnostic families", "Formula reference"], horizontal=True)
+    view = st.radio("Catalog", ["Diagnostic families", "Analysis entry points", "Formula reference"], horizontal=True)
     query = st.text_input("Search by diagnostic, observable, formula, method or caveat", "").strip().lower()
     if view == "Diagnostic families":
         family = st.selectbox("Diagnostic family", ["All families"] + diagnostic_families())
@@ -43,6 +45,23 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                     f"**Limitations:** {diagnostic['caveat']}"
                 )
         json_download("Export diagnostic registry JSON", entries, "tis_diagnostic_registry.json")
+        return
+    if view == "Analysis entry points":
+        entries = [item for item in analyses
+                   if not query or query in " ".join(str(v) for v in item.values()).lower()]
+        st.write(f"{len(entries)} callable analysis entry points")
+        for analysis in entries:
+            contract = analysis.get("execution_contract", {})
+            with st.expander(f"{analysis['id']:02d} · {analysis['name']}"):
+                st.markdown(
+                    f"**Callable:** `{analysis['module']}.{analysis['function']}`\n\n"
+                    f"**Execution level:** `{contract.get('execution_level', 'reference_only')}`\n\n"
+                    f"**Contract completeness:** {contract.get('completeness', 'incomplete')}\n\n"
+                    f"**Declared input / output specifications:** {len(contract.get('input_specs', []))} / {len(contract.get('output_specs', []))}\n\n"
+                    f"**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics', False) and contract.get('completeness') == 'complete' else 'Not claimed'}\n\n"
+                    f"**Limitations:** {'; '.join(contract.get('limitations', [])) or 'Not yet documented'}"
+                )
+        json_download("Export analysis entry-point contracts JSON", entries, "tis_analysis_contracts.json")
         return
     entries = [formula for formula in formulas
                if not query or query in " ".join(str(v) for v in formula.values()).lower()]
