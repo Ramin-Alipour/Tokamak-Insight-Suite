@@ -1141,3 +1141,18 @@ def test_o_mode_reflectometry_dispersion_relation():
     out=density_from_o_mode_refractive_index(f,n)
     cutoff=cutoff_density(f,mode="O")["cutoff_density_m-3"]
     assert out["electron_density_m3"] == pytest.approx(cutoff*(1-n**2),rel=1e-14)
+
+
+def test_density_wave_phase_velocity_relation():
+    from tokamak_analysis.density_waves import wave_phase_velocity
+    out=wave_phase_velocity(1000.0,0.25)
+    assert out["phase_velocity_m_s"] == pytest.approx(250.0)
+
+
+def test_langmuir_dispersion_zero_wavenumber():
+    from tokamak_analysis.plasma_wave_spectrum import langmuir_wave_frequency
+    from tokamak_analysis.interferometry import E, ME, EPS0
+    ne=1e19
+    out=langmuir_wave_frequency(ne,20.0,0.0)
+    expected=np.sqrt(ne*E**2/(EPS0*ME))/(2*np.pi)
+    assert out["frequency_Hz"] == pytest.approx(expected,rel=1e-14)
