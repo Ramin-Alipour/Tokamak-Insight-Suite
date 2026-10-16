@@ -34,4 +34,4 @@ def test_transport_flux_uses_canonical_particle_flux_alias(function, key):
 def test_divertor_integrated_flux_contract_has_explicit_profile_units():
     result = analyze_divertor_particle_flux([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
     assert result["integrated_particle_flux_m-1_s-1"] == pytest.approx(3.0)
-    assert result["particle_flux_m-2_s-1"] == [1.0, 2.0, 1.0]
+    np.testing.assert_allclose(result["particle_flux_m-2_s-1"], [1.0, 2.0, 1.0])
