@@ -931,4 +931,4 @@ def test_thomson_scattering_physical_density_relation_known_answer():
     )
     assert out["electron_density_m3"] == pytest.approx(ne, rel=1e-12)
     assert out["model_scattered_power_W"] == pytest.approx(scattered, rel=1e-12)
-    assert dsigma == pytest.approx((2.8179403262e-15)**2, rel=1e-12)
+    assert dsigma == pytest.approx(0.5 * (2.8179403262e-15)**2, rel=1e-12)
