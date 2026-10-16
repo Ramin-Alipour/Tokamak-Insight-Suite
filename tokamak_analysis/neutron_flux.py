@@ -23,7 +23,7 @@ def analyze_neutron_flux(time_s, counts, *, efficiency=None, effective_area_m2=N
     if efficiency is not None or effective_area_m2 is not None:
         if efficiency is None or effective_area_m2 is None: raise ValueError("Provide detector efficiency and effective area")
         eff=float(efficiency); area=float(effective_area_m2)
-        if not 0<eff<=1 or area<=0: raise ValueError("Efficiency must be (0,1] and area positive")
+        if not np.isfinite(eff) or not np.isfinite(area) or not 0<eff<=1 or area<=0: raise ValueError("Efficiency must be finite in (0,1] and area finite positive")
         out["flux_estimate_m-2_s-1"]=rate/(eff*area)
     out["caveat"]="For per-bin counts, time_s is interpreted as bin-center times unless live_time_s is supplied; cumulative counters must be selected explicitly. Flux also requires detector geometry, efficiency, background, dead-time, and energy-response corrections."
     return out
