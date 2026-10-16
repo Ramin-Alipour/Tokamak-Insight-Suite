@@ -14,3 +14,13 @@ def analyze_ion_temperature(temperature_eV, *, coordinate=None, uncertainty_eV=N
         out["uncertainty_eV"]=u
     out["caveat"]="Input must be a measured or independently inferred Ti profile; this does not fit spectral line widths."
     return out
+
+def ion_temperature_from_pressure_density(ion_pressure_Pa, ion_density_m3):
+    """Ideal-gas ion temperature in eV: Ti=pi/(ni*e)."""
+    pi,ni=np.broadcast_arrays(np.asarray(ion_pressure_Pa,dtype=float),np.asarray(ion_density_m3,dtype=float))
+    if not np.all(np.isfinite(pi)) or not np.all(np.isfinite(ni)) or np.any(pi<0) or np.any(ni<=0):
+        raise ValueError("Ion pressure must be non-negative and ion density positive; inputs finite")
+    ti=pi/(ni*1.602176634e-19)
+    return {"ion_temperature_eV":ti,"ion_pressure_Pa":pi,"ion_density_m3":ni,
+            "equation":"Ti[eV]=pi[Pa]/(ni[m^-3]*e[C])",
+            "assumption":"Single-temperature ideal ion gas; ion species and density definition must be consistent."}
