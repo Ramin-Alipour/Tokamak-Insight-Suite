@@ -166,9 +166,10 @@
             "electron_temperature_uncertainty_eV (eV)",
             "fitted spectrum",
             "residual",
-            "fit quality metrics"
+            "fit quality metrics",
+            "optional integrated_scattered_power_W and fit uncertainty when signal is calibrated in W/nm"
           ],
-          "scope": "Gaussian non-relativistic Maxwellian model, non-collective scattering, linear local background, known Gaussian instrumental sigma; spectral amplitude is not converted to density."
+          "scope": "Non-collective, non-relativistic Maxwellian Gaussian approximation, known Gaussian instrument response, and linear background. Optional integrated power is only reported for an explicitly calibrated W/nm signal; density requires the separate calibrated-power relation."
         },
         {
           "name": "calibrated_power_density",
