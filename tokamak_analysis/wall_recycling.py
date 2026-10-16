@@ -20,4 +20,4 @@ def net_wall_particle_sink(incident_flux_m2_s, returned_flux_m2_s):
     inc,ret=np.broadcast_arrays(np.asarray(incident_flux_m2_s,dtype=float),np.asarray(returned_flux_m2_s,dtype=float))
     if not np.all(np.isfinite(inc)) or not np.all(np.isfinite(ret)) or np.any(inc<0) or np.any(ret<0):
         raise ValueError("Incident and returned fluxes must be finite and non-negative")
-    return {"net_wall_sink_flux_m-2_s-1":inc-ret,"equation":"Gamma_sink=Gamma_incident-Gamma_returned"}
+    net=inc-ret\n    return {"net_particle_sink_flux_m-2_s-1":net,"net_wall_sink_flux_m-2_s-1":net,\n            "equation":"Gamma_sink=Gamma_incident-Gamma_returned",\n            "units":"m^-2 s^-1","caveat":"Returned and incident fluxes must use matched surfaces, species conventions and time windows."}
