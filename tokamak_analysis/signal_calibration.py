@@ -14,3 +14,12 @@ def calibration_residuals(reference, measured):
     if r.shape!=m.shape or r.ndim!=1 or len(r)<2 or not np.all(np.isfinite(r)) or not np.all(np.isfinite(m)): raise ValueError("Matching finite calibration vectors required")
     d=m-r
     return {"residual":d,"bias":float(np.mean(d)),"rmse":float(np.sqrt(np.mean(d**2))),"max_absolute_error":float(np.max(np.abs(d)))}
+
+def fit_linear_calibration(raw_reference, physical_reference):
+    """Least-squares affine calibration y=gain*x+offset from reference pairs."""
+    x=np.asarray(raw_reference,dtype=float); y=np.asarray(physical_reference,dtype=float)
+    if x.ndim!=1 or y.shape!=x.shape or len(x)<2 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)) or np.ptp(x)==0:
+        raise ValueError("Need at least two matching finite calibration points with varying raw values")
+    gain,offset=np.polyfit(x,y,1); predicted=gain*x+offset; residual=y-predicted
+    return {"gain":float(gain),"offset":float(offset),"predicted_reference":predicted,"residual":residual,"rmse":float(np.sqrt(np.mean(residual**2))),
+            "equation":"y_calibrated=gain*x_raw+offset"}
