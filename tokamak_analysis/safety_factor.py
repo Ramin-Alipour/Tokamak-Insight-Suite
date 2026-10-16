@@ -8,7 +8,7 @@ def estimate_safety_factor(R_m, minor_radius_m, B_toroidal_T, B_poloidal_T, *, q
     out={"q_cylindrical_estimate":q,"equation":"q(r) approximately r*B_t/(R*B_p) for circular, large-aspect-ratio geometry","caveat":"Approximate circular large-aspect-ratio estimate only; accurate q(r) requires equilibrium flux-surface integration with consistent local major radius and poloidal field."}
     if q_profile is not None:
         qp=np.asarray(q_profile,dtype=float)
-        if qp.ndim!=1 or not np.all(np.isfinite(qp)): raise ValueError("q_profile must be a finite 1-D array")
+        if qp.ndim!=1 or len(qp)<2 or not np.all(np.isfinite(qp)): raise ValueError("q_profile must contain at least two finite 1-D samples")
         out["provided_q_profile"]=qp; out["q_min_provided"]=float(np.min(qp)); out["q95_provided"]=float(np.interp(.95,np.linspace(0,1,len(qp)),qp))
     return out
 
