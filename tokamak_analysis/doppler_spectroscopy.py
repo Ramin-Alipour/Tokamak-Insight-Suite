@@ -21,3 +21,13 @@ def analyze_doppler_spectrum(wavelength_nm,intensity,*,rest_wavelength_nm=None,m
         out["doppler_shift_nm"]=out["center_nm"]-rest; out["nonrelativistic_velocity_m_s"]=C_M_S*(out["center_nm"]/rest-1)
     out["caveat"]="Input wavelengths must be instrument-calibrated; line-of-sight velocity is non-relativistic and depends on correct rest wavelength and line identification."
     return out
+
+def relativistic_doppler_velocity(observed_wavelength_nm, rest_wavelength_nm):
+    """Relativistic line-of-sight velocity from wavelength ratio beta=(lambda^2-lambda0^2)/(lambda^2+lambda0^2)."""
+    obs,rest=np.broadcast_arrays(np.asarray(observed_wavelength_nm,dtype=float),np.asarray(rest_wavelength_nm,dtype=float))
+    if not np.all(np.isfinite(obs)) or not np.all(np.isfinite(rest)) or np.any(obs<=0) or np.any(rest<=0):
+        raise ValueError("Observed and rest wavelengths must be finite and positive")
+    beta=(obs**2-rest**2)/(obs**2+rest**2)
+    return {"line_of_sight_velocity_m_s":C_M_S*beta,"beta_v_over_c":beta,
+            "equation":"v/c=(lambda_obs^2-lambda_0^2)/(lambda_obs^2+lambda_0^2)",
+            "convention":"Positive velocity denotes redshift/recession; assumes a single Doppler shift with negligible other wavelength shifts."}
