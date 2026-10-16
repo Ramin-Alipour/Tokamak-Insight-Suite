@@ -173,3 +173,17 @@ def test_calibrated_thomson_spectrum_to_temperature_and_density_pipeline():
     density_uncertainty = float(np.asarray(density["electron_density_uncertainty_m3"]).item())
     assert 1.0e19 < density_value < 1.0e20
     assert 0 < density_uncertainty < density_value
+
+
+
+def test_raw_thomson_spectrum_rejects_insufficient_wavelength_window():
+    wavelength = np.linspace(531.8, 532.2, 101)
+    signal = 100.0 * np.exp(-0.5 * ((wavelength - 532.0) / 0.3) ** 2) + 2.0
+    with pytest.raises(ValueError, match="Wavelength window must cover"):
+        fit_thomson_spectrum(
+            wavelength,
+            signal,
+            laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+            instrument_sigma_nm=0.05,
+        )
