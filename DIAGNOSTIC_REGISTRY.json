@@ -4,17 +4,18 @@
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "M→D/I",
-    "method": "Compute profile extrema, trapezoidal line averages, optional approximate volume averages, numerical radial gradients, normalized gradients and local scale lengths. The separate density_from_thomson_scattered_power helper estimates density from calibrated collected power using the classical single-band Thomson power relation.",
-    "caveat": "Raw-spectrum inversion is not implemented. Power-based density needs calibrated optical power/efficiency and geometry; volume averages are large-aspect-ratio approximations.",
+    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
+    "caveat": "The raw-spectrum fit is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. It does not infer density from spectral amplitude; calibrated profile and single-band power density workflows remain separate.",
     "implementation_functions": [
       "thomson_workflow.analyze_thomson_profile",
-      "thomson_scattering.density_from_thomson_scattered_power"
+      "thomson_scattering.density_from_thomson_scattered_power",
+      "thomson_spectrum.fit_thomson_spectrum"
     ],
-    "implementation_status": "Implemented calibrated-profile workflow (scope-limited; see contract)",
+    "implementation_status": "Implemented calibrated-profile workflow plus scoped raw-spectrum electron-temperature fit; overall analysis remains incomplete",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "radius_m",
@@ -93,20 +94,60 @@
       "preprocessing": [
         "Validate finite values, matching lengths, unique radii, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
       ],
-      "algorithm": "Compute profile extrema, trapezoidal line averages, optional approximate volume averages, numerical radial gradients, normalized gradients and local scale lengths. The separate density_from_thomson_scattered_power helper estimates density from calibrated collected power using the classical single-band Thomson power relation.",
-      "uncertainty_model": "Provided pointwise 1-sigma uncertainties are validated, sorted and preserved; uncertainties on numerical gradients, peak locations and averages are not propagated.",
+      "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated.",
+      "uncertainty_model": "Profile uncertainties are validated and preserved but are not propagated through gradients or averages. Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width.",
       "limitations": [
-        "Does not fit raw scattered-light spectra or infer electron temperature from spectral shape.",
         "Power-based density helper requires calibrated collected power, laser power, interaction length, scattering geometry, collection solid angle and optical efficiency.",
         "Single-band power relation neglects spectral-response integration, stray-light subtraction and relativistic spectral-shape effects.",
-        "Numerical gradients can amplify measurement noise; use appropriate smoothing only with a justified noise model."
+        "Numerical gradients can amplify measurement noise; use appropriate smoothing only with a justified noise model.",
+        "Raw-spectrum fit uses a Gaussian non-relativistic Maxwellian approximation and requires a known Gaussian instrumental width.",
+        "Raw-spectrum fit does not infer density from fitted amplitude; absolute density requires a separately calibrated power/throughput model."
       ],
       "function_links": [
         "thomson_workflow.analyze_thomson_profile",
         "thomson_scattering.density_from_thomson_scattered_power"
       ],
       "raw_data_to_physics": false,
-      "note": "Complete only for calibrated profile processing and the explicitly scoped power-based density helper; raw-spectrum inversion is not implemented."
+      "note": "Overall analysis remains incomplete: the scoped raw-spectrum temperature fit is available, but density inversion from spectral amplitude and more general collective/relativistic/non-Maxwellian models are not implemented.",
+      "workflow_modes": [
+        {
+          "name": "calibrated_profile",
+          "function": "thomson_workflow.analyze_thomson_profile",
+          "inputs": [
+            "radius_m (m)",
+            "density_m3 (m^-3)",
+            "temperature_ev (eV)"
+          ],
+          "outputs": [
+            "density and temperature profiles",
+            "radial gradients",
+            "normalized gradients",
+            "local scale lengths",
+            "profile summary"
+          ],
+          "scope": "Processes already calibrated profile values; does not invert detector counts."
+        },
+        {
+          "name": "raw_spectrum_temperature_fit",
+          "function": "thomson_spectrum.fit_thomson_spectrum",
+          "inputs": [
+            "wavelength_nm (nm)",
+            "signal (detector units)",
+            "laser_wavelength_nm (nm)",
+            "scattering_angle_rad (rad)",
+            "instrument_sigma_nm (nm)",
+            "signal_uncertainty (optional, detector units)"
+          ],
+          "outputs": [
+            "electron_temperature_eV (eV)",
+            "electron_temperature_uncertainty_eV (eV)",
+            "fitted spectrum",
+            "residual",
+            "fit quality metrics"
+          ],
+          "scope": "Gaussian non-relativistic Maxwellian model, non-collective scattering, linear local background, known Gaussian instrumental sigma; spectral amplitude is not converted to density."
+        }
+      ]
     }
   },
   {
