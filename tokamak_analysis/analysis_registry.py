@@ -77,7 +77,7 @@ ANALYSES = [
     {"id":71,"name":"Divertor Heat Flux","module":"divertor_analysis","function":"analyze_divertor_flux"},
     {"id":72,"name":"Plasma-Facing Component Heat Load","module":"divertor_analysis","function":"analyze_divertor_flux"},
     {"id":73,"name":"Wall Erosion and Sputtering","module":"divertor_analysis","function":"sputtering_yield"},
-    {"id":74,"name":"Divertor Particle Flux","module":"divertor_analysis","function":"analyze_divertor_flux"},
+    {"id":74,"name":"Divertor Particle Flux","module":"divertor_analysis","function":"analyze_divertor_particle_flux"},
     {"id":75,"name":"Edge Potential and Electric Field","module":"edge_field","function":"analyze_edge_field"},
     {"id":76,"name":"L-H Transition Analysis","module":"lh_transition","function":"detect_lh_transition"},
     {"id":77,"name":"Signal Calibration","module":"signal_calibration","function":"calibrate_signal"},
