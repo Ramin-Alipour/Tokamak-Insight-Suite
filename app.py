@@ -999,7 +999,7 @@ elif page=='Advanced Analysis':
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.write(result)
-                st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat()}])[-100:]
+                st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
             except Exception as e: st.error(f'Analysis failed: {e}')
     elif workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
