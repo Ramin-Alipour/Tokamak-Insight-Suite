@@ -1029,3 +1029,10 @@ def test_cylindrical_volume_average_density_relation():
     assert constant["volume_average_density_m3"] == pytest.approx(3e19,rel=1e-12)
     linear=cylindrical_volume_average_density(r,2e19*(1-r))
     assert linear["volume_average_density_m3"] == pytest.approx(2e19/3,rel=1e-6)
+
+
+def test_electron_temperature_pressure_density_relation():
+    from tokamak_analysis.electron_temperature import electron_temperature_from_pressure_density
+    ne=2e19; te=100.0; e=1.602176634e-19
+    out=electron_temperature_from_pressure_density(ne*te*e,ne)
+    assert out["electron_temperature_eV"] == pytest.approx(te,rel=1e-14)
