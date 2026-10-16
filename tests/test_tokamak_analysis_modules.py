@@ -978,3 +978,11 @@ def test_thermal_beta_density_temperature_relation():
     out=thermal_beta_from_density_temperature(1e19,100.0,1e19,100.0,2.0)
     expected=2*MU0*(2*1e19*100.0*1.602176634e-19)/(2.0**2)
     assert out["thermal_beta"] == pytest.approx(expected,rel=1e-14)
+
+
+def test_safety_factor_field_line_pitch_integral():
+    from tokamak_analysis.safety_factor import safety_factor_from_field_line_pitch
+    theta=np.linspace(0.0,2*np.pi,1001)
+    q=2.5
+    out=safety_factor_from_field_line_pitch(theta,np.full_like(theta,q))
+    assert out["safety_factor_q"] == pytest.approx(q,rel=1e-12)
