@@ -1092,3 +1092,11 @@ def test_forward_inverse_doppler_temperature_relation():
     width=thermal_doppler_fwhm_nm(ti,lam,mass)["thermal_fwhm_nm"]
     out=ion_temperature_from_doppler_fwhm(width,lam,mass)
     assert out["ion_temperature_eV"] == pytest.approx(ti,rel=1e-12)
+
+
+def test_forward_doppler_wavelength_velocity_relation():
+    from tokamak_analysis.doppler_flow import wavelength_from_line_of_sight_velocity, doppler_flow_velocity
+    rest=500.0; velocity=1e5
+    wavelength=wavelength_from_line_of_sight_velocity(rest,velocity,relativistic=True)["observed_wavelength_nm"]
+    recovered=doppler_flow_velocity(wavelength,rest,relativistic=True)["velocity_m_s"]
+    assert recovered == pytest.approx(velocity,rel=1e-12)
