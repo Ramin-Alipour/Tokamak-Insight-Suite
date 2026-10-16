@@ -971,3 +971,10 @@ def test_toroidal_vacuum_field_scaling_relation():
     out=toroidal_field_vacuum_scaling(3.0,2.0,r)
     np.testing.assert_allclose(out["B_toroidal_T"],[6.0,3.0,1.5],rtol=1e-14)
     np.testing.assert_allclose(out["Bt_times_R_T_m"],6.0,rtol=1e-14)
+
+
+def test_thermal_beta_density_temperature_relation():
+    from tokamak_analysis.beta import thermal_beta_from_density_temperature, MU0
+    out=thermal_beta_from_density_temperature(1e19,100.0,1e19,100.0,2.0)
+    expected=2*MU0*(2*1e19*100.0*1.602176634e-19)/(2.0**2)
+    assert out["thermal_beta"] == pytest.approx(expected,rel=1e-14)
