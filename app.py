@@ -1027,6 +1027,19 @@ elif page=='Advanced Analysis':
                         'Density scale length (m)':profile['density_scale_length_m'],
                         'Temperature scale length (m)':profile['temperature_scale_length_m'],
                     })
+                    optional_columns={
+                        'Density uncertainty (m⁻³)':'density_uncertainty_m3',
+                        'Temperature uncertainty (eV)':'temperature_uncertainty_eV',
+                        'Density-gradient uncertainty (m⁻⁴)':'density_gradient_uncertainty_m-4',
+                        'Temperature-gradient uncertainty (eV/m)':'temperature_gradient_uncertainty_eV_m-1',
+                        'Density scale-length uncertainty (m)':'density_scale_length_uncertainty_m',
+                        'Temperature scale-length uncertainty (m)':'temperature_scale_length_uncertainty_m',
+                    }
+                    for column_label,result_key in optional_columns.items():
+                        if result_key in profile:
+                            profile_frame[column_label]=profile[result_key]
+                    st.markdown('**Profile summary**')
+                    st.json(dict(vars(summary)))
                     st.markdown('**Radial profiles**')
                     st.line_chart(profile_frame.set_index('Radius (m)')[['Electron density (m⁻³)']])
                     st.line_chart(profile_frame.set_index('Radius (m)')[['Electron temperature (eV)']])
