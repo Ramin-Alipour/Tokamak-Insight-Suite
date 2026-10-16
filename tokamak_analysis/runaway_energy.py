@@ -11,7 +11,8 @@ def estimate_runaway_energy(energy_keV, counts, *, detector_response_corrected=F
     m &= c>0
     if np.count_nonzero(m)<3: raise ValueError("Need at least three positive bins in fit range")
     slope,intercept=np.polyfit(e[m],np.log(c[m]),1)
-    temperature=-1/slope if slope<0 else float("nan")
+    if slope>=0: raise ValueError("HXR spectrum has a non-negative log-slope; an exponential characteristic energy is not defined")
+    temperature=-1/slope
     return {"exponential_slope_per_keV":float(slope),"characteristic_energy_keV":float(temperature),"fit_intercept":float(intercept),"response_corrected":bool(detector_response_corrected),"caveat":"Exponential-slope energy is a model-dependent characteristic scale, not a unique maximum runaway-electron energy; detector response correction is essential."}
 
 def runaway_speed_from_kinetic_energy(kinetic_energy_keV):
