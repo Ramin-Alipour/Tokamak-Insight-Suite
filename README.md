@@ -74,6 +74,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Confinement & Scalings:** Greenwald fraction, q95 (ITER formula), β_t/β_p/β_N, ν*ₑ, Spitzer resistivity, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold. Empirical comparison tools, not device-validated predictions.
 - **Signal conditioning:** explicit gap policies, Hampel despiking, drift-corrected integration. Every repair is reported.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
+- **Thomson Scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
 ## Tests and CI
