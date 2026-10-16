@@ -114,3 +114,26 @@ def test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area():
     assert out["integrated_scattered_power_W"] == pytest.approx(expected_power, rel=1e-12)
     assert out["integrated_scattered_power_uncertainty_W"] > 0
     assert out["spectral_power_density_calibrated"] is True
+    assert out["electron_temperature_eV"] == pytest.approx(100.0, rel=0.03)
+
+
+
+def test_thomson_temperature_fit_is_stable_under_signal_unit_scaling():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    counts_fit = fit_thomson_spectrum(
+        wavelength, signal,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=0.05,
+    )
+    power_density_fit = fit_thomson_spectrum(
+        wavelength, signal * 1.0e-18,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=0.05,
+        signal_uncertainty=np.full(signal.size, 0.8e-18),
+        spectral_power_density_calibrated=True,
+    )
+    assert power_density_fit["electron_temperature_eV"] == pytest.approx(
+        counts_fit["electron_temperature_eV"], rel=1e-8
+    )
