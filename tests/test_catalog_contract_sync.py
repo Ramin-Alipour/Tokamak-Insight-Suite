@@ -21,3 +21,14 @@ def test_package_and_runtime_versions_are_consistent():
     metadata = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     version_line = next(line for line in metadata.splitlines() if line.startswith("version = "))
     assert version_line.split("=", 1)[1].strip().strip('"') == __version__
+
+
+def test_all_analysis_entry_points_declare_conservative_contracts():
+    from tokamak_analysis.analysis_registry import ANALYSES
+    assert len(ANALYSES) == 80
+    for entry in ANALYSES:
+        contract = entry["execution_contract"]
+        assert contract["execution_level"] == "limited_calculation"
+        assert contract["completeness"] == "incomplete"
+        assert contract["raw_data_to_physics"] is False
+        assert contract["function_links"] == [f'{entry["module"]}.{entry["function"]}']
