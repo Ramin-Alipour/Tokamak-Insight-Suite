@@ -70,3 +70,11 @@ def test_thomson_density_rejects_invalid_scattering_angle():
 
     with pytest.raises(ValueError, match="angle"):
         density_from_thomson_scattered_power(1.0, 2.0, 0.1, 4.0, 1.0e-3)
+
+
+def test_thomson_volume_average_rejects_signed_radius_coordinate():
+    from tokamak_analysis.thomson_scattering import build_profile, profile_summary
+
+    profile = build_profile([-0.2, 0.0, 0.2], [1e19, 2e19, 1e19], [20.0, 40.0, 20.0])
+    with pytest.raises(ValueError, match="non-negative minor-radius"):
+        profile_summary(profile, major_radius_m=1.0)
