@@ -78,9 +78,14 @@ def fit_thomson_spectrum(
         if np.any(uncertainty <= 0):
             raise ValueError("signal_uncertainty must be strictly positive")
 
-    peak_index = int(np.argmax(y))
-    baseline = float(np.median(np.r_[y[: max(2, y.size // 10)], y[-max(2, y.size // 10):]]))
-    amplitude0 = float(np.max(y) - baseline)
+    signal_scale = float(np.max(np.abs(y)))
+    if not np.isfinite(signal_scale) or signal_scale <= 0:
+        raise ValueError("signal must contain at least one non-zero finite value")
+    y_scaled = y / signal_scale
+    uncertainty_scaled = None if uncertainty is None else uncertainty / signal_scale
+    peak_index = int(np.argmax(y_scaled))
+    baseline = float(np.median(np.r_[y_scaled[: max(2, y.size // 10)], y_scaled[-max(2, y.size // 10):]]))
+    amplitude0 = float(np.max(y_scaled) - baseline)
     if not np.isfinite(amplitude0) or amplitude0 <= 0:
         raise ValueError("signal must contain a positive peak above its edge baseline")
     center0 = float(x[peak_index])
@@ -91,16 +96,19 @@ def fit_thomson_spectrum(
     upper = [np.inf, float(x[-1]), span, np.inf, np.inf]
     p0 = [amplitude0, center0, min(sigma0, span * 0.5), baseline, 0.0]
 
-    params, covariance = curve_fit(
+    scaled_params, scaled_covariance = curve_fit(
         _gaussian_linear_background,
         x,
-        y,
+        y_scaled,
         p0=p0,
         bounds=(lower, upper),
-        sigma=uncertainty,
+        sigma=uncertainty_scaled,
         absolute_sigma=uncertainty is not None,
         maxfev=50_000,
     )
+    parameter_scales = np.array([signal_scale, 1.0, 1.0, signal_scale, signal_scale])
+    params = np.asarray(scaled_params, dtype=float) * parameter_scales
+    covariance = scaled_covariance * np.outer(parameter_scales, parameter_scales)
     amplitude, center, sigma_fit, intercept, slope = [float(v) for v in params]
     if sigma_fit <= instrument_sigma_nm:
         raise ValueError(
