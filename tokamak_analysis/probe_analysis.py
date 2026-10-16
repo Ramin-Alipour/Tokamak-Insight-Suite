@@ -21,7 +21,9 @@ def analyze_probe_voltage_current(voltage_V,current_A,*,electron_fit_range=None,
             out["electron_current_used_A"]=electron_current[m]
             out["electron_fit_note"]="Ion-saturation baseline subtracted before log-linear fitting; verify current polarity and fit interval."
     if ion_fit_range is not None:
-        lo,hi=map(float,ion_fit_range); m=(v>=lo)&(v<=hi)
+        lo,hi=map(float,ion_fit_range)
+        if not np.all(np.isfinite([lo,hi])) or hi<=lo: raise ValueError("ion_fit_range must have finite increasing bounds")
+        m=(v>=lo)&(v<=hi)
         out["ion_fit_linear_slope_A_V"]=float(np.polyfit(v[m],i[m],1)[0]) if np.count_nonzero(m)>=2 else None
     return out
 
