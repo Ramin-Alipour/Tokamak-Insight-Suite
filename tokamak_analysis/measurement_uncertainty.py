@@ -3,8 +3,15 @@ import numpy as np
 def propagate_product_uncertainty(values, uncertainties):
     v=np.asarray(values,dtype=float); u=np.asarray(uncertainties,dtype=float)
     if v.ndim!=1 or u.shape!=v.shape or len(v)<1 or not np.all(np.isfinite(v)) or not np.all(np.isfinite(u)) or np.any(u<0): raise ValueError("Matching finite values and nonnegative uncertainties required")
-    product=float(np.prod(v)); rel=np.sqrt(np.sum((u/np.maximum(np.abs(v),np.finfo(float).tiny))**2))
-    return {"value":product,"standard_uncertainty":abs(product)*float(rel),"relative_uncertainty":float(rel)}
+    product=float(np.prod(v))
+    # First-order independent uncertainty propagation remains valid when one or more factors are zero.
+    derivatives=np.ones_like(v)
+    for i in range(len(v)):
+        derivatives[i]=float(np.prod(np.delete(v,i)))
+    standard=float(np.sqrt(np.sum((derivatives*u)**2)))
+    relative=standard/abs(product) if product!=0 else float("nan")
+    return {"value":product,"standard_uncertainty":standard,"relative_uncertainty":float(relative),
+            "equation":"u_product=sqrt(sum_i((u_i*product_{j!=i}(x_j))^2)); relative uncertainty undefined when product is zero"}
 def uncertainty_summary(measured, uncertainty):
     x=np.asarray(measured,dtype=float); u=np.asarray(uncertainty,dtype=float)
     if x.shape!=u.shape or x.size<1 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(u)) or np.any(u<0): raise ValueError("Matching finite data and nonnegative uncertainty required")
