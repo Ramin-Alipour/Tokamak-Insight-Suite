@@ -1162,3 +1162,10 @@ def test_compton_scattering_energy_relation():
     from tokamak_analysis.hard_xray import compton_scattered_photon_energy_keV
     out=compton_scattered_photon_energy_keV(511.0,np.pi)
     assert out["scattered_photon_energy_keV"] == pytest.approx(511.0/3.0,rel=1e-5)
+
+
+def test_soft_xray_maxwellian_bremsstrahlung_shape():
+    from tokamak_analysis.soft_xray import maxwellian_bremsstrahlung_spectral_shape
+    out=maxwellian_bremsstrahlung_spectral_shape(np.array([0.0,10.0]),10.0)
+    shape=out["relative_bremsstrahlung_spectral_shape"]
+    assert shape[1]/shape[0] == pytest.approx(np.exp(-1.0),rel=1e-14)
