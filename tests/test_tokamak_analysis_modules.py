@@ -986,3 +986,13 @@ def test_safety_factor_field_line_pitch_integral():
     q=2.5
     out=safety_factor_from_field_line_pitch(theta,np.full_like(theta,q))
     assert out["safety_factor_q"] == pytest.approx(q,rel=1e-12)
+
+
+def test_quadratic_magnetic_axis_refinement_known_offgrid_minimum():
+    from tokamak_analysis.magnetic_axis import quadratic_magnetic_axis_refinement
+    R=np.linspace(1.0,2.0,11); Z=np.linspace(-0.5,0.5,11)
+    RR,ZZ=np.meshgrid(R,Z); psi=(RR-1.43)**2+2*(ZZ-0.13)**2+4.0
+    out=quadratic_magnetic_axis_refinement(R,Z,psi)
+    assert out["R_axis_m"] == pytest.approx(1.43,abs=1e-10)
+    assert out["Z_axis_m"] == pytest.approx(0.13,abs=1e-10)
+    assert out["psi_axis_Wb_rad"] == pytest.approx(4.0,abs=1e-10)
