@@ -2,7 +2,7 @@
 import numpy as np
 def identify_spectral_lines(observed_nm, reference_lines, *, tolerance_nm=0.05):
     obs=np.asarray(observed_nm,dtype=float); tol=float(tolerance_nm)
-    if obs.ndim!=1 or not np.all(np.isfinite(obs)) or not np.isfinite(tol) or tol<=0: raise ValueError("Observed wavelengths and tolerance must be finite; tolerance positive")
+    if obs.ndim!=1 or obs.size<1 or not np.all(np.isfinite(obs)) or np.any(obs<=0) or not np.isfinite(tol) or tol<=0: raise ValueError("Observed wavelengths must be a nonempty finite positive 1-D array; tolerance must be positive")
     refs=[]
     for item in reference_lines:
         if len(item)<2: raise ValueError("Each reference line must contain wavelength and label")
