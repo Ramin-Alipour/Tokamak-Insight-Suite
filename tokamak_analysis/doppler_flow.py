@@ -16,3 +16,13 @@ def doppler_flow_velocity(observed_wavelength_nm, rest_wavelength_nm, *, uncerta
         out["velocity_uncertainty_m_s"]=C*u/rest
     out["caveat"]="Velocity is line-of-sight and depends on accurate wavelength calibration and rest-line identification."
     return out
+
+def wavelength_from_line_of_sight_velocity(rest_wavelength_nm, velocity_m_s, *, relativistic=False):
+    """Forward Doppler relation from line-of-sight velocity to observed wavelength."""
+    rest,v=np.broadcast_arrays(np.asarray(rest_wavelength_nm,dtype=float),np.asarray(velocity_m_s,dtype=float))
+    if not np.all(np.isfinite(rest)) or not np.all(np.isfinite(v)) or np.any(rest<=0) or np.any(np.abs(v)>=C):
+        raise ValueError("Rest wavelength must be positive and |velocity|<c; inputs finite")
+    beta=v/C
+    ratio=np.sqrt((1+beta)/(1-beta)) if relativistic else (1+beta)
+    if not relativistic and np.any(ratio<=0): raise ValueError("Non-relativistic wavelength factor is non-positive")
+    return {"observed_wavelength_nm":rest*ratio,"equation":"lambda=lambda0*sqrt((1+beta)/(1-beta)) relativistic; lambda=lambda0*(1+beta) nonrelativistic" if relativistic else "lambda=lambda0*(1+v/c)"}
