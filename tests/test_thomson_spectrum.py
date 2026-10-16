@@ -95,3 +95,22 @@ def test_raw_thomson_spectrum_does_not_claim_chi_square_without_uncertainties():
     assert out["chi_square"] is None
     assert out["reduced_chi_square"] is None
     assert out["residual_variance"] >= 0
+
+
+
+def test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    calibrated_signal = signal * 1.0e-18
+    out = fit_thomson_spectrum(
+        wavelength,
+        calibrated_signal,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=0.05,
+        signal_uncertainty=np.full(signal.size, 0.8e-18),
+        spectral_power_density_calibrated=True,
+    )
+    expected_power = out["amplitude"] * out["fitted_sigma_nm"] * np.sqrt(2.0 * np.pi)
+    assert out["integrated_scattered_power_W"] == pytest.approx(expected_power, rel=1e-12)
+    assert out["integrated_scattered_power_uncertainty_W"] > 0
+    assert out["spectral_power_density_calibrated"] is True
