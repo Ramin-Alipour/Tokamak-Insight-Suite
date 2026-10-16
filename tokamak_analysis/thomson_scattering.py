@@ -110,8 +110,14 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
     if major_radius_m is not None:
         if not np.isfinite(major_radius_m) or major_radius_m <= 0:
             raise ValueError("major_radius_m must be positive and finite")
+        # Volume weighting requires a non-negative minor-radius coordinate.
+        # Clipping negative coordinates would silently bias the inferred average.
+        if np.any(r < 0):
+            raise ValueError(
+                "volume averaging requires a non-negative minor-radius coordinate"
+            )
         # For a circular, large-aspect-ratio cross-section, dV/dr ∝ r.
-        weight = np.maximum(r, 0.0)
+        weight = r
         denom = float(np.trapezoid(weight, r))
         if denom > 0:
             ne_vol = float(np.trapezoid(ne * weight, r) / denom)
