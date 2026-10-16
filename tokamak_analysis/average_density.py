@@ -27,7 +27,7 @@ def cylindrical_volume_average_density(radius_m, density_profile_m3):
     if np.any(np.diff(r)<=0) or r[0]<0 or r[-1]<=0 or np.any(ne<0):
         raise ValueError("Radius must increase from non-negative values and density must be non-negative")
     if not np.isclose(r[0],0.0,atol=1e-12): raise ValueError("Profile must include the magnetic axis at r=0")
-    a=float(r[-1]); avg=2*float(np.trapezoid(ne*r,r))/(a*a)
+    a=float(r[-1]); avg=2*float(getattr(np, "trapezoid", np.trapz)(ne*r,r))/(a*a)
     return {"volume_average_density_m3":avg,"minor_radius_m":a,
             "equation":"<n>_V=(2/a^2)*integral_0^a n(r)*r dr",
             "caveat":"Assumes circular cylindrical cross-section and density represented as a function of minor radius."}
