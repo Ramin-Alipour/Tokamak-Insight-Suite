@@ -40,3 +40,13 @@ def turbulent_momentum_flux(v_radial_m_s, v_poloidal_m_s, mass_density_kg_m3):
     return {"turbulent_momentum_flux_Pa":-rho*cov,"velocity_covariance_m2_s2":cov,
             "equation":"Pi_rtheta=-rho*<v_r_prime*v_theta_prime>",
             "convention":"Negative covariance sign chosen for outward flux convention; verify sign conventions for the target publication."}
+
+
+def radial_transport_analysis(density_fluctuation, velocity_fluctuation, *, coordinate_m=None):
+    """Radial particle-flux covariance from synchronized density and radial-velocity fluctuations."""
+    return fluctuation_transport(density_fluctuation, velocity_fluctuation, coordinate_m=coordinate_m, direction="radial")
+
+
+def poloidal_transport_analysis(density_fluctuation, velocity_fluctuation, *, coordinate_m=None):
+    """Poloidal particle-flux covariance from synchronized density and poloidal-velocity fluctuations."""
+    return fluctuation_transport(density_fluctuation, velocity_fluctuation, coordinate_m=coordinate_m, direction="poloidal")
