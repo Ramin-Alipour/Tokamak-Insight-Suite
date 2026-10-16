@@ -223,3 +223,24 @@ def test_plasma_wave_spectrum_zero_signal_has_no_dominant_frequency():
     from tokamak_analysis.plasma_wave_spectrum import analyze_wave_signal
     result = analyze_wave_signal(np.arange(16, dtype=float) * 0.01, np.zeros(16))
     assert result["dominant_frequency_Hz"] is None
+
+
+def test_empty_xray_and_neutron_spectra_have_no_peak_energy():
+    from tokamak_analysis.hard_xray import analyze_hard_xray
+    from tokamak_analysis.xray_spectrum import analyze_xray_spectrum
+    from tokamak_analysis.neutron_spectrum import analyze_neutron_spectrum
+    assert analyze_hard_xray([1.0, 2.0], [0.0, 0.0])["peak_energy_keV"] is None
+    assert analyze_xray_spectrum([1.0, 2.0], [0.0, 0.0])["peak_energy_keV"] is None
+    assert analyze_neutron_spectrum([1.0, 2.0], [0.0, 0.0])["peak_energy_keV"] is None
+
+
+def test_abel_projection_on_axis_has_finite_endpoint():
+    from tokamak_analysis.radiation_tomography import abel_project_axisymmetric_emissivity
+    result = abel_project_axisymmetric_emissivity([0.0, 1.0, 2.0], [1.0, 1.0, 1.0], [0.0])
+    assert np.all(np.isfinite(result["line_integrated_emissivity_W_m2"]))
+
+
+def test_tomography_uses_stable_least_squares_for_identity_response():
+    from tokamak_analysis.radiation_tomography import reconstruct_emissivity
+    result = reconstruct_emissivity([[1.0, 0.0], [0.0, 1.0]], [2.0, 3.0], regularization=0.0, nonnegative=False)
+    np.testing.assert_allclose(result["emissivity"], [2.0, 3.0])
