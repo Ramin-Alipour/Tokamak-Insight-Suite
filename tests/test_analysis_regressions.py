@@ -156,3 +156,10 @@ def test_divertor_bohm_flux_uses_electron_temperature():
     result = divertor_ion_particle_flux_from_sheath(1e19, 10.0, 2.0)
     expected_sound_speed = np.sqrt(10.0 * 1.602176634e-19 / (2.0 * 1.66053906660e-27))
     assert result["sound_speed_m_s"] == pytest.approx(expected_sound_speed)
+
+
+def test_large_aspect_ratio_shafranov_shift_includes_geometric_half_term():
+    from tokamak_analysis.shafranov_shift import large_aspect_ratio_shafranov_shift
+
+    result = large_aspect_ratio_shafranov_shift(0.5, 1.0, 1.0, 1.0)
+    assert result["predicted_shafranov_shift_m"] == pytest.approx(0.125)
