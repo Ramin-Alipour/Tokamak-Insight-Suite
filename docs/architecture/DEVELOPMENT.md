@@ -7,8 +7,12 @@
 - `tis/contracts.py`: typed interpretation and validation of diagnostic contracts.
 - `tis/data_model.py`: measurement metadata, unit conversion and quality state.
 - `tis/project.py`: persistent projects and reproducible analysis-run records.
+- `tis/signal_processing.py`: filtering, FFT, Welch PSD, correlation and spectrograms.
+- `tis/spectral_analysis.py`: spectral line fitting and fit-quality metrics.
+- `tis/tomography.py`: response-matrix tomography, regularization selection and Abel inversion.
+- `tis/ui/catalog_page.py` and `tis/ui/project_page.py`: separated Streamlit pages.
 - `tokamak_analysis/`: public numerical analysis functions.
-- `tis/core.py` and `app.py`: legacy entry points during incremental refactoring.
+- `tis/core.py` and `app.py`: compatibility entry points during incremental refactoring; new UI pages and numerical domains should be added in their dedicated modules first.
 
 ## Adding or promoting an analysis
 
