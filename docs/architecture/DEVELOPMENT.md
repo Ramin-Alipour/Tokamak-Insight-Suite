@@ -11,6 +11,8 @@
 - `tis/spectral_analysis.py`: spectral line fitting and fit-quality metrics.
 - `tis/tomography.py`: response-matrix tomography, regularization selection and Abel inversion.
 - `tis/uncertainty.py`: correlated first-order covariance propagation and seeded Monte Carlo propagation.
+- `tis/probe_analysis.py`: Langmuir I–V and triple-probe calculations.
+- `tis/transport_analysis.py`: fluctuation flux, exponential heat-flux and Eich-profile fitting.
 - `tis/ui/catalog_page.py` and `tis/ui/project_page.py`: separated Streamlit pages.
 - `tokamak_analysis/`: public numerical analysis functions.
 - `tis/core.py` and `app.py`: compatibility entry points during incremental refactoring; new UI pages and numerical domains should be added in their dedicated modules first.
