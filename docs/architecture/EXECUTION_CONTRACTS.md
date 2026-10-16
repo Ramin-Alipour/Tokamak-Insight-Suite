@@ -15,7 +15,7 @@ A function existing in the repository does not establish an end-to-end instrumen
 
 Every row in `DIAGNOSTIC_REGISTRY.json` now has an `execution_contract` with execution level, completeness, input/output specs, assumptions, preprocessing, algorithm, uncertainty model, limitations, function links and a raw-data-to-physics flag.
 
-The first migration deliberately marks contracts `incomplete` until input/output schemas, units, uncertainty handling and assumptions are actually specified. Empty specifications mean "not declared", not "no inputs required". UI code must show that state rather than inventing defaults. The typed adapter in `tis.contracts` reads the same JSON records. Contract completeness is not experimental validation.
+The first migration deliberately marks contracts `incomplete` until input/output schemas, units, uncertainty handling and assumptions are actually specified. Empty specifications mean "not declared", not "no inputs required". UI code must show that state rather than inventing defaults. The typed adapter in `tis.contracts` reads the same JSON records. The separate 80-entry callable registry also carries conservative contracts; callable resolution alone is not treated as a complete raw-data workflow. Contract completeness is not experimental validation.
 
 `FORMULA_REGISTRY.json` separately identifies formula-to-code links as `not_mapped` until an implementation and supporting tests are explicitly associated.
 
