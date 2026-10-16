@@ -993,6 +993,8 @@ elif page=='Advanced Analysis':
                 try:
                     if wavelength_col==signal_col:
                         raise ValueError('Wavelength and signal must use different columns.')
+                    if uncertainty_col in {wavelength_col,signal_col}:
+                        raise ValueError('The uncertainty column must differ from wavelength and signal columns.')
                     wavelength_values=pd.to_numeric(df[wavelength_col],errors='raise').to_numpy(dtype=float)
                     signal_values=pd.to_numeric(df[signal_col],errors='raise').to_numpy(dtype=float)
                     signal_uncertainty=None
