@@ -21,6 +21,7 @@ def safety_factor_from_field_line_pitch(theta_rad, dphi_dtheta):
     span=float(theta[-1]-theta[0])
     if not np.isclose(span,2*np.pi,rtol=1e-3,atol=1e-6):
         raise ValueError("theta_rad must cover one full 2*pi poloidal turn")
-    q=float(np.trapezoid(slope,theta)/(2*np.pi))
+    integrate = getattr(np, "trapezoid", np.trapz)
+    q=float(integrate(slope,theta)/(2*np.pi))
     return {"safety_factor_q":q,"toroidal_turns_per_poloidal_turn":q,
             "equation":"q=(1/(2*pi))*integral_0^(2*pi) (dphi/dtheta) dtheta"}
