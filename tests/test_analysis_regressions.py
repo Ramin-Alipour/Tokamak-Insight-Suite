@@ -57,3 +57,12 @@ def test_geometry_rejects_boundary_crossing_symmetry_axis():
     with pytest.raises(ValueError, match="symmetry axis"):
         geometry_from_boundary([-0.1, 0.5, 0.5, -0.1, -0.1],
                                [0.0, 0.0, 1.0, 1.0, 0.0])
+
+
+def test_fft_one_sided_amplitude_does_not_double_nyquist_bin():
+    from tokamak_analysis.fft_analysis import analyze_fft
+
+    time = np.arange(8, dtype=float) / 8.0
+    signal = (-1.0) ** np.arange(8)
+    result = analyze_fft(time, signal, detrend=False, window="rectangular")
+    assert result["amplitude"][-1] == pytest.approx(1.0)
