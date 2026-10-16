@@ -7,7 +7,9 @@ def detect_lh_transition(time_s, signal, *, baseline_window=None, threshold_sigm
     if not np.isfinite(persistence) or int(persistence)!=persistence or int(persistence)<1: raise ValueError("persistence must be a positive integer")
     if baseline_window is None: base=x[:max(5,len(x)//5)]
     else:
-        lo,hi=baseline_window; base=x[(t>=lo)&(t<=hi)]
+        lo,hi=map(float,baseline_window)
+        if not np.all(np.isfinite([lo,hi])) or hi<=lo: raise ValueError("Baseline window must have finite increasing bounds")
+        base=x[(t>=lo)&(t<=hi)]
         if len(base)<3: raise ValueError("Baseline window has too few samples")
     mu=float(np.median(base)); sigma=float(1.4826*np.median(np.abs(base-mu)))
     threshold=mu+float(threshold_sigma)*max(sigma,np.finfo(float).eps)
