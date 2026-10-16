@@ -13,7 +13,7 @@ def quadratic_magnetic_axis_refinement(R_m, Z_m, psi_Wb_rad, *, axis_type="minim
     R=np.asarray(R_m,dtype=float); Z=np.asarray(Z_m,dtype=float); p=np.asarray(psi_Wb_rad,dtype=float)
     if R.ndim!=1 or Z.ndim!=1 or len(R)<3 or len(Z)<3 or p.shape!=(len(Z),len(R)):
         raise ValueError("Need 1-D R,Z grids of length >=3 and matching flux map")
-    if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or not np.all(np.isfinite(p)) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0):
+    if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or not np.all(np.isfinite(p)) or np.any(R<=0) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0):
         raise ValueError("Grids and flux must be finite and strictly increasing")
     if axis_type not in ("minimum","maximum"): raise ValueError("axis_type must be minimum or maximum")
     j,i=np.unravel_index(np.argmin(p) if axis_type=="minimum" else np.argmax(p),p.shape)
