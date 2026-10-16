@@ -13,3 +13,12 @@ def analyze_runaway_events(time_s, hard_xray_signal, *, threshold=None, plasma_c
         out["plasma_current_A"]=ip
     out["caveat"]="HXR bursts are a proxy for energetic-electron activity, not unique proof of runaway electrons or a direct energy distribution."
     return out
+
+def electric_field_energy_gain_eV(parallel_electric_field_V_m, parallel_distance_m):
+    """Electron energy gain magnitude in eV from a uniform parallel field: Delta K[eV]=|E_parallel|*distance."""
+    field,distance=np.broadcast_arrays(np.asarray(parallel_electric_field_V_m,dtype=float),np.asarray(parallel_distance_m,dtype=float))
+    if not np.all(np.isfinite(field)) or not np.all(np.isfinite(distance)) or np.any(distance<0):
+        raise ValueError("Field and distance must be finite; distance non-negative")
+    return {"energy_gain_eV":np.abs(field)*distance,
+            "equation":"Delta K[eV]=|E_parallel[V/m]|*L_parallel[m]",
+            "assumption":"Uniform field and aligned path; ignores collisional drag, radiation losses, and orbit effects."}
