@@ -7,7 +7,9 @@ def analyze_gamma_spectrum(energy_keV, counts, *, expected_lines_keV=None, toler
     matches=[]
     if expected_lines_keV is not None:
         for line in expected_lines_keV:
-            target=float(line); idx=int(np.argmin(abs(e-target)))
+            target=float(line)
+            if not np.isfinite(target) or target<=0: raise ValueError("Expected gamma-line energies must be finite and positive")
+            idx=int(np.argmin(abs(e-target)))
             matches.append({"expected_keV":target,"observed_bin_keV":float(e[idx]),"counts":float(c[idx]),"within_tolerance":bool(abs(e[idx]-target)<=tol)})
     return {"peaks":peaks,"expected_line_matches":matches,"tolerance_keV":tol,"caveat":"Peak assignment is preliminary; detector calibration, efficiency, background, and nuclear-line databases are needed."}
 
