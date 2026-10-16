@@ -3,11 +3,11 @@ import numpy as np
 def analyze_divertor_flux(position_m, heat_flux_W_m2, *, particle_flux_m2_s=None, surface_area_m2=None):
     x=np.asarray(position_m,dtype=float); q=np.asarray(heat_flux_W_m2,dtype=float)
     if x.ndim!=1 or q.shape!=x.shape or len(x)<2 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(q)) or np.any(np.diff(x)<=0) or np.any(q<0): raise ValueError("Divertor heat flux must be finite, non-negative, and ordered by increasing position")
-    out={"position_m":x,"heat_flux_W_m2":q,"peak_heat_flux_W_m2":float(np.max(q)),"integrated_heat_flux_W_m":float(getattr(np, "trapezoid", np.trapz)(q,x))}
+    out={"position_m":x,"heat_flux_W_m2":q,"peak_heat_flux_W_m2":float(np.max(q)),"integrated_heat_flux_W_m":float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(q,x))}
     if particle_flux_m2_s is not None:
         g=np.asarray(particle_flux_m2_s,dtype=float)
         if g.shape!=x.shape or not np.all(np.isfinite(g)) or np.any(g<0): raise ValueError("Particle flux must match and be nonnegative")
-        out["particle_flux_m-2_s-1"]=g; out["integrated_particle_flux_m-1_s-1"]=float(getattr(np, "trapezoid", np.trapz)(g,x))
+        out["particle_flux_m-2_s-1"]=g; out["integrated_particle_flux_m-1_s-1"]=float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(g,x))
     if surface_area_m2 is not None:
         area=float(surface_area_m2)
         if area<=0 or not np.isfinite(area): raise ValueError("Area must be positive")
@@ -35,7 +35,7 @@ def total_pfc_power_from_surface_profile(position_m, heat_flux_W_m2, toroidal_ra
     s=np.asarray(position_m,dtype=float); q=np.asarray(heat_flux_W_m2,dtype=float); R=np.asarray(toroidal_radius_m,dtype=float)
     if s.ndim!=1 or q.shape!=s.shape or R.shape!=s.shape or len(s)<2 or any(not np.all(np.isfinite(v)) for v in (s,q,R)) or np.any(np.diff(s)<=0) or np.any(q<0) or np.any(R<=0):
         raise ValueError("Require matching finite profiles, increasing position, nonnegative heat flux and positive radius")
-    return {"total_pfc_power_W":float(getattr(np, "trapezoid", np.trapz)(q*2*np.pi*R,s)),"equation":"P=integral q(s)*2*pi*R(s) ds"}
+    return {"total_pfc_power_W":float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(q*2*np.pi*R,s)),"equation":"P=integral q(s)*2*pi*R(s) ds"}
 
 
 def divertor_ion_particle_flux_from_sheath(ion_density_m3, electron_temperature_eV, ion_mass_amu, *, ion_temperature_eV=0.0, ion_thermal_factor=1.0):
@@ -56,7 +56,7 @@ def analyze_divertor_particle_flux(position_m, particle_flux_m2_s):
         raise ValueError("Position must be finite/increasing and particle flux finite, non-negative, and shape-matched")
     return {"position_m":x,"particle_flux_m-2_s-1":g,
             "peak_particle_flux_m-2_s-1":float(np.max(g)),
-            "integrated_particle_flux_m-1_s-1":float(getattr(np, "trapezoid", np.trapz)(g,x)),
+            "integrated_particle_flux_m-1_s-1":float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(g,x)),
             "caveat":"Integrated profile is per unit toroidal length unless surface geometry is included; absolute particle rate needs the relevant area and geometry."}
 
 
