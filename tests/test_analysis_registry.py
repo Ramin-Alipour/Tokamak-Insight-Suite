@@ -23,7 +23,7 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "incomplete"
-    assert contract["raw_data_to_physics"] is False
+    assert contract["raw_data_to_physics"] is True
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"radius_m", "density_m3", "temperature_ev"} <= set(inputs)
     assert inputs["radius_m"]["unit"] == "m"
