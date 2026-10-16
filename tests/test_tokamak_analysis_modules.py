@@ -1036,3 +1036,10 @@ def test_electron_temperature_pressure_density_relation():
     ne=2e19; te=100.0; e=1.602176634e-19
     out=electron_temperature_from_pressure_density(ne*te*e,ne)
     assert out["electron_temperature_eV"] == pytest.approx(te,rel=1e-14)
+
+
+def test_ion_temperature_pressure_density_relation():
+    from tokamak_analysis.ion_temperature import ion_temperature_from_pressure_density
+    ni=3e19; ti=250.0; e=1.602176634e-19
+    out=ion_temperature_from_pressure_density(ni*ti*e,ni)
+    assert out["ion_temperature_eV"] == pytest.approx(ti,rel=1e-14)
