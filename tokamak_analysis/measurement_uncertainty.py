@@ -27,6 +27,8 @@ def propagate_sum_uncertainty(values, uncertainties, *, correlation_matrix=None)
         corr=np.asarray(correlation_matrix,dtype=float)
         if corr.shape!=(len(v),len(v)) or not np.all(np.isfinite(corr)) or not np.allclose(corr,corr.T,atol=1e-10) or not np.allclose(np.diag(corr),1.0,atol=1e-10):
             raise ValueError("Correlation matrix must be finite, symmetric, and have unit diagonal")
+        if np.min(np.linalg.eigvalsh(corr)) < -1e-10:
+            raise ValueError("Correlation matrix must be positive semidefinite")
         covariance=np.outer(u,u)*corr
         variance=float(np.sum(covariance))
         if variance < -1e-12: raise ValueError("Correlation matrix yields negative sum variance")
