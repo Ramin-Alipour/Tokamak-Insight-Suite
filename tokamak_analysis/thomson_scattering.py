@@ -189,15 +189,20 @@ def density_from_thomson_scattered_power(
     collection_solid_angle_sr,
     *,
     optical_efficiency=1.0,
+    scattered_power_uncertainty_W=None,
+    incident_power_uncertainty_W=None,
+    interaction_length_uncertainty_m=None,
+    scattering_angle_uncertainty_rad=None,
+    collection_solid_angle_uncertainty_sr=None,
+    optical_efficiency_uncertainty=None,
 ):
     """Infer electron density from calibrated collected Thomson-scattered power.
 
-    Uses P_det = P_inc * n_e * L * (dσ/dΩ) * ΔΩ * η.
-    Inputs must describe the same calibrated spectral band/time gate; this
-    single-band relation neglects spectral-response integration and relativistic
-    spectral-shape effects.
+    Uses P_det = P_inc * n_e * L * (dσ/dΩ) * ΔΩ * η. Inputs must describe the
+    same calibrated spectral band and time gate. Optional independent 1-sigma
+    input uncertainties are propagated by first-order Gaussian error propagation.
     """
-    ps, pi, length, theta, omega, eta = np.broadcast_arrays(
+    base = np.broadcast_arrays(
         np.asarray(scattered_power_W, dtype=float),
         np.asarray(incident_power_W, dtype=float),
         np.asarray(interaction_length_m, dtype=float),
@@ -205,7 +210,8 @@ def density_from_thomson_scattered_power(
         np.asarray(collection_solid_angle_sr, dtype=float),
         np.asarray(optical_efficiency, dtype=float),
     )
-    if not all(np.all(np.isfinite(x)) for x in (ps, pi, length, theta, omega, eta)):
+    ps, pi, length, theta, omega, eta = base
+    if not all(np.all(np.isfinite(x)) for x in base):
         raise ValueError("All inputs must be finite")
     if np.any(ps < 0) or np.any(pi <= 0) or np.any(length <= 0) or np.any(omega <= 0):
         raise ValueError("Scattered power must be nonnegative; incident power, length, and solid angle must be positive")
@@ -216,10 +222,46 @@ def density_from_thomson_scattered_power(
     if np.any(denominator <= 0):
         raise ValueError("Scattering geometry gives zero differential cross-section")
     density = ps / denominator
-    return {
+
+    uncertainty_values = {
+        "scattered_power_uncertainty_W": scattered_power_uncertainty_W,
+        "incident_power_uncertainty_W": incident_power_uncertainty_W,
+        "interaction_length_uncertainty_m": interaction_length_uncertainty_m,
+        "scattering_angle_uncertainty_rad": scattering_angle_uncertainty_rad,
+        "collection_solid_angle_uncertainty_sr": collection_solid_angle_uncertainty_sr,
+        "optical_efficiency_uncertainty": optical_efficiency_uncertainty,
+    }
+    uncertainty_arrays = {}
+    for name, values in uncertainty_values.items():
+        if values is None:
+            continue
+        arr = np.broadcast_to(np.asarray(values, dtype=float), density.shape)
+        if not np.all(np.isfinite(arr)) or np.any(arr < 0):
+            raise ValueError(f"{name} must be finite and non-negative")
+        uncertainty_arrays[name] = arr
+
+    result = {
         "electron_density_m3": density,
         "differential_cross_section_m2_sr": cross_section,
         "model_scattered_power_W": pi * density * length * cross_section * omega * eta,
         "relation": "P_det = P_inc * n_e * L * (dσ/dΩ) * ΔΩ * η",
-        "caveat": "Requires calibrated collected power and optical efficiency; a full Thomson spectrum fit is needed for temperature and relativistic spectral effects.",
+        "caveat": "Requires calibrated collected power and optical efficiency; the single-band relation neglects spectral-response integration and relativistic spectral-shape effects.",
     }
+    if uncertainty_arrays:
+        variance = np.zeros_like(density, dtype=float)
+        if "scattered_power_uncertainty_W" in uncertainty_arrays:
+            variance += (uncertainty_arrays["scattered_power_uncertainty_W"] / denominator) ** 2
+        if "incident_power_uncertainty_W" in uncertainty_arrays:
+            variance += (density * uncertainty_arrays["incident_power_uncertainty_W"] / pi) ** 2
+        if "interaction_length_uncertainty_m" in uncertainty_arrays:
+            variance += (density * uncertainty_arrays["interaction_length_uncertainty_m"] / length) ** 2
+        if "collection_solid_angle_uncertainty_sr" in uncertainty_arrays:
+            variance += (density * uncertainty_arrays["collection_solid_angle_uncertainty_sr"] / omega) ** 2
+        if "optical_efficiency_uncertainty" in uncertainty_arrays:
+            variance += (density * uncertainty_arrays["optical_efficiency_uncertainty"] / eta) ** 2
+        if "scattering_angle_uncertainty_rad" in uncertainty_arrays:
+            dlog_cross_section_dtheta = -2.0 * np.cos(theta) * np.sin(theta) / (1.0 + np.cos(theta) ** 2)
+            variance += (density * dlog_cross_section_dtheta * uncertainty_arrays["scattering_angle_uncertainty_rad"]) ** 2
+        result["electron_density_uncertainty_m3"] = np.sqrt(variance)
+        result["uncertainty_model"] = "First-order propagation of supplied independent 1-sigma input uncertainties; correlations and model/calibration discrepancy are not included."
+    return result
