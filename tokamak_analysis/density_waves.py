@@ -13,3 +13,11 @@ def analyze_density_waves(time_s,density_m3,*,band_Hz=None):
         if lo<0 or hi<=lo: raise ValueError("Invalid frequency band")
         m=(f>=lo)&(f<=hi); out["band_power"]=float(np.trapezoid(p[m],f[m])) if np.count_nonzero(m)>1 else 0.0
     return out
+
+def wave_phase_velocity(frequency_Hz, wavelength_m):
+    """Phase velocity from measured frequency and wavelength: v_ph=f*lambda=omega/k."""
+    f,w=np.broadcast_arrays(np.asarray(frequency_Hz,dtype=float),np.asarray(wavelength_m,dtype=float))
+    if not np.all(np.isfinite(f)) or not np.all(np.isfinite(w)) or np.any(f<0) or np.any(w<=0):
+        raise ValueError("Frequency must be non-negative and wavelength positive; inputs finite")
+    return {"phase_velocity_m_s":f*w,"angular_frequency_rad_s":2*np.pi*f,"wavenumber_rad_m":2*np.pi/w,
+            "equation":"v_phase=omega/k=f*lambda"}
