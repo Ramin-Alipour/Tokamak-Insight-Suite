@@ -9,7 +9,7 @@ def analyze_average_density(*, density_profile_m3=None, radius_m=None, line_inte
         if radius_m is not None:
             r=np.asarray(radius_m,dtype=float)
             if r.shape!=ne.shape or not np.all(np.isfinite(r)) or np.any(np.diff(r)<=0): raise ValueError("radius_m must match density profile and increase strictly")
-            out["radial_average_density_m3"]=float(np.trapezoid(ne,r)/(r[-1]-r[0]))
+            out["radial_average_density_m3"]=float(getattr(np, "trapezoid", np.trapz)(ne,r)/(r[-1]-r[0]))
     if line_integrated_density_m2 is not None:
         if chord_length_m is None: raise ValueError("chord_length_m required for line-average density")
         nbar=float(line_integrated_density_m2); length=float(chord_length_m)
