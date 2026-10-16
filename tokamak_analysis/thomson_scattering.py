@@ -113,7 +113,7 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
     """
     r, ne, te = profile.radius_m, profile.density_m3, profile.temperature_ev
     ne_line = float(_trapezoid(ne, r) / (r[-1] - r[0]))
-    te_line = float(np.trapezoid(te, r) / (r[-1] - r[0]))
+    te_line = float(_trapezoid(te, r) / (r[-1] - r[0]))
     ne_vol = te_vol = None
     if major_radius_m is not None:
         if not np.isfinite(major_radius_m) or major_radius_m <= 0:
@@ -126,10 +126,10 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
             )
         # For a circular, large-aspect-ratio cross-section, dV/dr ∝ r.
         weight = r
-        denom = float(np.trapezoid(weight, r))
+        denom = float(_trapezoid(weight, r))
         if denom > 0:
-            ne_vol = float(np.trapezoid(ne * weight, r) / denom)
-            te_vol = float(np.trapezoid(te * weight, r) / denom)
+            ne_vol = float(_trapezoid(ne * weight, r) / denom)
+            te_vol = float(_trapezoid(te * weight, r) / denom)
     ine, ite = int(np.argmax(ne)), int(np.argmax(te))
     return ThomsonSummary(
         point_count=int(r.size),
