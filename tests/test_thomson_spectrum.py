@@ -81,3 +81,17 @@ def test_raw_thomson_spectrum_rejects_invalid_uncertainty():
             instrument_sigma_nm=0.05,
             signal_uncertainty=uncertainty,
         )
+
+
+def test_raw_thomson_spectrum_does_not_claim_chi_square_without_uncertainties():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    out = fit_thomson_spectrum(
+        wavelength,
+        signal,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=0.05,
+    )
+    assert out["chi_square"] is None
+    assert out["reduced_chi_square"] is None
+    assert out["residual_variance"] >= 0
