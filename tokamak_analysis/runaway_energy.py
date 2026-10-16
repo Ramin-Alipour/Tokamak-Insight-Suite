@@ -2,7 +2,7 @@
 import numpy as np
 def estimate_runaway_energy(energy_keV, counts, *, detector_response_corrected=False, fit_range_keV=None):
     e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
-    if e.ndim!=1 or c.shape!=e.shape or len(e)<4 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(c<0): raise ValueError("Invalid HXR spectrum")
+    if e.ndim!=1 or c.shape!=e.shape or len(e)<4 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(e<0) or np.any(c<0): raise ValueError("Invalid HXR spectrum: energies must be non-negative and counts non-negative")
     m=np.ones_like(e,dtype=bool)
     if fit_range_keV is not None:
         lo,hi=map(float,fit_range_keV); m=(e>=lo)&(e<=hi)
