@@ -12,7 +12,6 @@ def doppler_flow_velocity(observed_wavelength_nm, rest_wavelength_nm, *, uncerta
     out={"velocity_m_s":v,"wavelength_shift_nm":obs-rest,"relativistic":bool(relativistic)}
     if uncertainty_nm is not None:
         u=np.asarray(uncertainty_nm,dtype=float)
-        if np.any(~np.isfinite(u)) or np.any(u<0): raise ValueError("uncertainty_nm must be finite and non-negative")
         if not np.all(np.isfinite(u)) or np.any(u<0): raise ValueError("uncertainty_nm must be finite and non-negative")
         try: u=np.broadcast_to(u,obs.shape)
         except ValueError as exc: raise ValueError("uncertainty_nm must be scalar or broadcast-compatible with observed wavelength") from exc
