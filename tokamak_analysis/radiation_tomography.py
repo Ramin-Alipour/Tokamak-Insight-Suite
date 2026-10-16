@@ -42,3 +42,11 @@ def forward_project_emissivity(response_matrix, emissivity):
     if np.any(eps<0): raise ValueError("Emissivity must be non-negative")
     return {"predicted_line_integrals":A@eps,"equation":"y=A*epsilon",
             "caveat":"Response matrix must encode calibrated line-of-sight geometry and detector response."}
+
+
+def reconstruct_bolometric_tomography(bolometer_response_matrix, bolometer_signals, *, regularization=1e-6, nonnegative=True):
+    """Bolometer-specific emissivity reconstruction using a calibrated bolometer response matrix."""
+    result=reconstruct_emissivity(bolometer_response_matrix, bolometer_signals, regularization=regularization, nonnegative=nonnegative)
+    result["diagnostic_type"]="bolometric tomography"
+    result["caveat"]="Requires a calibrated bolometer view/response matrix and compatible signal units; generic inversion does not supply equilibrium mapping or detector calibration."
+    return result
