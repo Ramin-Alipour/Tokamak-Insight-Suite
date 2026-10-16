@@ -1197,3 +1197,9 @@ def test_visible_imaging_pixel_to_object_relation():
     from tokamak_analysis.visible_imaging import pixel_to_object_coordinate
     out=pixel_to_object_coordinate(np.array([100,110]),100,5e-6,2.0,0.05)
     np.testing.assert_allclose(out["object_coordinate_m"],[0.0,0.002],rtol=1e-14,atol=0.0)
+
+
+def test_photon_energy_wavelength_relation():
+    from tokamak_analysis.line_radiation import photon_energy_from_wavelength_eV
+    out=photon_energy_from_wavelength_eV(500.0)
+    assert out["photon_energy_eV"] == pytest.approx(1239.841984,rel=1e-8)
