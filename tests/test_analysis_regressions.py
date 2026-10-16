@@ -163,3 +163,14 @@ def test_large_aspect_ratio_shafranov_shift_includes_geometric_half_term():
 
     result = large_aspect_ratio_shafranov_shift(0.5, 1.0, 1.0, 1.0)
     assert result["predicted_shafranov_shift_m"] == pytest.approx(0.125)
+
+
+def test_langmuir_temperature_fit_subtracts_ion_saturation_baseline():
+    from tokamak_analysis.probe_analysis import analyze_probe_voltage_current
+
+    voltage = np.arange(-5.0, 5.0)
+    current = np.full_like(voltage, -1.0)
+    mask = voltage >= 0
+    current[mask] = -1.0 + np.exp((voltage[mask] - 4.0) / 2.0)
+    result = analyze_probe_voltage_current(voltage, current, electron_fit_range=(0.0, 4.0))
+    assert result["electron_temperature_estimate_eV"] == pytest.approx(2.0)
