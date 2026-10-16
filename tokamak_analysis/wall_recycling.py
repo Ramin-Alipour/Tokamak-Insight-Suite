@@ -8,7 +8,7 @@ def recycling_coefficient(incident_flux_m2_s, returned_flux_m2_s, *, uncertainti
     if uncertainties is not None:
         si,sr=map(lambda x:np.asarray(x,dtype=float),uncertainties)
         if np.any(si<0) or np.any(sr<0) or not np.all(np.isfinite(si)) or not np.all(np.isfinite(sr)): raise ValueError("Uncertainties must be finite and nonnegative")
-        out["uncertainty"]=np.abs(r)*np.sqrt((sr/np.maximum(ret,np.finfo(float).tiny))**2+(si/inc)**2)
+        out["uncertainty"]=np.sqrt((sr/inc)**2+(ret*si/inc**2)**2)
     out["caveat"]="Requires matched incident and recycled fluxes on consistent surfaces and time windows."
     return out
 
