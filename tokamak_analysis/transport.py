@@ -29,3 +29,14 @@ def poloidal_diffusive_particle_flux(diffusion_coefficient_m2_s, poloidal_densit
     D,g=np.broadcast_arrays(np.asarray(diffusion_coefficient_m2_s,dtype=float),np.asarray(poloidal_density_gradient_m4,dtype=float))
     if not np.all(np.isfinite(D)) or not np.all(np.isfinite(g)) or np.any(D<0): raise ValueError("Diffusivity non-negative and inputs finite")
     return {"poloidal_particle_flux_m2_s":-D*g,"equation":"Gamma_theta=-D_theta*d<n>/dtheta_phys"}
+
+
+def turbulent_momentum_flux(v_radial_m_s, v_poloidal_m_s, mass_density_kg_m3):
+    """Outward turbulent momentum flux convention Pi_rtheta=-rho*<v_r' v_theta'>."""
+    vr=np.asarray(v_radial_m_s,dtype=float); vt=np.asarray(v_poloidal_m_s,dtype=float); rho=float(mass_density_kg_m3)
+    if vr.ndim!=1 or vt.shape!=vr.shape or len(vr)<2 or not np.all(np.isfinite(vr)) or not np.all(np.isfinite(vt)) or not np.isfinite(rho) or rho<=0:
+        raise ValueError("Matching finite velocity signals and positive mass density required")
+    cov=float(np.mean((vr-np.mean(vr))*(vt-np.mean(vt))))
+    return {"turbulent_momentum_flux_Pa":-rho*cov,"velocity_covariance_m2_s2":cov,
+            "equation":"Pi_rtheta=-rho*<v_r_prime*v_theta_prime>",
+            "convention":"Negative covariance sign chosen for outward flux convention; verify sign conventions for the target publication."}
