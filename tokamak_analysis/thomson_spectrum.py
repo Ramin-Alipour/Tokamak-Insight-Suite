@@ -115,12 +115,18 @@ def fit_thomson_spectrum(
     residual = y - fitted
     dof = max(1, y.size - params.size)
     if uncertainty is None:
-        chi_square = float(np.sum(residual**2))
-        reduced_chi_square = float(chi_square / dof)
-        covariance_scale = reduced_chi_square
+        # curve_fit already scales covariance by residual variance when
+        # absolute_sigma=False; do not scale it a second time.
+        residual_sum_squares = float(np.sum(residual**2))
+        chi_square = None
+        reduced_chi_square = None
+        residual_variance = float(residual_sum_squares / dof)
+        covariance_scale = 1.0
     else:
+        residual_sum_squares = float(np.sum(residual**2))
         chi_square = float(np.sum((residual / uncertainty) ** 2))
         reduced_chi_square = float(chi_square / dof)
+        residual_variance = None
         covariance_scale = 1.0
     sigma_fit_uncertainty = float(np.sqrt(max(0.0, covariance[2, 2] * covariance_scale)))
     temperature_uncertainty = float(
@@ -144,6 +150,8 @@ def fit_thomson_spectrum(
         "residual": residual,
         "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square,
+        "residual_sum_squares": residual_sum_squares,
+        "residual_variance": residual_variance,
         "r_squared": r_squared,
         "degrees_of_freedom": int(dof),
         "fit_covariance": covariance,
