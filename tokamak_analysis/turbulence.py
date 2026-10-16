@@ -14,3 +14,12 @@ def analyze_turbulence(time_s, signal_a, signal_b=None):
         out["cross_covariance"]=float(np.mean((a-np.mean(a))*(b-np.mean(b))))
         fc,coh=coherence(a,b,fs=1/dt,nperseg=min(512,len(a))); out["coherence_frequency_Hz"]=fc; out["coherence"]=coh
     return out
+
+def mixing_length_diffusivity(growth_rate_s, perpendicular_wavenumber_m):
+    """Mixing-length estimate D~gamma/k_perp^2 from linear growth rate and perpendicular wavenumber."""
+    gamma,k=np.broadcast_arrays(np.asarray(growth_rate_s,dtype=float),np.asarray(perpendicular_wavenumber_m,dtype=float))
+    if not np.all(np.isfinite(gamma)) or not np.all(np.isfinite(k)) or np.any(gamma<0) or np.any(k<=0):
+        raise ValueError("Growth rate must be non-negative and perpendicular wavenumber positive")
+    return {"mixing_length_diffusivity_m2_s":gamma/k**2,
+            "equation":"D_mix~gamma/k_perp^2",
+            "caveat":"Order-of-magnitude mixing-length estimate, not a measured transport coefficient."}
