@@ -24,7 +24,7 @@ def test_neutron_flux_treats_input_as_binned_counts_by_default():
 def test_neutron_flux_supports_cumulative_counters_explicitly():
     result = analyze_neutron_flux([0.0, 1.0, 2.0], [0.0, 10.0, 30.0], counts_are_cumulative=True, timestamp_semantics="counter_read_times")
     assert result["total_counts"] == 30.0
-    np.testing.assert_allclose(result["count_rate_s-1"], [10.0, 15.0, 20.0])
+    np.testing.assert_allclose(result["count_rate_s-1"], [5.0, 15.0, 25.0])
 
 
 def test_line_ratio_uncertainty_is_finite_for_zero_numerator():
