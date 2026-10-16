@@ -16,3 +16,16 @@ def reynolds_stress(v_radial_m_s,v_poloidal_m_s,density_kg_m3=1.0):
     if vr.shape!=vp.shape or vr.ndim!=1 or len(vr)<2 or not np.all(np.isfinite(vr)) or not np.all(np.isfinite(vp)) or not np.isfinite(rho) or rho<=0: raise ValueError("Invalid velocity signals or mass density")
     ar=vr-np.mean(vr); ap=vp-np.mean(vp)
     return {"reynolds_stress_Pa":float(rho*np.mean(ar*ap)),"velocity_covariance_m2_s-2":float(np.mean(ar*ap)),"density_kg_m3":rho}
+
+def radial_diffusive_particle_flux(diffusion_coefficient_m2_s, radial_density_gradient_m4):
+    """Radial Fick-law flux Gamma_r=-D_r*d<n>/dr."""
+    D,g=np.broadcast_arrays(np.asarray(diffusion_coefficient_m2_s,dtype=float),np.asarray(radial_density_gradient_m4,dtype=float))
+    if not np.all(np.isfinite(D)) or not np.all(np.isfinite(g)) or np.any(D<0): raise ValueError("Diffusivity non-negative and inputs finite")
+    return {"radial_particle_flux_m2_s":-D*g,"equation":"Gamma_r=-D_r*d<n>/dr"}
+
+
+def poloidal_diffusive_particle_flux(diffusion_coefficient_m2_s, poloidal_density_gradient_m4):
+    """Poloidal Fick-law flux Gamma_theta=-D_theta*d<n>/dtheta_phys."""
+    D,g=np.broadcast_arrays(np.asarray(diffusion_coefficient_m2_s,dtype=float),np.asarray(poloidal_density_gradient_m4,dtype=float))
+    if not np.all(np.isfinite(D)) or not np.all(np.isfinite(g)) or np.any(D<0): raise ValueError("Diffusivity non-negative and inputs finite")
+    return {"poloidal_particle_flux_m2_s":-D*g,"equation":"Gamma_theta=-D_theta*d<n>/dtheta_phys"}
