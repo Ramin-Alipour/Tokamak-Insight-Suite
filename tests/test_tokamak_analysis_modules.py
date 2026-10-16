@@ -1156,3 +1156,9 @@ def test_langmuir_dispersion_zero_wavenumber():
     out=langmuir_wave_frequency(ne,20.0,0.0)
     expected=np.sqrt(ne*E**2/(EPS0*ME))/(2*np.pi)
     assert out["frequency_Hz"] == pytest.approx(expected,rel=1e-14)
+
+
+def test_compton_scattering_energy_relation():
+    from tokamak_analysis.hard_xray import compton_scattered_photon_energy_keV
+    out=compton_scattered_photon_energy_keV(511.0,np.pi)
+    assert out["scattered_photon_energy_keV"] == pytest.approx(511.0/3.0,rel=1e-5)
