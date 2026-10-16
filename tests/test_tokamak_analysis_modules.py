@@ -1118,3 +1118,10 @@ def test_hydrogen_rydberg_wavelength_relation():
     from tokamak_analysis.spectral_line_identification import hydrogen_rydberg_wavelength_nm
     out=hydrogen_rydberg_wavelength_nm(3,2)
     assert out["wavelength_nm"] == pytest.approx(656.47,rel=2e-4)
+
+
+def test_boltzmann_line_ratio_temperature_relation():
+    from tokamak_analysis.spectral_line_ratio import boltzmann_temperature_from_line_ratio
+    te=10.0; delta=5.0; pref=4.0; ratio=pref*np.exp(-delta/te)
+    out=boltzmann_temperature_from_line_ratio(ratio,pref,delta)
+    assert out["excitation_temperature_eV"] == pytest.approx(te,rel=1e-14)
