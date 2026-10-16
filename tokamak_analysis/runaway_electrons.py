@@ -4,6 +4,7 @@ def analyze_runaway_events(time_s, hard_xray_signal, *, threshold=None, plasma_c
     t=np.asarray(time_s,dtype=float); x=np.asarray(hard_xray_signal,dtype=float)
     if t.ndim!=1 or x.shape!=t.shape or len(t)<3 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(x)) or np.any(np.diff(t)<=0): raise ValueError("Finite increasing time and matching HXR signal required")
     thr=float(threshold) if threshold is not None else float(np.mean(x)+3*np.std(x))
+    if not np.isfinite(thr): raise ValueError("Event threshold must be finite")
     mask=x>=thr; edges=np.diff(np.r_[False,mask,False].astype(int)); starts=np.flatnonzero(edges==1); ends=np.flatnonzero(edges==-1)
     events=[{"start_s":float(t[a]),"end_s":float(t[min(b-1,len(t)-1)]),"duration_s":float(t[min(b-1,len(t)-1)]-t[a]),"peak_signal":float(np.max(x[a:b]))} for a,b in zip(starts,ends)]
     out={"threshold":thr,"events":events,"event_count":len(events),"above_threshold_fraction":float(np.mean(mask))}
