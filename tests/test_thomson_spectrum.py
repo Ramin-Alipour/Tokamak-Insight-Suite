@@ -14,7 +14,7 @@ def _synthetic_spectrum(temperature_ev=100.0, instrument_sigma_nm=0.05):
         2.0 * temperature_ev / ELECTRON_REST_ENERGY_EV
     ) * np.sin(angle / 2)
     sigma_measured = np.sqrt(sigma_physical**2 + instrument_sigma_nm**2)
-    wavelength = np.linspace(laser_nm - 1.2, laser_nm + 1.2, 401)
+    wavelength = np.linspace(laser_nm - 30.0, laser_nm + 30.0, 801)
     signal = (
         1200.0 * np.exp(-0.5 * ((wavelength - laser_nm) / sigma_measured) ** 2)
         + 30.0
