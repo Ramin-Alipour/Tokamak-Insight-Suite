@@ -1452,7 +1452,7 @@ def test_registered_shape_analysis_exposes_used_physical_relations():
     from tokamak_analysis.shape_reconstruction import analyze_plasma_shape
     R=np.linspace(1.0,3.0,101); Z=np.linspace(-1.0,1.0,101)
     RR,ZZ=np.meshgrid(R,Z); psi=((RR-2.0)/0.5)**2+(ZZ/0.5)**2
-    out=analyze_plasma_shape(R,Z,psi,boundary_level=1.0)
+    out=analyze_plasma_shape(R,Z,psi,boundary_level=0.95)
     assert "cross_section_area" in out["physical_relations"]
     assert out["cross_section_area_m2"] > 0
 
