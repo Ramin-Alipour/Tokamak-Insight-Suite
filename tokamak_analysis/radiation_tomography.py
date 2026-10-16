@@ -32,3 +32,13 @@ def abel_project_axisymmetric_emissivity(radius_m, emissivity_W_m3, impact_param
     return {"impact_parameter_m":p,"line_integrated_emissivity_W_m2":np.asarray(values),
             "equation":"g(p)=2*integral_p^a epsilon(r)*r/sqrt(r^2-p^2) dr",
             "caveat":"Discrete forward Abel projection; near-tangent chords require adequate radial resolution and endpoint treatment."}
+
+
+def forward_project_emissivity(response_matrix, emissivity):
+    """Forward tomography model y=A*epsilon, mapping voxel emissivity to line-integrated measurements."""
+    A=np.asarray(response_matrix,dtype=float); eps=np.asarray(emissivity,dtype=float)
+    if A.ndim!=2 or eps.ndim!=1 or A.shape[1]!=len(eps) or not np.all(np.isfinite(A)) or not np.all(np.isfinite(eps)):
+        raise ValueError("Finite 2-D response matrix and matching 1-D emissivity vector required")
+    if np.any(eps<0): raise ValueError("Emissivity must be non-negative")
+    return {"predicted_line_integrals":A@eps,"equation":"y=A*epsilon",
+            "caveat":"Response matrix must encode calibrated line-of-sight geometry and detector response."}
