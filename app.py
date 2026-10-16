@@ -10,6 +10,7 @@ from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -974,8 +975,60 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Registered analysis modules'])
-    if workflow=='Registered analysis modules':
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson raw-spectrum temperature fit','Registered analysis modules'])
+    if workflow=='Thomson raw-spectrum temperature fit':
+        st.markdown('Fit a calibrated Thomson-scattering spectrum with a non-relativistic Gaussian Doppler model and a linear local background.')
+        st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. This mode estimates electron temperature only; it does not infer density from spectral amplitude.')
+        if df is None or len(numeric) < 2:
+            st.info('Load a table with wavelength and measured spectral-signal columns to run this analysis.')
+        else:
+            wavelength_col=col_select('Wavelength (nm)',numeric,'tis_thomson_wavelength_col')
+            signal_col=col_select('Measured spectral signal (detector units)',numeric,'tis_thomson_signal_col')
+            laser_wavelength_nm=st.number_input('Laser wavelength (nm)',min_value=0.000001,value=532.0,format='%.6f',key='tis_thomson_laser_nm')
+            scattering_angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,format='%.3f',key='tis_thomson_angle_deg')
+            instrument_sigma_nm=st.number_input('Gaussian instrument sigma (nm)',min_value=0.000001,value=0.05,format='%.6f',key='tis_thomson_instrument_sigma')
+            uncertainty_options=['(none)']+list(numeric)
+            uncertainty_col=st.selectbox('Optional signal standard-uncertainty column',uncertainty_options,key='tis_thomson_uncertainty_col')
+            if st.button('Fit Thomson spectrum and estimate electron temperature',type='primary',key='run_thomson_spectrum_fit'):
+                try:
+                    if wavelength_col==signal_col:
+                        raise ValueError('Wavelength and signal must use different columns.')
+                    wavelength_values=pd.to_numeric(df[wavelength_col],errors='raise').to_numpy(dtype=float)
+                    signal_values=pd.to_numeric(df[signal_col],errors='raise').to_numpy(dtype=float)
+                    signal_uncertainty=None
+                    if uncertainty_col!='(none)':
+                        signal_uncertainty=pd.to_numeric(df[uncertainty_col],errors='raise').to_numpy(dtype=float)
+                    fit=fit_thomson_spectrum(
+                        wavelength_values,signal_values,
+                        laser_wavelength_nm=float(laser_wavelength_nm),
+                        scattering_angle_rad=float(np.deg2rad(scattering_angle_deg)),
+                        instrument_sigma_nm=float(instrument_sigma_nm),
+                        signal_uncertainty=signal_uncertainty,
+                    )
+                    st.success('Thomson spectral fit completed.')
+                    st.metric('Electron temperature',f"{fit['electron_temperature_eV']:.4g} eV",
+                              delta=f"± {fit['electron_temperature_uncertainty_eV']:.3g} eV (fit uncertainty)")
+                    st.metric('Reduced chi-square',
+                              'Not available without signal uncertainties' if fit['reduced_chi_square'] is None else f"{fit['reduced_chi_square']:.4g}")
+                    fit_frame=pd.DataFrame({
+                        'Wavelength (nm)':wavelength_values,
+                        'Measured signal':signal_values,
+                        'Fitted spectrum':fit['fitted_spectrum'],
+                        'Residual':fit['residual'],
+                    })
+                    st.markdown('**Measured spectrum and fitted model**')
+                    st.line_chart(fit_frame.set_index('Wavelength (nm)')[['Measured signal','Fitted spectrum']])
+                    st.markdown('**Fit residuals**')
+                    st.line_chart(fit_frame.set_index('Wavelength (nm)')[['Residual']])
+                    download_df('Download Thomson spectrum fit and residuals',fit_frame,'tis_thomson_spectrum_fit.csv')
+                    summary={k:v for k,v in fit.items() if k not in {'fitted_spectrum','residual','fit_covariance'}}
+                    json_download('Export Thomson fit summary',summary,'tis_thomson_spectrum_fit.json')
+                    with st.expander('Model assumptions and limitations'):
+                        for item in fit['assumptions']: st.markdown(f'- {item}')
+                        for item in fit['limitations']: st.warning(item)
+                except Exception as e:
+                    st.error(str(e))
+    elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
         fn=resolve_analysis(selected_id)
