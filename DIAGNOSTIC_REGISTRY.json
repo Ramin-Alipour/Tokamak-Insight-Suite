@@ -84,6 +84,26 @@
           "name": "summary",
           "unit": "structured",
           "description": "Peak locations, line averages, and optional approximate volume averages."
+        },
+        {
+          "name": "density_gradient_uncertainty_m-4",
+          "unit": "m^-4",
+          "description": "First-order uncertainty of the numerical density gradient from independent pointwise density uncertainties."
+        },
+        {
+          "name": "temperature_gradient_uncertainty_eV_m-1",
+          "unit": "eV m^-1",
+          "description": "First-order uncertainty of the numerical temperature gradient from independent pointwise temperature uncertainties."
+        },
+        {
+          "name": "density_scale_length_uncertainty_m",
+          "unit": "m",
+          "description": "First-order uncertainty of local density scale length; NaN where the scale length is undefined."
+        },
+        {
+          "name": "temperature_scale_length_uncertainty_m",
+          "unit": "m",
+          "description": "First-order uncertainty of local temperature scale length; NaN where the scale length is undefined."
         }
       ],
       "assumptions": [
