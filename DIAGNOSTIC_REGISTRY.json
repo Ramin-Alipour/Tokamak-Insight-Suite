@@ -130,7 +130,7 @@
         "thomson_scattering.density_from_thomson_scattered_power",
         "thomson_spectrum.fit_thomson_spectrum"
       ],
-      "raw_data_to_physics": false,
+      "raw_data_to_physics": true,
       "note": "Overall analysis remains incomplete until the declared workflows and automated tests are confirmed end-to-end. Direct density inference from uncalibrated spectral amplitude and more general collective, relativistic, or non-Maxwellian spectral models are not implemented.",
       "workflow_modes": [
         {
