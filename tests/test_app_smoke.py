@@ -62,3 +62,12 @@ def test_every_workspace_page_renders_with_loaded_data(page):
     app.run()
     app.radio[0].set_value(page).run()
     assert not app.exception, (page, [str(error.value) for error in app.exception])
+
+
+def test_catalog_displays_analysis_contracts_separately_from_reference_entries():
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Diagnostic Catalog").run()
+    app.radio[1].set_value("Analysis entry points").run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("callable analysis entry points" in str(item.value).lower() for item in app.markdown)
