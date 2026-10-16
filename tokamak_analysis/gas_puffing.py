@@ -10,3 +10,11 @@ def analyze_gas_puffing(time_s, valve_signal, *, calibrated_flow_mol_s=None):
         out["flow_mol_s"]=q; out["injected_amount_mol"]=float(np.trapezoid(q,t))
     out["caveat"]="Valve command alone is not a gas throughput measurement; calibrated flow and plumbing response are required."
     return out
+
+def molar_flow_to_gas_throughput_Pa_m3_s(molar_flow_mol_s, gas_temperature_K):
+    """Ideal-gas throughput conversion Q=dot(n)*R*T in Pa*m^3/s."""
+    flow,temp=np.broadcast_arrays(np.asarray(molar_flow_mol_s,dtype=float),np.asarray(gas_temperature_K,dtype=float))
+    if not np.all(np.isfinite(flow)) or not np.all(np.isfinite(temp)) or np.any(flow<0) or np.any(temp<=0):
+        raise ValueError("Molar flow non-negative and temperature positive; inputs finite")
+    return {"gas_throughput_Pa_m3_s":flow*8.314462618*temp,
+            "equation":"Q_PV=dot(n)_mol_s*R*T"}
