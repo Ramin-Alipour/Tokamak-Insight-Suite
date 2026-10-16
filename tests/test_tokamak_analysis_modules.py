@@ -945,3 +945,12 @@ def test_grad_shafranov_physical_relation_known_quadratic_solution():
     np.testing.assert_allclose(out["grad_shafranov_operator_Wb_rad_m-2"], 2.0, atol=1e-10)
     np.testing.assert_allclose(out["physical_source_Wb_rad_m-2"], 0.0, atol=0.0)
     np.testing.assert_allclose(out["equation_residual_Wb_rad_m-2"], 2.0, atol=1e-10)
+
+
+def test_miller_plasma_boundary_physical_relation_circle():
+    from tokamak_analysis.shape_reconstruction import miller_boundary
+    theta=np.linspace(0.0,2*np.pi,2001)
+    out=miller_boundary(1.5,0.2,1.0,0.0,theta)
+    np.testing.assert_allclose(out["R_m"],1.5+0.2*np.cos(theta),atol=1e-14)
+    np.testing.assert_allclose(out["Z_m"],0.2*np.sin(theta),atol=1e-14)
+    assert out["cross_section_area_m2"] == pytest.approx(np.pi*0.2**2,rel=2e-5)
