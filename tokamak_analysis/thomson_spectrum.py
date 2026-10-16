@@ -114,6 +114,10 @@ def fit_thomson_spectrum(
         raise ValueError(
             "Fitted width is not larger than the instrumental width; electron temperature is unresolved"
         )
+    if center - 3.0 * sigma_fit < x[0] or center + 3.0 * sigma_fit > x[-1]:
+        raise ValueError(
+            "Wavelength window must cover at least plus/minus 3 fitted standard deviations around the line center"
+        )
     sigma_physical = float(np.sqrt(sigma_fit**2 - instrument_sigma_nm**2))
     angular_factor = float(np.sin(scattering_angle_rad / 2.0) ** 2)
     temperature_ev = float(
