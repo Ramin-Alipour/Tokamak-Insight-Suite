@@ -23,11 +23,13 @@ def abel_project_axisymmetric_emissivity(radius_m, emissivity_W_m3, impact_param
         raise ValueError("Require radius from zero, non-negative emissivity and impact parameters in [0,a)")
     values=[]
     for chord in p:
-        mask=r>chord
+        mask=(r>=chord) if chord==0 else (r>chord)
         rr=r[mask]; ee=eps[mask]
         if len(rr)<2: values.append(0.0); continue
-        integrand=ee*rr/np.sqrt(rr**2-chord**2)
-        # Avoid the integrable endpoint singularity by omitting the first sample adjacent to p.
+        integrand=np.zeros_like(rr)
+        valid=rr>chord
+        integrand[valid]=ee[valid]*rr[valid]/np.sqrt(rr[valid]**2-chord**2)
+        # The p=0 endpoint has a finite zero limit; for p>0 the singular endpoint is omitted.
         values.append(float(2*getattr(np, "trapezoid", np.trapz)(integrand,rr)))
     return {"impact_parameter_m":p,"line_integrated_emissivity_W_m2":np.asarray(values),
             "equation":"g(p)=2*integral_p^a epsilon(r)*r/sqrt(r^2-p^2) dr",
