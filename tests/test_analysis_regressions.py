@@ -89,3 +89,21 @@ def test_fft_rejects_degenerate_two_sample_hann_window():
 
     with pytest.raises(ValueError, match="at least 3"):
         analyze_fft([0.0, 1.0], [0.0, 1.0], window="hann")
+
+
+def test_radial_and_poloidal_registry_entries_use_distinct_directions():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    radial = resolve_analysis(61)([1.0, 2.0, 3.0], [0.1, 0.2, 0.3])
+    poloidal = resolve_analysis(62)([1.0, 2.0, 3.0], [0.1, 0.2, 0.3])
+    assert radial["direction"] == "radial"
+    assert poloidal["direction"] == "poloidal"
+
+
+def test_electron_and_ion_heating_registry_entries_are_species_specific():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    electron = resolve_analysis(66)([0.0, 1.0], [10.0, 10.0])
+    ion = resolve_analysis(67)([0.0, 1.0], [10.0, 10.0])
+    assert electron["species"] == "electron"
+    assert ion["species"] == "ion"
