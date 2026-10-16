@@ -105,7 +105,8 @@
       ],
       "function_links": [
         "thomson_workflow.analyze_thomson_profile",
-        "thomson_scattering.density_from_thomson_scattered_power"
+        "thomson_scattering.density_from_thomson_scattered_power",
+        "thomson_spectrum.fit_thomson_spectrum"
       ],
       "raw_data_to_physics": false,
       "note": "Overall analysis remains incomplete: the scoped raw-spectrum temperature fit is available, but density inversion from spectral amplitude and more general collective/relativistic/non-Maxwellian models are not implemented.",
