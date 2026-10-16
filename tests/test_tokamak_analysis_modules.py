@@ -1112,3 +1112,9 @@ def test_voigt_fwhm_approximation_limits():
     from tokamak_analysis.spectral_broadening import voigt_fwhm_approximation
     assert voigt_fwhm_approximation(2.0,0.0)["voigt_fwhm_approx_nm"] == pytest.approx(2.0)
     assert voigt_fwhm_approximation(0.0,2.0)["voigt_fwhm_approx_nm"] == pytest.approx(2.0,rel=2e-4)
+
+
+def test_hydrogen_rydberg_wavelength_relation():
+    from tokamak_analysis.spectral_line_identification import hydrogen_rydberg_wavelength_nm
+    out=hydrogen_rydberg_wavelength_nm(3,2)
+    assert out["wavelength_nm"] == pytest.approx(656.47,rel=2e-4)
