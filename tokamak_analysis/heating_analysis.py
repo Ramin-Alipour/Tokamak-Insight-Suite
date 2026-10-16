@@ -25,3 +25,13 @@ def ion_heating_power_from_partition(absorbed_power_W, electron_fraction):
     if not np.all(np.isfinite(power)) or not np.all(np.isfinite(f)) or np.any(power<0) or np.any(f<0) or np.any(f>1):
         raise ValueError("Absorbed power non-negative and electron fraction in [0,1]")
     return {"ion_heating_power_W":power*(1-f),"equation":"P_i=(1-f_e)*P_abs"}
+
+
+def analyze_electron_heating(time_s, power_W, *, stored_energy_J=None):
+    """Electron-specific heating summary; absorbed electron power must be supplied."""
+    return analyze_heating(time_s, power_W, stored_energy_J=stored_energy_J, species="electron")
+
+
+def analyze_ion_heating(time_s, power_W, *, stored_energy_J=None):
+    """Ion-specific heating summary; absorbed ion power must be supplied."""
+    return analyze_heating(time_s, power_W, stored_energy_J=stored_energy_J, species="ion")
