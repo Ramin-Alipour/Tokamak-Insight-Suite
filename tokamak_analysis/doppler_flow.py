@@ -13,7 +13,11 @@ def doppler_flow_velocity(observed_wavelength_nm, rest_wavelength_nm, *, uncerta
     if uncertainty_nm is not None:
         u=np.asarray(uncertainty_nm,dtype=float)
         if np.any(~np.isfinite(u)) or np.any(u<0): raise ValueError("uncertainty_nm must be finite and non-negative")
-        out["velocity_uncertainty_m_s"]=C*u/rest
+        if not np.all(np.isfinite(u)) or np.any(u<0): raise ValueError("uncertainty_nm must be finite and non-negative")
+        if relativistic:
+            out["velocity_uncertainty_m_s"]=C*(4*ratio/(ratio**2+1)**2)*(u/rest)
+        else:
+            out["velocity_uncertainty_m_s"]=C*u/rest
     out["caveat"]="Velocity is line-of-sight and depends on accurate wavelength calibration and rest-line identification."
     return out
 
