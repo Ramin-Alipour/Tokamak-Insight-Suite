@@ -1225,3 +1225,15 @@ def test_neutron_time_of_flight_energy_relation():
     speed=np.sqrt(2*energy/mass); tof=1.0/speed
     out=neutron_energy_from_time_of_flight_keV(1.0,tof)
     assert out["neutron_energy_keV"] == pytest.approx(2450.0,rel=1e-12)
+
+
+def test_fusion_power_from_reaction_rate_relation():
+    from tokamak_analysis.fusion_rate import fusion_power_from_reaction_rate
+    out=fusion_power_from_reaction_rate(1e18,1.0,17.6)
+    assert out["fusion_power_W"] == pytest.approx(1e18*17.6*1.602176634e-13,rel=1e-14)
+
+
+def test_gamma_peak_activity_relation():
+    from tokamak_analysis.nuclear_gamma import activity_from_gamma_peak_rate
+    out=activity_from_gamma_peak_rate(100.0,0.2,0.5)
+    assert out["activity_Bq"] == pytest.approx(1000.0)
