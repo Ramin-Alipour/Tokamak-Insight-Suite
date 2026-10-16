@@ -16,7 +16,7 @@ def analyze_plasma_shape(R_m, Z_m, psi_normalized, *, boundary_level=0.95):
     paths=[np.asarray(seg,dtype=float) for seg in cs.allsegs[0] if len(seg)>=5 and np.all(np.isfinite(seg)) and np.allclose(seg[0],seg[-1],rtol=1e-5,atol=1e-8)]
     plt.close(fig)
     if not paths: raise ValueError("No closed boundary contour found at the requested flux level; open contours are not converted into artificial closed shapes")
-    contour=max(paths,key=lambda v: len(v))
+    contour=max(paths,key=lambda v: abs(0.5*np.sum(v[:-1,0]*v[1:,1]-v[1:,0]*v[:-1,1])))
     rr=contour[:,0]; zz=contour[:,1]
     area=0.5*abs(np.sum(rr[:-1]*zz[1:]-rr[1:]*zz[:-1]))
     Rgeo=0.5*(float(np.max(rr))+float(np.min(rr))); a=0.5*(float(np.max(rr))-float(np.min(rr)))
