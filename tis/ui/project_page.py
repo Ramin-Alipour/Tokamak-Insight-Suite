@@ -50,13 +50,15 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                         analysis_name=str(item.get("name", "Unnamed UI result")),
                         inputs={"source_filename": filename or None, "shot_id": shot_id or None},
                         settings=item.get("parameter_snapshot", {}),
-                        algorithm_version=software_version,
+                        algorithm_version=str(item.get("algorithm_version", software_version)),
                         outputs=item.get("result_summary", {}),
                         input_provenance={
-                            "source_sha256": source_sha256 or None,
-                            "source_manifest": session_state.get("tis_source_manifest"),
-                            "import_parameters": session_state.get("tis_import_parameters")},
-                        warnings=("UI history stores a result summary, not necessarily full numeric arrays.",),
+                            "source_filename": item.get("source_filename"),
+                            "source_sha256": item.get("source_sha256"),
+                            "shot_id": item.get("shot_id"),
+                            "source_manifest": item.get("source_manifest"),
+                            "import_parameters": item.get("import_parameters")},
+                        warnings=tuple(item.get("warnings", ())) + ("Raw input data is referenced, not embedded in the project.",),
                         status="warning"))
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
