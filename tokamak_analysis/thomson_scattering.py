@@ -153,3 +153,59 @@ def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float
     if profile.temperature_uncertainty_ev is not None:
         result["temperature_uncertainty_ev"] = np.interp(target, r, profile.temperature_uncertainty_ev)
     return result
+
+
+# Classical Thomson-scattering power relation for an optically thin plasma.
+ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
+
+
+def thomson_differential_cross_section_m2_sr(scattering_angle_rad):
+    """Unpolarized classical differential Thomson cross-section, dσ/dΩ = r_e²(1-cos²θ)."""
+    theta = np.asarray(scattering_angle_rad, dtype=float)
+    if not np.all(np.isfinite(theta)) or np.any((theta < 0) | (theta > np.pi)):
+        raise ValueError("scattering angle must be finite and in [0, pi]")
+    return ELECTRON_CLASSICAL_RADIUS_M**2 * np.sin(theta)**2
+
+
+def density_from_thomson_scattered_power(
+    scattered_power_W,
+    incident_power_W,
+    interaction_length_m,
+    scattering_angle_rad,
+    collection_solid_angle_sr,
+    *,
+    optical_efficiency=1.0,
+):
+    """Infer electron density from calibrated collected Thomson-scattered power.
+
+    Uses P_det = P_inc * n_e * L * (dσ/dΩ) * ΔΩ * η.
+    Inputs must describe the same calibrated spectral band/time gate; this
+    single-band relation neglects spectral-response integration and relativistic
+    spectral-shape effects.
+    """
+    ps, pi, length, omega, eta = np.broadcast_arrays(
+        np.asarray(scattered_power_W, dtype=float),
+        np.asarray(incident_power_W, dtype=float),
+        np.asarray(interaction_length_m, dtype=float),
+        np.asarray(collection_solid_angle_sr, dtype=float),
+        np.asarray(optical_efficiency, dtype=float),
+    )
+    theta = np.asarray(scattering_angle_rad, dtype=float)
+    if not all(np.all(np.isfinite(x)) for x in (ps, pi, length, omega, eta, theta)):
+        raise ValueError("All inputs must be finite")
+    if np.any(ps < 0) or np.any(pi <= 0) or np.any(length <= 0) or np.any(omega <= 0):
+        raise ValueError("Scattered power must be nonnegative; incident power, length, and solid angle must be positive")
+    if np.any((eta <= 0) | (eta > 1)):
+        raise ValueError("optical_efficiency must be in (0, 1]")
+    cross_section = thomson_differential_cross_section_m2_sr(theta)
+    denominator = pi * length * cross_section * omega * eta
+    if np.any(denominator <= 0):
+        raise ValueError("Scattering geometry gives zero differential cross-section")
+    density = ps / denominator
+    return {
+        "electron_density_m3": density,
+        "differential_cross_section_m2_sr": cross_section,
+        "model_scattered_power_W": pi * density * length * cross_section * omega * eta,
+        "relation": "P_det = P_inc * n_e * L * (dσ/dΩ) * ΔΩ * η",
+        "caveat": "Requires calibrated collected power and optical efficiency; a full Thomson spectrum fit is needed for temperature and relativistic spectral effects.",
+    }
