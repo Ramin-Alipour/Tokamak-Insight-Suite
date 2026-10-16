@@ -72,3 +72,21 @@ def test_catalog_displays_analysis_contracts_separately_from_reference_entries()
     catalog_radio.set_value("Analysis entry points").run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("callable analysis entry points" in str(item.value).lower() for item in app.markdown)
+
+
+
+@pytest.mark.parametrize(
+    "workflow",
+    [
+        "Thomson calibrated profile analysis",
+        "Thomson raw-spectrum temperature fit",
+        "Thomson calibrated scattered-power density",
+    ],
+)
+def test_thomson_workflow_panels_render_without_streamlit_exceptions(workflow):
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Advanced Analysis").run()
+    selector = next(item for item in app.selectbox if item.label == "Select workflow")
+    selector.set_value(workflow).run()
+    assert not app.exception, (workflow, [str(error.value) for error in app.exception])
