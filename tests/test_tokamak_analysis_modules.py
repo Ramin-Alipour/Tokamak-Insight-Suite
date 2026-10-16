@@ -1210,3 +1210,18 @@ def test_tomography_forward_projection_relation():
     A=np.array([[1.0,2.0],[0.5,1.0]])
     out=forward_project_emissivity(A,[3.0,4.0])
     np.testing.assert_allclose(out["predicted_line_integrals"],[11.0,5.5])
+
+
+def test_integrated_neutron_flux_poisson_relation():
+    from tokamak_analysis.neutron_flux import neutron_flux_from_integrated_counts
+    out=neutron_flux_from_integrated_counts(100.0,10.0,0.5,2.0)
+    assert out["neutron_flux_m2_s"] == pytest.approx(10.0)
+    assert out["poisson_uncertainty_m2_s"] == pytest.approx(1.0)
+
+
+def test_neutron_time_of_flight_energy_relation():
+    from tokamak_analysis.neutron_spectrum import neutron_energy_from_time_of_flight_keV
+    mass=1.67492749804e-27; energy=2.45e6*1.602176634e-19
+    speed=np.sqrt(2*energy/mass); tof=1.0/speed
+    out=neutron_energy_from_time_of_flight_keV(1.0,tof)
+    assert out["neutron_energy_keV"] == pytest.approx(2450.0,rel=1e-12)
