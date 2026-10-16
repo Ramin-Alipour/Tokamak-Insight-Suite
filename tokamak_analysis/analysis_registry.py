@@ -42,7 +42,7 @@ ANALYSES = [
     {"id":36,"name":"Radiation Tomography","module":"radiation_tomography","function":"reconstruct_emissivity"},
     {"id":37,"name":"Visible Imaging Analysis","module":"visible_imaging","function":"analyze_visible_image"},
     {"id":38,"name":"Plasma Line Radiation Analysis","module":"line_radiation","function":"analyze_line_radiation"},
-    {"id":39,"name":"Bolometric Tomography","module":"radiation_tomography","function":"reconstruct_emissivity"},
+    {"id":39,"name":"Bolometric Tomography","module":"radiation_tomography","function":"reconstruct_bolometric_tomography"},
     {"id":40,"name":"Neutron Flux Analysis","module":"neutron_flux","function":"analyze_neutron_flux"},
     {"id":41,"name":"Neutron Energy Spectrum","module":"neutron_spectrum","function":"analyze_neutron_spectrum"},
     {"id":42,"name":"Fusion Reaction Rate Analysis","module":"fusion_rate","function":"fusion_reaction_rate"},
