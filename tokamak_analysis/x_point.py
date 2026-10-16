@@ -7,14 +7,15 @@ def find_x_point_candidates(R_m,Z_m,psi_Wb_rad,*,gradient_tolerance=None):
     if gradient_tolerance is not None:
         gradient_tolerance=float(gradient_tolerance)
         if not np.isfinite(gradient_tolerance) or gradient_tolerance<0: raise ValueError("gradient_tolerance must be finite and non-negative")
-    dz,dr=np.gradient(p,Z,R,edge_order=2); candidates=[]
+    dz,dr=np.gradient(p,Z,R,edge_order=2)
+    d2psi_dz2=np.gradient(dz,Z,axis=0,edge_order=2)
+    d2psi_dr2=np.gradient(dr,R,axis=1,edge_order=2)
+    d2psi_drdz=np.gradient(dr,Z,axis=0,edge_order=2)
+    candidates=[]
     for j in range(1,len(Z)-1):
         for i in range(1,len(R)-1):
             if dr[j-1:j+2,i-1:i+2].min()<=0<=dr[j-1:j+2,i-1:i+2].max() and dz[j-1:j+2,i-1:i+2].min()<=0<=dz[j-1:j+2,i-1:i+2].max():
-                d2psi_dz2=np.gradient(np.gradient(p,Z,axis=0,edge_order=2),Z,axis=0,edge_order=2)[j,i]
-                d2psi_dr2=np.gradient(np.gradient(p,R,axis=1,edge_order=2),R,axis=1,edge_order=2)[j,i]
-                d2psi_drdz=np.gradient(np.gradient(p,R,axis=1,edge_order=2),Z,axis=0,edge_order=2)[j,i]
-                h=d2psi_dz2*d2psi_dr2-d2psi_drdz**2
+                h=d2psi_dz2[j,i]*d2psi_dr2[j,i]-d2psi_drdz[j,i]**2
                 grad_norm=float(np.hypot(dr[j,i],dz[j,i]))
                 if h<0 and (gradient_tolerance is None or grad_norm<=gradient_tolerance): candidates.append({"R_m":float(R[i]),"Z_m":float(Z[j]),"psi_Wb_rad":float(p[j,i]),"hessian_determinant":float(h),"gradient_norm":grad_norm})
     return {"candidates":candidates,"count":len(candidates),"caveat":"Grid-based saddle candidates only; separatrix topology and equilibrium boundary conditions must be checked."}
