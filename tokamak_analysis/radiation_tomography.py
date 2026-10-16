@@ -30,7 +30,7 @@ def abel_project_axisymmetric_emissivity(radius_m, emissivity_W_m3, impact_param
         valid=rr>chord
         integrand[valid]=ee[valid]*rr[valid]/np.sqrt(rr[valid]**2-chord**2)
         # The p=0 endpoint has a finite zero limit; for p>0 the singular endpoint is omitted.
-        values.append(float(2*getattr(np, "trapezoid", np.trapz)(integrand,rr)))
+        values.append(float(2*(getattr(np, "trapezoid", None) or getattr(np, "trapz"))(integrand,rr)))
     return {"impact_parameter_m":p,"line_integrated_emissivity_W_m2":np.asarray(values),
             "equation":"g(p)=2*integral_p^a epsilon(r)*r/sqrt(r^2-p^2) dr",
             "caveat":"Discrete forward Abel projection; near-tangent chords require adequate radial resolution and endpoint treatment."}
