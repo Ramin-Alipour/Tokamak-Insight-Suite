@@ -4,6 +4,7 @@ from scipy.signal import medfilt, savgol_filter
 def denoise_signal(signal, *, method="savgol", window_length=9, polynomial_order=2):
     x=np.asarray(signal,dtype=float)
     if x.ndim!=1 or len(x)<3 or not np.all(np.isfinite(x)): raise ValueError("Signal must be finite 1-D data")
+    if not np.isfinite(window_length) or int(window_length)!=window_length: raise ValueError("window_length must be an integer")
     w=int(window_length)
     if w<3: raise ValueError("window_length must be >=3")
     if method=="median":
@@ -12,6 +13,7 @@ def denoise_signal(signal, *, method="savgol", window_length=9, polynomial_order
     elif method=="savgol":
         if w%2==0: w+=1
         w=min(w,len(x) if len(x)%2 else len(x)-1)
+        if not np.isfinite(polynomial_order) or int(polynomial_order)!=polynomial_order: raise ValueError("polynomial_order must be an integer")
         poly=int(polynomial_order)
         if poly<0 or w<=poly: raise ValueError("polynomial_order must be non-negative and smaller than the filter window")
         y=savgol_filter(x,w,poly)
