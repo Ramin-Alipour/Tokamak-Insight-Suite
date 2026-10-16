@@ -23,7 +23,7 @@ def confinement_time_from_energy_decay(time_s, stored_energy_J, *, fit_range_s=N
     mask=np.ones_like(t,dtype=bool)
     if fit_range_s is not None:
         lo,hi=map(float,fit_range_s)
-        if hi<=lo: raise ValueError("Invalid fit range")
+        if not np.all(np.isfinite([lo,hi])) or hi<=lo: raise ValueError("Fit range must have finite increasing bounds")
         mask=(t>=lo)&(t<=hi)
     if np.count_nonzero(mask)<3: raise ValueError("At least three points required in fit range")
     slope,intercept=np.polyfit(t[mask],np.log(W[mask]),1)
