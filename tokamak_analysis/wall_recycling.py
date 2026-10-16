@@ -11,3 +11,10 @@ def recycling_coefficient(incident_flux_m2_s, returned_flux_m2_s, *, uncertainti
         out["uncertainty"]=np.abs(r)*np.sqrt((sr/np.maximum(ret,np.finfo(float).tiny))**2+(si/inc)**2)
     out["caveat"]="Requires matched incident and recycled fluxes on consistent surfaces and time windows."
     return out
+
+def net_wall_particle_sink(incident_flux_m2_s, returned_flux_m2_s):
+    """Net wall sink flux from particle balance: Gamma_sink=Gamma_incident-Gamma_returned."""
+    inc,ret=np.broadcast_arrays(np.asarray(incident_flux_m2_s,dtype=float),np.asarray(returned_flux_m2_s,dtype=float))
+    if not np.all(np.isfinite(inc)) or not np.all(np.isfinite(ret)) or np.any(inc<0) or np.any(ret<0):
+        raise ValueError("Incident and returned fluxes must be finite and non-negative")
+    return {"net_wall_sink_flux_m2_s":inc-ret,"equation":"Gamma_sink=Gamma_incident-Gamma_returned"}
