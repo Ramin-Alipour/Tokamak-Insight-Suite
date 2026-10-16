@@ -5,8 +5,10 @@ def geometry_from_boundary(R_boundary_m,Z_boundary_m):
     if R.ndim!=1 or Z.ndim!=1 or R.size!=Z.size or R.size<4 or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)): raise ValueError("Boundary coordinates must be finite equal-length 1-D arrays")
     if np.any(R<=0): raise ValueError("Tokamak boundary must remain at positive major radius and cannot cross the symmetry axis")
     if not np.allclose([R[0],Z[0]],[R[-1],Z[-1]]): R=np.r_[R,R[0]]; Z=np.r_[Z,Z[0]]
-    signed=.5*np.sum(R[:-1]*Z[1:]-R[1:]*Z[:-1]); area=abs(float(signed))
-    rcent=float(np.sum((R[:-1]+R[1:])*(R[:-1]*Z[1:]-R[1:]*Z[:-1]))/(6*signed)) if signed else float("nan")
+    signed=.5*np.sum(R[:-1]*Z[1:]-R[1:]*Z[:-1])
+    if not np.isfinite(signed) or abs(signed)<=np.finfo(float).eps: raise ValueError("Boundary contour has zero or numerically degenerate signed area")
+    area=abs(float(signed))
+    rcent=float(np.sum((R[:-1]+R[1:])*(R[:-1]*Z[1:]-R[1:]*Z[:-1]))/(6*signed))
     major=float(np.sum((R[:-1]+R[1:])*(R[:-1]*Z[1:]-R[1:]*Z[:-1]))/(6*signed)) if signed else float("nan")
     volume=2*np.pi*major*area if np.isfinite(major) else float("nan")
     return {"cross_section_area_m2":area,"geometric_major_radius_m":major,"toroidal_volume_m3":volume,"R_boundary_m":R,"Z_boundary_m":Z,"caveat":"Volume uses axisymmetric Pappus theorem for a closed contour not crossing the symmetry axis."}
