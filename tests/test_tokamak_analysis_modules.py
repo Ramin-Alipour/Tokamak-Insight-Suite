@@ -1100,3 +1100,9 @@ def test_forward_doppler_wavelength_velocity_relation():
     wavelength=wavelength_from_line_of_sight_velocity(rest,velocity,relativistic=True)["observed_wavelength_nm"]
     recovered=doppler_flow_velocity(wavelength,rest,relativistic=True)["velocity_m_s"]
     assert recovered == pytest.approx(velocity,rel=1e-12)
+
+
+def test_impurity_fraction_line_ratio_relation():
+    from tokamak_analysis.impurity_concentration import impurity_fraction_from_line_ratio
+    out=impurity_fraction_from_line_ratio(4.0,10.0,2.0,5.0)
+    assert out["impurity_to_hydrogen_density_ratio"] == pytest.approx(1.0)
