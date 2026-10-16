@@ -68,6 +68,7 @@ def test_catalog_displays_analysis_contracts_separately_from_reference_entries()
     app = _loaded_app()
     app.run()
     app.radio[0].set_value("Diagnostic Catalog").run()
-    app.radio[1].set_value("Analysis entry points").run()
+    catalog_radio = next(item for item in app.radio if item.label == "Catalog")
+    catalog_radio.set_value("Analysis entry points").run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("callable analysis entry points" in str(item.value).lower() for item in app.markdown)
