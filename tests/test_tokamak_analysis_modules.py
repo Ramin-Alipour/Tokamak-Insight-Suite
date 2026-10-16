@@ -1237,3 +1237,29 @@ def test_gamma_peak_activity_relation():
     from tokamak_analysis.nuclear_gamma import activity_from_gamma_peak_rate
     out=activity_from_gamma_peak_rate(100.0,0.2,0.5)
     assert out["activity_Bq"] == pytest.approx(1000.0)
+
+
+def test_runaway_electron_field_energy_gain_relation():
+    from tokamak_analysis.runaway_electrons import electric_field_energy_gain_eV
+    out=electric_field_energy_gain_eV(5.0,100.0)
+    assert out["energy_gain_eV"] == pytest.approx(500.0)
+
+
+def test_relativistic_particle_kinetic_energy_relation():
+    from tokamak_analysis.energetic_particles import relativistic_kinetic_energy_keV
+    mass=9.1093837139e-31; c=299792458.0; energy=1000.0
+    p=np.sqrt((energy*1.602176634e-16)*(energy*1.602176634e-16+2*mass*c*c))/c
+    out=relativistic_kinetic_energy_keV(p,mass)
+    assert out["kinetic_energy_keV"] == pytest.approx(energy,rel=1e-12)
+
+
+def test_exponential_particle_loss_rate_relation():
+    from tokamak_analysis.energetic_particles import exponential_confinement_loss_rate
+    assert exponential_confinement_loss_rate(1e12,0.02)["particle_loss_rate_s-1"] == pytest.approx(5e13)
+
+
+def test_relativistic_runaway_speed_relation():
+    from tokamak_analysis.runaway_energy import runaway_speed_from_kinetic_energy
+    out=runaway_speed_from_kinetic_energy(0.0)
+    assert out["speed_m_s"] == pytest.approx(0.0)
+    assert out["gamma_factor"] == pytest.approx(1.0)
