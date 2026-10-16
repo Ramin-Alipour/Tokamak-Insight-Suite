@@ -12,7 +12,8 @@ def analyze_doppler_spectrum(wavelength_nm,intensity,*,rest_wavelength_nm=None,m
     fn=gauss if model.lower()=="gaussian" else lorentz if model.lower()=="lorentzian" else None
     if fn is None: raise ValueError("model must be gaussian or lorentzian")
     p0=[amp,center0,max(np.median(np.diff(x))*2,(x[-1]-x[0])/20),baseline]
-    popt,_=curve_fit(fn,x,y,p0=p0,maxfev=20000)
+    width_floor=max(np.finfo(float).eps, np.median(np.diff(x))*1e-6)
+    popt,_=curve_fit(fn,x,y,p0=p0,bounds=([0.0,float(x[0]),width_floor,-np.inf],[np.inf,float(x[-1]),float(x[-1]-x[0]),np.inf]),maxfev=20000)
     pred=fn(x,*popt); resid=y-pred; width=2.354820045*abs(popt[2]) if model.lower()=="gaussian" else 2*abs(popt[2])
     out={"center_nm":float(popt[1]),"amplitude":float(popt[0]),"width_fwhm_nm":float(width),"baseline":float(popt[3]),"r_squared":float(1-np.sum(resid**2)/np.sum((y-np.mean(y))**2)) if np.sum((y-np.mean(y))**2)>0 else float("nan"),"model":model}
     if rest_wavelength_nm is not None:
