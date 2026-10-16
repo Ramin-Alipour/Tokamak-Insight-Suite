@@ -16,6 +16,7 @@ from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
 from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_star, spitzer_resistivity,
     larmor_radii_and_speeds, coulomb_logarithm_electron, shaping_surface_area, q95_iter_formula)
 from tis.report import build_html_report, figure_to_png_base64
+from tis.contributions import build_contribution_bundle, bundle_json
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
@@ -1000,6 +1001,27 @@ elif page=='Advanced Analysis':
                 st.success('Analysis executed.')
                 st.write(result)
                 st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
+                contribution = build_contribution_bundle(
+                    analysis_id=int(entry['id']),
+                    analysis_name=str(entry['name']),
+                    software_version=str(__version__),
+                    parameters=args,
+                    result=result,
+                    dataset_sha256=sha or None,
+                    dataset_name=filename or None,
+                    tokamak=str(st.session_state.get('tis_source_manifest', {}).get('tokamak', '') or '') or None,
+                    shot_id=shot or st.session_state.get('tis_source_manifest', {}).get('shot'),
+                    diagnostic=str(entry['name']),
+                    researcher_notes="Review metadata and scientific assumptions before sharing.",
+                )
+                st.download_button(
+                    'Export community contribution bundle (JSON)',
+                    data=bundle_json(contribution),
+                    file_name=f"tis_contribution_analysis_{selected_id:02d}.json",
+                    mime='application/json',
+                    key=f"download_contribution_{selected_id}",
+                    help='Exports analysis parameters, result and provenance. Raw experimental data are not embedded.',
+                )
             except Exception as e: st.error(f'Analysis failed: {e}')
     elif workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
