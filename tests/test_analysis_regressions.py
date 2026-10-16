@@ -205,3 +205,21 @@ def test_x_point_detection_does_not_duplicate_a_single_saddle():
     assert result["count"] == 1
     assert result["candidates"][0]["R_m"] == pytest.approx(2.0)
     assert result["candidates"][0]["Z_m"] == pytest.approx(0.0)
+
+
+def test_interferometry_rejects_phase_sign_that_implies_negative_density():
+    from tokamak_analysis.interferometry import interferometry_density
+    with pytest.raises(ValueError, match="negative line density"):
+        interferometry_density(-1.0, 10e9, sign=1)
+
+
+def test_reflectometry_zero_spectrum_has_no_defined_peak():
+    from tokamak_analysis.reflectometry import analyze_reflectometry_spectrum
+    result = analyze_reflectometry_spectrum([1.0, 2.0, 3.0], [0.0, 0.0, 0.0])
+    assert result["peak_frequency_Hz"] is None
+
+
+def test_plasma_wave_spectrum_zero_signal_has_no_dominant_frequency():
+    from tokamak_analysis.plasma_wave_spectrum import analyze_wave_signal
+    result = analyze_wave_signal(np.arange(16, dtype=float) * 0.01, np.zeros(16))
+    assert result["dominant_frequency_Hz"] is None
