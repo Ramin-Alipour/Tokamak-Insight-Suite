@@ -10,3 +10,13 @@ def analyze_ball_pen_probe(time_s, ball_pen_V, floating_V=None):
         out["floating_potential_V"]=vf; out["potential_difference_V"]=v-vf; out["mean_potential_difference_V"]=float(np.mean(v-vf))
     out["caveat"]="Ball-pen potential interpretation depends on probe geometry, emissive/collection physics, and calibration."
     return out
+
+def plasma_potential_from_ball_pen(ball_pen_potential_V, electron_temperature_eV, calibrated_offset_factor):
+    """Apply calibrated ball-pen correction: Vp=V_BPP+alpha*Te[eV]."""
+    vb,te,alpha=np.broadcast_arrays(np.asarray(ball_pen_potential_V,dtype=float),np.asarray(electron_temperature_eV,dtype=float),np.asarray(calibrated_offset_factor,dtype=float))
+    if any(not np.all(np.isfinite(x)) for x in (vb,te,alpha)) or np.any(te<0):
+        raise ValueError("Inputs must be finite and electron temperature non-negative")
+    vp=vb+alpha*te
+    return {"plasma_potential_V":vp,"ball_pen_potential_V":vb,"calibrated_offset_factor":alpha,
+            "equation":"Vp=V_BPP+alpha*Te_eV",
+            "caveat":"alpha must be independently calibrated for the probe geometry and plasma regime; it is not universal."}
