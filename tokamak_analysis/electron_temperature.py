@@ -15,3 +15,13 @@ def analyze_electron_temperature(temperature_eV, *, coordinate=None, uncertainty
         out["uncertainty_eV"]=u
     out["caveat"]="Statistics summarize calibrated Te measurements; they do not perform Thomson spectral fitting."
     return out
+
+def electron_temperature_from_pressure_density(electron_pressure_Pa, electron_density_m3):
+    """Ideal-gas electron temperature in eV: Te_eV=pe/(ne*e)."""
+    pe,ne=np.broadcast_arrays(np.asarray(electron_pressure_Pa,dtype=float),np.asarray(electron_density_m3,dtype=float))
+    if not np.all(np.isfinite(pe)) or not np.all(np.isfinite(ne)) or np.any(pe<0) or np.any(ne<=0):
+        raise ValueError("Electron pressure must be non-negative and density positive; inputs finite")
+    te=pe/(ne*1.602176634e-19)
+    return {"electron_temperature_eV":te,"electron_pressure_Pa":pe,"electron_density_m3":ne,
+            "equation":"Te[eV]=pe[Pa]/(ne[m^-3]*e[C])",
+            "assumption":"Single-temperature ideal electron gas with pe=ne*kB*Te[K]=ne*e*Te[eV]."}
