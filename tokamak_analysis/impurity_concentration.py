@@ -11,3 +11,13 @@ def estimate_impurity_fraction(impurity_line_emissivity, impurity_excitation_coe
         nz=Lz/(ne*Qz); nh=Lh/(ne*Qh); out["impurity_fraction_estimate"]=nz/nh
     out["caveat"]="Requires calibrated optically thin emissivity and appropriate collisional-radiative coefficients; this simplified estimator omits transport and charge-state balance."
     return out
+
+def impurity_fraction_from_line_ratio(impurity_emissivity, hydrogen_emissivity, impurity_pec, hydrogen_pec):
+    """Optically thin line-ratio estimate: nz/nh=(epsilon_z/epsilon_H)*(PEC_H/PEC_z)."""
+    ez,eh,pz,ph=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (impurity_emissivity,hydrogen_emissivity,impurity_pec,hydrogen_pec)])
+    if any(not np.all(np.isfinite(v)) for v in (ez,eh,pz,ph)) or np.any(ez<0) or np.any(eh<=0) or np.any(pz<=0) or np.any(ph<=0):
+        raise ValueError("Emissivities and PECs must be finite; impurity emissivity non-negative and other inputs positive")
+    ratio=(ez/eh)*(ph/pz)
+    return {"impurity_to_hydrogen_density_ratio":ratio,
+            "equation":"nz/nH=(epsilon_z/epsilon_H)*(PEC_H/PEC_z)",
+            "assumption":"Optically thin emission with compatible photon emissivity coefficients, charge states, and plasma conditions."}
