@@ -8,7 +8,9 @@ def analyze_line_ratio(intensity_numerator,intensity_denominator,*,uncertainty_n
         if uncertainty_numerator is None or uncertainty_denominator is None: raise ValueError("Provide both intensity uncertainties")
         sa=np.asarray(uncertainty_numerator,dtype=float); sb=np.asarray(uncertainty_denominator,dtype=float)
         if np.any(sa<0) or np.any(sb<0) or not np.all(np.isfinite(sa)) or not np.all(np.isfinite(sb)): raise ValueError("Uncertainties must be finite and non-negative")
-        sa,sb=np.broadcast_arrays(sa,sb); out["line_ratio_uncertainty"]=np.sqrt((sa/b)**2+(a*sb/b**2)**2)
+        try: a_u,b_u,sa,sb=np.broadcast_arrays(a,b,sa,sb)
+        except ValueError as exc: raise ValueError("Intensity uncertainties must be broadcast-compatible with the intensities") from exc
+        out["line_ratio_uncertainty"]=np.sqrt((sa/b_u)**2+(a_u*sb/b_u**2)**2)
     out["caveat"]="Physical interpretation requires line calibration, background subtraction, optical-depth assessment and atomic-rate modeling."
     return out
 
