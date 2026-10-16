@@ -33,7 +33,7 @@ ALL_PAGES = [
     "Home", "Public Data Access", "Data Import & QC", "Time Series & MHD", "Events & Transients",
     "Spectral Analysis", "Probe Analysis", "Plasma Parameters", "Confinement & Scalings",
     "Equilibrium & Reconstruction", "Tomography & Bolometry", "Advanced Analysis",
-    "Diagnostic Catalog", "Reports & Export",
+    "Diagnostic Catalog", "Project Manager", "Reports & Export",
 ]
 
 
