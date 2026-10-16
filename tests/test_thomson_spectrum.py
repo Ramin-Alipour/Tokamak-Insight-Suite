@@ -137,3 +137,37 @@ def test_thomson_temperature_fit_is_stable_under_signal_unit_scaling():
     assert power_density_fit["electron_temperature_eV"] == pytest.approx(
         counts_fit["electron_temperature_eV"], rel=1e-8
     )
+
+
+
+def test_calibrated_thomson_spectrum_to_temperature_and_density_pipeline():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    calibrated_signal = signal * 1.0e-18
+    fit = fit_thomson_spectrum(
+        wavelength,
+        calibrated_signal,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=0.05,
+        signal_uncertainty=np.full(signal.size, 0.8e-18),
+        spectral_power_density_calibrated=True,
+    )
+    density = density_from_thomson_scattered_power(
+        fit["integrated_scattered_power_W"],
+        incident_power_W=2.0,
+        interaction_length_m=0.15,
+        scattering_angle_rad=angle,
+        collection_solid_angle_sr=1.0e-3,
+        optical_efficiency=0.7,
+        scattered_power_uncertainty_W=fit["integrated_scattered_power_uncertainty_W"],
+        incident_power_uncertainty_W=0.02,
+        interaction_length_uncertainty_m=0.001,
+        scattering_angle_uncertainty_rad=np.deg2rad(0.5),
+        collection_solid_angle_uncertainty_sr=2.0e-5,
+        optical_efficiency_uncertainty=0.01,
+    )
+    assert fit["electron_temperature_eV"] == pytest.approx(100.0, rel=0.03)
+    assert 1.0e19 < float(density["electron_density_m3"]) < 1.0e20
+    assert 0 < float(density["electron_density_uncertainty_m3"]) < float(density["electron_density_m3"])
