@@ -58,3 +58,14 @@ def analyze_divertor_particle_flux(position_m, particle_flux_m2_s):
             "peak_particle_flux_m2_s":float(np.max(g)),
             "integrated_particle_flux_m_s-1":float(getattr(np, "trapezoid", np.trapz)(g,x)),
             "caveat":"Integrated profile is per unit toroidal length unless surface geometry is included; absolute particle rate needs the relevant area and geometry."}
+
+
+def plasma_facing_component_heat_load(position_m, heat_flux_W_m2, surface_area_m2):
+    """Estimate peak heat load from a measured flux profile and specified exposed area."""
+    area=float(surface_area_m2)
+    if not np.isfinite(area) or area<=0:
+        raise ValueError("surface_area_m2 must be finite and positive")
+    result=analyze_divertor_flux(position_m, heat_flux_W_m2, surface_area_m2=area)
+    result["surface_area_m2"]=area
+    result["caveat"]="Peak flux multiplied by the supplied exposed area is a peak-based estimate, not an area-integrated load for a nonuniform surface."
+    return result
