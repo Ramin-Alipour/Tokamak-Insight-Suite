@@ -24,7 +24,10 @@ def estimate_channel_time_lag(reference_time_s, reference_signal, target_time_s,
     if any(not np.all(np.isfinite(v)) for v in (t1,x1,t2,x2)) or np.any(np.diff(t1)<=0) or np.any(np.diff(t2)<=0):
         raise ValueError("Inputs must be finite with strictly increasing time")
     dt=max(float(np.median(np.diff(t1))),float(np.median(np.diff(t2))))
-    start=max(t1[0],t2[0]); stop=min(t1[-1],t2[-1]); grid=np.arange(start,stop+0.5*dt,dt)
+    start=max(t1[0],t2[0]); stop=min(t1[-1],t2[-1])
+    if not np.isfinite(dt) or dt<=0 or stop<=start: raise ValueError("Channels must have a positive overlapping time interval")
+    grid_count=int(np.floor((stop-start)/dt))+1
+    grid=start+np.arange(grid_count)*dt
     if len(grid)<3: raise ValueError("Insufficient overlapping time interval")
     a=np.interp(grid,t1,x1); b=np.interp(grid,t2,x2); a=a-np.mean(a); b=b-np.mean(b)
     corr=correlate(b,a,mode="full",method="auto"); lags=correlation_lags(len(b),len(a),mode="full")
