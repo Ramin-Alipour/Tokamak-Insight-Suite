@@ -262,3 +262,17 @@ def test_zero_magnetic_signal_has_no_dominant_mode_frequency():
     from tokamak_analysis.magnetic_mode_frequency import magnetic_mode_frequency
     result = magnetic_mode_frequency(np.arange(16, dtype=float), np.zeros(16))
     assert result["dominant_frequency_Hz"] is None
+
+
+def test_channel_lag_rejects_constant_signals():
+    from tokamak_analysis.channel_synchronization import estimate_channel_time_lag
+    t = np.arange(8, dtype=float)
+    with pytest.raises(ValueError, match="constant or zero-variance"):
+        estimate_channel_time_lag(t, np.ones(8), t, np.ones(8))
+
+
+def test_lh_transition_rejects_invalid_baseline_window():
+    from tokamak_analysis.lh_transition import detect_lh_transition
+    t = np.arange(12, dtype=float)
+    with pytest.raises(ValueError, match="finite increasing bounds"):
+        detect_lh_transition(t, np.zeros(12), baseline_window=(8.0, 2.0))
