@@ -2,7 +2,7 @@
 import numpy as np
 def analyze_neutron_spectrum(energy_keV, counts, *, background=None):
     e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
-    if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(c<0): raise ValueError("Invalid energy spectrum")
+    if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(e<0) or np.any(c<0): raise ValueError("Energy bins must be increasing and non-negative; counts must be non-negative")
     net=c.copy()
     if background is not None:
         b=np.asarray(background,dtype=float)
