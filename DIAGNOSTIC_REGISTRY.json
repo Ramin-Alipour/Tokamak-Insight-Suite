@@ -148,6 +148,25 @@
             "fit quality metrics"
           ],
           "scope": "Gaussian non-relativistic Maxwellian model, non-collective scattering, linear local background, known Gaussian instrumental sigma; spectral amplitude is not converted to density."
+        },
+        {
+          "name": "calibrated_power_density",
+          "function": "thomson_scattering.density_from_thomson_scattered_power",
+          "inputs": [
+            "scattered_power_W (W)",
+            "incident_power_W (W)",
+            "interaction_length_m (m)",
+            "scattering_angle_rad (rad)",
+            "collection_solid_angle_sr (sr)",
+            "optical_efficiency (dimensionless)",
+            "optional independent 1-sigma input uncertainties"
+          ],
+          "outputs": [
+            "electron_density_m3 (m^-3)",
+            "optional electron_density_uncertainty_m3 (m^-3)",
+            "model_scattered_power_W"
+          ],
+          "scope": "Single-band calibrated-power relation; first-order uncertainty propagation assumes independent inputs and excludes model/calibration discrepancy."
         }
       ]
     }
