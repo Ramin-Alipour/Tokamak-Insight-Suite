@@ -94,6 +94,8 @@ def q95_iter_formula(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa95:
     if not 0 < eps < 1:
         raise ValueError("Inverse aspect ratio a/R must be in (0,1).")
     d = float(delta95)
+    if not math.isfinite(d) or not -1 < d < 1:
+        raise ValueError("delta95 must be finite and lie strictly between -1 and 1.")
     shape = (1 + k ** 2 * (1 + 2 * d ** 2 - 1.2 * d ** 3)) / 2
     return float(5 * a ** 2 * b / (r * ip) * shape * (1.17 - 0.65 * eps) / (1 - eps ** 2) ** 2)
 
