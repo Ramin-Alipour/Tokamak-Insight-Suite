@@ -10,7 +10,7 @@ def analyze_plasma_current(time_s, current_A, *, uncertainty_A=None, smoothing_w
     t=np.asarray(time_s,dtype=float); ip=np.asarray(current_A,dtype=float)
     if t.ndim!=1 or ip.ndim!=1 or len(t)!=len(ip) or len(t)<3: raise ValueError("time and current must be equal-length 1-D arrays with at least 3 points")
     if not np.all(np.isfinite(t)) or not np.all(np.isfinite(ip)) or np.any(np.diff(t)<=0): raise ValueError("Inputs must be finite and time strictly increasing")
-    if int(smoothing_window)<1 or int(smoothing_window)>len(ip): raise ValueError("smoothing_window must be between 1 and data length")
+    if not np.isfinite(smoothing_window) or int(smoothing_window)!=smoothing_window or int(smoothing_window)<1 or int(smoothing_window)>len(ip): raise ValueError("smoothing_window must be an integer between 1 and data length")
     if uncertainty_A is not None:
         u=np.asarray(uncertainty_A,dtype=float)
         if u.shape!=ip.shape or not np.all(np.isfinite(u)) or np.any(u<0): raise ValueError("uncertainty_A must be finite, non-negative, and match current")
