@@ -15,3 +15,14 @@ def identify_spectral_lines(observed_nm, reference_lines, *, tolerance_nm=0.05):
         ref,label=min(refs,key=lambda z:abs(z[0]-wl)); delta=float(wl-ref)
         result.append({"observed_nm":float(wl),"candidate_nm":ref,"label":label,"delta_nm":delta,"matched":abs(delta)<=tol})
     return {"matches":result,"tolerance_nm":tol,"caveat":"Nearest-wavelength matching is preliminary; use a trusted atomic database and account for calibration, blends, charge state, and plasma conditions."}
+
+def hydrogen_rydberg_wavelength_nm(n_upper, n_lower):
+    """Hydrogen transition wavelength from 1/lambda=R_H*(1/n_lower^2-1/n_upper^2)."""
+    nu, nl=np.broadcast_arrays(np.asarray(n_upper,dtype=float),np.asarray(n_lower,dtype=float))
+    if not np.all(np.isfinite(nu)) or not np.all(np.isfinite(nl)) or np.any(nl<1) or np.any(nu<=nl) or np.any(nu!=np.floor(nu)) or np.any(nl!=np.floor(nl)):
+        raise ValueError("Principal quantum numbers must be integers with n_upper > n_lower >= 1")
+    R_H=10967758.340
+    inv_lambda=R_H*(1/nl**2-1/nu**2)
+    return {"wavelength_nm":1e9/inv_lambda,
+            "equation":"1/lambda=R_H*(1/n_lower^2-1/n_upper^2)",
+            "caveat":"Non-relativistic hydrogen Rydberg estimate; fine structure, isotope shifts, and plasma wavelength shifts are omitted."}
