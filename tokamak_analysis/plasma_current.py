@@ -23,7 +23,8 @@ def analyze_plasma_current(time_s, current_A, *, uncertainty_A=None, smoothing_w
     peak_idx=int(np.argmax(np.abs(smooth))); peak=float(smooth[peak_idx])
     flat_tol=max(float(np.nanpercentile(np.abs(derivative),25)),np.finfo(float).eps)
     flat=np.abs(derivative)<=flat_tol
-    return {"time_s":t.copy(),"current_A":ip.copy(),"smoothed_current_A":smooth,"dIp_dt_A_s":derivative,"peak_signed_current_A":peak,"peak_absolute_current_A":float(np.max(np.abs(smooth))),"peak_time_s":float(t[peak_idx]),"time_integral_A_s":float(np.trapezoid(smooth,t)),"ramp_up_indices":np.flatnonzero(derivative>flat_tol),"ramp_down_indices":np.flatnonzero(derivative < -flat_tol),"flat_top_candidate_indices":np.flatnonzero(flat),"uncertainty_A":u,"caveat":"Flat-top detection is a simple derivative threshold; select thresholds based on noise and machine-specific criteria."}
+    integrate = getattr(np, "trapezoid", np.trapz)
+    return {"time_s":t.copy(),"current_A":ip.copy(),"smoothed_current_A":smooth,"dIp_dt_A_s":derivative,"peak_signed_current_A":peak,"peak_absolute_current_A":float(np.max(np.abs(smooth))),"peak_time_s":float(t[peak_idx]),"time_integral_A_s":float(integrate(smooth,t)),"ramp_up_indices":np.flatnonzero(derivative>flat_tol),"ramp_down_indices":np.flatnonzero(derivative < -flat_tol),"flat_top_candidate_indices":np.flatnonzero(flat),"uncertainty_A":u,"caveat":"Flat-top detection is a simple derivative threshold; select thresholds based on noise and machine-specific criteria."}
 
 def current_from_rogowski_voltage(time_s, voltage_V, mutual_inductance_H, *, initial_current_A=0.0):
     """Recover plasma current from calibrated Rogowski output: V=M*dIp/dt.
