@@ -115,14 +115,15 @@
         "Validate finite values, matching lengths, unique radii, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
       ],
       "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated.",
-      "uncertainty_model": "Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width. Optional independent uncertainties for the calibrated scattered-power density relation are propagated to first order; profile pointwise uncertainties are preserved but not propagated through gradients, extrema, or averages.",
+      "uncertainty_model": "Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width. Optional independent uncertainties for calibrated scattered-power density are propagated to first order. Profile pointwise uncertainties are propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples; peak-location uncertainty is not estimated.",
       "limitations": [
         "Power-based density helper requires calibrated collected power, laser power, interaction length, scattering geometry, collection solid angle and optical efficiency.",
         "Single-band power relation neglects spectral-response integration, stray-light subtraction and relativistic spectral-shape effects.",
         "Numerical gradients can amplify measurement noise; use appropriate smoothing only with a justified noise model.",
         "Raw-spectrum fit uses a Gaussian non-relativistic Maxwellian approximation and requires a known Gaussian instrumental width.",
         "Raw-spectrum fit does not infer density from fitted amplitude; absolute density requires a separately calibrated power/throughput model.",
-        "Scattered-power density uncertainty propagation assumes independent input uncertainties and excludes covariance and model/calibration discrepancy."
+        "Scattered-power density uncertainty propagation assumes independent input uncertainties and excludes covariance and model/calibration discrepancy.",
+        "Profile uncertainty propagation assumes independent pointwise errors and excludes covariance, calibration uncertainty, and model discrepancy."
       ],
       "function_links": [
         "thomson_workflow.analyze_thomson_profile",
