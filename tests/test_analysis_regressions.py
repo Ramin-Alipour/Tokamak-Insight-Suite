@@ -197,8 +197,8 @@ def test_bolometric_tomography_has_diagnostic_specific_entry_point():
 def test_x_point_detection_does_not_duplicate_a_single_saddle():
     from tokamak_analysis.x_point import find_x_point_candidates
 
-    R = np.linspace(1.0, 3.0,  nine := 9)
-    Z = np.linspace(-1.0, 1.0, nine)
+    R = np.linspace(1.0, 3.0, 9)
+    Z = np.linspace(-1.0, 1.0, 9)
     RR, ZZ = np.meshgrid(R, Z)
     psi = (RR - 2.0) ** 2 - ZZ ** 2
     result = find_x_point_candidates(R, Z, psi, gradient_tolerance=1e-10)
