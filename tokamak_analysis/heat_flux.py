@@ -14,3 +14,10 @@ def analyze_heat_flux(position_m, heat_flux_W_m2):
         except Exception: out["exponential_decay_length_m"]=None
     out["caveat"]="Profile integration yields power per unit toroidal length unless geometry factors are included."
     return out
+
+def conductive_heat_flux_from_gradient(thermal_conductivity_W_m_K, temperature_gradient_K_m):
+    """Fourier law for conductive heat flux: q=-kappa*grad(T)."""
+    kappa,grad=np.broadcast_arrays(np.asarray(thermal_conductivity_W_m_K,dtype=float),np.asarray(temperature_gradient_K_m,dtype=float))
+    if not np.all(np.isfinite(kappa)) or not np.all(np.isfinite(grad)) or np.any(kappa<0):
+        raise ValueError("Thermal conductivity non-negative and inputs finite")
+    return {"conductive_heat_flux_W_m2":-kappa*grad,"equation":"q=-kappa*dT/dx"}
