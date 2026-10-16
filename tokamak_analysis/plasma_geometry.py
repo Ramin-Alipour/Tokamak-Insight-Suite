@@ -16,10 +16,11 @@ def geometry_from_boundary(R_boundary_m,Z_boundary_m):
 def cross_section_area_from_boundary(R_boundary_m,Z_boundary_m):
     """Shoelace line-integral relation A=1/2*|integral(R dZ-Z dR)| for a closed contour."""
     R=np.asarray(R_boundary_m,dtype=float); Z=np.asarray(Z_boundary_m,dtype=float)
-    if R.ndim!=1 or Z.shape!=R.shape or len(R)<3 or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)):
-        raise ValueError("Boundary coordinates must be finite equal-length 1-D arrays with at least 3 points")
+    if R.ndim!=1 or Z.shape!=R.shape or len(R)<3 or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or np.any(R<=0):
+        raise ValueError("Boundary coordinates must be finite equal-length 1-D arrays with at least 3 points and positive major radius")
     if not np.allclose([R[0],Z[0]],[R[-1],Z[-1]]): R=np.r_[R,R[0]]; Z=np.r_[Z,Z[0]]
     area=0.5*abs(float(np.sum(R[:-1]*Z[1:]-R[1:]*Z[:-1])))
+    if not np.isfinite(area) or area<=np.finfo(float).eps: raise ValueError("Boundary contour has zero or numerically degenerate cross-sectional area")
     return {"cross_section_area_m2":area,"equation":"A=0.5*abs(sum(R_i*Z_(i+1)-R_(i+1)*Z_i))"}
 
 
