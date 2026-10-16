@@ -13,3 +13,15 @@ def energetic_particle_flux(time_s, counts, effective_area_m2, *, efficiency=1.0
     t=np.asarray(time_s,dtype=float); c=np.asarray(counts,dtype=float); area=float(effective_area_m2); eff=float(efficiency)
     if t.ndim!=1 or c.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(c)) or np.any(np.diff(t)<=0) or np.any(c<0) or area<=0 or not 0<eff<=1: raise ValueError("Invalid inputs")
     return {"particle_flux_m-2_s-1":np.gradient(c,t,edge_order=2 if len(t)>2 else 1)/(area*eff),"caveat":"Flux is a detector-normalized estimate and requires validated geometry and efficiency."}
+
+def relativistic_kinetic_energy_keV(momentum_kg_m_s, particle_mass_kg):
+    """Relativistic kinetic energy K=sqrt((pc)^2+(mc^2)^2)-mc^2."""
+    p,m=np.broadcast_arrays(np.asarray(momentum_kg_m_s,dtype=float),np.asarray(particle_mass_kg,dtype=float))
+    c=299792458.0; joule_per_keV=1.602176634e-16
+    if not np.all(np.isfinite(p)) or not np.all(np.isfinite(m)) or np.any(p<0) or np.any(m<=0):
+        raise ValueError("Momentum must be non-negative and mass positive; inputs finite")
+    rest=m*c*c; total=np.hypot(p*c,rest)
+    # Stable form avoids cancellation at low momentum.
+    kinetic=(p*c)**2/(total+rest)
+    return {"kinetic_energy_keV":kinetic/joule_per_keV,"gamma_factor":total/rest,
+            "equation":"K=sqrt((p*c)^2+(m*c^2)^2)-m*c^2"}
