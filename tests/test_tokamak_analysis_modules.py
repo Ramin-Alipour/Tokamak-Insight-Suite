@@ -1084,3 +1084,11 @@ def test_relativistic_doppler_velocity_relation():
     out=relativistic_doppler_velocity(obs,rest)
     assert out["beta_v_over_c"] == pytest.approx(0.01,rel=1e-13)
     assert out["line_of_sight_velocity_m_s"] == pytest.approx(0.01*C_M_S,rel=1e-13)
+
+
+def test_forward_inverse_doppler_temperature_relation():
+    from tokamak_analysis.doppler_temperature import thermal_doppler_fwhm_nm, ion_temperature_from_doppler_fwhm
+    ti=80.0; lam=500.0; mass=40.0
+    width=thermal_doppler_fwhm_nm(ti,lam,mass)["thermal_fwhm_nm"]
+    out=ion_temperature_from_doppler_fwhm(width,lam,mass)
+    assert out["ion_temperature_eV"] == pytest.approx(ti,rel=1e-12)
