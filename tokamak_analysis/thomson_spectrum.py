@@ -35,6 +35,7 @@ def fit_thomson_spectrum(
     scattering_angle_rad: float,
     instrument_sigma_nm: float,
     signal_uncertainty=None,
+    spectral_power_density_calibrated: bool = False,
 ) -> dict:
     """Fit a raw Thomson spectrum and estimate electron temperature.
 
@@ -49,8 +50,10 @@ def fit_thomson_spectrum(
     Temperature uses sigma_physical^2 = sigma_fit^2 - sigma_instrument^2 and
     T_e[eV] = (sigma_physical / lambda_0)^2 * (m_e c^2 / 2) /
               sin(scattering_angle / 2)^2.
-    The amplitude is not converted to density: absolute density requires a
-    calibrated optical throughput/power model and background treatment.
+    By default, signal amplitude is not converted to power or density. If
+    spectral_power_density_calibrated=True, signal must be calibrated in W/nm;
+    the fitted Gaussian area is then reported as collected power in W. Absolute
+    density still requires a separate calibrated optical geometry/power model.
     """
     x = _finite_vector(wavelength_nm, "wavelength_nm")
     y = _finite_vector(signal, "signal")
@@ -136,6 +139,21 @@ def fit_thomson_spectrum(
     ss_tot = float(np.sum((y - np.mean(y)) ** 2))
     r_squared = float(1.0 - ss_res / ss_tot) if ss_tot > 0 else float("nan")
 
+    if spectral_power_density_calibrated:
+        # The integral of the fitted Gaussian is preserved by convolution with
+        # a normalized instrument response; the signal axis must be in W/nm.
+        area_factor = float(np.sqrt(2.0 * np.pi))
+        integrated_power = float(amplitude * sigma_fit * area_factor)
+        area_variance = 2.0 * np.pi * (
+            sigma_fit**2 * covariance[0, 0]
+            + amplitude**2 * covariance[2, 2]
+            + 2.0 * amplitude * sigma_fit * covariance[0, 2]
+        )
+        result_area_uncertainty = float(np.sqrt(max(0.0, area_variance)))
+    else:
+        integrated_power = None
+        result_area_uncertainty = None
+
     return {
         "electron_temperature_eV": temperature_ev,
         "electron_temperature_uncertainty_eV": temperature_uncertainty,
@@ -155,6 +173,9 @@ def fit_thomson_spectrum(
         "r_squared": r_squared,
         "degrees_of_freedom": int(dof),
         "fit_covariance": covariance,
+        "spectral_power_density_calibrated": bool(spectral_power_density_calibrated),
+        "integrated_scattered_power_W": integrated_power,
+        "integrated_scattered_power_uncertainty_W": result_area_uncertainty,
         "model": "Gaussian Doppler profile convolved with Gaussian instrument response, plus linear background",
         "assumptions": [
             "Non-collective Thomson scattering",
