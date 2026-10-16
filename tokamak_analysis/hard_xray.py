@@ -2,7 +2,7 @@
 import numpy as np
 def analyze_hard_xray(energy_keV, counts, *, live_time_s=None, background_counts=None):
     e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
-    if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(c<0): raise ValueError("Energy bins increasing; counts finite and nonnegative")
+    if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(np.diff(e)<=0) or np.any(e<0) or np.any(c<0): raise ValueError("Energy bins must be finite, increasing and non-negative; counts finite and nonnegative")
     net=c.copy()
     if background_counts is not None:
         bg=np.asarray(background_counts,dtype=float)
