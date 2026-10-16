@@ -11,6 +11,7 @@ from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
+from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -975,7 +976,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson raw-spectrum temperature fit','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Registered analysis modules'])
     if workflow=='Thomson raw-spectrum temperature fit':
         st.markdown('Fit a calibrated Thomson-scattering spectrum with a non-relativistic Gaussian Doppler model and a linear local background.')
         st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. This mode estimates electron temperature only; it does not infer density from spectral amplitude.')
@@ -1030,6 +1031,60 @@ elif page=='Advanced Analysis':
                         for item in fit['limitations']: st.warning(item)
                 except Exception as e:
                     st.error(str(e))
+    elif workflow=='Thomson calibrated scattered-power density':
+        st.markdown('Estimate electron density from calibrated collected Thomson-scattered power and a specified single-band optical geometry.')
+        st.warning('Use only when collected and incident powers refer to the same calibrated spectral band and time gate. This is a single-band relation, not a full spectral-response inversion.')
+        scattered_power=st.number_input('Collected scattered power (W)',min_value=0.0,value=1.0e-14,format='%.6e',key='tis_thomson_power_scattered')
+        incident_power=st.number_input('Incident laser power (W)',min_value=0.000001,value=2.0,format='%.6e',key='tis_thomson_power_incident')
+        interaction_length=st.number_input('Effective interaction length (m)',min_value=0.000001,value=0.15,format='%.6f',key='tis_thomson_interaction_length')
+        angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,format='%.3f',key='tis_thomson_power_angle')
+        solid_angle=st.number_input('Collection solid angle (sr)',min_value=0.000000001,value=1.0e-3,format='%.6e',key='tis_thomson_solid_angle')
+        efficiency=st.number_input('Total optical efficiency (0–1)',min_value=0.000001,max_value=1.0,value=0.7,format='%.6f',key='tis_thomson_efficiency')
+        propagate=st.checkbox('Propagate independent input uncertainties',value=False,key='tis_thomson_power_propagate')
+        power_uncertainty_args={}
+        if propagate:
+            st.caption('Enter 1-sigma standard uncertainties. The propagation assumes independent inputs and excludes calibration/model discrepancy.')
+            ups=st.number_input('Scattered-power uncertainty (W)',min_value=0.0,value=2.0e-16,format='%.6e',key='tis_thomson_u_scattered')
+            upi=st.number_input('Incident-power uncertainty (W)',min_value=0.0,value=0.02,format='%.6e',key='tis_thomson_u_incident')
+            ulength=st.number_input('Interaction-length uncertainty (m)',min_value=0.0,value=0.001,format='%.6f',key='tis_thomson_u_length')
+            uangle_deg=st.number_input('Scattering-angle uncertainty (degrees)',min_value=0.0,value=0.5,format='%.3f',key='tis_thomson_u_angle')
+            usolid=st.number_input('Collection-solid-angle uncertainty (sr)',min_value=0.0,value=2.0e-5,format='%.6e',key='tis_thomson_u_solid')
+            uefficiency=st.number_input('Optical-efficiency uncertainty',min_value=0.0,value=0.01,format='%.6f',key='tis_thomson_u_efficiency')
+            power_uncertainty_args={
+                'scattered_power_uncertainty_W':ups,
+                'incident_power_uncertainty_W':upi,
+                'interaction_length_uncertainty_m':ulength,
+                'scattering_angle_uncertainty_rad':float(np.deg2rad(uangle_deg)),
+                'collection_solid_angle_uncertainty_sr':usolid,
+                'optical_efficiency_uncertainty':uefficiency,
+            }
+        if st.button('Estimate Thomson electron density',type='primary',key='run_thomson_power_density'):
+            try:
+                density_result=density_from_thomson_scattered_power(
+                    scattered_power_W=scattered_power,
+                    incident_power_W=incident_power,
+                    interaction_length_m=interaction_length,
+                    scattering_angle_rad=float(np.deg2rad(angle_deg)),
+                    collection_solid_angle_sr=solid_angle,
+                    optical_efficiency=efficiency,
+                    **power_uncertainty_args,
+                )
+                density_value=float(np.asarray(density_result['electron_density_m3']).item())
+                st.success('Calibrated scattered-power density estimate completed.')
+                st.metric('Electron density',f'{density_value:.4g} m⁻³')
+                if 'electron_density_uncertainty_m3' in density_result:
+                    uncertainty_value=float(np.asarray(density_result['electron_density_uncertainty_m3']).item())
+                    st.metric('Propagated 1-sigma uncertainty',f'± {uncertainty_value:.4g} m⁻³')
+                summary={}
+                for key,value in density_result.items():
+                    if isinstance(value,np.ndarray) and value.ndim==0:
+                        summary[key]=value.item()
+                    else:
+                        summary[key]=value
+                st.json(summary)
+                json_download('Export Thomson power-density estimate',summary,'tis_thomson_power_density.json')
+            except Exception as e:
+                st.error(str(e))
     elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
