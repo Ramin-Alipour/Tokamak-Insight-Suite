@@ -26,7 +26,9 @@ jobs:
         run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
       - name: Verify all 80 analysis entry points resolve
         run: python -c "from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis; assert len(ANALYSES) == 80; assert [x['id'] for x in ANALYSES] == list(range(1, 81)); [resolve_analysis(x['id']) for x in ANALYSES]; print('All 80 registered analysis entry points resolve')"
-      - name: Run automated tests
-        run: python -m pytest -q
+      - name: Run numerical, API, and data-model tests
+        run: python -m pytest -q --ignore=tests/test_app_smoke.py
+      - name: Run Streamlit UI smoke tests
+        run: python -m pytest -q tests/test_app_smoke.py
       - name: Check Python syntax
         run: python -m compileall -q tis tokamak_analysis app.py
