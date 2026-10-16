@@ -9,7 +9,10 @@ def analyze_fft(time_s, signal, *, detrend=True, window="hann"):
     if window=="hann": w=np.hanning(len(y))
     elif window=="rectangular": w=np.ones(len(y))
     else: raise ValueError("window must be hann or rectangular")
-    spec=np.fft.rfft(y*w); f=np.fft.rfftfreq(len(y),dt); amp=2*np.abs(spec)/max(np.sum(w),np.finfo(float).tiny)
+    spec=np.fft.rfft(y*w); f=np.fft.rfftfreq(len(y),dt)
+    amp=np.abs(spec)/max(np.sum(w),np.finfo(float).tiny)
+    if len(amp)>1:
+        amp[1:-1 if len(y)%2==0 else None] *= 2.0
     return {"frequency_Hz":f,"amplitude":amp,"phase_rad":np.angle(spec),"sampling_frequency_Hz":1/dt,"window":window}
 
 
