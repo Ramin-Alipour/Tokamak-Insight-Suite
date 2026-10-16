@@ -50,7 +50,7 @@ The reported temperature uncertainty does not include uncertainty in laser wavel
 
 The profile workflow expects calibrated radius_m (m), density_m3 (m^-3), and temperature_ev (eV) arrays with equal lengths and at least two finite samples. Radius values must be unique; density, temperature, and supplied pointwise uncertainties must be non-negative. The arrays are sorted by radius together. Optional volume averages use circular, large-aspect-ratio weighting and require a non-negative minor-radius coordinate; they are not an equilibrium reconstruction.
 
-Pointwise uncertainties are validated and retained, but the current profile workflow does not propagate them through gradients, extrema, or averages.
+Pointwise uncertainties are validated and propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples. Peak-location uncertainty is not estimated.
 
 ## Example
 
