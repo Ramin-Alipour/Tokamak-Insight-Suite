@@ -7,8 +7,10 @@ def synchronize_channels(time_arrays, signal_arrays, *, target_time=None):
         t=np.asarray(t0,dtype=float); y=np.asarray(y0,dtype=float)
         if t.ndim!=1 or y.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)) or np.any(np.diff(t)<=0): raise ValueError("Each channel needs finite increasing time and matching signal")
         ts.append(t); ys.append(y)
-    common=np.asarray(target_time,dtype=float) if target_time is not None else ts[0][(ts[0]>=max(t[0] for t in ts))&(ts[0]<=min(t[-1] for t in ts))]
-    if common.ndim!=1 or len(common)<1 or not np.all(np.isfinite(common)): raise ValueError("Common time grid is empty or invalid")
+    overlap_start=max(t[0] for t in ts); overlap_stop=min(t[-1] for t in ts)
+    common=np.asarray(target_time,dtype=float) if target_time is not None else ts[0][(ts[0]>=overlap_start)&(ts[0]<=overlap_stop)]
+    if common.ndim!=1 or len(common)<1 or not np.all(np.isfinite(common)) or np.any(np.diff(common)<=0): raise ValueError("Common time grid must be finite, nonempty, and strictly increasing")
+    if common[0]<overlap_start or common[-1]>overlap_stop: raise ValueError("Target time grid must lie inside the channels’ shared time interval; extrapolation is not allowed")
     synced=np.vstack([np.interp(common,t,y) for t,y in zip(ts,ys)])
     return {"time_s":common,"synchronized_signals":synced,"channel_count":len(ts),"caveat":"Linear interpolation assumes no significant aliasing and does not correct hardware latency; determine timing offsets independently."}
 
