@@ -1048,13 +1048,20 @@ elif page=='Diagnostic Catalog':
         for d in entries:
             with st.expander(f"{d['diagnostic']} · {d['family']}"):
                 function_text=', '.join(d.get('implementation_functions',[])) or 'No direct callable workflow is mapped; registry description only.'
-                st.markdown(f"**Observables:** {d['quantities']}\n\n**Quantity class (M=measured, D=derived, I=inferred):** {d['status']}\n\n**Implementation status:** {d.get('implementation_status','Registry reference only')}\n\n**Mapped functions:** `{function_text}`\n\n**Method:** {d['method']}\n\n**Limitations:** {d['caveat']}")
+                contract=d.get('execution_contract', {})
+                level=contract.get('execution_level','reference_only')
+                completeness=contract.get('completeness','incomplete')
+                inputs=contract.get('input_specs',[])
+                outputs=contract.get('output_specs',[])
+                st.markdown(f"**Observables:** {d['quantities']}\n\n**Quantity class (M=measured, D=derived, I=inferred):** {d['status']}\n\n**Execution level:** `{level}`\n\n**Contract completeness:** {completeness}\n\n**Declared inputs / outputs:** {len(inputs)} / {len(outputs)}\n\n**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics',False) and completeness=='complete' else 'Not claimed'}\n\n**Implementation status:** {d.get('implementation_status','Registry reference only')}\n\n**Mapped functions:** `{function_text}`\n\n**Method:** {d['method']}\n\n**Limitations:** {d['caveat']}")
         json_download('Export diagnostic registry JSON',entries,'tis_diagnostic_registry.json')
     else:
         entries=[f for f in FORMULAS if not query or query in ' '.join(str(v) for v in f.values()).lower()]
         st.write(f'{len(entries)} formula entries')
         for f in entries:
-            with st.expander(f['name']): st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Status:** {f['status']}\n\n**Assumptions:** {f['assumptions']}")
+            with st.expander(f['name']):
+                execution=f.get('execution_contract',{})
+                st.markdown(f"**Equation:** `{f['equation']}`\n\n**Inputs:** {f['inputs']}\n\n**Output:** {f['output']}\n\n**Status:** {f['status']}\n\n**Implementation link:** {execution.get('implementation_link_status','not_mapped')}\n\n**Assumptions:** {f['assumptions']}\n\n**Execution note:** {execution.get('note','No implementation link declared.')}")
         json_download('Export formula registry JSON',entries,'tis_formula_registry.json')
 
 elif page=='Reports & Export':
