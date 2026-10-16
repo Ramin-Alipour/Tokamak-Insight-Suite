@@ -9,6 +9,7 @@ import streamlit as st
 from tis import __version__
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.workflow_registry import resolve_workflow, workflow_signature
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
 from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_star, spitzer_resistivity,
@@ -115,7 +116,7 @@ with st.sidebar:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
         st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
     st.divider()
-    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Reports & Export']
+    pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Workbench','Diagnostic Catalog','Reports & Export']
     requested=st.session_state.pop('jump','Home')
     page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
     st.divider()
@@ -1036,6 +1037,55 @@ elif page=='Advanced Analysis':
             st.bar_chart(mat.iloc[0].drop(mat.columns[0],errors="ignore").rename("Pearson r"))
             st.caption(f"Pearson correlation coefficients with reference channel {mat.columns[0]!r}; these are not a spatial profile.")
             download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
+
+elif page=='Diagnostic Workbench':
+    st.title('Diagnostic Workbench')
+    st.caption('Run catalogued analysis callables on calibrated data or explicit numeric inputs. Use the exact units, geometry, calibration and model assumptions required by each workflow.')
+    available_diagnostics = [d for d in DIAGNOSTICS if d.get('implementation_functions')]
+    selected_name = st.selectbox('Diagnostic / analysis', [d['diagnostic'] for d in available_diagnostics], key='workbench_diagnostic')
+    selected_entry = next(d for d in available_diagnostics if d['diagnostic'] == selected_name)
+    function_name = st.selectbox('Workflow function', selected_entry['implementation_functions'], key='workbench_function')
+    try:
+        st.code(workflow_signature(function_name), language='python')
+    except Exception as exc:
+        st.error(f'Workflow lookup failed: {exc}')
+    st.markdown('**Arguments as JSON**')
+    st.caption('Use ordinary JSON arrays for numeric vectors. To pass an uploaded numeric column, use the string "@column:EXACT_COLUMN_NAME" in the argument value.')
+    initial_args = st.session_state.get('workbench_args', '{}')
+    args_text = st.text_area('Keyword arguments', value=initial_args, height=180, key='workbench_args_editor',
+                             placeholder='{"time_s": "@column:time_s", "signal": "@column:signal"}')
+    def _resolve_workbench_values(value):
+        if isinstance(value, str) and value.startswith('@column:'):
+            column_name = value[len('@column:'):]
+            if df is None or column_name not in df.columns:
+                raise ValueError(f'Column {column_name!r} is not available in the loaded table.')
+            return pd.to_numeric(df[column_name], errors='raise').to_numpy()
+        if isinstance(value, list):
+            return [_resolve_workbench_values(item) for item in value]
+        if isinstance(value, dict):
+            return {key: _resolve_workbench_values(item) for key, item in value.items()}
+        return value
+    if st.button('Run selected diagnostic workflow', type='primary', key='run_workbench'):
+        try:
+            parsed = json.loads(args_text or '{}')
+            if not isinstance(parsed, dict):
+                raise ValueError('Arguments must be a JSON object of keyword arguments.')
+            arguments = _resolve_workbench_values(parsed)
+            callable_workflow = resolve_workflow(function_name)
+            output = callable_workflow(**arguments)
+            safe_output = _json_safe(output)
+            st.session_state['workbench_args'] = args_text
+            st.success('Workflow completed.')
+            st.json(safe_output)
+            json_download('Export workflow result JSON', safe_output, f'tis_{function_name}.json')
+            add_report_section(f'{selected_name} · {function_name}', safe_output,
+                               notes='Executed through Diagnostic Workbench; inspect input units and model assumptions.')
+        except Exception as exc:
+            st.error(f'Workflow could not run: {exc}')
+    st.markdown('### Catalog notes')
+    st.write(selected_entry['quantities'])
+    st.write(selected_entry['method'])
+    st.warning(selected_entry['caveat'])
 
 elif page=='Diagnostic Catalog':
     st.title('Diagnostic Knowledge Base')
