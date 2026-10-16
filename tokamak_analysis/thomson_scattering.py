@@ -160,11 +160,11 @@ ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
 
 
 def thomson_differential_cross_section_m2_sr(scattering_angle_rad):
-    """Unpolarized classical differential Thomson cross-section, dσ/dΩ = r_e²(1-cos²θ)."""
+    """Unpolarized classical differential Thomson cross-section, dσ/dΩ = (r_e²/2)(1+cos²θ)."""
     theta = np.asarray(scattering_angle_rad, dtype=float)
     if not np.all(np.isfinite(theta)) or np.any((theta < 0) | (theta > np.pi)):
         raise ValueError("scattering angle must be finite and in [0, pi]")
-    return ELECTRON_CLASSICAL_RADIUS_M**2 * np.sin(theta)**2
+    return 0.5 * ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2)
 
 
 def density_from_thomson_scattered_power(
