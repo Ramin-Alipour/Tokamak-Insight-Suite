@@ -12,8 +12,9 @@ def denoise_signal(signal, *, method="savgol", window_length=9, polynomial_order
     elif method=="savgol":
         if w%2==0: w+=1
         w=min(w,len(x) if len(x)%2 else len(x)-1)
-        if w<=polynomial_order: raise ValueError("Window must exceed polynomial order")
-        y=savgol_filter(x,w,int(polynomial_order))
+        poly=int(polynomial_order)
+        if poly<0 or w<=poly: raise ValueError("polynomial_order must be non-negative and smaller than the filter window")
+        y=savgol_filter(x,w,poly)
     else: raise ValueError("method must be median or savgol")
     return {"filtered_signal":y,"residual":x-y,"residual_rms":float(np.sqrt(np.mean((x-y)**2))),"method":method,"window_length":w}
 
