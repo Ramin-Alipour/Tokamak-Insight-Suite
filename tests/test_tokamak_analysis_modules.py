@@ -1010,3 +1010,13 @@ def test_large_aspect_ratio_shafranov_shift_relation():
     out=large_aspect_ratio_shafranov_shift(0.5,1.5,1.0,1.0)
     assert out["predicted_shafranov_shift_m"] == pytest.approx(0.125)
     assert out["normalized_shift"] == pytest.approx(0.25)
+
+
+def test_dedicated_plasma_area_and_volume_relations():
+    from tokamak_analysis.plasma_geometry import cross_section_area_from_boundary, axisymmetric_volume_from_boundary
+    theta=np.linspace(0,2*np.pi,2001)
+    R=1.5+0.2*np.cos(theta); Z=0.2*np.sin(theta)
+    area=cross_section_area_from_boundary(R,Z)
+    volume=axisymmetric_volume_from_boundary(R,Z)
+    assert area["cross_section_area_m2"] == pytest.approx(np.pi*0.2**2,rel=1e-5)
+    assert volume["toroidal_volume_m3"] == pytest.approx(2*np.pi**2*1.5*0.2**2,rel=1e-5)
