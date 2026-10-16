@@ -25,3 +25,12 @@ def relativistic_kinetic_energy_keV(momentum_kg_m_s, particle_mass_kg):
     kinetic=(p*c)**2/(total+rest)
     return {"kinetic_energy_keV":kinetic/joule_per_keV,"gamma_factor":total/rest,
             "equation":"K=sqrt((p*c)^2+(m*c^2)^2)-m*c^2"}
+
+
+def exponential_confinement_loss_rate(particle_inventory, confinement_time_s):
+    """First-order loss model: instantaneous loss rate Gamma_loss=N/tau_p."""
+    n,tau=np.broadcast_arrays(np.asarray(particle_inventory,dtype=float),np.asarray(confinement_time_s,dtype=float))
+    if not np.all(np.isfinite(n)) or not np.all(np.isfinite(tau)) or np.any(n<0) or np.any(tau<=0):
+        raise ValueError("Inventory non-negative and confinement time positive; inputs finite")
+    return {"particle_loss_rate_s-1":n/tau,"equation":"Gamma_loss=N_particles/tau_p",
+            "assumption":"Single exponential particle-loss model with constant confinement time."}
