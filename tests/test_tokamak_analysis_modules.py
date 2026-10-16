@@ -1386,3 +1386,56 @@ def test_rf_power_balance_relation():
     out=rf_power_balance(1000.0,100.0,50.0)
     assert out["net_delivered_power_W"] == pytest.approx(850.0)
     assert out["reflection_fraction"] == pytest.approx(0.1)
+
+
+def test_divertor_sheath_heat_flux_relation():
+    from tokamak_analysis.divertor_analysis import sheath_heat_flux_to_divertor
+    out=sheath_heat_flux_to_divertor(1e19,10.0,2.0,7.0,1.0,2.0)
+    assert out["target_heat_flux_W_m2"] == pytest.approx(out["parallel_sheath_heat_flux_W_m2"]*0.5)
+
+
+def test_pfc_surface_power_integral_relation():
+    from tokamak_analysis.divertor_analysis import total_pfc_power_from_surface_profile
+    s=np.linspace(0,1,101); q=np.full_like(s,10.0); R=np.full_like(s,2.0)
+    out=total_pfc_power_from_surface_profile(s,q,R)
+    assert out["total_pfc_power_W"] == pytest.approx(40*np.pi)
+
+
+def test_debye_length_relation():
+    from tokamak_analysis.edge_field import debye_length_m
+    ne=1e19; te=10.0; e=1.602176634e-19; eps=8.8541878128e-12
+    out=debye_length_m(ne,te)
+    assert out["debye_length_m"] == pytest.approx(np.sqrt(eps*te/(ne*e)),rel=1e-14)
+
+
+def test_martin_lh_threshold_scaling():
+    from tokamak_analysis.lh_transition import martin_lh_threshold_power_MW
+    out=martin_lh_threshold_power_MW(1e20,1.0,10.0)
+    assert out["lh_threshold_power_MW"] == pytest.approx(0.0488*10**0.941,rel=1e-14)
+
+
+def test_affine_signal_calibration_relation():
+    from tokamak_analysis.signal_calibration import fit_linear_calibration
+    out=fit_linear_calibration([0,1,2],[1,3,5])
+    assert out["gain"] == pytest.approx(2.0)
+    assert out["offset"] == pytest.approx(1.0)
+
+
+def test_robust_noise_sigma_relation():
+    from tokamak_analysis.denoising import robust_noise_sigma_from_residual
+    out=robust_noise_sigma_from_residual([-1.0,0.0,1.0,-2.0,2.0])
+    assert out["robust_noise_sigma"] == pytest.approx(1.4826)
+
+
+def test_sum_uncertainty_propagation_relation():
+    from tokamak_analysis.measurement_uncertainty import propagate_sum_uncertainty
+    out=propagate_sum_uncertainty([2.0,3.0],[0.3,0.4])
+    assert out["sum_value"] == pytest.approx(5.0)
+    assert out["sum_standard_uncertainty"] == pytest.approx(0.5)
+
+
+def test_channel_lag_cross_correlation_relation():
+    from tokamak_analysis.channel_synchronization import estimate_channel_time_lag
+    t=np.arange(0.0,10.0,0.01); ref=np.sin(2*np.pi*1.0*t); target=np.sin(2*np.pi*1.0*(t-0.2))
+    out=estimate_channel_time_lag(t,ref,t,target)
+    assert out["target_delay_relative_to_reference_s"] == pytest.approx(0.2,abs=0.02)
