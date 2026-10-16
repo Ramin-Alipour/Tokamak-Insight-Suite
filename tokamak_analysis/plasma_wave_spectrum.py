@@ -11,3 +11,16 @@ def analyze_wave_signal(time_s, signal, *, nperseg=None):
     f2,tt,sxx=spectrogram(y,fs=fs,nperseg=n)
     idx=int(np.argmax(p[1:])+1) if len(p)>1 else 0
     return {"frequency_Hz":f,"power_spectral_density":p,"dominant_frequency_Hz":float(f[idx]),"spectrogram_frequency_Hz":f2,"spectrogram_time_s":tt+t[0],"spectrogram_power":sxx,"sampling_frequency_Hz":fs}
+
+
+def langmuir_wave_frequency(ne_m3, Te_eV, wavenumber_rad_m):
+    """Warm-electron Langmuir dispersion: omega^2=omega_pe^2+3*k^2*kB*Te/me."""
+    E=1.602176634e-19; ME=9.1093837139e-31; EPS0=8.8541878128e-12
+    ne,te,k=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (ne_m3,Te_eV,wavenumber_rad_m)])
+    if any(not np.all(np.isfinite(v)) for v in (ne,te,k)) or np.any(ne<0) or np.any(te<0) or np.any(k<0):
+        raise ValueError("Density, temperature, and wavenumber must be finite and non-negative")
+    omega_pe=np.sqrt(ne*E**2/(EPS0*ME))
+    omega=np.sqrt(omega_pe**2+3*k**2*E*te/ME)
+    return {"angular_frequency_rad_s":omega,"frequency_Hz":omega/(2*np.pi),"electron_plasma_angular_frequency_rad_s":omega_pe,
+            "equation":"omega^2=omega_pe^2+3*k^2*e*Te_eV/me",
+            "assumption":"Unmagnetized, weakly damped Maxwellian electron plasma in the long-wavelength fluid approximation."}
