@@ -1203,3 +1203,10 @@ def test_photon_energy_wavelength_relation():
     from tokamak_analysis.line_radiation import photon_energy_from_wavelength_eV
     out=photon_energy_from_wavelength_eV(500.0)
     assert out["photon_energy_eV"] == pytest.approx(1239.841984,rel=1e-8)
+
+
+def test_tomography_forward_projection_relation():
+    from tokamak_analysis.radiation_tomography import forward_project_emissivity
+    A=np.array([[1.0,2.0],[0.5,1.0]])
+    out=forward_project_emissivity(A,[3.0,4.0])
+    np.testing.assert_allclose(out["predicted_line_integrals"],[11.0,5.5])
