@@ -82,3 +82,10 @@ def test_confinement_uncertainty_handles_zero_stored_energy():
     result = energy_confinement_time(0.0, 10.0, uncertainty_energy_J=2.0, uncertainty_power_W=1.0)
     assert result["energy_confinement_time_s"] == 0.0
     assert result["uncertainty_s"] == pytest.approx(0.2)
+
+
+def test_fft_rejects_degenerate_two_sample_hann_window():
+    from tokamak_analysis.fft_analysis import analyze_fft
+
+    with pytest.raises(ValueError, match="at least 3"):
+        analyze_fft([0.0, 1.0], [0.0, 1.0], window="hann")
