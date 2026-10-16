@@ -12,8 +12,10 @@ def magnetic_mode_frequency(time_s, signal, *, frequency_band_Hz=None):
         if not np.all(np.isfinite([lo,hi])) or lo<0 or hi<=lo: raise ValueError("Frequency band must have finite increasing non-negative bounds")
         m &= (f>=lo)&(f<=hi)
     if not np.any(m): raise ValueError("No frequency bins in requested range")
-    inds=np.flatnonzero(m); idx=inds[np.argmax(p[m])]
-    return {"dominant_frequency_Hz":float(f[idx]),"frequency_Hz":f,"power_spectral_density":p,"peak_power":float(p[idx])}
+    inds=np.flatnonzero(m)
+    if not np.any(p[m]>0): return {"dominant_frequency_Hz":None,"frequency_Hz":f,"power_spectral_density":p,"peak_power":0.0,"dominant_frequency_defined":False}
+    idx=inds[np.argmax(p[m])]
+    return {"dominant_frequency_Hz":float(f[idx]),"frequency_Hz":f,"power_spectral_density":p,"peak_power":float(p[idx]),"dominant_frequency_defined":True}
 
 def frequency_from_unwrapped_phase(time_s, phase_rad):
     """Estimate coherent mode frequency from phase: f=(1/2pi)*d(phase)/dt."""
