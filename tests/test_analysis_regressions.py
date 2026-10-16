@@ -148,3 +148,11 @@ def test_mhd_mode_estimate_sorts_unsorted_sensor_angles():
     amplitudes = np.exp(1j * angles)
     result = estimate_mode_number(angles, amplitudes)
     assert result["mode_number_estimate"] == pytest.approx(1.0)
+
+
+def test_divertor_bohm_flux_uses_electron_temperature():
+    from tokamak_analysis.divertor_analysis import divertor_ion_particle_flux_from_sheath
+
+    result = divertor_ion_particle_flux_from_sheath(1e19, 10.0, 2.0)
+    expected_sound_speed = np.sqrt(10.0 * 1.602176634e-19 / (2.0 * 1.66053906660e-27))
+    assert result["sound_speed_m_s"] == pytest.approx(expected_sound_speed)
