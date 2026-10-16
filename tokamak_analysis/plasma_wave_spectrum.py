@@ -6,12 +6,15 @@ def analyze_wave_signal(time_s, signal, *, nperseg=None):
     if t.ndim!=1 or y.shape!=t.shape or len(t)<8 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)) or np.any(np.diff(t)<=0): raise ValueError("Need matching finite signals and increasing time")
     dt=float(np.median(np.diff(t)))
     if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform time sampling required")
-    fs=1/dt; n=min(len(y),int(min(256,len(y)) if nperseg is None else nperseg))
-    if n<2: raise ValueError("nperseg must be at least 2")
+    fs=1/dt
+    requested=min(256,len(y)) if nperseg is None else nperseg
+    if not np.isfinite(requested) or int(requested)!=requested or int(requested)<2: raise ValueError("nperseg must be an integer of at least 2")
+    n=min(len(y),int(requested))
     f,p=welch(y-np.mean(y),fs=fs,nperseg=n)
     f2,tt,sxx=spectrogram(y,fs=fs,nperseg=n)
-    idx=int(np.argmax(p[1:])+1) if len(p)>1 else 0
-    return {"frequency_Hz":f,"power_spectral_density":p,"dominant_frequency_Hz":float(f[idx]),"spectrogram_frequency_Hz":f2,"spectrogram_time_s":tt+t[0],"spectrogram_power":sxx,"sampling_frequency_Hz":fs}
+    has_peak=bool(len(p)>1 and np.any(p[1:]>0))
+    idx=int(np.argmax(p[1:])+1) if has_peak else 0
+    return {"frequency_Hz":f,"power_spectral_density":p,"dominant_frequency_Hz":float(f[idx]) if has_peak else None,"spectrogram_frequency_Hz":f2,"spectrogram_time_s":tt+t[0],"spectrogram_power":sxx,"sampling_frequency_Hz":fs,"dominant_frequency_defined":has_peak}
 
 
 def langmuir_wave_frequency(ne_m3, Te_eV, wavenumber_rad_m):
