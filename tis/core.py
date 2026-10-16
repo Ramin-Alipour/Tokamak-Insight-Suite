@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal, optimize, integrate, linalg
 from .signal_processing import (butterworth_filter, fft_spectrum, welch_psd, autocorrelation_analysis, time_frequency_spectrogram, cross_analysis, cross_correlation_lag)
-from .spectral_analysis import fit_spectral_line
+from .spectral_analysis import fit_spectral_line, _r2
 from .tomography import (build_tomography_matrix_2d, regularized_tomography, select_tikhonov_lambda, abel_reconstruction)
 from scipy.special import voigt_profile, erfcx, erfc
 
