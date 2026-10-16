@@ -1263,3 +1263,9 @@ def test_relativistic_runaway_speed_relation():
     out=runaway_speed_from_kinetic_energy(0.0)
     assert out["speed_m_s"] == pytest.approx(0.0)
     assert out["gamma_factor"] == pytest.approx(1.0)
+
+
+def test_energetic_particle_flux_area_efficiency_relation():
+    from tokamak_analysis.energetic_particles import energetic_particle_flux
+    out=energetic_particle_flux([0.0,1.0,2.0],[0.0,10.0,20.0],effective_area_m2=2.0,efficiency=0.5)
+    np.testing.assert_allclose(out["particle_flux_m-2_s-1"],[10.0,10.0,10.0])
