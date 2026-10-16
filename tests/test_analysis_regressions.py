@@ -244,3 +244,15 @@ def test_tomography_uses_stable_least_squares_for_identity_response():
     from tokamak_analysis.radiation_tomography import reconstruct_emissivity
     result = reconstruct_emissivity([[1.0, 0.0], [0.0, 1.0]], [2.0, 3.0], regularization=0.0, nonnegative=False)
     np.testing.assert_allclose(result["emissivity"], [2.0, 3.0])
+
+
+def test_empty_energetic_particle_distribution_has_no_peak_energy():
+    from tokamak_analysis.energetic_particles import analyze_energy_distribution
+    result = analyze_energy_distribution([1.0, 2.0], [0.0, 0.0])
+    assert result["peak_energy_keV"] is None
+
+
+def test_runaway_energy_fit_rejects_non_decaying_spectrum():
+    from tokamak_analysis.runaway_energy import estimate_runaway_energy
+    with pytest.raises(ValueError, match="non-negative log-slope"):
+        estimate_runaway_energy([10.0, 20.0, 30.0, 40.0], [1.0, 2.0, 3.0, 4.0])
