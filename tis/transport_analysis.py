@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Any
 import numpy as np
 from scipy import optimize, integrate
-from scipy.special import erfc
+from scipy.special import erfc, erfcx
+from .constants import E_CHARGE
 from .spectral_analysis import _r2
 
 def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | None = None) -> dict[str, float]:
