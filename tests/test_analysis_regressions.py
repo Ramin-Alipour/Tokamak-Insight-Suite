@@ -107,3 +107,11 @@ def test_electron_and_ion_heating_registry_entries_are_species_specific():
     ion = resolve_analysis(67)([0.0, 1.0], [10.0, 10.0])
     assert electron["species"] == "electron"
     assert ion["species"] == "ion"
+
+
+def test_divertor_particle_flux_entry_does_not_require_heat_flux():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    result = resolve_analysis(74)([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
+    assert result["peak_particle_flux_m2_s"] == 2.0
+    assert result["integrated_particle_flux_m_s-1"] == pytest.approx(3.0)
