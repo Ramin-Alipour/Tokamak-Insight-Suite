@@ -39,3 +39,36 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile, pressur
     br=-dpsi_dz/R[None,:]; bz=dpsi_dr/R[None,:]
     span=float(np.max(psi)-np.min(psi)); psin=np.zeros_like(psi) if span==0 else (psi-np.min(psi))/span
     return {"R_m":R.copy(),"Z_m":Z.copy(),"psi_Wb_rad":psi,"psi_normalized":psin,"B_R_T":br,"B_Z_T":bz,"B_poloidal_T":np.hypot(br,bz),"iterations":it,"relative_iteration_change":change,"converged":converged,"warning":"Check nonlinear residual, boundary constraints, profile conventions, and experimental magnetic constraints before scientific interpretation."}
+
+def grad_shafranov_physical_relation(R_m, Z_m, psi_Wb_rad, pressure_gradient_Pa_per_Wb, ffprime_T2):
+    """Evaluate the Grad-Shafranov equation Δ*ψ = -μ0 R² p'(ψ) - F F'(ψ).
+
+    Returns the Grad-Shafranov operator, physical source term, and equation
+    residual on a measured/reconstructed uniform or nonuniform R-Z grid.
+    The supplied profile terms must already be mapped onto the grid.
+    """
+    R = np.asarray(R_m, dtype=float)
+    Z = np.asarray(Z_m, dtype=float)
+    psi = np.asarray(psi_Wb_rad, dtype=float)
+    dp = np.asarray(pressure_gradient_Pa_per_Wb, dtype=float)
+    ff = np.asarray(ffprime_T2, dtype=float)
+    expected = (Z.size, R.size)
+    if R.ndim != 1 or Z.ndim != 1 or R.size < 3 or Z.size < 3:
+        raise ValueError("R and Z must be 1-D grids with at least three points")
+    if np.any(R <= 0) or np.any(np.diff(R) <= 0) or np.any(np.diff(Z) <= 0):
+        raise ValueError("R must be positive and both grids strictly increasing")
+    if any(a.shape != expected for a in (psi, dp, ff)):
+        raise ValueError("psi, pressure-gradient, and FF-prime arrays must have shape (len(Z), len(R))")
+    if not all(np.all(np.isfinite(a)) for a in (R, Z, psi, dp, ff)):
+        raise ValueError("All inputs must be finite")
+    dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
+    d2psi_dz2 = np.gradient(dpsi_dz, Z, axis=0, edge_order=2)
+    d2psi_dr2 = np.gradient(dpsi_dr, R, axis=1, edge_order=2)
+    operator = d2psi_dr2 - dpsi_dr / R[None, :] + d2psi_dz2
+    source = -MU0 * R[None, :]**2 * dp - ff
+    return {
+        "grad_shafranov_operator_Wb_rad_m-2": operator,
+        "physical_source_Wb_rad_m-2": source,
+        "equation_residual_Wb_rad_m-2": operator - source,
+        "equation": "Δ*ψ = -μ0 R² dp/dψ - F dF/dψ",
+    }
