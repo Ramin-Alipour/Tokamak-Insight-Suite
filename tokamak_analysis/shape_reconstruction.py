@@ -8,7 +8,7 @@ def analyze_plasma_shape(R_m, Z_m, psi_normalized, *, boundary_level=0.95):
     geometric only; users must choose a physically appropriate boundary level.
     """
     R=np.asarray(R_m,dtype=float); Z=np.asarray(Z_m,dtype=float); psi=np.asarray(psi_normalized,dtype=float)
-    if R.ndim!=1 or Z.ndim!=1 or len(R)<3 or len(Z)<3 or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("R and Z must be finite, increasing 1-D grids")
+    if R.ndim!=1 or Z.ndim!=1 or len(R)<3 or len(Z)<3 or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or np.any(R<=0) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("R and Z must be finite, increasing 1-D grids")
     if psi.shape!=(len(Z),len(R)) or not np.all(np.isfinite(psi)): raise ValueError("psi_normalized must be finite with shape (len(Z), len(R))")
     if not 0<boundary_level<1: raise ValueError("boundary_level must lie between 0 and 1")
     import matplotlib.pyplot as plt
