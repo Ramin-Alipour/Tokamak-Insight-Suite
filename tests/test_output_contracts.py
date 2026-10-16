@@ -35,3 +35,12 @@ def test_divertor_integrated_flux_contract_has_explicit_profile_units():
     result = analyze_divertor_particle_flux([0.0, 1.0, 2.0], [1.0, 2.0, 1.0])
     assert result["integrated_particle_flux_m-1_s-1"] == pytest.approx(3.0)
     np.testing.assert_allclose(result["particle_flux_m-2_s-1"], [1.0, 2.0, 1.0])
+
+
+def test_neutron_flux_requires_timestamp_semantics_and_supports_bin_edges():
+    with pytest.raises(ValueError, match="timestamp_semantics explicitly"):
+        analyze_neutron_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0])
+    result = analyze_neutron_flux([0.0, 0.5, 2.0, 4.0], [5.0, 15.0, 20.0],
+                                  timestamp_semantics="bin_edges")
+    np.testing.assert_allclose(result["time_s"], [0.25, 1.25, 3.0])
+    np.testing.assert_allclose(result["count_rate_s-1"], [10.0, 10.0, 10.0])
