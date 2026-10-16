@@ -14,7 +14,9 @@ def analyze_svd(signals, *, rank=None, center=True):
 
 def svd_truncation_frobenius_error(singular_values, rank):
     """Eckart-Young bound: best rank-k Frobenius residual is sqrt(sum_{j>k} sigma_j^2)."""
-    s=np.asarray(singular_values,dtype=float); k=int(rank)
+    s=np.asarray(singular_values,dtype=float)
+    if not np.isfinite(rank) or int(rank)!=rank: raise ValueError("rank must be an integer")
+    k=int(rank)
     if s.ndim!=1 or len(s)<1 or not np.all(np.isfinite(s)) or np.any(s<0) or np.any(np.diff(s)>1e-12):
         raise ValueError("Singular values must be finite, non-negative, and non-increasing")
     if k<0 or k>len(s): raise ValueError("rank must lie between 0 and number of singular values")
