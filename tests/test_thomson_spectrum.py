@@ -169,5 +169,7 @@ def test_calibrated_thomson_spectrum_to_temperature_and_density_pipeline():
         optical_efficiency_uncertainty=0.01,
     )
     assert fit["electron_temperature_eV"] == pytest.approx(100.0, rel=0.03)
-    assert 1.0e19 < float(density["electron_density_m3"]) < 1.0e20
-    assert 0 < float(density["electron_density_uncertainty_m3"]) < float(density["electron_density_m3"])
+    density_value = float(np.asarray(density["electron_density_m3"]).item())
+    density_uncertainty = float(np.asarray(density["electron_density_uncertainty_m3"]).item())
+    assert 1.0e19 < density_value < 1.0e20
+    assert 0 < density_uncertainty < density_value
