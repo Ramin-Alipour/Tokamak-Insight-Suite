@@ -8,6 +8,9 @@ def recycling_coefficient(incident_flux_m2_s, returned_flux_m2_s, *, uncertainti
     if uncertainties is not None:
         si,sr=map(lambda x:np.asarray(x,dtype=float),uncertainties)
         if np.any(si<0) or np.any(sr<0) or not np.all(np.isfinite(si)) or not np.all(np.isfinite(sr)): raise ValueError("Uncertainties must be finite and nonnegative")
+        try:
+            si=np.broadcast_to(si,inc.shape); sr=np.broadcast_to(sr,inc.shape)
+        except ValueError as exc: raise ValueError("Uncertainties must be scalar or broadcast-compatible with flux shape") from exc
         out["uncertainty"]=np.sqrt((sr/inc)**2+(ret*si/inc**2)**2)
     out["caveat"]="Requires matched incident and recycled fluxes on consistent surfaces and time windows."
     return out
