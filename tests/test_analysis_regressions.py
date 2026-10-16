@@ -123,3 +123,10 @@ def test_pfc_heat_load_entry_requires_area_and_reports_peak_load():
     result = resolve_analysis(72)([0.0, 1.0], [10.0, 20.0], 3.0)
     assert result["peak_power_load_W"] == pytest.approx(60.0)
     assert result["surface_area_m2"] == 3.0
+
+
+def test_energetic_particle_flux_uses_binned_counts_per_bin_width():
+    from tokamak_analysis.energetic_particles import energetic_particle_flux
+
+    result = energetic_particle_flux([0.0, 1.0, 2.0], [10.0, 20.0, 30.0], 2.0, efficiency=0.5)
+    np.testing.assert_allclose(result["particle_flux_m-2_s-1"], [10.0, 20.0, 30.0])
