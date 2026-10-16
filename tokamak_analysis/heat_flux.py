@@ -3,7 +3,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 def analyze_heat_flux(position_m, heat_flux_W_m2):
     x=np.asarray(position_m,dtype=float); q=np.asarray(heat_flux_W_m2,dtype=float)
-    if x.ndim!=1 or q.shape!=x.shape or len(x)<3 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(q)) or np.any(np.diff(x)<=0): raise ValueError("Invalid heat-flux profile")
+    if x.ndim!=1 or q.shape!=x.shape or len(x)<3 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(q)) or np.any(np.diff(x)<=0) or np.any(q<0): raise ValueError("Heat-flux profile must be finite, non-negative, and ordered by increasing position")
     peak=int(np.argmax(q)); out={"position_m":x,"heat_flux_W_m2":q,"peak_heat_flux_W_m2":float(q[peak]),"peak_position_m":float(x[peak]),"integrated_heat_flux_W_m":float(getattr(np, "trapezoid", np.trapz)(q,x))}
     m=q>0
     if np.count_nonzero(m)>=3:
