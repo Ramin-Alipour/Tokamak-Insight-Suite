@@ -4,7 +4,7 @@ def analyze_energy_distribution(energy_keV, counts, *, normalize=True):
     e=np.asarray(energy_keV,dtype=float); c=np.asarray(counts,dtype=float)
     if e.ndim!=1 or c.shape!=e.shape or len(e)<2 or not np.all(np.isfinite(e)) or not np.all(np.isfinite(c)) or np.any(e<0) or np.any(c<0): raise ValueError("Energy and counts must be finite, nonnegative 1-D arrays")
     total=float(np.sum(c)); dist=c/total if normalize and total>0 else c.copy()
-    return {"energy_keV":e,"distribution":dist,"total_counts":total,"mean_energy_keV":float(np.sum(e*c)/total) if total>0 else float("nan"),"peak_energy_keV":float(e[np.argmax(c)]),"normalized":bool(normalize and total>0)}
+    return {"energy_keV":e,"distribution":dist,"total_counts":total,"mean_energy_keV":float(np.sum(e*c)/total) if total>0 else float("nan"),"peak_energy_keV":float(e[np.argmax(c)]) if total>0 else None,"normalized":bool(normalize and total>0)}
 def particle_loss_rate(time_s, loss_counts, *, detection_efficiency=1.0, live_time_s=None, counts_are_cumulative=False):
     t=np.asarray(time_s,dtype=float); c=np.asarray(loss_counts,dtype=float); eff=float(detection_efficiency)
     if t.ndim!=1 or c.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(c)) or np.any(np.diff(t)<=0) or np.any(c<0) or not np.isfinite(eff) or not 0<eff<=1:
