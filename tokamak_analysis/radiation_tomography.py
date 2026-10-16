@@ -13,3 +13,22 @@ def reconstruct_emissivity(response_matrix, line_integrals, *, regularization=1e
     else: sol=np.linalg.lstsq(lhs,rhs,rcond=None)[0]
     residual=A@sol-y
     return {"emissivity":sol,"synthetic_measurements":A@sol,"residual":residual,"residual_norm":float(np.linalg.norm(residual)),"regularization":lam,"caveat":"Reconstruction quality depends on calibrated geometry matrix, coverage, regularization, and uncertainty model."}
+
+def abel_project_axisymmetric_emissivity(radius_m, emissivity_W_m3, impact_parameter_m):
+    """Forward Abel projection g(p)=2*integral_p^a epsilon(r)*r/sqrt(r^2-p^2) dr."""
+    r=np.asarray(radius_m,dtype=float); eps=np.asarray(emissivity_W_m3,dtype=float); p=np.asarray(impact_parameter_m,dtype=float)
+    if r.ndim!=1 or eps.shape!=r.shape or len(r)<3 or p.ndim!=1 or len(p)<1 or any(not np.all(np.isfinite(v)) for v in (r,eps,p)):
+        raise ValueError("Radius/emissivity must match and all inputs be finite 1-D arrays")
+    if np.any(np.diff(r)<=0) or not np.isclose(r[0],0.0,atol=1e-12) or np.any(eps<0) or np.any(p<0) or np.any(p>=r[-1]):
+        raise ValueError("Require radius from zero, non-negative emissivity and impact parameters in [0,a)")
+    values=[]
+    for chord in p:
+        mask=r>chord
+        rr=r[mask]; ee=eps[mask]
+        if len(rr)<2: values.append(0.0); continue
+        integrand=ee*rr/np.sqrt(rr**2-chord**2)
+        # Avoid the integrable endpoint singularity by omitting the first sample adjacent to p.
+        values.append(float(2*np.trapezoid(integrand,rr)))
+    return {"impact_parameter_m":p,"line_integrated_emissivity_W_m2":np.asarray(values),
+            "equation":"g(p)=2*integral_p^a epsilon(r)*r/sqrt(r^2-p^2) dr",
+            "caveat":"Discrete forward Abel projection; near-tangent chords require adequate radial resolution and endpoint treatment."}
