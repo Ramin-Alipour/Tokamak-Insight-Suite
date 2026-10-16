@@ -11,7 +11,7 @@ def analyze_density_waves(time_s,density_m3,*,band_Hz=None):
     if band_Hz is not None:
         lo,hi=map(float,band_Hz)
         if lo<0 or hi<=lo: raise ValueError("Invalid frequency band")
-        m=(f>=lo)&(f<=hi); out["band_power"]=float(np.trapezoid(p[m],f[m])) if np.count_nonzero(m)>1 else 0.0
+        m=(f>=lo)&(f<=hi); out["band_power"]=float(getattr(np, "trapezoid", np.trapz)(p[m],f[m])) if np.count_nonzero(m)>1 else 0.0
     return out
 
 def wave_phase_velocity(frequency_Hz, wavelength_m):
