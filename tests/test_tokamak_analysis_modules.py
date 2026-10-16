@@ -1003,3 +1003,10 @@ def test_flux_hessian_x_point_classification():
     out=classify_flux_critical_point(2.0,-2.0,0.0)
     assert out["hessian_determinant"] == pytest.approx(-4.0)
     assert out["classification"] == "saddle (X-point candidate)"
+
+
+def test_large_aspect_ratio_shafranov_shift_relation():
+    from tokamak_analysis.shafranov_shift import large_aspect_ratio_shafranov_shift
+    out=large_aspect_ratio_shafranov_shift(0.5,1.5,1.0,1.0)
+    assert out["predicted_shafranov_shift_m"] == pytest.approx(0.125)
+    assert out["normalized_shift"] == pytest.approx(0.25)
