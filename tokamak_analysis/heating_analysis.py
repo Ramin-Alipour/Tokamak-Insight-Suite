@@ -10,3 +10,18 @@ def analyze_heating(time_s, power_W, *, stored_energy_J=None, species="electron"
         out["stored_energy_change_J"]=float(w[-1]-w[0]); out["stored_energy_J"]=w
     out["caveat"]="Species-specific heating requires validated power partition and deposition model; input power alone does not establish absorbed plasma heating."
     return out
+
+def electron_heating_power_from_partition(absorbed_power_W, electron_fraction):
+    """Species power partition: P_e=f_e*P_abs."""
+    power,f=np.broadcast_arrays(np.asarray(absorbed_power_W,dtype=float),np.asarray(electron_fraction,dtype=float))
+    if not np.all(np.isfinite(power)) or not np.all(np.isfinite(f)) or np.any(power<0) or np.any(f<0) or np.any(f>1):
+        raise ValueError("Absorbed power non-negative and electron fraction in [0,1]")
+    return {"electron_heating_power_W":power*f,"equation":"P_e=f_e*P_abs"}
+
+
+def ion_heating_power_from_partition(absorbed_power_W, electron_fraction):
+    """Complementary species power partition: P_i=(1-f_e)*P_abs."""
+    power,f=np.broadcast_arrays(np.asarray(absorbed_power_W,dtype=float),np.asarray(electron_fraction,dtype=float))
+    if not np.all(np.isfinite(power)) or not np.all(np.isfinite(f)) or np.any(power<0) or np.any(f<0) or np.any(f>1):
+        raise ValueError("Absorbed power non-negative and electron fraction in [0,1]")
+    return {"ion_heating_power_W":power*(1-f),"equation":"P_i=(1-f_e)*P_abs"}
