@@ -8,7 +8,7 @@ def analyze_hard_xray(energy_keV, counts, *, live_time_s=None, background_counts
         bg=np.asarray(background_counts,dtype=float)
         if bg.shape!=c.shape or not np.all(np.isfinite(bg)) or np.any(bg<0): raise ValueError("Background must match counts and be nonnegative")
         net=np.maximum(c-bg,0)
-    total=float(np.sum(net)); out={"energy_keV":e,"net_counts":net,"total_net_counts":total,"peak_energy_keV":float(e[np.argmax(net)]),"count_weighted_mean_energy_keV":float(np.sum(e*net)/total) if total else float("nan")}
+    total=float(np.sum(net)); out={"energy_keV":e,"net_counts":net,"total_net_counts":total,"peak_energy_keV":float(e[np.argmax(net)]) if total>0 else None,"count_weighted_mean_energy_keV":float(np.sum(e*net)/total) if total else float("nan")}
     if live_time_s is not None:
         t=float(live_time_s)
         if not np.isfinite(t) or t<=0: raise ValueError("Live time must be positive")
