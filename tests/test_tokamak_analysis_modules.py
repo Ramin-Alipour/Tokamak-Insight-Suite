@@ -1049,3 +1049,9 @@ def test_langmuir_electron_retarding_current_relation():
     from tokamak_analysis.probe_analysis import electron_retarding_current
     v=np.array([0.0,5.0,10.0]); out=electron_retarding_current(v,10.0,2.0,5.0)
     np.testing.assert_allclose(out["electron_current_A"],2*np.exp((v-10.0)/5.0),rtol=1e-14)
+
+
+def test_ball_pen_calibrated_plasma_potential_relation():
+    from tokamak_analysis.ball_pen_probe import plasma_potential_from_ball_pen
+    out=plasma_potential_from_ball_pen(20.0,10.0,0.6)
+    assert out["plasma_potential_V"] == pytest.approx(26.0)
