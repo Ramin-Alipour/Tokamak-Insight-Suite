@@ -25,7 +25,7 @@ def analyze_neutron_flux(time_s, counts, *, efficiency=None, effective_area_m2=N
         if efficiency is None or effective_area_m2 is None: raise ValueError("Provide detector efficiency and effective area")
         eff=float(efficiency); area=float(effective_area_m2)
         if not np.isfinite(eff) or not np.isfinite(area) or not 0<eff<=1 or area<=0: raise ValueError("Efficiency must be finite in (0,1] and area finite positive")
-        out["flux_estimate_m-2_s-1"]=rate/(eff*area)
+        out["neutron_flux_m-2_s-1"]=rate/(eff*area)\n        out["flux_estimate_m-2_s-1"]=out["neutron_flux_m-2_s-1"]  # backwards-compatible alias
     out["caveat"]="For per-bin counts, time_s is interpreted as bin-center times unless live_time_s is supplied; cumulative counters must be selected explicitly. Flux also requires detector geometry, efficiency, background, dead-time, and energy-response corrections."
     return out
 
@@ -35,6 +35,6 @@ def neutron_flux_from_integrated_counts(counts, live_time_s, detector_efficiency
     if any(not np.all(np.isfinite(v)) for v in (n,t,eff,area)) or np.any(n<0) or np.any(t<=0) or np.any(eff<=0) or np.any(eff>1) or np.any(area<=0):
         raise ValueError("Counts non-negative; time/area positive; efficiency in (0,1]; inputs finite")
     denom=t*eff*area
-    return {"neutron_flux_m-2_s-1":n/denom,"poisson_uncertainty_m-2_s-1":np.sqrt(n)/denom,
+    return {"neutron_flux_m-2_s-1":n/denom,"flux_estimate_m-2_s-1":n/denom,\n            "poisson_uncertainty_m-2_s-1":np.sqrt(n)/denom,
             "equation":"Phi=N/(T*epsilon*A); sigma_Phi=sqrt(N)/(T*epsilon*A)",
             "assumption":"Poisson counting statistics and constant efficiency/area over live time; background and dead-time corrections must be applied separately."}
