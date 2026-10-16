@@ -954,3 +954,12 @@ def test_miller_plasma_boundary_physical_relation_circle():
     np.testing.assert_allclose(out["R_m"],1.5+0.2*np.cos(theta),atol=1e-14)
     np.testing.assert_allclose(out["Z_m"],0.2*np.sin(theta),atol=1e-14)
     assert out["cross_section_area_m2"] == pytest.approx(np.pi*0.2**2,rel=2e-5)
+
+
+def test_rogowski_voltage_current_physical_relation():
+    from tokamak_analysis.plasma_current import current_from_rogowski_voltage
+    t=np.linspace(0.0,1.0,101)
+    M=2e-6; slope=3e5
+    out=current_from_rogowski_voltage(t,np.full_like(t,M*slope),M,initial_current_A=10.0)
+    np.testing.assert_allclose(out["current_A"],10.0+slope*t,rtol=1e-12,atol=1e-10)
+    np.testing.assert_allclose(out["dIp_dt_A_s"],slope,rtol=1e-12)
