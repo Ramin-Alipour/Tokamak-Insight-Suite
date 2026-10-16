@@ -104,6 +104,16 @@
           "name": "temperature_scale_length_uncertainty_m",
           "unit": "m",
           "description": "First-order uncertainty of local temperature scale length; NaN where the scale length is undefined."
+        },
+        {
+          "name": "density_normalized_gradient_uncertainty_m-1",
+          "unit": "m^-1",
+          "description": "First-order uncertainty of the normalized density gradient under independent pointwise measurement errors."
+        },
+        {
+          "name": "temperature_normalized_gradient_uncertainty_m-1",
+          "unit": "m^-1",
+          "description": "First-order uncertainty of the normalized temperature gradient under independent pointwise measurement errors."
         }
       ],
       "assumptions": [
