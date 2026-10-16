@@ -1268,7 +1268,7 @@ def test_relativistic_runaway_speed_relation():
 
 def test_energetic_particle_flux_area_efficiency_relation():
     from tokamak_analysis.energetic_particles import energetic_particle_flux
-    out=energetic_particle_flux([0.0,1.0,2.0],[0.0,10.0,20.0],effective_area_m2=2.0,efficiency=0.5)
+    out=energetic_particle_flux([0.0,1.0,2.0],[0.0,10.0,20.0],effective_area_m2=2.0,efficiency=0.5,counts_are_cumulative=True,timestamp_semantics="counter_read_times")
     np.testing.assert_allclose(out["particle_flux_m-2_s-1"],[10.0,10.0,10.0])
 
 
