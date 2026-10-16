@@ -8,7 +8,7 @@ def estimate_impurity_fraction(impurity_line_emissivity, impurity_excitation_coe
         if hydrogen_line_emissivity is None or hydrogen_excitation_coefficient is None: raise ValueError("Provide both hydrogen emissivity and coefficient")
         Lh=np.asarray(hydrogen_line_emissivity,dtype=float); Qh=np.asarray(hydrogen_excitation_coefficient,dtype=float)
         if np.any(Lh<=0) or np.any(Qh<=0) or not np.all(np.isfinite(Lh)) or not np.all(np.isfinite(Qh)): raise ValueError("Hydrogen emissivity and excitation coefficient must be finite and positive when computing an impurity-to-hydrogen ratio")
-        nz=Lz/(ne*Qz); nh=Lh/(ne*Qh); out["impurity_to_hydrogen_density_ratio"]=nz/nh
+        nz=Lz/(ne*Qz); nh=Lh/(ne*Qh); out["impurity_to_hydrogen_density_ratio"]=nz/nh\n        out["impurity_fraction_estimate"]=nz/nh  # compatibility alias; ratio is nz/nH, not a charge-state fraction
     out["caveat"]="Requires calibrated optically thin emissivity and appropriate collisional-radiative coefficients; this simplified estimator omits transport and charge-state balance."
     return out
 
