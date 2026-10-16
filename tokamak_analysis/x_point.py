@@ -3,7 +3,7 @@ import numpy as np
 def find_x_point_candidates(R_m,Z_m,psi_Wb_rad,*,gradient_tolerance=None):
     R=np.asarray(R_m,dtype=float); Z=np.asarray(Z_m,dtype=float); p=np.asarray(psi_Wb_rad,dtype=float)
     if R.ndim!=1 or Z.ndim!=1 or p.shape!=(len(Z),len(R)) or len(R)<3 or len(Z)<3: raise ValueError("Invalid R-Z flux grid")
-    if not np.all(np.isfinite(p)) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("Flux and grids must be finite and increasing")
+    if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or not np.all(np.isfinite(p)) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("Flux and grids must be finite and strictly increasing")
     dz,dr=np.gradient(p,Z,R,edge_order=2); candidates=[]
     for j in range(1,len(Z)-1):
         for i in range(1,len(R)-1):
