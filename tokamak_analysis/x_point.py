@@ -4,6 +4,9 @@ def find_x_point_candidates(R_m,Z_m,psi_Wb_rad,*,gradient_tolerance=None):
     R=np.asarray(R_m,dtype=float); Z=np.asarray(Z_m,dtype=float); p=np.asarray(psi_Wb_rad,dtype=float)
     if R.ndim!=1 or Z.ndim!=1 or p.shape!=(len(Z),len(R)) or len(R)<3 or len(Z)<3: raise ValueError("Invalid R-Z flux grid")
     if not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z)) or not np.all(np.isfinite(p)) or np.any(np.diff(R)<=0) or np.any(np.diff(Z)<=0): raise ValueError("Flux and grids must be finite and strictly increasing")
+    if gradient_tolerance is not None:
+        gradient_tolerance=float(gradient_tolerance)
+        if not np.isfinite(gradient_tolerance) or gradient_tolerance<0: raise ValueError("gradient_tolerance must be finite and non-negative")
     dz,dr=np.gradient(p,Z,R,edge_order=2); candidates=[]
     for j in range(1,len(Z)-1):
         for i in range(1,len(R)-1):
@@ -12,7 +15,8 @@ def find_x_point_candidates(R_m,Z_m,psi_Wb_rad,*,gradient_tolerance=None):
                 d2psi_dr2=np.gradient(np.gradient(p,R,axis=1,edge_order=2),R,axis=1,edge_order=2)[j,i]
                 d2psi_drdz=np.gradient(np.gradient(p,R,axis=1,edge_order=2),Z,axis=0,edge_order=2)[j,i]
                 h=d2psi_dz2*d2psi_dr2-d2psi_drdz**2
-                if h<0: candidates.append({"R_m":float(R[i]),"Z_m":float(Z[j]),"psi_Wb_rad":float(p[j,i]),"hessian_determinant":float(h)})
+                grad_norm=float(np.hypot(dr[j,i],dz[j,i]))
+                if h<0 and (gradient_tolerance is None or grad_norm<=gradient_tolerance): candidates.append({"R_m":float(R[i]),"Z_m":float(Z[j]),"psi_Wb_rad":float(p[j,i]),"hessian_determinant":float(h),"gradient_norm":grad_norm})
     return {"candidates":candidates,"count":len(candidates),"caveat":"Grid-based saddle candidates only; separatrix topology and equilibrium boundary conditions must be checked."}
 
 def classify_flux_critical_point(d2psi_dR2, d2psi_dZ2, d2psi_dRdZ):
