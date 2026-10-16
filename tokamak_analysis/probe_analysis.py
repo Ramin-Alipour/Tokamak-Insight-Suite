@@ -18,3 +18,13 @@ def analyze_probe_voltage_current(voltage_V,current_A,*,electron_fit_range=None,
         lo,hi=map(float,ion_fit_range); m=(v>=lo)&(v<=hi)
         out["ion_fit_linear_slope_A_V"]=float(np.polyfit(v[m],i[m],1)[0]) if np.count_nonzero(m)>=2 else None
     return out
+
+def electron_retarding_current(V_probe_V, plasma_potential_V, electron_saturation_current_A, electron_temperature_eV):
+    """Maxwellian electron-retarding branch: Ie=Ies*exp((V-Vp)/Te[eV])."""
+    v=np.asarray(V_probe_V,dtype=float); vp=float(plasma_potential_V); ies=float(electron_saturation_current_A); te=float(electron_temperature_eV)
+    if not np.all(np.isfinite(v)) or not np.isfinite(vp) or not np.isfinite(ies) or not np.isfinite(te) or ies<=0 or te<=0:
+        raise ValueError("Inputs must be finite; Ies and Te must be positive")
+    if np.any(v>vp): raise ValueError("This relation applies only to the electron-retarding region V <= Vp")
+    current=ies*np.exp((v-vp)/te)
+    return {"electron_current_A":current,"equation":"Ie=Ies*exp((Vprobe-Vplasma)/Te_eV)",
+            "assumption":"Ideal Maxwellian electron-retarding branch; sheath geometry, collisions, and ion current are not included."}
