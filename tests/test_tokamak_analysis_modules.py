@@ -1269,3 +1269,38 @@ def test_energetic_particle_flux_area_efficiency_relation():
     from tokamak_analysis.energetic_particles import energetic_particle_flux
     out=energetic_particle_flux([0.0,1.0,2.0],[0.0,10.0,20.0],effective_area_m2=2.0,efficiency=0.5)
     np.testing.assert_allclose(out["particle_flux_m-2_s-1"],[10.0,10.0,10.0])
+
+
+def test_vacuum_pressure_gas_balance_relation():
+    from tokamak_analysis.vacuum_pressure import pressure_rate_from_gas_load
+    out=pressure_rate_from_gas_load(10.0,2.0,3.0,4.0)
+    assert out["pressure_rate_Pa_s"] == pytest.approx(1.0)
+
+
+def test_gas_puff_molar_throughput_relation():
+    from tokamak_analysis.gas_puffing import molar_flow_to_gas_throughput_Pa_m3_s
+    out=molar_flow_to_gas_throughput_Pa_m3_s(2.0,300.0)
+    assert out["gas_throughput_Pa_m3_s"] == pytest.approx(2*8.314462618*300)
+
+
+def test_fueling_efficiency_relation():
+    from tokamak_analysis.fueling_rate import fueling_efficiency_from_particle_inventory
+    assert fueling_efficiency_from_particle_inventory(2e19,5e19)["fueling_efficiency"] == pytest.approx(0.4)
+
+
+def test_neutral_mean_free_path_relation():
+    from tokamak_analysis.neutral_gas import neutral_mean_free_path_m, K_B
+    out=neutral_mean_free_path_m(1.0,300.0,3e-10)
+    assert out["mean_free_path_m"] == pytest.approx(K_B*300/(np.sqrt(2)*np.pi*(3e-10)**2))
+
+
+def test_net_wall_particle_sink_relation():
+    from tokamak_analysis.wall_recycling import net_wall_particle_sink
+    assert net_wall_particle_sink(10.0,7.0)["net_wall_sink_flux_m2_s"] == pytest.approx(3.0)
+
+
+def test_mirnov_faraday_law_relation():
+    from tokamak_analysis.mirnov_analysis import magnetic_perturbation_from_mirnov_voltage
+    t=np.linspace(0.0,1.0,101); n=10; area=0.01; slope=2.0
+    out=magnetic_perturbation_from_mirnov_voltage(t,np.full_like(t,-n*area*slope),n,area)
+    np.testing.assert_allclose(out["delta_B_T"],slope*t,rtol=1e-12,atol=1e-12)
