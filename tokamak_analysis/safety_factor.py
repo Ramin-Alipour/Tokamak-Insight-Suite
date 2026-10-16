@@ -3,8 +3,9 @@ import numpy as np
 def estimate_safety_factor(R_m, minor_radius_m, B_toroidal_T, B_poloidal_T, *, q_profile=None):
     R=np.asarray(R_m,dtype=float); a=np.asarray(minor_radius_m,dtype=float); bt=np.asarray(B_toroidal_T,dtype=float); bp=np.asarray(B_poloidal_T,dtype=float)
     if any(not np.all(np.isfinite(x)) for x in (R,a,bt,bp)) or np.any(R<=0) or np.any(a<=0) or np.any(bp<=0): raise ValueError("Geometry and field values must be finite; R, a and Bp positive")
-    q=R*bt/(a*bp)
-    out={"q_cylindrical_estimate":q,"caveat":"Large-aspect-ratio cylindrical estimate only; accurate q(r) requires equilibrium flux-surface integration."}
+    R, a, bt, bp = np.broadcast_arrays(R, a, bt, bp)
+    q=a*bt/(R*bp)
+    out={"q_cylindrical_estimate":q,"equation":"q(r) approximately r*B_t/(R*B_p) for circular, large-aspect-ratio geometry","caveat":"Approximate circular large-aspect-ratio estimate only; accurate q(r) requires equilibrium flux-surface integration with consistent local major radius and poloidal field."}
     if q_profile is not None:
         qp=np.asarray(q_profile,dtype=float)
         if qp.ndim!=1 or not np.all(np.isfinite(qp)): raise ValueError("q_profile must be a finite 1-D array")
