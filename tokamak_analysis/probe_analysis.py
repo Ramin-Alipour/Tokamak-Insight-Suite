@@ -6,8 +6,24 @@ def analyze_probe_voltage_current(voltage_V,current_A,*,electron_fit_range=None,
     order=np.argsort(v); v=v[order]; i=i[order]
     if np.any(np.diff(v)<=0): raise ValueError("Voltage values must be unique")
     dvdi=np.gradient(i,v,edge_order=2)
-    vf=float(np.interp(0.0,i[np.argsort(i)],v[np.argsort(i)])) if np.min(i)<=0<=np.max(i) else None
-    out={"voltage_V":v,"current_A":i,"dI_dV_S":dvdi,"floating_potential_V":vf,"ion_saturation_current_A":float(np.median(i[v<=np.quantile(v,.2)])),"electron_saturation_current_A":float(np.median(i[v>=np.quantile(v,.8)])),"caveat":"These are descriptive I-V metrics only; reliable Te and plasma-potential inference requires physically selected fit regions and probe-specific theory."}
+    # Floating potential is the voltage where I(V)=0. Interpolate in voltage order;
+    # sorting the current itself would fabricate a crossing for non-monotonic/noisy I-V data.
+    zero = (i == 0.0)
+    candidates = []
+    zero_idx = np.flatnonzero(zero)
+    if zero_idx.size:
+        groups = np.split(zero_idx, np.flatnonzero(np.diff(zero_idx) > 1) + 1)
+        candidates.extend(float(0.5 * (v[g[0]] + v[g[-1]])) for g in groups)
+    for k in range(len(i) - 1):
+        if not zero[k] and not zero[k + 1] and i[k] * i[k + 1] < 0:
+            candidates.append(float(v[k] - i[k] * (v[k + 1] - v[k]) / (i[k + 1] - i[k])))
+    candidates = sorted(candidates)
+    unique_candidates = []
+    for candidate in candidates:
+        if not unique_candidates or not np.isclose(candidate, unique_candidates[-1], rtol=1e-10, atol=1e-12):
+            unique_candidates.append(candidate)
+    vf = unique_candidates[0] if len(unique_candidates) == 1 else None
+    out={"voltage_V":v,"current_A":i,"dI_dV_S":dvdi,"floating_potential_V":vf,"floating_potential_candidates_V":unique_candidates,"ion_saturation_current_A":float(np.median(i[v<=np.quantile(v,.2)])),"electron_saturation_current_A":float(np.median(i[v>=np.quantile(v,.8)])),"caveat":"These are descriptive I-V metrics only; reliable Te and plasma-potential inference requires physically selected fit regions and probe-specific theory."}
     if electron_fit_range is not None:
         lo,hi=map(float,electron_fit_range)
         if not np.all(np.isfinite([lo,hi])) or hi<=lo: raise ValueError("electron_fit_range must have finite increasing bounds")
