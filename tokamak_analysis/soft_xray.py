@@ -11,7 +11,7 @@ def analyze_soft_xray(time_s, channel_signals, *, baseline_window=None):
         if not np.any(m): raise ValueError("No samples in baseline window")
         base=np.median(x[m],axis=0)
     signal=x-base
-    return {"time_s":t,"baseline":base,"baseline_subtracted_signal":signal,"peak_by_channel":np.max(signal,axis=0),"integrated_signal_by_channel":getattr(np, "trapezoid", np.trapz)(signal,t,axis=0),"caveat":"Without detector response and line-of-sight inversion, signals are not absolute emissivity or temperature."}
+    return {"time_s":t,"baseline":base,"baseline_subtracted_signal":signal,"peak_by_channel":np.max(signal,axis=0),"integrated_signal_by_channel":(getattr(np, "trapezoid", None) or getattr(np, "trapz"))(signal,t,axis=0),"caveat":"Without detector response and line-of-sight inversion, signals are not absolute emissivity or temperature."}
 
 def maxwellian_bremsstrahlung_spectral_shape(photon_energy_eV, electron_temperature_eV):
     """Relative non-relativistic free-free spectral shape proportional to Te^-1/2 exp(-E_gamma/Te)."""
