@@ -1439,3 +1439,9 @@ def test_channel_lag_cross_correlation_relation():
     t=np.arange(0.0,10.0,0.01); ref=np.sin(2*np.pi*1.0*t); target=np.sin(2*np.pi*1.0*(t-0.2))
     out=estimate_channel_time_lag(t,ref,t,target)
     assert out["target_delay_relative_to_reference_s"] == pytest.approx(0.2,abs=0.02)
+
+
+def test_divertor_sheath_particle_flux_relation():
+    from tokamak_analysis.divertor_analysis import divertor_ion_particle_flux_from_sheath
+    out=divertor_ion_particle_flux_from_sheath(1e19,10.0,2.0)
+    assert out["divertor_ion_particle_flux_m2_s"] == pytest.approx(1e19*out["sound_speed_m_s"])
