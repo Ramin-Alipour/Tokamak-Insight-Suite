@@ -910,3 +910,25 @@ def test_channel_synchronization_known_linear_interpolation():
     np.testing.assert_allclose(out["time_s"], [1.0, 2.0])
     np.testing.assert_allclose(out["synchronized_signals"], [[10.0, 20.0], [10.0, 20.0]])
     assert out["channel_count"] == 2
+
+
+def test_thomson_scattering_physical_density_relation_known_answer():
+    from tokamak_analysis.thomson_scattering import (
+        thomson_differential_cross_section_m2_sr,
+        density_from_thomson_scattered_power,
+    )
+    ne = 2.0e19
+    incident = 10.0
+    length = 0.1
+    theta = np.pi / 2
+    solid_angle = 0.01
+    efficiency = 0.5
+    dsigma = thomson_differential_cross_section_m2_sr(theta)
+    scattered = incident * ne * length * dsigma * solid_angle * efficiency
+    out = density_from_thomson_scattered_power(
+        scattered, incident, length, theta, solid_angle,
+        optical_efficiency=efficiency,
+    )
+    assert out["electron_density_m3"] == pytest.approx(ne, rel=1e-12)
+    assert out["model_scattered_power_W"] == pytest.approx(scattered, rel=1e-12)
+    assert dsigma == pytest.approx((2.8179403262e-15)**2, rel=1e-12)
