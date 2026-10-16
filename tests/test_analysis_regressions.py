@@ -174,3 +174,14 @@ def test_langmuir_temperature_fit_subtracts_ion_saturation_baseline():
     current[mask] = -1.0 + np.exp((voltage[mask] - 4.0) / 2.0)
     result = analyze_probe_voltage_current(voltage, current, electron_fit_range=(0.0, 4.0))
     assert result["electron_temperature_estimate_eV"] == pytest.approx(2.0)
+
+
+def test_volume_and_cross_section_registry_entries_are_distinct():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    R = [1.5, 2.5, 2.5, 1.5, 1.5]
+    Z = [-0.5, -0.5, 0.5, 0.5, -0.5]
+    volume = resolve_analysis(11)(R, Z)
+    area = resolve_analysis(12)(R, Z)
+    assert volume["toroidal_volume_m3"] == pytest.approx(4 * np.pi)
+    assert area["cross_section_area_m2"] == pytest.approx(1.0)
