@@ -1076,3 +1076,11 @@ def test_floating_potential_current_balance_relation():
     from tokamak_analysis.potential_analysis import floating_potential_from_saturation_currents
     out=floating_potential_from_saturation_currents(20.0,5.0,np.e**2,1.0)
     assert out["floating_potential_V"] == pytest.approx(10.0)
+
+
+def test_relativistic_doppler_velocity_relation():
+    from tokamak_analysis.doppler_spectroscopy import relativistic_doppler_velocity, C_M_S
+    rest=500.0; obs=rest*np.sqrt((1+0.01)/(1-0.01))
+    out=relativistic_doppler_velocity(obs,rest)
+    assert out["beta_v_over_c"] == pytest.approx(0.01,rel=1e-13)
+    assert out["line_of_sight_velocity_m_s"] == pytest.approx(0.01*C_M_S,rel=1e-13)
