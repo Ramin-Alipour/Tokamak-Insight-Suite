@@ -1045,6 +1045,9 @@ elif page=='Advanced Analysis':
             if contract.get('output_specs'):
                 st.markdown('**Outputs**')
                 st.dataframe(pd.DataFrame(contract['output_specs']), use_container_width=True, hide_index=True)
+            if contract.get('workflow_modes'):
+                st.markdown('**Available execution paths**')
+                st.dataframe(pd.DataFrame(contract['workflow_modes']), use_container_width=True, hide_index=True)
             if contract.get('assumptions'):
                 st.markdown('**Assumptions**')
                 for item in contract['assumptions']: st.markdown(f'- {item}')
