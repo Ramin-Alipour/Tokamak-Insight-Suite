@@ -7,7 +7,24 @@
     "method": "Fit calibrated scattered-light spectrum using instrument response and scattering model.",
     "caveat": "Laser energy, absolute calibration, stray light, collection geometry and spectral response are required.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit calibrated scattered-light spectrum using instrument response and scattering model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Laser energy, absolute calibration, stray light, collection geometry and spectral response are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -20,7 +37,27 @@
       "langmuir_iv_analysis",
       "probe_iv_summary"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."
+      ],
+      "function_links": [
+        "langmuir_iv_analysis",
+        "probe_iv_summary"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -30,7 +67,24 @@
     "method": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
     "caveat": "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -40,7 +94,24 @@
     "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
     "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutral-beam overlap, background, instrument function and atomic data are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -53,7 +124,27 @@
       "fit_spectral_line",
       "doppler_temperature_with_uncertainty_eV"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."
+      ],
+      "function_links": [
+        "fit_spectral_line",
+        "doppler_temperature_with_uncertainty_eV"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -63,7 +154,24 @@
     "method": "Fit molecular band structure and compare populations with an appropriate model.",
     "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit molecular band structure and compare populations with an appropriate model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma parameters",
@@ -73,7 +181,24 @@
     "method": "Fit a scattering spectrum using the correct collective/non-collective model.",
     "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit a scattering spectrum using the correct collective/non-collective model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -83,7 +208,24 @@
     "method": "Apply calibration and geometry-specific field-coil relation.",
     "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply calibration and geometry-specific field-coil relation.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Current-to-field conversion depends on coil geometry and magnetic materials."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -93,7 +235,24 @@
     "method": "Calibrate field probes and combine with equilibrium reconstruction.",
     "caveat": "Local fields alone do not determine a full equilibrium.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate field probes and combine with equilibrium reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Local fields alone do not determine a full equilibrium."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -108,7 +267,29 @@
       "mode_number_from_channels",
       "integrate_time_series"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Orientation, bandwidth, transfer function, integration drift and pickup must be checked."
+      ],
+      "function_links": [
+        "fft_spectrum",
+        "welch_psd",
+        "mode_number_from_channels",
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -120,7 +301,26 @@
     "implementation_functions": [
       "integrate_time_series"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Integration constants, loop area/orientation and bandwidth matter."
+      ],
+      "function_links": [
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -132,7 +332,26 @@
     "implementation_functions": [
       "integrate_time_series"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated Rogowski output with documented integrator response.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Offset drift, saturation, bandwidth and calibration are critical."
+      ],
+      "function_links": [
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -142,7 +361,24 @@
     "method": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
     "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -152,7 +388,24 @@
     "method": "Invert rotation with wavelength, density and line-of-sight geometry model.",
     "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Invert rotation with wavelength, density and line-of-sight geometry model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sign conventions, birefringence, geometry and density-field degeneracy must be handled."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Magnetic and equilibrium",
@@ -162,7 +415,24 @@
     "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
     "caveat": "Reference surfaces and sign conventions must be recorded.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Reference surfaces and sign conventions must be recorded."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Electrostatic probes",
@@ -172,7 +442,24 @@
     "method": "Use collector-current balance and a configuration-specific correction validated for the probe.",
     "caveat": "Do not universally equate raw ball-pen voltage with plasma potential.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use collector-current balance and a configuration-specific correction validated for the probe.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not universally equate raw ball-pen voltage with plasma potential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Electrostatic probes",
@@ -182,7 +469,24 @@
     "method": "Fit angular current response with probe-specific collection/sheath model.",
     "caveat": "Probe orientation, geometry, bias, collisionality and electrical isolation matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit angular current response with probe-specific collection/sheath model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Probe orientation, geometry, bias, collisionality and electrical isolation matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Electrostatic probes",
@@ -192,7 +496,24 @@
     "method": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
     "caveat": "Not a standalone density measurement without assumptions.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Not a standalone density measurement without assumptions."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Electrostatic probes",
@@ -202,7 +523,24 @@
     "method": "Calibrate channels and derive spatial potential gradients using known geometry.",
     "caveat": "Potential gradients require spatial calibration and consistent time alignment.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate channels and derive spatial potential gradients using known geometry.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Potential gradients require spatial calibration and consistent time alignment."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Electrostatic probes",
@@ -212,7 +550,24 @@
     "method": "Use calibrated probe response and a validated conversion from current/voltage to density.",
     "caveat": "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated probe response and a validated conversion from current/voltage to density.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -222,7 +577,24 @@
     "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
     "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -232,7 +604,24 @@
     "method": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
     "caveat": "Detector response and atomic rates are often dominant uncertainties.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector response and atomic rates are often dominant uncertainties."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -244,7 +633,26 @@
     "implementation_functions": [
       "xray_spectrum_summary"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate energy scale and response; fit lines/continuum using a physics model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Pile-up, dead time, detector response and continuum assumptions matter."
+      ],
+      "function_links": [
+        "xray_spectrum_summary"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -254,7 +662,24 @@
     "method": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
     "caveat": "Neutral density and atomic rates can dominate inference.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutral density and atomic rates can dominate inference."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -264,7 +689,24 @@
     "method": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
     "caveat": "Line intensity is not a direct particle flux without a collisional-radiative model.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line intensity is not a direct particle flux without a collisional-radiative model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -274,7 +716,24 @@
     "method": "Fit known reference lines using a documented calibration function and residuals.",
     "caveat": "Calibration range, polynomial order and time drift must be assessed.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit known reference lines using a documented calibration function and residuals.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration range, polynomial order and time drift must be assessed."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Spectroscopy",
@@ -284,7 +743,24 @@
     "method": "Measure a narrow reference line or use a validated instrument function.",
     "caveat": "Do not subtract widths without a compatible convolution model.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Measure a narrow reference line or use a validated instrument function.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not subtract widths without a compatible convolution model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Density and refractive diagnostics",
@@ -294,7 +770,24 @@
     "method": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
     "caveat": "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Density and refractive diagnostics",
@@ -304,7 +797,24 @@
     "method": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
     "caveat": "Mode identification, ray/beam effects and equilibrium assumptions are essential.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Mode identification, ray/beam effects and equilibrium assumptions are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Density and refractive diagnostics",
@@ -314,7 +824,24 @@
     "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
     "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit scattered spectrum using scattering geometry and plasma response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires wave-vector geometry, calibration and plasma response model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Density and refractive diagnostics",
@@ -324,7 +851,24 @@
     "method": "Solve propagation through a spatially varying refractive index.",
     "caveat": "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve propagation through a spatially varying refractive index.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -338,7 +882,28 @@
       "build_tomography_matrix_2d",
       "abel_reconstruction"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate detector channels and solve a regularized geometry-matrix inverse problem.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Tomography is ill-posed; report regularization, coverage and uncertainty."
+      ],
+      "function_links": [
+        "regularized_tomography",
+        "build_tomography_matrix_2d",
+        "abel_reconstruction"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -348,7 +913,24 @@
     "method": "Calibrate bandwidth/response and analyze time series consistently.",
     "caveat": "Detector response and channel synchronization limit transient interpretation.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate bandwidth/response and analyze time series consistently.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector response and channel synchronization limit transient interpretation."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -358,7 +940,24 @@
     "method": "Calibrate channels and combine with geometry/model for reconstruction.",
     "caveat": "Signals depend on spectral response, impurity mix and detector sightlines.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate channels and combine with geometry/model for reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Signals depend on spectral response, impurity mix and detector sightlines."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -368,7 +967,24 @@
     "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
     "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Counts are not direct runaway current or electron energy without transport/response models."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -378,7 +994,24 @@
     "method": "Apply geometric calibration and image segmentation/tracking.",
     "caveat": "Line integration, brightness thresholds and viewing geometry affect interpretation.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply geometric calibration and image segmentation/tracking.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line integration, brightness thresholds and viewing geometry affect interpretation."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -388,7 +1021,24 @@
     "method": "Track calibrated image features across synchronized frames.",
     "caveat": "Apparent velocity is line-of-sight projected and affected by exposure/time resolution.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Track calibrated image features across synchronized frames.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Apparent velocity is line-of-sight projected and affected by exposure/time resolution."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -398,7 +1048,24 @@
     "method": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
     "caveat": "Emissivity, reflections, viewing angle and thermal properties are critical.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Emissivity, reflections, viewing angle and thermal properties are critical."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Radiation and imaging",
@@ -408,7 +1075,24 @@
     "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
     "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Geometry matrix, regularization and uncertainty must be saved with output."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Neutron and nuclear",
@@ -418,7 +1102,24 @@
     "method": "Apply efficiency, dead-time, geometry and background corrections.",
     "caveat": "Neutron scattering and source anisotropy can affect absolute yield.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply efficiency, dead-time, geometry and background corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutron scattering and source anisotropy can affect absolute yield."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Neutron and nuclear",
@@ -428,7 +1129,24 @@
     "method": "Unfold detector response or fit spectrum with a forward model.",
     "caveat": "Unfolding is ill-conditioned and must include response and uncertainty.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Unfold detector response or fit spectrum with a forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Unfolding is ill-conditioned and must include response and uncertainty."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Neutron and nuclear",
@@ -438,7 +1156,24 @@
     "method": "Reconstruct from multiple sightlines or imaging response.",
     "caveat": "Sparse viewing and scattering make inversion uncertain.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Reconstruct from multiple sightlines or imaging response.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sparse viewing and scattering make inversion uncertain."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Neutron and nuclear",
@@ -448,7 +1183,24 @@
     "method": "Calibrate energy and efficiency; fit peaks and background.",
     "caveat": "Pile-up, dead time, shielding and activation backgrounds matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate energy and efficiency; fit peaks and background.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Pile-up, dead time, shielding and activation backgrounds matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Fast particles",
@@ -458,7 +1210,24 @@
     "method": "Use calibrated response and neutralization/charge-exchange forward model.",
     "caveat": "Sightline integration and atomic cross sections are required.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated response and neutralization/charge-exchange forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sightline integration and atomic cross sections are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Fast particles",
@@ -468,7 +1237,24 @@
     "method": "Separate thermal/background emission and compare calibrated spectra with forward model.",
     "caveat": "Atomic physics, beam geometry, background and phase-space sensitivity matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Separate thermal/background emission and compare calibrated spectra with forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Atomic physics, beam geometry, background and phase-space sensitivity matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Fast particles",
@@ -478,7 +1264,24 @@
     "method": "Fit frequency-shifted scattered spectrum using plasma response model.",
     "caveat": "Calibration, scattering geometry and background rejection are required.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit frequency-shifted scattered spectrum using plasma response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration, scattering geometry and background rejection are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Fast particles",
@@ -488,7 +1291,24 @@
     "method": "Calibrate scintillator/particle response and compare to orbit-following model.",
     "caveat": "Detector geometry and magnetic equilibrium are needed for energy/pitch inference.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate scintillator/particle response and compare to orbit-following model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector geometry and magnetic equilibrium are needed for energy/pitch inference."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Fast particles",
@@ -498,7 +1318,24 @@
     "method": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
     "caveat": "Radiation is a proxy, not a direct measurement of runaway population.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Radiation is a proxy, not a direct measurement of runaway population."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Gas, pressure and fueling",
@@ -508,7 +1345,24 @@
     "method": "Apply gauge-specific calibration and gas sensitivity corrections.",
     "caveat": "Gauge type, gas species, location and operating range matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply gauge-specific calibration and gas sensitivity corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Gauge type, gas species, location and operating range matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Gas, pressure and fueling",
@@ -518,7 +1372,24 @@
     "method": "Apply mass-sensitivity and cracking-pattern corrections.",
     "caveat": "Species cross-sensitivity, fragmentation and calibration are essential.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply mass-sensitivity and cracking-pattern corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Species cross-sensitivity, fragmentation and calibration are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Gas, pressure and fueling",
@@ -528,7 +1399,24 @@
     "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
     "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Standard/actual flow conditions and gas temperature/pressure conventions matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Gas, pressure and fueling",
@@ -538,7 +1426,24 @@
     "method": "Combine pressure, spectroscopy and transport/neutral model.",
     "caveat": "Chamber pressure is not equal to local edge neutral density.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine pressure, spectroscopy and transport/neutral model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Chamber pressure is not equal to local edge neutral density."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Gas, pressure and fueling",
@@ -548,7 +1453,24 @@
     "method": "Compute from calibrated throughput and pressure under defined conditions.",
     "caveat": "Conductance, gauge position and units must be consistent.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compute from calibrated throughput and pressure under defined conditions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Conductance, gauge position and units must be consistent."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -561,7 +1483,27 @@
       "mode_number_from_channels",
       "fluctuation_flux"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detrend/window; compute Welch PSD, cross-spectrum, coherence and correlation with synchronized channels.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Aliasing, nonstationarity, common pickup, time skew and low coherence can mislead."
+      ],
+      "function_links": [
+        "mode_number_from_channels",
+        "fluctuation_flux"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -571,7 +1513,24 @@
     "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
     "caveat": "Mode number needs array geometry and assumptions about mode structure.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Mode number needs array geometry and assumptions about mode structure."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -584,7 +1543,27 @@
       "detect_elms",
       "interval_statistics"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detect pulses with robust threshold/prominence and cross-check independent diagnostics.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Thresholds are dataset-dependent; event energy needs calibrated power/energy channels."
+      ],
+      "function_links": [
+        "detect_elms",
+        "interval_statistics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -597,7 +1576,27 @@
       "detect_sawteeth",
       "interval_statistics"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detect rapid changes in ECE, SXR or other core channels.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Signal choice, temporal resolution and event overlap affect timing."
+      ],
+      "function_links": [
+        "detect_sawteeth",
+        "interval_statistics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -609,7 +1608,26 @@
     "implementation_functions": [
       "current_quench_analysis"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Align calibrated channels and detect multi-signal event signatures.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "A single threshold is not a robust universal disruption classifier."
+      ],
+      "function_links": [
+        "current_quench_analysis"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -622,7 +1640,27 @@
       "cross_analysis",
       "cross_correlation_lag"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compute normalized correlation after time alignment and detrending.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Correlation does not prove causation; periodic signals create ambiguous lags."
+      ],
+      "function_links": [
+        "cross_analysis",
+        "cross_correlation_lag"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "MHD and turbulence",
@@ -634,7 +1672,26 @@
     "implementation_functions": [
       "cross_analysis"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Estimate using consistent windows and sampling; report degrees of freedom if available.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Coherence estimates are biased for short/nonstationary records."
+      ],
+      "function_links": [
+        "cross_analysis"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Transport and confinement",
@@ -644,7 +1701,24 @@
     "method": "Combine density/velocity profiles and a stated transport convention.",
     "caveat": "Flux convention and simultaneous local measurements are essential.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine density/velocity profiles and a stated transport convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Flux convention and simultaneous local measurements are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Transport and confinement",
@@ -658,7 +1732,28 @@
       "ipb98y2_confinement_time",
       "h_factor"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use consistent stored energy and net loss power for the same time window.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not substitute input power for loss power without an explicit energy balance."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "ipb98y2_confinement_time",
+        "h_factor"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Transport and confinement",
@@ -668,7 +1763,24 @@
     "method": "Construct a time-resolved power balance with explicit sign convention.",
     "caveat": "Missing channels and derivative noise can dominate inferred losses.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Construct a time-resolved power balance with explicit sign convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Missing channels and derivative noise can dominate inferred losses."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Transport and confinement",
@@ -681,7 +1793,27 @@
       "derive_parameters",
       "greenwald"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use plasma current in MA and minor radius in metres.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Empirical reference scaling, not a universal physical limit."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "greenwald"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Transport and confinement",
@@ -694,7 +1826,27 @@
       "derive_parameters",
       "beta_metrics"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated density/temperature with equilibrium magnetic field.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Species composition and averaging definitions must be explicit."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "beta_metrics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Heating and RF",
@@ -704,7 +1856,24 @@
     "method": "Use beam diagnostics and power-balance/attenuation models.",
     "caveat": "Injected power is not equal to absorbed power.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use beam diagnostics and power-balance/attenuation models.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Injected power is not equal to absorbed power."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Heating and RF",
@@ -714,7 +1883,24 @@
     "method": "Calibrate directional couplers and apply propagation/absorption model.",
     "caveat": "Forward/reflected power and absorbed plasma power differ.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate directional couplers and apply propagation/absorption model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Forward/reflected power and absorbed plasma power differ."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Heating and RF",
@@ -724,7 +1910,24 @@
     "method": "Use calibrated RF measurements and coupling/absorption model.",
     "caveat": "Matching-network and antenna losses must be accounted for.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated RF measurements and coupling/absorption model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Matching-network and antenna losses must be accounted for."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Heating and RF",
@@ -734,7 +1937,24 @@
     "method": "Combine calibrated RF power with propagation/absorption/current-drive model.",
     "caveat": "Deposition and driven current are model-dependent.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated RF power with propagation/absorption/current-drive model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Deposition and driven current are model-dependent."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Heating and RF",
@@ -744,7 +1964,24 @@
     "method": "Infer from power balance and transport model.",
     "caveat": "Needs source partition, exchange terms and time-dependent energy balance.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Infer from power balance and transport model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Needs source partition, exchange terms and time-dependent energy balance."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -754,7 +1991,24 @@
     "method": "Calibrate sensor dynamics and apply heat-transfer model.",
     "caveat": "Sensor lag and conduction mean measured temperature may differ from surface temperature.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate sensor dynamics and apply heat-transfer model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sensor lag and conduction mean measured temperature may differ from surface temperature."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -767,7 +2021,27 @@
       "eich_heat_flux_fit",
       "exponential_heat_flux_fit"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Infer from calibrated IR/surface sensors and transient heat-conduction inversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Emissivity, surface properties, geometry and time response are critical."
+      ],
+      "function_links": [
+        "eich_heat_flux_fit",
+        "exponential_heat_flux_fit"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -777,7 +2051,24 @@
     "method": "Compare pre/post exposure profilometry, microscopy and spectroscopy.",
     "caveat": "Sampling and surface preparation can bias apparent changes.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compare pre/post exposure profilometry, microscopy and spectroscopy.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sampling and surface preparation can bias apparent changes."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -787,7 +2078,24 @@
     "method": "Use calibrated imaging/spectroscopy and post-mortem surface analysis.",
     "caveat": "Line-of-sight and sampling bias matter.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated imaging/spectroscopy and post-mortem surface analysis.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line-of-sight and sampling bias matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -797,7 +2105,24 @@
     "method": "Map camera pixels to machine coordinates and track features over time.",
     "caveat": "Camera calibration and perspective are essential.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Map camera pixels to machine coordinates and track features over time.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Camera calibration and perspective are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Plasma-facing components",
@@ -807,7 +2132,24 @@
     "method": "Solve a stated heat equation with material properties and boundary conditions.",
     "caveat": "Inverse heat conduction is ill-conditioned; report regularization and sensitivity.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve a stated heat equation with material properties and boundary conditions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Inverse heat conduction is ill-conditioned; report regularization and sensitivity."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Data quality and calibration",
@@ -821,7 +2163,28 @@
       "polynomial_calibration",
       "uncertainty_linear"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit documented calibration and propagate input/calibration uncertainty.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration range and covariance must be retained."
+      ],
+      "function_links": [
+        "linear_calibration",
+        "polynomial_calibration",
+        "uncertainty_linear"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Data quality and calibration",
@@ -833,7 +2196,26 @@
     "implementation_functions": [
       "hampel_despike"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Estimate from background/no-signal data using a stated detection criterion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detection limit depends on bandwidth, false-positive rate and averaging."
+      ],
+      "function_links": [
+        "hampel_despike"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Data quality and calibration",
@@ -848,7 +2230,29 @@
       "sampling_audit",
       "resample_uniform"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)"
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Inspect timestamps, monotonicity, gaps and sample-rate consistency.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Digital filtering cannot recover aliased information."
+      ],
+      "function_links": [
+        "prepare_time_series",
+        "signal_quality",
+        "sampling_audit",
+        "resample_uniform"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   },
   {
     "family": "Data quality and calibration",
@@ -858,6 +2262,23 @@
     "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
     "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
     "implementation_functions": [],
-    "implementation_status": "Registry reference only"
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use common trigger or calibration pulses; quantify lag uncertainty.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Small offsets can corrupt cross-phase and transport estimates."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
   }
 ]
