@@ -13,3 +13,12 @@ def detect_lh_transition(time_s, signal, *, baseline_window=None, threshold_sigm
     for i in range(0,len(x)-p+1):
         if np.all(active[i:i+p]): idx=i; break
     return {"transition_candidate_time_s":float(t[idx]) if idx is not None else None,"threshold":threshold,"baseline_median":mu,"baseline_robust_sigma":sigma,"caveat":"Single-signal threshold is a candidate detector, not definitive L-H classification; combine density, radiation, D-alpha and confinement evidence."}
+
+def martin_lh_threshold_power_MW(line_average_density_m3, toroidal_field_T, plasma_surface_area_m2):
+    """Martin 2008 empirical L-H threshold scaling: PLH=0.0488*n20^0.717*B^0.803*S^0.941 MW."""
+    n,B,S=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (line_average_density_m3,toroidal_field_T,plasma_surface_area_m2)])
+    if any(not np.all(np.isfinite(v)) for v in (n,B,S)) or np.any(n<=0) or np.any(B<=0) or np.any(S<=0):
+        raise ValueError("Density, field, and surface area must be finite and positive")
+    n20=n/1e20; power=0.0488*n20**0.717*B**0.803*S**0.941
+    return {"lh_threshold_power_MW":power,"equation":"P_LH[MW]=0.0488*n20^0.717*B_T^0.803*S_m2^0.941",
+            "caveat":"Empirical multi-machine scaling; applicability and uncertainty depend on plasma configuration, isotope, and parameter definitions."}
