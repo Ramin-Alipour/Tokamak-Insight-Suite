@@ -1169,3 +1169,10 @@ def test_soft_xray_maxwellian_bremsstrahlung_shape():
     out=maxwellian_bremsstrahlung_spectral_shape(np.array([0.0,10.0]),10.0)
     shape=out["relative_bremsstrahlung_spectral_shape"]
     assert shape[1]/shape[0] == pytest.approx(np.exp(-1.0),rel=1e-14)
+
+
+def test_xray_continuum_temperature_from_exponential_spectrum():
+    from tokamak_analysis.xray_spectrum import electron_temperature_from_xray_continuum
+    energy=np.linspace(1.0,10.0,20); te=3.0; counts=100*np.exp(-energy/te)
+    out=electron_temperature_from_xray_continuum(energy,counts)
+    assert out["electron_temperature_keV"] == pytest.approx(te,rel=1e-12)
