@@ -38,15 +38,15 @@ def total_pfc_power_from_surface_profile(position_m, heat_flux_W_m2, toroidal_ra
     return {"total_pfc_power_W":float(getattr(np, "trapezoid", np.trapz)(q*2*np.pi*R,s)),"equation":"P=integral q(s)*2*pi*R(s) ds"}
 
 
-def divertor_ion_particle_flux_from_sheath(ion_density_m3, ion_temperature_eV, ion_mass_amu):
-    """Bohm-sheath particle flux estimate Gamma_i=n_i*c_s, c_s=sqrt(e*Ti_eV/m_i)."""
-    ni,ti,mass=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (ion_density_m3,ion_temperature_eV,ion_mass_amu)])
-    if any(not np.all(np.isfinite(v)) for v in (ni,ti,mass)) or np.any(ni<0) or np.any(ti<0) or np.any(mass<=0):
-        raise ValueError("Density and temperature non-negative, ion mass positive; inputs finite")
-    cs=np.sqrt(ti*1.602176634e-19/(mass*1.66053906660e-27))
+def divertor_ion_particle_flux_from_sheath(ion_density_m3, electron_temperature_eV, ion_mass_amu, *, ion_temperature_eV=0.0, ion_thermal_factor=1.0):
+    """Approximate Bohm-sheath particle flux: Gamma_i=n_i*c_s, c_s=sqrt(e*(Te+gamma_i*Ti)/m_i)."""
+    ni,te,mass,ti,gamma=np.broadcast_arrays(*[np.asarray(v,dtype=float) for v in (ion_density_m3,electron_temperature_eV,ion_mass_amu,ion_temperature_eV,ion_thermal_factor)])
+    if any(not np.all(np.isfinite(v)) for v in (ni,te,mass,ti,gamma)) or np.any(ni<0) or np.any(te<0) or np.any(ti<0) or np.any(mass<=0) or np.any(gamma<0):
+        raise ValueError("Density and temperatures must be non-negative; mass positive; thermal factor non-negative; inputs finite")
+    cs=np.sqrt((te+gamma*ti)*1.602176634e-19/(mass*1.66053906660e-27))
     return {"sound_speed_m_s":cs,"divertor_ion_particle_flux_m-2_s-1":ni*cs,
-            "equation":"Gamma_i~=n_i*c_s; c_s=sqrt(e*Ti_eV/m_i)",
-            "assumption":"Simplified Bohm-sheath estimate; electron-temperature contribution and sheath transmission factors may be required for the chosen regime."}
+            "equation":"Gamma_i~=n_i*c_s; c_s=sqrt(e*(Te_eV+gamma_i*Ti_eV)/m_i)",
+            "assumption":"Approximate Bohm-sheath entry speed; gamma_i sets the assumed ion thermal contribution. Use Te-only (Ti=0) only when the cold-ion approximation is justified; geometry and sheath transmission remain separate."}
 
 
 def analyze_divertor_particle_flux(position_m, particle_flux_m2_s):
