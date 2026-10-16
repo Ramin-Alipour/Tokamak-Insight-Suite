@@ -139,3 +139,12 @@ def test_plasma_current_distinguishes_signed_peak_from_absolute_peak():
     assert result["peak_signed_current_A"] == pytest.approx(3.0)
     assert result["peak_absolute_current_A"] == pytest.approx(5.0)
     assert result["current_at_peak_absolute_magnitude_A"] == pytest.approx(-5.0)
+
+
+def test_mhd_mode_estimate_sorts_unsorted_sensor_angles():
+    from tokamak_analysis.mhd_modes import estimate_mode_number
+
+    angles = np.array([2 * np.pi / 3, 0.0, 4 * np.pi / 3])
+    amplitudes = np.exp(1j * angles)
+    result = estimate_mode_number(angles, amplitudes)
+    assert result["mode_number_estimate"] == pytest.approx(1.0)
