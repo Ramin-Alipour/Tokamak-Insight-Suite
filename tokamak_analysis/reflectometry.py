@@ -13,3 +13,13 @@ def analyze_reflectometry_spectrum(frequency_Hz, amplitude):
     if f.ndim!=1 or a.shape!=f.shape or len(f)<3 or not np.all(np.isfinite(f)) or not np.all(np.isfinite(a)) or np.any(np.diff(f)<=0): raise ValueError("Finite increasing frequency and matching amplitude required")
     idx=int(np.argmax(np.abs(a)))
     return {"peak_frequency_Hz":float(f[idx]),"peak_amplitude":float(a[idx]),"frequency_Hz":f,"amplitude":a,"caveat":"Cutoff interpretation and density-profile inversion require a propagation model and instrument geometry."}
+
+def density_from_o_mode_refractive_index(frequency_Hz, refractive_index):
+    """Invert cold-plasma O-mode dispersion N^2=1-(f_pe/f)^2 for electron density."""
+    f,n=np.broadcast_arrays(np.asarray(frequency_Hz,dtype=float),np.asarray(refractive_index,dtype=float))
+    if not np.all(np.isfinite(f)) or not np.all(np.isfinite(n)) or np.any(f<=0) or np.any(n<0) or np.any(n>1):
+        raise ValueError("Frequency must be positive and O-mode refractive index must lie in [0,1]")
+    density=EPS0*ME*(2*np.pi*f)**2/E**2*(1-n**2)
+    return {"electron_density_m3":density,
+            "equation":"N_O^2=1-(f_pe/f)^2; ne=epsilon0*me*(2*pi*f)^2/e^2*(1-N_O^2)",
+            "assumption":"Cold, unmagnetized O-mode propagation; ray path and density-gradient effects are not inverted here."}
