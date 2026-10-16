@@ -1176,3 +1176,10 @@ def test_xray_continuum_temperature_from_exponential_spectrum():
     energy=np.linspace(1.0,10.0,20); te=3.0; counts=100*np.exp(-energy/te)
     out=electron_temperature_from_xray_continuum(energy,counts)
     assert out["electron_temperature_keV"] == pytest.approx(te,rel=1e-12)
+
+
+def test_axisymmetric_emissivity_radiated_power_relation():
+    from tokamak_analysis.bolometry import radiated_power_from_axisymmetric_emissivity
+    a=0.2; R0=1.5; eps=100.0; r=np.linspace(0.0,a,2001)
+    out=radiated_power_from_axisymmetric_emissivity(r,np.full_like(r,eps),R0)
+    assert out["total_radiated_power_W"] == pytest.approx(eps*2*np.pi**2*R0*a**2,rel=1e-6)
