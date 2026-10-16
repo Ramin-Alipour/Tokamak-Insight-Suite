@@ -7,7 +7,9 @@ def energy_confinement_time(stored_energy_J, net_heating_power_W, *, uncertainty
     if uncertainty_energy_J is not None or uncertainty_power_W is not None:
         if uncertainty_energy_J is None or uncertainty_power_W is None: raise ValueError("Provide both uncertainties")
         sW=np.asarray(uncertainty_energy_J,dtype=float); sP=np.asarray(uncertainty_power_W,dtype=float)
-        out["uncertainty_s"]=np.abs(tau)*np.sqrt((sW/np.maximum(W,np.finfo(float).tiny))**2+(sP/P)**2)
+        try: sW,sP=np.broadcast_arrays(sW,W); sP=np.broadcast_to(sP,P.shape)
+        except ValueError as exc: raise ValueError("Uncertainties must be broadcast-compatible with stored energy and power") from exc
+        out["uncertainty_s"]=np.sqrt((sW/P)**2+(W*sP/P**2)**2)
     out["caveat"]="Net heating power must consistently include auxiliary input, radiation, transport and other relevant losses."
     return out
 
