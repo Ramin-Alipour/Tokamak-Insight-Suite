@@ -20,6 +20,6 @@ def rf_power_balance(input_power_W, reflected_power_W, transmission_loss_W=0.0):
 def relativistic_ecrh_resonance_field(frequency_Hz, gamma_factor=1.0, harmonic=1):
     """Relativistic electron cyclotron resonance: omega=h*e*B/(gamma*m_e)."""
     f,gamma=np.broadcast_arrays(np.asarray(frequency_Hz,dtype=float),np.asarray(gamma_factor,dtype=float)); h=int(harmonic)
-    if not np.all(np.isfinite(f)) or not np.all(np.isfinite(gamma)) or np.any(f<=0) or np.any(gamma<1) or h<1:
+    if not np.all(np.isfinite(f)) or not np.all(np.isfinite(gamma)) or np.any(f<=0) or np.any(gamma<1) or not np.isfinite(harmonic) or h!=harmonic or h<1:
         raise ValueError("Frequency positive, gamma >=1, and harmonic positive required")
     return {"resonance_field_T":2*np.pi*ME*f*gamma/(E*h),"equation":"B_res=2*pi*m_e*f*gamma/(e*h)"}
