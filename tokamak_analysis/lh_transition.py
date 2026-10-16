@@ -4,7 +4,7 @@ def detect_lh_transition(time_s, signal, *, baseline_window=None, threshold_sigm
     t=np.asarray(time_s,dtype=float); x=np.asarray(signal,dtype=float)
     if t.ndim!=1 or x.shape!=t.shape or len(t)<10 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(x)) or np.any(np.diff(t)<=0): raise ValueError("Invalid transition signal")
     if not np.isfinite(threshold_sigma) or threshold_sigma<0: raise ValueError("threshold_sigma must be finite and non-negative")
-    if int(persistence)<1: raise ValueError("persistence must be a positive integer")
+    if not np.isfinite(persistence) or int(persistence)!=persistence or int(persistence)<1: raise ValueError("persistence must be a positive integer")
     if baseline_window is None: base=x[:max(5,len(x)//5)]
     else:
         lo,hi=baseline_window; base=x[(t>=lo)&(t<=hi)]
