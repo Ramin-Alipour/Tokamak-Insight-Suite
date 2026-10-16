@@ -1191,3 +1191,9 @@ def test_abel_projection_constant_emissivity():
     out=abel_project_axisymmetric_emissivity(r,np.full_like(r,eps),p)
     expected=2*eps*np.sqrt(1-p**2)
     np.testing.assert_allclose(out["line_integrated_emissivity_W_m2"],expected,rtol=0.03)
+
+
+def test_visible_imaging_pixel_to_object_relation():
+    from tokamak_analysis.visible_imaging import pixel_to_object_coordinate
+    out=pixel_to_object_coordinate(np.array([100,110]),100,5e-6,2.0,0.05)
+    np.testing.assert_allclose(out["object_coordinate_m"],[0.0,0.002],rtol=1e-14,atol=0.0)
