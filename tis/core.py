@@ -14,13 +14,7 @@ from .tomography import (build_tomography_matrix_2d, regularized_tomography, sel
 from .uncertainty import propagate_covariance, propagate_monte_carlo
 from scipy.special import voigt_profile, erfcx, erfc
 
-E_CHARGE = 1.602176634e-19
-K_B = 1.380649e-23
-EPS0 = 8.8541878128e-12
-MU0 = 1.25663706212e-6
-M_E = 9.1093837139e-31
-C_LIGHT = 299792458.0
-AMU = 1.66053906660e-27
+from .constants import E_CHARGE, K_B, EPS0, MU0, M_E, C_LIGHT, AMU
 
 
 def sha256_bytes(data: bytes) -> str:
