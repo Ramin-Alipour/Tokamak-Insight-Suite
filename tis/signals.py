@@ -76,13 +76,22 @@ def hampel_despike(values: Any, window: int = 11, n_sigmas: float = 6.0) -> dict
 def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
                        fit_window_s: tuple[float, float] | None = None) -> dict[str, Any]:
     """Subtract a polynomial trend fitted (optionally) only inside a quiet window."""
-    t = np.asarray(time_s, dtype=float).ravel(); y = np.asarray(values, dtype=float).ravel()
-    if len(t) != len(y) or len(t) < order + 2:
-        raise ValueError("Time/signal length mismatch or too few samples for the polynomial order.")
-    if isinstance(order, bool) or int(order) != order or not 0 <= order <= 8:
+    if isinstance(order, (bool, np.bool_)) or not isinstance(order, (int, np.integer)) or not 0 <= order <= 8:
         raise ValueError("order must be an integer in [0, 8].")
+    t = np.asarray(time_s, dtype=float).ravel()
+    y = np.asarray(values, dtype=float).ravel()
+    if len(t) != len(y):
+        raise ValueError("Time and signal must have equal lengths.")
+    if len(t) < order + 2:
+        raise ValueError("Too few samples for the polynomial order.")
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)):
+        raise ValueError("Time and signal must contain only finite values.")
+    if np.any(np.diff(t) <= 0):
+        raise ValueError("Timestamps must be strictly increasing for polynomial detrending.")
     m = np.ones(len(t), bool)
     if fit_window_s is not None:
+        if len(fit_window_s) != 2 or not np.all(np.isfinite(np.asarray(fit_window_s, dtype=float))):
+            raise ValueError("fit_window_s must contain two finite time bounds.")
         m = (t >= min(fit_window_s)) & (t <= max(fit_window_s))
         if m.sum() < order + 2:
             raise ValueError("Fit window contains too few samples for the polynomial order.")
