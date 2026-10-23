@@ -788,13 +788,21 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
                           count_uncertainty: Any | None = None,
                           assume_poisson_counts: bool = False,
                           bin_representation: str = "density_per_eV") -> dict[str, Any]:
-    r=spectrum_moments(energy_keV, counts, background, count_uncertainty,
+    # The shared moment routine expects its energy coordinate in eV. Convert
+    # the X-ray API's keV input before integration, then convert energy moments back.
+    energy_eV = np.asarray(energy_keV, dtype=float) * 1000.0
+    r=spectrum_moments(energy_eV, counts, background, count_uncertainty,
                        assume_poisson_counts, bin_representation)
-    if 'peak_energy_eV' in r: r['peak_energy_keV']=r.pop('peak_energy_eV')
-    if 'mean_energy_eV' in r: r['mean_energy_keV']=r.pop('mean_energy_eV')
-    if 'rms_energy_spread_eV' in r: r['rms_energy_spread_keV']=r.pop('rms_energy_spread_eV')
-    if 'standard_uncertainty_mean_energy_eV' in r: r['standard_uncertainty_mean_energy_keV']=r.pop('standard_uncertainty_mean_energy_eV')
-    if 'standard_uncertainty_rms_energy_spread_eV' in r: r['standard_uncertainty_rms_energy_spread_keV']=r.pop('standard_uncertainty_rms_energy_spread_eV')
+    for source, target in (
+        ('peak_energy_eV', 'peak_energy_keV'),
+        ('mean_energy_eV', 'mean_energy_keV'),
+        ('rms_energy_spread_eV', 'rms_energy_spread_keV'),
+        ('standard_uncertainty_mean_energy_eV', 'standard_uncertainty_mean_energy_keV'),
+        ('standard_uncertainty_rms_energy_spread_eV', 'standard_uncertainty_rms_energy_spread_keV'),
+    ):
+        if source in r:
+            value = r.pop(source)
+            r[target] = None if value is None else float(value) / 1000.0
     if 'integrated_counts_eV' in r:
         r['integrated_signal_keV_weighted']=r.pop('integrated_counts_eV')
         # Retained for compatibility with existing callers; actual units follow
