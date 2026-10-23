@@ -138,13 +138,24 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
             _ensure_project_shot(active_project, shot_id)
-            active_project.metadata.update({
-                "software": "Tokamak Insight Suite", "software_version": software_version,
-                "current_shot_id": shot_id or None, "analyst": analyst or None,
-                "source_filename": filename or None, "source_sha256": source_sha256 or None,
-                "source_manifest": session_state.get("tis_source_manifest"),
-                "import_parameters": session_state.get("tis_import_parameters"),
-                "project_export_note": "Raw source data is referenced by provenance and is not embedded."})
+            metadata_update = {
+                "software": "Tokamak Insight Suite",
+                "software_version": software_version,
+                "project_export_note": "Raw source data is referenced by provenance and is not embedded.",
+            }
+            if shot_id:
+                metadata_update["current_shot_id"] = shot_id
+            if analyst:
+                metadata_update["analyst"] = analyst
+            if filename:
+                metadata_update["source_filename"] = filename
+            if source_sha256:
+                metadata_update["source_sha256"] = source_sha256
+            if session_state.get("tis_source_manifest") is not None:
+                metadata_update["source_manifest"] = session_state.get("tis_source_manifest")
+            if session_state.get("tis_import_parameters") is not None:
+                metadata_update["import_parameters"] = session_state.get("tis_import_parameters")
+            active_project.metadata.update(metadata_update)
             with tempfile.TemporaryDirectory() as temp_dir:
                 target = Path(temp_dir) / "tokamak-insight-project.tis-project.json"
                 ProjectStore.save(active_project, target)
