@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Install numerical dependencies
@@ -43,7 +43,7 @@ jobs:
         run: python tools/discover_golem_bpp_31992.py
       - name: Upload reproducible analyses and BPP signal discovery
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: golem-ti-and-bpp-validation
           path: artifacts/
