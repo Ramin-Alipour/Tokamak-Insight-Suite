@@ -121,7 +121,7 @@ fit = fit_custom_spectral_model(
 print(fit["parameters"])
 ```
 
-The registry is session-local: register the model each time the Python process starts, or keep the model function in the user's own Python module and register it during setup. The software does not automatically load arbitrary files or execute downloaded plugins. The generic fitter does not automatically infer electron temperature, density, or other physical quantities from custom parameters; the model author must define and validate that interpretation, its instrument-response treatment, and its uncertainty budget. Registration is not evidence that a model is physically valid. The built-in Thomson workflow remains unchanged and continues to be the default supported model.
+The built-in registry is process-local, not isolated per web-app user: registered models remain available to code running in that Python process until unregistered or the process exits. In a multi-user service, do not use this global registry for private per-user model state; use isolated processes or a dedicated per-session registry layer. Register the model during application setup or from the user's own Python module. The software does not automatically load arbitrary files or execute downloaded plugins. The generic fitter does not automatically infer electron temperature, density, or other physical quantities from custom parameters; the model author must define and validate that interpretation, its instrument-response treatment, and its uncertainty budget. Registration is not evidence that a model is physically valid. The built-in Thomson workflow remains unchanged and continues to be the default supported model.
 
 ## Scientific limitations
 
