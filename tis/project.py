@@ -128,7 +128,13 @@ class ProjectStore:
         expected = payload.pop("content_sha256", None)
         if not expected or stable_digest(payload) != expected:
             raise ProjectError("Project integrity check failed (SHA-256 mismatch)")
-        runs = [AnalysisRun(**item) for item in payload.pop("analysis_runs", [])]
+        raw_runs = payload.pop("analysis_runs", [])
+        if not isinstance(raw_runs, list) or any(not isinstance(item, dict) for item in raw_runs):
+            raise ProjectError("Project analysis_runs must be a JSON array of objects.")
+        try:
+            runs = [AnalysisRun(**item) for item in raw_runs]
+        except (TypeError, ValueError) as exc:
+            raise ProjectError("Project contains an invalid analysis run record.") from exc
         run_ids = [run.run_id for run in runs]
         if len(run_ids) != len(set(run_ids)):
             raise ProjectError("Project contains duplicate analysis run IDs.")
