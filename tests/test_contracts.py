@@ -7,7 +7,8 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     contracts = get_diagnostic_contracts()
     assert len(contracts) == 80
     assert len({item.name for item in contracts}) == 80
-    assert sum(item.completeness == "complete" for item in contracts) == 1
+    assert sum(item.completeness == "complete" for item in contracts) == 0
+    assert sum(item.completeness == "incomplete" for item in contracts) == 80
     assert all(item.completeness in {"incomplete", "complete"} for item in contracts)
     assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 59
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 20
@@ -17,7 +18,7 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
 def test_thomson_catalogue_entry_does_not_claim_raw_data_to_physics():
     contract = get_diagnostic_contract("Thomson scattering")
     assert contract.level is ExecutionLevel.ANALYSIS_PIPELINE
-    assert contract.completeness == "complete"
+    assert contract.completeness == "incomplete"
     assert not contract.raw_data_to_physics
     assert not contract.supports_raw_data
 
