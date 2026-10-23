@@ -56,6 +56,10 @@ def build_contribution_bundle(
         raise ValueError("software_version must be a nonempty string.")
     if not isinstance(parameters, Mapping):
         raise ValueError("parameters must be a mapping.")
+    if not isinstance(result, Mapping):
+        raise ValueError("result must be a mapping.")
+    if input_provenance is not None and not isinstance(input_provenance, Mapping):
+        raise ValueError("input_provenance must be a mapping when supplied.")
     if data_units is not None and not isinstance(data_units, Mapping):
         raise ValueError("data_units must be a mapping when supplied.")
     if dataset_sha256 is not None and (
