@@ -1351,29 +1351,34 @@ elif page=='Advanced Analysis':
                     reference_result = json.loads(reference_text)
                     if not isinstance(reference_result, (dict, list, int, float, str, bool)) and reference_result is not None:
                         raise ValueError('Reference result must be valid JSON.')
-                contribution = build_contribution_bundle(
-                    analysis_id=int(entry['id']),
-                    analysis_name=str(entry['name']),
-                    software_version=str(__version__),
-                    parameters=args,
-                    result=result,
-                    dataset_sha256=sha or None,
-                    dataset_name=filename or None,
-                    tokamak=str(st.session_state.get('tis_source_manifest', {}).get('tokamak', '') or '') or None,
-                    shot_id=shot or st.session_state.get('tis_source_manifest', {}).get('shot'),
-                    diagnostic=str(entry['name']),
-                    reference_result=reference_result,
-                    reference_description=reference_description.strip() or None,
-                    researcher_notes="Review metadata and scientific assumptions before sharing.",
-                )
-                st.download_button(
-                    'Export community contribution bundle (JSON)',
-                    data=bundle_json(contribution),
-                    file_name=f"tis_contribution_analysis_{selected_id:02d}.json",
-                    mime='application/json',
-                    key=f"download_contribution_{selected_id}",
-                    help='Exports analysis parameters, result and provenance. Raw experimental data are not embedded.',
-                )
+                # Contribution export is optional: an export failure must not
+                # misreport a successfully computed and recorded analysis as failed.
+                try:
+                    contribution = build_contribution_bundle(
+                        analysis_id=int(entry['id']),
+                        analysis_name=str(entry['name']),
+                        software_version=str(__version__),
+                        parameters=args,
+                        result=result,
+                        dataset_sha256=sha or None,
+                        dataset_name=filename or None,
+                        tokamak=str(st.session_state.get('tis_source_manifest', {}).get('tokamak', '') or '') or None,
+                        shot_id=shot or st.session_state.get('tis_source_manifest', {}).get('shot'),
+                        diagnostic=str(entry['name']),
+                        reference_result=reference_result,
+                        reference_description=reference_description.strip() or None,
+                        researcher_notes="Review metadata and scientific assumptions before sharing.",
+                    )
+                    st.download_button(
+                        'Export community contribution bundle (JSON)',
+                        data=bundle_json(contribution),
+                        file_name=f"tis_contribution_analysis_{selected_id:02d}.json",
+                        mime='application/json',
+                        key=f"download_contribution_{selected_id}",
+                        help='Exports analysis parameters, result and provenance. Raw experimental data are not embedded.',
+                    )
+                except Exception as export_error:
+                    st.warning(f"Analysis completed and recorded, but contribution export failed: {export_error}")
             except Exception as e: st.error(f'Analysis failed: {e}')
     elif workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
