@@ -7,22 +7,23 @@ def test_project_export_syncs_new_history_into_existing_project_without_duplicat
         title="existing",
         analysis_runs=[AnalysisRun("older", {"history_key": "older-key"}, {}, "0.5.1")],
     )
+    # Session history is stored newest-first by the Streamlit download callback.
     history = [
         {
-            "name": "new analysis",
-            "created_at_utc": "2026-10-23T10:00:00+00:00",
+            "name": "another analysis",
+            "created_at_utc": "2026-10-23T10:01:00+00:00",
             "result_sha256": "same-result-digest",
-            "parameter_snapshot": {"window": "hann"},
+            "parameter_snapshot": {"window": "boxcar"},
             "result_summary": {"peak_Hz": 50.0},
             "source_filename": "shot.csv",
             "source_sha256": "abc",
             "shot_id": "42",
         },
         {
-            "name": "another analysis",
-            "created_at_utc": "2026-10-23T10:01:00+00:00",
+            "name": "new analysis",
+            "created_at_utc": "2026-10-23T10:00:00+00:00",
             "result_sha256": "same-result-digest",
-            "parameter_snapshot": {"window": "boxcar"},
+            "parameter_snapshot": {"window": "hann"},
             "result_summary": {"peak_Hz": 50.0},
             "source_filename": "shot.csv",
             "source_sha256": "abc",
