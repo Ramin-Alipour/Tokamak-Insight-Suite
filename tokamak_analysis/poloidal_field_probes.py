@@ -77,9 +77,13 @@ def analyze_poloidal_field_probes(
     baseline_mask = None
     baseline_values = np.zeros(n_channels)
     if baseline_interval_s is not None:
-        if len(baseline_interval_s) != 2:
+        try:
+            interval = np.asarray(baseline_interval_s, dtype=float)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("baseline_interval_s must be a finite (start, stop) pair.") from exc
+        if interval.shape != (2,):
             raise ValueError("baseline_interval_s must be a (start, stop) pair.")
-        start, stop = map(float, baseline_interval_s)
+        start, stop = map(float, interval)
         if not np.isfinite(start) or not np.isfinite(stop) or start >= stop:
             raise ValueError("Baseline interval must have finite start < stop.")
         baseline_mask = (t >= start) & (t <= stop)
@@ -117,7 +121,12 @@ def analyze_poloidal_field_probes(
         ],
     }
     if probe_names is not None:
-        names = list(probe_names)
+        if isinstance(probe_names, (str, bytes)):
+            raise ValueError("probe_names must be a sequence of channel names, not a single string.")
+        try:
+            names = list(probe_names)
+        except TypeError as exc:
+            raise ValueError("probe_names must be a sequence of channel names.") from exc
         if len(names) != n_channels or any(not isinstance(x, str) or not x.strip() for x in names):
             raise ValueError("probe_names must contain one non-empty name per channel.")
         out["probe_names"] = names
