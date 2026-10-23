@@ -16,12 +16,12 @@ def _sync_analysis_history(active_project: Project, history: list[dict[str, Any]
         if isinstance(run.inputs, dict) and run.inputs.get("history_key")
     }
     for item in reversed(history):
-        history_key = str(item.get("result_sha256") or stable_digest({
+        history_key = stable_digest({
             key: item.get(key) for key in (
-                "name", "created_at_utc", "parameter_snapshot", "result_summary",
-                "source_filename", "source_sha256", "shot_id"
+                "name", "created_at_utc", "result_sha256", "parameter_snapshot",
+                "result_summary", "source_filename", "source_sha256", "shot_id"
             )
-        }))
+        })
         if history_key in existing_keys:
             continue
         active_project.add_run(AnalysisRun(
