@@ -1712,36 +1712,168 @@
     "diagnostic": "Mirnov / pickup coils",
     "quantities": "dB/dt, MHD spectra, mode frequency, phase",
     "status": "M→D",
-    "method": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
-    "caveat": "Orientation, bandwidth, transfer function, integration drift and pickup must be checked.",
+    "method": "Validated uniformly sampled coil-voltage signals; calculate Welch PSD and spectral peaks, voltage statistics, optional ideal dB/dt from calibrated coil geometry, and baseline-explicit integrated delta-B. Multi-channel phase/coherence and candidate toroidal mode number are available when channel voltages and toroidal angles are supplied.",
+    "caveat": "Coil/electronics transfer function, orientation, voltage calibration, pickup, integration drift, channel polarity, geometry and spatial aliasing require explicit review. Peaks and mode numbers are candidates, not automatic MHD identifications.",
     "implementation_functions": [
-      "fft_spectrum",
-      "welch_psd",
-      "mode_number_from_channels",
-      "integrate_time_series"
+      "tokamak_analysis.mirnov_analysis.analyze_mirnov_signal",
+      "tokamak_analysis.mirnov_analysis.magnetic_perturbation_from_mirnov_voltage",
+      "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Complete within declared numerical scope; device-specific calibration and independent experimental validation remain external.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
-      "uncertainty_model": "not_specified",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite strictly increasing time samples; approximately uniform spacing required for spectral analysis.",
+          "required": true
+        },
+        {
+          "name": "voltage_V",
+          "unit": "V",
+          "description": "Finite calibrated Mirnov-coil voltage matching time_s.",
+          "required": true
+        },
+        {
+          "name": "coil_area_m2",
+          "unit": "m^2",
+          "description": "Optional positive effective coil area; must be supplied with turns for ideal dB/dt.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "turns",
+          "unit": "count",
+          "description": "Optional positive integer turn count; must be supplied with coil_area_m2.",
+          "required": false,
+          "minimum": 1
+        },
+        {
+          "name": "detrend",
+          "unit": "text",
+          "description": "PSD detrending method: constant, linear or none.",
+          "required": false
+        },
+        {
+          "name": "nperseg",
+          "unit": "samples",
+          "description": "Optional positive Welch segment length not exceeding sample count.",
+          "required": false,
+          "minimum": 1
+        },
+        {
+          "name": "peak_prominence_fraction",
+          "unit": "dimensionless",
+          "description": "Peak-selection threshold as a fraction of maximum in-band PSD, in [0,1].",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "frequency_range_Hz",
+          "unit": "Hz pair",
+          "description": "Optional low/high bounds used for peak selection only; high must not exceed Nyquist.",
+          "required": false
+        },
+        {
+          "name": "voltage_channels_V",
+          "unit": "V",
+          "description": "For array mode fitting, a finite matrix with shape (channels,samples), at least three channels.",
+          "required": false
+        },
+        {
+          "name": "toroidal_angles_rad",
+          "unit": "rad",
+          "description": "For array mode fitting, one measured toroidal angle per channel.",
+          "required": false
+        },
+        {
+          "name": "baseline_voltage_V",
+          "unit": "V",
+          "description": "Explicit baseline for field-perturbation integration.",
+          "required": false
+        },
+        {
+          "name": "polarity_sign",
+          "unit": "dimensionless",
+          "description": "Integration polarity convention, either -1 or +1.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "frequency_Hz",
+          "unit": "Hz",
+          "description": "Welch frequency grid."
+        },
+        {
+          "name": "power_spectral_density_V2_per_Hz",
+          "unit": "V^2/Hz",
+          "description": "Welch power spectral density of voltage."
+        },
+        {
+          "name": "dominant_peaks_Hz",
+          "unit": "Hz",
+          "description": "Up to eight in-band local spectral maxima passing the prominence threshold."
+        },
+        {
+          "name": "sampling_frequency_Hz",
+          "unit": "Hz",
+          "description": "Sampling frequency inferred from the median interval after uniform-sampling validation."
+        },
+        {
+          "name": "approx_Bdot_T_s",
+          "unit": "T/s",
+          "description": "Ideal fixed-coil dB/dt estimate, only when area and turns are supplied."
+        },
+        {
+          "name": "delta_B_T",
+          "unit": "T",
+          "description": "Integrated magnetic perturbation relative to the supplied initial value."
+        },
+        {
+          "name": "relative_phase_rad",
+          "unit": "rad",
+          "description": "Cross-spectral phase relative to the selected reference channel."
+        },
+        {
+          "name": "coherence",
+          "unit": "dimensionless",
+          "description": "Magnitude-squared coherence by channel at the dominant reference frequency."
+        },
+        {
+          "name": "estimated_toroidal_mode_number",
+          "unit": "integer",
+          "description": "Alias-prone integer candidate selected by weighted circular phase residual."
+        }
+      ],
+      "assumptions": [
+        "Input voltage is calibrated in volts before physical conversion.",
+        "Coil is treated as stationary with known effective area and turn count for ideal dB/dt.",
+        "Mode-number candidates assume supplied toroidal angles and a coherent mode over the analyzed interval."
+      ],
+      "preprocessing": [
+        "Reject mismatched, non-finite, non-monotonic or non-uniform spectral inputs.",
+        "Remove constant or linear trend only according to the explicitly selected detrend mode.",
+        "Use Welch PSD and cross-spectral estimates; no hidden smoothing or transfer-function correction."
+      ],
+      "algorithm": "Compute signal statistics and Welch PSD; select local PSD peaks within the optional band; optionally estimate ideal dB/dt from Faraday's law, integrate baseline-corrected voltage by the trapezoidal rule, or fit integer toroidal mode candidates to inter-channel cross-spectral phase weighted by coherence.",
+      "uncertainty_model": "No full uncertainty propagation is implemented. Spectral resolution is limited by sample duration and Welch segment length; calibration, geometry, phase and mode-number uncertainties require external assessment.",
       "limitations": [
-        "Orientation, bandwidth, transfer function, integration drift and pickup must be checked."
+        "No device-specific coil/electronics transfer function, orientation calibration, pickup subtraction or absolute equilibrium field reconstruction.",
+        "Integrated perturbations are sensitive to baseline offsets and drift.",
+        "Spectral peaks are not automatically classified as MHD modes.",
+        "Toroidal mode-number estimates are alias-prone and depend on geometry, polarity, coherence and mode structure.",
+        "Independent device-specific experimental validation remains required."
       ],
       "function_links": [
-        "fft_spectrum",
-        "welch_psd",
-        "mode_number_from_channels",
-        "integrate_time_series"
+        "tokamak_analysis.mirnov_analysis.analyze_mirnov_signal",
+        "tokamak_analysis.mirnov_analysis.magnetic_perturbation_from_mirnov_voltage",
+        "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
       ],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "raw_data_to_physics": true
     }
   },
   {
@@ -2963,25 +3095,31 @@
     "diagnostic": "MHD mode / Mirnov analysis",
     "quantities": "Mode frequency, phase propagation and mode-number constraints",
     "status": "D/I",
-    "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
+    "method": "Estimate inter-channel cross-spectral phase/coherence and candidate toroidal mode number from calibrated Mirnov arrays and supplied toroidal angles.",
     "caveat": "Mode number needs array geometry and assumptions about mode structure.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "implementation_functions": [
+      "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
+    ],
+    "implementation_status": "Implemented candidate phase/coherence and toroidal mode-number workflow; requires geometry-aware experimental review.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
       "input_specs": [],
       "output_specs": [],
       "assumptions": [],
       "preprocessing": [],
-      "algorithm": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
-      "uncertainty_model": "not_specified",
+      "algorithm": "At the reference channel's strongest non-DC PSD bin, compute cross-spectral phase and coherence for all channels; choose integer mode candidate minimizing coherence-weighted circular phase residual against measured toroidal angles.",
+      "uncertainty_model": "No formal uncertainty propagation; finite spectral resolution, coherence and phase-fit residual are returned. Spatial aliasing and geometry/polarity uncertainty require external review.",
       "limitations": [
-        "Mode number needs array geometry and assumptions about mode structure."
+        "Requires at least three channels and measured toroidal angles.",
+        "Mode number is an alias-prone candidate, not an automatic identification.",
+        "Requires calibrated channels, correct polarity, valid geometry and independent mode-structure checks."
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
+      "function_links": [
+        "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
+      ],
+      "raw_data_to_physics": true,
       "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
     }
   },
