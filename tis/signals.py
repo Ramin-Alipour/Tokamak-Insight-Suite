@@ -17,9 +17,14 @@ from .core import prepare_time_series
 def sampling_audit(time_s: Any) -> dict[str, Any]:
     """Describe sampling regularity: median/mean dt, jitter and the location of gaps."""
     t = np.asarray(time_s, dtype=float).ravel()
-    t = t[np.isfinite(t)]
+    if not np.all(np.isfinite(t)):
+        n_invalid = int(np.count_nonzero(~np.isfinite(t)))
+        raise ValueError(
+            f"Sampling audit requires finite timestamps; found {n_invalid} non-finite value(s). "
+            "Resolve invalid timestamps explicitly before auditing."
+        )
     if len(t) < 3:
-        raise ValueError("At least three finite timestamps are required.")
+        raise ValueError("At least three timestamps are required.")
     dt = np.diff(t)
     if np.any(dt <= 0):
         n_bad = int(np.count_nonzero(dt <= 0))
