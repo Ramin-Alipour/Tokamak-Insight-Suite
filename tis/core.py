@@ -740,7 +740,11 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
           'integrated_signal_energy_weighted_eV':energy_weighted_area,
           'energy_weighted_integral_unit':'counts·eV' if bin_representation=="counts_per_bin" else 'signal·eV',
           'bin_representation':bin_representation,'n_points':int(len(e)),
-          'uncertainty_propagated':sigma is not None}
+          'uncertainty_propagated':sigma is not None,
+          'integrated_counts':area}
+    if bin_representation == "density_per_eV":
+        # Backward-compatible name for the unweighted integrated signal.
+        base['integrated_counts_eV'] = area
     if area<=0:
         return {**base,'moments_valid':False,'moment_status':'not_defined_nonpositive_net_area',
                 'note':'Signed background-subtracted bins are retained without clipping. The net integrated signal is nonpositive, so centroid and width are not physically defined; inspect background subtraction and uncertainty.'}
