@@ -49,7 +49,7 @@ def _clear_loaded_data(clear_uploader=True):
     for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
                 "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
                 "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
-                "tis_import_parameters", "tis_analysis_history", "tis_report_sections"):
+                "tis_import_parameters", "tis_analysis_history", "tis_report_sections", "tis_project_export_bytes", "tis_project_export_signature"):
         st.session_state.pop(key, None)
     # Widget state may only be changed before its widget is instantiated in a run.
     # The Clear button invokes this as a callback (before widget creation); the
@@ -118,6 +118,8 @@ with st.sidebar:
                 st.session_state["tis_upload_identity"]=upload_identity
                 st.session_state["tis_upload_raw"]=uploaded_bytes
                 st.session_state.pop("tis_analysis_history",None)
+                st.session_state.pop("tis_project_export_bytes", None)
+                st.session_state.pop("tis_project_export_signature", None)
                 st.session_state["tis_active_source"]="upload"
                 st.session_state["tis_imported_at_utc"]=datetime.now(timezone.utc).isoformat()
                 st.session_state["tis_import_parameters"]={"delimiter":import_delimiter,"decimal":import_decimal,
@@ -251,6 +253,8 @@ def _record_download_history(name, digest, result_summary, page_name, parameter_
               "page":page_name,"parameter_snapshot":parameter_snapshot,"result_sha256":digest,
               "result_summary":result_summary, **provenance}]+history
     st.session_state["tis_analysis_history"]=history[:50]
+    st.session_state.pop("tis_project_export_bytes", None)
+    st.session_state.pop("tis_project_export_signature", None)
 
 def json_download(label,obj,name):
     safe=_json_safe(obj)
@@ -1335,6 +1339,8 @@ elif page=='Advanced Analysis':
                         gradients = pd.DataFrame({'Radius (m)': result['radius_m'], 'Density gradient (m^-4)': result['density_gradient_m-4'], 'Temperature gradient (eV/m)': result['temperature_gradient_eV_m-1']})
                         st.dataframe(gradients, use_container_width=True, hide_index=True)
                 st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
+                st.session_state.pop("tis_project_export_bytes", None)
+                st.session_state.pop("tis_project_export_signature", None)
                 reference_result = None
                 if reference_text.strip():
                     reference_result = json.loads(reference_text)
