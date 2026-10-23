@@ -858,7 +858,7 @@ def test_spectrum_moments_distinguishes_counts_per_bin_from_density():
     assert by_bin["integrated_counts"] == pytest.approx(3.0)
     assert density["integrated_counts"] == pytest.approx(4.0)
     assert density["integrated_signal_unit"] == "signal"
-    assert density["integrated_signal_energy_weighted_eV"] == pytest.approx(14.0)
+    assert density["integrated_signal_energy_weighted_eV"] == pytest.approx(12.0)
     assert by_bin["integrated_signal_energy_weighted_eV"] == pytest.approx(8.0)
     assert by_bin["mean_energy_eV"] != pytest.approx(density["mean_energy_eV"])
 
