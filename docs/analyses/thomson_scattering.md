@@ -2,7 +2,7 @@
 
 ## Completion status
 
-**Complete within the explicitly declared scope; not independently experimentally validated.** The supported calibrated-profile, raw-spectrum temperature-fit, calibrated single-band power-density, and combined calibrated spectrum-to-temperature/density paths have callable implementations, documented contracts, dashboard entry points, and focused numerical/validation tests.
+**Incomplete overall; several explicitly scoped workflows are implemented but not independently experimentally validated.** The supported calibrated-profile, raw-spectrum temperature-fit, calibrated single-band power-density, and combined calibrated spectrum-to-temperature/density paths have callable implementations, documented contracts, dashboard entry points, and focused numerical/validation tests.
 
 The scope is intentionally bounded: no density inference from uncalibrated amplitude; no collective, relativistic, non-Maxwellian, or non-Gaussian instrument-response inversion; no automatic stray-light correction, full spectral-response correction, or complete calibration/model-discrepancy uncertainty budget. Users must verify instrument calibration, spectral-band coverage, optical geometry, time-gate compatibility, and residuals against the experiment.
 
