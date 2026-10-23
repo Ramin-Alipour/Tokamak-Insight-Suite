@@ -98,3 +98,11 @@ def test_analysis_run_rejects_invalid_field_types_cleanly():
         AnalysisRun(None, {}, {}, "0.5.1")
     with pytest.raises(ProjectError, match="inputs must be a mapping"):
         AnalysisRun("analysis", [], {}, "0.5.1")
+
+
+def test_project_model_rejects_invalid_title_and_duplicate_runs():
+    with pytest.raises(ProjectError, match="title must be a nonempty string"):
+        Project(title="")
+    run = AnalysisRun("same", {}, {}, "0.5.1")
+    with pytest.raises(ProjectError, match="duplicate analysis run IDs"):
+        Project(title="duplicate", analysis_runs=[run, run])
