@@ -66,3 +66,30 @@ def test_moments_are_correct_on_nonuniform_wavelength_grid():
     )
     assert out["wavelength_quadrature_weights_nm"].shape == x.shape
     assert out["integrated_spectral_measure"].shape == x.shape
+
+
+def test_spectral_distribution_handles_constant_signal_without_nonfinite_json_value():
+    x = np.linspace(499.0, 501.0, 101)
+    y = np.full_like(x, 7.0)
+    # A zero net spectral area must be rejected clearly rather than producing NaN metrics.
+    with pytest.raises(ValueError, match="positive spectral area"):
+        analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.05)
+
+
+def test_spectral_distribution_validates_uncertainty_length_and_nonfinite_values():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="same length"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_sigma_nm=0.06, signal_uncertainty=np.ones(10)
+        )
+    bad = y.copy()
+    bad[20] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        analyze_thomson_spectral_distribution(x, bad, instrument_sigma_nm=0.06)
+
+
+def test_spectral_distribution_result_is_json_safe_for_degenerate_r_squared():
+    # A valid peaked signal has nonzero variance and finite fit metrics.
+    x, y = _spectrum()
+    out = analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
+    assert np.isfinite(out["r_squared"])
