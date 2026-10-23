@@ -163,7 +163,7 @@ def plasma_frequency_from_density_cm3(density_cm3, *, sigma_density_cm3=None):
     out = {"frequency_pe_Hz": result["frequency_pe_Hz"]}
     if sigma_si is not None:
         out["uncertainty_frequency_pe_Hz"] = result["uncertainty_frequency_pe_Hz"]
-    return out}
+    return out
 
 
 def doppler_line_of_sight_velocity(delta_lambda, lambda0, *, sigma_delta_lambda=None, sigma_lambda0=None):
