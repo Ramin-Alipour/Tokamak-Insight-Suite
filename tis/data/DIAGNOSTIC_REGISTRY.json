@@ -9,7 +9,8 @@
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
-      "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum"
+      "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
+      "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
     ],
     "implementation_status": "Implemented calibrated-profile workflow plus scoped raw-spectrum electron-temperature fit; overall analysis remains incomplete",
     "execution_contract": {
@@ -124,7 +125,7 @@
       "preprocessing": [
         "Validate finite values, matching lengths, unique radii, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
       ],
-      "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated.",
+      "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated. A combined calibrated-spectrum entry point now orchestrates spectral fitting and the calibrated-power density relation.",
       "uncertainty_model": "Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width. Optional independent uncertainties for calibrated scattered-power density are propagated to first order. Profile pointwise uncertainties are propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples; peak-location uncertainty is not estimated.",
       "limitations": [
         "Power-based density helper requires calibrated collected power, laser power, interaction length, scattering geometry, collection solid angle and optical efficiency.",
@@ -138,10 +139,11 @@
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
         "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
-        "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum"
+        "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
+        "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
       ],
       "raw_data_to_physics": true,
-      "note": "Overall analysis remains incomplete until the declared workflows and automated tests are confirmed end-to-end. Direct density inference from uncalibrated spectral amplitude and more general collective, relativistic, or non-Maxwellian spectral models are not implemented.",
+      "note": "Overall analysis remains incomplete until the supported paths and UI are confirmed end-to-end and the contract/test suite is synchronized. Uncalibrated spectral amplitude is not density; collective, relativistic, non-Maxwellian and non-Gaussian-response models are out of scope.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
@@ -199,6 +201,31 @@
             "model_scattered_power_W"
           ],
           "scope": "Single-band calibrated-power relation; first-order uncertainty propagation assumes independent inputs and excludes model/calibration discrepancy."
+        },
+        {
+          "name": "calibrated_spectrum_temperature_density",
+          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
+          "inputs": [
+            "wavelength_nm (nm; calibrated axis)",
+            "spectral_power_density_W_nm (W/nm; absolutely calibrated)",
+            "laser_wavelength_nm (nm)",
+            "scattering_angle_rad (rad)",
+            "instrument_sigma_nm (nm; known Gaussian standard deviation)",
+            "incident_power_W (W)",
+            "interaction_length_m (m)",
+            "collection_solid_angle_sr (sr)",
+            "optical_efficiency (dimensionless)",
+            "optional signal and optical-geometry 1-sigma uncertainties"
+          ],
+          "outputs": [
+            "electron_temperature_eV (eV)",
+            "electron_temperature_uncertainty_eV (eV; fit-only)",
+            "electron_density_m3 (m^-3)",
+            "optional electron_density_uncertainty_m3 (m^-3)",
+            "integrated_scattered_power_W (W)",
+            "fit and density diagnostics"
+          ],
+          "scope": "Combined calibrated spectral-power fit and single-band density estimate under the documented non-collective, non-relativistic Maxwellian and optically thin assumptions. Not a general Thomson spectral solver."
         }
       ]
     }
