@@ -55,3 +55,33 @@ def test_rejects_invalid_uncertainty_and_gain():
         analyze_poloidal_field_probes(t, np.arange(4.0), calibration_gain_T_per_unit=0)
     with pytest.raises(ValueError):
         analyze_poloidal_field_probes(t, np.arange(4.0), signal_uncertainty=-1)
+
+
+
+@pytest.mark.parametrize("interval", [1.0, (0.0,), (0.0, 1.0, 2.0), ("bad", 1.0)])
+def test_rejects_malformed_baseline_interval(interval):
+    t = np.arange(5.0)
+    with pytest.raises(ValueError, match="baseline_interval_s"):
+        analyze_poloidal_field_probes(t, np.arange(5.0), baseline_interval_s=interval)
+
+
+def test_rejects_single_string_as_probe_names():
+    t = np.arange(4.0)
+    with pytest.raises(ValueError, match="probe_names"):
+        analyze_poloidal_field_probes(t, np.arange(4.0), probe_names="inner")
+
+
+def test_multichannel_uncertainty_and_nonuniform_derivative_shapes():
+    t = np.array([0.0, 0.1, 0.23, 0.4])
+    y = np.column_stack((2 * t + 1, -3 * t + 2))
+    u = np.full_like(y, 0.05)
+    result = analyze_poloidal_field_probes(
+        t, y, calibration_gain_T_per_unit=[0.5, 2.0],
+        signal_uncertainty=u, probe_names=("inner", "outer"),
+    )
+    assert result["B_poloidal_T"].shape == (t.size, 2)
+    assert result["dB_poloidal_dt_T_s"].shape == (t.size, 2)
+    assert result["B_poloidal_uncertainty_T"].shape == (t.size, 2)
+    assert result["dB_poloidal_dt_uncertainty_T_s"].shape == (t.size, 2)
+    np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][1:-1, 0], 1.0, atol=1e-12)
+    np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][1:-1, 1], -6.0, atol=1e-12)
