@@ -44,11 +44,13 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
         if fit_range is not None:
-            if len(fit_range) != 2 or not np.all(np.isfinite(np.asarray(fit_range, dtype=float))):
+            try:
+                limits = np.asarray(fit_range, dtype=float)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"{name} must contain exactly two finite voltage limits.") from exc
+            if limits.shape != (2,) or not np.all(np.isfinite(limits)):
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.")
-    if area_m2 is None:
-        ion_mass_amu = None
-    elif ion_mass_amu is None:
+    if (area_m2 is None) != (ion_mass_amu is None):
         raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
     if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
         raise ValueError("Collection area must be positive and finite.")
@@ -95,6 +97,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("dI/dV is non-finite; voltage values must be distinct and well-conditioned.")
     out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
     if ion_fit_range is not None:
+        if max(ion_fit_range) < min(v) or min(ion_fit_range) > max(v):
+            raise ValueError("ion_fit_range must overlap the measured voltage sweep.")
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
             p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
@@ -102,6 +106,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         else:
             raise ValueError("ion_fit_range must contain at least 3 valid samples.")
     if electron_fit_range is not None:
+        if max(electron_fit_range) <= min(v) or min(electron_fit_range) >= max(v):
+            raise ValueError("electron_fit_range must overlap the measured voltage sweep.")
         ion_baseline=float(out.get('ion_saturation_current_A',0.0))
         electron_current=i-ion_baseline
         m=(v>=min(electron_fit_range))&(v<=max(electron_fit_range))&(electron_current>0)
