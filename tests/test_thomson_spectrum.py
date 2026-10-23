@@ -187,3 +187,17 @@ def test_raw_thomson_spectrum_rejects_insufficient_wavelength_window():
             scattering_angle_rad=np.pi / 2,
             instrument_sigma_nm=0.05,
         )
+
+
+
+def test_raw_thomson_spectrum_requires_boolean_power_calibration_flag():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    with pytest.raises(ValueError, match="must be boolean"):
+        fit_thomson_spectrum(
+            wavelength,
+            signal,
+            laser_wavelength_nm=laser_nm,
+            scattering_angle_rad=angle,
+            instrument_sigma_nm=0.05,
+            spectral_power_density_calibrated="yes",
+        )
