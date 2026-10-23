@@ -119,3 +119,32 @@ def test_langmuir_probe_does_not_infer_density_from_tail_fallback():
     )
     assert "ion_density_estimate_m-3" not in result
     assert result["ion_density_status"].startswith("not_estimated:")
+
+
+
+def test_langmuir_probe_rejects_ion_mass_without_collection_area():
+    voltage, current = synthetic_iv()
+    with pytest.raises(ValueError, match="supplied together"):
+        analyze_langmuir_probe(voltage, current, ion_mass_amu=2.0)
+
+
+def test_langmuir_probe_rejects_collection_area_without_ion_mass():
+    voltage, current = synthetic_iv()
+    with pytest.raises(ValueError, match="supplied together"):
+        analyze_langmuir_probe(voltage, current, area_m2=1.0e-5)
+
+
+@pytest.mark.parametrize("fit_range", [(100.0, 120.0), (-120.0, -100.0)])
+def test_langmuir_probe_rejects_fit_windows_outside_measured_sweep(fit_range):
+    voltage, current = synthetic_iv()
+    with pytest.raises(ValueError, match="overlap"):
+        analyze_langmuir_probe(voltage, current, ion_fit_range=fit_range)
+    with pytest.raises(ValueError, match="overlap"):
+        analyze_langmuir_probe(voltage, current, electron_fit_range=fit_range)
+
+
+@pytest.mark.parametrize("fit_range", [(1.0,), (1.0, 2.0, 3.0), (float("nan"), 2.0)])
+def test_langmuir_probe_rejects_malformed_fit_windows(fit_range):
+    voltage, current = synthetic_iv()
+    with pytest.raises(ValueError, match="two finite voltage limits"):
+        analyze_langmuir_probe(voltage, current, electron_fit_range=fit_range)
