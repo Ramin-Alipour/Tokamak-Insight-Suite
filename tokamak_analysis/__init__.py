@@ -14,7 +14,7 @@ __all__ = [
     "magnetic_axis", "magnetic_field", "magnetic_mode_frequency", "measurement_uncertainty", "molecular_spectroscopy",
     "mhd_modes", "mirnov_analysis", "multipin_probe", "neutral_gas", "neutron_flux",
     "neutron_spectrum", "nuclear_gamma", "plasma_current", "plasma_geometry",
-    "plasma_wave_spectrum", "potential_analysis", "probe_analysis", "radiation_tomography",
+    "plasma_wave_spectrum", "poloidal_field_probes", "potential_analysis", "probe_analysis", "radiation_tomography",
     "reflectometry", "rf_interaction", "runaway_electrons", "runaway_energy",
     "safety_factor", "shafranov_shift", "shape_reconstruction", "signal_calibration",
     "soft_xray", "spectral_broadening", "spectral_line_identification", "spectral_line_ratio",
