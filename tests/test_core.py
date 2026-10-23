@@ -640,6 +640,8 @@ def test_tomography_accepts_measurement_uncertainties_and_lcurve():
     choice = select_tikhonov_lambda(A, y, lambdas=[1e-4, 1e-2, 1.0, 100.0], nonnegative=False, measurement_sigma=sigma)
     assert choice["selected_lambda"] in [1e-4, 1e-2, 1.0, 100.0]
     assert len(choice["discrete_log_lcurve_curvature"]) == 4
+    expected_norms = [np.linalg.norm(regularized_tomography(A, y, float(lam), False, measurement_sigma=sigma)["solution"]) for lam in [1e-4, 1e-2, 1.0, 100.0]]
+    np.testing.assert_allclose(choice["solution_norms"], expected_norms)
 
 
 def test_cross_spectral_phase_convention_is_phi_y_minus_phi_x():
