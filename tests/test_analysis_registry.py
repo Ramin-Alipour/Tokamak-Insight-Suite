@@ -56,3 +56,15 @@ def test_get_analysis_rejects_noninteger_ids_instead_of_truncating():
         get_analysis(1.5)
     with pytest.raises(ValueError, match="analysis_id must be an integer"):
         get_analysis(True)
+
+
+def test_molecular_spectroscopy_entry_declares_scoped_workflow():
+    entry = get_analysis(6)
+    assert entry["name"] == "Molecular Spectroscopy"
+    assert entry["module"] == "molecular_spectroscopy"
+    assert entry["function"] == "analyze_molecular_spectrum"
+    contract = entry["execution_contract"]
+    assert contract["completeness"] == "complete"
+    assert contract["raw_data_to_physics"] is False
+    assert {"wavelength_nm", "intensity"} <= {item["name"] for item in contract["input_specs"]}
+    assert callable(resolve_analysis(6))
