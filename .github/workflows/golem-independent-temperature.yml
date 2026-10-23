@@ -180,6 +180,25 @@ jobs:
                   "caution": "The time window and averaging convention must match before claiming exact reproduction."
               }
               report["status"] = "cross-check-computed"
+          elif (
+              report.get("spectrometer_mean_estimated_temperature", {}).get("n_rows") == 1
+              and report.get("spectrometer_mean_estimated_temperature", {}).get("n_columns") == 1
+              and report.get("published_electron_temperature_mean", {}).get("n_rows") == 1
+              and report.get("published_electron_temperature_mean", {}).get("n_columns") == 1
+          ):
+              spectral = report["spectrometer_mean_estimated_temperature"]["column_statistics"][0]["mean"]
+              published = report["published_electron_temperature_mean"]["column_statistics"][0]["mean"]
+              report["comparison"] = {
+                  "comparison_type": "scalar_estimate_consistency",
+                  "spectrometer_mean_estimated_temperature_eV": spectral,
+                  "published_electron_temperature_mean_eV": published,
+                  "difference_eV": spectral - published,
+                  "absolute_difference_eV": abs(spectral - published),
+                  "relative_difference_percent": 100 * abs(spectral - published) / abs(published),
+                  "status": "scalar-comparison-only",
+                  "caution": "This compares two scalar estimates only. Their diagnostic definitions, averaging windows, and systematic uncertainties are not fully established; it is not a time-series or Thomson-scattering validation."
+              }
+              report["status"] = "scalar-comparison-computed"
           elif series.get("n_columns", 0) > 1:
               report["status"] = "data-retrieved-column-semantics-unresolved"
           else:
@@ -197,6 +216,8 @@ jobs:
           print(f"Scientific cross-check status: {status}")
           if status == "cross-check-computed":
               print("An electron-temperature series comparison was computed; inspect the artifact before interpreting it.")
+          elif status == "scalar-comparison-computed":
+              print("::warning::A GOLEM scalar-estimate consistency comparison was computed, but it is not a time-series or Thomson-scattering validation; inspect the artifact and preserve the stated diagnostic limitations.")
           elif status in {"retrieval-or-format-unresolved", "data-retrieved-column-semantics-unresolved"}:
               print("::warning::No interpretable GOLEM temperature comparison was completed. This is an upstream data/format limitation, not a scientific validation pass; inspect the artifact and keep the result unvalidated.")
           else:
