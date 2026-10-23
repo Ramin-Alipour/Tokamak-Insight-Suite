@@ -79,6 +79,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Signal conditioning:** explicit gap policies, Hampel despiking, drift-corrected integration. Every repair is reported.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
 - **Thomson Scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
+- **CXRS (analysis 4/80):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
 - **Electron Cyclotron Emission (analysis 3/80):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
