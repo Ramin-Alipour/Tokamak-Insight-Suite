@@ -18,9 +18,9 @@ class ProjectError(ValueError):
 
 def _jsonable(value: Any) -> Any:
     if isinstance(value, np.ndarray):
-        return value.tolist()
+        return _jsonable(value.tolist())
     if isinstance(value, np.generic):
-        return value.item()
+        return _jsonable(value.item())
     if isinstance(value, Path):
         return str(value)
     if hasattr(value, "isoformat") and callable(value.isoformat):
