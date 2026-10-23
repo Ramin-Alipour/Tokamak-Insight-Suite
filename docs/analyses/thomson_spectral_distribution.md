@@ -11,7 +11,7 @@ The analysis is available in `tokamak_analysis.thomson_distribution.analyze_thom
 - `background_fraction`: optional fraction of edge samples used to estimate a local linear background; range 0.02–0.4.
 
 ## Outputs and method
-The workflow estimates a local linear background from both spectral-window edges, preserves the background-subtracted spectrum, and calculates positive-weight spectral area, centroid, observed RMS width, skewness and excess kurtosis. It subtracts the known Gaussian instrumental variance from the observed variance. If the result is unresolved or non-positive, the instrument-corrected width is explicitly returned as null rather than fabricating a value. A Gaussian-plus-linear-background fit supplies shape diagnostics, residuals, R-squared and optional chi-square metrics when sample uncertainties are supplied.
+The workflow estimates a local linear background from both spectral-window edges, preserves the background-subtracted spectrum, and calculates positive-weight spectral area, centroid, observed RMS width, skewness and excess kurtosis. Spectral moments use trapezoidal wavelength-space quadrature weights, so nonuniform wavelength sampling does not incorrectly overweight densely sampled regions. It subtracts the known Gaussian instrumental variance from the observed variance. If the result is unresolved or non-positive, the instrument-corrected width is explicitly returned as null rather than fabricating a value. A Gaussian-plus-linear-background fit supplies shape diagnostics, residuals, R-squared and optional chi-square metrics when sample uncertainties are supplied.
 
 ## Scientific limits
 - Spectral moments describe the measured wavelength distribution; they do not uniquely recover the electron velocity distribution.
