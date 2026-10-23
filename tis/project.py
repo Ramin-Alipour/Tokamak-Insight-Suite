@@ -106,6 +106,8 @@ class Project:
             raise ProjectError("metadata must be a dictionary.")
 
     def add_run(self, run: AnalysisRun) -> None:
+        if not isinstance(run, AnalysisRun):
+            raise ProjectError("run must be an AnalysisRun instance.")
         if any(existing.run_id == run.run_id for existing in self.analysis_runs):
             raise ProjectError(f"Duplicate analysis run id: {run.run_id}")
         self.analysis_runs.append(run)
