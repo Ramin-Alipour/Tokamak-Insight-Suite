@@ -48,3 +48,10 @@ def test_contribution_bundle_rejects_invalid_name_and_mapping_types():
         build_contribution_bundle(analysis_id=1, analysis_name=None, software_version="0.5.1", parameters={}, result={})
     with pytest.raises(ValueError, match="parameters must be a mapping"):
         build_contribution_bundle(analysis_id=1, analysis_name="test", software_version="0.5.1", parameters=[], result={})
+
+
+def test_contribution_bundle_rejects_nonmapping_result_and_provenance():
+    with pytest.raises(ValueError, match="result must be a mapping"):
+        build_contribution_bundle(analysis_id=1, analysis_name="test", software_version="0.5.1", parameters={}, result=[])
+    with pytest.raises(ValueError, match="input_provenance must be a mapping"):
+        build_contribution_bundle(analysis_id=1, analysis_name="test", software_version="0.5.1", parameters={}, result={}, input_provenance=[])
