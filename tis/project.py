@@ -84,6 +84,27 @@ class Project:
     analysis_runs: list[AnalysisRun] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not isinstance(self.title, str) or not self.title.strip():
+            raise ProjectError("Project title must be a nonempty string.")
+        if not isinstance(self.project_id, str) or not self.project_id.strip():
+            raise ProjectError("project_id must be a nonempty string.")
+        if self.schema_version != PROJECT_SCHEMA_VERSION:
+            raise ProjectError(f"Unsupported project schema version: {self.schema_version!r}")
+        if not isinstance(self.created_at, str) or not self.created_at.strip():
+            raise ProjectError("created_at must be a nonempty string.")
+        if not isinstance(self.updated_at, str) or not self.updated_at.strip():
+            raise ProjectError("updated_at must be a nonempty string.")
+        if not isinstance(self.shots, list) or any(not isinstance(shot, dict) for shot in self.shots):
+            raise ProjectError("shots must be a list of mappings.")
+        if not isinstance(self.analysis_runs, list) or any(not isinstance(run, AnalysisRun) for run in self.analysis_runs):
+            raise ProjectError("analysis_runs must be a list of AnalysisRun objects.")
+        run_ids = [run.run_id for run in self.analysis_runs]
+        if len(run_ids) != len(set(run_ids)):
+            raise ProjectError("Project contains duplicate analysis run IDs.")
+        if not isinstance(self.metadata, dict):
+            raise ProjectError("metadata must be a dictionary.")
+
     def add_run(self, run: AnalysisRun) -> None:
         if any(existing.run_id == run.run_id for existing in self.analysis_runs):
             raise ProjectError(f"Duplicate analysis run id: {run.run_id}")
