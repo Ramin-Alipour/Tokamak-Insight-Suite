@@ -18,6 +18,12 @@
           "unit": "m^-3",
           "description": "Finite positive local electron density.",
           "required": true
+        },
+        {
+          "name": "sigma_n_e_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for n_e_m3; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -30,6 +36,16 @@
           "name": "frequency_pe_Hz",
           "unit": "Hz",
           "description": "Electron plasma frequency."
+        },
+        {
+          "name": "uncertainty_omega_pe_rad_s",
+          "unit": "rad s^-1",
+          "description": "Propagated 1-sigma uncertainty for omega_pe_rad_s; returned only when required uncertainty inputs are supplied."
+        },
+        {
+          "name": "uncertainty_frequency_pe_Hz",
+          "unit": "Hz",
+          "description": "Propagated 1-sigma uncertainty for frequency_pe_Hz; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -67,6 +83,18 @@
           "unit": "m^-3",
           "description": "Positive local electron density.",
           "required": true
+        },
+        {
+          "name": "sigma_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma uncertainty for temperature_eV; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for density_m3; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -74,6 +102,11 @@
           "name": "debye_length_m",
           "unit": "m",
           "description": "Electron Debye length."
+        },
+        {
+          "name": "uncertainty_debye_length_m",
+          "unit": "m",
+          "description": "Propagated 1-sigma uncertainty for debye_length_m; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -105,6 +138,12 @@
           "unit": "T",
           "description": "Finite magnetic-field magnitude in tesla; sign is ignored.",
           "required": true
+        },
+        {
+          "name": "sigma_magnetic_field_T",
+          "unit": "T",
+          "description": "Optional 1-sigma uncertainty for magnetic_field_T; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -117,6 +156,16 @@
           "name": "frequency_ce_Hz",
           "unit": "Hz",
           "description": "Non-relativistic electron cyclotron frequency."
+        },
+        {
+          "name": "uncertainty_omega_ce_rad_s",
+          "unit": "rad s^-1",
+          "description": "Propagated 1-sigma uncertainty for omega_ce_rad_s; returned only when required uncertainty inputs are supplied."
+        },
+        {
+          "name": "uncertainty_frequency_ce_Hz",
+          "unit": "Hz",
+          "description": "Propagated 1-sigma uncertainty for frequency_ce_Hz; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -239,6 +288,18 @@
           "unit": "eV",
           "description": "Finite non-negative electron temperature.",
           "required": true
+        },
+        {
+          "name": "sigma_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for density_m3; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma uncertainty for temperature_eV; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -246,6 +307,11 @@
           "name": "electron_pressure_Pa",
           "unit": "Pa",
           "description": "Electron ideal-gas thermal pressure using temperature in eV."
+        },
+        {
+          "name": "uncertainty_electron_pressure_Pa",
+          "unit": "Pa",
+          "description": "Propagated 1-sigma uncertainty for electron_pressure_Pa; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -283,6 +349,18 @@
           "unit": "eV",
           "description": "Matching 1-D array of non-negative ion-species temperatures.",
           "required": true
+        },
+        {
+          "name": "sigma_species_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for species_density_m3; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_species_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma uncertainty for species_temperature_eV; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -290,6 +368,11 @@
           "name": "ion_pressure_Pa",
           "unit": "Pa",
           "description": "Sum over explicitly supplied ion species of n_s*e*T_s."
+        },
+        {
+          "name": "uncertainty_ion_pressure_Pa",
+          "unit": "Pa",
+          "description": "Propagated 1-sigma uncertainty for ion_pressure_Pa; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -327,6 +410,18 @@
           "unit": "Pa",
           "description": "Non-negative ion thermal pressure.",
           "required": true
+        },
+        {
+          "name": "sigma_electron_pressure_Pa",
+          "unit": "Pa",
+          "description": "Optional 1-sigma uncertainty for electron_pressure_Pa; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_ion_pressure_Pa",
+          "unit": "Pa",
+          "description": "Optional 1-sigma uncertainty for ion_pressure_Pa; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -334,6 +429,11 @@
           "name": "total_thermal_pressure_Pa",
           "unit": "Pa",
           "description": "Sum of supplied electron and ion thermal pressures."
+        },
+        {
+          "name": "uncertainty_total_thermal_pressure_Pa",
+          "unit": "Pa",
+          "description": "Propagated 1-sigma uncertainty for total_thermal_pressure_Pa; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -371,6 +471,12 @@
           "unit": "m^3",
           "description": "Matching strictly increasing volume coordinate in m^3.",
           "required": true
+        },
+        {
+          "name": "sigma_pressure_Pa",
+          "unit": "Pa",
+          "description": "Optional 1-sigma uncertainty for pressure_Pa; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -378,6 +484,11 @@
           "name": "thermal_stored_energy_J",
           "unit": "J",
           "description": "Trapezoidal integral of 3/2*p_th dV."
+        },
+        {
+          "name": "uncertainty_thermal_stored_energy_J",
+          "unit": "J",
+          "description": "Propagated 1-sigma uncertainty for thermal_stored_energy_J; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -415,6 +526,12 @@
           "unit": "m",
           "description": "Matching strictly increasing path coordinate in metres.",
           "required": true
+        },
+        {
+          "name": "sigma_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for density_m3; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -422,6 +539,11 @@
           "name": "line_integrated_density_m-2",
           "unit": "m^-2",
           "description": "Trapezoidal line integral of electron density."
+        },
+        {
+          "name": "uncertainty_line_integrated_density_m-2",
+          "unit": "m^-2",
+          "description": "Propagated 1-sigma uncertainty for line_integrated_density_m-2; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -508,6 +630,18 @@
           "unit": "same as delta_lambda",
           "description": "Positive rest wavelength.",
           "required": true
+        },
+        {
+          "name": "sigma_delta_lambda",
+          "unit": "same as lambda0",
+          "description": "Optional 1-sigma uncertainty for delta_lambda; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_lambda0",
+          "unit": "same as delta_lambda",
+          "description": "Optional 1-sigma uncertainty for lambda0; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -515,6 +649,11 @@
           "name": "velocity_los_m_s",
           "unit": "m s^-1",
           "description": "Signed non-relativistic line-of-sight velocity."
+        },
+        {
+          "name": "uncertainty_velocity_los_m_s",
+          "unit": "m s^-1",
+          "description": "Propagated 1-sigma uncertainty for velocity_los_m_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -558,6 +697,24 @@
           "unit": "kg",
           "description": "Positive ion mass.",
           "required": true
+        },
+        {
+          "name": "sigma_sigma_lambda",
+          "unit": "same as lambda0",
+          "description": "Optional 1-sigma uncertainty for sigma_lambda; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_lambda0",
+          "unit": "same as sigma_lambda",
+          "description": "Optional 1-sigma uncertainty for lambda0; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_ion_mass_kg",
+          "unit": "kg",
+          "description": "Optional 1-sigma uncertainty for ion_mass_kg; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -565,6 +722,11 @@
           "name": "ion_temperature_eV",
           "unit": "eV",
           "description": "Thermal ion temperature from corrected Doppler sigma."
+        },
+        {
+          "name": "uncertainty_ion_temperature_eV",
+          "unit": "eV",
+          "description": "Propagated 1-sigma uncertainty for ion_temperature_eV; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -655,6 +817,12 @@
           "unit": "T",
           "description": "Finite magnetic field; sign is immaterial because B is squared.",
           "required": true
+        },
+        {
+          "name": "sigma_magnetic_field_T",
+          "unit": "T",
+          "description": "Optional 1-sigma uncertainty for magnetic_field_T; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -662,6 +830,11 @@
           "name": "magnetic_energy_density_J_m3",
           "unit": "J m^-3",
           "description": "Vacuum magnetic energy density, numerically equivalent to Pa."
+        },
+        {
+          "name": "uncertainty_magnetic_energy_density_J_m3",
+          "unit": "J m^-3",
+          "description": "Propagated 1-sigma uncertainty for magnetic_energy_density_J_m3; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -699,6 +872,18 @@
           "unit": "T",
           "description": "Finite non-zero toroidal magnetic field.",
           "required": true
+        },
+        {
+          "name": "sigma_pressure_Pa",
+          "unit": "Pa",
+          "description": "Optional 1-sigma uncertainty for pressure_Pa; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_toroidal_field_T",
+          "unit": "T",
+          "description": "Optional 1-sigma uncertainty for toroidal_field_T; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -706,6 +891,11 @@
           "name": "toroidal_beta",
           "unit": "1",
           "description": "Pressure divided by toroidal magnetic energy density; dimensionless."
+        },
+        {
+          "name": "uncertainty_toroidal_beta",
+          "unit": "1",
+          "description": "Propagated 1-sigma uncertainty for toroidal_beta; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -755,6 +945,30 @@
           "unit": "T",
           "description": "Finite non-zero signed poloidal field.",
           "required": true
+        },
+        {
+          "name": "sigma_r_m",
+          "unit": "m",
+          "description": "Optional 1-sigma uncertainty for r_m; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_major_radius_m",
+          "unit": "m",
+          "description": "Optional 1-sigma uncertainty for major_radius_m; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_toroidal_field_T",
+          "unit": "T",
+          "description": "Optional 1-sigma uncertainty for toroidal_field_T; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_poloidal_field_T",
+          "unit": "T",
+          "description": "Optional 1-sigma uncertainty for poloidal_field_T; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -762,6 +976,11 @@
           "name": "safety_factor_estimate",
           "unit": "1",
           "description": "Large-aspect-ratio safety-factor estimate."
+        },
+        {
+          "name": "uncertainty_safety_factor_estimate",
+          "unit": "1",
+          "description": "Propagated 1-sigma uncertainty for safety_factor_estimate; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -854,6 +1073,18 @@
           "unit": "A",
           "description": "Finite non-zero plasma current.",
           "required": true
+        },
+        {
+          "name": "sigma_loop_voltage_V",
+          "unit": "V",
+          "description": "Optional 1-sigma uncertainty for loop_voltage_V; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_plasma_current_A",
+          "unit": "A",
+          "description": "Optional 1-sigma uncertainty for plasma_current_A; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -861,6 +1092,11 @@
           "name": "loop_resistance_proxy_ohm",
           "unit": "ohm",
           "description": "Signed V_loop/I_p proxy."
+        },
+        {
+          "name": "uncertainty_loop_resistance_proxy_ohm",
+          "unit": "ohm",
+          "description": "Propagated 1-sigma uncertainty for loop_resistance_proxy_ohm; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -898,6 +1134,18 @@
           "unit": "A",
           "description": "Finite signed plasma current.",
           "required": true
+        },
+        {
+          "name": "sigma_loop_voltage_V",
+          "unit": "V",
+          "description": "Optional 1-sigma uncertainty for loop_voltage_V; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_plasma_current_A",
+          "unit": "A",
+          "description": "Optional 1-sigma uncertainty for plasma_current_A; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -905,6 +1153,11 @@
           "name": "ohmic_power_approximation_W",
           "unit": "W",
           "description": "Signed loop-voltage/current product."
+        },
+        {
+          "name": "uncertainty_ohmic_power_approximation_W",
+          "unit": "W",
+          "description": "Propagated 1-sigma uncertainty for ohmic_power_approximation_W; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -942,6 +1195,18 @@
           "unit": "W",
           "description": "Positive loss power under a declared convention.",
           "required": true
+        },
+        {
+          "name": "sigma_stored_energy_J",
+          "unit": "J",
+          "description": "Optional 1-sigma uncertainty for stored_energy_J; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_loss_power_W",
+          "unit": "W",
+          "description": "Optional 1-sigma uncertainty for loss_power_W; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -949,6 +1214,11 @@
           "name": "energy_confinement_time_s",
           "unit": "s",
           "description": "W_th/P_loss confinement-time estimate."
+        },
+        {
+          "name": "uncertainty_energy_confinement_time_s",
+          "unit": "s",
+          "description": "Propagated 1-sigma uncertainty for energy_confinement_time_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -986,6 +1256,18 @@
           "unit": "m",
           "description": "Positive minor radius.",
           "required": true
+        },
+        {
+          "name": "sigma_plasma_current_MA",
+          "unit": "MA",
+          "description": "Optional 1-sigma uncertainty for plasma_current_MA; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_minor_radius_m",
+          "unit": "m",
+          "description": "Optional 1-sigma uncertainty for minor_radius_m; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -998,6 +1280,16 @@
           "name": "greenwald_density_m3",
           "unit": "m^-3",
           "description": "Same reference density in SI units."
+        },
+        {
+          "name": "uncertainty_greenwald_density_1e20_m3",
+          "unit": "10^20 m^-3",
+          "description": "Propagated 1-sigma uncertainty for greenwald_density_1e20_m3; returned only when required uncertainty inputs are supplied."
+        },
+        {
+          "name": "uncertainty_greenwald_density_m3",
+          "unit": "m^-3",
+          "description": "Propagated 1-sigma uncertainty for greenwald_density_m3; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1035,6 +1327,18 @@
           "unit": "m",
           "description": "Positive Debye length.",
           "required": true
+        },
+        {
+          "name": "sigma_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for density_m3; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_debye_length_m",
+          "unit": "m",
+          "description": "Optional 1-sigma uncertainty for debye_length_m; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1042,6 +1346,11 @@
           "name": "debye_parameter_particles",
           "unit": "1",
           "description": "Expected number of particles in a Debye sphere; dimensionless count."
+        },
+        {
+          "name": "uncertainty_debye_parameter_particles",
+          "unit": "1",
+          "description": "Propagated 1-sigma uncertainty for debye_parameter_particles; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1073,6 +1382,12 @@
           "unit": "m^-3",
           "description": "Finite positive local electron density.",
           "required": true
+        },
+        {
+          "name": "sigma_density_m3",
+          "unit": "m^-3",
+          "description": "Optional 1-sigma uncertainty for density_m3; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1080,6 +1395,11 @@
           "name": "omega_pe_rad_s",
           "unit": "rad s^-1",
           "description": "Electron plasma angular frequency."
+        },
+        {
+          "name": "uncertainty_omega_pe_rad_s",
+          "unit": "rad s^-1",
+          "description": "Propagated 1-sigma uncertainty for omega_pe_rad_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1117,6 +1437,18 @@
           "unit": "m^2",
           "description": "Positive effective collection area.",
           "required": true
+        },
+        {
+          "name": "sigma_saturation_current_A",
+          "unit": "A",
+          "description": "Optional 1-sigma uncertainty for saturation_current_A; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_effective_area_m2",
+          "unit": "m^2",
+          "description": "Optional 1-sigma uncertainty for effective_area_m2; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1124,6 +1456,11 @@
           "name": "ion_saturation_particle_flux_m2_s",
           "unit": "m^-2 s^-1",
           "description": "Ion particle-flux proxy."
+        },
+        {
+          "name": "uncertainty_ion_saturation_particle_flux_m2_s",
+          "unit": "m^-2 s^-1",
+          "description": "Propagated 1-sigma uncertainty for ion_saturation_particle_flux_m2_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1161,6 +1498,18 @@
           "unit": "W",
           "description": "Positive input power under an explicitly defined convention.",
           "required": true
+        },
+        {
+          "name": "sigma_radiated_power_W",
+          "unit": "W",
+          "description": "Optional 1-sigma uncertainty for radiated_power_W; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_input_power_W",
+          "unit": "W",
+          "description": "Optional 1-sigma uncertainty for input_power_W; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1168,6 +1517,16 @@
           "name": "radiated_power_fraction",
           "unit": "1",
           "description": "Dimensionless radiated-to-input power ratio."
+        },
+        {
+          "name": "quality_flag",
+          "unit": "text",
+          "description": "Diagnostic status or limitation note returned by the implementation."
+        },
+        {
+          "name": "uncertainty_radiated_power_fraction",
+          "unit": "1",
+          "description": "Propagated 1-sigma uncertainty for radiated_power_fraction; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1205,6 +1564,18 @@
           "unit": "m^2",
           "description": "Matching non-negative surface-area weights for each sample.",
           "required": true
+        },
+        {
+          "name": "sigma_heat_flux_W_m2",
+          "unit": "W m^-2",
+          "description": "Optional 1-sigma uncertainty for heat_flux_W_m2; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_area_weights_m2",
+          "unit": "m^2",
+          "description": "Optional 1-sigma uncertainty for area_weights_m2; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1212,6 +1583,11 @@
           "name": "integrated_surface_power_W",
           "unit": "W",
           "description": "Discrete surface integral sum(q_i A_i)."
+        },
+        {
+          "name": "uncertainty_integrated_surface_power_W",
+          "unit": "W",
+          "description": "Propagated 1-sigma uncertainty for integrated_surface_power_W; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1249,6 +1625,18 @@
           "unit": "s",
           "description": "Positive frame interval.",
           "required": true
+        },
+        {
+          "name": "sigma_displacement_m",
+          "unit": "m",
+          "description": "Optional 1-sigma uncertainty for displacement_m; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_frame_interval_s",
+          "unit": "s",
+          "description": "Optional 1-sigma uncertainty for frame_interval_s; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1256,6 +1644,11 @@
           "name": "apparent_feature_speed_m_s",
           "unit": "m s^-1",
           "description": "Signed projected apparent feature speed."
+        },
+        {
+          "name": "uncertainty_apparent_feature_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Propagated 1-sigma uncertainty for apparent_feature_speed_m_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1293,6 +1686,18 @@
           "unit": "Pa",
           "description": "Positive pressure at the declared gauge location.",
           "required": true
+        },
+        {
+          "name": "sigma_throughput_Pa_m3_s",
+          "unit": "Pa m^3 s^-1",
+          "description": "Optional 1-sigma uncertainty for throughput_Pa_m3_s; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_pressure_Pa",
+          "unit": "Pa",
+          "description": "Optional 1-sigma uncertainty for pressure_Pa; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1300,6 +1705,11 @@
           "name": "gas_pumping_speed_m3_s",
           "unit": "m^3 s^-1",
           "description": "Q/p pumping speed."
+        },
+        {
+          "name": "uncertainty_gas_pumping_speed_m3_s",
+          "unit": "m^3 s^-1",
+          "description": "Propagated 1-sigma uncertainty for gas_pumping_speed_m3_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1337,6 +1747,12 @@
           "unit": "s",
           "description": "Matching strictly increasing time coordinate.",
           "required": true
+        },
+        {
+          "name": "sigma_particle_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for particle_rate_s; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1344,6 +1760,11 @@
           "name": "injected_particle_number",
           "unit": "particles",
           "description": "Trapezoidal integral of injection rate over time."
+        },
+        {
+          "name": "uncertainty_injected_particle_number",
+          "unit": "particles",
+          "description": "Propagated 1-sigma uncertainty for injected_particle_number; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1381,6 +1802,18 @@
           "unit": "s^-1",
           "description": "Positive particle loss rate in particles per second.",
           "required": true
+        },
+        {
+          "name": "sigma_stored_particles",
+          "unit": "particles",
+          "description": "Optional 1-sigma uncertainty for stored_particles; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_loss_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for loss_rate_s; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1388,6 +1821,11 @@
           "name": "particle_confinement_time_s",
           "unit": "s",
           "description": "Stored inventory divided by loss rate."
+        },
+        {
+          "name": "uncertainty_particle_confinement_time_s",
+          "unit": "s",
+          "description": "Propagated 1-sigma uncertainty for particle_confinement_time_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1516,6 +1954,12 @@
           "unit": "Hz",
           "description": "Positive uniform sampling frequency.",
           "required": true
+        },
+        {
+          "name": "sigma_sampling_frequency_Hz",
+          "unit": "Hz",
+          "description": "Optional 1-sigma uncertainty for sampling_frequency_Hz; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1523,6 +1967,11 @@
           "name": "nyquist_frequency_Hz",
           "unit": "Hz",
           "description": "Half the sampling frequency."
+        },
+        {
+          "name": "uncertainty_nyquist_frequency_Hz",
+          "unit": "Hz",
+          "description": "Propagated 1-sigma uncertainty for nyquist_frequency_Hz; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1639,6 +2088,16 @@
           "name": "magnitude_squared_coherence",
           "unit": "1",
           "description": "Magnitude-squared coherence values in [0,1]."
+        },
+        {
+          "name": "nperseg",
+          "unit": "samples",
+          "description": "Welch segment length actually used."
+        },
+        {
+          "name": "uncertainty_note",
+          "unit": "same as corresponding output",
+          "description": "Propagated 1-sigma uncertainty for note; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1682,6 +2141,12 @@
           "unit": "same scale as singular values of A",
           "description": "Positive Tikhonov parameter lambda; solution uses lambda squared in normal equations.",
           "required": true
+        },
+        {
+          "name": "sigma_measurements",
+          "unit": "measurement unit",
+          "description": "Optional 1-sigma uncertainty for measurements; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1704,6 +2169,26 @@
           "name": "negative_emissivity_voxel_count",
           "unit": "voxels",
           "description": "Count of negative reconstructed components."
+        },
+        {
+          "name": "regularization",
+          "unit": "same scale as singular values of A",
+          "description": "Regularization parameter actually used."
+        },
+        {
+          "name": "reconstruction_note",
+          "unit": "text",
+          "description": "Diagnostic status or limitation note returned by the implementation."
+        },
+        {
+          "name": "uncertainty_emissivity_estimate",
+          "unit": "emissivity units",
+          "description": "Propagated 1-sigma uncertainty for emissivity_estimate; returned only when required uncertainty inputs are supplied."
+        },
+        {
+          "name": "uncertainty_note",
+          "unit": "same as corresponding output",
+          "description": "Propagated 1-sigma uncertainty for note; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
@@ -1753,6 +2238,30 @@
           "unit": "s^-1",
           "description": "Non-negative loss rate; avoid double-counting terms.",
           "required": true
+        },
+        {
+          "name": "sigma_input_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for input_rate_s; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_output_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for output_rate_s; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_source_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for source_rate_s; independent-error propagation is used where documented.",
+          "required": false
+        },
+        {
+          "name": "sigma_loss_rate_s",
+          "unit": "s^-1",
+          "description": "Optional 1-sigma uncertainty for loss_rate_s; independent-error propagation is used where documented.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1760,6 +2269,11 @@
           "name": "particle_balance_rate_s",
           "unit": "particles s^-1",
           "description": "Net inventory derivative: input - output + source - loss."
+        },
+        {
+          "name": "uncertainty_particle_balance_rate_s",
+          "unit": "particles s^-1",
+          "description": "Propagated 1-sigma uncertainty for particle_balance_rate_s; returned only when required uncertainty inputs are supplied."
         }
       ],
       "prerequisites": [
