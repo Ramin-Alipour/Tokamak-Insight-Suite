@@ -71,3 +71,49 @@ def test_registration_validates_bounds():
             parameter_names=("a",), initial_values=(5.0,),
             bounds=((0.0,), (2.0,)),
         )
+
+
+def test_registration_rejects_parameter_names_that_duplicate_after_trimming():
+    with pytest.raises(ValueError, match="unique after trimming"):
+        register_spectral_model(
+            "duplicate_trimmed_names", lambda x, a, b: a * x + b,
+            parameter_names=("amplitude", " amplitude "),
+            initial_values=(1.0, 0.0),
+        )
+
+
+def test_fit_rejects_nonpositive_signal_uncertainty(registered_model):
+    x = np.linspace(531.0, 533.0, 8)
+    with pytest.raises(ValueError, match="finite and positive"):
+        fit_custom_spectral_model(
+            x, np.ones_like(x), model_name=registered_model,
+            signal_uncertainty=np.array([1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0]),
+        )
+
+
+def test_fit_rejects_custom_model_with_wrong_output_shape():
+    register_spectral_model(
+        "wrong_shape_model", lambda x, a: np.asarray([a]),
+        parameter_names=("a",), initial_values=(1.0,),
+    )
+    try:
+        with pytest.raises(ValueError, match="matching wavelength shape"):
+            fit_custom_spectral_model(
+                np.linspace(1.0, 2.0, 5), np.ones(5), model_name="wrong_shape_model"
+            )
+    finally:
+        unregister_spectral_model("wrong_shape_model")
+
+
+def test_fit_rejects_nonfinite_custom_model_output():
+    register_spectral_model(
+        "nonfinite_model", lambda x, a: np.full(x.shape, np.nan),
+        parameter_names=("a",), initial_values=(1.0,),
+    )
+    try:
+        with pytest.raises(ValueError, match="finite values matching wavelength shape"):
+            fit_custom_spectral_model(
+                np.linspace(1.0, 2.0, 5), np.ones(5), model_name="nonfinite_model"
+            )
+    finally:
+        unregister_spectral_model("nonfinite_model")
