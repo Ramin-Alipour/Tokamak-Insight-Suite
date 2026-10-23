@@ -7,9 +7,9 @@
     "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
     "caveat": "The raw-spectrum fit is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. It does not infer density from spectral amplitude; calibrated profile and single-band power density workflows remain separate.",
     "implementation_functions": [
-      "thomson_workflow.analyze_thomson_profile",
-      "thomson_scattering.density_from_thomson_scattered_power",
-      "thomson_spectrum.fit_thomson_spectrum"
+      "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+      "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
+      "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum"
     ],
     "implementation_status": "Implemented calibrated-profile workflow plus scoped raw-spectrum electron-temperature fit; overall analysis remains incomplete",
     "execution_contract": {
@@ -136,16 +136,16 @@
         "Profile uncertainty propagation assumes independent pointwise errors and excludes covariance, calibration uncertainty, and model discrepancy."
       ],
       "function_links": [
-        "thomson_workflow.analyze_thomson_profile",
-        "thomson_scattering.density_from_thomson_scattered_power",
-        "thomson_spectrum.fit_thomson_spectrum"
+        "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+        "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
+        "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum"
       ],
       "raw_data_to_physics": true,
       "note": "Overall analysis remains incomplete until the declared workflows and automated tests are confirmed end-to-end. Direct density inference from uncalibrated spectral amplitude and more general collective, relativistic, or non-Maxwellian spectral models are not implemented.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
-          "function": "thomson_workflow.analyze_thomson_profile",
+          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
           "inputs": [
             "radius_m (m)",
             "density_m3 (m^-3)",
@@ -162,7 +162,7 @@
         },
         {
           "name": "raw_spectrum_temperature_fit",
-          "function": "thomson_spectrum.fit_thomson_spectrum",
+          "function": "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
           "inputs": [
             "wavelength_nm (nm)",
             "signal (detector units)",
@@ -183,7 +183,7 @@
         },
         {
           "name": "calibrated_power_density",
-          "function": "thomson_scattering.density_from_thomson_scattered_power",
+          "function": "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
           "inputs": [
             "scattered_power_W (W)",
             "incident_power_W (W)",
