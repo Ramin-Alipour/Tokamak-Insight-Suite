@@ -9,8 +9,13 @@ from functools import lru_cache
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
+_PACKAGE_DATA = Path(__file__).resolve().parent / "data"
 _DIAGNOSTICS_PATH = _ROOT / "DIAGNOSTIC_REGISTRY.json"
 _FORMULAS_PATH = _ROOT / "FORMULA_REGISTRY.json"
+if not _DIAGNOSTICS_PATH.is_file():
+    _DIAGNOSTICS_PATH = _PACKAGE_DATA / "DIAGNOSTIC_REGISTRY.json"
+if not _FORMULAS_PATH.is_file():
+    _FORMULAS_PATH = _PACKAGE_DATA / "FORMULA_REGISTRY.json"
 
 def _load_list(path: Path) -> list[dict]:
     try:
