@@ -1125,28 +1125,115 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Molecular spectroscopy",
-    "quantities": "Rotational/vibrational temperatures; molecular species indicators",
+    "quantities": "Molecular-band features, band-integrated signal, candidate bandhead matches; user-model fit parameters",
     "status": "M→D/I",
-    "method": "Fit molecular band structure and compare populations with an appropriate model.",
-    "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "method": "Estimate a documented constant baseline, detect prominent spectral features, estimate approximate widths and integrate signal over selected windows; optionally compare against user-supplied bandhead references or fit a user-defined molecular spectral model.",
+    "caveat": "Exploratory feature extraction only: no automatic species identification or rotational/vibrational temperature inference. Quantitative inversion requires authoritative molecular constants, a species-specific model, instrument-response treatment and uncertainty analysis.",
+    "implementation_functions": [
+      "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
+      "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
+    ],
+    "implementation_status": "Complete within the explicitly bounded feature-extraction and user-defined-model-fitting scope; molecular species/temperature inversion and independent experimental validation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit molecular band structure and compare populations with an appropriate model.",
-      "uncertainty_model": "not_specified",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "description": "Finite, positive, strictly increasing calibrated wavelength samples; at least five points.",
+          "required": true
+        },
+        {
+          "name": "intensity",
+          "unit": "intensity",
+          "description": "Finite measured spectrum matching wavelength_nm.",
+          "required": true
+        },
+        {
+          "name": "reference_bandheads",
+          "unit": "list",
+          "description": "Optional user-supplied (wavelength_nm, label) reference list.",
+          "required": false
+        },
+        {
+          "name": "prominence_fraction",
+          "unit": "dimensionless",
+          "description": "Peak prominence threshold in (0,1].",
+          "required": false
+        },
+        {
+          "name": "baseline_quantile",
+          "unit": "dimensionless",
+          "description": "Constant baseline quantile in [0,0.5).",
+          "required": false
+        },
+        {
+          "name": "band_ranges_nm",
+          "unit": "list",
+          "description": "Optional in-range integration windows.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "peaks",
+          "unit": "structured",
+          "description": "Detected wavelengths, intensities, prominence and approximate widths."
+        },
+        {
+          "name": "integrated_signal_intensity_nm",
+          "unit": "intensity nm",
+          "description": "Baseline-subtracted integrated signal."
+        },
+        {
+          "name": "band_integrals",
+          "unit": "intensity nm",
+          "description": "Optional integrals over requested wavelength windows."
+        },
+        {
+          "name": "reference_matches",
+          "unit": "structured",
+          "description": "Optional nearest candidates from caller-supplied references."
+        },
+        {
+          "name": "custom_model_fit",
+          "unit": "structured",
+          "description": "Separate user-model fitting API with covariance and residual diagnostics."
+        }
+      ],
+      "assumptions": [
+        "Wavelength axis is calibrated before analysis.",
+        "Feature detection is exploratory and not a molecular population inversion.",
+        "Reference bandheads are user supplied."
+      ],
+      "preprocessing": [
+        "Validate finite matching arrays, positive increasing wavelength, model settings, reference entries and band integration ranges."
+      ],
+      "algorithm": "Constant quantile baseline, prominence-based feature detection, approximate half-prominence widths, trapezoidal integration and optional user-provided reference comparison; optional custom model fitting is exposed as a Python API.",
+      "uncertainty_model": "Feature summaries do not estimate a full measurement uncertainty budget. User-model covariance is local and excludes calibration and model discrepancy.",
       "limitations": [
         "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."
       ],
-      "function_links": [],
+      "function_links": [
+        "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
+        "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
+      ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "workflow_modes": [
+        {
+          "name": "spectrum_feature_summary",
+          "function": "analyze_molecular_spectrum",
+          "scope": "Exploratory calibrated-axis feature extraction; no molecular species or temperature inference."
+        },
+        {
+          "name": "user_defined_molecular_model_fit",
+          "function": "fit_custom_molecular_model",
+          "scope": "Caller-supplied model only; physical interpretation remains caller responsibility."
+        }
+      ],
+      "note": "Callable implementation, documentation and focused tests are provided. Do not interpret this as validated rotational/vibrational temperature inversion."
     }
   },
   {
