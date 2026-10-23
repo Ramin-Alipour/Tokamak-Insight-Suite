@@ -64,8 +64,8 @@ def test_diagnostic_registry_does_not_claim_all_80_analyses_are_complete():
     from collections import Counter
 
     counts = Counter(row["implementation_status"] for row in DIAGNOSTICS)
-    assert counts["Registry reference only"] == 59
-    assert counts["Implemented numerical workflow (see limits)"] == 20
+    assert counts["Registry reference only"] == 58
+    assert counts["Implemented numerical workflow (see limits)"] == 21
     assert sum("overall analysis remains incomplete" in status for status in counts) == 1
     assert all(row["execution_contract"]["completeness"] == "incomplete" for row in DIAGNOSTICS)
 
@@ -75,3 +75,16 @@ def test_packaged_registry_data_matches_repository_registries():
         repository_copy = json.loads((ROOT / name).read_text(encoding="utf-8"))
         packaged_copy = json.loads((ROOT / "tis" / "data" / name).read_text(encoding="utf-8"))
         assert packaged_copy == repository_copy
+
+
+def test_cxrs_registry_links_resolve_and_contract_is_scoped():
+    import importlib
+    rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    row = next(item for item in rows if item["diagnostic"] == "Charge-exchange recombination spectroscopy (CXRS)")
+    assert row["execution_contract"]["completeness"] == "incomplete"
+    assert row["execution_contract"]["input_specs"]
+    assert row["execution_contract"]["output_specs"]
+    assert row["execution_contract"]["uncertainty_model"] != "not_specified"
+    assert row["implementation_functions"] == ["tokamak_analysis.cxrs.analyze_cxrs_line"]
+    module = importlib.import_module("tokamak_analysis.cxrs")
+    assert callable(module.analyze_cxrs_line)
