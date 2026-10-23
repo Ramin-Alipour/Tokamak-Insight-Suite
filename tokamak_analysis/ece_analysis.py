@@ -117,6 +117,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             tau = np.asarray(optical_depth, dtype=float)
             if np.any(~np.isfinite(tau)) or np.any(tau < 0):
                 raise ValueError("optical_depth must be finite and non-negative.")
+            if tau.ndim > 1 or (tau.ndim == 1 and tau.shape != f.shape):
+                raise ValueError("optical_depth must be a scalar or one value per frequency channel.")
             out["optical_depth"] = tau
             out["optical_depth_warning"] = "Tau alone does not establish thermalization or calibration validity."
     if mode == "channel_fluctuations":
@@ -136,7 +138,10 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         y0 = y - np.mean(y, axis=0, keepdims=True)
         freq = np.fft.rfftfreq(t.size, d=float(np.median(dt)))
         fft = np.fft.rfft(y0, axis=0)
-        psd = (np.abs(fft) ** 2) * (2.0 * np.median(dt) / t.size)
+        psd = (np.abs(fft) ** 2) * (float(np.median(dt)) / t.size)
+        # One-sided periodogram: double positive-frequency bins only, excluding
+        # DC and (for even N) the Nyquist bin. This normalization satisfies
+        # Parseval: integral(PSD df) equals the mean-square fluctuation.
         if t.size % 2 == 0:
             psd[1:-1] *= 2.0
         else:
@@ -149,6 +154,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             n = np.asarray(noise_std, dtype=float)
             if np.any(~np.isfinite(n)) or np.any(n < 0):
                 raise ValueError("noise_std must be finite and non-negative.")
+            if n.ndim > 1 or (n.ndim == 1 and n.shape != (f.size,)):
+                raise ValueError("noise_std must be a scalar or one value per frequency channel.")
             out["noise_std"] = n
             out["above_noise_rms"] = out["fluctuation_rms"] > n
     return out
