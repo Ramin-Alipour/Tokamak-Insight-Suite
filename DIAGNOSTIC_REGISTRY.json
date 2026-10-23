@@ -4,13 +4,17 @@
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "D",
-    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
-    "caveat": "Raw-spectrum fitting is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. Density is never inferred from uncalibrated spectral amplitude; calibrated profile, calibrated single-band power-density, and combined spectrum-to-temperature/density workflows are separate explicit modes.",
+    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature. User-defined spectral models can be registered in Python for experiment-specific fitting without modifying the built-in model.",
+    "caveat": "Raw-spectrum fitting is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. Density is never inferred from uncalibrated spectral amplitude; calibrated profile, calibrated single-band power-density, and combined spectrum-to-temperature/density workflows are separate explicit modes. A generic custom-model registry supports user-provided fitting functions, but physical interpretation and validation remain the model author's responsibility.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
       "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
-      "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
+      "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
+      "tokamak_analysis.thomson_models.register_spectral_model",
+      "tokamak_analysis.thomson_models.fit_custom_spectral_model",
+      "tokamak_analysis.thomson_models.list_spectral_models",
+      "tokamak_analysis.thomson_models.unregister_spectral_model"
     ],
     "implementation_status": "Complete within the explicitly declared scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, and the combined calibrated spectrum-to-temperature/density workflow; excluded models remain explicitly unsupported",
     "execution_contract": {
@@ -104,6 +108,36 @@
           "description": "Mode-specific: total optical efficiency in (0, 1].",
           "required": false,
           "minimum": 1e-15
+        },
+        {
+          "name": "custom_model_name",
+          "unit": "text",
+          "description": "Name of a user-registered spectral model for the optional custom-model fitting path.",
+          "required": false
+        },
+        {
+          "name": "custom_model_function",
+          "unit": "callable",
+          "description": "User-defined Python callable accepting wavelength_nm and positional fit parameters; explicitly registered by the user.",
+          "required": false
+        },
+        {
+          "name": "custom_model_parameter_names",
+          "unit": "list[text]",
+          "description": "Unique names corresponding to the custom model's fitted parameters.",
+          "required": false
+        },
+        {
+          "name": "custom_model_initial_values",
+          "unit": "list[number]",
+          "description": "Finite initial parameter estimates corresponding to the custom model's parameter names.",
+          "required": false
+        },
+        {
+          "name": "custom_model_bounds",
+          "unit": "pair of lists",
+          "description": "Optional lower and upper parameter bounds; defaults to unbounded parameters.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -201,6 +235,31 @@
           "name": "fit_diagnostics",
           "unit": "structured",
           "description": "Fitted spectrum, residuals, covariance, and available fit-quality metrics."
+        },
+        {
+          "name": "custom_model_parameters",
+          "unit": "mapping",
+          "description": "Fitted parameter values for the selected user-defined spectral model; not automatically mapped to plasma quantities."
+        },
+        {
+          "name": "custom_model_parameter_uncertainties",
+          "unit": "mapping",
+          "description": "Covariance-based standard uncertainties for fitted custom-model parameters."
+        },
+        {
+          "name": "custom_model_covariance",
+          "unit": "parameter covariance matrix",
+          "description": "Covariance matrix returned by the generic custom-model fit."
+        },
+        {
+          "name": "custom_model_residual",
+          "unit": "signal units",
+          "description": "Measured minus fitted signal for a user-defined spectral model."
+        },
+        {
+          "name": "custom_model_fit_quality",
+          "unit": "structured",
+          "description": "Degrees of freedom and optional chi-square/reduced chi-square when signal uncertainties are supplied."
         }
       ],
       "assumptions": [
@@ -226,10 +285,14 @@
         "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
         "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
         "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
-        "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
+        "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
+        "tokamak_analysis.thomson_models.register_spectral_model",
+        "tokamak_analysis.thomson_models.fit_custom_spectral_model",
+        "tokamak_analysis.thomson_models.list_spectral_models",
+        "tokamak_analysis.thomson_models.unregister_spectral_model"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete within the declared scope, not independently experimentally validated. Workflow-specific requirements are defined by workflow_modes; the global input list is a cross-mode catalog, not a claim that all inputs are required simultaneously. Profile, spectral-fit, calibrated-power-density, and combined spectrum-to-temperature/density paths are callable; dashboard access and focused numerical/validation tests exist. Uncalibrated spectral amplitude is not density. Collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope.",
+      "note": "Complete within the declared scope, not independently experimentally validated. Workflow-specific requirements are defined by workflow_modes; the global input list is a cross-mode catalog, not a claim that all inputs are required simultaneously. Profile, spectral-fit, calibrated-power-density, and combined spectrum-to-temperature/density paths are callable; dashboard access and focused numerical/validation tests exist. Uncalibrated spectral amplitude is not density. Collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope. An optional user-defined spectral-model registry allows researchers to register custom Python fit functions and retrieve generic fit diagnostics; it does not automatically infer physical plasma parameters and does not dynamically import plugins.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
@@ -312,6 +375,25 @@
             "fit and density diagnostics"
           ],
           "scope": "Combined calibrated spectral-power fit and single-band density estimate under the documented non-collective, non-relativistic Maxwellian and optically thin assumptions. Not a general Thomson spectral solver."
+        },
+        {
+          "name": "user_defined_spectral_model",
+          "function": "tokamak_analysis.thomson_models.fit_custom_spectral_model",
+          "inputs": [
+            "wavelength_nm (nm)",
+            "signal (measured signal units)",
+            "model_name (registered custom model)",
+            "optional signal_uncertainty"
+          ],
+          "outputs": [
+            "custom_model_parameters",
+            "custom_model_parameter_uncertainties",
+            "custom_model_covariance",
+            "fitted_spectrum",
+            "residual",
+            "custom_model_fit_quality"
+          ],
+          "scope": "Generic fitting extension. User explicitly registers a Python callable, parameter names, initial values, optional bounds, and description. Does not automatically infer electron temperature, density, or other physical quantities. User is responsible for physical validation and uncertainty interpretation."
         }
       ],
       "test_links": [
@@ -323,7 +405,12 @@
         "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_recovers_temperature_with_instrument_deconvolution",
         "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_rejects_unresolved_instrument_width",
         "tests/test_thomson_spectrum.py::test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area",
-        "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_rejects_insufficient_wavelength_window"
+        "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_rejects_insufficient_wavelength_window",
+        "tests/test_thomson_models.py::test_custom_model_registry_and_fit_recovers_parameters",
+        "tests/test_thomson_models.py::test_registration_rejects_duplicate_names_without_replace",
+        "tests/test_thomson_models.py::test_fit_rejects_unknown_model",
+        "tests/test_thomson_models.py::test_fit_rejects_nonmonotonic_axis",
+        "tests/test_thomson_models.py::test_registration_validates_bounds"
       ]
     }
   },
