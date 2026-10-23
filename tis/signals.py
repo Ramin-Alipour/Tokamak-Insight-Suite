@@ -51,7 +51,7 @@ def hampel_despike(values: Any, window: int = 11, n_sigmas: float = 6.0) -> dict
     median filter itself distorts the signal and curvature is mistaken for spikes.
     """
     x = np.asarray(values, dtype=float).ravel()
-    if window < 3 or window % 2 == 0:
+    if isinstance(window, (bool, np.bool_)) or not isinstance(window, (int, np.integer)) or window < 3 or window % 2 == 0:
         raise ValueError("window must be an odd integer >= 3.")
     if n_sigmas <= 0 or not np.isfinite(n_sigmas):
         raise ValueError("n_sigmas must be positive and finite.")
