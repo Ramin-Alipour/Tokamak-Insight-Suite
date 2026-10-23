@@ -11,14 +11,26 @@ def test_project_export_syncs_new_history_into_existing_project_without_duplicat
         {
             "name": "new analysis",
             "created_at_utc": "2026-10-23T10:00:00+00:00",
+            "result_sha256": "same-result-digest",
             "parameter_snapshot": {"window": "hann"},
             "result_summary": {"peak_Hz": 50.0},
             "source_filename": "shot.csv",
             "source_sha256": "abc",
             "shot_id": "42",
-        }
+        },
+        {
+            "name": "another analysis",
+            "created_at_utc": "2026-10-23T10:01:00+00:00",
+            "result_sha256": "same-result-digest",
+            "parameter_snapshot": {"window": "boxcar"},
+            "result_summary": {"peak_Hz": 50.0},
+            "source_filename": "shot.csv",
+            "source_sha256": "abc",
+            "shot_id": "42",
+        },
     ]
     _sync_analysis_history(project, history, "0.5.1")
     _sync_analysis_history(project, history, "0.5.1")
-    assert [run.analysis_name for run in project.analysis_runs] == ["older", "new analysis"]
+    assert [run.analysis_name for run in project.analysis_runs] == ["older", "new analysis", "another analysis"]
     assert project.analysis_runs[1].inputs["history_key"]
+    assert project.analysis_runs[2].inputs["history_key"]
