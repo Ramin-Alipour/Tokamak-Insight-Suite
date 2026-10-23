@@ -1097,11 +1097,13 @@
       ],
       "preprocessing": [
         "Reject nonfinite, mismatched, non-1D, too-short, or non-increasing wavelength arrays.",
-        "Validate positive rest wavelength and ion mass, and finite nonnegative instrumental width.",
-        "Fit a Gaussian amplitude and center with positive sigma plus linear local background; reject nonpositive line contrast.",
-        "Reject unresolved widths when observed FWHM does not exceed instrumental FWHM."
+        "Require positive rest wavelength and ion mass; the rest wavelength must fall within the measured wavelength window.",
+        "Validate finite nonnegative instrumental width and positive finite per-sample intensity uncertainties when supplied.",
+        "Reject flat/no-contrast spectra and emission peaks at the spectral-window boundary.",
+        "Fit a Gaussian amplitude and center with positive sigma plus linear local background; convert fit failures and nonphysical fit parameters into clear validation errors.",
+        "Reject fitted centers at the wavelength-window boundary, excessively broad fits, and unresolved widths when observed FWHM does not exceed instrumental FWHM."
       ],
-      "algorithm": "Fit an isolated line to a Gaussian with linear background. Convert fitted sigma to observed FWHM, deconvolve known Gaussian instrumental FWHM in quadrature, then calculate Ti using Ti[eV] = (mi c^2/e) (FWHM_D/lambda0)^2/(8 ln 2). Return fitted spectrum, residuals, fit covariance, R-squared and assumptions.",
+      "algorithm": "Fit an isolated line to a Gaussian with linear background. Reject out-of-window rest wavelengths, boundary-truncated peaks/centers, failed/nonphysical fits and line widths too broad for the selected window. Convert fitted sigma to observed FWHM, deconvolve known Gaussian instrumental FWHM in quadrature, then calculate Ti using Ti[eV] = (mi c^2/e) (FWHM_D/lambda0)^2/(8 ln 2). Return fitted spectrum, residuals, fit covariance, R-squared and assumptions.",
       "uncertainty_model": "When intensity uncertainties are supplied, use weighted nonlinear least squares with absolute sigma. Otherwise use the fitter's residual-scaled covariance. Propagate observed-width and instrumental-width uncertainty to Ti by first-order independent-error propagation when both are available. Excludes wavelength calibration, ion-mass, instrument-model and physical-model discrepancy.",
       "limitations": [
         "Not a general Voigt, Stark/Zeeman, opacity, unresolved multiplet or non-Maxwellian line-shape solver.",
