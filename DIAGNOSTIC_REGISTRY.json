@@ -1214,7 +1214,11 @@
       "algorithm": "Constant quantile baseline, prominence-based feature detection, approximate half-prominence widths, trapezoidal integration and optional user-provided reference comparison; optional custom model fitting is exposed as a Python API.",
       "uncertainty_model": "Feature summaries do not estimate a full measurement uncertainty budget. User-model covariance is local and excludes calibration and model discrepancy.",
       "limitations": [
-        "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."
+        "Does not automatically identify molecular species or infer rotational/vibrational temperature, molecular density, or electron/ion temperature.",
+        "Overlapping bands, blends, wavelength-dependent response, noise, continuum emission and baseline choice can bias detected peaks and integrals.",
+        "Nearest reference matches are candidates only and require authoritative molecular constants/line lists and a user-selected tolerance.",
+        "Quantitative molecular temperature requires a validated species-specific model, transition data, instrument line-shape/response treatment and a defensible uncertainty budget.",
+        "Fit quality does not validate physical model suitability; independent experimental validation remains required."
       ],
       "function_links": [
         "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
