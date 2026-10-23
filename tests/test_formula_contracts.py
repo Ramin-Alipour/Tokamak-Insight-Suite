@@ -2,7 +2,7 @@
 import math
 import numpy as np
 import pytest
-from tis.constants import E_CHARGE, EPS0, M_E
+E_CHARGE = 1.602176634e-19  # CODATA 2019 exact elementary charge\nEPS0 = 8.8541878128e-12  # CODATA 2018 vacuum permittivity\nM_E = 9.1093837139e-31  # CODATA 2022 electron mass
 from tokamak_analysis.formula_library import (
     electron_plasma_frequency, debye_length, electron_cyclotron_frequency,
     ion_sound_speed, electron_thermal_pressure, ion_thermal_pressure,
@@ -34,7 +34,8 @@ def test_ion_sound_speed_independent_reference():
     r = ion_sound_speed(Te,Ti,mi,gamma, sigma_electron_temperature_eV=0.2,
                         sigma_ion_temperature_eV=0.3, sigma_ion_mass_kg=1e-29, sigma_gamma_i=0.02)
     assert r["ion_sound_speed_m_s"] == pytest.approx(math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi),rel=1e-12)
-    assert r["uncertainty_ion_sound_speed_m_s"] > 0
+    expected_sigma = math.sqrt((math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*0.2/(2*(Te+gamma*Ti)))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*gamma*0.3/(2*(Te+gamma*Ti)))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*1e-29/(2*mi))**2 + (math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)*Ti*0.02/(2*(Te+gamma*Ti)))**2)
+    assert r["uncertainty_ion_sound_speed_m_s"] == pytest.approx(expected_sigma, rel=1e-12)
 
 def test_electron_pressure_independent_reference():
     n,T=2e19,100.0; expected=n*E_CHARGE*T
@@ -45,7 +46,8 @@ def test_electron_pressure_independent_reference():
 def test_ion_pressure_multispecies_reference():
     r=ion_thermal_pressure([1e19,2e19],[10,20],sigma_species_density_m3=[1e17,2e17],sigma_species_temperature_eV=[1,2])
     assert r["ion_pressure_Pa"] == pytest.approx(E_CHARGE*(1e19*10+2e19*20),rel=1e-12)
-    assert r["uncertainty_ion_pressure_Pa"] > 0
+    expected_sigma = E_CHARGE * math.sqrt((10*1e17)**2 + (1e19*1)**2 + (20*2e17)**2 + (2e19*2)**2)
+    assert r["uncertainty_ion_pressure_Pa"] == pytest.approx(expected_sigma, rel=1e-12)
 
 def test_total_pressure_reference():
     r=total_thermal_pressure(10.0,20.0,sigma_electron_pressure_Pa=1.0,sigma_ion_pressure_Pa=2.0)
