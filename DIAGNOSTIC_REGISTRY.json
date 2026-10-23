@@ -511,7 +511,7 @@
         {
           "name": "floating_potential_V",
           "unit": "V",
-          "description": "Interpolated first zero-current crossing; null when no crossing is present."
+          "description": "Unique interpolated zero-current crossing; null when no crossing or multiple distinct crossings are present."
         },
         {
           "name": "plasma_potential_proxy_V",
@@ -572,6 +572,16 @@
           "name": "electron_temperature_uncertainty_note",
           "unit": "text",
           "description": "Statistical fit uncertainty excludes calibration, fit-window, sheath and instrumental systematics."
+        },
+        {
+          "name": "floating_potential_candidates_V",
+          "unit": "V",
+          "description": "All distinct interpolated zero-current crossings; a zero-current plateau is represented by its voltage midpoint."
+        },
+        {
+          "name": "floating_potential_status",
+          "unit": "text",
+          "description": "Explicit status: single_zero_crossing, no_zero_crossing_in_measured_sweep, or ambiguous_multiple_zero_crossings."
         }
       ],
       "assumptions": [
@@ -583,10 +593,10 @@
       "preprocessing": [
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
         "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
-        "Validate current polarity, fit windows, and positive finite geometry/model inputs.",
+        "Validate current polarity, fit windows, and positive finite geometry/model inputs; fit windows must have two finite strictly increasing bounds.",
         "Use explicit analyst-selected fit windows; no automatic physical regime selection."
       ],
-      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate floating-potential crossings, dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
+      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate every floating-potential zero crossing (including zero-plateau midpoint handling and explicit ambiguity), dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
       "uncertainty_model": "Only the optional electron-temperature fit returns a local regression standard error when enough fit points are available. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
@@ -600,7 +610,7 @@
         "tis.core.probe_iv_summary"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete only within this declared calibrated single-sweep I–V model scope. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
+      "note": "Complete only within this declared calibrated single-sweep I–V model scope. Fit-window validation and zero-crossing ambiguity are explicit. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
     }
   },
   {
