@@ -60,7 +60,7 @@ jobs:
           assert len(formulas) == 37, f"Expected 37 formula entries, got {len(formulas)}"
           assert all(item.get("execution_contract") for item in formulas), "Formula contract missing"
           (temp / "tis-cli-smoke.csv").write_text(
-              "t,b1\\n" + "".join(f"{i * 0.001},{(i % 4) - 1.5}\\n" for i in range(64)),
+              "t,b1\n" + "".join(f"{i * 0.001},{(i % 4) - 1.5}\n" for i in range(64)),
               encoding="utf-8",
           )
           PY
