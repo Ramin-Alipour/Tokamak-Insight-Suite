@@ -70,7 +70,17 @@ def analyze_thomson_spectral_distribution(
     area = float(np.trapezoid(weights, x) if hasattr(np, "trapezoid") else np.trapz(weights, x))
     if not np.isfinite(area) or area <= 0:
         raise ValueError("No positive spectral area remains after background subtraction")
-    normalized = weights / np.sum(weights)
+    # Use wavelength-space quadrature weights, not raw sample counts. This keeps
+    # moments correct for nonuniform wavelength grids (e.g. resampled spectrometers).
+    quadrature = np.empty_like(x)
+    quadrature[0] = 0.5 * (x[1] - x[0])
+    quadrature[-1] = 0.5 * (x[-1] - x[-2])
+    quadrature[1:-1] = 0.5 * (x[2:] - x[:-2])
+    spectral_measure = weights * quadrature
+    measure_sum = float(np.sum(spectral_measure))
+    if not np.isfinite(measure_sum) or measure_sum <= 0:
+        raise ValueError("No positive integrated spectral weight remains")
+    normalized = spectral_measure / measure_sum
     center = float(np.sum(normalized * x))
     centered = x - center
     variance_observed = float(np.sum(normalized * centered**2))
@@ -112,6 +122,8 @@ def analyze_thomson_spectral_distribution(
         "background": background,
         "background_subtracted_signal": corrected,
         "positive_spectral_weights": weights,
+        "wavelength_quadrature_weights_nm": quadrature,
+        "integrated_spectral_measure": spectral_measure,
         "integrated_positive_spectral_signal": area,
         "spectral_centroid_nm": center,
         "observed_sigma_nm": sigma_observed,
