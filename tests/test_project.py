@@ -48,3 +48,10 @@ def test_project_serializes_nonfinite_numpy_values(tmp_path):
     assert payload["metadata"]["array"] == [1.0, {"__nonfinite_float__": "inf"}, {"__nonfinite_float__": "-inf"}]
     restored = ProjectStore.load(path)
     assert restored.metadata == payload["metadata"]
+
+
+def test_project_load_rejects_non_object_json_root(tmp_path):
+    path = tmp_path / "invalid-project.json"
+    path.write_text("[]", encoding="utf-8")
+    with pytest.raises(ProjectError, match="root must be a JSON object"):
+        ProjectStore.load(path)
