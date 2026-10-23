@@ -1,6 +1,8 @@
 import json
 import sys
 
+import pytest
+
 from tis.cli import main
 
 
@@ -24,3 +26,15 @@ def test_cli_scalings_creates_output_parent_directory(tmp_path, monkeypatch):
     ])
     assert main() == 0
     assert json.loads(output.read_text(encoding="utf-8"))
+
+
+def test_cli_fft_requires_exactly_one_sampling_source(tmp_path, monkeypatch):
+    source = tmp_path / "input.csv"
+    monkeypatch.setattr(sys, "argv", ["tis", "fft", str(source), "--signal", "signal"])
+    with pytest.raises(SystemExit):
+        main()
+    monkeypatch.setattr(sys, "argv", [
+        "tis", "fft", str(source), "--signal", "signal", "--time", "time", "--fs", "1000"
+    ])
+    with pytest.raises(SystemExit):
+        main()
