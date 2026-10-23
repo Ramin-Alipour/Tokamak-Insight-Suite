@@ -75,3 +75,37 @@ def test_langmuir_probe_rejects_mismatched_and_undersampled_sweeps():
         analyze_langmuir_probe([0, 1, 2], [0, 1])
     with pytest.raises(ValueError, match="8 valid"):
         analyze_langmuir_probe([0, 1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6])
+
+
+def test_langmuir_probe_without_fit_windows_returns_labelled_tail_estimates():
+    voltage = np.linspace(-10.0, 10.0, 101)
+    current = 2e-3 * np.tanh(voltage / 3.0) + 1e-4 * voltage
+    result = analyze_langmuir_probe(voltage, current)
+    assert np.isfinite(result["ion_saturation_current_A"])
+    assert np.isfinite(result["electron_saturation_current_A"])
+    assert result["ion_saturation_current_method"] == "median_lowest_voltage_tail_fallback"
+    assert result["electron_saturation_current_method"] == "median_highest_voltage_tail_descriptive"
+    assert result["electron_temperature_eV"] is None
+    assert "interpretation_warning" in result
+
+
+@pytest.mark.parametrize("voltage,current", [
+    (np.zeros((3, 3)), np.zeros((3, 3))),
+    (np.arange(8).reshape(2, 4), np.arange(8)),
+    (np.arange(8), np.arange(8).reshape(2, 4)),
+])
+def test_langmuir_probe_rejects_non_one_dimensional_sweeps(voltage, current):
+    with pytest.raises(ValueError, match="one-dimensional"):
+        analyze_langmuir_probe(voltage, current)
+
+
+def test_langmuir_probe_selected_ion_range_overrides_tail_fallback():
+    voltage = np.linspace(-5.0, 20.0, 101)
+    current = -1.0e-3 + 2.0e-5 * np.exp((voltage - 10.0) / 3.0)
+    result = analyze_langmuir_probe(
+        voltage, current,
+        electron_fit_range=(10.0, 20.0),
+        ion_fit_range=(-5.0, 0.0),
+    )
+    assert result["ion_saturation_current_method"] == "median_user_selected_ion_fit_range"
+    assert result["ion_saturation_current_A"] == pytest.approx(-1e-3, abs=1e-7)
