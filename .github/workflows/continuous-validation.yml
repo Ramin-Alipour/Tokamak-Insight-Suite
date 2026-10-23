@@ -47,18 +47,28 @@ jobs:
           tis --help
           output_dir="$RUNNER_TEMP/tis-registry-smoke"
           tis catalog --kind both --output-dir "$output_dir"
-          python - "$output_dir" <<'PY'
+          python - "$RUNNER_TEMP" "$output_dir" <<'PY'
           import json
           import pathlib
           import sys
 
-          root = pathlib.Path(sys.argv[1])
+          temp = pathlib.Path(sys.argv[1])
+          root = pathlib.Path(sys.argv[2])
           diagnostics = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text())
           formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text())
           assert len(diagnostics) == 80, f"Expected 80 diagnostic entries, got {len(diagnostics)}"
           assert len(formulas) == 37, f"Expected 37 formula entries, got {len(formulas)}"
           assert all(item.get("execution_contract") for item in formulas), "Formula contract missing"
+          (temp / "tis-cli-smoke.csv").write_text(
+              "t,b1\\n" + "".join(f"{i * 0.001},{(i % 4) - 1.5}\\n" for i in range(64)),
+              encoding="utf-8",
+          )
           PY
+          tis qc "$RUNNER_TEMP/tis-cli-smoke.csv" --output "$RUNNER_TEMP/tis-qc-smoke.json"
+          tis fft "$RUNNER_TEMP/tis-cli-smoke.csv" --signal b1 --time t --output "$RUNNER_TEMP/tis-fft-smoke.csv"
+          test -s "$RUNNER_TEMP/tis-qc-smoke.json"
+          test -s "$RUNNER_TEMP/tis-fft-smoke.csv"
+          test -s "$RUNNER_TEMP/tis-fft-smoke_welch_psd.csv"
       - name: Exercise every workspace page with Streamlit AppTest
         run: |
           python - <<'PY'
