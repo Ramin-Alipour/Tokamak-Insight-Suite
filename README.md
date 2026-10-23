@@ -60,6 +60,8 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **External empirical validation protocol:** [raw-data + independent-reference acceptance criteria, GOLEM candidates, and FAIR-MAST comparison requirements](docs/external_empirical_validation_protocol.md). Candidate datasets are not labeled validated until rawness, reference equivalence, numerical discrepancy, and reproducibility are all documented.
 
+**Implementation coverage audit:** [current 80-entry diagnostic status, 37-formula mapping gap, and promotion gates](docs/implementation_coverage_audit.md). The 80 catalog entries are not 80 complete analyses; incomplete status is intentionally explicit.
+
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
