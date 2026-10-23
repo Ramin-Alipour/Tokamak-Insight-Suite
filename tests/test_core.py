@@ -390,6 +390,14 @@ def test_integrate_time_series_recovers_linear_integral():
     np.testing.assert_allclose(result["integrated_signal"], 1.0 + 6.0 * t, atol=1e-12)
 
 
+def test_integrate_time_series_rejects_overlapping_drift_windows():
+    time = np.arange(20, dtype=float)
+    signal = np.ones(20)
+    with pytest.raises(ValueError, match="must start after"):
+        integrate_time_series(time, signal, baseline_start_s=0, baseline_end_s=5,
+                               drift_start_s=4, drift_end_s=8)
+
+
 def test_integrate_time_series_baseline_correction_removes_constant_offset():
     t = np.linspace(0.0, 1.0, 101)
     y = np.full_like(t, 4.0)
