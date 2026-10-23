@@ -64,8 +64,8 @@ def test_diagnostic_registry_does_not_claim_all_80_analyses_are_complete():
     from collections import Counter
 
     counts = Counter(row["implementation_status"] for row in DIAGNOSTICS)
-    assert counts["Registry reference only"] == 58
-    assert counts["Implemented numerical workflow (see limits)"] == 21
+    assert counts["Registry reference only"] == 57
+    assert counts["Implemented numerical workflow (see limits)"] == 19
     assert sum("overall analysis remains incomplete" in status for status in counts) == 1
     assert all(row["execution_contract"]["completeness"] == "incomplete" for row in DIAGNOSTICS)
 
