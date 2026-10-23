@@ -9,15 +9,37 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.electron_plasma_frequency",
+      "formula_key": "electron_plasma_frequency",
+      "input_specs": [
+        {
+          "name": "n_e_m3",
+          "unit": "m^-3",
+          "description": "Finite positive local electron density.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "omega_pe_rad_s",
+          "unit": "rad s^-1",
+          "description": "Electron plasma angular frequency."
+        },
+        {
+          "name": "frequency_pe_Hz",
+          "unit": "Hz",
+          "description": "Electron plasma frequency."
+        }
+      ],
       "prerequisites": [
         "Local electron density; cold-plasma definition."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent 1-sigma uncertainty in density is propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_electron_plasma_frequency_independent_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -30,15 +52,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.debye_length",
+      "formula_key": "debye_length",
+      "input_specs": [
+        {
+          "name": "temperature_eV",
+          "unit": "eV",
+          "description": "Positive electron temperature expressed in eV.",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Positive local electron density.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "debye_length_m",
+          "unit": "m",
+          "description": "Electron Debye length."
+        }
+      ],
       "prerequisites": [
         "Quasi-equilibrium Maxwellian electron approximation."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent 1-sigma uncertainties in temperature and density are propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_debye_length_independent_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -51,15 +96,37 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.electron_cyclotron_frequency",
+      "formula_key": "electron_cyclotron_frequency",
+      "input_specs": [
+        {
+          "name": "magnetic_field_T",
+          "unit": "T",
+          "description": "Finite magnetic-field magnitude in tesla; sign is ignored.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "omega_ce_rad_s",
+          "unit": "rad s^-1",
+          "description": "Non-relativistic electron cyclotron angular-frequency magnitude."
+        },
+        {
+          "name": "frequency_ce_Hz",
+          "unit": "Hz",
+          "description": "Non-relativistic electron cyclotron frequency."
+        }
+      ],
       "prerequisites": [
         "Non-relativistic single-particle frequency; harmonics and relativistic shifts may matter."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional 1-sigma uncertainty in magnetic-field magnitude is propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_electron_cyclotron_frequency_independent_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -72,15 +139,50 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.ion_sound_speed",
+      "formula_key": "ion_sound_speed",
+      "input_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive electron temperature.",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Non-negative ion temperature.",
+          "required": true
+        },
+        {
+          "name": "ion_mass_kg",
+          "unit": "kg",
+          "description": "Positive mass of the modeled ion species.",
+          "required": true
+        },
+        {
+          "name": "gamma_i",
+          "unit": "1",
+          "description": "Non-negative model closure coefficient; defaults to 1.0.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Sound-speed approximation sqrt(e*(Te + gamma_i*Ti)/mi)."
+        }
+      ],
       "prerequisites": [
         "Model-dependent closure and ion species."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "No uncertainty is returned; inputs are treated as exact. A future uncertainty model must account for covariance and model-closure uncertainty.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_ion_sound_speed_independent_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -93,15 +195,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.electron_thermal_pressure",
+      "formula_key": "electron_thermal_pressure",
+      "input_specs": [
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Finite non-negative electron density.",
+          "required": true
+        },
+        {
+          "name": "temperature_eV",
+          "unit": "eV",
+          "description": "Finite non-negative electron temperature.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_pressure_Pa",
+          "unit": "Pa",
+          "description": "Electron ideal-gas thermal pressure using temperature in eV."
+        }
+      ],
       "prerequisites": [
         "Temperature represented in electron-volts."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent 1-sigma density and temperature uncertainties are propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_electron_pressure_independent_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -114,15 +239,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.ion_thermal_pressure",
+      "formula_key": "ion_thermal_pressure",
+      "input_specs": [
+        {
+          "name": "species_density_m3",
+          "unit": "m^-3",
+          "description": "1-D array of non-negative ion-species densities.",
+          "required": true
+        },
+        {
+          "name": "species_temperature_eV",
+          "unit": "eV",
+          "description": "Matching 1-D array of non-negative ion-species temperatures.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_pressure_Pa",
+          "unit": "Pa",
+          "description": "Sum over explicitly supplied ion species of n_s*e*T_s."
+        }
+      ],
       "prerequisites": [
         "Sum over ion species; do not assume single-ion composition silently."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional pointwise independent density and temperature uncertainties may be supplied; their variances are summed under an independence assumption.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_ion_pressure_multispecies_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -135,15 +283,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.total_thermal_pressure",
+      "formula_key": "total_thermal_pressure",
+      "input_specs": [
+        {
+          "name": "electron_pressure_Pa",
+          "unit": "Pa",
+          "description": "Non-negative electron thermal pressure.",
+          "required": true
+        },
+        {
+          "name": "ion_pressure_Pa",
+          "unit": "Pa",
+          "description": "Non-negative ion thermal pressure.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "total_thermal_pressure_Pa",
+          "unit": "Pa",
+          "description": "Sum of supplied electron and ion thermal pressures."
+        }
+      ],
       "prerequisites": [
         "Excludes energetic/non-thermal components unless included explicitly."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent uncertainties in electron and ion pressure are combined in quadrature.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_total_pressure_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -156,15 +327,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thermal_stored_energy",
+      "formula_key": "thermal_stored_energy",
+      "input_specs": [
+        {
+          "name": "pressure_Pa",
+          "unit": "Pa",
+          "description": "Finite non-negative thermal-pressure samples.",
+          "required": true
+        },
+        {
+          "name": "volume_m3",
+          "unit": "m^3",
+          "description": "Matching strictly increasing volume coordinate in m^3.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "thermal_stored_energy_J",
+          "unit": "J",
+          "description": "Trapezoidal integral of 3/2*p_th dV."
+        }
+      ],
       "prerequisites": [
         "Classical isotropic ideal-gas form; geometry and species definitions matter."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent pointwise pressure uncertainties are propagated using the trapezoidal integration weights; volume-coordinate uncertainty is not included.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_thermal_stored_energy_integral_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -177,15 +371,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.line_integrated_density",
+      "formula_key": "line_integrated_density",
+      "input_specs": [
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Finite non-negative density samples along the sightline.",
+          "required": true
+        },
+        {
+          "name": "distance_m",
+          "unit": "m",
+          "description": "Matching strictly increasing path coordinate in metres.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "line_integrated_density_m-2",
+          "unit": "m^-2",
+          "description": "Trapezoidal line integral of electron density."
+        }
+      ],
       "prerequisites": [
         "A line integral; local profile needs multiple sightlines/model."
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "uncertainty_model": "Optional independent pointwise density uncertainties are propagated using the trapezoidal integration weights; path-coordinate uncertainty is not included.",
+      "test_links": [
+        "tests/test_formula_contracts.py::test_line_integrated_density_reference"
+      ],
+      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
     }
   },
   {
