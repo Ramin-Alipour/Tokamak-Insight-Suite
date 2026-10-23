@@ -119,3 +119,8 @@ def test_multitime_multichannel_radiance_shape_is_preserved():
     result = analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=radiance)
     assert result["brightness_temperature_K"].shape == (2, 2)
     assert np.all(np.isfinite(result["brightness_temperature_eV"]))
+
+
+def test_resonance_mapping_does_not_fabricate_high_field_side_radius():
+    with pytest.raises(ValueError, match="viewing geometry and equilibrium"):
+        resonance_radius_m(56e9, 1.0, 2.0, harmonic=2, sign=-1)
