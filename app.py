@@ -893,7 +893,7 @@ elif page=='Spectral Analysis':
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
     elif mode=='CXRS line profile':
         st.caption('Fit one calibrated, isolated charge-exchange line. Requires independently known rest wavelength, emitting-ion mass and Gaussian instrumental sigma (not FWHM). Reports line-of-sight velocity and a single-Maxwellian Ti estimate; it does not infer impurity density or invert multiple views.')
-        xcol=col_select('Calibrated wavelength (nm)','', 'cxrs_x') if False else col_select('Calibrated wavelength (nm)',numeric,'cxrs_x')
+        xcol=col_select('Calibrated wavelength (nm)',numeric,'cxrs_x')
         ycol=col_select('Spectral intensity',numeric,'cxrs_y')
         c1,c2=st.columns(2)
         with c1:
@@ -915,6 +915,8 @@ elif page=='Spectral Analysis':
                 _result=analyze_cxrs_line(_spec['wavelength_nm'].to_numpy(dtype=float),_spec['signal'].to_numpy(dtype=float),
                     rest_wavelength_nm=float(rest),ion_mass_amu=float(mass),instrument_sigma_nm=float(inst),**_kwargs)
                 _result_dict=_result.to_dict()
+                _result_dict['wavelength_nm']=_spec['wavelength_nm'].to_numpy(dtype=float).tolist()
+                _result_dict['measured_signal']=_spec['signal'].to_numpy(dtype=float).tolist()
                 st.session_state['tis_cxrs_result']={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'sigma_col':sigma_col,'result':_result_dict}
             except Exception as e:
                 st.error(str(e))
@@ -922,7 +924,7 @@ elif page=='Spectral Analysis':
         if _saved_cxrs and all(_saved_cxrs.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'sigma_col':sigma_col}.items()):
             _rr=_saved_cxrs['result']
             st.json({k:v for k,v in _rr.items() if k not in {'fitted_signal','residual'}})
-            st.line_chart(pd.DataFrame({'measured':pd.to_numeric(df[ycol],errors='coerce').to_numpy()[:len(_rr['fitted_signal'])],'fitted':_rr['fitted_signal'],'residual':_rr['residual']}))
+            st.line_chart(pd.DataFrame({'measured':_rr['measured_signal'],'fitted':_rr['fitted_signal'],'residual':_rr['residual']},index=_rr['wavelength_nm']))
             json_download('Export CXRS line-profile result',_rr,'tis_cxrs_line_profile.json')
             st.caption('Uncertainties are local fit-covariance estimates and exclude calibration/systematic effects. Check the stated assumptions before interpreting Ti or velocity.')
     elif mode=='Molecular spectroscopy':
