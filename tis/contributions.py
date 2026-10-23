@@ -43,6 +43,7 @@ def build_contribution_bundle(
     shot_id: str | int | None = None,
     diagnostic: str | None = None,
     data_units: Mapping[str, str] | None = None,
+    input_provenance: Mapping[str, Any] | None = None,
     reference_result: Any = None,
     reference_description: str | None = None,
     researcher_notes: str | None = None,
@@ -86,6 +87,7 @@ def build_contribution_bundle(
             "units": _json_safe(data_units or {}),
         },
         "parameters": _json_safe(parameters),
+        "input_provenance": _json_safe(input_provenance or {}),
         "software_result": _json_safe(result),
         "reference": {
             "result": _json_safe(reference_result),
