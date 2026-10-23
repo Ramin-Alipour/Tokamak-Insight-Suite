@@ -784,27 +784,191 @@
     "family": "Plasma parameters",
     "diagnostic": "Charge-exchange recombination spectroscopy (CXRS)",
     "quantities": "T_i, toroidal/poloidal rotation, impurity density constraints",
-    "status": "M→D/I",
-    "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
-    "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "status": "D/I",
+    "method": "Fit a calibrated isolated charge-exchange emission line with a Gaussian plus local linear background; subtract a known Gaussian instrumental width in quadrature to estimate ion temperature and Doppler line-of-sight velocity.",
+    "caveat": "Requires correct line identification, calibrated wavelength axis, rest wavelength, emitting-ion mass, and independently measured instrumental sigma (not FWHM). This workflow does not perform atomic-rate impurity-density estimation, neutral-beam attenuation, or toroidal/poloidal inversion.",
+    "implementation_functions": [
+      "tokamak_analysis.cxrs.analyze_cxrs_line"
+    ],
+    "implementation_status": "Implemented numerical workflow for isolated calibrated line-profile fitting; full device-specific CXRS inversion and independent experimental validation remain out of scope.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Neutral-beam overlap, background, instrument function and atomic data are required."
+      "execution_level": "analysis_pipeline",
+      "completeness": "partial",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "description": "Finite strictly increasing calibrated wavelength axis, at least 7 samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "detector units",
+          "description": "Finite spectral signal samples matching wavelength_nm.",
+          "required": true
+        },
+        {
+          "name": "rest_wavelength_nm",
+          "unit": "nm",
+          "description": "Known positive rest wavelength of the identified CXRS transition.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "ion_mass_amu",
+          "unit": "u",
+          "description": "Positive mass of the emitting ion in atomic mass units.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm",
+          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "viewing_angle_rad",
+          "unit": "rad",
+          "description": "Optional view geometry metadata in [0, pi]; no deprojection is performed.",
+          "required": false,
+          "minimum": 0,
+          "maximum": 3.141592653589793
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "signal units",
+          "description": "Optional positive 1-sigma uncertainty for each signal sample; enables weighted fitting and reduced chi-square.",
+          "required": false
+        },
+        {
+          "name": "initial_center_nm",
+          "unit": "nm",
+          "description": "Optional starting estimate for line center within wavelength range.",
+          "required": false
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "wavelength_center_nm",
+          "unit": "nm",
+          "description": "Fitted line center."
+        },
+        {
+          "name": "wavelength_center_uncertainty_nm",
+          "unit": "nm",
+          "description": "Local covariance-based 1-sigma line-center uncertainty."
+        },
+        {
+          "name": "line_sigma_nm",
+          "unit": "nm",
+          "description": "Fitted observed Gaussian standard deviation."
+        },
+        {
+          "name": "intrinsic_sigma_nm",
+          "unit": "nm",
+          "description": "Doppler width after quadrature subtraction of instrumental width."
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Ion temperature assuming a single Maxwellian emitting population."
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Local fit-covariance propagated uncertainty; excludes systematic inputs."
+        },
+        {
+          "name": "line_of_sight_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Non-relativistic Doppler line-of-sight velocity."
+        },
+        {
+          "name": "velocity_uncertainty_m_s",
+          "unit": "m s^-1",
+          "description": "Local line-center covariance propagated uncertainty."
+        },
+        {
+          "name": "fitted_signal",
+          "unit": "signal units",
+          "description": "Model evaluated on the input wavelength grid."
+        },
+        {
+          "name": "residual",
+          "unit": "signal units",
+          "description": "Measured signal minus fitted model."
+        },
+        {
+          "name": "fit_r_squared",
+          "unit": "dimensionless",
+          "description": "Unweighted coefficient of determination."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless",
+          "description": "Weighted reduced chi-square when sample uncertainties are supplied; otherwise null."
+        },
+        {
+          "name": "assumptions",
+          "unit": "list[text]",
+          "description": "Explicit model assumptions."
+        },
+        {
+          "name": "limitations",
+          "unit": "list[text]",
+          "description": "Scientific scope and excluded effects."
+        }
+      ],
+      "assumptions": [
+        "Wavelength axis is calibrated and strictly increasing.",
+        "Line is isolated, optically thin, and correctly identified.",
+        "Emitting-ion velocity distribution is a single Maxwellian.",
+        "Doppler and instrumental profiles are Gaussian.",
+        "Rest wavelength, ion mass, and instrumental standard deviation are known."
+      ],
+      "preprocessing": [
+        "Validate dimensions, finite values, monotonic wavelength, positive physical parameters and optional uncertainties.",
+        "Estimate a local linear edge background and fit Gaussian amplitude, center, width, intercept and slope.",
+        "Reject unresolved line widths when observed width does not exceed instrumental width."
+      ],
+      "algorithm": "Fit Gaussian emission plus local linear background using nonlinear least squares. Compute intrinsic Doppler sigma from sqrt(sigma_observed^2 - sigma_instrument^2), Ti = m_i c^2/e * (sigma_D/lambda_0)^2, and v_los = c*(lambda_center-lambda_0)/lambda_0. Propagate local fit covariance to Ti and line-of-sight velocity uncertainties.",
+      "uncertainty_model": "Local nonlinear least-squares covariance; optional per-sample standard deviations enable weighted fitting. Ti and velocity uncertainties are first-order covariance propagation. Excludes systematic uncertainty and covariance in wavelength calibration, rest wavelength, ion mass, and instrumental width.",
+      "limitations": [
+        "No atomic-rate or neutral-beam attenuation model and no impurity-density estimate.",
+        "No toroidal/poloidal rotation inversion; reported velocity is line-of-sight only.",
+        "No line deblending, opacity correction, non-Maxwellian distribution, or non-Gaussian instrumental response.",
+        "Viewing angle is metadata only and does not perform geometric deprojection.",
+        "Covariance-based errors omit calibration and model systematics; independent experimental validation remains required."
+      ],
+      "function_links": [
+        "tokamak_analysis.cxrs.analyze_cxrs_line"
+      ],
+      "raw_data_to_physics": true,
+      "note": "This is a scoped calibrated line-profile workflow, not a complete device-specific CXRS diagnostic inversion. Use only correctly identified, isolated transitions and independently characterized instrumental response.",
+      "workflow_modes": [
+        {
+          "name": "calibrated_isolated_line",
+          "function": "tokamak_analysis.cxrs.analyze_cxrs_line",
+          "inputs": [
+            "wavelength_nm (nm)",
+            "signal",
+            "rest_wavelength_nm (nm)",
+            "ion_mass_amu (u)",
+            "instrument_sigma_nm (nm)",
+            "optional signal_uncertainty"
+          ],
+          "outputs": [
+            "ion_temperature_eV",
+            "line_of_sight_velocity_m_s",
+            "fit diagnostics and residuals",
+            "local covariance-based uncertainties"
+          ],
+          "scope": "Calibrated single-line fit; no impurity-density, beam-attenuation, or multi-view rotation inversion."
+        }
+      ]
     }
   },
   {
