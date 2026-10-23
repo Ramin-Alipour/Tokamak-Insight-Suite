@@ -42,3 +42,11 @@ def test_get_analysis_returns_deep_copy_of_nested_contract():
     entry = get_analysis(1)
     entry["execution_contract"]["input_specs"][0]["name"] = "mutated"
     assert ANALYSES[0]["execution_contract"]["input_specs"][0]["name"] == original
+
+
+def test_get_analysis_rejects_noninteger_ids_instead_of_truncating():
+    import pytest
+    with pytest.raises(ValueError, match="analysis_id must be an integer"):
+        get_analysis(1.5)
+    with pytest.raises(ValueError, match="analysis_id must be an integer"):
+        get_analysis(True)
