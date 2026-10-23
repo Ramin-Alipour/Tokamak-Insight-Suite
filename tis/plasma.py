@@ -177,6 +177,9 @@ def lh_threshold_martin08(ne_line_avg_m3: float, bt_T: float, surface_m2: float,
     Hydrogen plasmas need roughly a factor 2 more power (scaled here as 2/M for M<2 only).
     The scaling has ~±30% scatter and does not capture low-density branch/ isotope/ divertor effects.
     """
+    # A non-positive density is outside the empirical scaling domain. Validate it
+    # explicitly so zero cannot silently produce P_LH = 0 and negative values do
+    # not fail later with an opaque fractional-power error.
     n20 = _pos("ne_line_avg_m3", ne_line_avg_m3) / 1e20
     p = 0.0488 * n20 ** 0.717 * _pos("|Bt|", abs(bt_T)) ** 0.803 * _pos("surface_m2", surface_m2) ** 0.941
     m = _pos("ion_mass_amu", ion_mass_amu)
