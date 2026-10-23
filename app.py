@@ -232,16 +232,24 @@ def _parameter_snapshot():
 def _record_download_history(name, digest, result_summary, page_name, parameter_snapshot):
     """Record an analysis export only after the user actually clicks its download button."""
     history=st.session_state.get("tis_analysis_history",[])
-    if any(h.get("name")==name and h.get("result_sha256")==digest for h in history):
+    provenance = {
+        "source_filename": st.session_state.get("tis_filename"),
+        "source_sha256": st.session_state.get("tis_sha"),
+        "shot_id": st.session_state.get("shot"),
+        "source_manifest": _json_safe(st.session_state.get("tis_source_manifest")),
+        "import_parameters": _json_safe(st.session_state.get("tis_import_parameters")),
+    }
+    if any(
+        h.get("name") == name
+        and h.get("result_sha256") == digest
+        and h.get("parameter_snapshot") == parameter_snapshot
+        and all(h.get(key) == value for key, value in provenance.items())
+        for h in history
+    ):
         return
     history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
               "page":page_name,"parameter_snapshot":parameter_snapshot,"result_sha256":digest,
-              "result_summary":result_summary,
-              "source_filename":st.session_state.get("tis_filename"),
-              "source_sha256":st.session_state.get("tis_sha"),
-              "shot_id":st.session_state.get("shot"),
-              "source_manifest":_json_safe(st.session_state.get("tis_source_manifest")),
-              "import_parameters":_json_safe(st.session_state.get("tis_import_parameters"))}]+history
+              "result_summary":result_summary, **provenance}]+history
     st.session_state["tis_analysis_history"]=history[:50]
 
 def json_download(label,obj,name):
