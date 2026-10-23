@@ -64,8 +64,8 @@ def test_diagnostic_registry_does_not_claim_all_80_analyses_are_complete():
     from collections import Counter
 
     counts = Counter(row["implementation_status"] for row in DIAGNOSTICS)
-    assert counts["Registry reference only"] == 57
-    assert counts["Implemented numerical workflow (see limits)"] == 19
+    assert counts["Registry reference only"] == 56
+    assert counts["Implemented numerical workflow (see limits)"] == 20
     assert sum("overall analysis remains incomplete" in status for status in counts) == 1
     assert all(row["execution_contract"]["completeness"] == "incomplete" for row in DIAGNOSTICS)
 
@@ -88,3 +88,16 @@ def test_cxrs_registry_links_resolve_and_contract_is_scoped():
     assert row["implementation_functions"] == ["tokamak_analysis.cxrs.analyze_cxrs_line"]
     module = importlib.import_module("tokamak_analysis.cxrs")
     assert callable(module.analyze_cxrs_line)
+
+
+def test_toroidal_field_coil_analysis_contract_and_callable():
+    import importlib
+    rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    row = next(item for item in rows if item["diagnostic"] == "Toroidal-field coils / magnetic probes")
+    contract = row["execution_contract"]
+    assert contract["completeness"] == "incomplete"
+    assert contract["input_specs"] and contract["output_specs"]
+    assert contract["uncertainty_model"] != "not_specified"
+    assert row["implementation_functions"] == ["tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"]
+    module = importlib.import_module("tokamak_analysis.toroidal_field_coils")
+    assert callable(module.analyze_toroidal_field_coil)
