@@ -794,7 +794,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "wavelength_nm",
@@ -953,8 +953,8 @@
       "function_links": [
         "tokamak_analysis.cxrs.analyze_cxrs_line"
       ],
-      "raw_data_to_physics": false,
-      "note": "Complete for calibrated isolated-line fitting and its documented outputs. Not a full CXRS diagnostic suite: impurity density, atomic-rate modelling, neutral-beam attenuation, line deblending, multi-view toroidal/poloidal inversion, and independent device-specific validation are outside scope.",
+      "raw_data_to_physics": true,
+      "note": "Complete for calibrated isolated-line fitting from spectral samples to line-of-sight velocity and ion temperature within the documented Gaussian/Maxwellian model. This flag denotes a numerical raw-spectrum-to-physics path, not raw detector calibration or a complete device-specific CXRS inversion. Impurity density, atomic-rate modelling, neutral-beam attenuation, line deblending, multi-view toroidal/poloidal inversion, and independent device-specific validation remain outside scope.",
       "workflow_modes": [
         {
           "name": "calibrated_isolated_line",
