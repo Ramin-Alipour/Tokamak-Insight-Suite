@@ -21,6 +21,16 @@ def test_profile_gradient_rejects_mismatched_coordinate_and_profile_lengths():
         profile_gradient_analysis([0, 1, 2, 3, 4], [1, 2, 3, 4])
 
 
+def test_grid_from_table_accepts_fair_mast_efit_jphi_column_names():
+    frame = pd.DataFrame(
+        [[0, 1, 2, 3], [1, 4, 5, 6], [2, 7, 8, 9]],
+        columns=["z_m", "Jphi_R=1.000000m", "Jphi_R=2.000000m", "Jphi_R=3.000000m"],
+    )
+    result = grid_from_table(frame)
+    np.testing.assert_allclose(result["R_m"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(result["grid"], [[1, 2, 3], [4, 5, 6], [7, 8, 9]])
+
+
 def test_grid_from_table_rejects_nonfinite_or_duplicate_coordinates():
     duplicate_r = pd.DataFrame(
         [[0, 1, 2, 3], [1, 4, 5, 6], [2, 7, 8, 9]],
