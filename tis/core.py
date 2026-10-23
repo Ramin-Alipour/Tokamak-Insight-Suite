@@ -817,6 +817,7 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
         r['integrated_counts_keV']=r['integrated_signal_keV_weighted']
     elif 'integrated_signal' in r:
         r['integrated_signal_keV_weighted']=r['integrated_signal']
+        r['integrated_counts_keV']=r['integrated_signal']
     r['energy_axis_unit']='keV'
     r['note']='Energy axis is interpreted as keV. Select counts-per-bin or signal density explicitly; detector response and absolute calibration are not applied.'
     return r
