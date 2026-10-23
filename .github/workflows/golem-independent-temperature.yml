@@ -35,6 +35,10 @@ jobs:
           # in GOLEM's shot 30622 Data.php, not guessed diagnostic folder names.
           candidates = {
               "electron_temperature": [
+                  # Canonical identifier documented by GOLEM's Data.php and
+                  # data-processing documentation (filename is ElectronTemp).
+                  f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemperature",
+                  f"http://golem.fjfi.cvut.cz/operation/shots/{shot}/basicdiagn/ElectronTemperature",
                   f"{root}/cgi-bin/data/{shot}/electron_temperature",
                   f"{root}/cgi-bin/data/{shot}/electron_temperature.txt",
                   f"{root}/cgi-bin/data/{shot}/ElectronTemp",
