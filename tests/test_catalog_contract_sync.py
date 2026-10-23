@@ -32,3 +32,10 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
         assert contract["completeness"] == "incomplete"
         assert contract["raw_data_to_physics"] is False
         assert contract["function_links"] == [f'{entry["module"]}.{entry["function"]}']
+
+
+def test_packaged_registry_data_matches_repository_registries():
+    for name in ("DIAGNOSTIC_REGISTRY.json", "FORMULA_REGISTRY.json"):
+        repository_copy = json.loads((ROOT / name).read_text(encoding="utf-8"))
+        packaged_copy = json.loads((ROOT / "tis" / "data" / name).read_text(encoding="utf-8"))
+        assert packaged_copy == repository_copy
