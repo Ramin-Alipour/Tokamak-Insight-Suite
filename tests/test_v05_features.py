@@ -298,11 +298,17 @@ def test_registry_json_files_match_catalog_module():
 
 
 def test_every_mapped_function_actually_exists():
+    import importlib
     import tis.core, tis.events, tis.plasma, tis.signals
     modules = (tis.core, tis.events, tis.plasma, tis.signals)
     for d in DIAGNOSTICS:
         for fn in d["implementation_functions"]:
-            assert any(hasattr(m, fn) for m in modules), f"{d['diagnostic']} maps to missing function {fn}"
+            if "." in fn:
+                module_name, function_name = fn.rsplit(".", 1)
+                module = importlib.import_module(module_name)
+                assert callable(getattr(module, function_name, None)), f"{d['diagnostic']} maps to missing function {fn}"
+            else:
+                assert any(callable(getattr(m, fn, None)) for m in modules), f"{d['diagnostic']} maps to missing function {fn}"
 
 
 @pytest.mark.parametrize("seed", range(6))
