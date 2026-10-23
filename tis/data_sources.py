@@ -349,6 +349,17 @@ def fetch_fair_mast_efit_snapshot(
         z = np.asarray(ds["z"].values, dtype=np.float64).ravel()
         if grid.shape != (z.size, r.size):
             raise ValueError(f"Grid/coordinate mismatch: field={grid.shape}, z={z.size}, r={r.size}")
+        if not np.all(np.isfinite(r)) or not np.all(np.isfinite(z)):
+            raise ValueError("EFIT R and Z coordinates must contain only finite values.")
+        if len(np.unique(r)) != len(r) or len(np.unique(z)) != len(z):
+            raise ValueError("EFIT R and Z coordinates must be unique.")
+        # Normalize descending archive axes to increasing coordinates without
+        # detaching the current-density grid from its physical coordinates.
+        r_order = np.argsort(r)
+        z_order = np.argsort(z)
+        r = r[r_order]
+        z = z[z_order]
+        grid = grid[np.ix_(z_order, r_order)]
         finite = np.isfinite(grid)
         if not np.any(finite):
             raise ValueError("Selected EFIT snapshot contains no finite grid values.")
