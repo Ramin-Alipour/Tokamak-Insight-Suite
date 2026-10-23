@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tis.constants import C_LIGHT, E_CHARGE, MU0, M_E
+C_LIGHT = 299792458.0  # exact SI value\nE_CHARGE = 1.602176634e-19  # exact SI value\nMU0 = 1.25663706212e-6  # CODATA 2018 reference\nM_E = 9.1093837139e-31  # CODATA 2022 reference
 from tokamak_analysis.formula_library import (
     plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity, ion_sound_speed,
     ion_temperature_from_doppler_sigma, gaussian_fwhm_from_sigma,
