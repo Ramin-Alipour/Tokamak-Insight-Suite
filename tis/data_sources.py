@@ -86,7 +86,7 @@ def fetch_fair_mast_signal(
     time_s/signal_raw table and provenance manifest. Downsampling uses polyphase
     FIR anti-alias filtering; no calibration is applied.
     """
-    if int(shot) < 1:
+    if isinstance(shot, bool) or not isinstance(shot, (int, np.integer)) or shot < 1:
         raise ValueError("Shot number must be a positive integer.")
     group = str(group).strip()
     if not group or "/" in group or "\\" in group:
