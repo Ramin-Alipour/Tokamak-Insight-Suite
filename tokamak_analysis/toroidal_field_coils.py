@@ -49,3 +49,74 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
     elif sk > 0:
         out["B_toroidal_uncertainty_T"] = np.abs(corrected)*sk
     return out
+
+
+def integrate_pickup_coil_voltage(
+    time_s, voltage_V, *, sensitivity_V_per_T_per_s: float,
+    initial_field_T: float, voltage_baseline_V: float = 0.0,
+    voltage_uncertainty_V=None, sensitivity_uncertainty_V_per_T_per_s: float = 0.0,
+    initial_field_uncertainty_T: float = 0.0,
+):
+    """Recover field change from a calibrated pickup coil using Faraday-law integration.
+
+    sensitivity_V_per_T_per_s is the validated system transfer coefficient for
+    V = sensitivity * dB/dt over the sampled bandwidth. The initial field is
+    required because integration determines field change, not its absolute offset.
+    """
+    t = np.asarray(time_s, dtype=float)
+    v = np.asarray(voltage_V, dtype=float)
+    if t.ndim != 1 or v.ndim != 1 or t.size != v.size or t.size < 2:
+        raise ValueError("time_s and voltage_V must be 1-D arrays of equal length >= 2")
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)):
+        raise ValueError("time_s and voltage_V must contain only finite values")
+    dt = np.diff(t)
+    if np.any(dt <= 0):
+        raise ValueError("time_s must be strictly increasing")
+    s = float(sensitivity_V_per_T_per_s)
+    b0 = float(initial_field_T)
+    vb = float(voltage_baseline_V)
+    ss = float(sensitivity_uncertainty_V_per_T_per_s)
+    sb0 = float(initial_field_uncertainty_T)
+    if not np.isfinite(s) or s == 0:
+        raise ValueError("sensitivity_V_per_T_per_s must be finite and non-zero")
+    if not all(np.isfinite(z) for z in (b0, vb, ss, sb0)) or ss < 0 or sb0 < 0:
+        raise ValueError("Initial field/baseline must be finite and uncertainties non-negative")
+    corrected = v - vb
+    derivative = corrected / s
+    increments = 0.5 * (derivative[:-1] + derivative[1:]) * dt
+    delta_b = np.concatenate(([0.0], np.cumsum(increments)))
+    field = b0 + delta_b
+    out = {
+        "time_s": t.copy(), "voltage_corrected_V": corrected,
+        "dB_dt_T_s": derivative, "delta_B_T": delta_b, "B_toroidal_T": field,
+        "initial_field_T": b0, "sensitivity_V_per_T_per_s": s,
+        "voltage_baseline_V": vb,
+        "integration_method": "cumulative trapezoidal integration",
+        "physical_relation": "B(t)=B(t0)+integral[(V(t)-V_baseline)/sensitivity]dt",
+        "sampling_rate_Hz": float(1.0 / np.median(dt)),
+        "sampling_interval_jitter_fraction": float(np.std(dt) / np.mean(dt)),
+        "limitations": [
+            "Requires independently validated pickup-coil sensitivity/transfer function over the signal bandwidth.",
+            "Absolute field depends on the supplied initial-field boundary condition.",
+            "Baseline offset causes integration drift; no automatic detrending or frequency-response correction is applied.",
+            "Uncertainty model assumes independent pointwise voltage noise and excludes correlated drift, baseline uncertainty, bandwidth error and model discrepancy."
+        ]
+    }
+    if voltage_uncertainty_V is not None:
+        sv = np.asarray(voltage_uncertainty_V, dtype=float)
+        if sv.shape != v.shape or not np.all(np.isfinite(sv)) or np.any(sv < 0):
+            raise ValueError("voltage_uncertainty_V must match voltage and be finite/non-negative")
+        # Independent voltage-noise propagation through the trapezoidal integral.
+        variance = np.zeros(t.size, dtype=float)
+        for i, h in enumerate(dt):
+            q = h / (2.0 * s)
+            variance[i] += (q * sv[i])**2
+            variance[i + 1] += (q * sv[i + 1])**2
+        cumulative_variance = np.concatenate(([0.0], np.cumsum(variance[1:])))
+        # Sensitivity and initial-condition terms are propagated separately.
+        sigma_voltage_integral = np.sqrt(cumulative_variance)
+        sigma_sensitivity = np.abs(delta_b / s) * ss
+        out["B_toroidal_uncertainty_T"] = np.sqrt(sb0**2 + sigma_voltage_integral**2 + sigma_sensitivity**2)
+    elif ss > 0 or sb0 > 0:
+        out["B_toroidal_uncertainty_T"] = np.sqrt(sb0**2 + (np.abs(delta_b / s) * ss)**2)
+    return out
