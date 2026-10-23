@@ -39,3 +39,51 @@ def test_custom_molecular_model_fit():
     )
     assert out["parameters"]["center"] == pytest.approx(405.0, abs=1e-3)
     assert out["parameters"]["amplitude"] == pytest.approx(3.0, rel=1e-3)
+
+
+def test_custom_molecular_model_fit_reports_weighted_diagnostics():
+    x = np.linspace(400.0, 410.0, 101)
+    sigma_y = np.full_like(x, 0.05)
+    def model(w, amplitude, center, width, baseline):
+        return amplitude * np.exp(-0.5 * ((w - center) / width) ** 2) + baseline
+    y = model(x, 4.0, 405.2, 0.35, 1.5)
+    out = fit_custom_molecular_model(
+        x, y, model,
+        parameter_names=("amplitude", "center", "width", "baseline"),
+        initial_values=(3.5, 405.0, 0.4, 1.0),
+        intensity_uncertainty=sigma_y,
+    )
+    assert out["degrees_of_freedom"] == x.size - 4
+    assert out["chi_square"] < 1e-8
+    assert out["reduced_chi_square"] < 1e-8
+    assert np.asarray(out["covariance"]).shape == (4, 4)
+    assert len(out["residual"]) == x.size
+
+
+def test_custom_molecular_model_rejects_bad_uncertainty_and_parameter_names():
+    x = np.linspace(400.0, 410.0, 20)
+    y = np.ones_like(x)
+    def model(w, amplitude):
+        return np.full_like(w, amplitude)
+    with pytest.raises(ValueError):
+        fit_custom_molecular_model(
+            x, y, model, parameter_names=("amplitude",),
+            initial_values=(1.0,), intensity_uncertainty=np.zeros_like(y),
+        )
+    with pytest.raises(ValueError):
+        fit_custom_molecular_model(
+            x, y, model, parameter_names=("amplitude", "amplitude"),
+            initial_values=(1.0, 2.0),
+        )
+
+
+def test_molecular_spectrum_rejects_duplicate_wavelength_and_invalid_ranges():
+    x = np.array([400.0, 401.0, 402.0, 402.0, 404.0])
+    y = np.array([0.0, 1.0, 3.0, 2.0, 0.0])
+    with pytest.raises(ValueError, match="strictly increasing"):
+        analyze_molecular_spectrum(x, y)
+    with pytest.raises(ValueError, match="inside the measured"):
+        analyze_molecular_spectrum(
+            np.arange(5, dtype=float) + 400.0, y,
+            band_ranges_nm=[(399.0, 402.0)],
+        )
