@@ -1389,17 +1389,17 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Toroidal-field coils / magnetic probes",
     "quantities": "Calibrated toroidal magnetic-field time series B_t(t), summary statistics, sampling quality and optional propagated uncertainty",
-    "status": "D",
+    "status": "D/I",
     "method": "Analyze calibrated toroidal-field coil/current signals with explicit calibration, baseline correction, sampling-quality metrics and optional first-order uncertainty propagation. Voltage is converted only when its transfer/calibration coefficient is explicitly supplied; no implicit Faraday-law integration.",
     "caveat": "This is a calibrated-signal workflow, not a coil-design or equilibrium solver. A pickup-coil voltage generally measures changing linked flux; recovering B requires a validated transfer function/integration and boundary condition. Total toroidal field cannot be inferred from coil current without geometry and machine-specific calibration.",
     "implementation_functions": [
       "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
     ],
-    "implementation_status": "Implemented calibrated-signal analysis pipeline; complete within declared scope. Device calibration and independent experimental validation remain the user's responsibility.",
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "time_s",
@@ -1505,8 +1505,8 @@
       "function_links": [
         "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
       ],
-      "raw_data_to_physics": true,
-      "note": "Executable calibrated-signal workflow with focused tests. Completeness applies only to the declared calibrated-input scope, not uncalibrated raw pickup-coil inversion or device-specific validation."
+      "raw_data_to_physics": false,
+      "note": "Implemented calibrated-signal workflow with focused tests; completeness remains conservative because uncalibrated pickup-coil inversion and independent device-specific validation are outside the implemented scope."
     }
   },
   {
