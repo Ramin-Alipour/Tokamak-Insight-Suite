@@ -403,7 +403,17 @@
         "tests/test_thomson_models.py::test_registration_rejects_duplicate_names_without_replace",
         "tests/test_thomson_models.py::test_fit_rejects_unknown_model",
         "tests/test_thomson_models.py::test_fit_rejects_nonmonotonic_axis",
-        "tests/test_thomson_models.py::test_registration_validates_bounds"
+        "tests/test_thomson_models.py::test_registration_validates_bounds",
+        "tests/test_thomson_models.py::test_registration_rejects_parameter_names_that_duplicate_after_trimming",
+        "tests/test_thomson_models.py::test_fit_rejects_nonpositive_signal_uncertainty",
+        "tests/test_thomson_models.py::test_fit_rejects_custom_model_with_wrong_output_shape",
+        "tests/test_thomson_models.py::test_fit_rejects_nonfinite_custom_model_output",
+        "tests/test_thomson_models.py::test_registration_rejects_string_instead_of_parameter_name_sequence",
+        "tests/test_thomson_models.py::test_registration_rejects_malformed_numeric_bounds",
+        "tests/test_thomson_models.py::test_fit_rejects_wrong_uncertainty_shape",
+        "tests/test_thomson_models.py::test_fit_rejects_non_boolean_absolute_sigma",
+        "tests/test_thomson_models.py::test_fit_requires_more_samples_than_parameters",
+        "tests/test_thomson_models.py::test_unregister_returns_false_for_missing_model"
       ]
     },
     "extension_functions": [
