@@ -1358,14 +1358,6 @@ elif page=='Advanced Analysis':
                         st.markdown('**Radial gradients**')
                         gradients = pd.DataFrame({'Radius (m)': result['radius_m'], 'Density gradient (m^-4)': result['density_gradient_m-4'], 'Temperature gradient (eV/m)': result['temperature_gradient_eV_m-1']})
                         st.dataframe(gradients, use_container_width=True, hide_index=True)
-                st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
-                st.session_state.pop("tis_project_export_bytes", None)
-                st.session_state.pop("tis_project_export_signature", None)
-                reference_result = None
-                if reference_text.strip():
-                    reference_result = json.loads(reference_text)
-                    if not isinstance(reference_result, (dict, list, int, float, str, bool)) and reference_result is not None:
-                        raise ValueError('Reference result must be valid JSON.')
                 contribution = build_contribution_bundle(
                     analysis_id=int(entry['id']),
                     analysis_name=str(entry['name']),
@@ -1389,6 +1381,11 @@ elif page=='Advanced Analysis':
                     key=f"download_contribution_{selected_id}",
                     help='Exports analysis parameters, result and provenance. Raw experimental data are not embedded.',
                 )
+                # Commit the analysis to session history only after all result
+                # processing and contribution-bundle construction has succeeded.
+                st.session_state['tis_analysis_history']=(st.session_state.get('tis_analysis_history',[])+[{'name':entry['name'],'created_at_utc':datetime.now(timezone.utc).isoformat(),'parameter_snapshot':args,'result_summary':result,'source_filename':filename or None,'source_sha256':sha or None,'shot_id':shot or None,'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'algorithm_version':__version__,'warnings':([str(result.get('caveat'))] if isinstance(result,dict) and result.get('caveat') else [])}])[-100:]
+                st.session_state.pop("tis_project_export_bytes", None)
+                st.session_state.pop("tis_project_export_signature", None)
             except Exception as e: st.error(f'Analysis failed: {e}')
     elif workflow=='Calibration & uncertainty':
         st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
