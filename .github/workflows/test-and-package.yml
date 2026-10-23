@@ -38,6 +38,13 @@ jobs:
       - name: Run complete test suite
         run: python -m pytest -q
 
+      - name: Verify installed wheel contains canonical registries
+        run: |
+          python -m pip wheel --no-deps --wheel-dir /tmp/tis-wheel .
+          python -m pip install --no-deps --target /tmp/tis-installed /tmp/tis-wheel/*.whl
+          cd /tmp
+          PYTHONPATH=/tmp/tis-installed python -c "from tis.catalog import DIAGNOSTICS, FORMULAS; assert len(DIAGNOSTICS) == 80; assert len(FORMULAS) == 37; print('Installed wheel registry check passed.')"
+
       - name: Launch dashboard smoke test
         run: |
           streamlit run app.py --server.headless=true --server.port=8501 > /tmp/tis-streamlit.log 2>&1 &
