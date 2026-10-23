@@ -1,4 +1,4 @@
-""""Extensible user-defined spectral models for Thomson-scattering analysis.
+"""Extensible user-defined spectral models for Thomson-scattering analysis.
 
 The registry fits user-supplied model callables; it does not interpret fitted
 parameters as plasma quantities. Registration is explicit and never dynamically
@@ -37,19 +37,27 @@ def register_spectral_model(
     description: str = "",
     replace: bool = False,
 ) -> SpectralModelSpec:
-    """Register a model callable accepting function(wavelength_nm, *parameters)."""
+    """Register a callable accepting function(wavelength_nm, *parameters)."""
     if not isinstance(name, str) or not name.strip():
         raise ValueError("Model name must be a non-empty string")
     key = name.strip()
     if not callable(function):
         raise TypeError("Model function must be callable")
-    raw_names = tuple(parameter_names)
+    if isinstance(parameter_names, (str, bytes)):
+        raise ValueError("parameter_names must be a sequence of distinct names, not a string")
+    try:
+        raw_names = tuple(parameter_names)
+    except TypeError as exc:
+        raise ValueError("parameter_names must be a sequence of names") from exc
     if not raw_names or any(not isinstance(v, str) or not v.strip() for v in raw_names):
         raise ValueError("Parameter names must be non-empty strings")
     names = tuple(v.strip() for v in raw_names)
     if len(set(names)) != len(names):
         raise ValueError("Parameter names must be unique after trimming whitespace")
-    initial = tuple(float(v) for v in initial_values)
+    try:
+        initial = tuple(float(v) for v in initial_values)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Initial values must be numeric and match parameter names") from exc
     if len(initial) != len(names) or not np.all(np.isfinite(initial)):
         raise ValueError("Initial values must be finite and match parameter names")
 
@@ -57,10 +65,15 @@ def register_spectral_model(
         lower = tuple(-np.inf for _ in names)
         upper = tuple(np.inf for _ in names)
     else:
-        if len(bounds) != 2:
-            raise ValueError("bounds must be a (lower, upper) pair")
-        lower = tuple(float(v) for v in bounds[0])
-        upper = tuple(float(v) for v in bounds[1])
+        try:
+            if len(bounds) != 2:
+                raise ValueError("bounds must be a (lower, upper) pair")
+            lower = tuple(float(v) for v in bounds[0])
+            upper = tuple(float(v) for v in bounds[1])
+        except (TypeError, ValueError, IndexError) as exc:
+            if isinstance(exc, ValueError) and str(exc) == "bounds must be a (lower, upper) pair":
+                raise
+            raise ValueError("bounds must contain numeric lower and upper sequences") from exc
         if len(lower) != len(names) or len(upper) != len(names):
             raise ValueError("Bounds must match parameter names")
         if np.any(np.isnan(lower)) or np.any(np.isnan(upper)):
@@ -80,8 +93,11 @@ def register_spectral_model(
 def list_spectral_models() -> list[dict[str, object]]:
     """List metadata for registered custom models in this process."""
     return [
-        {"name": spec.name, "parameter_names": list(spec.parameter_names),
-         "description": spec.description}
+        {
+            "name": spec.name,
+            "parameter_names": list(spec.parameter_names),
+            "description": spec.description,
+        }
         for spec in sorted(_CUSTOM_MODELS.values(), key=lambda item: item.name.casefold())
     ]
 
@@ -100,8 +116,12 @@ def fit_custom_spectral_model(
     absolute_sigma: bool = True,
 ) -> dict[str, object]:
     """Fit a registered model; no plasma-parameter interpretation is inferred."""
+    if not isinstance(model_name, str) or not model_name.strip():
+        raise ValueError("model_name must be a non-empty registered model name")
     if model_name not in _CUSTOM_MODELS:
         raise ValueError(f"Unknown custom spectral model {model_name!r}; register it first")
+    if not isinstance(absolute_sigma, (bool, np.bool_)):
+        raise ValueError("absolute_sigma must be boolean")
     spec = _CUSTOM_MODELS[model_name]
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(signal, dtype=float)
@@ -137,14 +157,16 @@ def fit_custom_spectral_model(
     residual = y - fitted
     dof = int(y.size - parameters.size)
     chi_square = None if sigma is None else float(np.sum((residual / sigma) ** 2))
+    covariance_diagonal = np.diag(covariance)
+    parameter_uncertainties = {
+        name: float(np.sqrt(max(value, 0.0))) if np.isfinite(value) else float("inf")
+        for name, value in zip(spec.parameter_names, covariance_diagonal)
+    }
     return {
         "model_name": spec.name,
         "parameter_names": list(spec.parameter_names),
         "parameters": {n: float(v) for n, v in zip(spec.parameter_names, parameters)},
-        "parameter_uncertainties": {
-            n: float(v) for n, v in zip(
-                spec.parameter_names, np.sqrt(np.maximum(np.diag(covariance), 0.0)))
-        },
+        "parameter_uncertainties": parameter_uncertainties,
         "covariance": covariance,
         "wavelength_nm": x.copy(),
         "fitted_spectrum": fitted,
