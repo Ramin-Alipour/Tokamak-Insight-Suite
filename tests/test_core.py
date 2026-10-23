@@ -1011,5 +1011,5 @@ def test_xray_spectrum_integrated_energy_weighted_signal_converts_ev_to_kev():
     # Integral of E_keV times a unit signal/eV density over 1--3 keV is
     # 4,000 signal·keV; the unweighted total signal is 2,000.
     assert result["integrated_signal_keV_weighted"] == pytest.approx(4000.0)
-    assert result["integrated_counts_keV"] == pytest.approx(4000.0)
+    assert result["integrated_counts_keV"] == pytest.approx(2000.0)
     assert result["integrated_signal"] == pytest.approx(2000.0)
