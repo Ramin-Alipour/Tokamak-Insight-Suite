@@ -118,6 +118,8 @@ with st.sidebar:
                 st.session_state["tis_upload_identity"]=upload_identity
                 st.session_state["tis_upload_raw"]=uploaded_bytes
                 st.session_state.pop("tis_analysis_history",None)
+                # Report sections belong to the dataset that produced them; never carry them into a new import.
+                st.session_state.pop("tis_report_sections", None)
                 st.session_state.pop("tis_project_export_bytes", None)
                 st.session_state.pop("tis_project_export_signature", None)
                 st.session_state["tis_active_source"]="upload"
