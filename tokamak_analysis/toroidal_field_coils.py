@@ -107,12 +107,9 @@ def integrate_pickup_coil_voltage(
         if sv.shape != v.shape or not np.all(np.isfinite(sv)) or np.any(sv < 0):
             raise ValueError("voltage_uncertainty_V must match voltage and be finite/non-negative")
         # Independent voltage-noise propagation through the trapezoidal integral.
-        variance = np.zeros(t.size, dtype=float)
-        for i, h in enumerate(dt):
-            q = h / (2.0 * s)
-            variance[i] += (q * sv[i])**2
-            variance[i + 1] += (q * sv[i + 1])**2
-        cumulative_variance = np.concatenate(([0.0], np.cumsum(variance[1:])))
+        q = dt / (2.0 * s)
+        interval_variance = q**2 * (sv[:-1]**2 + sv[1:]**2)
+        cumulative_variance = np.concatenate(([0.0], np.cumsum(interval_variance)))
         # Sensitivity and initial-condition terms are propagated separately.
         sigma_voltage_integral = np.sqrt(cumulative_variance)
         sigma_sensitivity = np.abs(delta_b / s) * ss
