@@ -7,6 +7,7 @@ machine-specific empirical validations.
 from __future__ import annotations
 import math
 import numpy as np
+from scipy.integrate import trapezoid
 from tis.constants import E_CHARGE, EPS0, M_E, MU0, C_LIGHT
 
 def _finite(name, value):
@@ -123,7 +124,7 @@ def _integrate_with_uncertainty(y, x, sigma_y, name):
     if y.ndim!=1 or x.shape!=y.shape or y.size<2 or not np.all(np.isfinite(y)) or not np.all(np.isfinite(x)) or np.any(np.diff(x)<=0):
         raise ValueError(f"{name}: values and coordinate must be matching finite 1-D arrays; coordinate strictly increasing.")
     if np.any(y<0): raise ValueError(f"{name}: values must be non-negative.")
-    value=float(np.trapezoid(y,x))
+    value=float(trapezoid(y, x))
     out={"value":value}
     if sigma_y is not None:
         s=np.asarray(sigma_y,dtype=float)
@@ -547,7 +548,13 @@ def magnitude_squared_coherence(signal_x, signal_y, sampling_frequency_Hz, *, np
     fs = _positive("sampling_frequency_Hz", sampling_frequency_Hz)
     if x.ndim != 1 or y.shape != x.shape or x.size < 8 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
         raise ValueError("signals must be matching finite 1-D arrays with at least eight samples.")
-    segment = min(256, x.size) if nperseg is None else int(nperseg)
+    if nperseg is None:
+        segment = min(256, x.size)
+    else:
+        raw_segment = _finite("nperseg", nperseg)
+        if not raw_segment.is_integer():
+            raise ValueError("nperseg must be an integer number of samples.")
+        segment = int(raw_segment)
     if segment < 2 or segment > x.size:
         raise ValueError("nperseg must be between 2 and the signal length.")
     frequencies, values = coherence(x, y, fs=fs, nperseg=segment)
@@ -566,13 +573,21 @@ def bolometry_regularized_inverse(measurements, geometry_matrix, regularization,
         raise ValueError("measurements must be 1-D and match the row count of a 2-D geometry matrix.")
     if not np.all(np.isfinite(y)) or not np.all(np.isfinite(A)):
         raise ValueError("measurements and geometry matrix must be finite.")
-    normal = A.T @ A + (lam**2) * np.eye(A.shape[1])
-    kernel = np.linalg.solve(normal, A.T)
+    # SVD form avoids explicitly solving normal equations, which square the
+    # condition number. This is the same unconstrained Tikhonov estimator.
+    U, singular_values, Vh = np.linalg.svd(A, full_matrices=False)
+    factors = singular_values / (singular_values**2 + lam**2)
+    kernel = (Vh.T * factors) @ U.T
     x = kernel @ y
+    regularized_eigenvalues = singular_values**2 + lam**2
+    if A.shape[1] > singular_values.size:
+        regularized_eigenvalues = np.concatenate(
+            [regularized_eigenvalues, np.full(A.shape[1] - singular_values.size, lam**2)]
+        )
     out = {"emissivity_estimate": x.tolist(),
            "residual_norm": float(np.linalg.norm(A @ x - y)),
            "regularization": lam,
-           "normal_matrix_condition_number": float(np.linalg.cond(normal)),
+           "normal_matrix_condition_number": float(np.max(regularized_eigenvalues) / np.min(regularized_eigenvalues)),
            "negative_emissivity_voxel_count": int(np.count_nonzero(x < 0)),
            "reconstruction_note": "Unconstrained linear Tikhonov estimate; geometry/calibration and regularization bias are not validated by this calculation."}
     if sigma_measurements is not None:
