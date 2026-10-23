@@ -66,18 +66,20 @@ def analyze_molecular_spectrum(
     peaks, props = find_peaks(corrected, prominence=prominence_fraction * contrast)
     width_data = peak_widths(corrected, peaks, rel_height=0.5) if peaks.size else None
     widths = width_data[0] if width_data is not None else np.array([])
-    dx = float(np.median(np.diff(x)))
+    sample_indices = np.arange(x.size, dtype=float)
     peak_results = []
     for i, peak in enumerate(peaks):
         left_i = int(np.clip(np.floor(width_data[2][i]), 0, x.size - 1))
         right_i = int(np.clip(np.ceil(width_data[3][i]), 0, x.size - 1))
+        left_nm = float(np.interp(width_data[2][i], sample_indices, x))
+        right_nm = float(np.interp(width_data[3][i], sample_indices, x))
         peak_results.append({
             "wavelength_nm": float(x[peak]),
             "intensity": float(y[peak]),
             "prominence": float(props["prominences"][i]),
-            "approx_fwhm_nm": float(widths[i] * dx),
-            "left_half_max_nm_approx": float(x[left_i]),
-            "right_half_max_nm_approx": float(x[right_i]),
+            "approx_fwhm_nm": float(right_nm - left_nm),
+            "left_half_max_nm_approx": left_nm,
+            "right_half_max_nm_approx": right_nm,
         })
     result = {
         "baseline": baseline,
