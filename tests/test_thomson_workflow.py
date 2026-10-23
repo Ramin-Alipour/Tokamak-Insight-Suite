@@ -168,3 +168,17 @@ def test_calibrated_thomson_spectrum_pipeline_returns_temperature_and_density():
     assert 0 < out["electron_density_uncertainty_m3"] < out["electron_density_m3"]
     assert out["fit"]["spectral_power_density_calibrated"] is True
     assert "calibration/model discrepancy" in " ".join(out["limitations"]).lower()
+
+
+
+def test_thomson_density_rejects_collection_solid_angle_above_sphere():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    with pytest.raises(ValueError, match="cannot exceed 4\\*pi"):
+        density_from_thomson_scattered_power(
+            scattered_power_W=1.0e-14,
+            incident_power_W=2.0,
+            interaction_length_m=0.15,
+            scattering_angle_rad=np.pi / 2,
+            collection_solid_angle_sr=4.0 * np.pi + 1e-6,
+        )
