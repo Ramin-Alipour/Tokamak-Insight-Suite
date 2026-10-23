@@ -153,6 +153,11 @@ def test_unsafe_invalid_cutoff_rejected():
     with pytest.raises(ValueError): butterworth_filter(np.arange(100),100,lowpass=50)
 
 
+def test_tomography_rejects_noninteger_regularization_order():
+    with pytest.raises(ValueError, match="must be an integer"):
+        regularized_tomography(np.eye(2), np.ones(2), regularization_order=1.0)
+
+
 def test_tomography_rank_deficient_without_regularization_is_stable():
     A=np.array([[1,1],[2,2]],float); y=np.array([2,4],float)
     r=regularized_tomography(A,y,0,False)
