@@ -58,6 +58,8 @@ def ion_temperature_from_doppler_spectrum(
         raise ValueError("wavelength_nm and intensity must be finite, matching 1-D arrays with at least 7 increasing wavelengths")
     if not np.isfinite(rest) or rest <= 0 or not np.isfinite(mass) or mass <= 0:
         raise ValueError("rest wavelength and ion mass must be finite and positive")
+    if not (x[0] <= rest <= x[-1]):
+        raise ValueError("rest_wavelength_nm must lie within the measured wavelength window")
     if not np.isfinite(inst) or inst < 0:
         raise ValueError("instrumental_fwhm_nm must be finite and non-negative")
     if instrumental_fwhm_uncertainty_nm is not None:
@@ -77,6 +79,9 @@ def ion_temperature_from_doppler_spectrum(
     amplitude0 = float(np.max(y) - baseline0)
     if amplitude0 <= 0:
         raise ValueError("spectrum has no positive emission-line contrast")
+    peak_index = int(np.argmax(y))
+    if peak_index == 0 or peak_index == y.size - 1:
+        raise ValueError("emission-line peak is at a wavelength-window boundary; provide a wider spectral window")
     spacing = float(np.median(np.diff(x)))
     sigma0 = max(spacing, (x[-1] - x[0]) / 12.0)
     def gaussian(z, amplitude, center, sigma, baseline, slope):
@@ -84,10 +89,22 @@ def ion_temperature_from_doppler_spectrum(
     p0 = [amplitude0, float(x[np.argmax(y)]), sigma0, baseline0, 0.0]
     lower = [0.0, float(x[0]), spacing * 1e-3, -np.inf, -np.inf]
     upper = [np.inf, float(x[-1]), float(x[-1]-x[0]), np.inf, np.inf]
-    popt, pcov = curve_fit(
-        gaussian, x, y, p0=p0, bounds=(lower, upper),
-        sigma=uy, absolute_sigma=uy is not None, maxfev=50000,
-    )
+    try:
+        popt, pcov = curve_fit(
+            gaussian, x, y, p0=p0, bounds=(lower, upper),
+            sigma=uy, absolute_sigma=uy is not None, maxfev=50000,
+        )
+    except (RuntimeError, ValueError, FloatingPointError) as exc:
+        raise ValueError(f"Gaussian line fit failed: {exc}") from exc
+    if not np.all(np.isfinite(popt)) or popt[0] <= 0 or popt[2] <= 0:
+        raise ValueError("Gaussian line fit returned non-physical or non-finite parameters")
+    # A center pinned to the fit-window boundary usually indicates a truncated
+    # feature or a failed identification, not a trustworthy line-width estimate.
+    edge_tolerance = max(spacing * 0.51, np.finfo(float).eps * max(abs(x[0]), abs(x[-1])))
+    if min(popt[1] - x[0], x[-1] - popt[1]) <= edge_tolerance:
+        raise ValueError("fitted line center is at the wavelength-window boundary; provide a wider spectral window")
+    if popt[2] >= 0.45 * (x[-1] - x[0]):
+        raise ValueError("fitted line is too broad for the selected wavelength window")
     fitted = gaussian(x, *popt)
     residual = y - fitted
     sigma_nm = float(popt[2])
