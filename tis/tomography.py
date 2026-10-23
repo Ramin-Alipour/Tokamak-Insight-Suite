@@ -114,11 +114,12 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     candidates=np.logspace(-8,2,31) if lambdas is None else np.asarray(lambdas,float).ravel()
     if len(candidates)<3 or not np.all(np.isfinite(candidates)) or np.any(candidates<=0) or np.any(np.diff(candidates)<=0):
         raise ValueError("Provide at least three finite, positive, strictly increasing candidate lambdas.")
-    residuals=[]; norms=[]
+    residuals=[]; norms=[]; solution_norms=[]
     for value in candidates:
         result=regularized_tomography(A,y,float(value),nonnegative,measurement_sigma)
         residuals.append(max(result['weighted_residual_norm'],np.finfo(float).tiny))
         norms.append(max(float(result['regularization_operator_norm']),np.finfo(float).tiny))
+        solution_norms.append(float(np.linalg.norm(result['solution'])))
     lx=np.log(residuals); ly=np.log(norms); lt=np.log(candidates)
     dx=np.gradient(lx,lt); dy=np.gradient(ly,lt)
     ddx=np.gradient(dx,lt); ddy=np.gradient(dy,lt)
@@ -127,7 +128,7 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     selected=int(interior[np.argmax(curvature[interior])])
     return {'selected_lambda':float(candidates[selected]),'candidate_lambdas':candidates,
             'weighted_residual_norms':np.asarray(residuals),
-            'regularization_norms':np.asarray(norms),'solution_norms':np.asarray(norms),
+            'regularization_norms':np.asarray(norms),'solution_norms':np.asarray(solution_norms),
             'discrete_log_lcurve_curvature':curvature,
             'selection_method':'maximum discrete curvature of log-weighted-residual vs log-regularization-norm L-curve',
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
