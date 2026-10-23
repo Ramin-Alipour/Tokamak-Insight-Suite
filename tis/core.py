@@ -102,7 +102,18 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("The imported table is empty.")
     if len(frame)>max_rows:
         raise ValueError(f"Table exceeds the configured {max_rows:,}-row import limit.")
-    frame.columns = [str(col).strip() or f"column_{i}" for i, col in enumerate(frame.columns)]
+    normalized_columns = []
+    used_columns = set()
+    for i, column in enumerate(frame.columns):
+        base = str(column).strip() or f"column_{i}"
+        name = base
+        suffix = 1
+        while name in used_columns:
+            name = f"{base}.{suffix}"
+            suffix += 1
+        normalized_columns.append(name)
+        used_columns.add(name)
+    frame.columns = normalized_columns
     # Recover mostly numeric instrument columns containing a unit row or a few
     # malformed cells. Those cells become NaN and remain visible to QC.
     for col in frame.columns:
