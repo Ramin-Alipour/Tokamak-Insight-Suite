@@ -167,7 +167,17 @@ def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
         for lo,hi in zip(edges[:-1],edges[1:]):
             if hi>lo:
                 segment=yy[lo:hi]
-                keep.extend((lo+int(np.argmin(segment)),lo+int(np.argmax(segment))))
+                finite_idx=np.flatnonzero(np.isfinite(segment))
+                if finite_idx.size:
+                    finite_values=segment[finite_idx]
+                    keep.extend((
+                        lo+int(finite_idx[int(np.argmin(finite_values))]),
+                        lo+int(finite_idx[int(np.argmax(finite_values))]),
+                    ))
+                else:
+                    # Preserve an all-invalid bucket as a gap rather than
+                    # allowing NaNs to mask extrema in neighbouring buckets.
+                    keep.append(lo)
         idx=np.asarray(sorted(set(keep)),dtype=int)
         xx,yy=xx[idx],yy[idx]
     fig=Figure(figsize=(9,3.3)); ax=fig.subplots(); ax.plot(xx,yy,lw=1.0)
