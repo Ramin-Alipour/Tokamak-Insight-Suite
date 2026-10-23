@@ -7,6 +7,8 @@ from scipy.special import voigt_profile
 
 def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | None = None, model: str = 'Gaussian', sigma_y: Any | None = None) -> dict[str, float | str]:
     xx, yy = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
+    if len(xx) != len(yy):
+        raise ValueError("Spectral coordinates and intensity values must have equal lengths.")
     if (xmin is not None and not np.isfinite(xmin)) or (xmax is not None and not np.isfinite(xmax)):
         raise ValueError("Fit limits must be finite when supplied.")
     if xmin is not None and xmax is not None and xmin >= xmax:
