@@ -30,10 +30,21 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
     # with integer multiples of a common clock tick.
     max_ratio = float(np.max(intervals) / dt)
     cv = float(np.std(intervals) / dt)
-    tick = float(np.min(intervals))
+    # Estimate the timestamp clock quantum from the smallest positive
+    # separation between distinct intervals. Using min(intervals) as the tick
+    # fails for a 400 kHz signal timestamped at 1 us resolution: intervals
+    # alternate between 2 and 3 us, while the actual clock quantum is 1 us.
+    unique_intervals = np.unique(intervals)
+    differences = np.diff(unique_intervals)
+    positive_differences = differences[differences > 0]
+    tick = float(np.min(positive_differences)) if positive_differences.size else float(np.min(intervals))
     tick_ratios = intervals / tick
     quantized_ticks = np.all(np.abs(tick_ratios - np.rint(tick_ratios)) <= 0.05)
-    quantized_adjacent = quantized_ticks and max_ratio <= 1.5 and np.max(tick_ratios) - np.min(tick_ratios) <= 1.0 + 1e-9
+    quantized_adjacent = (
+        quantized_ticks
+        and max_ratio <= 1.5
+        and float(np.max(tick_ratios) - np.min(tick_ratios)) <= 1.0 + 1e-9
+    )
     if max_ratio > 1.5 or (cv > 0.02 and not quantized_adjacent):
         raise ValueError("Event detection requires approximately uniform sampling; resample irregular timestamps and handle missing samples explicitly first.")
     return t, y, dt
