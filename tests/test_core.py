@@ -76,6 +76,11 @@ def test_welch_psd_shape():
     assert len(f)==len(p)>2 and np.all(p>=0)
 
 
+def test_cross_analysis_rejects_segments_too_short_for_coherence():
+    with pytest.raises(ValueError, match="at least 8 samples"):
+        cross_analysis(np.arange(64.0), np.arange(64.0), fs=1000.0, nperseg=1)
+
+
 def test_cross_analysis_coherence_bounds():
     rng=np.random.default_rng(2);x=rng.normal(size=512);y=x+.05*rng.normal(size=512)
     z=cross_analysis(x,y,1000)
