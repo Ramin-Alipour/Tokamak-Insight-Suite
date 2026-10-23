@@ -9,7 +9,9 @@ from tis.core import (
     linear_phase_density, load_table, sha256_bytes, langmuir_iv_analysis, mode_number_from_phase, spectrum_moments,
     reflectometry_cutoff_density, electron_cyclotron_resonance_field,
     axisymmetric_radiated_power, equilibrium_grid_derivatives,
-    exponential_heat_flux_fit, integrate_time_series, time_frequency_spectrogram, autocorrelation_analysis,
+    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, integrate_time_series,
+    profile_gradient_analysis, grid_from_table, xray_spectrum_summary,
+    time_frequency_spectrogram, autocorrelation_analysis,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
