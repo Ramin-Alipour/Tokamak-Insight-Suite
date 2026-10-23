@@ -147,6 +147,8 @@ def analyze_mirnov_signal(
     if coil_area_m2 is not None or turns is not None:
         if coil_area_m2 is None or turns is None:
             raise ValueError("coil_area_m2 and turns must be supplied together")
+        if isinstance(coil_area_m2, (bool, np.bool_)):
+            raise ValueError("coil area must be finite and positive")
         try:
             area = float(coil_area_m2)
         except (TypeError, ValueError, OverflowError) as exc:
