@@ -24,7 +24,10 @@ def main() -> int:
         from .plasma import confinement_summary
         res=confinement_summary(ip_A=args.ip_A,bt_T=args.bt_T,r_m=args.r_m,a_m=args.a_m,kappa=args.kappa,ne_line_avg_m3=args.ne_line_avg_m3,p_loss_W=args.p_loss_W,mass_amu=args.mass_amu,stored_energy_J=args.stored_energy_J,delta=args.delta)
         Path(args.output).parent.mkdir(parents=True,exist_ok=True)
-        Path(args.output).write_text(json.dumps(res,indent=2,ensure_ascii=False,default=float)+'\n',encoding='utf-8'); print(f'Wrote {Path(args.output).resolve()}'); return 0
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(res,indent=2,ensure_ascii=False,default=float)+'\n',encoding='utf-8')
+        print(f'Wrote {output_path.resolve()}'); return 0
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
         if args.kind in ('diagnostics','both'):(out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(DIAGNOSTICS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
