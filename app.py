@@ -229,20 +229,29 @@ def _parameter_snapshot():
             except (TypeError,ValueError): continue
     return snapshot
 
+def _record_download_history(name, digest, result_summary, page_name, parameter_snapshot):
+    """Record an analysis export only after the user actually clicks its download button."""
+    history=st.session_state.get("tis_analysis_history",[])
+    if any(h.get("name")==name and h.get("result_sha256")==digest for h in history):
+        return
+    history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
+              "page":page_name,"parameter_snapshot":parameter_snapshot,"result_sha256":digest,
+              "result_summary":result_summary}]+history
+    st.session_state["tis_analysis_history"]=history[:50]
+
 def json_download(label,obj,name):
     safe=_json_safe(obj)
     payload=json.dumps(safe,indent=2,ensure_ascii=False,allow_nan=False).encode()
-    st.download_button(label,payload,name,'application/json')
-    if not any(token in name.lower() for token in ("provenance","registry","formula_registry")):
+    if any(token in name.lower() for token in ("provenance","registry","formula_registry")):
+        st.download_button(label,payload,name,'application/json')
+    else:
         import hashlib
-        history=st.session_state.get("tis_analysis_history",[])
         digest=hashlib.sha256(payload).hexdigest()
-        # Streamlit reruns the script on every widget change; only log a result once.
-        if not any(h.get("name")==name and h.get("result_sha256")==digest for h in history):
-            history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
-                      "page":page,"parameter_snapshot":_parameter_snapshot(),"result_sha256":digest,
-                      "result_summary":_result_summary(obj)}]+history
-            st.session_state["tis_analysis_history"]=history[:50]
+        st.download_button(
+            label,payload,name,'application/json',
+            on_click=_record_download_history,
+            args=(name,digest,_result_summary(obj),page,_parameter_snapshot()),
+        )
 def add_report_section(title, results, fig=None, notes=""):
     """Remember a result (and optional figure) so it appears in the HTML report. Replaces any previous section of the same title."""
     sections=[x for x in st.session_state.get('tis_report_sections',[]) if x['title']!=title]
