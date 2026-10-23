@@ -176,6 +176,10 @@ def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
     if title: ax.set_title(title)
     ax.grid(alpha=.25); fig.tight_layout(); st.pyplot(fig)
 def _json_safe(value):
+    # Pandas nullable scalars and timestamps can appear in imported-data metadata
+    # and analysis results; normalize them before json.dumps().
+    if value is pd.NA or value is pd.NaT: return None
+    if isinstance(value, (pd.Timestamp, datetime)): return value.isoformat()
     if isinstance(value, dict): return {str(k): _json_safe(v) for k,v in value.items()}
     if isinstance(value, (list,tuple)): return [_json_safe(v) for v in value]
     if isinstance(value, np.ndarray): return _json_safe(value.tolist())
