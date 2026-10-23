@@ -14,6 +14,18 @@ from tis.core import (
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
 
+def test_grid_from_table_rejects_nonfinite_or_duplicate_coordinates():
+    duplicate_r = pd.DataFrame(
+        [[0, 1, 2, 3], [1, 4, 5, 6], [2, 7, 8, 9]],
+        columns=["z_m", "1.0", "1.0", "2.0"],
+    )
+    with pytest.raises(ValueError, match="must be unique"):
+        grid_from_table(duplicate_r)
+    nonfinite_z = pd.DataFrame({"z_m": [0.0, np.nan, 2.0], "1.0": [1, 2, 3], "2.0": [4, 5, 6], "3.0": [7, 8, 9]})
+    with pytest.raises(ValueError, match="finite values"):
+        grid_from_table(nonfinite_z)
+
+
 def test_load_table_makes_headers_unique_after_whitespace_normalization():
     frame = load_table(b"time, time\\n0,1\\n1,2\\n", "duplicate_headers.csv")
     assert list(frame.columns) == ["time", "time.1"]
