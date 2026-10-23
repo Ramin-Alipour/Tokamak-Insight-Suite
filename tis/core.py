@@ -829,6 +829,7 @@ def axisymmetric_radiated_power(R_m: Any, Z_m: Any, emissivity_W_m3: Any) -> dic
 def profile_gradient_analysis(coordinate: Any, profile: Any) -> dict[str, Any]:
     """Compute calibrated profile gradients, interpolated half-height width and peak descriptors."""
     x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel()
+    if len(x) != len(y): raise ValueError("Profile coordinates and values must have equal lengths.")
     m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
     if len(x)<5: raise ValueError('At least 5 finite profile points are required.')
     o=np.argsort(x); x,y=x[o],y[o]
