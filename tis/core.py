@@ -43,7 +43,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
         raise ValueError("skiprows must be a nonnegative integer.")
     name = filename.lower()
     if name.endswith((".csv", ".txt")):
-        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header}
+        kwargs = {"decimal": decimal, "skiprows": skiprows, "header": header, "nrows": max_rows + 1}
         if comment is not None:
             kwargs["comment"] = comment
         # Instrument exports are frequently Windows-1252/Latin-1 (e.g. 'Température',
@@ -75,7 +75,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                         raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
             except zipfile.BadZipFile as exc:
                 raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header, decimal=decimal)
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header, decimal=decimal, nrows=max_rows + 1)
     elif name.endswith((".parquet", ".pq")):
         import pyarrow.parquet as pq
         try:
