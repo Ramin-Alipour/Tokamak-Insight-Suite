@@ -55,6 +55,9 @@ def fit_thomson_spectrum(
     the fitted Gaussian area is then reported as collected power in W. Absolute
     density still requires a separate calibrated optical geometry/power model.
     """
+    if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
+        raise ValueError("spectral_power_density_calibrated must be boolean")
+
     x = _finite_vector(wavelength_nm, "wavelength_nm")
     y = _finite_vector(signal, "signal")
     if x.size != y.size:
