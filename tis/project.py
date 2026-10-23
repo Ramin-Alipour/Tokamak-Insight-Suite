@@ -123,8 +123,17 @@ class ProjectStore:
             raise ProjectError(f"Cannot read project file {source}") from exc
         if not isinstance(payload, dict):
             raise ProjectError("Project file root must be a JSON object.")
-        if payload.get("schema_version") != PROJECT_SCHEMA_VERSION:
-            raise ProjectError(f"Unsupported project schema version: {payload.get('schema_version')!r}")
+        schema_version = payload.get("schema_version")
+        if isinstance(schema_version, bool) or schema_version != PROJECT_SCHEMA_VERSION:
+            raise ProjectError(f"Unsupported project schema version: {schema_version!r}")
+        if not isinstance(payload.get("title"), str) or not payload["title"].strip():
+            raise ProjectError("Project title must be a nonempty string.")
+        shots = payload.get("shots", [])
+        if not isinstance(shots, list) or any(not isinstance(shot, dict) for shot in shots):
+            raise ProjectError("Project shots must be a JSON array of objects.")
+        metadata = payload.get("metadata", {})
+        if not isinstance(metadata, dict):
+            raise ProjectError("Project metadata must be a JSON object.")
         expected = payload.pop("content_sha256", None)
         if not expected or stable_digest(payload) != expected:
             raise ProjectError("Project integrity check failed (SHA-256 mismatch)")
