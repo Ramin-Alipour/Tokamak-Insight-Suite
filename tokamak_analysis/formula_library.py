@@ -222,6 +222,13 @@ def magnetic_energy_density(magnetic_field_T, *, sigma_magnetic_field_T=None):
     out = {"magnetic_energy_density_J_m3": value}
     if sigma_magnetic_field_T is not None:
         sB = _nonnegative("sigma_magnetic_field_T", sigma_magnetic_field_T)
+        # First-order propagation through B^2/(2 mu_0) has zero derivative at B=0.
+        # Returning a zero uncertainty there would be misleading when sigma_B > 0.
+        if B == 0.0 and sB > 0.0:
+            raise ValueError(
+                "First-order magnetic-energy uncertainty is undefined at B=0 with non-zero "
+                "field uncertainty; use a distribution-aware uncertainty model."
+            )
         out["uncertainty_magnetic_energy_density_J_m3"] = abs(B) * sB / MU0
     return out
 
@@ -271,6 +278,8 @@ def safety_factor_large_aspect_ratio(r_m, major_radius_m, toroidal_field_T, polo
 def faraday_induction(flux_derivative_Wb_s, turns, *, sigma_flux_derivative_Wb_s=None):
     """Coil voltage from Faraday's law: V = -N dPhi/dt; derivative in Wb s^-1."""
     derivative = _finite("flux_derivative_Wb_s", flux_derivative_Wb_s)
+    if isinstance(turns, (bool, np.bool_)):
+        raise ValueError("turns must be a positive integer, not a boolean.")
     n_float = _positive("turns", turns)
     if not n_float.is_integer():
         raise ValueError("turns must be a positive integer.")
@@ -375,10 +384,18 @@ def electron_plasma_angular_frequency(density_m3, *, sigma_density_m3=None):
 def ion_saturation_particle_flux_proxy(saturation_current_A, effective_area_m2, *,
                                        sigma_saturation_current_A=None, sigma_effective_area_m2=None):
     """Magnitude-based ion particle-flux proxy |I_sat|/(e A_eff), requiring a valid collection model."""
-    current = abs(_finite("saturation_current_A", saturation_current_A))
+    raw_current = _finite("saturation_current_A", saturation_current_A)
+    current = abs(raw_current)
     area = _positive("effective_area_m2", effective_area_m2)
     if (sigma_saturation_current_A is None) != (sigma_effective_area_m2 is None):
         raise ValueError("Provide both current and area uncertainties, or neither.")
+    if sigma_saturation_current_A is not None and raw_current == 0.0 and _nonnegative(
+        "sigma_saturation_current_A", sigma_saturation_current_A
+    ) > 0.0:
+        raise ValueError(
+            "First-order uncertainty propagation through absolute current is undefined at zero "
+            "current with non-zero uncertainty; use a distribution-aware uncertainty model."
+        )
     value = current / (E_CHARGE * area)
     out = {"ion_saturation_particle_flux_m2_s": value}
     if sigma_saturation_current_A is not None:
@@ -548,6 +565,8 @@ def magnitude_squared_coherence(signal_x, signal_y, sampling_frequency_Hz, *, np
     fs = _positive("sampling_frequency_Hz", sampling_frequency_Hz)
     if x.ndim != 1 or y.shape != x.shape or x.size < 8 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
         raise ValueError("signals must be matching finite 1-D arrays with at least eight samples.")
+    if np.ptp(x) == 0.0 or np.ptp(y) == 0.0:
+        raise ValueError("Coherence is undefined when either input signal is constant.")
     if nperseg is None:
         segment = min(256, x.size)
     else:
@@ -558,6 +577,10 @@ def magnitude_squared_coherence(signal_x, signal_y, sampling_frequency_Hz, *, np
     if segment < 2 or segment > x.size:
         raise ValueError("nperseg must be between 2 and the signal length.")
     frequencies, values = coherence(x, y, fs=fs, nperseg=segment)
+    if not np.all(np.isfinite(values)):
+        raise ValueError("Coherence estimator returned non-finite values; check signal power and numerical conditioning.")
+    # The estimator is mathematically bounded by [0, 1]; clip only floating-point roundoff.
+    values = np.clip(values, 0.0, 1.0)
     return {"coherence_frequency_Hz": frequencies.tolist(),
             "magnitude_squared_coherence": values.tolist(),
             "nperseg": segment,
