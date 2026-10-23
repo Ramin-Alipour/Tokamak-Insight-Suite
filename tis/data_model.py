@@ -58,12 +58,23 @@ class Measurement:
             not isinstance(flag, str) or not flag.strip() for flag in self.quality_flags
         ):
             raise MeasurementError("quality_flags must be a sequence of non-empty strings")
-        if self.status not in {"valid", "warning", "invalid", "missing", "unvalidated"}:
+        if not isinstance(self.status, str) or self.status not in {
+            "valid", "warning", "invalid", "missing", "unvalidated"
+        }:
             raise MeasurementError(f"Unsupported measurement status: {self.status!r}")
         if self.status != "valid" and (
             not isinstance(self.invalid_reason, str) or not self.invalid_reason.strip()
         ):
             raise MeasurementError("non-valid measurements must state invalid_reason")
+
+        if self.sample_rate_hz is not None:
+            try:
+                rate = float(self.sample_rate_hz)
+            except (TypeError, ValueError) as exc:
+                raise MeasurementError("sample_rate_hz must be finite and positive") from exc
+            if isinstance(self.sample_rate_hz, (bool, np.bool_)) or not np.isfinite(rate) or rate <= 0:
+                raise MeasurementError("sample_rate_hz must be finite and positive")
+            self.sample_rate_hz = rate
 
         try:
             self.values = np.asarray(self.values, dtype=float)
@@ -103,7 +114,7 @@ class Measurement:
                 raise MeasurementError("location_m must contain only finite coordinates")
             if self.location_m.ndim > 2:
                 raise MeasurementError("location_m must be a coordinate vector or 2-D coordinate array")
-        if self.location_m is not None and self.coordinate_system is not None:
+        if self.coordinate_system is not None:
             if not isinstance(self.coordinate_system, str) or not self.coordinate_system.strip():
                 raise MeasurementError("coordinate_system must be a non-empty string when supplied")
 
@@ -116,11 +127,6 @@ class Measurement:
                 raise MeasurementError("uncertainty must be scalar or match values shape")
             if not np.all(np.isfinite(self.uncertainty)) or np.any(self.uncertainty < 0):
                 raise MeasurementError("uncertainty must be finite and non-negative")
-
-        if self.sample_rate_hz is not None:
-            if (isinstance(self.sample_rate_hz, (bool, np.bool_))
-                    or not np.isfinite(self.sample_rate_hz) or self.sample_rate_hz <= 0):
-                raise MeasurementError("sample_rate_hz must be finite and positive")
 
     def to(self, target_unit: str) -> "Measurement":
         """Return a copy converted explicitly to target_unit.
