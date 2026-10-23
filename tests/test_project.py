@@ -112,3 +112,45 @@ def test_project_add_run_rejects_non_analysis_run_objects():
     project = Project(title="valid project")
     with pytest.raises(ProjectError, match="run must be an AnalysisRun"):
         project.add_run({"analysis_name": "not a dataclass"})
+
+
+def test_analysis_run_fingerprint_is_stable_and_sensitive_to_settings():
+    base = dict(
+        analysis_name="Welch PSD", inputs={"signal": "shot.csv"},
+        settings={"window": "hann", "nperseg": 128},
+        algorithm_version="1.2", software_version="0.5.1",
+        environment={"python": "3.12", "numpy": "2.x"},
+        input_hashes={"shot.csv": "a" * 64}, units={"frequency": "Hz"},
+        random_seed=17,
+    )
+    first = AnalysisRun(**base, outputs={"peak_Hz": 10.0})
+    repeat = AnalysisRun(**base, outputs={"peak_Hz": 10.0})
+    changed = AnalysisRun(**{**base, "settings": {"window": "hann", "nperseg": 256}},
+                          outputs={"peak_Hz": 10.0})
+    assert first.reproducibility_fingerprint == repeat.reproducibility_fingerprint
+    assert first.reproducibility_fingerprint != changed.reproducibility_fingerprint
+    assert first.output_digest == repeat.output_digest
+
+
+def test_analysis_run_rejects_malformed_input_hashes_and_seed():
+    with pytest.raises(ProjectError, match="SHA-256"):
+        AnalysisRun("analysis", {}, {}, "1", input_hashes={"source": "not-a-hash"})
+    with pytest.raises(ProjectError, match="random_seed"):
+        AnalysisRun("analysis", {}, {}, "1", random_seed=-1)
+
+
+def test_analysis_run_reproducibility_metadata_roundtrips(tmp_path):
+    run = AnalysisRun(
+        "FFT", {"source": "trace.csv"}, {"window": "hann"}, "fft-v2",
+        software_version="0.5.1", environment={"python": "3.12"},
+        input_hashes={"trace.csv": "b" * 64}, random_seed=123,
+    )
+    project = Project(title="reproducibility metadata")
+    project.add_run(run)
+    restored = ProjectStore.load(ProjectStore.save(project, tmp_path / "repro.json"))
+    loaded = restored.analysis_runs[0]
+    assert loaded.software_version == "0.5.1"
+    assert loaded.environment == {"python": "3.12"}
+    assert loaded.input_hashes == {"trace.csv": "b" * 64}
+    assert loaded.random_seed == 123
+    assert loaded.reproducibility_fingerprint == run.reproducibility_fingerprint
