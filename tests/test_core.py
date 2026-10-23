@@ -14,6 +14,7 @@ from tis.core import (
     time_frequency_spectrogram, autocorrelation_analysis,
 )
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.signals import hampel_despike
 
 
 def test_profile_gradient_rejects_mismatched_coordinate_and_profile_lengths():
@@ -49,6 +50,13 @@ def test_load_table_makes_headers_unique_after_whitespace_normalization():
     assert frame["time"].tolist() == [0, 1]
     assert frame["time.1"].tolist() == [1, 2]
 
+
+def test_hampel_despike_requires_integer_odd_window():
+    for window in (3.5, 4.0, True, np.bool_(True)):
+        with pytest.raises(ValueError, match="odd integer"):
+            hampel_despike(np.arange(11, dtype=float), window=window)
+    result = hampel_despike(np.arange(11, dtype=float), window=np.int64(3))
+    assert result["n_replaced"] == 0
 
 def test_linear_calibration():
     np.testing.assert_allclose(linear_calibration([0,1,2],2,1),[1,3,5])
