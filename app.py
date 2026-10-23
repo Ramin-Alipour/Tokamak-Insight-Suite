@@ -71,6 +71,9 @@ with st.sidebar:
         import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
         import_encoding=st.selectbox("Text encoding",["Auto (UTF-8 → Windows-1252 → Latin-1)","utf-8","cp1252","latin-1","utf-16"],index=0,key="import_encoding")
         import_drop_units=st.checkbox("Drop first data row if it contains units (e.g. V / s)",value=False,key="import_drop_units")
+    if upload is None and st.session_state.get("tis_active_source") == "upload":
+        # The uploader was cleared; do not keep silently analysing the previous upload.
+        _clear_loaded_data()
     if upload is not None:
         try:
             upload_identity=f"{getattr(upload,'file_id',upload.name)}:{upload.name}:{upload.size}"
