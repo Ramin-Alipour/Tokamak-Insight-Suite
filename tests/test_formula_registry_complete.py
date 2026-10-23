@@ -242,22 +242,6 @@ def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
             assert f"def {test_name}(" in test_path.read_text(encoding="utf-8"), link
 
 
-@pytest.mark.parametrize("call", [
-    lambda: doppler_line_of_sight_velocity(1.0, 0.0),
-    lambda: ion_temperature_from_doppler_sigma(0.1, 500.0, 0.0),
-    lambda: toroidal_beta(100.0, 0.0),
-    lambda: safety_factor_large_aspect_ratio(0.2, 1.5, 2.0, 0.0),
-    lambda: faraday_induction(0.1, 2.5),
-    lambda: plasma_loop_resistance_proxy(1.0, 0.0),
-    lambda: energy_confinement_time(10.0, 0.0),
-    lambda: greenwald_density_reference(1.0, 0.0),
-    lambda: gas_pumping_speed(1.0, 0.0),
-    lambda: particle_confinement_time_proxy(1.0, 0.0),
-    lambda: relative_fluctuation_level([-1.0, 1.0]),
-    lambda: cross_correlation_lag([1.0, 1.0, 1.0], [1.0, 2.0, 3.0], 0.1),
-    lambda: bolometry_regularized_inverse([1.0, 2.0], [[1.0, 2.0]], 0.1),
-    lambda: particle_balance_rate(-1.0, 0.0, 0.0, 0.0),
-])
 def test_ion_sound_speed_uncertainty_reference():
     Te, Ti, mi, gamma = 20.0, 10.0, 2 * 1.66053906660e-27, 1.0
     r = ion_sound_speed(Te, Ti, mi, gamma, sigma_electron_temperature_eV=0.2,

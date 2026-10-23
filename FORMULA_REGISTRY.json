@@ -44,10 +44,10 @@
   },
   {
     "name": "Debye length",
-    "equation": "λ_D = sqrt(ε₀ k_B T_e/(n_e e²))",
-    "inputs": "T_e [K] or convert eV using k_B T=e T_e[eV]; n_e [m^-3]",
+    "equation": "λ_D = sqrt(ε₀ e T_e[eV]/(n_e e²))",
+    "inputs": "T_e [eV], n_e [m^-3]",
     "output": "m",
-    "assumptions": "Quasi-equilibrium Maxwellian electron approximation.",
+    "assumptions": "Quasi-equilibrium Maxwellian electron approximation; temperature input is in eV.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -165,7 +165,7 @@
           "name": "gamma_i",
           "unit": "1",
           "description": "Non-negative model closure coefficient; defaults to 1.0.",
-          "required": true
+          "required": false
         },
         {
           "name": "sigma_electron_temperature_eV",
