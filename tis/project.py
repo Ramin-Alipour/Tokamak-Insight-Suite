@@ -129,4 +129,7 @@ class ProjectStore:
         if not expected or stable_digest(payload) != expected:
             raise ProjectError("Project integrity check failed (SHA-256 mismatch)")
         runs = [AnalysisRun(**item) for item in payload.pop("analysis_runs", [])]
+        run_ids = [run.run_id for run in runs]
+        if len(run_ids) != len(set(run_ids)):
+            raise ProjectError("Project contains duplicate analysis run IDs.")
         return Project(analysis_runs=runs, **payload)
