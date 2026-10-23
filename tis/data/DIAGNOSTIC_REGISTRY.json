@@ -1,0 +1,2461 @@
+[
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Thomson scattering",
+    "quantities": "n_e, T_e profiles; electron distribution constraints",
+    "status": "M→D/I",
+    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
+    "caveat": "The raw-spectrum fit is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. It does not infer density from spectral amplitude; calibrated profile and single-band power density workflows remain separate.",
+    "implementation_functions": [
+      "thomson_workflow.analyze_thomson_profile",
+      "thomson_scattering.density_from_thomson_scattered_power",
+      "thomson_spectrum.fit_thomson_spectrum"
+    ],
+    "implementation_status": "Implemented calibrated-profile workflow plus scoped raw-spectrum electron-temperature fit; overall analysis remains incomplete",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "analysis_pipeline",
+      "completeness": "incomplete",
+      "input_specs": [
+        {
+          "name": "radius_m",
+          "unit": "m",
+          "description": "Unique radial coordinate of calibrated Thomson-scattering profile samples.",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Calibrated electron-density profile; same length and order as radius_m.",
+          "required": true,
+          "minimum": 0
+        },
+        {
+          "name": "temperature_ev",
+          "unit": "eV",
+          "description": "Calibrated electron-temperature profile; same length and order as radius_m.",
+          "required": true,
+          "minimum": 0
+        },
+        {
+          "name": "density_uncertainty_m3",
+          "unit": "m^-3",
+          "description": "Optional pointwise 1-sigma density uncertainty; non-negative.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "temperature_uncertainty_ev",
+          "unit": "eV",
+          "description": "Optional pointwise 1-sigma temperature uncertainty; non-negative.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "major_radius_m",
+          "unit": "m",
+          "description": "Optional positive major radius; enables approximate circular large-aspect-ratio volume-weighted averages.",
+          "required": false,
+          "minimum": 1e-15
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "density_gradient_m-4",
+          "unit": "m^-4",
+          "description": "Numerical radial derivative of electron density."
+        },
+        {
+          "name": "temperature_gradient_eV_m-1",
+          "unit": "eV m^-1",
+          "description": "Numerical radial derivative of electron temperature."
+        },
+        {
+          "name": "density_scale_length_m",
+          "unit": "m",
+          "description": "Local -n_e/(dn_e/dr); undefined values are NaN."
+        },
+        {
+          "name": "temperature_scale_length_m",
+          "unit": "m",
+          "description": "Local -T_e/(dT_e/dr); undefined values are NaN."
+        },
+        {
+          "name": "summary",
+          "unit": "structured",
+          "description": "Peak locations, line averages, and optional approximate volume averages."
+        },
+        {
+          "name": "density_gradient_uncertainty_m-4",
+          "unit": "m^-4",
+          "description": "First-order uncertainty of the numerical density gradient from independent pointwise density uncertainties."
+        },
+        {
+          "name": "temperature_gradient_uncertainty_eV_m-1",
+          "unit": "eV m^-1",
+          "description": "First-order uncertainty of the numerical temperature gradient from independent pointwise temperature uncertainties."
+        },
+        {
+          "name": "density_scale_length_uncertainty_m",
+          "unit": "m",
+          "description": "First-order uncertainty of local density scale length; NaN where the scale length is undefined."
+        },
+        {
+          "name": "temperature_scale_length_uncertainty_m",
+          "unit": "m",
+          "description": "First-order uncertainty of local temperature scale length; NaN where the scale length is undefined."
+        },
+        {
+          "name": "density_normalized_gradient_uncertainty_m-1",
+          "unit": "m^-1",
+          "description": "First-order uncertainty of the normalized density gradient under independent pointwise measurement errors."
+        },
+        {
+          "name": "temperature_normalized_gradient_uncertainty_m-1",
+          "unit": "m^-1",
+          "description": "First-order uncertainty of the normalized temperature gradient under independent pointwise measurement errors."
+        }
+      ],
+      "assumptions": [
+        "Inputs are calibrated radial profiles, not raw detector counts or uncalibrated spectra.",
+        "Radius is a one-dimensional unique coordinate in metres; samples are sorted internally.",
+        "Volume averages use circular, large-aspect-ratio weighting proportional to minor radius and are not equilibrium reconstruction."
+      ],
+      "preprocessing": [
+        "Validate finite values, matching lengths, unique radii, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
+      ],
+      "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated.",
+      "uncertainty_model": "Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width. Optional independent uncertainties for calibrated scattered-power density are propagated to first order. Profile pointwise uncertainties are propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples; peak-location uncertainty is not estimated.",
+      "limitations": [
+        "Power-based density helper requires calibrated collected power, laser power, interaction length, scattering geometry, collection solid angle and optical efficiency.",
+        "Single-band power relation neglects spectral-response integration, stray-light subtraction and relativistic spectral-shape effects.",
+        "Numerical gradients can amplify measurement noise; use appropriate smoothing only with a justified noise model.",
+        "Raw-spectrum fit uses a Gaussian non-relativistic Maxwellian approximation and requires a known Gaussian instrumental width.",
+        "Raw-spectrum fit does not infer density from fitted amplitude; absolute density requires a separately calibrated power/throughput model.",
+        "Scattered-power density uncertainty propagation assumes independent input uncertainties and excludes covariance and model/calibration discrepancy.",
+        "Profile uncertainty propagation assumes independent pointwise errors and excludes covariance, calibration uncertainty, and model discrepancy."
+      ],
+      "function_links": [
+        "thomson_workflow.analyze_thomson_profile",
+        "thomson_scattering.density_from_thomson_scattered_power",
+        "thomson_spectrum.fit_thomson_spectrum"
+      ],
+      "raw_data_to_physics": true,
+      "note": "Overall analysis remains incomplete until the declared workflows and automated tests are confirmed end-to-end. Direct density inference from uncalibrated spectral amplitude and more general collective, relativistic, or non-Maxwellian spectral models are not implemented.",
+      "workflow_modes": [
+        {
+          "name": "calibrated_profile",
+          "function": "thomson_workflow.analyze_thomson_profile",
+          "inputs": [
+            "radius_m (m)",
+            "density_m3 (m^-3)",
+            "temperature_ev (eV)"
+          ],
+          "outputs": [
+            "density and temperature profiles",
+            "radial gradients",
+            "normalized gradients",
+            "local scale lengths",
+            "profile summary"
+          ],
+          "scope": "Processes already calibrated profile values; does not invert detector counts."
+        },
+        {
+          "name": "raw_spectrum_temperature_fit",
+          "function": "thomson_spectrum.fit_thomson_spectrum",
+          "inputs": [
+            "wavelength_nm (nm)",
+            "signal (detector units)",
+            "laser_wavelength_nm (nm)",
+            "scattering_angle_rad (rad)",
+            "instrument_sigma_nm (nm)",
+            "signal_uncertainty (optional, detector units)"
+          ],
+          "outputs": [
+            "electron_temperature_eV (eV)",
+            "electron_temperature_uncertainty_eV (eV)",
+            "fitted spectrum",
+            "residual",
+            "fit quality metrics",
+            "optional integrated_scattered_power_W and fit uncertainty when signal is calibrated in W/nm"
+          ],
+          "scope": "Non-collective, non-relativistic Maxwellian Gaussian approximation, known Gaussian instrument response, and linear background. Optional integrated power is only reported for an explicitly calibrated W/nm signal; density requires the separate calibrated-power relation."
+        },
+        {
+          "name": "calibrated_power_density",
+          "function": "thomson_scattering.density_from_thomson_scattered_power",
+          "inputs": [
+            "scattered_power_W (W)",
+            "incident_power_W (W)",
+            "interaction_length_m (m)",
+            "scattering_angle_rad (rad)",
+            "collection_solid_angle_sr (sr)",
+            "optical_efficiency (dimensionless)",
+            "optional independent 1-sigma input uncertainties"
+          ],
+          "outputs": [
+            "electron_density_m3 (m^-3)",
+            "optional electron_density_uncertainty_m3 (m^-3)",
+            "model_scattered_power_W"
+          ],
+          "scope": "Single-band calibrated-power relation; first-order uncertainty propagation assumes independent inputs and excludes model/calibration discrepancy."
+        }
+      ]
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Langmuir probe",
+    "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
+    "status": "M→D/I",
+    "method": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
+    "caveat": "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter.",
+    "implementation_functions": [
+      "langmuir_iv_analysis",
+      "probe_iv_summary"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."
+      ],
+      "function_links": [
+        "langmuir_iv_analysis",
+        "probe_iv_summary"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Electron cyclotron emission (ECE)",
+    "quantities": "T_e profile and fluctuations",
+    "status": "M→D/I",
+    "method": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
+    "caveat": "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Map frequency to resonance location and fit radiance using radiative transfer assumptions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Optical thickness, harmonics, relativistic shifts, mode and non-thermal populations can invalidate simple mapping."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Charge-exchange recombination spectroscopy (CXRS)",
+    "quantities": "T_i, toroidal/poloidal rotation, impurity density constraints",
+    "status": "M→D/I",
+    "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
+    "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutral-beam overlap, background, instrument function and atomic data are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Ion temperature from Doppler spectroscopy",
+    "quantities": "T_i from corrected Gaussian thermal width",
+    "status": "M→D/I",
+    "method": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
+    "caveat": "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i.",
+    "implementation_functions": [
+      "fit_spectral_line",
+      "doppler_temperature_with_uncertainty_eV"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."
+      ],
+      "function_links": [
+        "fit_spectral_line",
+        "doppler_temperature_with_uncertainty_eV"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Molecular spectroscopy",
+    "quantities": "Rotational/vibrational temperatures; molecular species indicators",
+    "status": "M→D/I",
+    "method": "Fit molecular band structure and compare populations with an appropriate model.",
+    "caveat": "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit molecular band structure and compare populations with an appropriate model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Rotational/vibrational temperatures need not equal plasma ion/electron temperatures."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Thomson spectral distribution analysis",
+    "quantities": "Electron velocity-distribution constraints",
+    "status": "M→I",
+    "method": "Fit a scattering spectrum using the correct collective/non-collective model.",
+    "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit a scattering spectrum using the correct collective/non-collective model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Toroidal-field coils / magnetic probes",
+    "quantities": "B_t",
+    "status": "M→D",
+    "method": "Apply calibration and geometry-specific field-coil relation.",
+    "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply calibration and geometry-specific field-coil relation.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Current-to-field conversion depends on coil geometry and magnetic materials."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Poloidal-field coils / magnetic probes",
+    "quantities": "B_p; boundary constraints",
+    "status": "M→D/I",
+    "method": "Calibrate field probes and combine with equilibrium reconstruction.",
+    "caveat": "Local fields alone do not determine a full equilibrium.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate field probes and combine with equilibrium reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Local fields alone do not determine a full equilibrium."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Mirnov / pickup coils",
+    "quantities": "dB/dt, MHD spectra, mode frequency, phase",
+    "status": "M→D",
+    "method": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
+    "caveat": "Orientation, bandwidth, transfer function, integration drift and pickup must be checked.",
+    "implementation_functions": [
+      "fft_spectrum",
+      "welch_psd",
+      "mode_number_from_channels",
+      "integrate_time_series"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated transfer function; integrate only if justified; analyze PSD/cross-spectrum/coherence.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Orientation, bandwidth, transfer function, integration drift and pickup must be checked."
+      ],
+      "function_links": [
+        "fft_spectrum",
+        "welch_psd",
+        "mode_number_from_channels",
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Flux loops",
+    "quantities": "Flux change, loop voltage constraints",
+    "status": "M→D",
+    "method": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
+    "caveat": "Integration constants, loop area/orientation and bandwidth matter.",
+    "implementation_functions": [
+      "integrate_time_series"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Integration constants, loop area/orientation and bandwidth matter."
+      ],
+      "function_links": [
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Rogowski coil",
+    "quantities": "Plasma current I_p",
+    "status": "M→D",
+    "method": "Integrate calibrated Rogowski output with documented integrator response.",
+    "caveat": "Offset drift, saturation, bandwidth and calibration are critical.",
+    "implementation_functions": [
+      "integrate_time_series"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated Rogowski output with documented integrator response.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Offset drift, saturation, bandwidth and calibration are critical."
+      ],
+      "function_links": [
+        "integrate_time_series"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)",
+    "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
+    "status": "I",
+    "method": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
+    "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Polarimetry / Faraday rotation",
+    "quantities": "Line-integrated density-weighted B_parallel; rotation angle",
+    "status": "M→D/I",
+    "method": "Invert rotation with wavelength, density and line-of-sight geometry model.",
+    "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Invert rotation with wavelength, density and line-of-sight geometry model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sign conventions, birefringence, geometry and density-field degeneracy must be handled."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Magnetic and equilibrium",
+    "diagnostic": "Magnetic flux / poloidal flux",
+    "quantities": "Φ_B, ψ",
+    "status": "M→D/I",
+    "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
+    "caveat": "Reference surfaces and sign conventions must be recorded.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Reference surfaces and sign conventions must be recorded."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Electrostatic probes",
+    "diagnostic": "Ball-pen probe",
+    "quantities": "Floating-potential proxy; potential fluctuations",
+    "status": "M→D/I",
+    "method": "Use collector-current balance and a configuration-specific correction validated for the probe.",
+    "caveat": "Do not universally equate raw ball-pen voltage with plasma potential.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use collector-current balance and a configuration-specific correction validated for the probe.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not universally equate raw ball-pen voltage with plasma potential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Electrostatic probes",
+    "diagnostic": "Gundestrup / compound directional probe",
+    "quantities": "Ion saturation current, flow direction and components, particle flux",
+    "status": "M→D/I",
+    "method": "Fit angular current response with probe-specific collection/sheath model.",
+    "caveat": "Probe orientation, geometry, bias, collisionality and electrical isolation matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit angular current response with probe-specific collection/sheath model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Probe orientation, geometry, bias, collisionality and electrical isolation matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Electrostatic probes",
+    "diagnostic": "Ion saturation current",
+    "quantities": "I_sat and flux proxy",
+    "status": "M→D/I",
+    "method": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
+    "caveat": "Not a standalone density measurement without assumptions.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Convert current using effective area and a regime-appropriate sheath/ion-current model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Not a standalone density measurement without assumptions."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Electrostatic probes",
+    "diagnostic": "Floating / plasma potential arrays",
+    "quantities": "V_f, relative potential, E×B fluctuation proxies",
+    "status": "M→D/I",
+    "method": "Calibrate channels and derive spatial potential gradients using known geometry.",
+    "caveat": "Potential gradients require spatial calibration and consistent time alignment.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate channels and derive spatial potential gradients using known geometry.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Potential gradients require spatial calibration and consistent time alignment."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Electrostatic probes",
+    "diagnostic": "Probe-derived density fluctuations",
+    "quantities": "ñ_e proxy; correlation length/time",
+    "status": "M→D/I",
+    "method": "Use calibrated probe response and a validated conversion from current/voltage to density.",
+    "caveat": "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated probe response and a validated conversion from current/voltage to density.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Raw current fluctuations also contain temperature, potential, sheath and instrumental contributions."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "Visible / optical emission spectroscopy",
+    "quantities": "Line centroid, width, intensity, species/charge state, flow projection",
+    "status": "M→D/I",
+    "method": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
+    "caveat": "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Wavelength calibrate; fit line profiles; correct instrument response; compare to atomic data.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Blends, Stark/Zeeman broadening, opacity and non-equilibrium populations matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "VUV spectroscopy",
+    "quantities": "Impurity line emission, radiation spectrum, line ratios",
+    "status": "M→D/I",
+    "method": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
+    "caveat": "Detector response and atomic rates are often dominant uncertainties.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply spectral/absolute calibration and atomic collisional-radiative model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector response and atomic rates are often dominant uncertainties."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "X-ray spectroscopy",
+    "quantities": "Photon energy spectrum, line emission, continuum constraints",
+    "status": "M→D/I",
+    "method": "Calibrate energy scale and response; fit lines/continuum using a physics model.",
+    "caveat": "Pile-up, dead time, detector response and continuum assumptions matter.",
+    "implementation_functions": [
+      "xray_spectrum_summary"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate energy scale and response; fit lines/continuum using a physics model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Pile-up, dead time, detector response and continuum assumptions matter."
+      ],
+      "function_links": [
+        "xray_spectrum_summary"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "Charge-exchange spectroscopy",
+    "quantities": "Ion temperature, rotation, impurity population constraints",
+    "status": "M→D/I",
+    "method": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
+    "caveat": "Neutral density and atomic rates can dominate inference.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit calibrated line shape/centroid and apply charge-exchange atomic model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutral density and atomic rates can dominate inference."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "Hydrogen Balmer / Balmer-alpha spectroscopy",
+    "quantities": "Line intensity, particle-recycling and edge-emission proxies",
+    "status": "M→D/I",
+    "method": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
+    "caveat": "Line intensity is not a direct particle flux without a collisional-radiative model.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Integrate calibrated line after background subtraction; interpret with excitation/recombination model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line intensity is not a direct particle flux without a collisional-radiative model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "Spectral wavelength calibration",
+    "quantities": "Wavelength axis and line-centroid accuracy",
+    "status": "D",
+    "method": "Fit known reference lines using a documented calibration function and residuals.",
+    "caveat": "Calibration range, polynomial order and time drift must be assessed.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit known reference lines using a documented calibration function and residuals.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration range, polynomial order and time drift must be assessed."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Spectroscopy",
+    "diagnostic": "Instrumental line-shape characterization",
+    "quantities": "Instrument width and response function",
+    "status": "M→D",
+    "method": "Measure a narrow reference line or use a validated instrument function.",
+    "caveat": "Do not subtract widths without a compatible convolution model.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Measure a narrow reference line or use a validated instrument function.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not subtract widths without a compatible convolution model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Density and refractive diagnostics",
+    "diagnostic": "Laser / microwave interferometry",
+    "quantities": "Line-integrated electron density N_e",
+    "status": "M→D",
+    "method": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
+    "caveat": "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Convert calibrated phase shift to line-integrated density using frequency and propagation model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Fringe jumps, vibrations, cutoffs, refraction, path geometry and phase convention matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Density and refractive diagnostics",
+    "diagnostic": "Microwave reflectometry",
+    "quantities": "Cutoff layer, density profile/fluctuations, group delay",
+    "status": "M→D/I",
+    "method": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
+    "caveat": "Mode identification, ray/beam effects and equilibrium assumptions are essential.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Interpret phase and delay with frequency sweep, propagation and cutoff model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Mode identification, ray/beam effects and equilibrium assumptions are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Density and refractive diagnostics",
+    "diagnostic": "Collective Thomson / coherent scattering (CTS)",
+    "quantities": "Ion/electron fluctuation spectrum and fast-ion constraints",
+    "status": "M→I",
+    "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
+    "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit scattered spectrum using scattering geometry and plasma response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires wave-vector geometry, calibration and plasma response model."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Density and refractive diagnostics",
+    "diagnostic": "Refractive-index / ray-tracing diagnostics",
+    "quantities": "Ray bending, propagation delay and density constraints",
+    "status": "M→I",
+    "method": "Solve propagation through a spatially varying refractive index.",
+    "caveat": "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve propagation through a spatially varying refractive index.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Requires profile assumptions and ray/beam model; ray tracing can fail near cutoffs."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Bolometry",
+    "quantities": "Line-integrated radiated power; emissivity reconstruction",
+    "status": "M→D/I",
+    "method": "Calibrate detector channels and solve a regularized geometry-matrix inverse problem.",
+    "caveat": "Tomography is ill-posed; report regularization, coverage and uncertainty.",
+    "implementation_functions": [
+      "regularized_tomography",
+      "build_tomography_matrix_2d",
+      "abel_reconstruction"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate detector channels and solve a regularized geometry-matrix inverse problem.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Tomography is ill-posed; report regularization, coverage and uncertainty."
+      ],
+      "function_links": [
+        "regularized_tomography",
+        "build_tomography_matrix_2d",
+        "abel_reconstruction"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Fast bolometry",
+    "quantities": "Time-resolved radiated-power fluctuations and transients",
+    "status": "M→D",
+    "method": "Calibrate bandwidth/response and analyze time series consistently.",
+    "caveat": "Detector response and channel synchronization limit transient interpretation.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate bandwidth/response and analyze time series consistently.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector response and channel synchronization limit transient interpretation."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Soft X-ray arrays",
+    "quantities": "Line-integrated emissivity, sawteeth, MHD and impurity-radiation proxies",
+    "status": "M→D/I",
+    "method": "Calibrate channels and combine with geometry/model for reconstruction.",
+    "caveat": "Signals depend on spectral response, impurity mix and detector sightlines.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate channels and combine with geometry/model for reconstruction.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Signals depend on spectral response, impurity mix and detector sightlines."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Hard X-ray detector",
+    "quantities": "Photon counts/rate and energy spectrum; runaway-electron proxies",
+    "status": "M→D/I",
+    "method": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
+    "caveat": "Counts are not direct runaway current or electron energy without transport/response models.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Correct dead time/pile-up and apply detector-response unfolding if justified.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Counts are not direct runaway current or electron energy without transport/response models."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Visible imaging",
+    "quantities": "Plasma boundary, strike-point/feature position, light fluctuations",
+    "status": "M→D/I",
+    "method": "Apply geometric calibration and image segmentation/tracking.",
+    "caveat": "Line integration, brightness thresholds and viewing geometry affect interpretation.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply geometric calibration and image segmentation/tracking.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line integration, brightness thresholds and viewing geometry affect interpretation."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Fast visible imaging",
+    "quantities": "Transient structures, apparent propagation speed, event timing",
+    "status": "M→D",
+    "method": "Track calibrated image features across synchronized frames.",
+    "caveat": "Apparent velocity is line-of-sight projected and affected by exposure/time resolution.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Track calibrated image features across synchronized frames.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Apparent velocity is line-of-sight projected and affected by exposure/time resolution."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "IR thermography",
+    "quantities": "Surface radiance, surface temperature and heat-flux inference",
+    "status": "M→D/I",
+    "method": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
+    "caveat": "Emissivity, reflections, viewing angle and thermal properties are critical.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply radiometric calibration, emissivity/reflection correction and heat-transfer inversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Emissivity, reflections, viewing angle and thermal properties are critical."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Radiation and imaging",
+    "diagnostic": "Bolometric tomography",
+    "quantities": "Spatial radiation emissivity",
+    "status": "I",
+    "method": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
+    "caveat": "Geometry matrix, regularization and uncertainty must be saved with output.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve y = A x + ε with non-negativity/regularization as appropriate.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Geometry matrix, regularization and uncertainty must be saved with output."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Neutron and nuclear",
+    "diagnostic": "Neutron yield monitor",
+    "quantities": "Neutron count rate and fusion-yield proxy",
+    "status": "M→D/I",
+    "method": "Apply efficiency, dead-time, geometry and background corrections.",
+    "caveat": "Neutron scattering and source anisotropy can affect absolute yield.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply efficiency, dead-time, geometry and background corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Neutron scattering and source anisotropy can affect absolute yield."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Neutron and nuclear",
+    "diagnostic": "Neutron spectrometry",
+    "quantities": "Neutron energy spectrum; ion-temperature constraints",
+    "status": "M→D/I",
+    "method": "Unfold detector response or fit spectrum with a forward model.",
+    "caveat": "Unfolding is ill-conditioned and must include response and uncertainty.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Unfold detector response or fit spectrum with a forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Unfolding is ill-conditioned and must include response and uncertainty."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Neutron and nuclear",
+    "diagnostic": "Neutron imaging / tomography",
+    "quantities": "Spatial neutron emissivity",
+    "status": "M→I",
+    "method": "Reconstruct from multiple sightlines or imaging response.",
+    "caveat": "Sparse viewing and scattering make inversion uncertain.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Reconstruct from multiple sightlines or imaging response.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sparse viewing and scattering make inversion uncertain."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Neutron and nuclear",
+    "diagnostic": "Gamma spectroscopy",
+    "quantities": "Gamma count rate and energy spectrum",
+    "status": "M→D/I",
+    "method": "Calibrate energy and efficiency; fit peaks and background.",
+    "caveat": "Pile-up, dead time, shielding and activation backgrounds matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate energy and efficiency; fit peaks and background.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Pile-up, dead time, shielding and activation backgrounds matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Fast particles",
+    "diagnostic": "Neutral particle analyzer (NPA)",
+    "quantities": "Fast neutral energy distribution and ion-distribution constraints",
+    "status": "M→I",
+    "method": "Use calibrated response and neutralization/charge-exchange forward model.",
+    "caveat": "Sightline integration and atomic cross sections are required.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated response and neutralization/charge-exchange forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sightline integration and atomic cross sections are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Fast particles",
+    "diagnostic": "Fast-ion D-alpha (FIDA)",
+    "quantities": "Fast-ion distribution constraints and energy/pitch sensitivity",
+    "status": "M→I",
+    "method": "Separate thermal/background emission and compare calibrated spectra with forward model.",
+    "caveat": "Atomic physics, beam geometry, background and phase-space sensitivity matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Separate thermal/background emission and compare calibrated spectra with forward model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Atomic physics, beam geometry, background and phase-space sensitivity matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Fast particles",
+    "diagnostic": "Collective Thomson scattering (CTS)",
+    "quantities": "Fast-ion velocity-space constraints",
+    "status": "M→I",
+    "method": "Fit frequency-shifted scattered spectrum using plasma response model.",
+    "caveat": "Calibration, scattering geometry and background rejection are required.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit frequency-shifted scattered spectrum using plasma response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration, scattering geometry and background rejection are required."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Fast particles",
+    "diagnostic": "Fast-ion loss detector (FILD)",
+    "quantities": "Lost-particle flux, energy/pitch constraints and impact patterns",
+    "status": "M→D/I",
+    "method": "Calibrate scintillator/particle response and compare to orbit-following model.",
+    "caveat": "Detector geometry and magnetic equilibrium are needed for energy/pitch inference.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate scintillator/particle response and compare to orbit-following model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detector geometry and magnetic equilibrium are needed for energy/pitch inference."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Fast particles",
+    "diagnostic": "Runaway-electron diagnostics",
+    "quantities": "Hard X-ray/gamma signatures, synchrotron light, runaway proxies",
+    "status": "M→D/I",
+    "method": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
+    "caveat": "Radiation is a proxy, not a direct measurement of runaway population.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated radiation diagnostics with a runaway transport/response model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Radiation is a proxy, not a direct measurement of runaway population."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Gas, pressure and fueling",
+    "diagnostic": "Pressure gauges",
+    "quantities": "Vacuum vessel pressure",
+    "status": "M→D",
+    "method": "Apply gauge-specific calibration and gas sensitivity corrections.",
+    "caveat": "Gauge type, gas species, location and operating range matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply gauge-specific calibration and gas sensitivity corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Gauge type, gas species, location and operating range matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Gas, pressure and fueling",
+    "diagnostic": "Residual gas analyzer (RGA)",
+    "quantities": "Partial-pressure pattern and residual-gas composition",
+    "status": "M→D/I",
+    "method": "Apply mass-sensitivity and cracking-pattern corrections.",
+    "caveat": "Species cross-sensitivity, fragmentation and calibration are essential.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Apply mass-sensitivity and cracking-pattern corrections.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Species cross-sensitivity, fragmentation and calibration are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Gas, pressure and fueling",
+    "diagnostic": "Gas flow meters",
+    "quantities": "Gas injection rate and injected particle number",
+    "status": "M→D",
+    "method": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
+    "caveat": "Standard/actual flow conditions and gas temperature/pressure conventions matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate flow; integrate particle/molar flow over time with unit conversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Standard/actual flow conditions and gas temperature/pressure conventions matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Gas, pressure and fueling",
+    "diagnostic": "Neutral pressure / recycling estimates",
+    "quantities": "Neutral density and flux constraints",
+    "status": "I",
+    "method": "Combine pressure, spectroscopy and transport/neutral model.",
+    "caveat": "Chamber pressure is not equal to local edge neutral density.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine pressure, spectroscopy and transport/neutral model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Chamber pressure is not equal to local edge neutral density."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Gas, pressure and fueling",
+    "diagnostic": "Effective pumping speed",
+    "quantities": "S = Q/p under consistent throughput/pressure units",
+    "status": "D",
+    "method": "Compute from calibrated throughput and pressure under defined conditions.",
+    "caveat": "Conductance, gauge position and units must be consistent.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compute from calibrated throughput and pressure under defined conditions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Conductance, gauge position and units must be consistent."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "Multi-channel fluctuation analysis",
+    "quantities": "PSD, mode frequency, cross-phase, coherence, delay and correlation length",
+    "status": "D",
+    "method": "Detrend/window; compute Welch PSD, cross-spectrum, coherence and correlation with synchronized channels.",
+    "caveat": "Aliasing, nonstationarity, common pickup, time skew and low coherence can mislead.",
+    "implementation_functions": [
+      "mode_number_from_channels",
+      "fluctuation_flux"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detrend/window; compute Welch PSD, cross-spectrum, coherence and correlation with synchronized channels.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Aliasing, nonstationarity, common pickup, time skew and low coherence can mislead."
+      ],
+      "function_links": [
+        "mode_number_from_channels",
+        "fluctuation_flux"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "MHD mode / Mirnov analysis",
+    "quantities": "Mode frequency, phase propagation and mode-number constraints",
+    "status": "D/I",
+    "method": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
+    "caveat": "Mode number needs array geometry and assumptions about mode structure.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Analyze calibrated coil arrays with geometry-aware phase fitting.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Mode number needs array geometry and assumptions about mode structure."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "ELM / transient event detection",
+    "quantities": "Event times, amplitude, repetition rate and energy proxies",
+    "status": "D/I",
+    "method": "Detect pulses with robust threshold/prominence and cross-check independent diagnostics.",
+    "caveat": "Thresholds are dataset-dependent; event energy needs calibrated power/energy channels.",
+    "implementation_functions": [
+      "detect_elms",
+      "interval_statistics"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detect pulses with robust threshold/prominence and cross-check independent diagnostics.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Thresholds are dataset-dependent; event energy needs calibrated power/energy channels."
+      ],
+      "function_links": [
+        "detect_elms",
+        "interval_statistics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "Sawtooth analysis",
+    "quantities": "Crash times, period and pre/post-crash changes",
+    "status": "D",
+    "method": "Detect rapid changes in ECE, SXR or other core channels.",
+    "caveat": "Signal choice, temporal resolution and event overlap affect timing.",
+    "implementation_functions": [
+      "detect_sawteeth",
+      "interval_statistics"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Detect rapid changes in ECE, SXR or other core channels.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Signal choice, temporal resolution and event overlap affect timing."
+      ],
+      "function_links": [
+        "detect_sawteeth",
+        "interval_statistics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "Disruption analysis",
+    "quantities": "Current drop, voltage/radiation transients, precursor activity",
+    "status": "D/I",
+    "method": "Align calibrated channels and detect multi-signal event signatures.",
+    "caveat": "A single threshold is not a robust universal disruption classifier.",
+    "implementation_functions": [
+      "current_quench_analysis"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Align calibrated channels and detect multi-signal event signatures.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "A single threshold is not a robust universal disruption classifier."
+      ],
+      "function_links": [
+        "current_quench_analysis"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "Correlation / cross-correlation",
+    "quantities": "Correlation coefficient, lag and apparent propagation delay",
+    "status": "D",
+    "method": "Compute normalized correlation after time alignment and detrending.",
+    "caveat": "Correlation does not prove causation; periodic signals create ambiguous lags.",
+    "implementation_functions": [
+      "cross_analysis",
+      "cross_correlation_lag"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compute normalized correlation after time alignment and detrending.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Correlation does not prove causation; periodic signals create ambiguous lags."
+      ],
+      "function_links": [
+        "cross_analysis",
+        "cross_correlation_lag"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "MHD and turbulence",
+    "diagnostic": "Spectral transfer / coherence",
+    "quantities": "Cross-spectrum, phase and magnitude-squared coherence",
+    "status": "D",
+    "method": "Estimate using consistent windows and sampling; report degrees of freedom if available.",
+    "caveat": "Coherence estimates are biased for short/nonstationary records.",
+    "implementation_functions": [
+      "cross_analysis"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Estimate using consistent windows and sampling; report degrees of freedom if available.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Coherence estimates are biased for short/nonstationary records."
+      ],
+      "function_links": [
+        "cross_analysis"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Transport and confinement",
+    "diagnostic": "Particle flux and effective diffusion",
+    "quantities": "Γ, D_eff, convective velocity constraints",
+    "status": "D/I",
+    "method": "Combine density/velocity profiles and a stated transport convention.",
+    "caveat": "Flux convention and simultaneous local measurements are essential.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine density/velocity profiles and a stated transport convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Flux convention and simultaneous local measurements are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Transport and confinement",
+    "diagnostic": "Energy confinement",
+    "quantities": "τ_E = W_th/P_loss",
+    "status": "D",
+    "method": "Use consistent stored energy and net loss power for the same time window.",
+    "caveat": "Do not substitute input power for loss power without an explicit energy balance.",
+    "implementation_functions": [
+      "derive_parameters",
+      "ipb98y2_confinement_time",
+      "h_factor"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use consistent stored energy and net loss power for the same time window.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Do not substitute input power for loss power without an explicit energy balance."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "ipb98y2_confinement_time",
+        "h_factor"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Transport and confinement",
+    "diagnostic": "Energy balance",
+    "quantities": "Input, radiation, stored-energy derivative and loss power",
+    "status": "D/I",
+    "method": "Construct a time-resolved power balance with explicit sign convention.",
+    "caveat": "Missing channels and derivative noise can dominate inferred losses.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Construct a time-resolved power balance with explicit sign convention.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Missing channels and derivative noise can dominate inferred losses."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Transport and confinement",
+    "diagnostic": "Greenwald density reference",
+    "quantities": "n_G = I_p/(πa²) in conventional MA and 10²⁰ m⁻³ units",
+    "status": "D",
+    "method": "Use plasma current in MA and minor radius in metres.",
+    "caveat": "Empirical reference scaling, not a universal physical limit.",
+    "implementation_functions": [
+      "derive_parameters",
+      "greenwald"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use plasma current in MA and minor radius in metres.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Empirical reference scaling, not a universal physical limit."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "greenwald"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Transport and confinement",
+    "diagnostic": "Pressure and beta",
+    "quantities": "p_e, p_i, total pressure, β_t and β_p",
+    "status": "D/I",
+    "method": "Combine calibrated density/temperature with equilibrium magnetic field.",
+    "caveat": "Species composition and averaging definitions must be explicit.",
+    "implementation_functions": [
+      "derive_parameters",
+      "beta_metrics"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated density/temperature with equilibrium magnetic field.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Species composition and averaging definitions must be explicit."
+      ],
+      "function_links": [
+        "derive_parameters",
+        "beta_metrics"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Heating and RF",
+    "diagnostic": "Neutral beam injection (NBI) power",
+    "quantities": "Injected/absorbed beam power and energy deposition constraints",
+    "status": "M→D/I",
+    "method": "Use beam diagnostics and power-balance/attenuation models.",
+    "caveat": "Injected power is not equal to absorbed power.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use beam diagnostics and power-balance/attenuation models.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Injected power is not equal to absorbed power."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Heating and RF",
+    "diagnostic": "Electron cyclotron heating (ECRH)",
+    "quantities": "Injected/reflected/transmitted RF power and deposition constraints",
+    "status": "M→D/I",
+    "method": "Calibrate directional couplers and apply propagation/absorption model.",
+    "caveat": "Forward/reflected power and absorbed plasma power differ.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate directional couplers and apply propagation/absorption model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Forward/reflected power and absorbed plasma power differ."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Heating and RF",
+    "diagnostic": "Ion cyclotron heating (ICRH)",
+    "quantities": "Forward/reflected RF power and coupling constraints",
+    "status": "M→D/I",
+    "method": "Use calibrated RF measurements and coupling/absorption model.",
+    "caveat": "Matching-network and antenna losses must be accounted for.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated RF measurements and coupling/absorption model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Matching-network and antenna losses must be accounted for."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Heating and RF",
+    "diagnostic": "Lower hybrid heating/current drive",
+    "quantities": "RF power and current-drive constraints",
+    "status": "M→I",
+    "method": "Combine calibrated RF power with propagation/absorption/current-drive model.",
+    "caveat": "Deposition and driven current are model-dependent.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Combine calibrated RF power with propagation/absorption/current-drive model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Deposition and driven current are model-dependent."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Heating and RF",
+    "diagnostic": "Electron/ion heating power",
+    "quantities": "Species-resolved heating rates",
+    "status": "I",
+    "method": "Infer from power balance and transport model.",
+    "caveat": "Needs source partition, exchange terms and time-dependent energy balance.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Infer from power balance and transport model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Needs source partition, exchange terms and time-dependent energy balance."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Thermocouples / embedded sensors",
+    "quantities": "Local temperature histories",
+    "status": "M→D/I",
+    "method": "Calibrate sensor dynamics and apply heat-transfer model.",
+    "caveat": "Sensor lag and conduction mean measured temperature may differ from surface temperature.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Calibrate sensor dynamics and apply heat-transfer model.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sensor lag and conduction mean measured temperature may differ from surface temperature."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Target/divertor heat flux",
+    "quantities": "q_perp and integrated target power",
+    "status": "M→D/I",
+    "method": "Infer from calibrated IR/surface sensors and transient heat-conduction inversion.",
+    "caveat": "Emissivity, surface properties, geometry and time response are critical.",
+    "implementation_functions": [
+      "eich_heat_flux_fit",
+      "exponential_heat_flux_fit"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Infer from calibrated IR/surface sensors and transient heat-conduction inversion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Emissivity, surface properties, geometry and time response are critical."
+      ],
+      "function_links": [
+        "eich_heat_flux_fit",
+        "exponential_heat_flux_fit"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Surface erosion / deposition",
+    "quantities": "Thickness change, morphology and composition",
+    "status": "M→D/I",
+    "method": "Compare pre/post exposure profilometry, microscopy and spectroscopy.",
+    "caveat": "Sampling and surface preparation can bias apparent changes.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Compare pre/post exposure profilometry, microscopy and spectroscopy.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Sampling and surface preparation can bias apparent changes."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Wall impurity / dust monitoring",
+    "quantities": "Impurity deposition, dust motion and surface composition",
+    "status": "M→D/I",
+    "method": "Use calibrated imaging/spectroscopy and post-mortem surface analysis.",
+    "caveat": "Line-of-sight and sampling bias matter.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use calibrated imaging/spectroscopy and post-mortem surface analysis.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Line-of-sight and sampling bias matter."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Strike-point / hot-spot tracking",
+    "quantities": "Position, velocity and peak temperature/heat-flux proxies",
+    "status": "D/I",
+    "method": "Map camera pixels to machine coordinates and track features over time.",
+    "caveat": "Camera calibration and perspective are essential.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Map camera pixels to machine coordinates and track features over time.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Camera calibration and perspective are essential."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Plasma-facing components",
+    "diagnostic": "Thermal response / heat diffusion",
+    "quantities": "Subsurface temperature and heat flux constraints",
+    "status": "I",
+    "method": "Solve a stated heat equation with material properties and boundary conditions.",
+    "caveat": "Inverse heat conduction is ill-conditioned; report regularization and sensitivity.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Solve a stated heat equation with material properties and boundary conditions.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Inverse heat conduction is ill-conditioned; report regularization and sensitivity."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Data quality and calibration",
+    "diagnostic": "Calibration curve and uncertainty",
+    "quantities": "Physical units, offset, gain, uncertainty propagation",
+    "status": "M→D",
+    "method": "Fit documented calibration and propagate input/calibration uncertainty.",
+    "caveat": "Calibration range and covariance must be retained.",
+    "implementation_functions": [
+      "linear_calibration",
+      "polynomial_calibration",
+      "uncertainty_linear"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Fit documented calibration and propagate input/calibration uncertainty.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Calibration range and covariance must be retained."
+      ],
+      "function_links": [
+        "linear_calibration",
+        "polynomial_calibration",
+        "uncertainty_linear"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Data quality and calibration",
+    "diagnostic": "Noise floor and detection limit",
+    "quantities": "Noise spectrum, detectable signal threshold",
+    "status": "D",
+    "method": "Estimate from background/no-signal data using a stated detection criterion.",
+    "caveat": "Detection limit depends on bandwidth, false-positive rate and averaging.",
+    "implementation_functions": [
+      "hampel_despike"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Estimate from background/no-signal data using a stated detection criterion.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Detection limit depends on bandwidth, false-positive rate and averaging."
+      ],
+      "function_links": [
+        "hampel_despike"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Data quality and calibration",
+    "diagnostic": "Sampling / aliasing audit",
+    "quantities": "Sampling rate, Nyquist frequency, timing gaps and jitter",
+    "status": "D",
+    "method": "Inspect timestamps, monotonicity, gaps and sample-rate consistency.",
+    "caveat": "Digital filtering cannot recover aliased information.",
+    "implementation_functions": [
+      "prepare_time_series",
+      "signal_quality",
+      "sampling_audit",
+      "resample_uniform"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "limited_calculation",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Inspect timestamps, monotonicity, gaps and sample-rate consistency.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Digital filtering cannot recover aliased information."
+      ],
+      "function_links": [
+        "prepare_time_series",
+        "signal_quality",
+        "sampling_audit",
+        "resample_uniform"
+      ],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  },
+  {
+    "family": "Data quality and calibration",
+    "diagnostic": "Channel synchronization",
+    "quantities": "Inter-channel time offset and jitter",
+    "status": "D",
+    "method": "Use common trigger or calibration pulses; quantify lag uncertainty.",
+    "caveat": "Small offsets can corrupt cross-phase and transport estimates.",
+    "implementation_functions": [],
+    "implementation_status": "Registry reference only",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "reference_only",
+      "completeness": "incomplete",
+      "input_specs": [],
+      "output_specs": [],
+      "assumptions": [],
+      "preprocessing": [],
+      "algorithm": "Use common trigger or calibration pulses; quantify lag uncertainty.",
+      "uncertainty_model": "not_specified",
+      "limitations": [
+        "Small offsets can corrupt cross-phase and transport estimates."
+      ],
+      "function_links": [],
+      "raw_data_to_physics": false,
+      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+    }
+  }
+]
