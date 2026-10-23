@@ -5,7 +5,7 @@ diagnostic geometry and model-dependent assumptions must be supplied by users.
 """
 __all__ = [
     "analysis_registry", "average_density", "ball_pen_probe", "beta", "bolometry", "channel_synchronization",
-    "confinement", "denoising", "density_waves", "divertor_analysis", "doppler_flow",
+    "confinement", "cxrs", "denoising", "density_waves", "divertor_analysis", "doppler_flow",
     "doppler_spectroscopy", "doppler_temperature", "ece_analysis", "ecrh_icrh",
     "edge_field", "electron_temperature", "energetic_particles", "equilibrium_reconstruction",
     "fft_analysis", "fueling_rate", "fusion_rate", "gas_puffing", "gundestrup_probe",
