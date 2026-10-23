@@ -94,7 +94,8 @@ def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
 
 
 def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
-                     max_interp_gap_s: float | None = None) -> dict[str, Any]:
+                     max_interp_gap_s: float | None = None,
+                     max_output_samples: int = 10_000_000) -> dict[str, Any]:
     """Linearly interpolate onto a uniform grid, without inventing data inside long gaps.
 
     Samples falling in a gap longer than `max_interp_gap_s` (default: 3 median intervals)
@@ -116,6 +117,14 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
         fs = 1.0 / med
     if not np.isfinite(fs) or fs <= 0:
         raise ValueError("fs must be positive and finite.")
+    if isinstance(max_output_samples, bool) or not isinstance(max_output_samples, (int, np.integer)) or max_output_samples < 8:
+        raise ValueError("max_output_samples must be an integer >= 8.")
+    estimated_samples = int(np.floor((t[-1] - t[0]) * float(fs))) + 1
+    if estimated_samples > max_output_samples:
+        raise ValueError(
+            f"Uniform resampling would create about {estimated_samples:,} samples, exceeding "
+            f"the configured limit of {max_output_samples:,}. Reduce fs or raise the explicit limit."
+        )
     limit = 3.0 * med if max_interp_gap_s is None else float(max_interp_gap_s)
     if limit <= 0 or not np.isfinite(limit):
         raise ValueError("max_interp_gap_s must be positive and finite.")
