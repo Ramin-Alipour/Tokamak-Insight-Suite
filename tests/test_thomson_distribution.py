@@ -50,3 +50,19 @@ def test_spectral_distribution_rejects_invalid_uncertainty_and_background_fracti
     with pytest.raises(ValueError, match="background_fraction"):
         analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06,
                                               background_fraction=0.9)
+
+
+def test_moments_are_correct_on_nonuniform_wavelength_grid():
+    # A nonuniform grid must not bias moments toward densely sampled regions.
+    left = np.linspace(499.0, 499.8, 90, endpoint=False)
+    center = np.linspace(499.8, 500.2, 401, endpoint=False)
+    right = np.linspace(500.2, 501.0, 90)
+    x = np.unique(np.concatenate([left, center, right]))
+    y = 1000.0 * np.exp(-0.5 * ((x - 500.0) / 0.18) ** 2) + 12.0
+    out = analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
+    assert out["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.003)
+    assert out["instrument_corrected_sigma_nm"] == pytest.approx(
+        np.sqrt(0.18**2 - 0.06**2), rel=0.04
+    )
+    assert out["wavelength_quadrature_weights_nm"].shape == x.shape
+    assert out["integrated_spectral_measure"].shape == x.shape
