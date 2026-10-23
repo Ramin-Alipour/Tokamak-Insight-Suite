@@ -37,7 +37,9 @@ def main() -> int:
         for col in frame.columns:
             if pd.api.types.is_numeric_dtype(frame[col]): report['quality'][str(col)]=signal_quality(frame[col].to_numpy())
         Path(args.output).parent.mkdir(parents=True,exist_ok=True)
-        Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=str)+'\n',encoding='utf-8')
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report,indent=2,ensure_ascii=False,default=str)+'\n',encoding='utf-8')
         print(f"Audited {len(frame)} rows × {len(frame.columns)} columns; report: {Path(args.output).resolve()}"); return 0
     if args.command=='events':
         from .events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -52,7 +54,9 @@ def main() -> int:
             raise TypeError(type(v))
         report={'input':Path(args.input).name,'sha256':sha256_bytes(data),'kind':args.kind,'result':res}
         Path(args.output).parent.mkdir(parents=True,exist_ok=True)
-        Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=_js)+'\n',encoding='utf-8')
+        output_path = Path(args.output)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(report,indent=2,ensure_ascii=False,default=_js)+'\n',encoding='utf-8')
         print(f"{args.kind}: wrote {Path(args.output).resolve()}"); return 0
     if args.signal not in frame.columns: raise SystemExit(f"Signal column {args.signal!r} not found. Available: {list(frame.columns)}")
     if args.time and args.time not in frame.columns:
