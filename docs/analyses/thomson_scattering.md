@@ -85,6 +85,44 @@ The function returns electron temperature from the Gaussian spectral width and e
 
 This workflow is only appropriate when the measured spectrum is absolutely calibrated in W/nm over a band compatible with the integrated-power model, the plasma is optically thin, the signal is dominated by non-collective non-relativistic Maxwellian Thomson scattering, and the instrument response is adequately Gaussian. It does not automatically correct stray light, wavelength-dependent throughput, spectral-band truncation, polarization-specific collection geometry, calibration covariance, or model discrepancy. Results require an independent uncertainty budget and experiment-specific review.
 
+
+## User-defined spectral model extension
+
+Users can register an experiment-specific or research-specific spectral model in Python without changing the built-in Gaussian workflow. The extension is an explicit in-process registry: users provide a callable of the form `model(wavelength_nm, *parameters)`, parameter names, initial values, optional lower/upper bounds, and a description. The generic fitter returns fitted parameters, their covariance-based uncertainties, fitted spectrum, residuals, and (when signal uncertainties are supplied) chi-square diagnostics.
+
+```python
+import numpy as np
+from tokamak_analysis.thomson_models import (
+    register_spectral_model,
+    fit_custom_spectral_model,
+)
+
+def my_spectrum(wavelength_nm, amplitude, center_nm, sigma_nm, background):
+    return amplitude * np.exp(
+        -0.5 * ((wavelength_nm - center_nm) / sigma_nm) ** 2
+    ) + background
+
+register_spectral_model(
+    "my_experiment_model",
+    my_spectrum,
+    parameter_names=("amplitude", "center_nm", "sigma_nm", "background"),
+    initial_values=(100.0, 532.0, 0.2, 1.0),
+    bounds=((0.0, 500.0, 1e-6, -np.inf),
+            (np.inf, 560.0, np.inf, np.inf)),
+    description="Example model; replace with a validated physical model",
+)
+
+fit = fit_custom_spectral_model(
+    wavelength_nm,
+    measured_signal,
+    model_name="my_experiment_model",
+    signal_uncertainty=signal_sigma,  # optional
+)
+print(fit["parameters"])
+```
+
+The registry is session-local: register the model each time the Python process starts, or keep the model function in the user's own Python module and register it during setup. The software does not automatically load arbitrary files or execute downloaded plugins. The generic fitter does not automatically infer electron temperature, density, or other physical quantities from custom parameters; the model author must define and validate that interpretation, its instrument-response treatment, and its uncertainty budget. Registration is not evidence that a model is physically valid. The built-in Thomson workflow remains unchanged and continues to be the default supported model.
+
 ## Scientific limitations
 
 - Assumes a non-collective, non-relativistic Maxwellian electron distribution.
