@@ -427,45 +427,137 @@
     "family": "Plasma parameters",
     "diagnostic": "Langmuir probe",
     "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
-    "status": "M→D/I",
-    "method": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
-    "caveat": "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter.",
+    "status": "D",
+    "method": "Analyze a calibrated single-probe I–V sweep with explicit current polarity and user-selected electron-retarding and ion-branch fit intervals. Report floating-potential zero crossing, dI/dV plasma-potential proxy, optional log-linear electron-temperature fit, ion-branch fit and optional sheath-model ion-density estimate when geometry and ion mass are supplied.",
+    "caveat": "This is a single-probe, model-dependent workflow, not an automatic substitute for calibration or device-specific sheath theory. Fit windows must be physically justified; estimates are sensitive to magnetic field, collisions, RF pickup, secondary emission, sheath expansion, sweep direction and surface condition.",
     "implementation_functions": [
-      "langmuir_iv_analysis",
-      "probe_iv_summary"
+      "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+      "tis.core.langmuir_iv_analysis",
+      "tis.core.probe_iv_summary"
     ],
     "implementation_status": "Implemented single-sweep I–V analysis with explicit current convention, descriptive saturation-tail fallbacks, optional fit-window-based Te and ion-branch estimates, and optional model-dependent density inference. Independent experimental validation and full uncertainty propagation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
       "input_specs": [
+        {
+          "name": "voltage_V",
+          "unit": "V",
+          "description": "One-dimensional calibrated voltage sweep; at least eight distinct finite values are required.",
+          "required": true
+        },
+        {
+          "name": "current_A",
+          "unit": "A",
+          "description": "Current samples aligned with voltage_V. The routine filters non-finite pairs and averages duplicate voltage values.",
+          "required": true
+        },
+        {
+          "name": "current_convention",
+          "unit": "text",
+          "description": "Current polarity convention: electron_positive (ion saturation current normally negative) or ion_positive (internally sign-flipped); both are supported by the analysis entry point.",
+          "required": false
+        },
+        {
+          "name": "electron_fit_range",
+          "unit": "V",
+          "description": "Optional physically selected electron-retarding voltage interval for an unweighted log-linear fit after subtracting the estimated ion-current baseline.",
+          "required": false
+        },
+        {
+          "name": "ion_fit_range",
+          "unit": "V",
+          "description": "Optional physically selected ion-branch interval; at least three samples are required for the linear fit.",
+          "required": false
+        },
+        {
+          "name": "area_m2",
+          "unit": "m^2",
+          "description": "Positive effective ion collection area; must be supplied together with ion_mass_amu for ion-density estimation.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "ion_mass_amu",
+          "unit": "amu",
+          "description": "Positive ion mass in atomic mass units; must be supplied together with area_m2.",
+          "required": false,
+          "minimum": 1e-15
+        },
         {
           "name": "ti_eV",
           "unit": "eV",
-          "description": "Assumed ion temperature used by the optional sound-speed/density model.",
+          "description": "Non-negative assumed ion temperature used by the ion-sound-speed model; core default is 0 eV.",
           "required": false,
-          "minimum": 0,
-          "default": 0
+          "minimum": 0
         },
         {
           "name": "sheath_factor",
           "unit": "dimensionless",
-          "description": "Positive sheath collection coefficient for the density model.",
+          "description": "Positive sheath collection coefficient; core default is 0.61.",
           "required": false,
-          "minimum": 1e-15,
-          "default": 0.61
+          "minimum": 1e-15
         },
         {
           "name": "gamma_i",
           "unit": "dimensionless",
-          "description": "Non-negative coefficient multiplying ion temperature in the adopted sound-speed expression.",
+          "description": "Non-negative coefficient multiplying ion temperature in the adopted sound-speed expression; core default is 1.",
           "required": false,
-          "minimum": 0,
-          "default": 1
+          "minimum": 0
         }
       ],
       "output_specs": [
+        {
+          "name": "floating_potential_V",
+          "unit": "V",
+          "description": "Unique interpolated zero-current crossing; null when no crossing or multiple distinct crossings are present."
+        },
+        {
+          "name": "plasma_potential_proxy_V",
+          "unit": "V",
+          "description": "Voltage at maximum measured dI/dV; proxy only, not a universally valid plasma-potential estimate."
+        },
+        {
+          "name": "ion_saturation_current_A",
+          "unit": "A",
+          "description": "Median current in the user-selected ion-fit interval, with linear-fit slope, intercept and R²."
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Optional reciprocal slope from a log-linear electron-retarding branch fit after ion-baseline subtraction."
+        },
+        {
+          "name": "electron_temperature_standard_error_eV",
+          "unit": "eV",
+          "description": "Optional local statistical standard error from unweighted log-linear regression; excludes systematic and calibration uncertainties."
+        },
+        {
+          "name": "electron_retarding_fit_R2",
+          "unit": "dimensionless",
+          "description": "R² of the log-current linear fit over the selected electron-retarding interval."
+        },
+        {
+          "name": "ion_density_estimate_m-3",
+          "unit": "m^-3",
+          "description": "Optional model-dependent estimate from ion saturation current, collection area, ion mass, ion temperature and sheath coefficient."
+        },
+        {
+          "name": "ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Ion sound speed from the explicitly selected model assumptions when density estimation is enabled."
+        },
+        {
+          "name": "max_dIdV_A_per_V",
+          "unit": "A V^-1",
+          "description": "Maximum numerical derivative of current with respect to voltage."
+        },
+        {
+          "name": "interpretation_warning",
+          "unit": "text",
+          "description": "Physical limitations and required experiment-specific checks."
+        },
         {
           "name": "electron_saturation_current_A",
           "unit": "A",
@@ -480,17 +572,32 @@
           "name": "electron_temperature_uncertainty_note",
           "unit": "text",
           "description": "Statistical fit uncertainty excludes calibration, fit-window, sheath and instrumental systematics."
+        },
+        {
+          "name": "floating_potential_candidates_V",
+          "unit": "V",
+          "description": "All distinct interpolated zero-current crossings; a zero-current plateau is represented by its voltage midpoint."
+        },
+        {
+          "name": "floating_potential_status",
+          "unit": "text",
+          "description": "Explicit status: single_zero_crossing, no_zero_crossing_in_measured_sweep, or ambiguous_multiple_zero_crossings."
         }
       ],
-      "assumptions": [],
+      "assumptions": [
+        "Voltage and current are calibrated and synchronized samples from a quasi-static single-probe I–V sweep.",
+        "The electron-retarding branch is adequately described by an exponential current after subtracting the ion-current baseline.",
+        "The ion branch and collection model are appropriate for the experimental regime; the user selects fit intervals and geometry.",
+        "Ion density uses n_i≈|I_isat|/(sheath_factor·e·A·c_s), with c_s=sqrt(e·(gamma_i·T_i+T_e)/(m_i)); all temperatures are in eV."
+      ],
       "preprocessing": [
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
         "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
-        "Validate current polarity, fit windows, and positive finite geometry/model inputs.",
+        "Validate current polarity, fit windows, and positive finite geometry/model inputs; fit windows must have two finite strictly increasing bounds.",
         "Use explicit analyst-selected fit windows; no automatic physical regime selection."
       ],
-      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate floating-potential crossings, dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
-      "uncertainty_model": "not_specified",
+      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate every floating-potential zero crossing (including zero-plateau midpoint handling and explicit ambiguity), dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
+      "uncertainty_model": "Only the optional electron-temperature fit returns a local regression standard error when enough fit points are available. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
         "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
@@ -498,11 +605,12 @@
         "Check fit quality and probe-specific sheath, magnetic-field, RF, collision, surface and sweep-direction effects."
       ],
       "function_links": [
-        "langmuir_iv_analysis",
-        "probe_iv_summary"
+        "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+        "tis.core.langmuir_iv_analysis",
+        "tis.core.probe_iv_summary"
       ],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "raw_data_to_physics": true,
+      "note": "Complete only within this declared calibrated single-sweep I–V model scope. Fit-window validation and zero-crossing ambiguity are explicit. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
     }
   },
   {
@@ -676,27 +784,191 @@
     "family": "Plasma parameters",
     "diagnostic": "Charge-exchange recombination spectroscopy (CXRS)",
     "quantities": "T_i, toroidal/poloidal rotation, impurity density constraints",
-    "status": "M→D/I",
-    "method": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
-    "caveat": "Neutral-beam overlap, background, instrument function and atomic data are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "status": "D/I",
+    "method": "Fit a calibrated isolated charge-exchange emission line with a Gaussian plus local linear background; subtract a known Gaussian instrumental width in quadrature to estimate ion temperature and Doppler line-of-sight velocity.",
+    "caveat": "Requires correct line identification, calibrated wavelength axis, rest wavelength, emitting-ion mass, and independently measured instrumental sigma (not FWHM). This workflow does not perform atomic-rate impurity-density estimation, neutral-beam attenuation, or toroidal/poloidal inversion.",
+    "implementation_functions": [
+      "tokamak_analysis.cxrs.analyze_cxrs_line"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
+      "execution_level": "analysis_pipeline",
       "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit calibrated charge-exchange line profiles with viewing geometry and atomic rates.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Neutral-beam overlap, background, instrument function and atomic data are required."
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "description": "Finite strictly increasing calibrated wavelength axis, at least 7 samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "detector units",
+          "description": "Finite spectral signal samples matching wavelength_nm.",
+          "required": true
+        },
+        {
+          "name": "rest_wavelength_nm",
+          "unit": "nm",
+          "description": "Known positive rest wavelength of the identified CXRS transition.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "ion_mass_amu",
+          "unit": "u",
+          "description": "Positive mass of the emitting ion in atomic mass units.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm",
+          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "viewing_angle_rad",
+          "unit": "rad",
+          "description": "Optional view geometry metadata in [0, pi]; no deprojection is performed.",
+          "required": false,
+          "minimum": 0,
+          "maximum": 3.141592653589793
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "signal units",
+          "description": "Optional positive 1-sigma uncertainty for each signal sample; enables weighted fitting and reduced chi-square.",
+          "required": false
+        },
+        {
+          "name": "initial_center_nm",
+          "unit": "nm",
+          "description": "Optional starting estimate for line center within wavelength range.",
+          "required": false
+        }
       ],
-      "function_links": [],
+      "output_specs": [
+        {
+          "name": "wavelength_center_nm",
+          "unit": "nm",
+          "description": "Fitted line center."
+        },
+        {
+          "name": "wavelength_center_uncertainty_nm",
+          "unit": "nm",
+          "description": "Local covariance-based 1-sigma line-center uncertainty."
+        },
+        {
+          "name": "line_sigma_nm",
+          "unit": "nm",
+          "description": "Fitted observed Gaussian standard deviation."
+        },
+        {
+          "name": "intrinsic_sigma_nm",
+          "unit": "nm",
+          "description": "Doppler width after quadrature subtraction of instrumental width."
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Ion temperature assuming a single Maxwellian emitting population."
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Local fit-covariance propagated uncertainty; excludes systematic inputs."
+        },
+        {
+          "name": "line_of_sight_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Non-relativistic Doppler line-of-sight velocity."
+        },
+        {
+          "name": "velocity_uncertainty_m_s",
+          "unit": "m s^-1",
+          "description": "Local line-center covariance propagated uncertainty."
+        },
+        {
+          "name": "fitted_signal",
+          "unit": "signal units",
+          "description": "Model evaluated on the input wavelength grid."
+        },
+        {
+          "name": "residual",
+          "unit": "signal units",
+          "description": "Measured signal minus fitted model."
+        },
+        {
+          "name": "fit_r_squared",
+          "unit": "dimensionless",
+          "description": "Unweighted coefficient of determination."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless",
+          "description": "Weighted reduced chi-square when sample uncertainties are supplied; otherwise null."
+        },
+        {
+          "name": "assumptions",
+          "unit": "list[text]",
+          "description": "Explicit model assumptions."
+        },
+        {
+          "name": "limitations",
+          "unit": "list[text]",
+          "description": "Scientific scope and excluded effects."
+        }
+      ],
+      "assumptions": [
+        "Wavelength axis is calibrated and strictly increasing.",
+        "Line is isolated, optically thin, and correctly identified.",
+        "Emitting-ion velocity distribution is a single Maxwellian.",
+        "Doppler and instrumental profiles are Gaussian.",
+        "Rest wavelength, ion mass, and instrumental standard deviation are known."
+      ],
+      "preprocessing": [
+        "Validate dimensions, finite values, monotonic wavelength, positive physical parameters and optional uncertainties.",
+        "Estimate a local linear edge background and fit Gaussian amplitude, center, width, intercept and slope.",
+        "Reject unresolved line widths when observed width does not exceed instrumental width."
+      ],
+      "algorithm": "Fit Gaussian emission plus local linear background using nonlinear least squares. Compute intrinsic Doppler sigma from sqrt(sigma_observed^2 - sigma_instrument^2), Ti = m_i c^2/e * (sigma_D/lambda_0)^2, and v_los = c*(lambda_center-lambda_0)/lambda_0. Propagate local fit covariance to Ti and line-of-sight velocity uncertainties.",
+      "uncertainty_model": "Local nonlinear least-squares covariance; optional per-sample standard deviations enable weighted fitting. Ti and velocity uncertainties are first-order covariance propagation. Excludes systematic uncertainty and covariance in wavelength calibration, rest wavelength, ion mass, and instrumental width.",
+      "limitations": [
+        "No atomic-rate or neutral-beam attenuation model and no impurity-density estimate.",
+        "No toroidal/poloidal rotation inversion; reported velocity is line-of-sight only.",
+        "No line deblending, opacity correction, non-Maxwellian distribution, or non-Gaussian instrumental response.",
+        "Viewing angle is metadata only and does not perform geometric deprojection.",
+        "Covariance-based errors omit calibration and model systematics; independent experimental validation remains required."
+      ],
+      "function_links": [
+        "tokamak_analysis.cxrs.analyze_cxrs_line"
+      ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Scoped calibrated single-line analysis is implemented; it is not a complete device-specific CXRS inversion. Use correctly identified isolated transitions and independently characterized instrumental response. Independent experimental validation remains necessary.",
+      "workflow_modes": [
+        {
+          "name": "calibrated_isolated_line",
+          "function": "tokamak_analysis.cxrs.analyze_cxrs_line",
+          "inputs": [
+            "wavelength_nm (nm)",
+            "signal",
+            "rest_wavelength_nm (nm)",
+            "ion_mass_amu (u)",
+            "instrument_sigma_nm (nm)",
+            "optional signal_uncertainty"
+          ],
+          "outputs": [
+            "ion_temperature_eV",
+            "line_of_sight_velocity_m_s",
+            "fit diagnostics and residuals",
+            "local covariance-based uncertainties"
+          ],
+          "scope": "Calibrated single-line fit; no impurity-density, beam-attenuation, or multi-view rotation inversion."
+        }
+      ]
     }
   },
   {
