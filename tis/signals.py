@@ -122,10 +122,16 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     grid = np.arange(t[0], t[-1] + 0.5 / fs, 1.0 / fs)
     grid = grid[grid <= t[-1] + 1e-12 * abs(t[-1])]
     out = np.interp(grid, t, y)
-    # Flag grid points whose bracketing source samples are further apart than the limit.
+    # Flag only *interpolated interior* points inside long gaps. Exact source
+    # timestamps are measured data and must remain available even when they border
+    # a long gap; searchsorted(side="left") otherwise incorrectly masks the left
+    # endpoint (and can mask the right endpoint) of that gap.
     right = np.clip(np.searchsorted(t, grid, side="left"), 1, len(t) - 1)
-    span = t[right] - t[right - 1]
-    inside_gap = span > limit
+    left_time = t[right - 1]
+    right_time = t[right]
+    span = right_time - left_time
+    strictly_inside_interval = (grid > left_time) & (grid < right_time)
+    inside_gap = (span > limit) & strictly_inside_interval
     out[inside_gap] = np.nan
     return {"time_s": grid, "values": out, "fs_Hz": float(fs), "n_nan_in_long_gaps": int(inside_gap.sum()),
             "n_input": int(len(t)), "n_output": int(len(grid)),
