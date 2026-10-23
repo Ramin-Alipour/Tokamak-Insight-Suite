@@ -68,3 +68,14 @@ def test_project_load_rejects_duplicate_run_ids(tmp_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ProjectError, match="duplicate analysis run IDs"):
         ProjectStore.load(path)
+
+
+def test_project_load_rejects_malformed_analysis_runs_schema(tmp_path):
+    path = ProjectStore.save(Project(title="malformed runs"), tmp_path / "malformed-runs.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["analysis_runs"] = {"not": "an array"}
+    payload.pop("content_sha256")
+    payload["content_sha256"] = stable_digest(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ProjectError, match="analysis_runs must be a JSON array"):
+        ProjectStore.load(path)
