@@ -30,3 +30,14 @@ The first migration deliberately marks contracts `incomplete` until input/output
 ## Migration boundary
 
 The new contract/data-model/project modules are the first migration boundary. Existing `app.py` and `tis/core.py` remain compatibility entry points during incremental page and numerical-domain extraction. Do not remove existing functions until public callers and tests are migrated.
+
+
+## Measurement validation and unit-conversion rules
+
+The canonical Measurement object validates declared quantity/unit, metadata mapping types, uncertainty shape and sign, coordinate finiteness, timebase monotonicity, and consistency between an explicitly supplied sample rate and the median time interval (2% tolerance). For irregularly sampled data, omit sample_rate_hz and preserve the explicit time coordinates. Non-finite measurement samples are intentionally retained to represent acquisition gaps; producers should attach quality flags or a non-valid status with a reason.
+
+Unit conversion treats uncertainty as a scale-only quantity. For affine units such as degrees Celsius and kelvin, the value receives the offset while the standard uncertainty does not. Regression tests cover this distinction. This conversion rule does not infer calibration uncertainty or instrument response.
+
+## Reproducible analysis-run records
+
+AnalysisRun supports explicit software_version, environment metadata, input_hashes (SHA-256 hex digests keyed by input name), and random_seed. Its reproducibility_fingerprint hashes the analysis name, input references, settings, algorithm/software versions, environment, input hashes, declared units and random seed. output_digest hashes normalized outputs separately. The fingerprint records configuration; it does not guarantee bitwise-identical results across platforms or establish scientific validity. Callers must populate meaningful version/environment fields and calculate hashes from the actual input bytes.
