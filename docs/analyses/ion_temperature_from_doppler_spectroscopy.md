@@ -26,7 +26,8 @@ Callable entry point: `tokamak_analysis.ion_temperature.ion_temperature_from_dop
 
 ## Interpretation limits
 
-- The rest transition, ion species, wavelength calibration and instrumental line-spread function must be independently verified.
+- The rest transition and ion species must be independently verified; the rest wavelength must lie inside the measured wavelength window, and the emission peak/fit center must not be truncated at its boundary.
+- The workflow rejects flat/no-contrast spectra, failed or non-physical Gaussian fits, and fits whose width is too large for the selected wavelength window.
 - Blends, unresolved fine structure, Stark/Zeeman broadening, opacity, rotation/flow distributions and non-thermal populations can bias the result.
 - `fit_r_squared` is a diagnostic, not proof of physical validity.
 - The reported uncertainty is local statistical propagation. It does not automatically include wavelength-calibration, instrument-model, atomic-data or physical-model systematic uncertainty.
@@ -34,4 +35,4 @@ Callable entry point: `tokamak_analysis.ion_temperature.ion_temperature_from_dop
 
 ## Tests
 
-`tests/test_ion_temperature_spectrum.py` covers synthetic recovery, line-fit diagnostics, malformed wavelength inputs, unresolved instrumental widths and uncertainty-array validation.
+`tests/test_ion_temperature_spectrum.py` covers synthetic recovery, line-fit diagnostics, malformed wavelength inputs, unresolved instrumental widths, uncertainty-array validation, out-of-window rest wavelengths, boundary-truncated peaks and flat spectra.
