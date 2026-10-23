@@ -1581,13 +1581,13 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Poloidal-field coils / magnetic probes",
     "quantities": "Calibrated local B_p(t), dB_p/dt, channel statistics, sampling diagnostics, optional uncertainty",
-    "status": "M→D/I",
-    "method": "Calibrate digitized poloidal-field probe signals with documented per-channel gain and offset; optionally remove a defined baseline; calculate dB_p/dt on the measured time grid and propagate supplied independent signal uncertainty. Use probe geometry/transfer functions and equilibrium constraints in a separate, validated workflow for flux or reconstruction.",
+    "status": "D",
+    "method": "Analyze calibrated poloidal-field probe channels using documented per-channel gain and offset, optional baseline subtraction, nonuniform-time dBp/dt, per-channel statistics, sampling-interval diagnostics, and first-order propagation of independent signal uncertainty. Expose this workflow in the Probe Analysis UI.",
     "caveat": "Local fields and derivatives do not uniquely determine PF-coil currents, poloidal flux, plasma boundary, or equilibrium. This workflow does not perform coil inversion or Grad–Shafranov reconstruction.",
     "implementation_functions": [
       "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
     ],
-    "implementation_status": "Implemented calibrated-signal analysis with validation, optional baseline correction, nonuniform-time derivatives, channel metrics, sampling-jitter flag, and first-order independent-noise uncertainty propagation. Raw voltage-to-field calibration, frequency response, geometry, and device-specific validation remain user supplied.",
+    "implementation_status": "Implemented and exposed in the Probe Analysis UI: calibrated single-/multi-channel signals, validation, optional baseline correction, nonuniform-grid derivatives, channel statistics, sampling-jitter warning, and first-order signal/derivative uncertainty. Raw-voltage transfer calibration and device-specific validation remain user supplied.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -1704,7 +1704,7 @@
         "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete only for the declared calibrated digitized-signal processing scope; not a complete magnetic-equilibrium or coil-inversion pipeline."
+      "note": "The executable Python API and Probe Analysis dashboard workflow cover calibrated digitized poloidal-field signals only. They do not infer flux, PF-coil currents, plasma boundary or equilibrium. Calibration, transfer response, geometry, bandwidth and independent experimental validation remain user responsibilities."
     }
   },
   {
