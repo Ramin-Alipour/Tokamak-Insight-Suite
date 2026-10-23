@@ -122,15 +122,19 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     grid = np.arange(t[0], t[-1] + 0.5 / fs, 1.0 / fs)
     grid = grid[grid <= t[-1] + 1e-12 * abs(t[-1])]
     out = np.interp(grid, t, y)
-    # Flag only *interpolated interior* points inside long gaps. Exact source
-    # timestamps are measured data and must remain available even when they border
-    # a long gap; searchsorted(side="left") otherwise incorrectly masks the left
-    # endpoint (and can mask the right endpoint) of that gap.
+    # Mask only interpolated points strictly inside long source intervals.
+    # Floating-point grids can represent a source timestamp (e.g. 0.6 s) as
+    # 0.6000000000000001 s. Treat values within a few local ULPs of either
+    # endpoint as measured samples, not interpolated gap interiors.
     right = np.clip(np.searchsorted(t, grid, side="left"), 1, len(t) - 1)
     left_time = t[right - 1]
     right_time = t[right]
     span = right_time - left_time
-    strictly_inside_interval = (grid > left_time) & (grid < right_time)
+    left_tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(left_time)))
+    right_tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(right_time)))
+    at_left_sample = np.abs(grid - left_time) <= left_tol
+    at_right_sample = np.abs(grid - right_time) <= right_tol
+    strictly_inside_interval = ~(at_left_sample | at_right_sample)
     inside_gap = (span > limit) & strictly_inside_interval
     out[inside_gap] = np.nan
     return {"time_s": grid, "values": out, "fs_Hz": float(fs), "n_nan_in_long_gaps": int(inside_gap.sum()),
