@@ -608,7 +608,9 @@ def mode_number_from_channels(theta_rad: Any, signals: Any, fs: float,
         if len(frequency_range_hz) != 2 or not np.all(np.isfinite(frequency_range_hz)) or frequency_range_hz[0] < 0 or frequency_range_hz[0] >= frequency_range_hz[1] or frequency_range_hz[1] > fs/2:
             raise ValueError("frequency_range_hz must be a finite increasing interval within [0, Nyquist].")
     data = data - np.mean(data, axis=1, keepdims=True)
-    nperseg = min(data.shape[1], max(64, min(4096, data.shape[1]//2)))
+    # Keep at least two Welch segments even at the 64-sample minimum; with
+    # one segment, magnitude-squared coherence is identically 1 and not testable.
+    nperseg = min(4096, max(32, data.shape[1] // 2))
     noverlap = nperseg // 2
     f, p0 = signal.welch(data[0], fs=fs, nperseg=nperseg, noverlap=noverlap)
     spectra = [p0]
