@@ -617,7 +617,7 @@
     "family": "Plasma parameters",
     "diagnostic": "Electron cyclotron emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness/electron-temperature estimate, channel fluctuations and spectra",
-    "status": "I",
+    "status": "D",
     "method": "Validated ECE workflow: non-relativistic harmonic resonance field; optional simplified circular-toroidal-field resonance mapping; calibrated spectral-radiance to Rayleigh–Jeans brightness temperature; multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata.",
     "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Accurate channel-to-flux-surface mapping requires equilibrium reconstruction and ray tracing; account for relativistic/Doppler shifts, harmonics, polarization/mode, optical depth, calibration, bandwidth, IF response, and nonthermal populations. Simplified circular B(R) mapping is explicitly approximate.",
     "implementation_functions": [
