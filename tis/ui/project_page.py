@@ -13,6 +13,31 @@ def _ensure_project_shot(active_project: Project, shot_id: str | None) -> None:
         active_project.shots.append({"shot_id": shot_id})
 
 
+def _update_project_metadata(active_project: Project, *, software_version: str,
+                             shot_id: str, analyst: str, filename: str,
+                             source_sha256: str, source_manifest: dict[str, Any] | None,
+                             import_parameters: dict[str, Any] | None) -> None:
+    """Update available workspace metadata without erasing saved provenance."""
+    metadata_update: dict[str, Any] = {
+        "software": "Tokamak Insight Suite",
+        "software_version": software_version,
+        "project_export_note": "Raw source data is referenced by provenance and is not embedded.",
+    }
+    if shot_id:
+        metadata_update["current_shot_id"] = shot_id
+    if analyst:
+        metadata_update["analyst"] = analyst
+    if filename:
+        metadata_update["source_filename"] = filename
+    if source_sha256:
+        metadata_update["source_sha256"] = source_sha256
+    if source_manifest is not None:
+        metadata_update["source_manifest"] = source_manifest
+    if import_parameters is not None:
+        metadata_update["import_parameters"] = import_parameters
+    active_project.metadata.update(metadata_update)
+
+
 def _history_item_key(item: dict[str, Any]) -> str:
     return stable_digest({
         key: item.get(key) for key in (
@@ -138,24 +163,12 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
             _ensure_project_shot(active_project, shot_id)
-            metadata_update = {
-                "software": "Tokamak Insight Suite",
-                "software_version": software_version,
-                "project_export_note": "Raw source data is referenced by provenance and is not embedded.",
-            }
-            if shot_id:
-                metadata_update["current_shot_id"] = shot_id
-            if analyst:
-                metadata_update["analyst"] = analyst
-            if filename:
-                metadata_update["source_filename"] = filename
-            if source_sha256:
-                metadata_update["source_sha256"] = source_sha256
-            if session_state.get("tis_source_manifest") is not None:
-                metadata_update["source_manifest"] = session_state.get("tis_source_manifest")
-            if session_state.get("tis_import_parameters") is not None:
-                metadata_update["import_parameters"] = session_state.get("tis_import_parameters")
-            active_project.metadata.update(metadata_update)
+            _update_project_metadata(
+                active_project, software_version=software_version, shot_id=shot_id,
+                analyst=analyst, filename=filename, source_sha256=source_sha256,
+                source_manifest=session_state.get("tis_source_manifest"),
+                import_parameters=session_state.get("tis_import_parameters"),
+            )
             with tempfile.TemporaryDirectory() as temp_dir:
                 target = Path(temp_dir) / "tokamak-insight-project.tis-project.json"
                 ProjectStore.save(active_project, target)
