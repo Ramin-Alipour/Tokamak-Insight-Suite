@@ -236,7 +236,12 @@ def _record_download_history(name, digest, result_summary, page_name, parameter_
         return
     history=[{"name":name,"created_at_utc":datetime.now(timezone.utc).isoformat(),
               "page":page_name,"parameter_snapshot":parameter_snapshot,"result_sha256":digest,
-              "result_summary":result_summary}]+history
+              "result_summary":result_summary,
+              "source_filename":st.session_state.get("tis_filename"),
+              "source_sha256":st.session_state.get("tis_sha"),
+              "shot_id":st.session_state.get("shot"),
+              "source_manifest":_json_safe(st.session_state.get("tis_source_manifest")),
+              "import_parameters":_json_safe(st.session_state.get("tis_import_parameters"))}]+history
     st.session_state["tis_analysis_history"]=history[:50]
 
 def json_download(label,obj,name):
