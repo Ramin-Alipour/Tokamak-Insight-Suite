@@ -23,6 +23,7 @@ def main() -> int:
     if args.command=='scalings':
         from .plasma import confinement_summary
         res=confinement_summary(ip_A=args.ip_A,bt_T=args.bt_T,r_m=args.r_m,a_m=args.a_m,kappa=args.kappa,ne_line_avg_m3=args.ne_line_avg_m3,p_loss_W=args.p_loss_W,mass_amu=args.mass_amu,stored_energy_J=args.stored_energy_J,delta=args.delta)
+        Path(args.output).parent.mkdir(parents=True,exist_ok=True)
         Path(args.output).write_text(json.dumps(res,indent=2,ensure_ascii=False,default=float)+'\n',encoding='utf-8'); print(f'Wrote {Path(args.output).resolve()}'); return 0
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
@@ -35,6 +36,7 @@ def main() -> int:
                 'missing_by_column':frame.isna().sum().to_dict(),'quality':{}}
         for col in frame.columns:
             if pd.api.types.is_numeric_dtype(frame[col]): report['quality'][str(col)]=signal_quality(frame[col].to_numpy())
+        Path(args.output).parent.mkdir(parents=True,exist_ok=True)
         Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=str)+'\n',encoding='utf-8')
         print(f"Audited {len(frame)} rows × {len(frame.columns)} columns; report: {Path(args.output).resolve()}"); return 0
     if args.command=='events':
@@ -49,6 +51,7 @@ def main() -> int:
             if isinstance(v,(np.floating,np.integer)): return v.item()
             raise TypeError(type(v))
         report={'input':Path(args.input).name,'sha256':sha256_bytes(data),'kind':args.kind,'result':res}
+        Path(args.output).parent.mkdir(parents=True,exist_ok=True)
         Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=_js)+'\n',encoding='utf-8')
         print(f"{args.kind}: wrote {Path(args.output).resolve()}"); return 0
     if args.signal not in frame.columns: raise SystemExit(f"Signal column {args.signal!r} not found. Available: {list(frame.columns)}")
