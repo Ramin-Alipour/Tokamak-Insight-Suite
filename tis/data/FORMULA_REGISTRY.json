@@ -1,0 +1,779 @@
+[
+  {
+    "name": "Electron plasma frequency",
+    "equation": "ω_pe = sqrt(n_e e²/(ε₀ m_e)); f_pe=ω_pe/(2π)",
+    "inputs": "n_e [m^-3]",
+    "output": "rad/s, Hz",
+    "assumptions": "Local electron density; cold-plasma definition.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Local electron density; cold-plasma definition."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Debye length",
+    "equation": "λ_D = sqrt(ε₀ k_B T_e/(n_e e²))",
+    "inputs": "T_e [K] or convert eV using k_B T=e T_e[eV]; n_e [m^-3]",
+    "output": "m",
+    "assumptions": "Quasi-equilibrium Maxwellian electron approximation.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Quasi-equilibrium Maxwellian electron approximation."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Electron cyclotron frequency",
+    "equation": "ω_ce=e|B|/m_e; f_ce=e|B|/(2πm_e)",
+    "inputs": "B [T]",
+    "output": "rad/s, Hz",
+    "assumptions": "Non-relativistic single-particle frequency; harmonics and relativistic shifts may matter.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Non-relativistic single-particle frequency; harmonics and relativistic shifts may matter."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Ion sound speed (common approximation)",
+    "equation": "c_s≈sqrt(e(T_e+γ_i T_i)/m_i)",
+    "inputs": "T_e,T_i [eV], m_i [kg], model γ_i",
+    "output": "m/s",
+    "assumptions": "Model-dependent closure and ion species.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Model-dependent closure and ion species."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Electron thermal pressure",
+    "equation": "p_e=n_e e T_e[eV]",
+    "inputs": "n_e [m^-3], T_e [eV]",
+    "output": "Pa",
+    "assumptions": "Temperature represented in electron-volts.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Temperature represented in electron-volts."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Ion thermal pressure",
+    "equation": "p_i=Σ_s n_s e T_s[eV]",
+    "inputs": "Species densities and temperatures",
+    "output": "Pa",
+    "assumptions": "Sum over ion species; do not assume single-ion composition silently.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Sum over ion species; do not assume single-ion composition silently."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Total thermal pressure",
+    "equation": "p_th=p_e+p_i",
+    "inputs": "Species-consistent electron and ion pressures",
+    "output": "Pa",
+    "assumptions": "Excludes energetic/non-thermal components unless included explicitly.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Excludes energetic/non-thermal components unless included explicitly."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Thermal stored energy",
+    "equation": "W_th=(3/2)∫p_th dV",
+    "inputs": "Pressure profile and volume element",
+    "output": "J",
+    "assumptions": "Classical isotropic ideal-gas form; geometry and species definitions matter.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Classical isotropic ideal-gas form; geometry and species definitions matter."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Line-integrated electron density",
+    "equation": "N_e=∫ n_e dl",
+    "inputs": "n_e along line of sight",
+    "output": "m^-2",
+    "assumptions": "A line integral; local profile needs multiple sightlines/model.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "A line integral; local profile needs multiple sightlines/model."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Plasma frequency from density",
+    "equation": "f_pe≈8.98×10^3 sqrt(n_e[cm^-3]) Hz",
+    "inputs": "n_e [cm^-3]",
+    "output": "Hz",
+    "assumptions": "Approximate electron plasma frequency.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Approximate electron plasma frequency."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Doppler line-of-sight velocity",
+    "equation": "v_LOS/c≈Δλ/λ₀ for |v|≪c",
+    "inputs": "Calibrated centroid shift Δλ; rest wavelength λ₀",
+    "output": "m/s",
+    "assumptions": "Non-relativistic Doppler approximation and correct viewing geometry.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Non-relativistic Doppler approximation and correct viewing geometry."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Ion temperature from Gaussian Doppler sigma",
+    "equation": "T_i[eV]=(m_i c²/e)(σ_λ/λ₀)²",
+    "inputs": "Corrected σ_λ and λ₀ in same units; ion mass in kg for SI form",
+    "output": "eV",
+    "assumptions": "Thermal Gaussian Doppler width only; instrument response and other broadening removed.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Thermal Gaussian Doppler width only; instrument response and other broadening removed."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Gaussian FWHM and sigma",
+    "equation": "FWHM=2 sqrt(2 ln 2) σ≈2.35482 σ",
+    "inputs": "Gaussian profile width",
+    "output": "same width unit",
+    "assumptions": "Gaussian profile only.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Gaussian profile only."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Magnetic energy density",
+    "equation": "u_B=B²/(2 μ₀)",
+    "inputs": "B [T]",
+    "output": "J/m³ = Pa",
+    "assumptions": "Magnetic energy density in vacuum approximation.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Magnetic energy density in vacuum approximation."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Toroidal beta",
+    "equation": "β_t=<p>/(B_t²/(2μ₀))",
+    "inputs": "Defined pressure average and reference toroidal field",
+    "output": "dimensionless",
+    "assumptions": "State volume/local average and field convention.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "State volume/local average and field convention."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Safety factor large-aspect-ratio estimate",
+    "equation": "q(r)≈r B_t/(R B_p)",
+    "inputs": "r,R [m], B_t,B_p [T]",
+    "output": "dimensionless",
+    "assumptions": "Approximate circular, large-aspect-ratio geometry; equilibrium reconstruction is preferred.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Approximate circular, large-aspect-ratio geometry; equilibrium reconstruction is preferred."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Faraday induction",
+    "equation": "V_coil=−N dΦ_B/dt; Φ_B=∫B·dA",
+    "inputs": "Calibrated coil voltage and geometry",
+    "output": "V, Wb",
+    "assumptions": "Sign, turns, area and electronics response documented.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Sign, turns, area and electronics response documented."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Plasma loop resistance proxy",
+    "equation": "R_p=V_loop/I_p",
+    "inputs": "V_loop [V], I_p [A]",
+    "output": "Ω",
+    "assumptions": "Only under consistent sign/definition; inductive terms can complicate interpretation.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Only under consistent sign/definition; inductive terms can complicate interpretation."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Ohmic power approximation",
+    "equation": "P_Ω≈V_loop I_p",
+    "inputs": "V_loop [V], I_p [A]",
+    "output": "W",
+    "assumptions": "Not generally the same as net loss power or total input power.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Not generally the same as net loss power or total input power."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Energy confinement time",
+    "equation": "τ_E=W_th/P_loss",
+    "inputs": "W_th [J], P_loss [W]",
+    "output": "s",
+    "assumptions": "Use consistent boundary, time window and loss-power definition.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Use consistent boundary, time window and loss-power definition."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Greenwald density reference",
+    "equation": "n_G[10^20 m^-3]=I_p[MA]/(π a²[m²])",
+    "inputs": "I_p [MA], minor radius a [m]",
+    "output": "10^20 m^-3",
+    "assumptions": "Empirical reference scaling, not a universal physical limit.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Empirical reference scaling, not a universal physical limit."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Debye parameter",
+    "equation": "N_D=(4π/3)n_e λ_D³",
+    "inputs": "n_e [m^-3], λ_D [m]",
+    "output": "dimensionless particles",
+    "assumptions": "Number of particles in a Debye sphere.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Number of particles in a Debye sphere."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Electron plasma angular frequency",
+    "equation": "ω_pe=sqrt(n_e e²/(ε₀m_e))",
+    "inputs": "n_e [m^-3]",
+    "output": "rad/s",
+    "assumptions": "Local electron density.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Local electron density."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Ion saturation particle flux proxy",
+    "equation": "Γ_i≈I_sat/(e A_eff)",
+    "inputs": "I_sat [A], effective area A_eff [m²]",
+    "output": "m^-2 s^-1",
+    "assumptions": "Converts charge current to particle flux only with valid collection geometry/model.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Converts charge current to particle flux only with valid collection geometry/model."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Radiated power fraction",
+    "equation": "f_rad=P_rad/P_in",
+    "inputs": "P_rad and defined input power, both W",
+    "output": "dimensionless",
+    "assumptions": "Input-power convention and time averaging must be specified.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Input-power convention and time averaging must be specified."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Integrated surface power",
+    "equation": "P_target=∫_A q_perp dA",
+    "inputs": "Heat flux q_perp [W/m²] and surface area",
+    "output": "W",
+    "assumptions": "Surface mapping, geometry and heat-flux calibration required.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Surface mapping, geometry and heat-flux calibration required."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Apparent feature speed",
+    "equation": "v_app=Δx/Δt",
+    "inputs": "Calibrated image displacement and frame interval",
+    "output": "m/s",
+    "assumptions": "Projected apparent velocity, not necessarily plasma flow velocity.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Projected apparent velocity, not necessarily plasma flow velocity."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Gas pumping speed",
+    "equation": "S=Q/p",
+    "inputs": "Throughput Q and pressure p in consistent units",
+    "output": "m³/s (SI throughput convention)",
+    "assumptions": "Gauge position, conductance and throughput convention matter.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Gauge position, conductance and throughput convention matter."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Injected particle number",
+    "equation": "N_injected=∫ Ṅ(t) dt",
+    "inputs": "Particle injection rate Ṅ(t) [s^-1]",
+    "output": "particles",
+    "assumptions": "Rate calibration and time base required.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Rate calibration and time base required."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Particle confinement time proxy",
+    "equation": "τ_p=N_p/Ṅ_loss",
+    "inputs": "Stored particle number and loss rate",
+    "output": "s",
+    "assumptions": "Requires consistent control volume and particle balance.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Requires consistent control volume and particle balance."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Relative fluctuation level",
+    "equation": "δx_rel=RMS(x−mean(x))/mean(x)",
+    "inputs": "Time series x with nonzero mean",
+    "output": "dimensionless",
+    "assumptions": "Window and detrending must be specified; unstable near zero mean.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Window and detrending must be specified; unstable near zero mean."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "RMS signal",
+    "equation": "x_RMS=sqrt(mean(x²))",
+    "inputs": "Signal samples",
+    "output": "same as signal",
+    "assumptions": "Specify whether DC component is included.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Specify whether DC component is included."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Nyquist frequency",
+    "equation": "f_N=f_s/2",
+    "inputs": "Sampling frequency f_s [Hz]",
+    "output": "Hz",
+    "assumptions": "Frequencies above Nyquist alias unless anti-alias filtering was applied.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Frequencies above Nyquist alias unless anti-alias filtering was applied."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Cross-correlation lag",
+    "equation": "τ_peak=argmax_τ R_xy(τ)",
+    "inputs": "Synchronized x(t), y(t)",
+    "output": "s",
+    "assumptions": "Correlation lag does not establish causality; periodic signals can create ambiguous peaks.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Correlation lag does not establish causality; periodic signals can create ambiguous peaks."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Magnitude-squared coherence",
+    "equation": "C_xy(f)=|S_xy(f)|²/(S_xx(f)S_yy(f))",
+    "inputs": "Synchronized channel time series",
+    "output": "0–1",
+    "assumptions": "Estimator uncertainty depends on segment count and stationarity.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Estimator uncertainty depends on segment count and stationarity."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Bolometry inverse problem",
+    "equation": "y=A x+ε; estimate x by regularized inverse",
+    "inputs": "Line-integrated signals y, geometry matrix A",
+    "output": "Spatial emissivity x",
+    "assumptions": "Ill-posed inverse problem; save regularization and uncertainty.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Ill-posed inverse problem; save regularization and uncertainty."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  },
+  {
+    "name": "Continuity / particle balance",
+    "equation": "dN/dt=Ṅ_in−Ṅ_out+S−L",
+    "inputs": "Stored particles, input/output and source/loss rates",
+    "output": "particles/s",
+    "assumptions": "Define volume and avoid double-counting source/loss terms.",
+    "status": "D",
+    "category": "Core physics",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "not_mapped",
+      "input_specs": [],
+      "output_specs": [],
+      "prerequisites": [
+        "Define volume and avoid double-counting source/loss terms."
+      ],
+      "uncertainty_model": "not_specified",
+      "test_links": [],
+      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+    }
+  }
+]
