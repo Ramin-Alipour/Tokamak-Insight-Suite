@@ -18,7 +18,7 @@ def test_harmonic_resonance_field_scales_inversely():
 def test_resonance_mapping_inverse_circular_field():
     r = resonance_radius_m(np.array([56e9]), 1.0, 2.0, harmonic=2)
     assert r.shape == (1,)
-    assert r[0] == pytest.approx(1.0, rel=0.01)
+    assert r[0] == pytest.approx(2.0, rel=0.01)
 
 
 def test_brightness_temperature_zero_radiance_is_zero():
