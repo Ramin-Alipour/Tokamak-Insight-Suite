@@ -63,6 +63,12 @@ def _sync_analysis_history(active_project: Project, history: list[dict[str, Any]
 
 def render_project_page(st: Any, *, session_state: Any, project_title: str, shot_id: str,
                         analyst: str, filename: str, source_sha256: str, software_version: str) -> None:
+    pending_title = session_state.pop("tis_pending_project_title", None)
+    if pending_title is not None:
+        session_state["tis_project_title"] = pending_title
+    active_project = session_state.get("tis_active_project")
+    default_project_title = active_project.title if active_project is not None else project_title
+    project_title = st.text_input("Project title", value=default_project_title, key="tis_project_title")
     st.title("Research Project Manager")
     st.caption("Save and reopen project metadata and analysis history independently of browser/session state.")
     uploaded_project = st.file_uploader("Open TIS project JSON", type=["json"], key="tis_project_upload")
@@ -73,6 +79,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 source_path.write_bytes(uploaded_project.getvalue())
                 loaded_project = ProjectStore.load(source_path)
             session_state["tis_active_project"] = loaded_project
+            session_state["tis_pending_project_title"] = loaded_project.title
             session_state["tis_project_history_excluded_keys"] = [
                 _history_item_key(item) for item in session_state.get("tis_analysis_history", [])
             ]
