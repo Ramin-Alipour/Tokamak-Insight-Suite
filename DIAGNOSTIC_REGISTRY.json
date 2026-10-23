@@ -13,11 +13,11 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Implemented numerical workflows within declared scope; Python-only custom-model extension; no independent experimental validation",
+    "implementation_status": "Implemented numerical workflow (see limits); overall analysis remains incomplete outside the declared scope",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "workflow_mode",
@@ -286,7 +286,7 @@
         "tokamak_analysis.thomson_models.fit_custom_spectral_model"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete within the declared computational scope: supported built-in profile, raw-spectrum temperature-fit, calibrated-power density, and combined spectrum-to-temperature/density workflows have dashboard entry points and focused tests. The user-defined spectral-model extension is a Python API, not a dashboard workflow. This does not imply independent experimental validation or support for the listed out-of-scope physics. The custom-model registry is process-local and shared by code in the same Python process; it is not per-user isolation for multi-user web deployments.",
+      "note": "The supported built-in profile, raw-spectrum temperature-fit, calibrated-power density, and combined spectrum-to-temperature/density workflows have dashboard entry points and focused tests. The user-defined spectral-model extension is a Python API, not a dashboard workflow. Overall status remains conservative because independent experimental validation and broader physics models are not claimed. The custom-model registry is process-local and shared by code in the same Python process; it is not per-user isolation for multi-user web deployments.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
