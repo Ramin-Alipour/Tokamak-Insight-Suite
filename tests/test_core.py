@@ -44,7 +44,7 @@ def test_grid_from_table_rejects_nonfinite_or_duplicate_coordinates():
 
 
 def test_load_table_makes_headers_unique_after_whitespace_normalization():
-    frame = load_table(b"time, time\n0,1\n1,2\n", "duplicate_headers.csv")
+    frame = load_table(b"time, time\n0,1\n1,2\n", "duplicate_headers.csv", delimiter=",")
     assert list(frame.columns) == ["time", "time.1"]
     assert frame["time"].tolist() == [0, 1]
     assert frame["time.1"].tolist() == [1, 2]
