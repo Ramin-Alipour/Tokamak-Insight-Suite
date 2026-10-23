@@ -172,6 +172,11 @@ def _json_safe(value):
     if isinstance(value, (list,tuple)): return [_json_safe(v) for v in value]
     if isinstance(value, np.ndarray): return _json_safe(value.tolist())
     if isinstance(value, np.integer): return int(value)
+    if isinstance(value, (complex, np.complexfloating)):
+        return {
+            "real": float(value.real) if np.isfinite(value.real) else None,
+            "imag": float(value.imag) if np.isfinite(value.imag) else None,
+        }
     if isinstance(value, np.floating): return float(value) if np.isfinite(value) else None
     if isinstance(value, float): return value if np.isfinite(value) else None
     if isinstance(value, np.bool_): return bool(value)
