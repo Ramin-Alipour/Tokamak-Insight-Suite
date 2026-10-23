@@ -1395,7 +1395,7 @@
     "implementation_functions": [
       "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Toroidal-field calibrated-signal workflow (scoped)",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
