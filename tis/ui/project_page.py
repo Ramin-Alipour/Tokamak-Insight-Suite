@@ -7,22 +7,28 @@ import pandas as pd
 from tis.project import AnalysisRun, Project, ProjectStore, stable_digest
 
 
+def _history_item_key(item: dict[str, Any]) -> str:
+    return stable_digest({
+        key: item.get(key) for key in (
+            "name", "created_at_utc", "result_sha256", "parameter_snapshot",
+            "result_summary", "source_filename", "source_sha256", "shot_id"
+        )
+    })
+
+
 def _sync_analysis_history(active_project: Project, history: list[dict[str, Any]],
-                           software_version: str) -> None:
-    """Append session history entries not already represented in the saved project."""
+                           software_version: str,
+                           excluded_history_keys: set[str] | None = None) -> None:
+    """Append new session history entries without importing unrelated pre-load history."""
+    excluded = excluded_history_keys or set()
     existing_keys = {
         run.inputs.get("history_key")
         for run in active_project.analysis_runs
         if isinstance(run.inputs, dict) and run.inputs.get("history_key")
     }
     for item in reversed(history):
-        history_key = stable_digest({
-            key: item.get(key) for key in (
-                "name", "created_at_utc", "result_sha256", "parameter_snapshot",
-                "result_summary", "source_filename", "source_sha256", "shot_id"
-            )
-        })
-        if history_key in existing_keys:
+        history_key = _history_item_key(item)
+        if history_key in existing_keys or history_key in excluded:
             continue
         active_project.add_run(AnalysisRun(
             analysis_name=str(item.get("name", "Unnamed UI result")),
@@ -61,6 +67,9 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 source_path.write_bytes(uploaded_project.getvalue())
                 loaded_project = ProjectStore.load(source_path)
             session_state["tis_active_project"] = loaded_project
+            session_state["tis_project_history_excluded_keys"] = [
+                _history_item_key(item) for item in session_state.get("tis_analysis_history", [])
+            ]
             session_state.pop("tis_project_export_bytes", None)
             st.success(f"Loaded project: {loaded_project.title} ({len(loaded_project.analysis_runs)} saved analysis runs)")
         except Exception as exc:
@@ -87,8 +96,10 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
             active_project = session_state.get("tis_active_project")
             if active_project is None:
                 active_project = Project(title=project_title, shots=([{"shot_id": shot_id}] if shot_id else []))
+                session_state.pop("tis_project_history_excluded_keys", None)
             history = list(session_state.get("tis_analysis_history", []))
-            _sync_analysis_history(active_project, history, software_version)
+            excluded = set(session_state.get("tis_project_history_excluded_keys", []))
+            _sync_analysis_history(active_project, history, software_version, excluded)
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
             active_project.metadata.update({
