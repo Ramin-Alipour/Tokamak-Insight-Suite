@@ -79,3 +79,14 @@ def test_project_load_rejects_malformed_analysis_runs_schema(tmp_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ProjectError, match="analysis_runs must be a JSON array"):
         ProjectStore.load(path)
+
+
+def test_project_load_rejects_invalid_metadata_type(tmp_path):
+    path = ProjectStore.save(Project(title="invalid metadata"), tmp_path / "invalid-metadata.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["metadata"] = []
+    payload.pop("content_sha256")
+    payload["content_sha256"] = stable_digest(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ProjectError, match="metadata must be a JSON object"):
+        ProjectStore.load(path)
