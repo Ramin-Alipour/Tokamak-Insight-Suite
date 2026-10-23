@@ -59,10 +59,11 @@ def test_project_load_rejects_non_object_json_root(tmp_path):
 
 def test_project_load_rejects_duplicate_run_ids(tmp_path):
     first = AnalysisRun("first", {}, {}, "1")
-    second = AnalysisRun("second", {}, {}, "1")
-    path = ProjectStore.save(Project(title="duplicates", analysis_runs=[first, second]), tmp_path / "duplicates.json")
+    path = ProjectStore.save(Project(title="duplicates", analysis_runs=[first]), tmp_path / "duplicates.json")
     payload = json.loads(path.read_text(encoding="utf-8"))
-    payload["analysis_runs"][1]["run_id"] = payload["analysis_runs"][0]["run_id"]
+    duplicate = dict(payload["analysis_runs"][0])
+    duplicate["analysis_name"] = "second"
+    payload["analysis_runs"].append(duplicate)
     payload.pop("content_sha256")
     payload["content_sha256"] = stable_digest(payload)
     path.write_text(json.dumps(payload), encoding="utf-8")
