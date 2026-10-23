@@ -130,7 +130,7 @@ with st.sidebar:
             for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
                         "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
                         "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
-                        "tis_import_parameters", "tis_analysis_history"):
+                        "tis_import_parameters", "tis_analysis_history", "tis_report_sections"):
                 st.session_state.pop(key, None)
             st.error(f"Import failed; no dataset is active. {e}")
     if 'tis_df' in st.session_state:
