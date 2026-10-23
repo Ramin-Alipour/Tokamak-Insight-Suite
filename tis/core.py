@@ -914,6 +914,10 @@ def grid_from_table(frame: pd.DataFrame, z_column: str = "z_m") -> dict[str, np.
     z = pd.to_numeric(frame[z_column], errors="coerce").to_numpy(dtype=float)
     grid = frame[r_cols].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
     r = np.asarray(r_vals, dtype=float)
+    if not np.all(np.isfinite(r)) or not np.all(np.isfinite(z)):
+        raise ValueError("Grid R and Z coordinates must contain only finite values.")
+    if len(np.unique(r)) != len(r) or len(np.unique(z)) != len(z):
+        raise ValueError("Grid R and Z coordinates must be unique.")
     order_r = np.argsort(r); order_z = np.argsort(z)
     return {"R_m": r[order_r], "Z_m": z[order_z], "grid": grid[np.ix_(order_z, order_r)]}
 
