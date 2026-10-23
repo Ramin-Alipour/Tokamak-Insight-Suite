@@ -82,3 +82,40 @@ def test_psd_dc_and_nyquist_are_not_doubled():
                          mode="channel_fluctuations")
     df = result["fluctuation_psd_frequency_Hz"][1]
     assert result["fluctuation_psd"][-1, 0] * df == pytest.approx(1.0, rel=1e-12)
+
+
+
+@pytest.mark.parametrize("harmonic", [0, -1, 1.5, True, "2"])
+def test_invalid_harmonic_is_rejected_by_pipeline(harmonic):
+    with pytest.raises(ValueError, match="harmonic"):
+        analyze_ece([80e9, 90e9], harmonic=harmonic, mode="resonance_mapping")
+
+
+@pytest.mark.parametrize("radiance", [
+    [1e-10, np.nan],
+    [1e-10, np.inf],
+    [1e-10, -1e-10],
+    1e-10,
+])
+def test_invalid_calibrated_radiance_is_rejected(radiance):
+    with pytest.raises(ValueError, match="spectral_radiance"):
+        analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=radiance)
+
+
+def test_analysis_modes_reject_conflicting_inputs():
+    with pytest.raises(ValueError, match="does not consume signal"):
+        analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=[1e-10, 2e-10],
+                    signal=np.ones((8, 2)), time_s=np.arange(8), mode="brightness_temperature")
+    with pytest.raises(ValueError, match="does not consume spectral radiance"):
+        analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=[1e-10, 2e-10],
+                    signal=np.ones((8, 2)), time_s=np.arange(8), mode="channel_fluctuations")
+    with pytest.raises(ValueError, match="accepts resonance inputs only"):
+        analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=[1e-10, 2e-10],
+                    mode="resonance_mapping")
+
+
+def test_multitime_multichannel_radiance_shape_is_preserved():
+    radiance = np.array([[1e-10, 2e-10], [2e-10, 4e-10]])
+    result = analyze_ece([80e9, 90e9], spectral_radiance_W_m2_sr_Hz=radiance)
+    assert result["brightness_temperature_K"].shape == (2, 2)
+    assert np.all(np.isfinite(result["brightness_temperature_eV"]))
