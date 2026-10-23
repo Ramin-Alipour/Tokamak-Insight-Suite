@@ -9,7 +9,7 @@ import pytest
 
 from tis.constants import C_LIGHT, E_CHARGE, MU0, M_E
 from tokamak_analysis.formula_library import (
-    plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity,
+    plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity, ion_sound_speed,
     ion_temperature_from_doppler_sigma, gaussian_fwhm_from_sigma,
     magnetic_energy_density, toroidal_beta, safety_factor_large_aspect_ratio,
     faraday_induction, plasma_loop_resistance_proxy, ohmic_power_approximation,
