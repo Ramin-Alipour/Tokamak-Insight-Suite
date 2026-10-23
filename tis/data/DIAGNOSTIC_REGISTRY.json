@@ -990,8 +990,15 @@
       "input_specs": [],
       "output_specs": [],
       "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
+      "preprocessing": [
+        "Reject nonfinite, mismatched, non-1D, too-short, or non-increasing wavelength arrays.",
+        "Require positive rest wavelength and ion mass; the rest wavelength must fall within the measured wavelength window.",
+        "Validate finite nonnegative instrumental width and positive finite per-sample intensity uncertainties when supplied.",
+        "Reject flat/no-contrast spectra and emission peaks at the spectral-window boundary.",
+        "Fit a Gaussian amplitude and center with positive sigma plus linear local background; convert fit failures and nonphysical fit parameters into clear validation errors.",
+        "Reject fitted centers at the wavelength-window boundary, excessively broad fits, and unresolved widths when observed FWHM does not exceed instrumental FWHM."
+      ],
+      "algorithm": "Fit an isolated line to a Gaussian with linear background. Reject out-of-window rest wavelengths, boundary-truncated peaks/centers, failed/nonphysical fits and line widths too broad for the selected window. Convert fitted sigma to observed FWHM, deconvolve known Gaussian instrumental FWHM in quadrature, then calculate Ti using Ti[eV] = (mi c^2/e) (FWHM_D/lambda0)^2/(8 ln 2). Return fitted spectrum, residuals, fit covariance, R-squared and assumptions.",
       "uncertainty_model": "not_specified",
       "limitations": [
         "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."
