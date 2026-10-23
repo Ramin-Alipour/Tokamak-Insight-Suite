@@ -72,7 +72,7 @@ with st.sidebar:
         import_decimal=st.selectbox("Decimal separator",[".",","],index=0,key="import_decimal")
         import_delimiter=st.selectbox("CSV/TXT delimiter",["Auto-detect",",",";","Tab","|"],index=0,key="import_delimiter")
         import_comment=st.selectbox("Comment marker",["None","#","%"],index=0,key="import_comment")
-        import_sheet=st.text_input("Excel sheet name or index (blank = first sheet)",value="",key="import_sheet")
+        import_sheet=st.text_input("Excel sheet name (use index:N for index; blank = first sheet)",value="",key="import_sheet")
         import_encoding=st.selectbox("Text encoding",["Auto (UTF-8 → Windows-1252 → Latin-1)","utf-8","cp1252","latin-1","utf-16"],index=0,key="import_encoding")
         import_drop_units=st.checkbox("Drop first data row if it contains units (e.g. V / s)",value=False,key="import_drop_units")
     if upload is None and st.session_state.get("tis_active_source") == "upload":
@@ -90,8 +90,17 @@ with st.sidebar:
                 uploaded_bytes=st.session_state.get("tis_upload_raw",b"")
                 uploaded_sha=st.session_state.get("tis_upload_sha","")
             delimiter_map={"Auto-detect":None,",":",",";":";","Tab":"\t","|":"|"}
-            sheet_value=import_sheet.strip()
-            sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
+            sheet_text=import_sheet.strip()
+            if not sheet_text:
+                sheet_value=0
+            elif sheet_text.lower().startswith("index:"):
+                index_text=sheet_text.split(":",1)[1].strip()
+                if not index_text.isdigit():
+                    raise ValueError("Excel sheet index must use index:N with a nonnegative integer, e.g. index:0.")
+                sheet_value=int(index_text)
+            else:
+                # Keep numeric-looking worksheet names (e.g. "2024") as names.
+                sheet_value=sheet_text
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
                 "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units),"encoding":import_encoding},sort_keys=True)
             needs_import=(new_upload or st.session_state.get("tis_active_source")!="upload" or
