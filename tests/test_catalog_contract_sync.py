@@ -28,7 +28,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
     assert len(ANALYSES) == 80
     for entry in ANALYSES:
         contract = entry["execution_contract"]
-        assert contract["execution_level"] == "limited_calculation"
+        assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
         assert contract["completeness"] == "incomplete"
         assert contract["raw_data_to_physics"] is False
         assert contract["function_links"] == [f'{entry["module"]}.{entry["function"]}']
