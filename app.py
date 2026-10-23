@@ -116,7 +116,15 @@ with st.sidebar:
                     "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units),
                     "encoding_requested":import_encoding,"encoding_used":frame.attrs.get("encoding")}
         except Exception as e:
-            st.error(f"Import failed: {e}")
+            # Never leave a previous dataset active after a failed import attempt:
+            # the user may otherwise analyse stale data while believing the new
+            # file or parsing configuration was accepted.
+            for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
+                        "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
+                        "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
+                        "tis_import_parameters", "tis_analysis_history"):
+                st.session_state.pop(key, None)
+            st.error(f"Import failed; no dataset is active. {e}")
     if 'tis_df' in st.session_state:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
         st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
