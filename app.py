@@ -711,10 +711,10 @@ elif page=='Spectral Analysis':
         if st.button('Fit spectral line'):
             try:
                 fit_sigma=None if sigma_col=='<none>' else pd.to_numeric(df[sigma_col],errors='coerce')
-                st.session_state['tis_spectral_fit']={'xcol':xcol,'ycol':ycol,'model':model,'sigma_col':sigma_col,'fit':fit_spectral_line(df[xcol],df[ycol],xmin,xmax,model,sigma_y=fit_sigma)}
+                st.session_state['tis_spectral_fit']={'xcol':xcol,'ycol':ycol,'model':model,'sigma_col':sigma_col,'xmin':xmin,'xmax':xmax,'data_sha':sha,'fit':fit_spectral_line(df[xcol],df[ycol],xmin,xmax,model,sigma_y=fit_sigma)}
             except Exception as e: st.error(str(e))
         saved=st.session_state.get('tis_spectral_fit')
-        if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model and saved.get('sigma_col')==sigma_col:
+        if saved and saved.get('xcol')==xcol and saved.get('ycol')==ycol and saved.get('model')==model and saved.get('sigma_col')==sigma_col and saved.get('xmin')==xmin and saved.get('xmax')==xmax and saved.get('data_sha')==sha:
             fit=saved['fit']; st.json(fit)
             if model=='Gaussian':
                 lam0=st.number_input('Known rest wavelength λ₀ (same unit as x)',min_value=1e-12,value=None,placeholder='Enter reference wavelength',key='doppler_rest_wavelength')
