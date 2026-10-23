@@ -95,3 +95,75 @@ def test_array_requires_three_channels():
     t = np.arange(64)*1e-4
     with pytest.raises(ValueError, match="three"):
         analyze_mirnov_array(t, np.ones((2, len(t))), [0, 1])
+
+
+def test_frequency_band_limits_peak_candidates_only():
+    fs = 10000.0
+    t = np.arange(4096) / fs
+    v = np.sin(2*np.pi*400*t) + 0.5*np.sin(2*np.pi*1400*t)
+    out = analyze_mirnov_signal(t, v, nperseg=1024, frequency_range_Hz=(300, 600))
+    assert out["dominant_peaks_Hz"][0] == pytest.approx(400, abs=20)
+    assert out["frequency_range_for_peaks_Hz"] == (300.0, 600.0)
+
+
+@pytest.mark.parametrize("band", [(0, 0), (-1, 10), (1, np.inf), (1, 6000), (1, 2, 3)])
+def test_invalid_frequency_bands_rejected(band):
+    t = np.arange(64)*1e-4
+    with pytest.raises(ValueError, match="frequency range"):
+        analyze_mirnov_signal(t, np.sin(np.arange(64)), frequency_range_Hz=band)
+
+
+@pytest.mark.parametrize("area", [0, -1, np.nan, np.inf, True, "bad"])
+def test_invalid_coil_area_rejected(area):
+    t = np.arange(32)*1e-4
+    with pytest.raises(ValueError, match="coil area"):
+        analyze_mirnov_signal(t, np.ones_like(t), coil_area_m2=area, turns=2)
+
+
+def test_detrended_bdot_and_signal_statistics_are_reported():
+    t = np.arange(128)*1e-4
+    v = 2.0 + np.sin(2*np.pi*100*t)
+    out = analyze_mirnov_signal(t, v, coil_area_m2=0.5, turns=2)
+    np.testing.assert_allclose(out["approx_Bdot_detrended_T_s"], -np.sin(2*np.pi*100*t)/1.0)
+    assert out["rms_voltage_V"] > out["ac_rms_voltage_V"]
+
+
+def test_array_rejects_duplicate_angles_modulo_full_turn():
+    fs = 10000.0
+    t = np.arange(256)/fs
+    signals = np.array([np.sin(2*np.pi*500*t + p) for p in (0, 1, 2)])
+    with pytest.raises(ValueError, match="unique"):
+        analyze_mirnov_array(t, signals, [0, 1, 2*np.pi])
+
+
+@pytest.mark.parametrize("reference", [True, -1, 3, 0.5, "0"])
+def test_array_rejects_invalid_reference_channel(reference):
+    fs = 10000.0
+    t = np.arange(256)/fs
+    signals = np.array([np.sin(2*np.pi*500*t + p) for p in (0, 1, 2)])
+    with pytest.raises(ValueError, match="reference_channel"):
+        analyze_mirnov_array(t, signals, [0, 1, 2], reference_channel=reference)
+
+
+def test_array_rejects_nonfinite_channel_samples_and_bad_geometry():
+    fs = 10000.0
+    t = np.arange(256)/fs
+    signals = np.array([np.sin(2*np.pi*500*t + p) for p in (0, 1, 2)])
+    broken = signals.copy()
+    broken[1, 4] = np.nan
+    with pytest.raises(ValueError, match="finite"):
+        analyze_mirnov_array(t, broken, [0, 1, 2])
+    with pytest.raises(ValueError, match="finite"):
+        analyze_mirnov_array(t, signals, [0, np.inf, 2])
+
+
+def test_array_reports_sampling_and_alias_diagnostics():
+    fs = 10000.0
+    t = np.arange(2048)/fs
+    angles = np.array([0.0, 0.7, 1.5, 2.4, 3.2])
+    signals = np.array([np.sin(2*np.pi*500*t + 2*a) for a in angles])
+    out = analyze_mirnov_array(t, signals, angles, nperseg=512)
+    assert out["sampling_frequency_Hz"] == pytest.approx(fs)
+    assert out["nyquist_frequency_Hz"] == pytest.approx(fs/2)
+    assert out["approximate_mode_alias_limit"] >= 1
+    assert out["minimum_toroidal_sensor_spacing_rad"] > 0
