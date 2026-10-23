@@ -121,6 +121,8 @@ class ProjectStore:
             payload = json.loads(source.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise ProjectError(f"Cannot read project file {source}") from exc
+        if not isinstance(payload, dict):
+            raise ProjectError("Project file root must be a JSON object.")
         if payload.get("schema_version") != PROJECT_SCHEMA_VERSION:
             raise ProjectError(f"Unsupported project schema version: {payload.get('schema_version')!r}")
         expected = payload.pop("content_sha256", None)
