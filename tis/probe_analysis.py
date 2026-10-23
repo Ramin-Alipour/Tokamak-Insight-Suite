@@ -120,9 +120,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             out['electron_retarding_log_slope_per_V']=slope
             out['electron_retarding_fit_intercept']=float(p[1])
         else: out['electron_temperature_eV']=None
-    if area_m2 is not None and 'ion_saturation_current_A' not in out:
-        out['ion_density_status'] = "not_estimated: provide an ion_fit_range containing at least three points"
-    if area_m2 is not None and 'ion_saturation_current_A' in out:
+    if area_m2 is not None and ion_fit_range is None:
+        out['ion_density_status'] = "not_estimated: provide a physically selected ion_fit_range containing at least three points; tail fallback is descriptive only"
+    if area_m2 is not None and ion_fit_range is not None and 'ion_saturation_current_A' in out:
         te_value = out.get('electron_temperature_eV')
         if te_value is None or not np.isfinite(te_value) or te_value <= 0:
             raise ValueError("Ion-density estimation requires a valid positive electron temperature from the electron-retarding fit; refusing to substitute Te=0.")
