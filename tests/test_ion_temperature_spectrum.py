@@ -68,3 +68,33 @@ def test_spectrum_workflow_validates_intensity_uncertainty():
             instrumental_fwhm_nm=instrument,
             intensity_uncertainty=np.ones(x.size - 1),
         )
+
+
+def test_spectrum_workflow_rejects_rest_wavelength_outside_window():
+    x, y, rest, mass, instrument = _synthetic_spectrum()
+    with pytest.raises(ValueError, match="within the measured wavelength window"):
+        ion_temperature_from_doppler_spectrum(
+            x, y, rest_wavelength_nm=x[-1] + 0.01, ion_mass_amu=mass,
+            instrumental_fwhm_nm=instrument,
+        )
+
+
+def test_spectrum_workflow_rejects_peak_at_window_edge():
+    x, y, rest, mass, instrument = _synthetic_spectrum()
+    y = y.copy()
+    y[0] = y.max() * 2
+    with pytest.raises(ValueError, match="peak is at a wavelength-window boundary"):
+        ion_temperature_from_doppler_spectrum(
+            x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
+            instrumental_fwhm_nm=instrument,
+        )
+
+
+def test_spectrum_workflow_rejects_flat_spectrum():
+    x, _, rest, mass, instrument = _synthetic_spectrum()
+    y = np.full_like(x, 4.0)
+    with pytest.raises(ValueError, match="no positive emission-line contrast"):
+        ion_temperature_from_doppler_spectrum(
+            x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
+            instrumental_fwhm_nm=instrument,
+        )
