@@ -90,3 +90,10 @@ def test_project_load_rejects_invalid_metadata_type(tmp_path):
     path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ProjectError, match="metadata must be a JSON object"):
         ProjectStore.load(path)
+
+
+def test_analysis_run_rejects_invalid_field_types_cleanly():
+    with pytest.raises(ProjectError, match="analysis_name must be a nonempty string"):
+        AnalysisRun(None, {}, {}, "0.5.1")
+    with pytest.raises(ProjectError, match="inputs must be a mapping"):
+        AnalysisRun("analysis", [], {}, "0.5.1")
