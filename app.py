@@ -11,6 +11,7 @@ from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum
+from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
@@ -803,7 +804,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Thomson spectral distribution','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Thomson spectral distribution':
         st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
         xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
@@ -890,6 +891,40 @@ elif page=='Spectral Analysis':
                                 st.error(f'Ion temperature withheld: {e}')
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
+    elif mode=='CXRS line profile':
+        st.caption('Fit one calibrated, isolated charge-exchange line. Requires independently known rest wavelength, emitting-ion mass and Gaussian instrumental sigma (not FWHM). Reports line-of-sight velocity and a single-Maxwellian Ti estimate; it does not infer impurity density or invert multiple views.')
+        xcol=col_select('Calibrated wavelength (nm)','', 'cxrs_x') if False else col_select('Calibrated wavelength (nm)',numeric,'cxrs_x')
+        ycol=col_select('Spectral intensity',numeric,'cxrs_y')
+        c1,c2=st.columns(2)
+        with c1:
+            rest=st.number_input('Known rest wavelength λ₀ (nm)',min_value=0.000001,value=530.0,format='%.9g',key='cxrs_rest')
+            mass=st.number_input('Emitting-ion mass (amu)',min_value=0.000001,value=12.0,format='%.8g',key='cxrs_mass')
+        with c2:
+            inst=st.number_input('Instrument Gaussian sigma (nm; not FWHM)',min_value=0.000001,value=0.008,format='%.9g',key='cxrs_inst_sigma')
+            sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='cxrs_sigma')
+        if st.button('Analyze CXRS line'):
+            try:
+                _spec=pd.DataFrame({'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),'signal':pd.to_numeric(df[ycol],errors='coerce')}).dropna()
+                if sigma_col!='<none>':
+                    _spec['signal_uncertainty']=pd.to_numeric(df.loc[_spec.index,sigma_col],errors='coerce')
+                    if not np.all(np.isfinite(_spec['signal_uncertainty'])) or np.any(_spec['signal_uncertainty']<=0):
+                        raise ValueError('Selected uncertainty column must contain finite positive values for every retained sample.')
+                _spec=_spec.sort_values('wavelength_nm',kind='stable')
+                _kwargs={}
+                if sigma_col!='<none>': _kwargs['signal_uncertainty']=_spec['signal_uncertainty'].to_numpy(dtype=float)
+                _result=analyze_cxrs_line(_spec['wavelength_nm'].to_numpy(dtype=float),_spec['signal'].to_numpy(dtype=float),
+                    rest_wavelength_nm=float(rest),ion_mass_amu=float(mass),instrument_sigma_nm=float(inst),**_kwargs)
+                _result_dict=_result.to_dict()
+                st.session_state['tis_cxrs_result']={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'sigma_col':sigma_col,'result':_result_dict}
+            except Exception as e:
+                st.error(str(e))
+        _saved_cxrs=st.session_state.get('tis_cxrs_result')
+        if _saved_cxrs and all(_saved_cxrs.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'sigma_col':sigma_col}.items()):
+            _rr=_saved_cxrs['result']
+            st.json({k:v for k,v in _rr.items() if k not in {'fitted_signal','residual'}})
+            st.line_chart(pd.DataFrame({'measured':pd.to_numeric(df[ycol],errors='coerce').to_numpy()[:len(_rr['fitted_signal'])],'fitted':_rr['fitted_signal'],'residual':_rr['residual']}))
+            json_download('Export CXRS line-profile result',_rr,'tis_cxrs_line_profile.json')
+            st.caption('Uncertainties are local fit-covariance estimates and exclude calibration/systematic effects. Check the stated assumptions before interpreting Ti or velocity.')
     elif mode=='Molecular spectroscopy':
         st.caption('Exploratory molecular-band feature extraction. Wavelength calibration is required; no species or rotational/vibrational temperature is inferred automatically.')
         xcol=col_select('Calibrated wavelength (nm)',numeric,'mol_x')
