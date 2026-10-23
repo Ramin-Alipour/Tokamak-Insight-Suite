@@ -1,4 +1,4 @@
-"""Extensible user-defined spectral models for Thomson-scattering analysis.
+""""Extensible user-defined spectral models for Thomson-scattering analysis.
 
 The registry fits user-supplied model callables; it does not interpret fitted
 parameters as plasma quantities. Registration is explicit and never dynamically
@@ -43,12 +43,13 @@ def register_spectral_model(
     key = name.strip()
     if not callable(function):
         raise TypeError("Model function must be callable")
-    names = tuple(parameter_names)
-    initial = tuple(float(v) for v in initial_values)
-    if not names or any(not isinstance(v, str) or not v.strip() for v in names):
+    raw_names = tuple(parameter_names)
+    if not raw_names or any(not isinstance(v, str) or not v.strip() for v in raw_names):
         raise ValueError("Parameter names must be non-empty strings")
+    names = tuple(v.strip() for v in raw_names)
     if len(set(names)) != len(names):
-        raise ValueError("Parameter names must be unique")
+        raise ValueError("Parameter names must be unique after trimming whitespace")
+    initial = tuple(float(v) for v in initial_values)
     if len(initial) != len(names) or not np.all(np.isfinite(initial)):
         raise ValueError("Initial values must be finite and match parameter names")
 
