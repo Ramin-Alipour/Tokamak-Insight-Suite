@@ -121,3 +121,50 @@ def test_thomson_power_density_rejects_negative_input_uncertainty():
             1.0e-9, 2.0, 0.15, np.pi / 2, 1.0e-3,
             scattered_power_uncertainty_W=-1.0e-12,
         )
+
+
+
+def test_calibrated_thomson_spectrum_pipeline_returns_temperature_and_density():
+    from tokamak_analysis.thomson_workflow import analyze_thomson_spectrum_and_density
+    from tokamak_analysis.thomson_spectrum import ELECTRON_REST_ENERGY_EV
+
+    laser_nm = 532.0
+    angle = np.pi / 2
+    temperature_ev = 100.0
+    instrument_sigma_nm = 0.05
+    sigma_physical = laser_nm * np.sqrt(
+        2.0 * temperature_ev / ELECTRON_REST_ENERGY_EV
+    ) * np.sin(angle / 2.0)
+    sigma_measured = np.sqrt(sigma_physical**2 + instrument_sigma_nm**2)
+    wavelength = np.linspace(laser_nm - 30.0, laser_nm + 30.0, 801)
+    power_density = (
+        1200.0 * np.exp(-0.5 * ((wavelength - laser_nm) / sigma_measured) ** 2)
+        + 30.0 + 0.4 * (wavelength - laser_nm)
+    ) * 1.0e-18
+    uncertainty = np.full(wavelength.size, 0.8e-18)
+
+    out = analyze_thomson_spectrum_and_density(
+        wavelength,
+        power_density,
+        laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle,
+        instrument_sigma_nm=instrument_sigma_nm,
+        incident_power_W=2.0,
+        interaction_length_m=0.15,
+        collection_solid_angle_sr=1.0e-3,
+        optical_efficiency=0.7,
+        signal_uncertainty_W_nm=uncertainty,
+        incident_power_uncertainty_W=0.02,
+        interaction_length_uncertainty_m=0.001,
+        scattering_angle_uncertainty_rad=np.deg2rad(0.5),
+        collection_solid_angle_uncertainty_sr=2.0e-5,
+        optical_efficiency_uncertainty=0.01,
+    )
+
+    assert out["electron_temperature_eV"] == pytest.approx(temperature_ev, rel=0.03)
+    assert np.isfinite(out["electron_density_m3"])
+    assert 1.0e19 < out["electron_density_m3"] < 1.0e20
+    assert np.isfinite(out["electron_density_uncertainty_m3"])
+    assert 0 < out["electron_density_uncertainty_m3"] < out["electron_density_m3"]
+    assert out["fit"]["spectral_power_density_calibrated"] is True
+    assert "calibration/model discrepancy" in " ".join(out["limitations"]).lower()
