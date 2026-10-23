@@ -48,8 +48,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
                 limits = np.asarray(fit_range, dtype=float)
             except (TypeError, ValueError) as exc:
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.") from exc
-            if limits.shape != (2,) or not np.all(np.isfinite(limits)):
-                raise ValueError(f"{name} must contain exactly two finite voltage limits.")
+            if limits.shape != (2,) or not np.all(np.isfinite(limits)) or limits[1] <= limits[0]:
+                raise ValueError(f"{name} must contain exactly two finite, strictly increasing voltage limits.")
     if (area_m2 is None) != (ion_mass_amu is None):
         raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
     if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
@@ -82,16 +82,31 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     out["ion_saturation_current_method"] = "median_lowest_voltage_tail_fallback"
     out["electron_saturation_current_A"] = float(np.median(i[-tail_n:]))
     out["electron_saturation_current_method"] = "median_highest_voltage_tail_descriptive"
-    # Handle exact zero-current samples explicitly; avoid 0/0 for repeated zero values.
-    exact_zero=np.flatnonzero(i == 0)
-    cross=np.where(i[:-1]*i[1:]<0)[0]
-    if len(exact_zero):
-        out['floating_potential_V']=float(v[exact_zero[0]])
-    elif len(cross):
-        k=int(cross[0])
-        out['floating_potential_V']=float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
+    # Find every zero-current crossing in voltage order. A zero-current plateau
+    # is represented by its midpoint; multiple crossings are ambiguous and must
+    # not be silently collapsed to the first crossing.
+    exact_zero = (i == 0.0)
+    candidates: list[float] = []
+    zero_idx = np.flatnonzero(exact_zero)
+    if zero_idx.size:
+        groups = np.split(zero_idx, np.flatnonzero(np.diff(zero_idx) > 1) + 1)
+        candidates.extend(float(0.5 * (v[g[0]] + v[g[-1]])) for g in groups)
+    for k in range(len(i) - 1):
+        if not exact_zero[k] and not exact_zero[k + 1] and i[k] * i[k + 1] < 0:
+            candidates.append(float(v[k] - i[k] * (v[k + 1] - v[k]) / (i[k + 1] - i[k])))
+    candidates.sort()
+    unique_candidates: list[float] = []
+    for candidate in candidates:
+        if not unique_candidates or not np.isclose(candidate, unique_candidates[-1], rtol=1e-10, atol=1e-12):
+            unique_candidates.append(candidate)
+    out['floating_potential_candidates_V'] = unique_candidates
+    out['floating_potential_V'] = unique_candidates[0] if len(unique_candidates) == 1 else None
+    if not unique_candidates:
+        out['floating_potential_status'] = 'no_zero_crossing_in_measured_sweep'
+    elif len(unique_candidates) > 1:
+        out['floating_potential_status'] = 'ambiguous_multiple_zero_crossings'
     else:
-        out['floating_potential_V']=None
+        out['floating_potential_status'] = 'single_zero_crossing'
     didv=np.gradient(i,v)
     if not np.all(np.isfinite(didv)):
         raise ValueError("dI/dV is non-finite; voltage values must be distinct and well-conditioned.")
