@@ -52,6 +52,8 @@ def main() -> int:
         Path(args.output).write_text(json.dumps(report,indent=2,ensure_ascii=False,default=_js)+'\n',encoding='utf-8')
         print(f"{args.kind}: wrote {Path(args.output).resolve()}"); return 0
     if args.signal not in frame.columns: raise SystemExit(f"Signal column {args.signal!r} not found. Available: {list(frame.columns)}")
+    if args.time and args.time not in frame.columns:
+        raise SystemExit(f"Time column {args.time!r} not found. Available: {list(frame.columns)}")
     t=None if not args.time else pd.to_numeric(frame[args.time],errors='coerce').to_numpy()
     tt,yy,fs=prepare_time_series(t,pd.to_numeric(frame[args.signal],errors='coerce').to_numpy(),args.fs)
     f,amp=fft_spectrum(yy,fs); fp,psd=welch_psd(yy,fs)
