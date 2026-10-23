@@ -784,17 +784,17 @@
     "family": "Plasma parameters",
     "diagnostic": "Charge-exchange recombination spectroscopy (CXRS)",
     "quantities": "T_i, toroidal/poloidal rotation, impurity density constraints",
-    "status": "D/I",
+    "status": "D",
     "method": "Fit a calibrated isolated charge-exchange emission line with a Gaussian plus local linear background; subtract a known Gaussian instrumental width in quadrature to estimate ion temperature and Doppler line-of-sight velocity.",
     "caveat": "Requires correct line identification, calibrated wavelength axis, rest wavelength, emitting-ion mass, and independently measured instrumental sigma (not FWHM). This workflow does not perform atomic-rate impurity-density estimation, neutral-beam attenuation, or toroidal/poloidal inversion.",
     "implementation_functions": [
       "tokamak_analysis.cxrs.analyze_cxrs_line"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Complete within the explicitly supported calibrated single-line analysis scope; multi-view inversion, impurity density, atomic kinetics and device-specific validation are explicitly out of scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "input_specs": [
         {
           "name": "wavelength_nm",
@@ -934,7 +934,7 @@
         "Estimate a local linear edge background and fit Gaussian amplitude, center, width, intercept and slope.",
         "Reject unresolved line widths when observed width does not exceed instrumental width."
       ],
-      "algorithm": "Fit Gaussian emission plus local linear background using nonlinear least squares. Compute intrinsic Doppler sigma from sqrt(sigma_observed^2 - sigma_instrument^2), Ti = m_i c^2/e * (sigma_D/lambda_0)^2, and v_los = c*(lambda_center-lambda_0)/lambda_0. Propagate local fit covariance to Ti and line-of-sight velocity uncertainties.",
+      "algorithm": "Fit Gaussian emission plus local linear background using nonlinear least squares. Compute intrinsic Doppler sigma from sqrt(sigma_observed^2 - sigma_instrument^2), Ti = m_i c^2/e * (sigma_D/lambda_0)^2, and v_los = c*(lambda_center-lambda_0)/lambda_0. Propagate local fit covariance to Ti and line-of-sight velocity uncertainties. The declared completion boundary is calibrated isolated-line inference only; no uncalibrated detector-to-physics claim is made.",
       "uncertainty_model": "Local nonlinear least-squares covariance; optional per-sample standard deviations enable weighted fitting. Ti and velocity uncertainties are first-order covariance propagation. Excludes systematic uncertainty and covariance in wavelength calibration, rest wavelength, ion mass, and instrumental width.",
       "limitations": [
         "No atomic-rate or neutral-beam attenuation model and no impurity-density estimate.",
@@ -947,7 +947,7 @@
         "tokamak_analysis.cxrs.analyze_cxrs_line"
       ],
       "raw_data_to_physics": false,
-      "note": "Scoped calibrated single-line analysis is implemented; it is not a complete device-specific CXRS inversion. Use correctly identified isolated transitions and independently characterized instrumental response. Independent experimental validation remains necessary.",
+      "note": "Complete for calibrated isolated-line fitting and its documented outputs. Not a full CXRS diagnostic suite: impurity density, atomic-rate modelling, neutral-beam attenuation, line deblending, multi-view toroidal/poloidal inversion, and independent device-specific validation are outside scope.",
       "workflow_modes": [
         {
           "name": "calibrated_isolated_line",
