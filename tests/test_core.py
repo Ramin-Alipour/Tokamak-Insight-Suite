@@ -873,3 +873,15 @@ def test_fwhm_method_rejects_unresolved_line():
             observed_fwhm=0.04, lambda0=656.28, mass_amu=1.0,
             instrumental_fwhm=0.04,
         )
+
+
+def test_cross_analysis_single_welch_segment_marks_statistics_unavailable():
+    # One full-record segment gives a degenerate coherence estimate (typically 1)
+    # and cannot support a null-coherence threshold or phase standard error.
+    rng = np.random.default_rng(123)
+    x = rng.normal(size=64)
+    y = rng.normal(size=64)
+    result = cross_analysis(x, y, fs=1000, nperseg=64)
+    assert np.all(result["nominal_welch_segment_count"] == 1)
+    assert np.all(np.isnan(result["coherence_95pct_null_threshold"]))
+    assert np.all(np.isnan(result["phase_standard_error_approx_rad"]))
