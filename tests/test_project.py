@@ -38,3 +38,13 @@ def test_project_compares_runs_in_requested_order():
     assert [x.analysis_name for x in project.compare_runs([second.run_id, first.run_id])] == ["temperature", "density"]
     with pytest.raises(ProjectError, match="Unknown analysis run"):
         project.compare_runs(["not-a-run"])
+
+
+def test_project_serializes_nonfinite_numpy_values(tmp_path):
+    project = Project(title="non-finite values", metadata={"scalar": np.float64(np.nan), "array": np.array([1.0, np.inf, -np.inf])})
+    path = ProjectStore.save(project, tmp_path / "non-finite.tis-project.json")
+    payload = json.loads(path.read_text())
+    assert payload["metadata"]["scalar"] == {"__nonfinite_float__": "nan"}
+    assert payload["metadata"]["array"] == [1.0, {"__nonfinite_float__": "inf"}, {"__nonfinite_float__": "-inf"}]
+    restored = ProjectStore.load(path)
+    assert restored.metadata == payload["metadata"]
