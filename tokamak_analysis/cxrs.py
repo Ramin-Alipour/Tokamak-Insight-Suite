@@ -93,6 +93,8 @@ def analyze_cxrs_line(
         raise ValueError("wavelength_nm and signal must contain only finite values")
     if np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm must be strictly increasing")
+    if not x[0] <= rest_wavelength_nm <= x[-1]:
+        raise ValueError("rest_wavelength_nm must lie within the measured wavelength range")
     for name, value in (("rest_wavelength_nm", rest_wavelength_nm),
                         ("ion_mass_amu", ion_mass_amu),
                         ("instrument_sigma_nm", instrument_sigma_nm)):
