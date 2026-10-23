@@ -435,7 +435,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented single-sweep I–V analysis within the explicitly declared model scope; independent experimental validation and full uncertainty propagation are not claimed.",
+    "implementation_status": "Implemented single-sweep I–V analysis with explicit current convention, descriptive saturation-tail fallbacks, optional fit-window-based Te and ion-branch estimates, and optional model-dependent density inference. Independent experimental validation and full uncertainty propagation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -444,7 +444,7 @@
         {
           "name": "voltage_V",
           "unit": "V",
-          "description": "One-dimensional calibrated probe-voltage sweep; at least eight distinct finite values are required by the analysis routine.",
+          "description": "One-dimensional calibrated voltage sweep; at least eight distinct finite values are required.",
           "required": true
         },
         {
@@ -557,6 +557,21 @@
           "name": "interpretation_warning",
           "unit": "text",
           "description": "Physical limitations and required experiment-specific checks."
+        },
+        {
+          "name": "electron_saturation_current_A",
+          "unit": "A",
+          "description": "Median of the highest-voltage tail; descriptive only, not a validated saturation-branch fit."
+        },
+        {
+          "name": "ion_saturation_current_method",
+          "unit": "text",
+          "description": "Indicates whether ion current came from the analyst-selected fit interval or a low-voltage-tail fallback."
+        },
+        {
+          "name": "electron_temperature_uncertainty_note",
+          "unit": "text",
+          "description": "Statistical fit uncertainty excludes calibration, fit-window, sheath and instrumental systematics."
         }
       ],
       "assumptions": [
@@ -566,18 +581,18 @@
         "Ion density uses n_i≈|I_isat|/(sheath_factor·e·A·c_s), with c_s=sqrt(e·(gamma_i·T_i+T_e)/(m_i)); all temperatures are in eV."
       ],
       "preprocessing": [
-        "Require matching voltage/current lengths and at least eight valid distinct voltage points.",
-        "Discard non-finite voltage/current pairs, sort voltage-current pairs together, and average currents at duplicate voltages.",
-        "Validate fit ranges and positive finite collection area/ion mass when supplied; no automatic fit-window selection."
+        "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
+        "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
+        "Validate current polarity, fit windows, and positive finite geometry/model inputs.",
+        "Use explicit analyst-selected fit windows; no automatic physical regime selection."
       ],
-      "algorithm": "Compute dI/dV and floating-potential crossing; optionally fit the ion branch linearly and estimate ion saturation current; optionally fit log electron current against voltage to estimate electron temperature; optionally infer ion density using the stated sheath/sound-speed model.",
+      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate floating-potential crossings, dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
       "uncertainty_model": "Only the optional electron-temperature fit returns a local regression standard error when enough fit points are available. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
-        "Requires calibrated data and manually justified fit windows; no automatic regime classification.",
-        "Plasma-potential proxy from maximum dI/dV can be biased by noise, filtering, sweep direction and probe circuitry.",
-        "Ion-density estimate is valid only to the extent that the assumed sheath collection law, collection area, ion mass and ion temperature describe the experiment.",
-        "No automatic uncertainty propagation for calibration or ion density; fit R² alone does not establish physical validity.",
-        "Not a multi-probe, swept-frequency RF-compensation, magnetized-sheath, or non-Maxwellian inversion model."
+        "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
+        "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
+        "Density is a model-dependent estimate; calibration and full uncertainty propagation are not automatic.",
+        "Check fit quality and probe-specific sheath, magnetic-field, RF, collision, surface and sweep-direction effects."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
