@@ -28,6 +28,8 @@ def test_electron_cyclotron_frequency_independent_reference():
     r=electron_cyclotron_frequency(B,sigma_magnetic_field_T=0.01)
     assert r["omega_ce_rad_s"] == pytest.approx(expected,rel=1e-12)
     assert r["frequency_ce_Hz"] == pytest.approx(expected/(2*math.pi),rel=1e-12)
+    assert r["uncertainty_omega_ce_rad_s"] == pytest.approx(E_CHARGE*0.01/M_E, rel=1e-12)
+    assert r["uncertainty_frequency_ce_Hz"] == pytest.approx(E_CHARGE*0.01/(2*math.pi*M_E), rel=1e-12)
 
 def test_ion_sound_speed_independent_reference():
     Te,Ti,mi,gamma=20.0,10.0,2*1.66053906660e-27,1.0
