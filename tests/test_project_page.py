@@ -5,7 +5,7 @@ from tis.ui.project_page import _sync_analysis_history
 def test_project_export_syncs_new_history_into_existing_project_without_duplicates():
     project = Project(
         title="existing",
-        analysis_runs=[AnalysisRun("older", {}, {}, "0.5.1", inputs={"history_key": "older-key"})],
+        analysis_runs=[AnalysisRun("older", {"history_key": "older-key"}, {}, "0.5.1")],
     )
     history = [
         {
