@@ -318,7 +318,7 @@ def fetch_fair_mast_efit_snapshot(
     This exports archive output; it does not perform a Grad-Shafranov solve.
     The returned table has z_m plus one column per R coordinate.
     """
-    if int(shot) < 1:
+    if isinstance(shot, bool) or not isinstance(shot, (int, np.integer)) or shot < 1:
         raise ValueError("Shot number must be a positive integer.")
     if not np.isfinite(time_s):
         raise ValueError("Requested EFIT time must be finite.")
@@ -399,7 +399,7 @@ def list_fair_mast_signals(shot: int, group: str) -> tuple[pd.DataFrame, dict[st
     :func:`fetch_fair_mast_signal`. Multidimensional profiles/images are listed
     for discovery but are not misrepresented as supported by the 1-D importer.
     """
-    if int(shot) < 1:
+    if isinstance(shot, bool) or not isinstance(shot, (int, np.integer)) or shot < 1:
         raise ValueError("Shot number must be a positive integer.")
     group = str(group).strip()
     if not group or "/" in group or "\\" in group:
