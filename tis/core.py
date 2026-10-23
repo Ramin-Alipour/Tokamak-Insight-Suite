@@ -732,8 +732,13 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
         quad[1:-1]=(e[2:]-e[:-2])/2
     weighted=quad*c
     area=float(np.sum(weighted))
+    energy_weighted_area = float(np.sum(e * weighted))
     base={'integrated_signal':area,
-          'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal·energy_unit',
+          # density_per_eV integrates to signal/counts; counts_per_bin sums
+          # already-integrated bin counts. Neither result is energy-weighted.
+          'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal',
+          'integrated_signal_energy_weighted_eV':energy_weighted_area,
+          'energy_weighted_integral_unit':'counts·eV' if bin_representation=="counts_per_bin" else 'signal·eV',
           'bin_representation':bin_representation,'n_points':int(len(e)),
           'uncertainty_propagated':sigma is not None}
     if area<=0:
@@ -753,10 +758,10 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
             'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
             'uncertainty_propagated':sigma is not None,
             'note':'Moments retain signed background-subtracted bins. Detector response, efficiency, pile-up and background covariance are not corrected automatically.'}
-    if bin_representation == "density_per_eV":
-        result['integrated_counts_eV']=area
-    else:
-        result['integrated_counts']=area
+    # The unweighted integral is the total signal. Keep one unit-stable key
+    # for both input representations; the energy-weighted integral is reported
+    # separately and is never confused with the total signal.
+    result['integrated_counts'] = area
     if sigma is not None:
         dmean=quad*(e-mean)/area
         var_derivative=quad*((e-mean)**2-var)/area
@@ -810,14 +815,17 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
         if source in r:
             value = r.pop(source)
             r[target] = None if value is None else float(value) / 1000.0
-    if 'integrated_counts_eV' in r:
-        r['integrated_signal_keV_weighted']=float(r.pop('integrated_counts_eV')) / 1000.0
-        # The shared moment routine integrates over eV. Convert the energy-weighted
-        # integral to keV-weighted units, while preserving the legacy output key.
-        r['integrated_counts_keV']=r['integrated_signal_keV_weighted']
-    elif 'integrated_signal' in r:
-        r['integrated_signal_keV_weighted']=r['integrated_signal']
-        r['integrated_counts_keV']=r['integrated_signal']
+    # Convert the explicitly energy-weighted integral from signal·eV to
+    # signal·keV. Do not scale the unweighted total signal by 1/1000.
+    weighted_eV = r.get('integrated_signal_energy_weighted_eV')
+    r['integrated_signal_keV_weighted'] = (
+        None if weighted_eV is None else float(weighted_eV) / 1000.0
+    )
+    r['integrated_counts_keV'] = r['integrated_signal_keV_weighted']
+    r['integrated_signal_keV_weighted_definition'] = (
+        'Integral of energy_keV times spectral signal over energy; '
+        'not the unweighted total signal.'
+    )
     r['energy_axis_unit']='keV'
     r['note']='Energy axis is interpreted as keV. Select counts-per-bin or signal density explicitly; detector response and absolute calibration are not applied.'
     return r
