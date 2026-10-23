@@ -1133,11 +1133,11 @@
       "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
       "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
     ],
-    "implementation_status": "Complete within the explicitly bounded feature-extraction and user-defined-model-fitting scope; molecular species/temperature inversion and independent experimental validation are not claimed.",
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "wavelength_nm",
