@@ -121,6 +121,19 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
         raise ValueError("max_interp_gap_s must be positive and finite.")
     grid = np.arange(t[0], t[-1] + 0.5 / fs, 1.0 / fs)
     grid = grid[grid <= t[-1] + 1e-12 * abs(t[-1])]
+    # Snap grid points that differ from a measured timestamp only by floating-
+    # point roundoff. Besides preserving measured values, this keeps endpoint
+    # identity consistent for downstream masks using strict time comparisons.
+    right_idx = np.clip(np.searchsorted(t, grid, side="left"), 0, len(t) - 1)
+    left_idx = np.clip(right_idx - 1, 0, len(t) - 1)
+    right_dist = np.abs(grid - t[right_idx])
+    left_dist = np.abs(grid - t[left_idx])
+    use_left = left_dist < right_dist
+    nearest_idx = np.where(use_left, left_idx, right_idx)
+    nearest_time = t[nearest_idx]
+    tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(nearest_time)))
+    snap = np.abs(grid - nearest_time) <= tol
+    grid[snap] = nearest_time[snap]
     out = np.interp(grid, t, y)
     # Mask only interpolated points strictly inside long source intervals.
     # Floating-point grids can represent a source timestamp (e.g. 0.6 s) as
