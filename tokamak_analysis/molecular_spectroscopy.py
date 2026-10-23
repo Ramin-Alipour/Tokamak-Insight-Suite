@@ -163,12 +163,31 @@ def fit_custom_molecular_model(wavelength_nm, intensity, model, *, parameter_nam
         sigma = np.asarray(intensity_uncertainty, dtype=float)
         if sigma.shape != y.shape or not np.all(np.isfinite(sigma)) or np.any(sigma <= 0):
             raise ValueError("intensity_uncertainty must be positive, finite, and match intensity")
-    lower, upper = bounds
-    popt, pcov = curve_fit(model, x, y, p0=p0, bounds=(lower, upper),
-                           sigma=sigma, absolute_sigma=sigma is not None, maxfev=50000)
-    fitted = np.asarray(model(x, *popt), dtype=float)
-    if fitted.shape != y.shape or not np.all(np.isfinite(fitted)):
-        raise ValueError("Model must return a finite array matching wavelength_nm")
+    try:
+        lower, upper = bounds
+        lower = np.broadcast_to(np.asarray(lower, dtype=float), p0.shape)
+        upper = np.broadcast_to(np.asarray(upper, dtype=float), p0.shape)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("bounds must contain broadcastable lower and upper parameter bounds") from exc
+    if (not np.all(np.isfinite(lower) | np.isneginf(lower))
+            or not np.all(np.isfinite(upper) | np.isposinf(upper))
+            or np.any(lower >= upper)):
+        raise ValueError("Each lower bound must be less than its upper bound; use -inf/+inf for unbounded sides")
+    if np.any(p0 < lower) or np.any(p0 > upper):
+        raise ValueError("initial_values must lie within the supplied parameter bounds")
+
+    def checked_model(wavelength, *parameters):
+        values = np.asarray(model(wavelength, *parameters), dtype=float)
+        if values.shape != np.asarray(wavelength).shape or not np.all(np.isfinite(values)):
+            raise ValueError("Model must return a finite array matching the wavelength input")
+        return values
+
+    try:
+        popt, pcov = curve_fit(checked_model, x, y, p0=p0, bounds=(lower, upper),
+                               sigma=sigma, absolute_sigma=sigma is not None, maxfev=50000)
+        fitted = checked_model(x, *popt)
+    except (TypeError, ValueError, FloatingPointError) as exc:
+        raise ValueError(f"Custom molecular model fitting failed: {exc}") from exc
     residual = y - fitted
     dof = int(y.size - len(popt))
     out = {
