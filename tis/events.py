@@ -22,7 +22,19 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
         raise ValueError("Time must be strictly increasing.")
     intervals = np.diff(t)
     dt = float(np.median(intervals))
-    if np.max(intervals) > 1.5 * dt or float(np.std(intervals) / dt) > 0.02:
+    # Timestamp quantization can alternate adjacent clock ticks (e.g. 2 and
+    # 3 microseconds for a 400 kHz signal stored at 1 us resolution). Such
+    # deterministic quantization is not the same as dropped-sample gaps.
+    # Retain the strict gap check, but tolerate interval variation when every
+    # interval is within 1.5x of the median and the intervals are consistent
+    # with integer multiples of a common clock tick.
+    max_ratio = float(np.max(intervals) / dt)
+    cv = float(np.std(intervals) / dt)
+    tick = float(np.min(intervals))
+    tick_ratios = intervals / tick
+    quantized_ticks = np.all(np.abs(tick_ratios - np.rint(tick_ratios)) <= 0.05)
+    quantized_adjacent = quantized_ticks and max_ratio <= 1.5 and np.max(tick_ratios) - np.min(tick_ratios) <= 1.0 + 1e-9
+    if max_ratio > 1.5 or (cv > 0.02 and not quantized_adjacent):
         raise ValueError("Event detection requires approximately uniform sampling; resample irregular timestamps and handle missing samples explicitly first.")
     return t, y, dt
 
