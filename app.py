@@ -13,6 +13,7 @@ from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
+from tokamak_analysis.ece_analysis import analyze_ece
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -956,6 +957,43 @@ elif page=='Plasma Parameters':
         if st.button('Calculate resonance field'):
             try: st.json(electron_cyclotron_resonance_field(ef*1e9,harm))
             except Exception as e: st.error(str(e))
+        st.divider()
+        st.markdown('#### ECE channel analysis')
+        st.caption('Use calibrated spectral radiance for brightness temperature. Temperature is not automatically electron temperature: optical thickness and thermalization must be justified independently.')
+        ece_mode=st.selectbox('ECE workflow',['Brightness temperature','Channel fluctuations / PSD','Resonance mapping'],key='ece_workflow_mode')
+        ece_freq_text=st.text_input('Channel center frequencies (GHz, comma-separated, ascending)',value='80, 90, 100',key='ece_channel_freqs')
+        try:
+            ece_freq_GHz=np.asarray([float(v.strip()) for v in ece_freq_text.split(',') if v.strip()],dtype=float)
+            if ece_freq_GHz.ndim!=1 or ece_freq_GHz.size==0 or np.any(~np.isfinite(ece_freq_GHz)) or np.any(ece_freq_GHz<=0) or np.any(np.diff(ece_freq_GHz)<=0):
+                raise ValueError('Enter finite, positive, strictly increasing channel frequencies.')
+            ece_freq_Hz=ece_freq_GHz*1e9
+            if ece_mode=='Brightness temperature':
+                ece_rad_text=st.text_input('Calibrated spectral radiance per channel (W m⁻² sr⁻¹ Hz⁻¹; comma-separated)',key='ece_radiance')
+                if st.button('Analyze ECE brightness temperature',type='primary',key='ece_run_brightness'):
+                    ece_rad=np.asarray([float(v.strip()) for v in ece_rad_text.split(',') if v.strip()],dtype=float)
+                    if ece_rad.shape!=ece_freq_Hz.shape:
+                        raise ValueError('Radiance count must equal the number of channel frequencies.')
+                    st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),spectral_radiance_W_m2_sr_Hz=ece_rad,mode='brightness_temperature'))
+            elif ece_mode=='Channel fluctuations / PSD':
+                if df is None:
+                    st.info('Upload a table containing a time column and one calibrated signal column per ECE channel.')
+                else:
+                    ece_time_col=col_select('ECE time column (s)',list(df.columns),'ece_time_col')
+                    ece_signal_cols=st.multiselect('ECE channel signal columns (same order as frequencies)',[c for c in numeric if c!=ece_time_col],key='ece_signal_cols')
+                    if st.button('Analyze ECE fluctuations / PSD',type='primary',key='ece_run_fluctuations'):
+                        if len(ece_signal_cols)!=len(ece_freq_Hz):
+                            raise ValueError('Select exactly one signal column per channel frequency.')
+                        ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce').dropna()
+                        ece_t=ece_frame[ece_time_col].to_numpy(dtype=float)
+                        ece_y=ece_frame[ece_signal_cols].to_numpy(dtype=float)
+                        st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),signal=ece_y,time_s=ece_t,mode='channel_fluctuations'))
+            else:
+                ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_r0')
+                ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_b0')
+                if st.button('Map ECE resonance radii',type='primary',key='ece_run_mapping'):
+                    st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping'))
+        except Exception as e:
+            st.error(str(e))
     with tabs[3]:
         st.write('For aligned columns, calculate covariance fluxes from calibrated density, radial velocity and optional temperature.')
         if df is not None and len(numeric)>=2:
