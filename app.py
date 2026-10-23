@@ -183,8 +183,25 @@ def _result_summary(value):
                 if not isinstance(v,np.ndarray) or v.size<=100}
     if isinstance(value,np.ndarray):
         finite=value[np.isfinite(value)] if np.issubdtype(value.dtype,np.number) else np.asarray([])
-        return {"shape":list(value.shape),"dtype":str(value.dtype),"finite_count":int(finite.size),
-                "min":float(np.min(finite)) if finite.size else None,"max":float(np.max(finite)) if finite.size else None}
+        summary={"shape":list(value.shape),"dtype":str(value.dtype),"finite_count":int(finite.size)}
+        if finite.size and np.iscomplexobj(finite):
+            # Complex-valued spectra/cross-spectra have no natural scalar min/max.
+            # Preserve their components and magnitude instead of raising TypeError
+            # when float(complex) is attempted during report-history generation.
+            summary.update({
+                "real_min":float(np.min(finite.real)),
+                "real_max":float(np.max(finite.real)),
+                "imag_min":float(np.min(finite.imag)),
+                "imag_max":float(np.max(finite.imag)),
+                "magnitude_min":float(np.min(np.abs(finite))),
+                "magnitude_max":float(np.max(np.abs(finite))),
+            })
+        else:
+            summary.update({
+                "min":float(np.min(finite)) if finite.size else None,
+                "max":float(np.max(finite)) if finite.size else None,
+            })
+        return summary
     if isinstance(value,(list,tuple)) and len(value)>30:
         return {"items":len(value),"preview":_json_safe(value[:5])}
     return _json_safe(value)
