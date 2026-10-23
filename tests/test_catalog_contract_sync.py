@@ -14,7 +14,16 @@ def test_formula_catalogue_is_loaded_from_canonical_formula_registry():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
     assert len(FORMULAS) == 37
     assert FORMULAS == rows
-    assert all(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS)
+    from importlib import import_module
+    mapped = [row for row in FORMULAS if row["execution_contract"]["implementation_link_status"] == "mapped"]
+    assert len(mapped) == 9
+    assert sum(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS) == 28
+    for row in mapped:
+        contract = row["execution_contract"]
+        module_name, function_name = contract["function_link"].rsplit(".", 1)
+        assert callable(getattr(import_module(module_name), function_name, None))
+        assert contract["input_specs"] and contract["output_specs"] and contract["test_links"]
+        assert contract["uncertainty_model"] != "not_specified"
 
 def test_package_and_runtime_versions_are_consistent():
     from tis import __version__
