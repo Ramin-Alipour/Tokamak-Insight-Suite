@@ -13,7 +13,7 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Implemented calibrated profile, scoped raw-spectrum fit, calibrated density, combined workflow, and user-defined spectral-model fitting within declared scope; overall analysis remains incomplete outside this scope",
+    "implementation_status": "Implemented numerical workflow (see limits); overall analysis remains incomplete outside the declared scope",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -286,7 +286,7 @@
         "tokamak_analysis.thomson_models.fit_custom_spectral_model"
       ],
       "raw_data_to_physics": true,
-      "note": "The implemented paths are complete only within their declared assumptions, not as a universal Thomson-scattering solver. Workflow-specific requirements are defined by workflow_modes; the global input list is a cross-mode catalog, not a claim that all inputs are required simultaneously. Dashboard access and focused numerical tests exist. Uncalibrated spectral amplitude is not density. Collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope. An optional user-defined spectral-model registry accepts explicitly registered Python callables and returns generic fit diagnostics; it does not automatically infer physical plasma parameters or dynamically import plugins.",
+      "note": "Overall analysis remains incomplete until the supported paths and UI are confirmed end-to-end and the contract/test suite is synchronized. User-defined model fitting returns generic fit parameters only; physical interpretation and validation remain the model author's responsibility.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
