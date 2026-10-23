@@ -22,6 +22,7 @@ All wavelengths and widths use nm consistently in the ratios. The ion mass is su
 - `rest_wavelength_nm`: positive rest wavelength for the identified transition (nm).
 - `ion_mass_amu`: positive emitting-ion mass in u.
 - `instrument_sigma_nm`: independently measured Gaussian instrumental standard deviation (nm), not FWHM.
+- `instrument_sigma_uncertainty_nm`: optional non-negative 1-sigma uncertainty of the instrumental standard deviation (nm); propagated into the ion-temperature uncertainty.
 - `viewing_angle_rad`: optional metadata in [0, pi]; no geometric deprojection is performed.
 - `signal_uncertainty`: optional positive 1-sigma uncertainty per sample.
 - `initial_center_nm`: optional line-center initial estimate.
@@ -32,8 +33,8 @@ Line center and uncertainty, observed/intrinsic width, Ti and uncertainty, line-
 
 ## Scientific limits
 
-This is a validated numerical line-fit workflow, not a complete device-specific CXRS inversion. It does not calculate impurity density from atomic rates, model neutral-beam attenuation or beam overlap, deblend multiple transitions, correct opacity, fit non-Gaussian instrumental line shapes, or infer toroidal/poloidal rotation from multiple views. Fit covariance excludes systematic uncertainties in wavelength calibration, rest wavelength, ion mass and instrumental width. The viewing angle is recorded only; the returned velocity remains line-of-sight. Independent experimental validation and device-specific atomic-data checks remain necessary.
+This is a validated numerical line-fit workflow, not a complete device-specific CXRS inversion. It does not calculate impurity density from atomic rates, model neutral-beam attenuation or beam overlap, deblend multiple transitions, correct opacity, fit non-Gaussian instrumental line shapes, or infer toroidal/poloidal rotation from multiple views. The ion-temperature uncertainty combines the local fitted observed-width covariance with the optional instrumental-width uncertainty in quadrature. If the latter is omitted it defaults to zero, so instrument-width uncertainty is not included. Remaining systematic uncertainties in wavelength calibration, rest wavelength, ion mass, line identification, and model discrepancy are excluded. The viewing angle is recorded only; the returned velocity remains line-of-sight. Independent experimental validation and device-specific atomic-data checks remain necessary.
 
 ## Reproducible tests
 
-`tests/test_cxrs.py` covers synthetic recovery of center/velocity/Ti, weighted fit diagnostics, invalid axes and uncertainties, nonphysical parameters, and unresolved instrumental broadening.
+`tests/test_cxrs.py` covers synthetic recovery of center/velocity/Ti, weighted fit diagnostics, propagation and validation of instrumental-width uncertainty, invalid axes and uncertainties, nonphysical parameters, and unresolved instrumental broadening.
