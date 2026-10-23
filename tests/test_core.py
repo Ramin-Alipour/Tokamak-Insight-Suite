@@ -837,9 +837,15 @@ def test_load_table_enforces_byte_limit():
         load_table(b"time,signal\n0,1\n","sample.csv",max_bytes=8)
 
 
-def test_xray_spectrum_summary_integrates_density_on_eV_scale():
+def test_xray_spectrum_summary_distinguishes_total_from_energy_weighted_integral():
     result = xray_spectrum_summary([1.0, 2.0, 3.0], [1.0, 1.0, 1.0], bin_representation="density_per_eV")
-    assert result["integrated_signal_keV_weighted"] == pytest.approx(2000.0)
+    # A unit density per eV over 1--3 keV integrates to 2000 signal units.
+    # The separate first energy moment is 4000 signal·keV.
+    assert result["integrated_signal"] == pytest.approx(2000.0)
+    assert result["integrated_counts"] == pytest.approx(2000.0)
+    assert result["integrated_signal_unit"] == "signal"
+    assert result["integrated_signal_keV_weighted"] == pytest.approx(4000.0)
+    assert result["integrated_counts_keV"] == pytest.approx(4000.0)
     assert result["mean_energy_keV"] == pytest.approx(2.0)
     assert result["rms_energy_spread_keV"] == pytest.approx(np.sqrt(0.5), rel=1e-6)
 
@@ -850,7 +856,10 @@ def test_spectrum_moments_distinguishes_counts_per_bin_from_density():
     by_bin=spectrum_moments(energy,counts,bin_representation="counts_per_bin")
     density=spectrum_moments(energy,counts,bin_representation="density_per_eV")
     assert by_bin["integrated_counts"] == pytest.approx(3.0)
-    assert density["integrated_counts_eV"] == pytest.approx(4.0)
+    assert density["integrated_counts"] == pytest.approx(4.0)
+    assert density["integrated_signal_unit"] == "signal"
+    assert density["integrated_signal_energy_weighted_eV"] == pytest.approx(14.0)
+    assert by_bin["integrated_signal_energy_weighted_eV"] == pytest.approx(8.0)
     assert by_bin["mean_energy_eV"] != pytest.approx(density["mean_energy_eV"])
 
 
@@ -999,6 +1008,8 @@ def test_xray_spectrum_integrated_energy_weighted_signal_converts_ev_to_kev():
     result = xray_spectrum_summary(
         [1.0, 2.0, 3.0], [1.0, 1.0, 1.0], bin_representation="density_per_eV"
     )
-    # Trapezoidal integral is 2 signal·eV, i.e. 0.002 signal·keV.
-    assert result["integrated_signal_keV_weighted"] == pytest.approx(0.002)
-    assert result["integrated_counts_keV"] == pytest.approx(0.002)
+    # Integral of E_keV times a unit signal/eV density over 1--3 keV is
+    # 4,000 signal·keV; the unweighted total signal is 2,000.
+    assert result["integrated_signal_keV_weighted"] == pytest.approx(4000.0)
+    assert result["integrated_counts_keV"] == pytest.approx(4000.0)
+    assert result["integrated_signal"] == pytest.approx(2000.0)
