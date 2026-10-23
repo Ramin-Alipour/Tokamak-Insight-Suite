@@ -991,3 +991,14 @@ def test_cross_analysis_single_welch_segment_marks_statistics_unavailable():
     assert np.all(result["nominal_welch_segment_count"] == 1)
     assert np.all(np.isnan(result["coherence_95pct_null_threshold"]))
     assert np.all(np.isnan(result["phase_standard_error_approx_rad"]))
+
+
+def test_xray_spectrum_integrated_energy_weighted_signal_converts_ev_to_kev():
+    from tis.core import xray_spectrum_summary
+
+    result = xray_spectrum_summary(
+        [1.0, 2.0, 3.0], [1.0, 1.0, 1.0], bin_representation="density_per_eV"
+    )
+    # Trapezoidal integral is 2 signal·eV, i.e. 0.002 signal·keV.
+    assert result["integrated_signal_keV_weighted"] == pytest.approx(0.002)
+    assert result["integrated_counts_keV"] == pytest.approx(0.002)
