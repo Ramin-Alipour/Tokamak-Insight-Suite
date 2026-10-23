@@ -9,6 +9,7 @@ from .spectral_analysis import _r2
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
     """Descriptive I-V preprocessing only; does not silently infer Te/ne without a validated regime model."""
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
+    if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
     if len(v)<5: raise ValueError('At least 5 finite I-V points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
@@ -56,6 +57,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if not np.all(np.isfinite([ti_eV, sheath_factor, gamma_i])) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0:
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
+    if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
     if current_convention=="ion_positive": i=-i
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
     if len(v)<8: raise ValueError('At least 8 valid voltage points are required.')
@@ -126,7 +128,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     return out
 
 def floating_potential(voltage: Any, current: Any) -> float | None:
-    v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel(); m=np.isfinite(v)&np.isfinite(i); v,i=v[m],i[m]
+    v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
+    if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
+    m=np.isfinite(v)&np.isfinite(i); v,i=v[m],i[m]
     if len(v)<2: return None
     o=np.argsort(v); v,i=v[o],i[o]; ix=np.where(i[:-1]*i[1:]<=0)[0]
     if not len(ix): return None
