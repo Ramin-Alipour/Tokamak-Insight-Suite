@@ -154,3 +154,11 @@ def test_analysis_run_reproducibility_metadata_roundtrips(tmp_path):
     assert loaded.input_hashes == {"trace.csv": "b" * 64}
     assert loaded.random_seed == 123
     assert loaded.reproducibility_fingerprint == run.reproducibility_fingerprint
+
+
+def test_analysis_run_fingerprint_includes_input_provenance():
+    common = dict(analysis_name="PSD", inputs={"signal": "trace.csv"},
+                  settings={"window": "hann"}, algorithm_version="v1")
+    archive_a = AnalysisRun(**common, input_provenance={"archive": "FAIR-MAST"})
+    archive_b = AnalysisRun(**common, input_provenance={"archive": "other source"})
+    assert archive_a.reproducibility_fingerprint != archive_b.reproducibility_fingerprint
