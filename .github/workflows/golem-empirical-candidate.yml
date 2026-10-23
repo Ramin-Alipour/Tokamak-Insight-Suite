@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - name: Fetch shot page and explicitly linked candidate files
@@ -28,7 +28,7 @@ jobs:
         run: python tools/fetch_golem_candidate.py --shot "$GOLEM_SHOT" --output-dir artifacts/golem-empirical-candidate
       - name: Upload provenance and candidate files
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: golem-shot-${{ github.event.inputs.shot || '30622' }}-candidate
           path: artifacts/golem-empirical-candidate/
