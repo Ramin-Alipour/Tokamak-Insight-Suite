@@ -16,7 +16,8 @@ def propagate_covariance(jacobian: Any, covariance: Any) -> dict[str, np.ndarray
         raise UncertaintyError("jacobian must be 2-D and covariance square with matching input dimension")
     if not np.all(np.isfinite(J)) or not np.all(np.isfinite(C)):
         raise UncertaintyError("jacobian and covariance must contain only finite values")
-    if not np.allclose(C, C.T, rtol=1e-10, atol=1e-14):
+    covariance_scale = max(float(np.max(np.abs(C))), np.finfo(float).tiny)
+    if not np.allclose(C, C.T, rtol=1e-10, atol=1e-12 * covariance_scale):
         raise UncertaintyError("covariance must be symmetric")
     C = 0.5 * (C + C.T)
     eigenvalues = np.linalg.eigvalsh(C)
@@ -51,7 +52,8 @@ def propagate_monte_carlo(model: Callable[[np.ndarray], Any], mean: Any, covaria
         raise UncertaintyError("confidence_level must lie strictly between 0 and 1")
     if C.shape != (mu.size, mu.size) or not np.all(np.isfinite(C)):
         raise UncertaintyError("covariance shape must match mean and contain only finite values")
-    if not np.allclose(C, C.T, rtol=1e-10, atol=1e-14):
+    covariance_scale = max(float(np.max(np.abs(C))), np.finfo(float).tiny)
+    if not np.allclose(C, C.T, rtol=1e-10, atol=1e-12 * covariance_scale):
         raise UncertaintyError("covariance must be symmetric")
     C = 0.5 * (C + C.T)
     eigenvalues, eigenvectors = np.linalg.eigh(C)
