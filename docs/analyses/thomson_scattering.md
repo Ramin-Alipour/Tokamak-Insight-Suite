@@ -71,6 +71,16 @@ fit = fit_thomson_spectrum(
 print(fit["electron_temperature_eV"], fit["electron_temperature_uncertainty_eV"])
 ~~~
 
+## End-to-end calibrated spectrum-to-density workflow
+
+The callable `tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density` composes the spectral fit and calibrated scattered-power density estimate into one reproducible Python entry point.
+
+Required inputs include a calibrated wavelength axis, spectral power density in W/nm, laser wavelength, scattering angle, known Gaussian instrument sigma, incident laser power, effective interaction length, collection solid angle, and total optical efficiency. Optional independent 1-sigma uncertainties can be supplied for the spectral samples and optical geometry.
+
+The function returns electron temperature from the Gaussian spectral width and electron density from the integrated fitted Gaussian power using the classical unpolarized differential Thomson cross-section. Temperature uncertainty is fit-only. Density uncertainty is returned when at least one supported input uncertainty is supplied and uses first-order independent-error propagation.
+
+This workflow is only appropriate when the measured spectrum is absolutely calibrated in W/nm over a band compatible with the integrated-power model, the plasma is optically thin, the signal is dominated by non-collective non-relativistic Maxwellian Thomson scattering, and the instrument response is adequately Gaussian. It does not automatically correct stray light, wavelength-dependent throughput, spectral-band truncation, polarization-specific collection geometry, calibration covariance, or model discrepancy. Results require an independent uncertainty budget and experiment-specific review.
+
 ## Scientific limitations
 
 - Assumes a non-collective, non-relativistic Maxwellian electron distribution.
