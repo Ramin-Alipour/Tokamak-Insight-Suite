@@ -69,6 +69,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         counts=np.bincount(inverse)
         v,i=unique_v,sums/counts
     out=probe_iv_summary(v,i)
+    # Always provide explicitly labelled descriptive saturation-tail estimates.
+    # These are fallbacks only; a user-supplied ion_fit_range overrides the ion tail.
+    # Tail size is bounded to avoid letting a few endpoint samples dominate.
+    tail_n = max(3, int(math.ceil(0.1 * len(v))))
+    out["ion_saturation_current_A"] = float(np.median(i[:tail_n]))
+    out["ion_saturation_current_method"] = "median_lowest_voltage_tail_fallback"
+    out["electron_saturation_current_A"] = float(np.median(i[-tail_n:]))
+    out["electron_saturation_current_method"] = "median_highest_voltage_tail_descriptive"
     # Handle exact zero-current samples explicitly; avoid 0/0 for repeated zero values.
     exact_zero=np.flatnonzero(i == 0)
     cross=np.where(i[:-1]*i[1:]<0)[0]
