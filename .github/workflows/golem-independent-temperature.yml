@@ -42,6 +42,10 @@ jobs:
                   f"http://golem.fjfi.cvut.cz/utils/data/{shot}/electron_temperature",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp.txt",
+                  # GOLEM Data.php lists ElectronTemp under shots/<shot>/basicdiagn.
+                  # Try its published path as legacy cgi-bin aliases may be absent.
+                  f"{root}/shots/{shot}/basicdiagn/ElectronTemp",
+                  f"{root}/shots/{shot}/basicdiagn/ElectronTemp.txt",
                   f"{root}/operation/shots/{shot}/temperature",
                   f"{root}/operation/shots/{shot}/temperature_mean",
               ],
