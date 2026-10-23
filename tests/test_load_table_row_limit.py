@@ -22,3 +22,10 @@ def test_excel_row_limit_is_enforced():
 
     with pytest.raises(ValueError, match="row import limit"):
         load_table(buffer.getvalue(), "sample.xlsx", max_rows=2)
+
+
+def test_parquet_uncompressed_size_limit_is_enforced():
+    buffer = io.BytesIO()
+    pd.DataFrame({"signal": list(range(100))}).to_parquet(buffer, index=False)
+    with pytest.raises(ValueError, match="uncompressed-size limit"):
+        load_table(buffer.getvalue(), "sample.parquet", max_uncompressed_bytes=1)
