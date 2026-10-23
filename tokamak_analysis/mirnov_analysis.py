@@ -1,41 +1,186 @@
-"""Mirnov-coil magnetic fluctuation signal analysis."""
+"""Mirnov / magnetic pickup-coil signal analysis with explicit calibration limits."""
+from __future__ import annotations
+from typing import Any
 import numpy as np
-from scipy.signal import welch, find_peaks
-def analyze_mirnov_signal(time_s, voltage_V, *, coil_area_m2=None, turns=None):
-    t=np.asarray(time_s,dtype=float); v=np.asarray(voltage_V,dtype=float)
-    if t.ndim!=1 or v.shape!=t.shape or len(t)<8 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)) or np.any(np.diff(t)<=0): raise ValueError("Invalid Mirnov signal")
-    dt=np.median(np.diff(t))
-    if not np.allclose(np.diff(t),dt,rtol=1e-3,atol=1e-12): raise ValueError("Uniform sampling required")
-    f,p=welch(v-np.mean(v),fs=1/dt,nperseg=min(1024,len(v))); inds,_=find_peaks(p)
-    inds=inds[np.argsort(p[inds])[::-1]][:8]
-    out={"frequency_Hz":f,"power_spectral_density":p,"dominant_peaks_Hz":f[inds],"rms_voltage_V":float(np.std(v,ddof=1))}
+from scipy.signal import coherence, csd, detrend as scipy_detrend, find_peaks, welch
+
+
+def _signal(time_s: Any, values: Any, minimum: int = 2):
+    t, y = np.asarray(time_s, float), np.asarray(values, float)
+    if t.ndim != 1 or y.ndim != 1 or t.shape != y.shape:
+        raise ValueError("time and signal must be matching one-dimensional arrays")
+    if len(t) < minimum or not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)):
+        raise ValueError(f"At least {minimum} finite matching samples are required")
+    if np.any(np.diff(t) <= 0):
+        raise ValueError("time_s must be strictly increasing")
+    return t, y
+
+
+def _integer(value: Any, name: str) -> int:
+    if isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a positive integer")
+    try:
+        x = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a positive integer") from exc
+    if not np.isfinite(x) or x < 1 or not x.is_integer():
+        raise ValueError(f"{name} must be a positive integer")
+    return int(x)
+
+
+def _dt(t: np.ndarray) -> float:
+    d = np.diff(t)
+    dt = float(np.median(d))
+    if not np.isfinite(dt) or dt <= 0 or not np.allclose(d, dt, rtol=1e-3, atol=max(1e-15, dt*1e-12)):
+        raise ValueError("Uniform sampling is required for spectral analysis")
+    return dt
+
+
+def analyze_mirnov_signal(time_s, voltage_V, *, coil_area_m2=None, turns=None,
+                          detrend="constant", nperseg=None,
+                          peak_prominence_fraction=0.01, frequency_range_Hz=None):
+    """Return statistics, Welch PSD (V^2/Hz), spectral peaks and optional ideal dB/dt.
+
+    Geometry inputs must be supplied together. The ideal fixed-coil relation is
+    V=-N*A*dB/dt; coil response, orientation and acquisition calibration are not
+    inferred. Peak frequencies are candidates, not automatic MHD-mode labels.
+    """
+    t, v = _signal(time_s, voltage_V, minimum=8)
+    dt = _dt(t)
+    if detrend not in {"constant", "linear", "none"}:
+        raise ValueError("detrend must be 'constant', 'linear', or 'none'")
+    try:
+        prominence = float(peak_prominence_fraction)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("peak_prominence_fraction must be finite and in [0, 1]") from exc
+    if not np.isfinite(prominence) or not 0 <= prominence <= 1:
+        raise ValueError("peak_prominence_fraction must be finite and in [0, 1]")
+    n = min(1024, len(v)) if nperseg is None else _integer(nperseg, "nperseg")
+    if n > len(v):
+        raise ValueError("nperseg cannot exceed sample count")
+    nyquist = 0.5 / dt
+    if frequency_range_Hz is None:
+        low, high = 0.0, nyquist
+    else:
+        try:
+            low, high = map(float, frequency_range_Hz)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("frequency_range_Hz must be a (low, high) pair") from exc
+        if not np.isfinite(low) or not np.isfinite(high) or low < 0 or high <= low or high > nyquist:
+            raise ValueError("frequency range must satisfy 0 <= low < high <= Nyquist")
+    y = v - np.mean(v) if detrend == "constant" else scipy_detrend(v, type="linear") if detrend == "linear" else v.copy()
+    f, p = welch(y, fs=1/dt, nperseg=n, detrend=False, scaling="density")
+    band = (f >= low) & (f <= high)
+    peaks, _ = find_peaks(p)
+    peaks = peaks[band[peaks]]
+    max_p = float(np.max(p[band])) if np.any(band) else 0.0
+    if max_p > 0:
+        peaks = peaks[p[peaks] >= prominence * max_p]
+    peaks = peaks[np.argsort(p[peaks])[::-1]][:8]
+    out = {
+        "time_s": t, "voltage_V": v, "sampling_interval_s": dt,
+        "sampling_frequency_Hz": 1/dt, "nyquist_frequency_Hz": nyquist,
+        "frequency_Hz": f, "power_spectral_density": p,
+        "power_spectral_density_V2_per_Hz": p,
+        "dominant_peaks_Hz": f[peaks], "dominant_peak_psd_V2_per_Hz": p[peaks],
+        "mean_voltage_V": float(np.mean(v)), "rms_voltage_V": float(np.sqrt(np.mean(v**2))),
+        "ac_rms_voltage_V": float(np.std(v)), "peak_to_peak_voltage_V": float(np.ptp(v)),
+        "detrend_method": detrend, "welch_nperseg": n,
+        "frequency_range_for_peaks_Hz": (low, high),
+        "equation": "Welch PSD; ideal fixed-coil relation V=-N*A*dB/dt",
+        "caveat": "No transfer-function, orientation, pickup, absolute-field or calibration correction is automatic; PSD peaks alone do not identify MHD modes.",
+    }
     if coil_area_m2 is not None or turns is not None:
+        if coil_area_m2 is None or turns is None:
+            raise ValueError("coil_area_m2 and turns must be supplied together")
         try:
             area = float(coil_area_m2)
-            turns_value = float(turns)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Finite positive coil area and positive integer turns required together") from exc
-        if (coil_area_m2 is None or turns is None or not np.isfinite(area) or area <= 0
-                or not np.isfinite(turns_value) or turns_value < 1 or not turns_value.is_integer()):
-            raise ValueError("Finite positive coil area and positive integer turns required together")
-        out["approx_Bdot_T_s"]=-v/(int(turns_value)*area)
-    out["caveat"]="Coil transfer function, orientation, integration constant and calibration are not corrected automatically."
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("coil area must be finite and positive") from exc
+        count = _integer(turns, "turns")
+        if not np.isfinite(area) or area <= 0:
+            raise ValueError("coil area must be finite and positive")
+        out.update({"approx_Bdot_T_s": -v/(count*area), "coil_area_m2": area, "turns": count})
     return out
 
-def magnetic_perturbation_from_mirnov_voltage(time_s, coil_voltage_V, turns, coil_area_m2, *, initial_delta_B_T=0.0):
-    """Faraday law for a fixed coil: V=-N*A*dB/dt; integrate to recover delta-B."""
-    t=np.asarray(time_s,dtype=float); v=np.asarray(coil_voltage_V,dtype=float)
+
+def magnetic_perturbation_from_mirnov_voltage(time_s, coil_voltage_V, turns, coil_area_m2,
+                                               *, initial_delta_B_T=0.0,
+                                               baseline_voltage_V=0.0, polarity_sign=-1):
+    """Integrate calibrated coil voltage to delta-B using trapezoidal integration."""
+    t, v = _signal(time_s, coil_voltage_V)
+    count = _integer(turns, "turns")
     try:
-        turns_value=float(turns); area=float(coil_area_m2); b0=float(initial_delta_B_T)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("Turns must be a positive integer; area positive and initial field finite") from exc
-    if t.ndim!=1 or v.shape!=t.shape or len(t)<2 or not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)) or np.any(np.diff(t)<=0):
-        raise ValueError("Need finite matching voltage/time arrays and increasing time")
-    if (not np.isfinite(turns_value) or turns_value<1 or not turns_value.is_integer()
-            or not np.isfinite(area) or area<=0 or not np.isfinite(b0)):
-        raise ValueError("Turns must be a positive integer; area positive and initial field finite")
-    n=int(turns_value)
-    dbdt=-v/(n*area); increments=0.5*(dbdt[1:]+dbdt[:-1])*np.diff(t)
-    db=np.r_[b0,b0+np.cumsum(increments)]
-    return {"delta_B_T":db,"dB_dt_T_s":dbdt,"equation":"V=-N*A*dB/dt; delta_B=integral(-V/(N*A) dt)",
-            "caveat":"Requires coil orientation, area, turns, transfer function and baseline offsets to be known."}
+        area, b0, baseline = float(coil_area_m2), float(initial_delta_B_T), float(baseline_voltage_V)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("area, initial field and baseline must be finite numbers") from exc
+    if not np.isfinite(area) or area <= 0:
+        raise ValueError("coil_area_m2 must be finite and positive")
+    if not np.isfinite(b0) or not np.isfinite(baseline):
+        raise ValueError("initial field and baseline voltage must be finite")
+    if isinstance(polarity_sign, (bool, np.bool_)) or polarity_sign not in (-1, 1):
+        raise ValueError("polarity_sign must be -1 or +1")
+    dbdt = int(polarity_sign) * (v-baseline)/(count*area)
+    db = np.r_[b0, b0 + np.cumsum(0.5*(dbdt[1:]+dbdt[:-1])*np.diff(t))]
+    return {"time_s": t, "delta_B_T": db, "dB_dt_T_s": dbdt, "turns": count,
+            "coil_area_m2": area, "baseline_voltage_V": baseline, "polarity_sign": int(polarity_sign),
+            "equation": "dB/dt=polarity_sign*(V-baseline)/(N*A)",
+            "caveat": "Returns perturbation relative to supplied initial value, not absolute field; offsets, transfer response and orientation must be validated."}
+
+
+def analyze_mirnov_array(time_s, voltage_channels_V, toroidal_angles_rad, *, reference_channel=0, nperseg=None):
+    """Estimate inter-channel phase/coherence and alias-prone toroidal mode candidates.
+
+    Channel voltages must have shape (channels, samples); angles are measured
+    toroidal locations in radians. Geometry and mode-structure assumptions
+    remain the user's responsibility.
+    """
+    t = np.asarray(time_s, float)
+    signals = np.asarray(voltage_channels_V, float)
+    angles = np.asarray(toroidal_angles_rad, float)
+    if t.ndim != 1 or signals.ndim != 2 or signals.shape[1] != len(t):
+        raise ValueError("voltage_channels_V must have shape (n_channels, len(time_s))")
+    channels = signals.shape[0]
+    if channels < 3:
+        raise ValueError("At least three Mirnov channels are required")
+    if angles.shape != (channels,) or not np.all(np.isfinite(angles)):
+        raise ValueError("One finite toroidal angle is required per channel")
+    t, _ = _signal(t, signals[0], minimum=8)
+    dt = _dt(t)
+    if not np.all(np.isfinite(signals)):
+        raise ValueError("channel signals must be finite")
+    if isinstance(reference_channel, (bool, np.bool_)) or not isinstance(reference_channel, (int, np.integer)) or not 0 <= reference_channel < channels:
+        raise ValueError("reference_channel must be a valid channel index")
+    n = min(1024, len(t)) if nperseg is None else _integer(nperseg, "nperseg")
+    if n > len(t):
+        raise ValueError("nperseg cannot exceed sample count")
+    signals = signals - np.mean(signals, axis=1, keepdims=True)
+    f, psd = welch(signals[reference_channel], fs=1/dt, nperseg=n)
+    if len(f) < 2 or not np.any(psd[1:] > 0):
+        raise ValueError("Reference channel has no non-DC spectral power")
+    k = int(np.argmax(psd[1:]) + 1)
+    phase, coh = [], []
+    for ch in range(channels):
+        _, cross = csd(signals[reference_channel], signals[ch], fs=1/dt, nperseg=n)
+        _, c = coherence(signals[reference_channel], signals[ch], fs=1/dt, nperseg=n)
+        phase.append(float(np.angle(cross[k])))
+        coh.append(float(c[k]))
+    phase, coh = np.asarray(phase), np.asarray(coh)
+    relative_angles = np.unwrap(angles-angles[reference_channel])
+    valid = (np.arange(channels) != reference_channel) & (coh > 0)
+    if np.count_nonzero(valid) < 2:
+        raise ValueError("Insufficient non-reference channels with usable coherence")
+    candidates = np.arange(-channels, channels+1, dtype=int)
+    scores = []
+    for m in candidates:
+        residual = np.angle(np.exp(1j*(phase[valid]-m*relative_angles[valid])))
+        scores.append(float(np.sqrt(np.average(residual**2, weights=coh[valid]))))
+    scores = np.asarray(scores)
+    best = int(np.argmin(scores))
+    return {"frequency_Hz": f, "reference_psd_V2_per_Hz": psd,
+            "dominant_frequency_Hz": float(f[k]), "relative_phase_rad": phase,
+            "coherence": coh, "toroidal_angles_rad": angles,
+            "candidate_mode_numbers": candidates, "candidate_phase_rms_rad": scores,
+            "estimated_toroidal_mode_number": int(candidates[best]), "phase_fit_rms_rad": float(scores[best]),
+            "reference_channel": int(reference_channel),
+            "caveat": "Mode number is an alias-prone candidate at one frequency. Verify polarity, coil geometry, coherence, bandwidth and mode structure independently."}
