@@ -100,6 +100,7 @@ class AnalysisRun:
         return stable_digest({
             "analysis_name": self.analysis_name,
             "inputs": self.inputs,
+            "input_provenance": self.input_provenance,
             "settings": self.settings,
             "algorithm_version": self.algorithm_version,
             "software_version": self.software_version,
