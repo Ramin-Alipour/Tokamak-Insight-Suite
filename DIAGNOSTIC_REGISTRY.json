@@ -3,7 +3,7 @@
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
-    "status": "M→D/I",
+    "status": "D",
     "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
     "caveat": "The raw-spectrum fit is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. It does not infer density from spectral amplitude; calibrated profile and single-band power density workflows remain separate.",
     "implementation_functions": [
@@ -12,11 +12,11 @@
       "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
     ],
-    "implementation_status": "Implemented calibrated-profile workflow plus scoped raw-spectrum electron-temperature fit; overall analysis remains incomplete",
+    "implementation_status": "Complete within the explicitly declared scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, and the combined calibrated spectrum-to-temperature/density workflow; excluded models remain explicitly unsupported",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "input_specs": [
         {
           "name": "radius_m",
@@ -143,7 +143,7 @@
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
       ],
       "raw_data_to_physics": true,
-      "note": "Overall analysis remains incomplete until the supported paths and UI are confirmed end-to-end and the contract/test suite is synchronized. Uncalibrated spectral amplitude is not density; collective, relativistic, non-Maxwellian and non-Gaussian-response models are out of scope.",
+      "note": "Complete within the declared scope. The callable profile, spectral-fit, calibrated-power-density, and combined spectrum-to-temperature/density paths are present; the dashboard exposes the relevant workflows and the test suite includes numerical recovery, validation failures, instrument-width deconvolution, uncertainty propagation, and the combined pipeline. This is software verification, not independent experimental validation. Uncalibrated spectral amplitude is not density; collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
@@ -227,6 +227,17 @@
           ],
           "scope": "Combined calibrated spectral-power fit and single-band density estimate under the documented non-collective, non-relativistic Maxwellian and optically thin assumptions. Not a general Thomson spectral solver."
         }
+      ],
+      "test_links": [
+        "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients",
+        "tests/test_thomson_workflow.py::test_thomson_workflow_preserves_sorted_uncertainties",
+        "tests/test_thomson_workflow.py::test_thomson_density_power_relation_round_trip",
+        "tests/test_thomson_workflow.py::test_thomson_power_density_propagates_independent_input_uncertainties",
+        "tests/test_thomson_workflow.py::test_calibrated_thomson_spectrum_pipeline_returns_temperature_and_density",
+        "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_recovers_temperature_with_instrument_deconvolution",
+        "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_rejects_unresolved_instrument_width",
+        "tests/test_thomson_spectrum.py::test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area",
+        "tests/test_thomson_spectrum.py::test_raw_thomson_spectrum_rejects_insufficient_wavelength_window"
       ]
     }
   },
