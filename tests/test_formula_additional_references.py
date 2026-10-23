@@ -6,6 +6,7 @@ import pytest
 
 from tokamak_analysis.formula_library import (
     apparent_feature_speed,
+    cross_correlation_lag,
     debye_parameter,
     doppler_line_of_sight_velocity,
     electron_plasma_angular_frequency,
@@ -155,7 +156,7 @@ def test_cross_correlation_lag_positive_when_y_lags_x():
     y = np.zeros(32)
     x[5] = 1.0
     y[8] = 1.0
-    result = __import__("tokamak_analysis.formula_library", fromlist=["cross_correlation_lag"]).cross_correlation_lag(x, y, 0.01)
+    result = cross_correlation_lag(x, y, 0.01)
     assert result["cross_correlation_lag_s"] == pytest.approx(0.03)
     assert result["normalized_peak_correlation"] > 0.0
 
