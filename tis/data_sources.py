@@ -18,6 +18,13 @@ from scipy.signal import resample_poly
 FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
 
+
+def _safe_provenance_url(value: str) -> str:
+    """Remove query strings and fragments that may contain signed-link secrets."""
+    parsed = urlparse(str(value).strip())
+    return parsed._replace(query="", fragment="").geturl()
+
+
 def _open_zarr_with_retry(xr: Any, url: str, group: str, attempts: int = 3,
                           timeout_s: float = 30.0):
     """Open a public Zarr group with bounded request timeout and transient retries."""
@@ -303,8 +310,12 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
         raise ValueError("The URL returned an HTML page, not a direct data file. Use the archive's direct download URL.")
     import hashlib
     from datetime import datetime,timezone
-    metadata={"source_url":str(url).strip(),"final_url":final_url,"content_type":content_type,
-              "downloaded_bytes":str(len(payload)),"downloaded_at_utc":datetime.now(timezone.utc).isoformat(),
+    source_parsed = urlparse(str(url).strip())
+    final_parsed = urlparse(final_url)
+    metadata={"source_url":_safe_provenance_url(str(url).strip()),"final_url":_safe_provenance_url(final_url),
+              "query_parameters_redacted":bool(source_parsed.query or final_parsed.query),
+              "content_type":content_type,"downloaded_bytes":str(len(payload)),
+              "downloaded_at_utc":datetime.now(timezone.utc).isoformat(),
               "sha256":hashlib.sha256(payload).hexdigest()}
     return payload,metadata
 
