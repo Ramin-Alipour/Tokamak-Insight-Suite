@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from .constants import E_CHARGE, M_E, C_LIGHT, K_B
+from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
 
 
 def resonance_field_T(frequency_Hz, harmonic: int = 1):
