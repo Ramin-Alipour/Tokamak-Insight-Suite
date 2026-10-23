@@ -14,6 +14,13 @@ from tis.core import (
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
 
+def test_load_table_makes_headers_unique_after_whitespace_normalization():
+    frame = load_table(b"time, time\\n0,1\\n1,2\\n", "duplicate_headers.csv")
+    assert list(frame.columns) == ["time", "time.1"]
+    assert frame["time"].tolist() == [0, 1]
+    assert frame["time.1"].tolist() == [1, 2]
+
+
 def test_linear_calibration():
     np.testing.assert_allclose(linear_calibration([0,1,2],2,1),[1,3,5])
 
