@@ -34,7 +34,7 @@ For the non-relativistic, non-collective Maxwellian approximation:
 
 ~~~text
 T_e[eV] = (sigma_physical / lambda_0)^2
-          * (m_e c^2 / 2) / sin(scattering_angle / 2)^2
+          * (m_e c^2 / 4) / sin(scattering_angle / 2)^2
 ~~~
 
 The module rejects a fit when the fitted width does not exceed the supplied instrumental width. That case is unresolved by the stated model and must not be reported as a temperature. It also rejects wavelength windows that do not cover at least ±3 fitted standard deviations around the line center.
