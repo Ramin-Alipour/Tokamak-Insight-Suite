@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import pytest
-from tis.project import AnalysisRun, Project, ProjectError, ProjectStore
+from tis.project import AnalysisRun, Project, ProjectError, ProjectStore, stable_digest
 
 def test_project_roundtrip_persists_reproducible_run(tmp_path):
     run = AnalysisRun(analysis_name="FFT power spectrum",
@@ -54,4 +54,17 @@ def test_project_load_rejects_non_object_json_root(tmp_path):
     path = tmp_path / "invalid-project.json"
     path.write_text("[]", encoding="utf-8")
     with pytest.raises(ProjectError, match="root must be a JSON object"):
+        ProjectStore.load(path)
+
+
+def test_project_load_rejects_duplicate_run_ids(tmp_path):
+    first = AnalysisRun("first", {}, {}, "1")
+    second = AnalysisRun("second", {}, {}, "1")
+    path = ProjectStore.save(Project(title="duplicates", analysis_runs=[first, second]), tmp_path / "duplicates.json")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["analysis_runs"][1]["run_id"] = payload["analysis_runs"][0]["run_id"]
+    payload.pop("content_sha256")
+    payload["content_sha256"] = stable_digest(payload)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ProjectError, match="duplicate analysis run IDs"):
         ProjectStore.load(path)
