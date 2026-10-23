@@ -87,3 +87,27 @@ def test_ece_entry_is_analysis_number_three_and_declares_scoped_workflow():
     assert "resonance_mapping" in contract["input_specs"][2]["description"]
     assert "tokamak_analysis.ece_analysis.analyze_ece" in contract["function_links"]
     assert callable(resolve_analysis(3))
+
+
+def test_cxrs_is_analysis_four_with_explicit_physics_contract():
+    entry = get_analysis(4)
+    assert entry["name"] == "Charge-exchange recombination spectroscopy (CXRS)"
+    assert entry["module"] == "cxrs"
+    assert entry["function"] == "analyze_cxrs_line"
+    contract = entry["execution_contract"]
+    assert contract["execution_level"] == "analysis_pipeline"
+    assert contract["completeness"] == "complete_with_declared_scope"
+    assert contract["raw_data_to_physics"] is True
+    inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert {
+        "wavelength_nm", "signal", "rest_wavelength_nm",
+        "ion_mass_amu", "instrument_sigma_nm",
+    } <= set(inputs)
+    assert inputs["instrument_sigma_nm"]["unit"] == "nm"
+    assert any("FWHM" in inputs["instrument_sigma_nm"]["description"] for _ in [0])
+    assert {item["name"] for item in contract["output_specs"]} >= {
+        "ion_temperature_eV", "line_of_sight_velocity_m_s",
+        "fitted_signal", "residual", "fit_r_squared",
+    }
+    assert any("instrument-width" in item for item in contract["limitations"])
+    assert callable(resolve_analysis(4))
