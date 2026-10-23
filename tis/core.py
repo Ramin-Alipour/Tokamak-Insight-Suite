@@ -209,7 +209,7 @@ def integrate_time_series(
             if not np.isfinite(drift_start_s) or not np.isfinite(drift_end_s) or drift_start_s >= drift_end_s:
                 raise ValueError('Drift window must be finite with start < end.')
             if drift_start_s <= baseline_end_s:
-                raise ValueError("Post-shot drift window must start after the pre-shot baseline window ends.")
+                raise ValueError("Drift window must start after the baseline window ends (post-shot drift window).")
             mask2 = (t >= drift_start_s) & (t <= drift_end_s)
             if np.count_nonzero(mask2) < 2:
                 raise ValueError('Drift window must include at least two samples.')
