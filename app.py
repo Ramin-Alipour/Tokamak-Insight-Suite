@@ -45,13 +45,17 @@ h1,h2,h3{color:#f0f7ff!important}
 .small-muted{color:#9fc7ec;font-size:.88rem}
 </style>''', unsafe_allow_html=True)
 
-def _clear_loaded_data():
+def _clear_loaded_data(clear_uploader=True):
     for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
                 "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
                 "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
                 "tis_import_parameters"):
         st.session_state.pop(key, None)
-    st.session_state["global_upload"] = None
+    # Widget state may only be changed before its widget is instantiated in a run.
+    # The Clear button invokes this as a callback (before widget creation); the
+    # automatic stale-upload cleanup below runs after file_uploader was created.
+    if clear_uploader:
+        st.session_state["global_upload"] = None
 
 # Sidebar: project identity and persistent data selection.
 with st.sidebar:
@@ -73,7 +77,8 @@ with st.sidebar:
         import_drop_units=st.checkbox("Drop first data row if it contains units (e.g. V / s)",value=False,key="import_drop_units")
     if upload is None and st.session_state.get("tis_active_source") == "upload":
         # The uploader was cleared; do not keep silently analysing the previous upload.
-        _clear_loaded_data()
+        # Its widget already exists in this run, so do not mutate its session-state key.
+        _clear_loaded_data(clear_uploader=False)
     if upload is not None:
         try:
             upload_identity=f"{getattr(upload,'file_id',upload.name)}:{upload.name}:{upload.size}"
