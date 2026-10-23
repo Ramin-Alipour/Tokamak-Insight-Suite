@@ -34,6 +34,10 @@ def _mad_sigma(x: np.ndarray) -> float:
 def interval_statistics(event_times_s: Any) -> dict[str, Any]:
     """Repetition statistics: mean/median period, frequency, coefficient of variation."""
     ev = np.asarray(event_times_s, dtype=float).ravel()
+    if not np.all(np.isfinite(ev)):
+        raise ValueError("Event times must contain only finite values.")
+    if np.any(np.diff(ev) <= 0):
+        raise ValueError("Event times must be strictly increasing and unique.")
     if len(ev) < 2:
         return {"n_events": int(len(ev)), "note": "At least two events are needed for interval statistics."}
     d = np.diff(ev)
