@@ -793,6 +793,13 @@ def test_load_table_enforces_byte_limit():
         load_table(b"time,signal\n0,1\n","sample.csv",max_bytes=8)
 
 
+def test_xray_spectrum_summary_integrates_density_on_eV_scale():
+    result = xray_spectrum_summary([1.0, 2.0, 3.0], [1.0, 1.0, 1.0], bin_representation="density_per_eV")
+    assert result["integrated_signal_keV_weighted"] == pytest.approx(2000.0)
+    assert result["mean_energy_keV"] == pytest.approx(2.0)
+    assert result["rms_energy_spread_keV"] == pytest.approx(np.sqrt(0.5), rel=1e-6)
+
+
 def test_spectrum_moments_distinguishes_counts_per_bin_from_density():
     energy=np.array([1.0,2.0,5.0])
     counts=np.array([1.0,1.0,1.0])
