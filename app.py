@@ -153,7 +153,7 @@ with st.sidebar:
     st.divider()
     pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Project Manager','Reports & Export']
     requested=st.session_state.pop('jump','Home')
-    page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,label_visibility='collapsed')
+    page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,key='workspace_page',label_visibility='collapsed')
     st.divider()
     st.caption('Reference catalog: extracted tokamak diagnostic reference')
     st.caption(f'Independent Python project · v{__version__}')
