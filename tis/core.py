@@ -794,7 +794,7 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
 def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None,
                           count_uncertainty: Any | None = None,
                           assume_poisson_counts: bool = False,
-                          bin_representation: str = "density_per_eV") -> dict[str, Any]:
+                          bin_representation: str = "counts_per_bin") -> dict[str, Any]:
     # The shared moment routine expects its energy coordinate in eV. Convert
     # the X-ray API's keV input before integration, then convert energy moments back.
     energy_eV = np.asarray(energy_keV, dtype=float) * 1000.0
