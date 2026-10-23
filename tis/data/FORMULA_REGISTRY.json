@@ -166,6 +166,30 @@
           "unit": "1",
           "description": "Non-negative model closure coefficient; defaults to 1.0.",
           "required": true
+        },
+        {
+          "name": "sigma_electron_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma electron-temperature uncertainty; must be supplied with all other input uncertainties.",
+          "required": false
+        },
+        {
+          "name": "sigma_ion_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma ion-temperature uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_ion_mass_kg",
+          "unit": "kg",
+          "description": "Optional 1-sigma ion-mass uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_gamma_i",
+          "unit": "1",
+          "description": "Optional 1-sigma uncertainty in the model closure coefficient.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -173,12 +197,17 @@
           "name": "ion_sound_speed_m_s",
           "unit": "m s^-1",
           "description": "Sound-speed approximation sqrt(e*(Te + gamma_i*Ti)/mi)."
+        },
+        {
+          "name": "uncertainty_ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "First-order independent-input uncertainty, returned when all four input uncertainties are supplied."
         }
       ],
       "prerequisites": [
         "Model-dependent closure and ion species."
       ],
-      "uncertainty_model": "Not propagated by this helper; uncertainty in temperature and ion mass must be reported separately.",
+      "uncertainty_model": "Optional independent 1-sigma uncertainties in electron temperature, ion temperature, ion mass and gamma_i are propagated by first-order linearization; model-closure uncertainty beyond gamma_i is excluded.",
       "test_links": [
         "tests/test_formula_contracts.py::test_ion_sound_speed_independent_reference"
       ],
@@ -424,6 +453,12 @@
           "unit": "cm^-3",
           "description": "Finite positive electron density in cm^-3.",
           "required": true
+        },
+        {
+          "name": "sigma_density_cm3",
+          "unit": "cm^-3",
+          "description": "Optional 1-sigma uncertainty in density; converted to SI with the density.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -431,12 +466,17 @@
           "name": "frequency_pe_Hz",
           "unit": "Hz",
           "description": "Electron plasma frequency."
+        },
+        {
+          "name": "uncertainty_frequency_pe_Hz",
+          "unit": "Hz",
+          "description": "First-order density uncertainty propagated to plasma frequency."
         }
       ],
       "prerequisites": [
         "Approximate electron plasma frequency; density conversion is exactly 1 cm^-3 = 10^6 m^-3."
       ],
-      "uncertainty_model": "First-order density uncertainty is not accepted by this unit-conversion wrapper; use the SI angular-frequency helper when propagating density uncertainty.",
+      "uncertainty_model": "Optional independent 1-sigma density uncertainty in cm^-3 is converted to SI and propagated by first-order linearization.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_plasma_frequency_cm3_conversion_reference"
       ],
@@ -556,6 +596,12 @@
           "unit": "any width unit",
           "description": "Non-negative Gaussian standard deviation.",
           "required": true
+        },
+        {
+          "name": "sigma_sigma_width",
+          "unit": "same as sigma_width",
+          "description": "Optional 1-sigma uncertainty in Gaussian sigma.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -568,12 +614,22 @@
           "name": "fwhm_width",
           "unit": "same as input",
           "description": "Gaussian full width at half maximum."
+        },
+        {
+          "name": "uncertainty_sigma_width",
+          "unit": "same as input",
+          "description": "Returned sigma uncertainty when supplied."
+        },
+        {
+          "name": "uncertainty_fwhm_width",
+          "unit": "same as input",
+          "description": "Gaussian FWHM uncertainty scaled by the Gaussian conversion factor."
         }
       ],
       "prerequisites": [
         "The line/profile is Gaussian."
       ],
-      "uncertainty_model": "No uncertainty propagation; this deterministic scale conversion can be applied to sigma uncertainty by the same positive factor.",
+      "uncertainty_model": "Optional sigma-width uncertainty is propagated exactly through the linear FWHM conversion.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_gaussian_fwhm_reference"
       ],
@@ -743,6 +799,12 @@
           "unit": "1",
           "description": "Positive integer coil turn count.",
           "required": true
+        },
+        {
+          "name": "sigma_flux_derivative_Wb_s",
+          "unit": "Wb s^-1",
+          "description": "Optional 1-sigma uncertainty in magnetic-flux derivative.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -750,12 +812,17 @@
           "name": "coil_voltage_V",
           "unit": "V",
           "description": "Induced coil voltage with Faraday-law sign."
+        },
+        {
+          "name": "uncertainty_coil_voltage_V",
+          "unit": "V",
+          "description": "Flux-derivative uncertainty multiplied by the known turn count."
         }
       ],
       "prerequisites": [
         "Coil orientation, polarity, number of turns and electronics response must be documented."
       ],
-      "uncertainty_model": "No uncertainty propagation in this primitive; uncertainty in flux derivative can be multiplied by the known turn count.",
+      "uncertainty_model": "Optional flux-derivative uncertainty is propagated exactly for a known integer turn count.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_faraday_induction_reference"
       ],
@@ -1400,6 +1467,12 @@
           "unit": "signal unit",
           "description": "Finite non-empty 1-D samples.",
           "required": true
+        },
+        {
+          "name": "sigma_signal",
+          "unit": "same as signal",
+          "description": "Optional per-sample 1-sigma measurement uncertainties, matching signal shape.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1407,12 +1480,17 @@
           "name": "rms_signal",
           "unit": "same as signal",
           "description": "Root mean square including DC component."
+        },
+        {
+          "name": "uncertainty_rms_signal",
+          "unit": "same as signal",
+          "description": "First-order independent-sample uncertainty in RMS; undefined at zero measured RMS."
         }
       ],
       "prerequisites": [
         "The DC component is included; subtract the mean before calling if AC-only RMS is intended."
       ],
-      "uncertainty_model": "No uncertainty estimated; sampling and measurement uncertainty must be handled separately.",
+      "uncertainty_model": "Optional independent per-sample uncertainties propagated by first-order linearization; zero measured RMS is rejected when uncertainty is requested.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_rms_signal_reference"
       ],

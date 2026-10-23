@@ -60,12 +60,26 @@ def electron_cyclotron_frequency(magnetic_field_T, *, sigma_magnetic_field_T=Non
         out["uncertainty_frequency_ce_Hz"]=out["uncertainty_omega_ce_rad_s"]/(2*math.pi)
     return out
 
-def ion_sound_speed(electron_temperature_eV, ion_temperature_eV, ion_mass_kg, gamma_i=1.0):
-    """Common closure c_s=sqrt(e*(Te + gamma_i*Ti)/mi), temperatures in eV."""
+def ion_sound_speed(electron_temperature_eV, ion_temperature_eV, ion_mass_kg, gamma_i=1.0, *,
+                    sigma_electron_temperature_eV=None, sigma_ion_temperature_eV=None,
+                    sigma_ion_mass_kg=None, sigma_gamma_i=None):
+    """Common closure c_s=sqrt(e*(Te + gamma_i*Ti)/mi); temperatures in eV."""
     Te=_positive("electron_temperature_eV",electron_temperature_eV)
     Ti=_nonnegative("ion_temperature_eV",ion_temperature_eV)
     mi=_positive("ion_mass_kg",ion_mass_kg); gamma=_nonnegative("gamma_i",gamma_i)
-    return {"ion_sound_speed_m_s":math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi)}
+    sigmas=(sigma_electron_temperature_eV,sigma_ion_temperature_eV,sigma_ion_mass_kg,sigma_gamma_i)
+    if any(v is not None for v in sigmas) and not all(v is not None for v in sigmas):
+        raise ValueError("Provide all four independent input uncertainties, or none.")
+    S=Te+gamma*Ti
+    speed=math.sqrt(E_CHARGE*S/mi)
+    out={"ion_sound_speed_m_s":speed}
+    if sigma_electron_temperature_eV is not None:
+        sTe,sTi,smi,sg=[_nonnegative(n,v) for n,v in zip(
+            ("sigma_electron_temperature_eV","sigma_ion_temperature_eV","sigma_ion_mass_kg","sigma_gamma_i"),sigmas)]
+        out["uncertainty_ion_sound_speed_m_s"]=math.sqrt(
+            (speed*sTe/(2*S))**2+(speed*gamma*sTi/(2*S))**2+
+            (speed*smi/(2*mi))**2+(speed*Ti*sg/(2*S))**2)
+    return out
 
 def electron_thermal_pressure(density_m3, temperature_eV, *, sigma_density_m3=None, sigma_temperature_eV=None):
     """Electron ideal-gas thermal pressure p_e=n_e*e*T_e[eV]."""
@@ -141,10 +155,12 @@ def line_integrated_density(density_m3, distance_m, *, sigma_density_m3=None):
 # calculations. These functions are numerical primitives, not machine-specific
 # empirical validations or substitutes for instrument calibration.
 
-def plasma_frequency_from_density_cm3(density_cm3):
+def plasma_frequency_from_density_cm3(density_cm3, *, sigma_density_cm3=None):
     """Electron plasma frequency from density in cm^-3; returns frequency in Hz."""
     n_cm3 = _positive("density_cm3", density_cm3)
-    return {"frequency_pe_Hz": electron_plasma_frequency(n_cm3 * 1.0e6)["frequency_pe_Hz"]}
+    sigma_si = None if sigma_density_cm3 is None else _nonnegative("sigma_density_cm3", sigma_density_cm3) * 1.0e6
+    return {"frequency_pe_Hz": electron_plasma_frequency(n_cm3 * 1.0e6, sigma_n_e_m3=sigma_si)["frequency_pe_Hz"],
+            **({"uncertainty_frequency_pe_Hz": electron_plasma_frequency(n_cm3 * 1.0e6, sigma_n_e_m3=sigma_si)["uncertainty_frequency_pe_Hz"]} if sigma_si is not None else {})}
 
 
 def doppler_line_of_sight_velocity(delta_lambda, lambda0, *, sigma_delta_lambda=None, sigma_lambda0=None):
@@ -183,11 +199,16 @@ def ion_temperature_from_doppler_sigma(sigma_lambda, lambda0, ion_mass_kg, *,
     return out
 
 
-def gaussian_fwhm_from_sigma(sigma_width):
+def gaussian_fwhm_from_sigma(sigma_width, *, sigma_sigma_width=None):
     """Convert Gaussian standard deviation to FWHM, preserving the width unit."""
     sigma = _nonnegative("sigma_width", sigma_width)
     factor = 2.0 * math.sqrt(2.0 * math.log(2.0))
-    return {"sigma_width": sigma, "fwhm_width": factor * sigma}
+    out = {"sigma_width": sigma, "fwhm_width": factor * sigma}
+    if sigma_sigma_width is not None:
+        s = _nonnegative("sigma_sigma_width", sigma_sigma_width)
+        out["uncertainty_sigma_width"] = s
+        out["uncertainty_fwhm_width"] = factor * s
+    return out
 
 
 def magnetic_energy_density(magnetic_field_T, *, sigma_magnetic_field_T=None):
@@ -243,13 +264,17 @@ def safety_factor_large_aspect_ratio(r_m, major_radius_m, toroidal_field_T, polo
     return out
 
 
-def faraday_induction(flux_derivative_Wb_s, turns):
+def faraday_induction(flux_derivative_Wb_s, turns, *, sigma_flux_derivative_Wb_s=None):
     """Coil voltage from Faraday's law: V = -N dPhi/dt; derivative in Wb s^-1."""
     derivative = _finite("flux_derivative_Wb_s", flux_derivative_Wb_s)
     n_float = _positive("turns", turns)
     if not n_float.is_integer():
         raise ValueError("turns must be a positive integer.")
-    return {"coil_voltage_V": -int(n_float) * derivative}
+    out = {"coil_voltage_V": -int(n_float) * derivative}
+    if sigma_flux_derivative_Wb_s is not None:
+        s = _nonnegative("sigma_flux_derivative_Wb_s", sigma_flux_derivative_Wb_s)
+        out["uncertainty_coil_voltage_V"] = int(n_float) * s
+    return out
 
 
 def plasma_loop_resistance_proxy(loop_voltage_V, plasma_current_A, *,
@@ -465,12 +490,21 @@ def relative_fluctuation_level(signal):
             "mean_signal": mean, "fluctuation_rms": fluctuation_rms}
 
 
-def rms_signal(signal):
+def rms_signal(signal, *, sigma_signal=None):
     """Root-mean-square of finite samples, including any DC component."""
     x = np.asarray(signal, dtype=float)
     if x.ndim != 1 or x.size == 0 or not np.all(np.isfinite(x)):
         raise ValueError("signal must be a non-empty finite 1-D array.")
-    return {"rms_signal": float(np.sqrt(np.mean(x**2)))}
+    value = float(np.sqrt(np.mean(x**2)))
+    out = {"rms_signal": value}
+    if sigma_signal is not None:
+        s = np.asarray(sigma_signal, dtype=float)
+        if s.shape != x.shape or not np.all(np.isfinite(s)) or np.any(s < 0):
+            raise ValueError("sigma_signal must match samples and be finite non-negative.")
+        if value == 0.0:
+            raise ValueError("RMS uncertainty linearization is undefined when the measured RMS is zero.")
+        out["uncertainty_rms_signal"] = float(np.sqrt(np.sum((x * s / (x.size * value))**2)))
+    return out
 
 
 def nyquist_frequency(sampling_frequency_Hz, *, sigma_sampling_frequency_Hz=None):

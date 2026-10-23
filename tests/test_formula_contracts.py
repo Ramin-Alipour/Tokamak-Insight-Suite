@@ -31,7 +31,10 @@ def test_electron_cyclotron_frequency_independent_reference():
 
 def test_ion_sound_speed_independent_reference():
     Te,Ti,mi,gamma=20.0,10.0,2*1.66053906660e-27,1.0
-    assert ion_sound_speed(Te,Ti,mi,gamma)["ion_sound_speed_m_s"] == pytest.approx(math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi),rel=1e-12)
+    r = ion_sound_speed(Te,Ti,mi,gamma, sigma_electron_temperature_eV=0.2,
+                        sigma_ion_temperature_eV=0.3, sigma_ion_mass_kg=1e-29, sigma_gamma_i=0.02)
+    assert r["ion_sound_speed_m_s"] == pytest.approx(math.sqrt(E_CHARGE*(Te+gamma*Ti)/mi),rel=1e-12)
+    assert r["uncertainty_ion_sound_speed_m_s"] > 0
 
 def test_electron_pressure_independent_reference():
     n,T=2e19,100.0; expected=n*E_CHARGE*T

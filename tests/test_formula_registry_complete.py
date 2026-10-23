@@ -27,7 +27,9 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_plasma_frequency_cm3_conversion_reference():
     n_cm3 = 1.0e13
     expected = math.sqrt(n_cm3 * 1.0e6 * E_CHARGE**2 / (8.8541878128e-12 * M_E)) / (2 * math.pi)
-    assert plasma_frequency_from_density_cm3(n_cm3)["frequency_pe_Hz"] == pytest.approx(expected, rel=1e-12)
+    r = plasma_frequency_from_density_cm3(n_cm3, sigma_density_cm3=1e11)
+    assert r["frequency_pe_Hz"] == pytest.approx(expected, rel=1e-12)
+    assert r["uncertainty_frequency_pe_Hz"] == pytest.approx(0.5 * expected * (1e11 / n_cm3), rel=1e-12)
 
 
 def test_doppler_velocity_reference():
@@ -46,9 +48,12 @@ def test_ion_temperature_from_doppler_sigma_reference():
 
 
 def test_gaussian_fwhm_reference():
-    r = gaussian_fwhm_from_sigma(2.0)
+    r = gaussian_fwhm_from_sigma(2.0, sigma_sigma_width=0.1)
+    factor = 2 * math.sqrt(2 * math.log(2))
     assert r["sigma_width"] == 2.0
-    assert r["fwhm_width"] == pytest.approx(2 * math.sqrt(2 * math.log(2)) * 2.0, rel=1e-12)
+    assert r["fwhm_width"] == pytest.approx(factor * 2.0, rel=1e-12)
+    assert r["uncertainty_sigma_width"] == pytest.approx(0.1)
+    assert r["uncertainty_fwhm_width"] == pytest.approx(factor * 0.1, rel=1e-12)
 
 
 def test_magnetic_energy_density_reference():
@@ -72,7 +77,9 @@ def test_safety_factor_reference():
 
 
 def test_faraday_induction_reference():
-    assert faraday_induction(0.25, 10)["coil_voltage_V"] == pytest.approx(-2.5)
+    r = faraday_induction(0.25, 10, sigma_flux_derivative_Wb_s=0.01)
+    assert r["coil_voltage_V"] == pytest.approx(-2.5)
+    assert r["uncertainty_coil_voltage_V"] == pytest.approx(0.1)
 
 
 def test_loop_resistance_proxy_reference():
@@ -165,7 +172,9 @@ def test_relative_fluctuation_level_reference():
 
 
 def test_rms_signal_reference():
-    assert rms_signal([3.0, 4.0])["rms_signal"] == pytest.approx(math.sqrt(12.5))
+    r = rms_signal([3.0, 4.0], sigma_signal=[0.1, 0.2])
+    assert r["rms_signal"] == pytest.approx(math.sqrt(12.5))
+    assert r["uncertainty_rms_signal"] > 0
 
 
 def test_nyquist_frequency_reference():
@@ -231,6 +240,38 @@ def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
             test_path = ROOT / path
             assert test_path.is_file(), link
             assert f"def {test_name}(" in test_path.read_text(encoding="utf-8"), link
+
+
+@pytest.mark.parametrize("call", [
+    lambda: doppler_line_of_sight_velocity(1.0, 0.0),
+    lambda: ion_temperature_from_doppler_sigma(0.1, 500.0, 0.0),
+    lambda: toroidal_beta(100.0, 0.0),
+    lambda: safety_factor_large_aspect_ratio(0.2, 1.5, 2.0, 0.0),
+    lambda: faraday_induction(0.1, 2.5),
+    lambda: plasma_loop_resistance_proxy(1.0, 0.0),
+    lambda: energy_confinement_time(10.0, 0.0),
+    lambda: greenwald_density_reference(1.0, 0.0),
+    lambda: gas_pumping_speed(1.0, 0.0),
+    lambda: particle_confinement_time_proxy(1.0, 0.0),
+    lambda: relative_fluctuation_level([-1.0, 1.0]),
+    lambda: cross_correlation_lag([1.0, 1.0, 1.0], [1.0, 2.0, 3.0], 0.1),
+    lambda: bolometry_regularized_inverse([1.0, 2.0], [[1.0, 2.0]], 0.1),
+    lambda: particle_balance_rate(-1.0, 0.0, 0.0, 0.0),
+])
+def test_ion_sound_speed_uncertainty_reference():
+    Te, Ti, mi, gamma = 20.0, 10.0, 2 * 1.66053906660e-27, 1.0
+    r = ion_sound_speed(Te, Ti, mi, gamma, sigma_electron_temperature_eV=0.2,
+                        sigma_ion_temperature_eV=0.3, sigma_ion_mass_kg=1e-29, sigma_gamma_i=0.02)
+    assert r["uncertainty_ion_sound_speed_m_s"] > 0
+
+
+@pytest.mark.parametrize("call", [
+    lambda: rms_signal([0.0, 0.0], sigma_signal=[0.1, 0.1]),
+    lambda: ion_sound_speed(1.0, 1.0, 1.0, sigma_electron_temperature_eV=0.1),
+])
+def test_uncertainty_contracts_reject_undefined_or_partial_uncertainty(call):
+    with pytest.raises(ValueError):
+        call()
 
 
 @pytest.mark.parametrize("call", [
