@@ -33,7 +33,7 @@ def main() -> int:
     data=Path(args.input).read_bytes(); frame=load_table(data,Path(args.input).name)
     if args.command=='qc':
         report={'input':str(Path(args.input).name),'sha256':sha256_bytes(data),'rows':len(frame),'columns':list(map(str,frame.columns)),
-                'missing_by_column':frame.isna().sum().to_dict(),'quality':{}}
+                'missing_by_column':{str(col): int(count) for col, count in frame.isna().sum().items()},'quality':{}}
         for col in frame.columns:
             if pd.api.types.is_numeric_dtype(frame[col]): report['quality'][str(col)]=signal_quality(frame[col].to_numpy())
         Path(args.output).parent.mkdir(parents=True,exist_ok=True)
