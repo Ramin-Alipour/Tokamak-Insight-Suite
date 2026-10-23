@@ -12,8 +12,9 @@ def propagate_covariance(jacobian: Any, covariance: Any) -> dict[str, np.ndarray
     """First-order covariance propagation: C_y = J C_x J^T."""
     J = np.asarray(jacobian, dtype=float)
     C = np.asarray(covariance, dtype=float)
-    if J.ndim != 2 or C.ndim != 2 or C.shape[0] != C.shape[1] or J.shape[1] != C.shape[0]:
-        raise UncertaintyError("jacobian must be 2-D and covariance square with matching input dimension")
+    if (J.ndim != 2 or C.ndim != 2 or J.shape[0] < 1 or J.shape[1] < 1
+            or C.shape[0] < 1 or C.shape[0] != C.shape[1] or J.shape[1] != C.shape[0]):
+        raise UncertaintyError("jacobian must be nonempty and 2-D; covariance must be nonempty, square, and match the input dimension")
     if not np.all(np.isfinite(J)) or not np.all(np.isfinite(C)):
         raise UncertaintyError("jacobian and covariance must contain only finite values")
     covariance_scale = max(float(np.max(np.abs(C))), np.finfo(float).tiny)
