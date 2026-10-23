@@ -2,7 +2,9 @@
 import math
 import numpy as np
 import pytest
-E_CHARGE = 1.602176634e-19  # CODATA 2019 exact elementary charge\nEPS0 = 8.8541878128e-12  # CODATA 2018 vacuum permittivity\nM_E = 9.1093837139e-31  # CODATA 2022 electron mass
+E_CHARGE = 1.602176634e-19  # CODATA 2019 exact elementary charge
+EPS0 = 8.8541878128e-12  # CODATA 2018 vacuum permittivity
+M_E = 9.1093837139e-31  # CODATA 2022 electron mass
 from tokamak_analysis.formula_library import (
     electron_plasma_frequency, debye_length, electron_cyclotron_frequency,
     ion_sound_speed, electron_thermal_pressure, ion_thermal_pressure,
