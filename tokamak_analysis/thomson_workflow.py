@@ -203,7 +203,7 @@ def analyze_thomson_spectrum_and_density(
         "limitations": [
             "Not valid for collective spectra, strongly relativistic or non-Maxwellian distributions, or non-Gaussian instrument response.",
             "Absolute density depends directly on laser-power, interaction-length, collection-solid-angle and optical-efficiency calibration.",
-            "Stray-light subtraction, wavelength-dependent throughput, spectral-band completeness, calibration covariance, and model/calibration discrepancy are not estimated.",
+            "Stray-light subtraction, wavelength-dependent throughput, spectral-band completeness, calibration covariance, and calibration/model discrepancy are not estimated.",
             "Review fit residuals and uncertainty budget before interpreting results scientifically.",
         ],
     }
