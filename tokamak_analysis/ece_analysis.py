@@ -27,8 +27,14 @@ def resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T, *,
                        harmonic: int = 1, sign: int = 1):
     """Invert a circular toroidal-field model B(R)=B_axis*R_axis/R.
 
-    Returns the resonance major radius. This is an explicitly simplified
-    equilibrium model, not a substitute for EFIT mapping in shaped plasmas.
+    Returns the resonance major radius for B(R)=B_axis*R_axis/R.
+
+    A frequency and a one-dimensional toroidal-field model determine the
+    major-radius coordinate; they do not determine which side of the plasma a
+    line of sight intersects. The legacy ``sign`` argument is therefore
+    accepted only at its default (+1); a mirrored high-field-side radius would
+    be physically unjustified without viewing geometry.
+    This simplified model is not a substitute for EFIT mapping in shaped plasmas.
     """
     f = np.asarray(frequency_Hz, dtype=float)
     r0 = np.asarray(major_radius_m, dtype=float)
@@ -37,11 +43,13 @@ def resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T, *,
         raise ValueError("major_radius_m must be finite and positive.")
     if np.any(~np.isfinite(b0)) or np.any(b0 <= 0):
         raise ValueError("B_axis_T must be finite and positive.")
-    if sign not in (-1, 1):
-        raise ValueError("sign must be -1 (high-field side) or +1 (low-field side).")
+    if isinstance(sign, bool) or sign != 1:
+        raise ValueError(
+            "sign=-1 cannot be represented by a 1-D major-radius mapping; "
+            "supply viewing geometry and equilibrium for high/low-field-side localization."
+        )
     b_res = resonance_field_T(f, harmonic)
     radius = r0 * b0 / b_res
-    radius = radius if sign == 1 else 2.0 * r0 - radius
     return float(radius) if np.ndim(radius) == 0 else radius
 
 
