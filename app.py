@@ -174,6 +174,11 @@ def plot_line(x,y,xlabel,ylabel,title=None,logy=False):
                         lo+int(finite_idx[int(np.argmin(finite_values))]),
                         lo+int(finite_idx[int(np.argmax(finite_values))]),
                     ))
+                    invalid_idx=np.flatnonzero(~np.isfinite(segment))
+                    if invalid_idx.size:
+                        # Retain a non-finite point so the plot does not
+                        # silently connect across a missing/invalid region.
+                        keep.append(lo+int(invalid_idx[0]))
                 else:
                     # Preserve an all-invalid bucket as a gap rather than
                     # allowing NaNs to mask extrema in neighbouring buckets.
