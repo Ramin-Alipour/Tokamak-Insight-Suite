@@ -1266,6 +1266,9 @@ elif page=='Advanced Analysis':
                 # Validate the optional reference before running or recording an analysis.
                 # Otherwise malformed reference JSON reports a failure after the result has
                 # already been added to session history.
+                reference_result = None
+                if reference_text.strip():
+                    reference_result = json.loads(reference_text)
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.write(result)
