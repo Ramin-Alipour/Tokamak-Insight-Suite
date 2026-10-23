@@ -103,6 +103,14 @@ def detect_sawteeth(time_s: Any, core_signal: Any, smooth_window_s: float | None
     exceedance is *expected* a few times per 10^4 Gaussian samples), so candidates whose drop is smaller
     than `min_relative_amplitude` x the median candidate drop are rejected and counted in `n_rejected_small`.
     """
+    if not np.isfinite(n_sigmas) or n_sigmas <= 0:
+        raise ValueError("n_sigmas must be positive and finite.")
+    if smooth_window_s is not None and (not np.isfinite(smooth_window_s) or smooth_window_s <= 0):
+        raise ValueError("smooth_window_s must be positive and finite when supplied.")
+    if min_period_s is not None and (not np.isfinite(min_period_s) or min_period_s <= 0):
+        raise ValueError("min_period_s must be positive and finite when supplied.")
+    if not np.isfinite(min_relative_amplitude) or not 0 <= min_relative_amplitude <= 1:
+        raise ValueError("min_relative_amplitude must be finite and between 0 and 1.")
     t, y, dt = _clean(time_s, core_signal, 64)
     sw = smooth_window_s if smooth_window_s is not None else 5 * dt
     k = max(1, int(round(sw / dt)))
