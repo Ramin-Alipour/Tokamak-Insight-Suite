@@ -1,4 +1,4 @@
-from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
 def test_registry_contains_80_unique_ordered_analysis_ids():
@@ -34,3 +34,11 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert "thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
     assert {mode["name"] for mode in contract["workflow_modes"]} == {"calibrated_profile", "raw_spectrum_temperature_fit", "calibrated_power_density"}
     assert callable(resolve_analysis(1))
+
+
+
+def test_get_analysis_returns_deep_copy_of_nested_contract():
+    original = ANALYSES[0]["execution_contract"]["input_specs"][0]["name"]
+    entry = get_analysis(1)
+    entry["execution_contract"]["input_specs"][0]["name"] = "mutated"
+    assert ANALYSES[0]["execution_contract"]["input_specs"][0]["name"] == original
