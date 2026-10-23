@@ -1800,6 +1800,32 @@
           "unit": "dimensionless",
           "description": "Integration polarity convention, either -1 or +1.",
           "required": false
+        },
+        {
+          "name": "reference_channel",
+          "unit": "zero-based channel index",
+          "description": "Reference channel for cross-spectral phase/coherence analysis; must be an integer index within the channel matrix.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "initial_delta_B_T",
+          "unit": "T",
+          "description": "Initial relative perturbation used by trapezoidal voltage integration.",
+          "required": false
+        },
+        {
+          "name": "frequency_range_Hz",
+          "unit": "Hz pair",
+          "description": "Optional low/high band for selecting single-channel PSD peaks; does not truncate the returned PSD.",
+          "required": false
+        },
+        {
+          "name": "peak_prominence_fraction",
+          "unit": "dimensionless",
+          "description": "In-band PSD peak threshold relative to the maximum in-band PSD, between zero and one.",
+          "required": false,
+          "minimum": 0
         }
       ],
       "output_specs": [
@@ -1847,6 +1873,46 @@
           "name": "estimated_toroidal_mode_number",
           "unit": "integer",
           "description": "Alias-prone integer candidate selected by weighted circular phase residual."
+        },
+        {
+          "name": "approx_Bdot_detrended_T_s",
+          "unit": "T/s",
+          "description": "Ideal dB/dt estimate from the selected detrended voltage trace when geometry is supplied."
+        },
+        {
+          "name": "mean_voltage_V",
+          "unit": "V",
+          "description": "Arithmetic mean of the original voltage trace."
+        },
+        {
+          "name": "rms_voltage_V",
+          "unit": "V",
+          "description": "Root-mean-square voltage including DC component."
+        },
+        {
+          "name": "ac_rms_voltage_V",
+          "unit": "V",
+          "description": "Standard deviation of voltage after removing its mean."
+        },
+        {
+          "name": "peak_to_peak_voltage_V",
+          "unit": "V",
+          "description": "Maximum minus minimum measured voltage."
+        },
+        {
+          "name": "phase_fit_rms_rad",
+          "unit": "rad",
+          "description": "Coherence-weighted circular phase residual RMS for the selected integer mode candidate."
+        },
+        {
+          "name": "minimum_toroidal_sensor_spacing_rad",
+          "unit": "rad",
+          "description": "Minimum circular angular spacing among supplied sensors."
+        },
+        {
+          "name": "approximate_mode_alias_limit",
+          "unit": "integer",
+          "description": "Coarse pi/minimum-spacing diagnostic; not a guarantee of mode-number uniqueness."
         }
       ],
       "assumptions": [
@@ -1857,7 +1923,8 @@
       "preprocessing": [
         "Reject mismatched, non-finite, non-monotonic or non-uniform spectral inputs.",
         "Remove constant or linear trend only according to the explicitly selected detrend mode.",
-        "Use Welch PSD and cross-spectral estimates; no hidden smoothing or transfer-function correction."
+        "Use Welch PSD and cross-spectral estimates; no hidden smoothing or transfer-function correction.",
+        "For array analysis, require at least three channels, finite samples, unique sensor angles modulo 2*pi, valid reference-channel index and segment length no larger than sample count."
       ],
       "algorithm": "Compute signal statistics and Welch PSD; select local PSD peaks within the optional band; optionally estimate ideal dB/dt from Faraday's law, integrate baseline-corrected voltage by the trapezoidal rule, or fit integer toroidal mode candidates to inter-channel cross-spectral phase weighted by coherence.",
       "uncertainty_model": "No full uncertainty propagation is implemented. Spectral resolution is limited by sample duration and Welch segment length; calibration, geometry, phase and mode-number uncertainties require external assessment.",
@@ -1866,14 +1933,16 @@
         "Integrated perturbations are sensitive to baseline offsets and drift.",
         "Spectral peaks are not automatically classified as MHD modes.",
         "Toroidal mode-number estimates are alias-prone and depend on geometry, polarity, coherence and mode structure.",
-        "Independent device-specific experimental validation remains required."
+        "Independent device-specific experimental validation remains required.",
+        "The reported pi/minimum-angular-spacing alias limit is a coarse geometry diagnostic and must not be interpreted as a rigorous uniqueness guarantee for irregular arrays."
       ],
       "function_links": [
         "tokamak_analysis.mirnov_analysis.analyze_mirnov_signal",
         "tokamak_analysis.mirnov_analysis.magnetic_perturbation_from_mirnov_voltage",
         "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
       ],
-      "raw_data_to_physics": true
+      "raw_data_to_physics": true,
+      "note": "Complete within the declared numerical scope. Single-channel PSD/peak analysis, ideal geometry-based dB/dt, baseline-explicit relative delta-B integration, and multi-channel coherence-weighted mode candidates are implemented. Instrument transfer functions, calibration uncertainties and independent experimental validation remain external."
     }
   },
   {
