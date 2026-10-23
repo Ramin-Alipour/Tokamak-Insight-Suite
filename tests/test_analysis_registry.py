@@ -82,7 +82,8 @@ def test_ece_entry_is_analysis_number_three_and_declares_scoped_workflow():
     assert {item["name"] for item in contract["input_specs"]} >= {
         "frequency_Hz", "harmonic", "mode"
     }
-    assert {mode for mode in ("brightness_temperature", "channel_fluctuations", "resonance_mapping")
-            if mode in " ".join(contract["input_specs"][2]["description"] for _ in [0])} or contract["input_specs"]
+    assert "brightness_temperature" in contract["input_specs"][2]["description"]
+    assert "channel_fluctuations" in contract["input_specs"][2]["description"]
+    assert "resonance_mapping" in contract["input_specs"][2]["description"]
     assert "tokamak_analysis.ece_analysis.analyze_ece" in contract["function_links"]
     assert callable(resolve_analysis(3))
