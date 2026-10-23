@@ -132,11 +132,11 @@ def test_calibrated_thomson_spectrum_pipeline_returns_temperature_and_density():
     angle = np.pi / 2
     temperature_ev = 100.0
     instrument_sigma_nm = 0.05
-    sigma_physical = laser_nm * np.sqrt(
-        2.0 * temperature_ev / ELECTRON_REST_ENERGY_EV
+    sigma_physical = 2.0 * laser_nm * np.sqrt(
+        temperature_ev / ELECTRON_REST_ENERGY_EV
     ) * np.sin(angle / 2.0)
     sigma_measured = np.sqrt(sigma_physical**2 + instrument_sigma_nm**2)
-    wavelength = np.linspace(laser_nm - 30.0, laser_nm + 30.0, 801)
+    wavelength = np.linspace(laser_nm - 40.0, laser_nm + 40.0, 1001)
     power_density = (
         1200.0 * np.exp(-0.5 * ((wavelength - laser_nm) / sigma_measured) ** 2)
         + 30.0 + 0.4 * (wavelength - laser_nm)
