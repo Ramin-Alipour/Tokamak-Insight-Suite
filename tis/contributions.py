@@ -59,7 +59,8 @@ def build_contribution_bundle(
     if data_units is not None and not isinstance(data_units, Mapping):
         raise ValueError("data_units must be a mapping when supplied.")
     if dataset_sha256 is not None and (
-        len(dataset_sha256) != 64
+        not isinstance(dataset_sha256, str)
+        or len(dataset_sha256) != 64
         or any(char not in "0123456789abcdefABCDEF" for char in dataset_sha256)
     ):
         raise ValueError("dataset_sha256 must be a 64-character hexadecimal SHA-256 digest.")
