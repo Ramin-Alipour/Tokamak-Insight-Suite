@@ -153,10 +153,18 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
     # Approximate 95% null threshold and phase standard error from nominal Welch
     # segment count. Overlap reduces the effective independent averages, so these
     # are diagnostic estimates, not exact confidence intervals.
-    coh_threshold=float(1.0-0.05**(1.0/max(1,segments-1)))
+    # A null-coherence threshold and phase standard error require multiple
+    # Welch averages. With one segment, coherence is not statistically testable;
+    # report NaN rather than presenting a misleading numeric threshold/error.
     phase_se=np.full_like(coh,np.nan,dtype=float)
-    positive=coh>np.finfo(float).eps
-    phase_se[positive]=np.sqrt(np.maximum(1.0-coh[positive],0.0)/(2.0*coh[positive]*max(segments,1)))
+    if segments >= 2:
+        coh_threshold=float(1.0-0.05**(1.0/(segments-1)))
+        positive=coh>np.finfo(float).eps
+        phase_se[positive]=np.sqrt(
+            np.maximum(1.0-coh[positive],0.0)/(2.0*coh[positive]*segments)
+        )
+    else:
+        coh_threshold=float("nan")
     return {'frequency_Hz':f, 'coherence':coh, 'cross_phase_rad':np.angle(pxy),
             'cross_spectrum_real':pxy.real, 'cross_spectrum_imag':pxy.imag,
             'coherence_95pct_null_threshold':np.full_like(coh,coh_threshold,dtype=float),
