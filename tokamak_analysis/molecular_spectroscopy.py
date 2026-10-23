@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.integrate import trapezoid
 from scipy.signal import find_peaks, peak_widths
 
 
@@ -63,12 +64,13 @@ def analyze_molecular_spectrum(
     if contrast <= 0:
         raise ValueError("Spectrum has no positive contrast above the estimated baseline")
     peaks, props = find_peaks(corrected, prominence=prominence_fraction * contrast)
-    widths = peak_widths(corrected, peaks, rel_height=0.5)[0] if peaks.size else np.array([])
+    width_data = peak_widths(corrected, peaks, rel_height=0.5) if peaks.size else None
+    widths = width_data[0] if width_data is not None else np.array([])
     dx = float(np.median(np.diff(x)))
     peak_results = []
     for i, peak in enumerate(peaks):
-        left_i = int(np.clip(np.floor(peak_widths(corrected, peaks, rel_height=0.5)[2][i]), 0, x.size - 1))
-        right_i = int(np.clip(np.ceil(peak_widths(corrected, peaks, rel_height=0.5)[3][i]), 0, x.size - 1))
+        left_i = int(np.clip(np.floor(width_data[2][i]), 0, x.size - 1))
+        right_i = int(np.clip(np.ceil(width_data[3][i]), 0, x.size - 1))
         peak_results.append({
             "wavelength_nm": float(x[peak]),
             "intensity": float(y[peak]),
@@ -80,7 +82,7 @@ def analyze_molecular_spectrum(
     result = {
         "baseline": baseline,
         "contrast": contrast,
-        "integrated_signal_intensity_nm": float(np.trapezoid(np.maximum(corrected, 0.0), x)),
+        "integrated_signal_intensity_nm": float(trapezoid(np.maximum(corrected, 0.0), x)),
         "peak_count": int(len(peak_results)),
         "peaks": peak_results,
         "wavelength_range_nm": [float(x[0]), float(x[-1])],
@@ -127,7 +129,7 @@ def analyze_molecular_spectrum(
             xx = np.concatenate(([lo], x[mask], [hi]))
             yy = np.interp(xx, x, np.maximum(corrected, 0.0))
             bands.append({"lower_nm": lo, "upper_nm": hi,
-                          "integrated_signal_intensity_nm": float(np.trapezoid(yy, xx))})
+                          "integrated_signal_intensity_nm": float(trapezoid(yy, xx))})
         result["band_integrals"] = bands
     return result
 
