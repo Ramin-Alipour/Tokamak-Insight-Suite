@@ -1813,19 +1813,6 @@
           "unit": "T",
           "description": "Initial relative perturbation used by trapezoidal voltage integration.",
           "required": false
-        },
-        {
-          "name": "frequency_range_Hz",
-          "unit": "Hz pair",
-          "description": "Optional low/high band for selecting single-channel PSD peaks; does not truncate the returned PSD.",
-          "required": false
-        },
-        {
-          "name": "peak_prominence_fraction",
-          "unit": "dimensionless",
-          "description": "In-band PSD peak threshold relative to the maximum in-band PSD, between zero and one.",
-          "required": false,
-          "minimum": 0
         }
       ],
       "output_specs": [
