@@ -12,6 +12,7 @@ from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
+from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
@@ -801,8 +802,34 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='Optical / emission line':
+    mode=st.radio('Workflow',['Optical / emission line','Thomson spectral distribution','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='Thomson spectral distribution':
+        st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
+        xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
+        ycol=col_select('Thomson spectral signal',numeric,'tsd_y')
+        sigma_col=st.selectbox('Signal uncertainty σ (optional)', ['<none>']+numeric, key='tsd_sigma')
+        inst_sigma=st.number_input('Gaussian instrument standard deviation σ (nm; independently calibrated)',min_value=1e-12,value=0.05,format='%.8g',key='tsd_instrument_sigma')
+        background_fraction=st.slider('Fraction of each spectral edge used for background estimation',0.02,0.40,0.10,0.01,key='tsd_background_fraction')
+        if st.button('Analyze Thomson spectral distribution'):
+            try:
+                _x=pd.to_numeric(df[xcol],errors='coerce').to_numpy(dtype=float)
+                _y=pd.to_numeric(df[ycol],errors='coerce').to_numpy(dtype=float)
+                _unc=None if sigma_col=='<none>' else pd.to_numeric(df[sigma_col],errors='coerce').to_numpy(dtype=float)
+                _result=analyze_thomson_spectral_distribution(
+                    _x,_y,instrument_sigma_nm=float(inst_sigma),
+                    signal_uncertainty=_unc,background_fraction=float(background_fraction))
+                st.session_state['tis_thomson_distribution']={
+                    'xcol':xcol,'ycol':ycol,'sigma_col':sigma_col,'instrument_sigma_nm':float(inst_sigma),
+                    'background_fraction':float(background_fraction),'data_sha':sha,'result':_result}
+            except Exception as e:
+                st.error(str(e))
+        _saved_tsd=st.session_state.get('tis_thomson_distribution')
+        if _saved_tsd and _saved_tsd.get('xcol')==xcol and _saved_tsd.get('ycol')==ycol and _saved_tsd.get('sigma_col')==sigma_col and _saved_tsd.get('instrument_sigma_nm')==float(inst_sigma) and _saved_tsd.get('background_fraction')==float(background_fraction) and _saved_tsd.get('data_sha')==sha:
+            _r=_saved_tsd['result']
+            st.json({k:v for k,v in _r.items() if not isinstance(v,(np.ndarray,dict)) and k not in {'signal','wavelength_nm','background','background_subtracted_signal','positive_spectral_weights','fitted_spectrum','residual'}} | {'gaussian_fit_parameters':_r['gaussian_fit_parameters'],'gaussian_fit_parameter_uncertainties':_r['gaussian_fit_parameter_uncertainties']})
+            st.line_chart(pd.DataFrame({'measured':_r['signal'],'background-subtracted':_r['background_subtracted_signal'],'Gaussian fit':_r['fitted_spectrum']} ,index=_r['wavelength_nm']))
+            json_download('Export Thomson spectral-distribution results', {k:v for k,v in _r.items() if not isinstance(v,np.ndarray)}, 'thomson_spectral_distribution.json')
+    elif mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
         model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
         if st.button('Fit spectral line'):
