@@ -1381,7 +1381,8 @@
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
       ],
-      "raw_data_to_physics": false
+      "raw_data_to_physics": false,
+      "note": "Contract matches tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution and its dashboard workflow. The analysis characterizes the measured wavelength distribution; it does not infer electron velocity distribution, temperature, or density. Independent experimental validation remains required."
     }
   },
   {
