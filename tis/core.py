@@ -75,7 +75,10 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                         raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
             except zipfile.BadZipFile as exc:
                 raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header, decimal=decimal, nrows=max_rows + 1)
+        excel_header = 0 if header == "infer" else header
+        if excel_header is not None and (isinstance(excel_header, bool) or not isinstance(excel_header, int)):
+            raise ValueError("Excel header must be an integer row index or None.")
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=excel_header, decimal=decimal, nrows=max_rows + 1)
     elif name.endswith((".parquet", ".pq")):
         import pyarrow.parquet as pq
         try:
