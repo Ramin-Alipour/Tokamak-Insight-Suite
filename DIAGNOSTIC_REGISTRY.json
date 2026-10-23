@@ -1580,28 +1580,131 @@
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Poloidal-field coils / magnetic probes",
-    "quantities": "B_p; boundary constraints",
+    "quantities": "Calibrated local B_p(t), dB_p/dt, channel statistics, sampling diagnostics, optional uncertainty",
     "status": "M→D/I",
-    "method": "Calibrate field probes and combine with equilibrium reconstruction.",
-    "caveat": "Local fields alone do not determine a full equilibrium.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "method": "Calibrate digitized poloidal-field probe signals with documented per-channel gain and offset; optionally remove a defined baseline; calculate dB_p/dt on the measured time grid and propagate supplied independent signal uncertainty. Use probe geometry/transfer functions and equilibrium constraints in a separate, validated workflow for flux or reconstruction.",
+    "caveat": "Local fields and derivatives do not uniquely determine PF-coil currents, poloidal flux, plasma boundary, or equilibrium. This workflow does not perform coil inversion or Grad–Shafranov reconstruction.",
+    "implementation_functions": [
+      "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
+    ],
+    "implementation_status": "Implemented calibrated-signal analysis with validation, optional baseline correction, nonuniform-time derivatives, channel metrics, sampling-jitter flag, and first-order independent-noise uncertainty propagation. Raw voltage-to-field calibration, frequency response, geometry, and device-specific validation remain user supplied.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Calibrate field probes and combine with equilibrium reconstruction.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Local fields alone do not determine a full equilibrium."
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite strictly increasing sample times, at least three samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "digitizer units",
+          "description": "Finite digitized signal array, shape (samples,) or (samples, probes).",
+          "required": true
+        },
+        {
+          "name": "calibration_gain_T_per_unit",
+          "unit": "T per digitizer unit",
+          "description": "Non-zero calibrated gain, scalar or one value per probe channel.",
+          "required": true
+        },
+        {
+          "name": "calibration_offset_T",
+          "unit": "T",
+          "description": "Finite calibration offset, scalar or one value per channel.",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "digitizer units",
+          "description": "Optional non-negative 1-sigma signal uncertainty; independent sample errors assumed.",
+          "required": false
+        },
+        {
+          "name": "baseline_interval_s",
+          "unit": "s",
+          "description": "Optional (start, stop) interval with at least two samples; its calibrated mean is subtracted.",
+          "required": false
+        },
+        {
+          "name": "probe_names",
+          "unit": "list[text]",
+          "description": "Optional channel labels matching the number of probe channels.",
+          "required": false
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "B_poloidal_T",
+          "unit": "T",
+          "description": "Calibrated poloidal-field signal, optionally baseline corrected."
+        },
+        {
+          "name": "dB_poloidal_dt_T_s",
+          "unit": "T s^-1",
+          "description": "Time derivative evaluated on the actual sample-time grid."
+        },
+        {
+          "name": "B_poloidal_uncertainty_T",
+          "unit": "T",
+          "description": "Optional gain-propagated 1-sigma signal uncertainty."
+        },
+        {
+          "name": "dB_poloidal_dt_uncertainty_T_s",
+          "unit": "T s^-1",
+          "description": "Optional first-order derivative uncertainty for independent sample errors."
+        },
+        {
+          "name": "channel_mean_T",
+          "unit": "T",
+          "description": "Per-channel mean of processed field signal."
+        },
+        {
+          "name": "channel_rms_T",
+          "unit": "T",
+          "description": "Per-channel RMS of processed field signal."
+        },
+        {
+          "name": "channel_min_T/channel_max_T",
+          "unit": "T",
+          "description": "Per-channel extrema."
+        },
+        {
+          "name": "sampling_rate_median_Hz",
+          "unit": "Hz",
+          "description": "Reciprocal median sampling interval."
+        },
+        {
+          "name": "sampling_interval_relative_max_deviation",
+          "unit": "dimensionless",
+          "description": "Maximum relative deviation from median sample interval."
+        }
+      ],
+      "assumptions": [
+        "Calibration gain/offset are valid for the specific probe, electronics, frequency response and acquisition chain.",
+        "Uncertainty propagation assumes independent sample errors and exact calibration coefficients.",
+        "The input timebase is accurate; no anti-aliasing claim is made from sample rate alone."
+      ],
+      "preprocessing": [
+        "Validate finite arrays, matching sample dimensions, strictly increasing time, nonzero finite gains, optional uncertainty shape/range, baseline interval and channel labels."
+      ],
+      "algorithm": "Apply B_p=gain*signal+offset per channel; optionally subtract the mean over a user-defined baseline interval; estimate dB_p/dt using nonuniform-grid finite differences; calculate per-channel descriptive statistics and sampling interval diagnostics.",
+      "uncertainty_model": "Optional signal uncertainty is propagated through absolute calibration gain. Derivative uncertainty uses the numerical-gradient coefficients and assumes independent sample uncertainties; calibration, timing, baseline-estimation, filtering and model uncertainties are excluded.",
+      "limitations": [
+        "Not a raw-voltage calibration workflow; the user must provide validated transfer coefficients and instrument response.",
+        "Does not infer magnetic flux, PF-coil currents, plasma boundary or equilibrium from local probe signals.",
+        "Numerical differentiation can amplify noise; any filtering must be justified and documented.",
+        "Sampling-jitter warning is a diagnostic only and does not establish freedom from aliasing.",
+        "Independent experimental validation and device-specific validation are not claimed."
+      ],
+      "function_links": [
+        "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
+      ],
+      "raw_data_to_physics": true,
+      "note": "Complete only for the declared calibrated digitized-signal processing scope; not a complete magnetic-equilibrium or coil-inversion pipeline."
     }
   },
   {
