@@ -10,6 +10,7 @@ from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
@@ -800,7 +801,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
         model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
@@ -861,6 +862,55 @@ elif page=='Spectral Analysis':
                                 st.error(f'Ion temperature withheld: {e}')
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
+    elif mode=='Molecular spectroscopy':
+        st.caption('Exploratory molecular-band feature extraction. Wavelength calibration is required; no species or rotational/vibrational temperature is inferred automatically.')
+        xcol=col_select('Calibrated wavelength (nm)',numeric,'mol_x')
+        ycol=col_select('Molecular spectral intensity',numeric,'mol_y')
+        prominence=st.slider('Peak prominence / spectral contrast',0.01,1.0,0.03,0.01,key='mol_prominence')
+        baseline_q=st.slider('Constant baseline quantile',0.0,0.49,0.10,0.01,key='mol_baseline_quantile')
+        refs_text=st.text_input('Optional user reference bandheads (nm:label; nm:label)',key='mol_refs')
+        ranges_text=st.text_input('Optional integration windows (lower_nm:upper_nm; ...)',key='mol_ranges')
+        if st.button('Analyze molecular spectrum'):
+            try:
+                refs=None
+                if refs_text.strip():
+                    refs=[]
+                    for item in refs_text.split(';'):
+                        parts=item.strip().split(':',1)
+                        if len(parts)!=2 or not parts[1].strip():
+                            raise ValueError('Reference entries must use wavelength_nm:label, separated by semicolons.')
+                        refs.append((float(parts[0].strip()),parts[1].strip()))
+                ranges=None
+                if ranges_text.strip():
+                    ranges=[]
+                    for item in ranges_text.split(';'):
+                        parts=item.strip().split(':',1)
+                        if len(parts)!=2:
+                            raise ValueError('Integration windows must use lower_nm:upper_nm, separated by semicolons.')
+                        ranges.append((float(parts[0].strip()),float(parts[1].strip())))
+                spectrum=pd.DataFrame({
+                    'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),
+                    'intensity':pd.to_numeric(df[ycol],errors='coerce')
+                }).dropna()
+                spectrum=spectrum.sort_values('wavelength_nm',kind='stable')
+                result=analyze_molecular_spectrum(
+                    spectrum['wavelength_nm'].to_numpy(dtype=float),
+                    spectrum['intensity'].to_numpy(dtype=float),
+                    reference_bandheads=refs,
+                    prominence_fraction=prominence,
+                    baseline_quantile=baseline_q,
+                    band_ranges_nm=ranges,
+                )
+                st.session_state['tis_molecular_spectrum_result']={
+                    'data_sha':sha,'xcol':xcol,'ycol':ycol,'result':result
+                }
+            except Exception as e:
+                st.error(str(e))
+        saved_molecular=st.session_state.get('tis_molecular_spectrum_result')
+        if saved_molecular and saved_molecular.get('data_sha')==sha and saved_molecular.get('xcol')==xcol and saved_molecular.get('ycol')==ycol:
+            st.json(saved_molecular['result'])
+            json_download('Export molecular spectroscopy JSON',saved_molecular['result'],'tis_molecular_spectroscopy.json')
+            st.caption('Reference matches are candidates only. Integrated signal is intensity·nm, not radiated power unless the input is absolutely calibrated.')
     elif mode=='Line-ratio analysis':
         st.caption('Enter background-subtracted line intensities and relative instrument responses. Atomic modelling is needed to infer Te, ne or impurity concentration.')
         c1,c2=st.columns(2)
