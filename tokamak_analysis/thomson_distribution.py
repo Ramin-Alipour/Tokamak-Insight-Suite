@@ -68,7 +68,8 @@ def analyze_thomson_spectral_distribution(
     corrected = y - background
     weights = np.clip(corrected, 0.0, None)
     area = float(np.trapezoid(weights, x) if hasattr(np, "trapezoid") else np.trapz(weights, x))
-    if not np.isfinite(area) or area <= 0:
+    area_tolerance = 100.0 * np.finfo(float).eps * max(float(np.max(np.abs(y))), 1.0) * float(x[-1] - x[0])
+    if not np.isfinite(area) or area <= area_tolerance:
         raise ValueError("No positive spectral area remains after background subtraction")
     # Use wavelength-space quadrature weights, not raw sample counts. This keeps
     # moments correct for nonuniform wavelength grids (e.g. resampled spectrometers).
