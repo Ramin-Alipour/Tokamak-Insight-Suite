@@ -10,9 +10,9 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     assert sum(item.completeness == "complete" for item in contracts) == 0
     assert sum(item.completeness == "incomplete" for item in contracts) == 80
     assert all(item.completeness in {"incomplete", "complete"} for item in contracts)
-    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 59
+    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 58
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 20
-    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 1
+    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 2
     assert not any(item.supports_raw_data for item in contracts)
 
 def test_thomson_contract_marks_scoped_raw_spectrum_analysis_explicitly():
