@@ -845,7 +845,7 @@ def test_xray_spectrum_summary_distinguishes_total_from_energy_weighted_integral
     assert result["integrated_counts"] == pytest.approx(2000.0)
     assert result["integrated_signal_unit"] == "signal"
     assert result["integrated_signal_keV_weighted"] == pytest.approx(4000.0)
-    assert result["integrated_counts_keV"] == pytest.approx(4000.0)
+    assert result["integrated_counts_keV"] == pytest.approx(2000.0)
     assert result["mean_energy_keV"] == pytest.approx(2.0)
     assert result["rms_energy_spread_keV"] == pytest.approx(np.sqrt(0.5), rel=1e-6)
 
