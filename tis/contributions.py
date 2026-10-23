@@ -50,10 +50,14 @@ def build_contribution_bundle(
     """Build an exportable contribution record without embedding raw data."""
     if isinstance(analysis_id, bool) or not isinstance(analysis_id, int) or analysis_id < 1:
         raise ValueError("analysis_id must be a positive integer.")
-    if not analysis_name.strip():
-        raise ValueError("analysis_name must not be empty.")
-    if not software_version.strip():
-        raise ValueError("software_version must not be empty.")
+    if not isinstance(analysis_name, str) or not analysis_name.strip():
+        raise ValueError("analysis_name must be a nonempty string.")
+    if not isinstance(software_version, str) or not software_version.strip():
+        raise ValueError("software_version must be a nonempty string.")
+    if not isinstance(parameters, Mapping):
+        raise ValueError("parameters must be a mapping.")
+    if data_units is not None and not isinstance(data_units, Mapping):
+        raise ValueError("data_units must be a mapping when supplied.")
     if dataset_sha256 and (
         len(dataset_sha256) != 64
         or any(char not in "0123456789abcdefABCDEF" for char in dataset_sha256)
