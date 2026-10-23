@@ -7,6 +7,12 @@ import pandas as pd
 from tis.project import AnalysisRun, Project, ProjectStore, stable_digest
 
 
+def _ensure_project_shot(active_project: Project, shot_id: str | None) -> None:
+    """Keep each selected discharge represented in the project's shot list."""
+    if shot_id and not any(str(shot.get("shot_id", "")) == shot_id for shot in active_project.shots):
+        active_project.shots.append({"shot_id": shot_id})
+
+
 def _history_item_key(item: dict[str, Any]) -> str:
     return stable_digest({
         key: item.get(key) for key in (
@@ -103,6 +109,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
             _sync_analysis_history(active_project, history, software_version, excluded)
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
+            _ensure_project_shot(active_project, shot_id)
             active_project.metadata.update({
                 "software": "Tokamak Insight Suite", "software_version": software_version,
                 "current_shot_id": shot_id or None, "analyst": analyst or None,
