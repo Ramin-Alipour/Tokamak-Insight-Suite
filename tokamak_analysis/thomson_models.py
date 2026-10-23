@@ -104,7 +104,9 @@ def list_spectral_models() -> list[dict[str, object]]:
 
 def unregister_spectral_model(name: str) -> bool:
     """Unregister a custom model from this process."""
-    return _CUSTOM_MODELS.pop(name, None) is not None
+    if not isinstance(name, str) or not name.strip():
+        return False
+    return _CUSTOM_MODELS.pop(name.strip(), None) is not None
 
 
 def fit_custom_spectral_model(
@@ -118,11 +120,12 @@ def fit_custom_spectral_model(
     """Fit a registered model; no plasma-parameter interpretation is inferred."""
     if not isinstance(model_name, str) or not model_name.strip():
         raise ValueError("model_name must be a non-empty registered model name")
-    if model_name not in _CUSTOM_MODELS:
-        raise ValueError(f"Unknown custom spectral model {model_name!r}; register it first")
+    key = model_name.strip()
+    if key not in _CUSTOM_MODELS:
+        raise ValueError(f"Unknown custom spectral model {key!r}; register it first")
     if not isinstance(absolute_sigma, (bool, np.bool_)):
         raise ValueError("absolute_sigma must be boolean")
-    spec = _CUSTOM_MODELS[model_name]
+    spec = _CUSTOM_MODELS[key]
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(signal, dtype=float)
     if x.ndim != 1 or y.ndim != 1 or x.size != y.size:
