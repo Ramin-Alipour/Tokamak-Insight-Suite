@@ -98,7 +98,8 @@ jobs:
           observed = list(app.radio[0].options)
           assert observed == pages, f"Workspace page list changed unexpectedly: {observed}"
           for page in pages[1:]:
-              app.radio[0].set_value(page).run()
+              app.session_state["workspace_page"] = page
+              app.run()
               assert not app.exception, f"{page} raised: {app.exception}"
           PY
       - name: Start Streamlit dashboard and check HTTP health
