@@ -57,8 +57,8 @@ def detect_elms(time_s: Any, d_alpha: Any, baseline_window_s: float | None = Non
         t, y = t[m], y[m]
         if len(t) < 32:
             raise ValueError("Analysis window contains too few samples.")
-    if n_sigmas <= 0:
-        raise ValueError("n_sigmas must be positive.")
+    if not np.isfinite(n_sigmas) or n_sigmas <= 0:
+        raise ValueError("n_sigmas must be positive and finite.")
     span = t[-1] - t[0]
     bw = baseline_window_s if baseline_window_s is not None else max(span * 0.05, 20 * dt)
     size = max(3, int(round(bw / dt)) | 1)
