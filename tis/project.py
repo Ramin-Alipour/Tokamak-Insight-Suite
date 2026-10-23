@@ -57,12 +57,21 @@ class AnalysisRun:
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     def __post_init__(self) -> None:
-        if not self.analysis_name.strip():
-            raise ProjectError("analysis_name must not be empty")
-        if not self.algorithm_version.strip():
-            raise ProjectError("algorithm_version must be recorded")
-        if self.status not in {"completed", "warning", "failed", "invalid_input"}:
+        if not isinstance(self.analysis_name, str) or not self.analysis_name.strip():
+            raise ProjectError("analysis_name must be a nonempty string")
+        if not isinstance(self.algorithm_version, str) or not self.algorithm_version.strip():
+            raise ProjectError("algorithm_version must be a nonempty string")
+        for field_name in ("inputs", "settings", "outputs", "input_provenance", "units"):
+            if not isinstance(getattr(self, field_name), Mapping):
+                raise ProjectError(f"{field_name} must be a mapping")
+        if not isinstance(self.warnings, (list, tuple)) or any(not isinstance(item, str) for item in self.warnings):
+            raise ProjectError("warnings must be a sequence of strings")
+        if not isinstance(self.status, str) or self.status not in {"completed", "warning", "failed", "invalid_input"}:
             raise ProjectError(f"Unsupported analysis run status: {self.status}")
+        if not isinstance(self.run_id, str) or not self.run_id.strip():
+            raise ProjectError("run_id must be a nonempty string")
+        if not isinstance(self.created_at, str) or not self.created_at.strip():
+            raise ProjectError("created_at must be a nonempty string")
 
 @dataclass
 class Project:
