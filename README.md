@@ -79,7 +79,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 ## Tests and CI
 
-Install test tools with `pip install -e '.[test]'`; data archive support is optional via `pip install -e '.[data]'`, and legacy `.xls` support via `pip install -e '.[excel]'`.
+Install test tools with `pip install -e '.[test]'`; data archive support is optional via `pip install -e '.[data]'`. Excel support (`.xlsx` and legacy `.xls`) is included in the base dependencies.
 
 The `Continuous validation` workflow tests Python 3.10–3.12, compiles the source, runs critical Ruff checks, executes numerical tests with coverage, and uses Streamlit AppTest to exercise Home and the default Probe page. An HTTP health check supplements these runtime tests; it is not treated as proof that every page works. Results are recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
 
