@@ -75,7 +75,7 @@ def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                         raise ValueError("Excel archive contains an extreme compression ratio and was rejected.")
             except zipfile.BadZipFile as exc:
                 raise ValueError("The XLSX file is not a valid ZIP-based Excel workbook.") from exc
-        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header)
+        frame = pd.read_excel(io.BytesIO(data), sheet_name=sheet_name, skiprows=skiprows, header=header, decimal=decimal)
     elif name.endswith((".parquet", ".pq")):
         import pyarrow.parquet as pq
         try:
