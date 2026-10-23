@@ -47,6 +47,10 @@ def test_coherence_rejects_constant_signal_and_returns_bounded_finite_values():
     assert np.all(np.isfinite(values))
     assert np.all((values >= 0.0) & (values <= 1.0))
     assert np.all(np.diff(frequencies) >= 0.0)
+    # For the same deterministic signal, magnitude-squared coherence is one
+    # wherever the estimate has nonzero power (up to floating-point tolerance).
+    identical = magnitude_squared_coherence(np.sin(2 * np.pi * t / 16), np.sin(2 * np.pi * t / 16), 1000.0)
+    assert np.max(identical["magnitude_squared_coherence"]) == pytest.approx(1.0, abs=1e-12)
 
 
 def test_faraday_induction_rejects_boolean_turn_count():
@@ -62,3 +66,9 @@ def test_bolometry_inverse_reconstruction_is_explicitly_model_limited():
     assert len(result["uncertainty_emissivity_estimate"]) == 2
     assert "Unconstrained linear Tikhonov estimate" in result["reconstruction_note"]
     assert math.isfinite(result["residual_norm"])
+
+def test_bolometry_tikhonov_solution_matches_diagonal_analytic_reference():
+    y = np.array([1.0, 2.0])
+    result = bolometry_regularized_inverse(y, np.eye(2), 0.5)
+    assert result["emissivity_estimate"] == pytest.approx([0.8, 1.6], rel=1e-12)
+    assert result["residual_norm"] == pytest.approx(math.sqrt(0.2), rel=1e-12)
