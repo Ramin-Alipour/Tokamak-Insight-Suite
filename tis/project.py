@@ -55,15 +55,36 @@ class AnalysisRun:
     status: str = "completed"
     run_id: str = field(default_factory=lambda: str(uuid4()))
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    software_version: str = "unknown"
+    environment: Mapping[str, str] = field(default_factory=dict)
+    input_hashes: Mapping[str, str] = field(default_factory=dict)
+    random_seed: int | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.analysis_name, str) or not self.analysis_name.strip():
             raise ProjectError("analysis_name must be a nonempty string")
         if not isinstance(self.algorithm_version, str) or not self.algorithm_version.strip():
             raise ProjectError("algorithm_version must be a nonempty string")
-        for field_name in ("inputs", "settings", "outputs", "input_provenance", "units"):
+        for field_name in (
+            "inputs", "settings", "outputs", "input_provenance", "units",
+            "environment", "input_hashes",
+        ):
             if not isinstance(getattr(self, field_name), Mapping):
                 raise ProjectError(f"{field_name} must be a mapping")
+        if not isinstance(self.software_version, str) or not self.software_version.strip():
+            raise ProjectError("software_version must be a nonempty string")
+        if any(not isinstance(key, str) or not isinstance(value, str) or not value.strip()
+               for key, value in self.environment.items()):
+            raise ProjectError("environment must map string names to nonempty string values")
+        if any(not isinstance(key, str) or not isinstance(value, str)
+               or len(value) != 64 or any(char not in "0123456789abcdefABCDEF" for char in value)
+               for key, value in self.input_hashes.items()):
+            raise ProjectError("input_hashes must map input names to 64-character SHA-256 hex digests")
+        if isinstance(self.random_seed, bool) or (
+            self.random_seed is not None and
+            (not isinstance(self.random_seed, int) or self.random_seed < 0)
+        ):
+            raise ProjectError("random_seed must be a non-negative integer or None")
         if not isinstance(self.warnings, (list, tuple)) or any(not isinstance(item, str) for item in self.warnings):
             raise ProjectError("warnings must be a sequence of strings")
         if not isinstance(self.status, str) or self.status not in {"completed", "warning", "failed", "invalid_input"}:
@@ -72,6 +93,26 @@ class AnalysisRun:
             raise ProjectError("run_id must be a nonempty string")
         if not isinstance(self.created_at, str) or not self.created_at.strip():
             raise ProjectError("created_at must be a nonempty string")
+
+    @property
+    def reproducibility_fingerprint(self) -> str:
+        """Stable fingerprint of inputs and execution configuration (not the output)."""
+        return stable_digest({
+            "analysis_name": self.analysis_name,
+            "inputs": self.inputs,
+            "settings": self.settings,
+            "algorithm_version": self.algorithm_version,
+            "software_version": self.software_version,
+            "environment": self.environment,
+            "input_hashes": self.input_hashes,
+            "units": self.units,
+            "random_seed": self.random_seed,
+        })
+
+    @property
+    def output_digest(self) -> str:
+        """SHA-256 digest of normalized outputs for regression comparison."""
+        return stable_digest(self.outputs)
 
 @dataclass
 class Project:
