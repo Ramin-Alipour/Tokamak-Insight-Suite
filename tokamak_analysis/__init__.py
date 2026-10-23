@@ -18,7 +18,7 @@ __all__ = [
     "reflectometry", "rf_interaction", "runaway_electrons", "runaway_energy",
     "safety_factor", "shafranov_shift", "shape_reconstruction", "signal_calibration",
     "soft_xray", "spectral_broadening", "spectral_line_identification", "spectral_line_ratio",
-    "svd_analysis", "thomson_scattering", "thomson_spectral_distribution", "thomson_workflow", "transport", "turbulence",
+    "svd_analysis", "thomson_scattering", "thomson_workflow", "transport", "turbulence",
     "vacuum_pressure", "visible_imaging", "wall_recycling", "wavelet_analysis", "x_point",
     "xray_spectrum",
 ]
