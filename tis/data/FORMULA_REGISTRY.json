@@ -178,7 +178,7 @@
       "prerequisites": [
         "Model-dependent closure and ion species."
       ],
-      "uncertainty_model": "No uncertainty is returned; inputs are treated as exact. A future uncertainty model must account for covariance and model-closure uncertainty.",
+      "uncertainty_model": "Not propagated by this helper; uncertainty in temperature and ion mass must be reported separately.",
       "test_links": [
         "tests/test_formula_contracts.py::test_ion_sound_speed_independent_reference"
       ],
@@ -314,7 +314,7 @@
       "test_links": [
         "tests/test_formula_contracts.py::test_total_pressure_reference"
       ],
-      "note": "Mapped to a callable implementation and covered by independent numerical tests. This is analytic/software verification, not empirical validation on tokamak measurements."
+      "note": "Mapped callable and analytic reference test; uncertainties assume independent electron and ion pressure estimates. Not empirical validation."
     }
   },
   {
@@ -415,15 +415,32 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Approximate electron plasma frequency."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.plasma_frequency_from_density_cm3",
+      "formula_key": "plasma_frequency_from_density_cm3",
+      "input_specs": [
+        {
+          "name": "density_cm3",
+          "unit": "cm^-3",
+          "description": "Finite positive electron density in cm^-3.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "frequency_pe_Hz",
+          "unit": "Hz",
+          "description": "Electron plasma frequency."
+        }
+      ],
+      "prerequisites": [
+        "Approximate electron plasma frequency; density conversion is exactly 1 cm^-3 = 10^6 m^-3."
+      ],
+      "uncertainty_model": "First-order density uncertainty is not accepted by this unit-conversion wrapper; use the SI angular-frequency helper when propagating density uncertainty.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_plasma_frequency_cm3_conversion_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -436,15 +453,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Non-relativistic Doppler approximation and correct viewing geometry."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.doppler_line_of_sight_velocity",
+      "formula_key": "doppler_line_of_sight_velocity",
+      "input_specs": [
+        {
+          "name": "delta_lambda",
+          "unit": "same as lambda0",
+          "description": "Calibrated centroid shift; may be signed.",
+          "required": true
+        },
+        {
+          "name": "lambda0",
+          "unit": "same as delta_lambda",
+          "description": "Positive rest wavelength.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "velocity_los_m_s",
+          "unit": "m s^-1",
+          "description": "Signed non-relativistic line-of-sight velocity."
+        }
+      ],
+      "prerequisites": [
+        "|v| much less than c; wavelengths must share the same unit; correct wavelength calibration and viewing geometry are prerequisites."
+      ],
+      "uncertainty_model": "Optional independent wavelength uncertainties propagated by first-order linearization; viewing geometry uncertainty is excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_doppler_velocity_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -457,15 +497,44 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Thermal Gaussian Doppler width only; instrument response and other broadening removed."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.ion_temperature_from_doppler_sigma",
+      "formula_key": "ion_temperature_from_doppler_sigma",
+      "input_specs": [
+        {
+          "name": "sigma_lambda",
+          "unit": "same as lambda0",
+          "description": "Positive Gaussian standard deviation after instrument and non-thermal broadening correction.",
+          "required": true
+        },
+        {
+          "name": "lambda0",
+          "unit": "same as sigma_lambda",
+          "description": "Positive rest wavelength.",
+          "required": true
+        },
+        {
+          "name": "ion_mass_kg",
+          "unit": "kg",
+          "description": "Positive ion mass.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Thermal ion temperature from corrected Doppler sigma."
+        }
+      ],
+      "prerequisites": [
+        "Thermal Gaussian Doppler broadening only; instrumental, Stark, Zeeman, opacity and other broadening contributions must be treated before calling this function."
+      ],
+      "uncertainty_model": "Optional independent uncertainties in corrected sigma, rest wavelength and ion mass propagated by first-order linearization; uncertainty in broadening subtraction is not modelled.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_ion_temperature_from_doppler_sigma_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -478,15 +547,37 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Gaussian profile only."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.gaussian_fwhm_from_sigma",
+      "formula_key": "gaussian_fwhm_from_sigma",
+      "input_specs": [
+        {
+          "name": "sigma_width",
+          "unit": "any width unit",
+          "description": "Non-negative Gaussian standard deviation.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "sigma_width",
+          "unit": "same as input",
+          "description": "Input Gaussian sigma, unchanged."
+        },
+        {
+          "name": "fwhm_width",
+          "unit": "same as input",
+          "description": "Gaussian full width at half maximum."
+        }
+      ],
+      "prerequisites": [
+        "The line/profile is Gaussian."
+      ],
+      "uncertainty_model": "No uncertainty propagation; this deterministic scale conversion can be applied to sigma uncertainty by the same positive factor.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_gaussian_fwhm_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -499,15 +590,32 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Magnetic energy density in vacuum approximation."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.magnetic_energy_density",
+      "formula_key": "magnetic_energy_density",
+      "input_specs": [
+        {
+          "name": "magnetic_field_T",
+          "unit": "T",
+          "description": "Finite magnetic field; sign is immaterial because B is squared.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "magnetic_energy_density_J_m3",
+          "unit": "J m^-3",
+          "description": "Vacuum magnetic energy density, numerically equivalent to Pa."
+        }
+      ],
+      "prerequisites": [
+        "Vacuum permeability approximation; this is magnetic energy density, not total plasma stored energy."
+      ],
+      "uncertainty_model": "Optional independent 1-sigma field uncertainty propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_magnetic_energy_density_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -520,15 +628,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "State volume/local average and field convention."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.toroidal_beta",
+      "formula_key": "toroidal_beta",
+      "input_specs": [
+        {
+          "name": "pressure_Pa",
+          "unit": "Pa",
+          "description": "Non-negative local pressure or explicitly defined average.",
+          "required": true
+        },
+        {
+          "name": "toroidal_field_T",
+          "unit": "T",
+          "description": "Finite non-zero toroidal magnetic field.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "toroidal_beta",
+          "unit": "1",
+          "description": "Pressure divided by toroidal magnetic energy density; dimensionless."
+        }
+      ],
+      "prerequisites": [
+        "Pressure averaging volume and toroidal-field convention must be stated; this helper does not compute a volume average."
+      ],
+      "uncertainty_model": "Optional independent pressure and field uncertainties propagated by first-order linearization; averaging and covariance uncertainty are excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_toroidal_beta_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -541,15 +672,50 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Approximate circular, large-aspect-ratio geometry; equilibrium reconstruction is preferred."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.safety_factor_large_aspect_ratio",
+      "formula_key": "safety_factor_large_aspect_ratio",
+      "input_specs": [
+        {
+          "name": "r_m",
+          "unit": "m",
+          "description": "Non-negative minor-radius coordinate.",
+          "required": true
+        },
+        {
+          "name": "major_radius_m",
+          "unit": "m",
+          "description": "Positive major radius.",
+          "required": true
+        },
+        {
+          "name": "toroidal_field_T",
+          "unit": "T",
+          "description": "Finite signed toroidal field.",
+          "required": true
+        },
+        {
+          "name": "poloidal_field_T",
+          "unit": "T",
+          "description": "Finite non-zero signed poloidal field.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "safety_factor_estimate",
+          "unit": "1",
+          "description": "Large-aspect-ratio safety-factor estimate."
+        }
+      ],
+      "prerequisites": [
+        "Approximate circular, large-aspect-ratio geometry; not a substitute for equilibrium reconstruction; sign conventions affect q."
+      ],
+      "uncertainty_model": "Optional independent uncertainties in r, R, B_t and B_p propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_safety_factor_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -562,15 +728,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Sign, turns, area and electronics response documented."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.faraday_induction",
+      "formula_key": "faraday_induction",
+      "input_specs": [
+        {
+          "name": "flux_derivative_Wb_s",
+          "unit": "Wb s^-1",
+          "description": "Time derivative of magnetic flux through one turn.",
+          "required": true
+        },
+        {
+          "name": "turns",
+          "unit": "1",
+          "description": "Positive integer coil turn count.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "coil_voltage_V",
+          "unit": "V",
+          "description": "Induced coil voltage with Faraday-law sign."
+        }
+      ],
+      "prerequisites": [
+        "Coil orientation, polarity, number of turns and electronics response must be documented."
+      ],
+      "uncertainty_model": "No uncertainty propagation in this primitive; uncertainty in flux derivative can be multiplied by the known turn count.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_faraday_induction_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -583,15 +772,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Only under consistent sign/definition; inductive terms can complicate interpretation."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.plasma_loop_resistance_proxy",
+      "formula_key": "plasma_loop_resistance_proxy",
+      "input_specs": [
+        {
+          "name": "loop_voltage_V",
+          "unit": "V",
+          "description": "Finite signed loop voltage.",
+          "required": true
+        },
+        {
+          "name": "plasma_current_A",
+          "unit": "A",
+          "description": "Finite non-zero plasma current.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "loop_resistance_proxy_ohm",
+          "unit": "ohm",
+          "description": "Signed V_loop/I_p proxy."
+        }
+      ],
+      "prerequisites": [
+        "Inductive terms can complicate interpretation; consistent voltage/current signs and time windows are required."
+      ],
+      "uncertainty_model": "Optional independent voltage and current uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_loop_resistance_proxy_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -604,15 +816,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Not generally the same as net loss power or total input power."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.ohmic_power_approximation",
+      "formula_key": "ohmic_power_approximation",
+      "input_specs": [
+        {
+          "name": "loop_voltage_V",
+          "unit": "V",
+          "description": "Finite signed loop voltage.",
+          "required": true
+        },
+        {
+          "name": "plasma_current_A",
+          "unit": "A",
+          "description": "Finite signed plasma current.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "ohmic_power_approximation_W",
+          "unit": "W",
+          "description": "Signed loop-voltage/current product."
+        }
+      ],
+      "prerequisites": [
+        "This product is not generally the same as net loss power or total input power; preserve sign convention."
+      ],
+      "uncertainty_model": "Optional independent voltage and current uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_ohmic_power_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -625,15 +860,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Use consistent boundary, time window and loss-power definition."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.energy_confinement_time",
+      "formula_key": "energy_confinement_time",
+      "input_specs": [
+        {
+          "name": "stored_energy_J",
+          "unit": "J",
+          "description": "Non-negative stored thermal energy.",
+          "required": true
+        },
+        {
+          "name": "loss_power_W",
+          "unit": "W",
+          "description": "Positive loss power under a declared convention.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "energy_confinement_time_s",
+          "unit": "s",
+          "description": "W_th/P_loss confinement-time estimate."
+        }
+      ],
+      "prerequisites": [
+        "Stored energy and loss power must use consistent boundaries, time windows and definitions."
+      ],
+      "uncertainty_model": "Optional independent energy and loss-power uncertainties propagated by first-order linearization; covariance and model uncertainty are excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_energy_confinement_time_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -646,15 +904,43 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Empirical reference scaling, not a universal physical limit."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.greenwald_density_reference",
+      "formula_key": "greenwald_density_reference",
+      "input_specs": [
+        {
+          "name": "plasma_current_MA",
+          "unit": "MA",
+          "description": "Non-negative plasma-current magnitude in megaamperes.",
+          "required": true
+        },
+        {
+          "name": "minor_radius_m",
+          "unit": "m",
+          "description": "Positive minor radius.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "greenwald_density_1e20_m3",
+          "unit": "10^20 m^-3",
+          "description": "Greenwald reference density in conventional scaled units."
+        },
+        {
+          "name": "greenwald_density_m3",
+          "unit": "m^-3",
+          "description": "Same reference density in SI units."
+        }
+      ],
+      "prerequisites": [
+        "Empirical reference scaling, not a universal density limit; use consistent plasma-current and minor-radius conventions."
+      ],
+      "uncertainty_model": "Optional independent current and radius uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_greenwald_density_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -667,15 +953,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Number of particles in a Debye sphere."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.debye_parameter",
+      "formula_key": "debye_parameter",
+      "input_specs": [
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Positive electron density.",
+          "required": true
+        },
+        {
+          "name": "debye_length_m",
+          "unit": "m",
+          "description": "Positive Debye length.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "debye_parameter_particles",
+          "unit": "1",
+          "description": "Expected number of particles in a Debye sphere; dimensionless count."
+        }
+      ],
+      "prerequisites": [
+        "Use electron density and a Debye length consistent with the plasma regime and temperature model."
+      ],
+      "uncertainty_model": "Optional independent density and Debye-length uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_debye_parameter_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -688,15 +997,32 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Local electron density."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.electron_plasma_angular_frequency",
+      "formula_key": "electron_plasma_angular_frequency",
+      "input_specs": [
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Finite positive local electron density.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "omega_pe_rad_s",
+          "unit": "rad s^-1",
+          "description": "Electron plasma angular frequency."
+        }
+      ],
+      "prerequisites": [
+        "Local electron density; cold-plasma definition."
+      ],
+      "uncertainty_model": "Optional 1-sigma density uncertainty is propagated by the underlying SI formula.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_electron_plasma_angular_frequency_alias_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -709,15 +1035,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Converts charge current to particle flux only with valid collection geometry/model."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.ion_saturation_particle_flux_proxy",
+      "formula_key": "ion_saturation_particle_flux_proxy",
+      "input_specs": [
+        {
+          "name": "saturation_current_A",
+          "unit": "A",
+          "description": "Finite saturation current; absolute magnitude is used.",
+          "required": true
+        },
+        {
+          "name": "effective_area_m2",
+          "unit": "m^2",
+          "description": "Positive effective collection area.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "ion_saturation_particle_flux_m2_s",
+          "unit": "m^-2 s^-1",
+          "description": "Ion particle-flux proxy."
+        }
+      ],
+      "prerequisites": [
+        "A proxy only: validity depends on probe collection geometry, sheath model, ion species and operating regime."
+      ],
+      "uncertainty_model": "Optional independent current and area uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_ion_saturation_flux_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -730,15 +1079,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Input-power convention and time averaging must be specified."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.radiated_power_fraction",
+      "formula_key": "radiated_power_fraction",
+      "input_specs": [
+        {
+          "name": "radiated_power_W",
+          "unit": "W",
+          "description": "Non-negative radiated power.",
+          "required": true
+        },
+        {
+          "name": "input_power_W",
+          "unit": "W",
+          "description": "Positive input power under an explicitly defined convention.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "radiated_power_fraction",
+          "unit": "1",
+          "description": "Dimensionless radiated-to-input power ratio."
+        }
+      ],
+      "prerequisites": [
+        "Time windows and input-power definition must be consistent; values above unity are flagged, not silently clipped."
+      ],
+      "uncertainty_model": "Optional independent radiated and input power uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_radiated_power_fraction_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -751,15 +1123,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Surface mapping, geometry and heat-flux calibration required."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.integrated_surface_power",
+      "formula_key": "integrated_surface_power",
+      "input_specs": [
+        {
+          "name": "heat_flux_W_m2",
+          "unit": "W m^-2",
+          "description": "Finite calibrated heat-flux samples.",
+          "required": true
+        },
+        {
+          "name": "area_weights_m2",
+          "unit": "m^2",
+          "description": "Matching non-negative surface-area weights for each sample.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "integrated_surface_power_W",
+          "unit": "W",
+          "description": "Discrete surface integral sum(q_i A_i)."
+        }
+      ],
+      "prerequisites": [
+        "Surface mapping, geometry, heat-flux calibration and area quadrature weights are supplied by the caller."
+      ],
+      "uncertainty_model": "Optional independent per-sample heat-flux and area uncertainties propagated in quadrature; spatial correlations are excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_integrated_surface_power_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -772,15 +1167,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Projected apparent velocity, not necessarily plasma flow velocity."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.apparent_feature_speed",
+      "formula_key": "apparent_feature_speed",
+      "input_specs": [
+        {
+          "name": "displacement_m",
+          "unit": "m",
+          "description": "Signed calibrated projected displacement.",
+          "required": true
+        },
+        {
+          "name": "frame_interval_s",
+          "unit": "s",
+          "description": "Positive frame interval.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "apparent_feature_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Signed projected apparent feature speed."
+        }
+      ],
+      "prerequisites": [
+        "Apparent projected velocity is not necessarily the plasma-flow velocity; image calibration and tracking errors are not inferred."
+      ],
+      "uncertainty_model": "Optional independent displacement and frame-interval uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_apparent_feature_speed_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -793,15 +1211,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Gauge position, conductance and throughput convention matter."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.gas_pumping_speed",
+      "formula_key": "gas_pumping_speed",
+      "input_specs": [
+        {
+          "name": "throughput_Pa_m3_s",
+          "unit": "Pa m^3 s^-1",
+          "description": "Non-negative gas throughput in SI pressure-volume units per second.",
+          "required": true
+        },
+        {
+          "name": "pressure_Pa",
+          "unit": "Pa",
+          "description": "Positive pressure at the declared gauge location.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "gas_pumping_speed_m3_s",
+          "unit": "m^3 s^-1",
+          "description": "Q/p pumping speed."
+        }
+      ],
+      "prerequisites": [
+        "Gauge position, conductance, gas-temperature convention and throughput units must be consistent."
+      ],
+      "uncertainty_model": "Optional independent throughput and pressure uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_gas_pumping_speed_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -814,15 +1255,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Rate calibration and time base required."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.injected_particle_number",
+      "formula_key": "injected_particle_number",
+      "input_specs": [
+        {
+          "name": "particle_rate_s",
+          "unit": "s^-1",
+          "description": "Non-negative calibrated particle injection-rate samples.",
+          "required": true
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Matching strictly increasing time coordinate.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "injected_particle_number",
+          "unit": "particles",
+          "description": "Trapezoidal integral of injection rate over time."
+        }
+      ],
+      "prerequisites": [
+        "Rate calibration and timebase are required; nonuniform increasing time is supported by trapezoidal integration."
+      ],
+      "uncertainty_model": "Optional independent per-sample rate uncertainties propagated with trapezoidal integration weights; time-coordinate uncertainty is excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_injected_particle_number_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -835,15 +1299,38 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Requires consistent control volume and particle balance."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.particle_confinement_time_proxy",
+      "formula_key": "particle_confinement_time_proxy",
+      "input_specs": [
+        {
+          "name": "stored_particles",
+          "unit": "particles",
+          "description": "Non-negative stored-particle inventory.",
+          "required": true
+        },
+        {
+          "name": "loss_rate_s",
+          "unit": "s^-1",
+          "description": "Positive particle loss rate in particles per second.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "particle_confinement_time_s",
+          "unit": "s",
+          "description": "Stored inventory divided by loss rate."
+        }
+      ],
+      "prerequisites": [
+        "Requires a consistent control volume and particle balance; not a full particle-transport model."
+      ],
+      "uncertainty_model": "Optional independent inventory and loss-rate uncertainties propagated by first-order linearization.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_particle_confinement_time_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -856,15 +1343,42 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Window and detrending must be specified; unstable near zero mean."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.relative_fluctuation_level",
+      "formula_key": "relative_fluctuation_level",
+      "input_specs": [
+        {
+          "name": "signal",
+          "unit": "signal unit",
+          "description": "Finite 1-D samples; nonzero stable mean required.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "relative_fluctuation_level",
+          "unit": "1",
+          "description": "Population RMS of demeaned signal divided by absolute mean."
+        },
+        {
+          "name": "mean_signal",
+          "unit": "signal unit",
+          "description": "Sample mean."
+        },
+        {
+          "name": "fluctuation_rms",
+          "unit": "signal unit",
+          "description": "Population RMS fluctuation after mean removal."
+        }
+      ],
+      "prerequisites": [
+        "The mean must not be zero or numerically negligible relative to signal scale; the function does not detrend or window automatically."
+      ],
+      "uncertainty_model": "No confidence interval estimated; this is a descriptive sample statistic and depends on window, detrending and stationarity.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_relative_fluctuation_level_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -877,15 +1391,32 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Specify whether DC component is included."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.rms_signal",
+      "formula_key": "rms_signal",
+      "input_specs": [
+        {
+          "name": "signal",
+          "unit": "signal unit",
+          "description": "Finite non-empty 1-D samples.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "rms_signal",
+          "unit": "same as signal",
+          "description": "Root mean square including DC component."
+        }
+      ],
+      "prerequisites": [
+        "The DC component is included; subtract the mean before calling if AC-only RMS is intended."
+      ],
+      "uncertainty_model": "No uncertainty estimated; sampling and measurement uncertainty must be handled separately.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_rms_signal_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -898,15 +1429,32 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Frequencies above Nyquist alias unless anti-alias filtering was applied."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.nyquist_frequency",
+      "formula_key": "nyquist_frequency",
+      "input_specs": [
+        {
+          "name": "sampling_frequency_Hz",
+          "unit": "Hz",
+          "description": "Positive uniform sampling frequency.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "nyquist_frequency_Hz",
+          "unit": "Hz",
+          "description": "Half the sampling frequency."
+        }
+      ],
+      "prerequisites": [
+        "Assumes uniform sampling; frequencies above Nyquist alias unless suitable anti-alias filtering is applied before sampling/downsampling."
+      ],
+      "uncertainty_model": "Optional sampling-frequency uncertainty is propagated linearly by division by two.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_nyquist_frequency_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -919,15 +1467,49 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Correlation lag does not establish causality; periodic signals can create ambiguous peaks."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.cross_correlation_lag",
+      "formula_key": "cross_correlation_lag",
+      "input_specs": [
+        {
+          "name": "signal_x",
+          "unit": "signal unit",
+          "description": "Finite 1-D samples from channel x.",
+          "required": true
+        },
+        {
+          "name": "signal_y",
+          "unit": "signal unit",
+          "description": "Matching synchronized samples from channel y.",
+          "required": true
+        },
+        {
+          "name": "sample_interval_s",
+          "unit": "s",
+          "description": "Positive uniform sample interval.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "cross_correlation_lag_s",
+          "unit": "s",
+          "description": "Lag of maximum positive cross-correlation; positive means y lags x."
+        },
+        {
+          "name": "normalized_peak_correlation",
+          "unit": "1",
+          "description": "Peak correlation normalized by global signal norms."
+        }
+      ],
+      "prerequisites": [
+        "Signals must be synchronized, uniformly sampled and nonconstant; correlation does not establish causality."
+      ],
+      "uncertainty_model": "No lag confidence interval estimated; uncertainty depends on noise, sample length, periodicity and peak ambiguity.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_cross_correlation_lag_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -940,15 +1522,55 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Estimator uncertainty depends on segment count and stationarity."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.magnitude_squared_coherence",
+      "formula_key": "magnitude_squared_coherence",
+      "input_specs": [
+        {
+          "name": "signal_x",
+          "unit": "signal unit",
+          "description": "Finite 1-D samples from channel x.",
+          "required": true
+        },
+        {
+          "name": "signal_y",
+          "unit": "signal unit",
+          "description": "Matching synchronized samples from channel y.",
+          "required": true
+        },
+        {
+          "name": "sampling_frequency_Hz",
+          "unit": "Hz",
+          "description": "Positive uniform sampling frequency.",
+          "required": true
+        },
+        {
+          "name": "nperseg",
+          "unit": "samples",
+          "description": "Optional Welch segment length; between 2 and record length.",
+          "required": false
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "coherence_frequency_Hz",
+          "unit": "Hz",
+          "description": "Welch coherence frequency bins."
+        },
+        {
+          "name": "magnitude_squared_coherence",
+          "unit": "1",
+          "description": "Magnitude-squared coherence values in [0,1]."
+        }
+      ],
+      "prerequisites": [
+        "Welch estimator; same-length synchronized uniformly sampled signals required. Frequency resolution depends on segment length."
+      ],
+      "uncertainty_model": "No confidence intervals estimated; effective degrees of freedom depend on segment count, overlap, window and stationarity.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_magnitude_squared_coherence_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -961,15 +1583,59 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Ill-posed inverse problem; save regularization and uncertainty."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.bolometry_regularized_inverse",
+      "formula_key": "bolometry_regularized_inverse",
+      "input_specs": [
+        {
+          "name": "measurements",
+          "unit": "measurement unit",
+          "description": "Finite line-integrated measurement vector y.",
+          "required": true
+        },
+        {
+          "name": "geometry_matrix",
+          "unit": "measurement unit per emissivity unit",
+          "description": "Finite forward matrix A with one row per measurement.",
+          "required": true
+        },
+        {
+          "name": "regularization",
+          "unit": "same scale as singular values of A",
+          "description": "Positive Tikhonov parameter lambda; solution uses lambda squared in normal equations.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "emissivity_estimate",
+          "unit": "emissivity units",
+          "description": "Unconstrained regularized estimate vector."
+        },
+        {
+          "name": "residual_norm",
+          "unit": "measurement unit",
+          "description": "Euclidean norm of forward-model residual."
+        },
+        {
+          "name": "normal_matrix_condition_number",
+          "unit": "1",
+          "description": "Condition number of regularized normal matrix."
+        },
+        {
+          "name": "negative_emissivity_voxel_count",
+          "unit": "voxels",
+          "description": "Count of negative reconstructed components."
+        }
+      ],
+      "prerequisites": [
+        "Ill-posed inverse problem; this is unconstrained linear Tikhonov regularization, not a positivity-constrained reconstruction; calibration and geometry must be independently validated."
+      ],
+      "uncertainty_model": "Optional independent measurement uncertainties propagated conditionally through the linear regularized kernel; geometry, regularization bias and model uncertainty are excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_bolometry_inverse_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   },
   {
@@ -982,15 +1648,50 @@
     "category": "Core physics",
     "execution_contract": {
       "schema_version": "1.0",
-      "implementation_link_status": "not_mapped",
-      "input_specs": [],
-      "output_specs": [],
-      "prerequisites": [
-        "Define volume and avoid double-counting source/loss terms."
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.particle_balance_rate",
+      "formula_key": "particle_balance_rate",
+      "input_specs": [
+        {
+          "name": "input_rate_s",
+          "unit": "s^-1",
+          "description": "Non-negative particle input rate.",
+          "required": true
+        },
+        {
+          "name": "output_rate_s",
+          "unit": "s^-1",
+          "description": "Non-negative particle output rate.",
+          "required": true
+        },
+        {
+          "name": "source_rate_s",
+          "unit": "s^-1",
+          "description": "Non-negative internal source rate.",
+          "required": true
+        },
+        {
+          "name": "loss_rate_s",
+          "unit": "s^-1",
+          "description": "Non-negative loss rate; avoid double-counting terms.",
+          "required": true
+        }
       ],
-      "uncertainty_model": "not_specified",
-      "test_links": [],
-      "note": "A formula reference is not proof of executable linkage. Map the function, exact units, preconditions and numerical/dimensional tests before claiming implementation."
+      "output_specs": [
+        {
+          "name": "particle_balance_rate_s",
+          "unit": "particles s^-1",
+          "description": "Net inventory derivative: input - output + source - loss."
+        }
+      ],
+      "prerequisites": [
+        "Define the control volume and terms consistently; do not double-count a source or loss in both boundary flows and volumetric terms."
+      ],
+      "uncertainty_model": "Optional independent uncertainties in all four rates propagated in quadrature; covariance is excluded.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_particle_balance_reference"
+      ],
+      "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
   }
 ]

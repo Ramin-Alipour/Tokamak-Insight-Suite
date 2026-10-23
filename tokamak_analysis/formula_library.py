@@ -7,7 +7,7 @@ machine-specific empirical validations.
 from __future__ import annotations
 import math
 import numpy as np
-from tis.constants import E_CHARGE, EPS0, M_E, MU0
+from tis.constants import E_CHARGE, EPS0, M_E, MU0, C_LIGHT
 
 def _finite(name, value):
     x=float(value)
@@ -134,4 +134,435 @@ def line_integrated_density(density_m3, distance_m, *, sigma_density_m3=None):
     result=_integrate_with_uncertainty(density_m3,distance_m,sigma_density_m3,"line_integrated_density")
     out={"line_integrated_density_m-2":result["value"]}
     if "uncertainty" in result: out["uncertainty_line_integrated_density_m-2"]=result["uncertainty"]
+    return out
+
+
+# The following helpers map the remaining catalogue formulae to explicit, unit-aware
+# calculations. These functions are numerical primitives, not machine-specific
+# empirical validations or substitutes for instrument calibration.
+
+def plasma_frequency_from_density_cm3(density_cm3):
+    """Electron plasma frequency from density in cm^-3; returns frequency in Hz."""
+    n_cm3 = _positive("density_cm3", density_cm3)
+    return {"frequency_pe_Hz": electron_plasma_frequency(n_cm3 * 1.0e6)["frequency_pe_Hz"]}
+
+
+def doppler_line_of_sight_velocity(delta_lambda, lambda0, *, sigma_delta_lambda=None, sigma_lambda0=None):
+    """Non-relativistic line-of-sight velocity; wavelength shift and rest wavelength share units."""
+    shift = _finite("delta_lambda", delta_lambda)
+    rest = _positive("lambda0", lambda0)
+    if (sigma_delta_lambda is None) != (sigma_lambda0 is None):
+        raise ValueError("Provide both wavelength uncertainties, or neither.")
+    velocity = C_LIGHT * shift / rest
+    out = {"velocity_los_m_s": velocity}
+    if sigma_delta_lambda is not None:
+        sd = _nonnegative("sigma_delta_lambda", sigma_delta_lambda)
+        sl = _nonnegative("sigma_lambda0", sigma_lambda0)
+        out["uncertainty_velocity_los_m_s"] = math.hypot(C_LIGHT * sd / rest, C_LIGHT * shift * sl / rest**2)
+    return out
+
+
+def ion_temperature_from_doppler_sigma(sigma_lambda, lambda0, ion_mass_kg, *,
+                                        sigma_sigma_lambda=None, sigma_lambda0=None, sigma_ion_mass_kg=None):
+    """Thermal ion temperature from instrument-corrected Gaussian sigma; wavelengths share units."""
+    sigma = _positive("sigma_lambda", sigma_lambda)
+    rest = _positive("lambda0", lambda0)
+    mass = _positive("ion_mass_kg", ion_mass_kg)
+    uncertainties = (sigma_sigma_lambda, sigma_lambda0, sigma_ion_mass_kg)
+    if any(v is not None for v in uncertainties) and not all(v is not None for v in uncertainties):
+        raise ValueError("Provide all three independent uncertainties, or none.")
+    ratio = sigma / rest
+    temp = mass * C_LIGHT**2 / E_CHARGE * ratio**2
+    out = {"ion_temperature_eV": temp}
+    if sigma_sigma_lambda is not None:
+        ss = _nonnegative("sigma_sigma_lambda", sigma_sigma_lambda)
+        sl = _nonnegative("sigma_lambda0", sigma_lambda0)
+        sm = _nonnegative("sigma_ion_mass_kg", sigma_ion_mass_kg)
+        rel = math.sqrt((2 * ss / sigma)**2 + (2 * sl / rest)**2 + (sm / mass)**2)
+        out["uncertainty_ion_temperature_eV"] = temp * rel
+    return out
+
+
+def gaussian_fwhm_from_sigma(sigma_width):
+    """Convert Gaussian standard deviation to FWHM, preserving the width unit."""
+    sigma = _nonnegative("sigma_width", sigma_width)
+    factor = 2.0 * math.sqrt(2.0 * math.log(2.0))
+    return {"sigma_width": sigma, "fwhm_width": factor * sigma}
+
+
+def magnetic_energy_density(magnetic_field_T, *, sigma_magnetic_field_T=None):
+    """Vacuum magnetic energy density B^2/(2 mu_0), in J m^-3."""
+    B = _finite("magnetic_field_T", magnetic_field_T)
+    value = B**2 / (2.0 * MU0)
+    out = {"magnetic_energy_density_J_m3": value}
+    if sigma_magnetic_field_T is not None:
+        sB = _nonnegative("sigma_magnetic_field_T", sigma_magnetic_field_T)
+        out["uncertainty_magnetic_energy_density_J_m3"] = abs(B) * sB / MU0
+    return out
+
+
+def toroidal_beta(pressure_Pa, toroidal_field_T, *, sigma_pressure_Pa=None, sigma_toroidal_field_T=None):
+    """Local or explicitly averaged beta_t = p/(B_t^2/(2 mu_0)); pressure in Pa, field in T."""
+    p = _nonnegative("pressure_Pa", pressure_Pa)
+    B = _finite("toroidal_field_T", toroidal_field_T)
+    if B == 0:
+        raise ValueError("toroidal_field_T must be non-zero.")
+    if (sigma_pressure_Pa is None) != (sigma_toroidal_field_T is None):
+        raise ValueError("Provide both pressure and field uncertainties, or neither.")
+    value = 2.0 * MU0 * p / B**2
+    out = {"toroidal_beta": value}
+    if sigma_pressure_Pa is not None:
+        sp = _nonnegative("sigma_pressure_Pa", sigma_pressure_Pa)
+        sB = _nonnegative("sigma_toroidal_field_T", sigma_toroidal_field_T)
+        out["uncertainty_toroidal_beta"] = math.hypot(2.0 * MU0 * sp / B**2,
+                                                        4.0 * MU0 * p * sB / abs(B)**3)
+    return out
+
+
+def safety_factor_large_aspect_ratio(r_m, major_radius_m, toroidal_field_T, poloidal_field_T, *,
+                                     sigma_r_m=None, sigma_major_radius_m=None,
+                                     sigma_toroidal_field_T=None, sigma_poloidal_field_T=None):
+    """Large-aspect-ratio circular estimate q ~ r B_t/(R B_p), not an equilibrium reconstruction."""
+    r = _nonnegative("r_m", r_m)
+    R = _positive("major_radius_m", major_radius_m)
+    Bt = _finite("toroidal_field_T", toroidal_field_T)
+    Bp = _finite("poloidal_field_T", poloidal_field_T)
+    if Bp == 0:
+        raise ValueError("poloidal_field_T must be non-zero.")
+    sigmas = (sigma_r_m, sigma_major_radius_m, sigma_toroidal_field_T, sigma_poloidal_field_T)
+    if any(v is not None for v in sigmas) and not all(v is not None for v in sigmas):
+        raise ValueError("Provide all four independent uncertainties, or none.")
+    q = r * Bt / (R * Bp)
+    out = {"safety_factor_estimate": q}
+    if sigma_r_m is not None:
+        sr, sR, sBt, sBp = [_nonnegative(n, v) for n, v in zip(
+            ("sigma_r_m", "sigma_major_radius_m", "sigma_toroidal_field_T", "sigma_poloidal_field_T"), sigmas)]
+        out["uncertainty_safety_factor_estimate"] = math.sqrt(
+            (Bt * sr / (R * Bp))**2 + (q * sR / R)**2 +
+            (r * sBt / (R * Bp))**2 + (q * sBp / Bp)**2)
+    return out
+
+
+def faraday_induction(flux_derivative_Wb_s, turns):
+    """Coil voltage from Faraday's law: V = -N dPhi/dt; derivative in Wb s^-1."""
+    derivative = _finite("flux_derivative_Wb_s", flux_derivative_Wb_s)
+    n_float = _positive("turns", turns)
+    if not n_float.is_integer():
+        raise ValueError("turns must be a positive integer.")
+    return {"coil_voltage_V": -int(n_float) * derivative}
+
+
+def plasma_loop_resistance_proxy(loop_voltage_V, plasma_current_A, *,
+                                 sigma_loop_voltage_V=None, sigma_plasma_current_A=None):
+    """Signed V_loop/I_p proxy in ohms; inductive and sign conventions remain the user's responsibility."""
+    V = _finite("loop_voltage_V", loop_voltage_V)
+    I = _finite("plasma_current_A", plasma_current_A)
+    if I == 0:
+        raise ValueError("plasma_current_A must be non-zero.")
+    if (sigma_loop_voltage_V is None) != (sigma_plasma_current_A is None):
+        raise ValueError("Provide both voltage and current uncertainties, or neither.")
+    value = V / I
+    out = {"loop_resistance_proxy_ohm": value}
+    if sigma_loop_voltage_V is not None:
+        sV = _nonnegative("sigma_loop_voltage_V", sigma_loop_voltage_V)
+        sI = _nonnegative("sigma_plasma_current_A", sigma_plasma_current_A)
+        out["uncertainty_loop_resistance_proxy_ohm"] = math.hypot(sV / I, V * sI / I**2)
+    return out
+
+
+def ohmic_power_approximation(loop_voltage_V, plasma_current_A, *,
+                              sigma_loop_voltage_V=None, sigma_plasma_current_A=None):
+    """Signed loop-voltage/current product in watts; not a general net-loss-power estimate."""
+    V = _finite("loop_voltage_V", loop_voltage_V)
+    I = _finite("plasma_current_A", plasma_current_A)
+    if (sigma_loop_voltage_V is None) != (sigma_plasma_current_A is None):
+        raise ValueError("Provide both voltage and current uncertainties, or neither.")
+    value = V * I
+    out = {"ohmic_power_approximation_W": value}
+    if sigma_loop_voltage_V is not None:
+        sV = _nonnegative("sigma_loop_voltage_V", sigma_loop_voltage_V)
+        sI = _nonnegative("sigma_plasma_current_A", sigma_plasma_current_A)
+        out["uncertainty_ohmic_power_approximation_W"] = math.hypot(I * sV, V * sI)
+    return out
+
+
+def energy_confinement_time(stored_energy_J, loss_power_W, *, sigma_stored_energy_J=None, sigma_loss_power_W=None):
+    """Energy confinement-time estimate W_th/P_loss in seconds using a consistent loss-power definition."""
+    W = _nonnegative("stored_energy_J", stored_energy_J)
+    P = _positive("loss_power_W", loss_power_W)
+    if (sigma_stored_energy_J is None) != (sigma_loss_power_W is None):
+        raise ValueError("Provide both energy and power uncertainties, or neither.")
+    value = W / P
+    out = {"energy_confinement_time_s": value}
+    if sigma_stored_energy_J is not None:
+        sW = _nonnegative("sigma_stored_energy_J", sigma_stored_energy_J)
+        sP = _nonnegative("sigma_loss_power_W", sigma_loss_power_W)
+        out["uncertainty_energy_confinement_time_s"] = math.hypot(sW / P, W * sP / P**2)
+    return out
+
+
+def greenwald_density_reference(plasma_current_MA, minor_radius_m, *, sigma_plasma_current_MA=None, sigma_minor_radius_m=None):
+    """Greenwald empirical reference: n_G = I_p[MA]/(pi a^2) in units of 10^20 m^-3."""
+    Ip = _nonnegative("plasma_current_MA", plasma_current_MA)
+    a = _positive("minor_radius_m", minor_radius_m)
+    if (sigma_plasma_current_MA is None) != (sigma_minor_radius_m is None):
+        raise ValueError("Provide both current and radius uncertainties, or neither.")
+    scaled = Ip / (math.pi * a**2)
+    out = {"greenwald_density_1e20_m3": scaled, "greenwald_density_m3": scaled * 1.0e20}
+    if sigma_plasma_current_MA is not None:
+        sI = _nonnegative("sigma_plasma_current_MA", sigma_plasma_current_MA)
+        sa = _nonnegative("sigma_minor_radius_m", sigma_minor_radius_m)
+        s_scaled = math.hypot(sI / (math.pi * a**2), 2.0 * Ip * sa / (math.pi * a**3))
+        out["uncertainty_greenwald_density_1e20_m3"] = s_scaled
+        out["uncertainty_greenwald_density_m3"] = s_scaled * 1.0e20
+    return out
+
+
+def debye_parameter(density_m3, debye_length_m, *, sigma_density_m3=None, sigma_debye_length_m=None):
+    """Number of particles in a Debye sphere, N_D=(4 pi/3)n_e lambda_D^3."""
+    n = _positive("density_m3", density_m3)
+    lam = _positive("debye_length_m", debye_length_m)
+    if (sigma_density_m3 is None) != (sigma_debye_length_m is None):
+        raise ValueError("Provide both density and Debye-length uncertainties, or neither.")
+    value = (4.0 * math.pi / 3.0) * n * lam**3
+    out = {"debye_parameter_particles": value}
+    if sigma_density_m3 is not None:
+        sn = _nonnegative("sigma_density_m3", sigma_density_m3)
+        sl = _nonnegative("sigma_debye_length_m", sigma_debye_length_m)
+        out["uncertainty_debye_parameter_particles"] = math.hypot((4.0 * math.pi / 3.0) * lam**3 * sn,
+                                                                   4.0 * math.pi * n * lam**2 * sl)
+    return out
+
+
+def electron_plasma_angular_frequency(density_m3, *, sigma_density_m3=None):
+    """Angular-frequency-only view of the electron plasma frequency for density in m^-3."""
+    result = electron_plasma_frequency(density_m3, sigma_n_e_m3=sigma_density_m3)
+    out = {"omega_pe_rad_s": result["omega_pe_rad_s"]}
+    if "uncertainty_omega_pe_rad_s" in result:
+        out["uncertainty_omega_pe_rad_s"] = result["uncertainty_omega_pe_rad_s"]
+    return out
+
+
+def ion_saturation_particle_flux_proxy(saturation_current_A, effective_area_m2, *,
+                                       sigma_saturation_current_A=None, sigma_effective_area_m2=None):
+    """Magnitude-based ion particle-flux proxy |I_sat|/(e A_eff), requiring a valid collection model."""
+    current = abs(_finite("saturation_current_A", saturation_current_A))
+    area = _positive("effective_area_m2", effective_area_m2)
+    if (sigma_saturation_current_A is None) != (sigma_effective_area_m2 is None):
+        raise ValueError("Provide both current and area uncertainties, or neither.")
+    value = current / (E_CHARGE * area)
+    out = {"ion_saturation_particle_flux_m2_s": value}
+    if sigma_saturation_current_A is not None:
+        sI = _nonnegative("sigma_saturation_current_A", sigma_saturation_current_A)
+        sA = _nonnegative("sigma_effective_area_m2", sigma_effective_area_m2)
+        out["uncertainty_ion_saturation_particle_flux_m2_s"] = math.hypot(
+            sI / (E_CHARGE * area), current * sA / (E_CHARGE * area**2))
+    return out
+
+
+def radiated_power_fraction(radiated_power_W, input_power_W, *, sigma_radiated_power_W=None, sigma_input_power_W=None):
+    """Radiated-to-defined-input power ratio; values above unity are returned with a convention warning."""
+    Pr = _nonnegative("radiated_power_W", radiated_power_W)
+    Pin = _positive("input_power_W", input_power_W)
+    if (sigma_radiated_power_W is None) != (sigma_input_power_W is None):
+        raise ValueError("Provide both radiated- and input-power uncertainties, or neither.")
+    value = Pr / Pin
+    out = {"radiated_power_fraction": value}
+    if value > 1.0:
+        out["quality_flag"] = "fraction_above_unity_check_power_conventions_and_time_windows"
+    if sigma_radiated_power_W is not None:
+        sPr = _nonnegative("sigma_radiated_power_W", sigma_radiated_power_W)
+        sPin = _nonnegative("sigma_input_power_W", sigma_input_power_W)
+        out["uncertainty_radiated_power_fraction"] = math.hypot(sPr / Pin, Pr * sPin / Pin**2)
+    return out
+
+
+def integrated_surface_power(heat_flux_W_m2, area_weights_m2, *,
+                             sigma_heat_flux_W_m2=None, sigma_area_weights_m2=None):
+    """Integrate calibrated heat flux using matching surface-area weights; returns watts."""
+    q = np.asarray(heat_flux_W_m2, dtype=float)
+    area = np.asarray(area_weights_m2, dtype=float)
+    if q.ndim != 1 or area.shape != q.shape or q.size == 0 or not np.all(np.isfinite(q)) or not np.all(np.isfinite(area)) or np.any(area < 0):
+        raise ValueError("Heat flux and area weights must be matching finite 1-D arrays; areas must be non-negative.")
+    if (sigma_heat_flux_W_m2 is None) != (sigma_area_weights_m2 is None):
+        raise ValueError("Provide both heat-flux and area uncertainties, or neither.")
+    value = float(np.sum(q * area))
+    out = {"integrated_surface_power_W": value}
+    if sigma_heat_flux_W_m2 is not None:
+        sq = np.asarray(sigma_heat_flux_W_m2, dtype=float)
+        sa = np.asarray(sigma_area_weights_m2, dtype=float)
+        if sq.shape != q.shape or sa.shape != q.shape or not np.all(np.isfinite(sq)) or not np.all(np.isfinite(sa)) or np.any(sq < 0) or np.any(sa < 0):
+            raise ValueError("Uncertainty arrays must match the samples and be finite non-negative.")
+        out["uncertainty_integrated_surface_power_W"] = float(np.sqrt(np.sum((area * sq)**2 + (q * sa)**2)))
+    return out
+
+
+def apparent_feature_speed(displacement_m, frame_interval_s, *, sigma_displacement_m=None, sigma_frame_interval_s=None):
+    """Signed projected apparent feature speed, not necessarily plasma-flow velocity."""
+    dx = _finite("displacement_m", displacement_m)
+    dt = _positive("frame_interval_s", frame_interval_s)
+    if (sigma_displacement_m is None) != (sigma_frame_interval_s is None):
+        raise ValueError("Provide both displacement and interval uncertainties, or neither.")
+    value = dx / dt
+    out = {"apparent_feature_speed_m_s": value}
+    if sigma_displacement_m is not None:
+        sx = _nonnegative("sigma_displacement_m", sigma_displacement_m)
+        st = _nonnegative("sigma_frame_interval_s", sigma_frame_interval_s)
+        out["uncertainty_apparent_feature_speed_m_s"] = math.hypot(sx / dt, dx * st / dt**2)
+    return out
+
+
+def gas_pumping_speed(throughput_Pa_m3_s, pressure_Pa, *, sigma_throughput_Pa_m3_s=None, sigma_pressure_Pa=None):
+    """Pumping speed Q/p in m^3 s^-1 for throughput in Pa m^3 s^-1 and pressure in Pa."""
+    Q = _nonnegative("throughput_Pa_m3_s", throughput_Pa_m3_s)
+    p = _positive("pressure_Pa", pressure_Pa)
+    if (sigma_throughput_Pa_m3_s is None) != (sigma_pressure_Pa is None):
+        raise ValueError("Provide both throughput and pressure uncertainties, or neither.")
+    value = Q / p
+    out = {"gas_pumping_speed_m3_s": value}
+    if sigma_throughput_Pa_m3_s is not None:
+        sQ = _nonnegative("sigma_throughput_Pa_m3_s", sigma_throughput_Pa_m3_s)
+        sp = _nonnegative("sigma_pressure_Pa", sigma_pressure_Pa)
+        out["uncertainty_gas_pumping_speed_m3_s"] = math.hypot(sQ / p, Q * sp / p**2)
+    return out
+
+
+def injected_particle_number(particle_rate_s, time_s, *, sigma_particle_rate_s=None):
+    """Integrate calibrated particle injection rate [s^-1] over strictly increasing time [s]."""
+    result = _integrate_with_uncertainty(particle_rate_s, time_s, sigma_particle_rate_s, "injected_particle_number")
+    out = {"injected_particle_number": result["value"]}
+    if "uncertainty" in result:
+        out["uncertainty_injected_particle_number"] = result["uncertainty"]
+    return out
+
+
+def particle_confinement_time_proxy(stored_particles, loss_rate_s, *, sigma_stored_particles=None, sigma_loss_rate_s=None):
+    """Particle confinement-time proxy N_p/dN_loss/dt in seconds."""
+    N = _nonnegative("stored_particles", stored_particles)
+    rate = _positive("loss_rate_s", loss_rate_s)
+    if (sigma_stored_particles is None) != (sigma_loss_rate_s is None):
+        raise ValueError("Provide both stored-particle and loss-rate uncertainties, or neither.")
+    value = N / rate
+    out = {"particle_confinement_time_s": value}
+    if sigma_stored_particles is not None:
+        sN = _nonnegative("sigma_stored_particles", sigma_stored_particles)
+        sr = _nonnegative("sigma_loss_rate_s", sigma_loss_rate_s)
+        out["uncertainty_particle_confinement_time_s"] = math.hypot(sN / rate, N * sr / rate**2)
+    return out
+
+
+def relative_fluctuation_level(signal):
+    """Population RMS fluctuation divided by the absolute mean; DC mean must be safely non-zero."""
+    x = np.asarray(signal, dtype=float)
+    if x.ndim != 1 or x.size < 2 or not np.all(np.isfinite(x)):
+        raise ValueError("signal must be a finite 1-D array with at least two samples.")
+    mean = float(np.mean(x))
+    scale = float(np.max(np.abs(x)))
+    if scale == 0.0 or abs(mean) <= np.finfo(float).eps * scale * 10.0:
+        raise ValueError("signal mean is zero or too close to zero for a stable relative fluctuation.")
+    fluctuation_rms = float(np.sqrt(np.mean((x - mean)**2)))
+    return {"relative_fluctuation_level": fluctuation_rms / abs(mean),
+            "mean_signal": mean, "fluctuation_rms": fluctuation_rms}
+
+
+def rms_signal(signal):
+    """Root-mean-square of finite samples, including any DC component."""
+    x = np.asarray(signal, dtype=float)
+    if x.ndim != 1 or x.size == 0 or not np.all(np.isfinite(x)):
+        raise ValueError("signal must be a non-empty finite 1-D array.")
+    return {"rms_signal": float(np.sqrt(np.mean(x**2)))}
+
+
+def nyquist_frequency(sampling_frequency_Hz, *, sigma_sampling_frequency_Hz=None):
+    """Nyquist frequency for uniformly sampled data; anti-alias filtering is a separate requirement."""
+    fs = _positive("sampling_frequency_Hz", sampling_frequency_Hz)
+    out = {"nyquist_frequency_Hz": fs / 2.0}
+    if sigma_sampling_frequency_Hz is not None:
+        sfs = _nonnegative("sigma_sampling_frequency_Hz", sigma_sampling_frequency_Hz)
+        out["uncertainty_nyquist_frequency_Hz"] = sfs / 2.0
+    return out
+
+
+def cross_correlation_lag(signal_x, signal_y, sample_interval_s):
+    """Return lag of the maximum positive cross-correlation; positive means y lags x."""
+    x = np.asarray(signal_x, dtype=float)
+    y = np.asarray(signal_y, dtype=float)
+    dt = _positive("sample_interval_s", sample_interval_s)
+    if x.ndim != 1 or y.shape != x.shape or x.size < 3 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
+        raise ValueError("signals must be matching finite 1-D arrays with at least three samples.")
+    x0 = x - np.mean(x)
+    y0 = y - np.mean(y)
+    norm = float(np.linalg.norm(x0) * np.linalg.norm(y0))
+    if norm == 0.0:
+        raise ValueError("cross-correlation is undefined for a constant signal.")
+    corr = np.correlate(y0, x0, mode="full") / norm
+    lags = np.arange(-x.size + 1, x.size)
+    index = int(np.argmax(corr))
+    return {"cross_correlation_lag_s": float(lags[index] * dt),
+            "normalized_peak_correlation": float(corr[index])}
+
+
+def magnitude_squared_coherence(signal_x, signal_y, sampling_frequency_Hz, *, nperseg=None):
+    """Welch magnitude-squared coherence; estimator uncertainty is not inferred from one result."""
+    from scipy.signal import coherence
+    x = np.asarray(signal_x, dtype=float)
+    y = np.asarray(signal_y, dtype=float)
+    fs = _positive("sampling_frequency_Hz", sampling_frequency_Hz)
+    if x.ndim != 1 or y.shape != x.shape or x.size < 8 or not np.all(np.isfinite(x)) or not np.all(np.isfinite(y)):
+        raise ValueError("signals must be matching finite 1-D arrays with at least eight samples.")
+    segment = min(256, x.size) if nperseg is None else int(nperseg)
+    if segment < 2 or segment > x.size:
+        raise ValueError("nperseg must be between 2 and the signal length.")
+    frequencies, values = coherence(x, y, fs=fs, nperseg=segment)
+    return {"coherence_frequency_Hz": frequencies.tolist(),
+            "magnitude_squared_coherence": values.tolist(),
+            "nperseg": segment,
+            "uncertainty_note": "No confidence interval estimated; depends on segment count, windowing and stationarity."}
+
+
+def bolometry_regularized_inverse(measurements, geometry_matrix, regularization, *, sigma_measurements=None):
+    """Unconstrained Tikhonov estimate x=(A.T A + lambda^2 I)^-1 A.T y; negative x is retained and flagged."""
+    y = np.asarray(measurements, dtype=float)
+    A = np.asarray(geometry_matrix, dtype=float)
+    lam = _positive("regularization", regularization)
+    if y.ndim != 1 or A.ndim != 2 or A.shape[0] != y.size or A.shape[1] < 1 or y.size < 1:
+        raise ValueError("measurements must be 1-D and match the row count of a 2-D geometry matrix.")
+    if not np.all(np.isfinite(y)) or not np.all(np.isfinite(A)):
+        raise ValueError("measurements and geometry matrix must be finite.")
+    normal = A.T @ A + (lam**2) * np.eye(A.shape[1])
+    kernel = np.linalg.solve(normal, A.T)
+    x = kernel @ y
+    out = {"emissivity_estimate": x.tolist(),
+           "residual_norm": float(np.linalg.norm(A @ x - y)),
+           "regularization": lam,
+           "normal_matrix_condition_number": float(np.linalg.cond(normal)),
+           "negative_emissivity_voxel_count": int(np.count_nonzero(x < 0)),
+           "reconstruction_note": "Unconstrained linear Tikhonov estimate; geometry/calibration and regularization bias are not validated by this calculation."}
+    if sigma_measurements is not None:
+        sy = np.asarray(sigma_measurements, dtype=float)
+        if sy.ndim == 0:
+            sy = np.full(y.shape, float(sy))
+        if sy.shape != y.shape or not np.all(np.isfinite(sy)) or np.any(sy < 0):
+            raise ValueError("sigma_measurements must be a non-negative scalar or match the measurement vector.")
+        covariance = (kernel * (sy**2)[None, :]) @ kernel.T
+        out["uncertainty_emissivity_estimate"] = np.sqrt(np.maximum(np.diag(covariance), 0.0)).tolist()
+        out["uncertainty_note"] = "Conditional linear propagation of measurement uncertainty only; excludes geometry and regularization-model uncertainty."
+    return out
+
+
+def particle_balance_rate(input_rate_s, output_rate_s, source_rate_s, loss_rate_s, *,
+                          sigma_input_rate_s=None, sigma_output_rate_s=None,
+                          sigma_source_rate_s=None, sigma_loss_rate_s=None):
+    """Net particle inventory rate dN/dt = input - output + source - loss; all rates in s^-1."""
+    names = ("input_rate_s", "output_rate_s", "source_rate_s", "loss_rate_s")
+    vals = [_nonnegative(n, v) for n, v in zip(names, (input_rate_s, output_rate_s, source_rate_s, loss_rate_s))]
+    sigmas = (sigma_input_rate_s, sigma_output_rate_s, sigma_source_rate_s, sigma_loss_rate_s)
+    if any(v is not None for v in sigmas) and not all(v is not None for v in sigmas):
+        raise ValueError("Provide all four independent rate uncertainties, or none.")
+    value = vals[0] - vals[1] + vals[2] - vals[3]
+    out = {"particle_balance_rate_s": value}
+    if sigma_input_rate_s is not None:
+        s = [_nonnegative(n, v) for n, v in zip(
+            ("sigma_input_rate_s", "sigma_output_rate_s", "sigma_source_rate_s", "sigma_loss_rate_s"), sigmas)]
+        out["uncertainty_particle_balance_rate_s"] = math.sqrt(sum(v**2 for v in s))
     return out

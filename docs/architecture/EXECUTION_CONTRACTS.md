@@ -17,7 +17,7 @@ Every row in `DIAGNOSTIC_REGISTRY.json` now has an `execution_contract` with exe
 
 The first migration deliberately marks contracts `incomplete` until input/output schemas, units, uncertainty handling and assumptions are actually specified. Empty specifications mean "not declared", not "no inputs required". UI code must show that state rather than inventing defaults. The typed adapter in `tis.contracts` reads the same JSON records. The separate 80-entry callable registry also carries conservative contracts; callable resolution alone is not treated as a complete raw-data workflow. Contract completeness is not experimental validation.
 
-`FORMULA_REGISTRY.json` separately identifies formula-to-code links as `not_mapped` until an implementation and supporting tests are explicitly associated.
+`FORMULA_REGISTRY.json` separately maps all 37 catalogue formulae to callable functions, declared input/output units, preconditions, uncertainty policies and analytic reference tests. These are software/analytic verification contracts, not empirical validation on tokamak measurements. The root registry and packaged copy must remain synchronized; `tests/test_formula_registry_complete.py` enforces this mapping gate.
 
 ## Canonical data model
 
