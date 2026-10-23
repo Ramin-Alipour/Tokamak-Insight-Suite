@@ -88,3 +88,12 @@ def test_zarr_open_retries_transient_failure_and_passes_timeout():
     result = _open_zarr_with_retry(fake, "https://example.org/shot.zarr", "magnetics", attempts=3, timeout_s=12)
     assert fake.calls == 3
     assert result["group"] == "magnetics"
+
+
+def test_public_table_provenance_redacts_query_strings(monkeypatch):
+    fake_opener(monkeypatch, FakeResponse(b"a,b\\n1,2\\n", final_url="https://example.org/data.csv?token=secret"))
+    _, manifest = fetch_public_table_bytes("https://example.org/data.csv?api_key=secret")
+    assert manifest["source_url"] == "https://example.org/data.csv"
+    assert manifest["final_url"] == "https://example.org/data.csv"
+    assert manifest["query_parameters_redacted"] is True
+    assert "secret" not in str(manifest)
