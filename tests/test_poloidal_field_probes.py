@@ -85,3 +85,27 @@ def test_multichannel_uncertainty_and_nonuniform_derivative_shapes():
     assert result["dB_poloidal_dt_uncertainty_T_s"].shape == (t.size, 2)
     np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][1:-1, 0], 1.0, atol=1e-12)
     np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][1:-1, 1], -6.0, atol=1e-12)
+
+
+def test_rejects_nonfinite_calibration_and_invalid_channel_metadata():
+    t = np.arange(4.0)
+    y = np.column_stack((np.arange(4.0), np.arange(4.0)))
+    with pytest.raises(ValueError, match="calibration_gain"):
+        analyze_poloidal_field_probes(t, y, calibration_gain_T_per_unit=[1.0, np.nan])
+    with pytest.raises(ValueError, match="calibration_offset"):
+        analyze_poloidal_field_probes(t, y, calibration_offset_T=[0.0, np.inf])
+    with pytest.raises(ValueError, match="probe_names"):
+        analyze_poloidal_field_probes(t, y, probe_names=["inner", " "])
+
+
+def test_uncertainty_is_scaled_by_absolute_gain_and_derivative_has_units_scope():
+    t = np.array([0.0, 0.1, 0.25, 0.4])
+    y = np.column_stack((t, 2 * t))
+    result = analyze_poloidal_field_probes(
+        t, y, calibration_gain_T_per_unit=[-2.0, 0.5],
+        signal_uncertainty=np.full_like(y, 0.1),
+    )
+    np.testing.assert_allclose(result["B_poloidal_uncertainty_T"], [[0.2, 0.05]] * len(t))
+    np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][:, 0], -2.0, atol=1e-12)
+    np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][:, 1], 1.0, atol=1e-12)
+    assert "not a spatial derivative" in result["physical_relations"]["time_derivative"]
