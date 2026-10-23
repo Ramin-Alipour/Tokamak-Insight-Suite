@@ -72,7 +72,9 @@ def build_html_report(record: dict[str, Any], sections: list[dict[str, Any]] | N
         if sec.get("results"):
             parts.append(_kv_table(sec["results"]))
         for png in sec.get("figures", []):
-            parts.append(f"<p><img alt='figure' src='data:image/png;base64,{png}'></p>")
+            # The image payload may originate from a caller; escape it as an HTML attribute value.
+            safe_png = html.escape(str(png), quote=True)
+            parts.append(f"<p><img alt='figure' src='data:image/png;base64,{safe_png}'></p>")
     hist = record.get("analysis_history") or []
     if hist:
         parts.append("<h2>Analysis history</h2><table><tr><th>Export</th><th>Time (UTC)</th></tr>")
