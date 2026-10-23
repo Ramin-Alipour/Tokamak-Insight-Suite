@@ -1244,55 +1244,268 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson spectral distribution analysis",
-    "quantities": "Electron velocity-distribution constraints",
-    "status": "M→I",
-    "method": "Fit a scattering spectrum using the correct collective/non-collective model.",
-    "caveat": "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "quantities": "Calibrated spectral centroid, observed and instrument-corrected width, skewness, excess kurtosis, Gaussian fit diagnostics and residuals",
+    "status": "D",
+    "method": "Analyze a calibrated wavelength-resolved Thomson-scattering signal with local linear background estimation, positive-signal spectral moments, Gaussian instrumental variance deconvolution, and a Gaussian-plus-linear-background fit for shape diagnostics. Use the fit residuals and moment-based skewness/kurtosis to identify departures from a single Gaussian spectral shape.",
+    "caveat": "This generic workflow characterizes the measured wavelength distribution; it does not uniquely reconstruct an electron velocity distribution or infer electron temperature/density. Collective, relativistic, or non-Maxwellian physical inference requires a validated experiment-specific forward model and instrument response. Instrument width must be Gaussian and known; moments use positive background-subtracted signal.",
+    "implementation_functions": [
+      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+    ],
+    "implementation_status": "Complete for the declared model-independent spectral-distribution characterization scope; physical velocity-distribution inversion and device-specific calibration remain outside scope.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit a scattering spectrum using the correct collective/non-collective model.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Requires instrument response and a model beyond a single temperature when distribution is non-Maxwellian."
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "description": "Finite, strictly increasing calibrated wavelength axis with at least nine samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "detector units",
+          "description": "Measured spectral signal with the same length as wavelength_nm.",
+          "required": true
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm",
+          "description": "Known positive Gaussian instrumental line-spread standard deviation.",
+          "required": true,
+          "minimum": 1e-15
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "signal units",
+          "description": "Optional finite, strictly positive pointwise 1-sigma signal uncertainty.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "background_fraction",
+          "unit": "dimensionless",
+          "description": "Fraction of samples at each spectral-window edge used for local linear-background estimation; constrained to [0.02, 0.4].",
+          "required": false,
+          "minimum": 0.02,
+          "maximum": 0.4
+        }
       ],
-      "function_links": [],
+      "output_specs": [
+        {
+          "name": "spectral_centroid_nm",
+          "unit": "nm",
+          "description": "First moment of the positive background-subtracted spectral weights."
+        },
+        {
+          "name": "observed_sigma_nm",
+          "unit": "nm",
+          "description": "Square root of the second central moment of the observed spectral distribution."
+        },
+        {
+          "name": "instrument_corrected_sigma_nm",
+          "unit": "nm",
+          "description": "Square root of observed variance minus Gaussian instrument variance; null when unresolved."
+        },
+        {
+          "name": "instrument_width_resolved",
+          "unit": "boolean",
+          "description": "Whether observed spectral variance exceeds the instrumental variance."
+        },
+        {
+          "name": "spectral_skewness",
+          "unit": "dimensionless",
+          "description": "Third standardized central moment."
+        },
+        {
+          "name": "spectral_excess_kurtosis",
+          "unit": "dimensionless",
+          "description": "Fourth standardized central moment minus three."
+        },
+        {
+          "name": "gaussian_fit_parameters",
+          "unit": "structured",
+          "description": "Gaussian amplitude, center, width and linear background fit parameters."
+        },
+        {
+          "name": "gaussian_fit_parameter_uncertainties",
+          "unit": "structured",
+          "description": "Local covariance-based standard uncertainties for Gaussian fit parameters."
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "signal units",
+          "description": "Fitted Gaussian-plus-linear-background spectrum."
+        },
+        {
+          "name": "residual",
+          "unit": "signal units",
+          "description": "Measured minus fitted signal."
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless",
+          "description": "Weighted chi-square, only when signal_uncertainty is supplied."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless",
+          "description": "Chi-square divided by fit degrees of freedom, only when uncertainties are supplied."
+        },
+        {
+          "name": "r_squared",
+          "unit": "dimensionless",
+          "description": "Coefficient of determination for the Gaussian fit."
+        }
+      ],
+      "assumptions": [
+        "Wavelength calibration and monotonicity have already been established.",
+        "Instrument line-spread function is Gaussian with known standard deviation.",
+        "The background is locally linear and estimable from both window edges.",
+        "Positive background-subtracted samples are used as spectral weights."
+      ],
+      "preprocessing": [
+        "Validate dimensions, lengths, finite values, monotonic wavelength, positive instrument width, and optional strictly positive uncertainties.",
+        "Estimate a linear background from both edges and retain positive residual signal for moment calculations."
+      ],
+      "algorithm": "Compute background-subtracted spectral moments; deconvolve Gaussian instrument variance when resolvable; fit a Gaussian plus linear background; return residuals, covariance-based parameter uncertainties, fit-quality metrics, skewness, and excess kurtosis.",
+      "uncertainty_model": "Optional weighted nonlinear least-squares covariance for Gaussian fit parameters; moment uncertainty, calibration uncertainty, and instrument-width uncertainty are not propagated.",
+      "limitations": [
+        "Spectral moments characterize measured wavelength distribution and are not a unique electron velocity distribution.",
+        "No electron temperature or density is inferred by this generic analysis.",
+        "Collective, relativistic, and non-Maxwellian physical inversion requires an appropriate validated forward model and instrument response.",
+        "Gaussian variance deconvolution is invalid when observed variance does not exceed instrument variance; the workflow flags this as unresolved.",
+        "Parameter uncertainties are local covariance estimates and exclude systematic uncertainties."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+      ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Contract matches tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution and its dashboard workflow. The analysis characterizes the measured wavelength distribution; it does not infer electron velocity distribution, temperature, or density. Independent experimental validation remains required."
     }
   },
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Toroidal-field coils / magnetic probes",
-    "quantities": "B_t",
+    "quantities": "Calibrated toroidal magnetic-field time series B_t(t), summary statistics, sampling quality and optional propagated uncertainty",
     "status": "M→D",
-    "method": "Apply calibration and geometry-specific field-coil relation.",
-    "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "method": "Convert a documented field/current/voltage channel using an explicit calibration coefficient and optional baseline; report field time-series metrics and first-order independent-error propagation.",
+    "caveat": "Calibration coefficient and transfer function must be established for the actual coil/electronics. Pickup-coil voltage is not automatically an instantaneous field; geometry, mutual inductance and plasma-current contributions are not inferred.",
+    "implementation_functions": [
+      "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
+      "execution_level": "analysis_pipeline",
       "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Apply calibration and geometry-specific field-coil relation.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Current-to-field conversion depends on coil geometry and magnetic materials."
+      "input_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite strictly increasing timestamps, at least two samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "input channel units",
+          "description": "Finite sampled calibrated field, coil current or voltage channel.",
+          "required": true
+        },
+        {
+          "name": "signal_kind",
+          "unit": "text",
+          "description": "One of field, current, voltage; voltage is not automatically integrated.",
+          "required": true
+        },
+        {
+          "name": "calibration_T_per_unit",
+          "unit": "T per input unit",
+          "description": "Documented conversion coefficient valid for the channel, gain, bandwidth and operating range.",
+          "required": true
+        },
+        {
+          "name": "baseline",
+          "unit": "input channel units",
+          "description": "Optional baseline subtracted before conversion.",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "input channel units",
+          "description": "Optional pointwise independent 1-sigma uncertainty.",
+          "required": false
+        },
+        {
+          "name": "calibration_uncertainty_T_per_unit",
+          "unit": "T per input unit",
+          "description": "Optional 1-sigma calibration-coefficient uncertainty.",
+          "required": false
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "B_toroidal_T",
+          "unit": "T",
+          "description": "Calibrated toroidal-field time series."
+        },
+        {
+          "name": "mean_B_toroidal_T",
+          "unit": "T",
+          "description": "Mean calibrated toroidal field."
+        },
+        {
+          "name": "rms_B_toroidal_T",
+          "unit": "T",
+          "description": "Root-mean-square calibrated field."
+        },
+        {
+          "name": "std_B_toroidal_T",
+          "unit": "T",
+          "description": "Sample standard deviation."
+        },
+        {
+          "name": "peak_to_peak_B_toroidal_T",
+          "unit": "T",
+          "description": "Peak-to-peak calibrated field."
+        },
+        {
+          "name": "sampling_rate_Hz",
+          "unit": "Hz",
+          "description": "Inverse median sampling interval."
+        },
+        {
+          "name": "sampling_interval_jitter_fraction",
+          "unit": "dimensionless",
+          "description": "Standard deviation of intervals divided by their mean."
+        },
+        {
+          "name": "B_toroidal_uncertainty_T",
+          "unit": "T",
+          "description": "Optional first-order uncertainty from independent signal and calibration errors."
+        }
+      ],
+      "assumptions": [
+        "Calibration coefficient is independently established and valid over the full range and bandwidth.",
+        "Baseline is known if supplied; errors are independent for the optional uncertainty calculation."
+      ],
+      "preprocessing": [
+        "Reject non-finite values, mismatched arrays, fewer than two samples, non-increasing timestamps, invalid coefficient and invalid uncertainties."
+      ],
+      "algorithm": "B_t(t)=k_cal [signal(t)-baseline]; compute descriptive field and sampling metrics.",
+      "uncertainty_model": "sigma_B^2=(k_cal sigma_signal)^2+((signal-baseline) sigma_k)^2; baseline uncertainty, covariance, transfer-function uncertainty and model discrepancy are excluded.",
+      "limitations": [
+        "Does not infer coil geometry or calibration from current alone.",
+        "Does not integrate pickup-coil voltage or deconvolve channel frequency response.",
+        "Does not account for mutual inductance, plasma-current contribution, ferromagnetic structures or saturation.",
+        "Software tests establish numerical behavior, not experimental calibration or independent device validation."
+      ],
+      "function_links": [
+        "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+      ],
+      "raw_data_to_physics": true,
+      "note": "Executable calibrated-signal workflow; independent coil calibration and device-specific validation remain required."
     }
   },
   {
