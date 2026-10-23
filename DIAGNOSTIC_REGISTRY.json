@@ -1388,28 +1388,124 @@
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Toroidal-field coils / magnetic probes",
-    "quantities": "B_t",
+    "quantities": "Calibrated toroidal magnetic-field time series B_t(t), summary statistics, sampling quality and optional propagated uncertainty",
     "status": "M→D",
-    "method": "Apply calibration and geometry-specific field-coil relation.",
-    "caveat": "Current-to-field conversion depends on coil geometry and magnetic materials.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "method": "Convert a documented field/current/voltage channel using an explicit calibration coefficient and optional baseline; report field time-series metrics and first-order independent-error propagation.",
+    "caveat": "Calibration coefficient and transfer function must be established for the actual coil/electronics. Pickup-coil voltage is not automatically an instantaneous field; geometry, mutual inductance and plasma-current contributions are not inferred.",
+    "implementation_functions": [
+      "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+    ],
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
+      "execution_level": "analysis_pipeline",
       "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Apply calibration and geometry-specific field-coil relation.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Current-to-field conversion depends on coil geometry and magnetic materials."
+      "input_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite strictly increasing timestamps, at least two samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "input channel units",
+          "description": "Finite sampled calibrated field, coil current or voltage channel.",
+          "required": true
+        },
+        {
+          "name": "signal_kind",
+          "unit": "text",
+          "description": "One of field, current, voltage; voltage is not automatically integrated.",
+          "required": true
+        },
+        {
+          "name": "calibration_T_per_unit",
+          "unit": "T per input unit",
+          "description": "Documented conversion coefficient valid for the channel, gain, bandwidth and operating range.",
+          "required": true
+        },
+        {
+          "name": "baseline",
+          "unit": "input channel units",
+          "description": "Optional baseline subtracted before conversion.",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "input channel units",
+          "description": "Optional pointwise independent 1-sigma uncertainty.",
+          "required": false
+        },
+        {
+          "name": "calibration_uncertainty_T_per_unit",
+          "unit": "T per input unit",
+          "description": "Optional 1-sigma calibration-coefficient uncertainty.",
+          "required": false
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "B_toroidal_T",
+          "unit": "T",
+          "description": "Calibrated toroidal-field time series."
+        },
+        {
+          "name": "mean_B_toroidal_T",
+          "unit": "T",
+          "description": "Mean calibrated toroidal field."
+        },
+        {
+          "name": "rms_B_toroidal_T",
+          "unit": "T",
+          "description": "Root-mean-square calibrated field."
+        },
+        {
+          "name": "std_B_toroidal_T",
+          "unit": "T",
+          "description": "Sample standard deviation."
+        },
+        {
+          "name": "peak_to_peak_B_toroidal_T",
+          "unit": "T",
+          "description": "Peak-to-peak calibrated field."
+        },
+        {
+          "name": "sampling_rate_Hz",
+          "unit": "Hz",
+          "description": "Inverse median sampling interval."
+        },
+        {
+          "name": "sampling_interval_jitter_fraction",
+          "unit": "dimensionless",
+          "description": "Standard deviation of intervals divided by their mean."
+        },
+        {
+          "name": "B_toroidal_uncertainty_T",
+          "unit": "T",
+          "description": "Optional first-order uncertainty from independent signal and calibration errors."
+        }
+      ],
+      "assumptions": [
+        "Calibration coefficient is independently established and valid over the full range and bandwidth.",
+        "Baseline is known if supplied; errors are independent for the optional uncertainty calculation."
+      ],
+      "preprocessing": [
+        "Reject non-finite values, mismatched arrays, fewer than two samples, non-increasing timestamps, invalid coefficient and invalid uncertainties."
+      ],
+      "algorithm": "B_t(t)=k_cal [signal(t)-baseline]; compute descriptive field and sampling metrics.",
+      "uncertainty_model": "sigma_B^2=(k_cal sigma_signal)^2+((signal-baseline) sigma_k)^2; baseline uncertainty, covariance, transfer-function uncertainty and model discrepancy are excluded.",
+      "limitations": [
+        "Does not infer coil geometry or calibration from current alone.",
+        "Does not integrate pickup-coil voltage or deconvolve channel frequency response.",
+        "Does not account for mutual inductance, plasma-current contribution, ferromagnetic structures or saturation.",
+        "Software tests establish numerical behavior, not experimental calibration or independent device validation."
+      ],
+      "function_links": [
+        "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+      ],
+      "raw_data_to_physics": true,
+      "note": "Executable calibrated-signal workflow; independent coil calibration and device-specific validation remain required."
     }
   },
   {
