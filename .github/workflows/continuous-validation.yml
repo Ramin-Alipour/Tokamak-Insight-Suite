@@ -40,6 +40,23 @@ jobs:
         run: ruff check --select E9,F63,F7,F82 app.py tis tokamak_analysis tests
       - name: Run automated tests with coverage
         run: python -m pytest -q --cov=tis --cov=tokamak_analysis --cov-report=term-missing
+      - name: Exercise Home and Probe pages with Streamlit AppTest
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+
+          app = AppTest.from_file("app.py", default_timeout=30)
+          app.run()
+          assert not app.exception, f"Home page raised: {app.exception}"
+
+          # The first radio is the sidebar WORKSPACE page selector.
+          assert len(app.radio) > 0, "Workspace page selector was not rendered."
+          app.radio[0].set_value("Probe Analysis").run()
+          assert not app.exception, f"Probe Analysis page raised: {app.exception}"
+          assert any("Langmuir, Ball-Pen & Probe Analysis" in item.value for item in app.title), (
+              "Probe Analysis page did not render its expected title."
+          )
+          PY
       - name: Start Streamlit dashboard and check HTTP health
         shell: bash
         run: |
