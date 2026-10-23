@@ -1,5 +1,5 @@
 from tis.project import AnalysisRun, Project
-from tis.ui.project_page import _history_item_key, _sync_analysis_history
+from tis.ui.project_page import _export_context_signature, _history_item_key, _sync_analysis_history
 
 
 def test_project_export_syncs_new_history_into_existing_project_without_duplicates():
@@ -64,3 +64,11 @@ def test_existing_project_records_new_shot_ids_without_duplicates():
     _ensure_project_shot(project, "200")
     _ensure_project_shot(project, "200")
     assert project.shots == [{"shot_id": "100"}, {"shot_id": "200"}]
+
+
+def test_project_export_signature_changes_when_context_changes():
+    history = [{"name": "analysis", "created_at_utc": "2026-10-23T10:00:00+00:00"}]
+    base = _export_context_signature("project", "42", "analyst", "shot.csv", "abc", history)
+    assert _export_context_signature("renamed", "42", "analyst", "shot.csv", "abc", history) != base
+    assert _export_context_signature("project", "43", "analyst", "shot.csv", "abc", history) != base
+    assert _export_context_signature("project", "42", "analyst", "shot.csv", "abc", history + [{"name": "new"}]) != base
