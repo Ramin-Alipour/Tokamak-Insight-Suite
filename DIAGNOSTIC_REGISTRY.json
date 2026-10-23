@@ -22,7 +22,7 @@
         {
           "name": "workflow_mode",
           "unit": "text",
-          "description": "Select calibrated_profile, raw_spectrum_temperature_fit, calibrated_power_density, or calibrated_spectrum_temperature_density; required inputs depend on the selected mode.",
+          "description": "Select calibrated_profile, raw_spectrum_temperature_fit, calibrated_power_density, calibrated_spectrum_temperature_density, or user_defined_spectral_model; required inputs depend on the selected mode.",
           "required": true
         },
         {
