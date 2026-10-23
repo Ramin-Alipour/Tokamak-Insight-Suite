@@ -14,6 +14,11 @@ from tis.core import (
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
 
 
+def test_profile_gradient_rejects_mismatched_coordinate_and_profile_lengths():
+    with pytest.raises(ValueError, match="equal lengths"):
+        profile_gradient_analysis([0, 1, 2, 3, 4], [1, 2, 3, 4])
+
+
 def test_grid_from_table_rejects_nonfinite_or_duplicate_coordinates():
     duplicate_r = pd.DataFrame(
         [[0, 1, 2, 3], [1, 4, 5, 6], [2, 7, 8, 9]],
