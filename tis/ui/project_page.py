@@ -71,6 +71,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 _history_item_key(item) for item in session_state.get("tis_analysis_history", [])
             ]
             session_state.pop("tis_project_export_bytes", None)
+            session_state.pop("tis_project_export_signature", None)
             st.success(f"Loaded project: {loaded_project.title} ({len(loaded_project.analysis_runs)} saved analysis runs)")
         except Exception as exc:
             st.error(f"Project could not be loaded: {exc}")
