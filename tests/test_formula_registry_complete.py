@@ -1,4 +1,5 @@
 """Independent reference and contract checks for all 37 formula registry entries."""
+import ast
 import importlib
 import json
 import math
@@ -319,3 +320,36 @@ def test_registry_and_packaged_registry_contract_outputs_cover_uncertainty_field
         # Output uncertainty names need not mirror each input name; every declared
         # uncertainty model is explicit and every listed output must be unique.
         assert len(outputs) == len(row["execution_contract"]["output_specs"]), row["name"]
+
+
+def test_registry_output_specs_cover_all_statically_returned_keys():
+    source = (ROOT / "tokamak_analysis" / "formula_library.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
+    rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    for row in rows:
+        function_name = row["execution_contract"]["function_link"].rsplit(".", 1)[1]
+        node = functions[function_name]
+        returned = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Dict):
+                parent_keys = [
+                    key.value for key in child.keys
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str)
+                ]
+                # Only count dictionaries assigned to the public output object
+                # or returned directly; nested/internal dictionaries are ignored.
+                parent = next((p for p in ast.walk(node) if child in ast.iter_child_nodes(p)), None)
+                if isinstance(parent, ast.Assign) and any(
+                    isinstance(target, ast.Name) and target.id == "out" for target in parent.targets
+                ):
+                    returned.update(parent_keys)
+                elif isinstance(parent, ast.Return):
+                    returned.update(parent_keys)
+            elif isinstance(child, ast.Subscript) and isinstance(child.ctx, ast.Store):
+                if isinstance(child.value, ast.Name) and child.value.id == "out":
+                    key = child.slice
+                    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+                        returned.add(key.value)
+        declared = {item["name"] for item in row["execution_contract"]["output_specs"]}
+        assert returned <= declared, (row["name"], sorted(returned - declared))
