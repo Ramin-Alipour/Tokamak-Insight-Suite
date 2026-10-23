@@ -34,9 +34,24 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
     # separation between distinct intervals. Using min(intervals) as the tick
     # fails for a 400 kHz signal timestamped at 1 us resolution: intervals
     # alternate between 2 and 3 us, while the actual clock quantum is 1 us.
-    unique_intervals = np.unique(intervals)
-    differences = np.diff(unique_intervals)
-    positive_differences = differences[differences > 0]
+    # Cluster interval values that differ only by floating-point roundoff
+    # before estimating the clock tick. np.unique alone treats 2.0000000000000
+    # and 2.0000000000001 microseconds as distinct values, producing a false
+    # sub-femtosecond tick and rejecting otherwise valid quantized timestamps.
+    interval_tol = max(
+        1e-9 * dt,
+        8.0 * np.finfo(float).eps * max(float(np.max(np.abs(t))), float(np.max(intervals)), 1e-12),
+    )
+    sorted_intervals = np.sort(intervals)
+    clusters: list[list[float]] = []
+    for value in sorted_intervals:
+        if not clusters or value - clusters[-1][-1] > interval_tol:
+            clusters.append([float(value)])
+        else:
+            clusters[-1].append(float(value))
+    interval_levels = np.asarray([float(np.median(cluster)) for cluster in clusters])
+    differences = np.diff(interval_levels)
+    positive_differences = differences[differences > interval_tol]
     tick = float(np.min(positive_differences)) if positive_differences.size else float(np.min(intervals))
     tick_ratios = intervals / tick
     quantized_ticks = np.all(np.abs(tick_ratios - np.rint(tick_ratios)) <= 0.05)
