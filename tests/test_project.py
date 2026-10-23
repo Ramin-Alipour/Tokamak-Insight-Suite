@@ -106,3 +106,9 @@ def test_project_model_rejects_invalid_title_and_duplicate_runs():
     run = AnalysisRun("same", {}, {}, "0.5.1")
     with pytest.raises(ProjectError, match="duplicate analysis run IDs"):
         Project(title="duplicate", analysis_runs=[run, run])
+
+
+def test_project_add_run_rejects_non_analysis_run_objects():
+    project = Project(title="valid project")
+    with pytest.raises(ProjectError, match="run must be an AnalysisRun"):
+        project.add_run({"analysis_name": "not a dataclass"})
