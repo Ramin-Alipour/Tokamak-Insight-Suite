@@ -23,13 +23,13 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -117,4 +117,55 @@ jobs:
           done
           cat /tmp/tis-streamlit.log
           echo "FAIL: Streamlit health endpoint did not respond."
+          exit 1
+
+
+  optional-data-and-docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install and validate the optional data extra in a clean environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install '.[data]'
+          python -m pip check
+          python - <<'PY'
+          import aiohttp
+          import fsspec
+          import numcodecs
+          import xarray
+          import zarr
+          print("PASS: optional data dependencies import successfully.")
+          print(f"xarray={xarray.__version__}; zarr={zarr.__version__}; fsspec={fsspec.__version__}")
+          PY
+      - name: Build Docker image
+        run: docker build --tag tis-ci:smoke .
+      - name: Run container and verify dashboard health and data imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --detach --name tis-ci-smoke --publish 8501:8501 tis-ci:smoke
+          cleanup() {
+            docker logs tis-ci-smoke || true
+            docker rm --force tis-ci-smoke >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              echo "PASS: Dockerized Streamlit health endpoint responded."
+              docker exec tis-ci-smoke python -c "import xarray, zarr, fsspec, aiohttp, numcodecs; print('PASS: data dependencies import inside Docker.')"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs tis-ci-smoke
+          echo "FAIL: Dockerized Streamlit health endpoint did not respond."
           exit 1
