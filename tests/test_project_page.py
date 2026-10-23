@@ -1,5 +1,5 @@
 from tis.project import AnalysisRun, Project
-from tis.ui.project_page import _export_context_signature, _history_item_key, _sync_analysis_history
+from tis.ui.project_page import _export_context_signature, _history_item_key, _sync_analysis_history, _update_project_metadata
 
 
 def test_project_export_syncs_new_history_into_existing_project_without_duplicates():
@@ -72,3 +72,22 @@ def test_project_export_signature_changes_when_context_changes():
     assert _export_context_signature("renamed", "42", "analyst", "shot.csv", "abc", history) != base
     assert _export_context_signature("project", "43", "analyst", "shot.csv", "abc", history) != base
     assert _export_context_signature("project", "42", "analyst", "shot.csv", "abc", history + [{"name": "new"}]) != base
+
+
+def test_project_metadata_update_preserves_saved_provenance_when_workspace_is_empty():
+    project = Project(title="saved", metadata={
+        "source_filename": "old-shot.csv",
+        "source_sha256": "old-digest",
+        "source_manifest": {"source_url": "https://example.org/old.csv"},
+        "import_parameters": {"delimiter": ","},
+        "analyst": "previous analyst",
+    })
+    _update_project_metadata(
+        project, software_version="0.5.1", shot_id="", analyst="", filename="",
+        source_sha256="", source_manifest=None, import_parameters=None,
+    )
+    assert project.metadata["source_filename"] == "old-shot.csv"
+    assert project.metadata["source_sha256"] == "old-digest"
+    assert project.metadata["source_manifest"]["source_url"] == "https://example.org/old.csv"
+    assert project.metadata["import_parameters"] == {"delimiter": ","}
+    assert project.metadata["analyst"] == "previous analyst"
