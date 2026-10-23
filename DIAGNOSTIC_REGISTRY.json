@@ -427,33 +427,165 @@
     "family": "Plasma parameters",
     "diagnostic": "Langmuir probe",
     "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
-    "status": "M→D/I",
-    "method": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
-    "caveat": "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter.",
+    "status": "D",
+    "method": "Analyze a calibrated single-probe I–V sweep with explicit current polarity and user-selected electron-retarding and ion-branch fit intervals. Report floating-potential zero crossing, dI/dV plasma-potential proxy, optional log-linear electron-temperature fit, ion-branch fit and optional sheath-model ion-density estimate when geometry and ion mass are supplied.",
+    "caveat": "This is a single-probe, model-dependent workflow, not an automatic substitute for calibration or device-specific sheath theory. Fit windows must be physically justified; estimates are sensitive to magnetic field, collisions, RF pickup, secondary emission, sheath expansion, sweep direction and surface condition.",
     "implementation_functions": [
-      "langmuir_iv_analysis",
-      "probe_iv_summary"
+      "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+      "tis.core.langmuir_iv_analysis",
+      "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Implemented single-sweep I–V analysis within the explicitly declared model scope; independent experimental validation and full uncertainty propagation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
-      "uncertainty_model": "not_specified",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "voltage_V",
+          "unit": "V",
+          "description": "One-dimensional calibrated probe-voltage sweep; at least eight distinct finite values are required by the analysis routine.",
+          "required": true
+        },
+        {
+          "name": "current_A",
+          "unit": "A",
+          "description": "Current samples aligned with voltage_V. The routine filters non-finite pairs and averages duplicate voltage values.",
+          "required": true
+        },
+        {
+          "name": "current_convention",
+          "unit": "text",
+          "description": "Current polarity convention: electron_positive (ion current normally negative) or ion_positive (internally sign-flipped). The lower-level core function supports both; the registry entry-point currently uses electron_positive.",
+          "required": false
+        },
+        {
+          "name": "electron_fit_range",
+          "unit": "V",
+          "description": "Optional physically selected electron-retarding voltage interval for an unweighted log-linear fit after subtracting the estimated ion-current baseline.",
+          "required": false
+        },
+        {
+          "name": "ion_fit_range",
+          "unit": "V",
+          "description": "Optional physically selected ion-branch interval; at least three samples are required for the linear fit.",
+          "required": false
+        },
+        {
+          "name": "area_m2",
+          "unit": "m^2",
+          "description": "Positive effective ion collection area; must be supplied together with ion_mass_amu for ion-density estimation.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "ion_mass_amu",
+          "unit": "amu",
+          "description": "Positive ion mass in atomic mass units; must be supplied together with area_m2.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "ti_eV",
+          "unit": "eV",
+          "description": "Non-negative assumed ion temperature used by the ion-sound-speed model; core default is 0 eV.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "sheath_factor",
+          "unit": "dimensionless",
+          "description": "Positive sheath collection coefficient; core default is 0.61.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "gamma_i",
+          "unit": "dimensionless",
+          "description": "Non-negative coefficient multiplying ion temperature in the adopted sound-speed expression; core default is 1.",
+          "required": false,
+          "minimum": 0
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "floating_potential_V",
+          "unit": "V",
+          "description": "Interpolated first zero-current crossing; null when no crossing is present."
+        },
+        {
+          "name": "plasma_potential_proxy_V",
+          "unit": "V",
+          "description": "Voltage at maximum measured dI/dV; proxy only, not a universally valid plasma-potential estimate."
+        },
+        {
+          "name": "ion_saturation_current_A",
+          "unit": "A",
+          "description": "Median current in the user-selected ion-fit interval, with linear-fit slope, intercept and R²."
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Optional reciprocal slope from a log-linear electron-retarding branch fit after ion-baseline subtraction."
+        },
+        {
+          "name": "electron_temperature_standard_error_eV",
+          "unit": "eV",
+          "description": "Optional local statistical standard error from unweighted log-linear regression; excludes systematic and calibration uncertainties."
+        },
+        {
+          "name": "electron_retarding_fit_R2",
+          "unit": "dimensionless",
+          "description": "R² of the log-current linear fit over the selected electron-retarding interval."
+        },
+        {
+          "name": "ion_density_estimate_m-3",
+          "unit": "m^-3",
+          "description": "Optional model-dependent estimate from ion saturation current, collection area, ion mass, ion temperature and sheath coefficient."
+        },
+        {
+          "name": "ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Ion sound speed from the explicitly selected model assumptions when density estimation is enabled."
+        },
+        {
+          "name": "max_dIdV_A_per_V",
+          "unit": "A V^-1",
+          "description": "Maximum numerical derivative of current with respect to voltage."
+        },
+        {
+          "name": "interpretation_warning",
+          "unit": "text",
+          "description": "Physical limitations and required experiment-specific checks."
+        }
+      ],
+      "assumptions": [
+        "Voltage and current are calibrated and synchronized samples from a quasi-static single-probe I–V sweep.",
+        "The electron-retarding branch is adequately described by an exponential current after subtracting the ion-current baseline.",
+        "The ion branch and collection model are appropriate for the experimental regime; the user selects fit intervals and geometry.",
+        "Ion density uses n_i≈|I_isat|/(sheath_factor·e·A·c_s), with c_s=sqrt(e·(gamma_i·T_i+T_e)/(m_i)); all temperatures are in eV."
+      ],
+      "preprocessing": [
+        "Require matching voltage/current lengths and at least eight valid distinct voltage points.",
+        "Discard non-finite voltage/current pairs, sort voltage-current pairs together, and average currents at duplicate voltages.",
+        "Validate fit ranges and positive finite collection area/ion mass when supplied; no automatic fit-window selection."
+      ],
+      "algorithm": "Compute dI/dV and floating-potential crossing; optionally fit the ion branch linearly and estimate ion saturation current; optionally fit log electron current against voltage to estimate electron temperature; optionally infer ion density using the stated sheath/sound-speed model.",
+      "uncertainty_model": "Only the optional electron-temperature fit returns a local regression standard error when enough fit points are available. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
-        "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."
+        "Requires calibrated data and manually justified fit windows; no automatic regime classification.",
+        "Plasma-potential proxy from maximum dI/dV can be biased by noise, filtering, sweep direction and probe circuitry.",
+        "Ion-density estimate is valid only to the extent that the assumed sheath collection law, collection area, ion mass and ion temperature describe the experiment.",
+        "No automatic uncertainty propagation for calibration or ion density; fit R² alone does not establish physical validity.",
+        "Not a multi-probe, swept-frequency RF-compensation, magnetized-sheath, or non-Maxwellian inversion model."
       ],
       "function_links": [
-        "langmuir_iv_analysis",
-        "probe_iv_summary"
+        "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+        "tis.core.langmuir_iv_analysis",
+        "tis.core.probe_iv_summary"
       ],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "raw_data_to_physics": true,
+      "note": "Complete only within this declared calibrated single-sweep I–V model scope. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
     }
   },
   {
