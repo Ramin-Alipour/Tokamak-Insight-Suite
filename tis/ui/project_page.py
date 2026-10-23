@@ -17,8 +17,22 @@ def _history_item_key(item: dict[str, Any]) -> str:
     return stable_digest({
         key: item.get(key) for key in (
             "name", "created_at_utc", "result_sha256", "parameter_snapshot",
-            "result_summary", "source_filename", "source_sha256", "shot_id"
+            "result_summary", "source_filename", "source_sha256", "shot_id",
+            "source_manifest", "import_parameters"
         )
+    })
+
+
+def _export_context_signature(project_title: str, shot_id: str, analyst: str,
+                              filename: str, source_sha256: str,
+                              history: list[dict[str, Any]]) -> str:
+    return stable_digest({
+        "project_title": project_title,
+        "shot_id": shot_id,
+        "analyst": analyst,
+        "source_filename": filename,
+        "source_sha256": source_sha256,
+        "history_keys": [_history_item_key(item) for item in history],
     })
 
 
@@ -69,6 +83,13 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
     active_project = session_state.get("tis_active_project")
     default_project_title = active_project.title if active_project is not None else project_title
     project_title = st.text_input("Project title", value=default_project_title, key="tis_project_title")
+    current_history = list(session_state.get("tis_analysis_history", []))
+    current_signature = _export_context_signature(
+        project_title, shot_id, analyst, filename, source_sha256, current_history
+    )
+    if session_state.get("tis_project_export_bytes") and session_state.get("tis_project_export_signature") != current_signature:
+        session_state.pop("tis_project_export_bytes", None)
+        session_state.pop("tis_project_export_signature", None)
     st.title("Research Project Manager")
     st.caption("Save and reopen project metadata and analysis history independently of browser/session state.")
     uploaded_project = st.file_uploader("Open TIS project JSON", type=["json"], key="tis_project_upload")
@@ -130,6 +151,10 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 project_bytes = target.read_bytes()
             session_state["tis_active_project"] = active_project
             session_state["tis_project_export_bytes"] = project_bytes
+            session_state["tis_project_export_signature"] = _export_context_signature(
+                project_title, shot_id, analyst, filename, source_sha256,
+                list(session_state.get("tis_analysis_history", []))
+            )
             st.success(f"Project prepared with {len(active_project.analysis_runs)} analysis run(s).")
         except Exception as exc:
             st.error(f"Project export failed: {exc}")
