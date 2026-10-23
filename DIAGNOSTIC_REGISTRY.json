@@ -13,11 +13,11 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits); overall analysis remains incomplete outside the declared scope",
+    "implementation_status": "Complete within the explicitly supported computational scope; experimental calibration and independent device-specific validation remain the user's responsibility.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "input_specs": [
         {
           "name": "workflow_mode",
@@ -414,7 +414,8 @@
         "tests/test_thomson_models.py::test_fit_rejects_non_boolean_absolute_sigma",
         "tests/test_thomson_models.py::test_fit_requires_more_samples_than_parameters",
         "tests/test_thomson_models.py::test_unregister_returns_false_for_missing_model"
-      ]
+      ],
+      "completion_scope": "The five declared workflow modes are implemented, exposed through documented APIs/dashboard paths where applicable, and covered by automated numerical and input-validation tests. This status does not claim collective/relativistic inversion, arbitrary non-Maxwellian reconstruction, or independent experimental validation."
     },
     "extension_functions": [
       "tokamak_analysis.thomson_models.register_spectral_model",
