@@ -811,9 +811,9 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
             value = r.pop(source)
             r[target] = None if value is None else float(value) / 1000.0
     if 'integrated_counts_eV' in r:
-        r['integrated_signal_keV_weighted']=r.pop('integrated_counts_eV')
-        # Retained for compatibility with existing callers; actual units follow
-        # bin_representation and the supplied energy coordinate.
+        r['integrated_signal_keV_weighted']=float(r.pop('integrated_counts_eV')) / 1000.0
+        # The shared moment routine integrates over eV. Convert the energy-weighted
+        # integral to keV-weighted units, while preserving the legacy output key.
         r['integrated_counts_keV']=r['integrated_signal_keV_weighted']
     elif 'integrated_signal' in r:
         r['integrated_signal_keV_weighted']=r['integrated_signal']
