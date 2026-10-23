@@ -40,7 +40,9 @@ def fluctuation_flux(density: Any, radial_velocity: Any, temperature_eV: Any | N
 
 def exponential_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
     """Fit q(s)=q0 exp(-(s-s0)/lambda_q)+background with covariance diagnostics."""
-    x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel(); m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
+    x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel()
+    if len(x) != len(y): raise ValueError('Target coordinates and heat-flux values must have equal lengths.')
+    m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
     if len(x)<8 or len(np.unique(x))<8: raise ValueError('At least 8 distinct valid target-coordinate points are required for a stable three-parameter fit.')
     o=np.argsort(x); x,y=x[o],y[o]
     span=float(np.ptp(x))
@@ -71,6 +73,7 @@ def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
     distance; it does not infer equilibrium mapping or account for diagnostic response.
     """
     x=np.asarray(distance_m,float).ravel(); y=np.asarray(heat_flux_W_m2,float).ravel()
+    if len(x) != len(y): raise ValueError('Target coordinates and heat-flux values must have equal lengths.')
     valid=np.isfinite(x)&np.isfinite(y); x,y=x[valid],y[valid]
     if len(x)<15 or len(np.unique(x))<15:
         raise ValueError("Eich fit requires at least 15 distinct finite target-coordinate points for five free parameters.")
@@ -115,7 +118,9 @@ def eich_heat_flux_fit(distance_m: Any, heat_flux_W_m2: Any) -> dict[str, Any]:
 
 
 def integrate_profile(coordinate: Any, profile: Any) -> dict[str, float]:
-    x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel(); m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
+    x=np.asarray(coordinate,float).ravel(); y=np.asarray(profile,float).ravel()
+    if len(x) != len(y): raise ValueError('Coordinates and profile values must have equal lengths.')
+    m=np.isfinite(x)&np.isfinite(y); x,y=x[m],y[m]
     if len(x)<2: raise ValueError('At least two finite coordinate-profile points are required.')
     o=np.argsort(x); x,y=x[o],y[o]
     if np.any(np.diff(x)<=0): raise ValueError('Coordinate values must be unique after sorting.')
