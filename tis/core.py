@@ -915,13 +915,15 @@ def grid_from_table(frame: pd.DataFrame, z_column: str = "z_m") -> dict[str, np.
         raise ValueError("A grid needs at least 3 R columns and 3 Z rows.")
     r_vals = []
     for c in r_cols:
-        text = str(c).strip()
-        if text.upper().startswith("R="):
-            text = text[2:]
-        if text.lower().endswith("_m"):
-            text = text[:-2]
+        label = str(c).strip()
+        if "R=" in label.upper():
+            label = label[label.upper().index("R=") + 2:]
+        if label.lower().endswith("_m"):
+            label = label[:-2]
+        elif label.lower().endswith("m"):
+            label = label[:-1]
         try:
-            r_vals.append(float(text))
+            r_vals.append(float(label))
         except ValueError as exc:
             raise ValueError(f"Cannot parse an R coordinate from column name {c!r}.") from exc
     z = pd.to_numeric(frame[z_column], errors="coerce").to_numpy(dtype=float)
