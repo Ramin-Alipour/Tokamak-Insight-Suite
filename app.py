@@ -132,7 +132,8 @@ with st.sidebar:
             for key in ("tis_raw", "tis_filename", "tis_df", "tis_sha", "tis_source_manifest",
                         "tis_upload_sha", "tis_upload_signature", "tis_upload_identity",
                         "tis_upload_raw", "tis_active_source", "tis_imported_at_utc",
-                        "tis_import_parameters", "tis_analysis_history", "tis_report_sections"):
+                        "tis_import_parameters", "tis_analysis_history", "tis_report_sections",
+                        "tis_project_export_bytes", "tis_project_export_signature"):
                 st.session_state.pop(key, None)
             st.error(f"Import failed; no dataset is active. {e}")
     if 'tis_df' in st.session_state:
@@ -386,6 +387,8 @@ elif page=='Public Data Access':
                 st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_active_source'] = 'mast'
                 st.session_state.pop('tis_analysis_history', None)
+                st.session_state.pop('tis_project_export_bytes', None)
+                st.session_state.pop('tis_project_export_signature', None)
                 st.session_state['tis_raw'] = mast_csv
                 st.session_state['tis_filename'] = mast_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
@@ -435,6 +438,8 @@ elif page=='Public Data Access':
                 st.session_state.pop('tis_source_manifest', None)
                 st.session_state['tis_active_source'] = 'public_url'
                 st.session_state.pop('tis_analysis_history', None)
+                st.session_state.pop('tis_project_export_bytes', None)
+                st.session_state.pop('tis_project_export_signature', None)
                 st.session_state['tis_raw'] = payload
                 st.session_state['tis_filename'] = public_filename
                 st.session_state['tis_imported_at_utc'] = datetime.now(timezone.utc).isoformat()
