@@ -44,3 +44,8 @@ def test_covariance_symmetry_check_scales_with_small_magnitudes():
         propagate_covariance(np.eye(2), nonsymmetric)
     with pytest.raises(UncertaintyError, match="must be symmetric"):
         propagate_monte_carlo(lambda samples: samples[:, 0], [0.0, 0.0], nonsymmetric, n_samples=100)
+
+
+def test_covariance_propagation_rejects_empty_dimensions():
+    with pytest.raises(UncertaintyError, match="nonempty"):
+        propagate_covariance(np.empty((1, 0)), np.empty((0, 0)))
