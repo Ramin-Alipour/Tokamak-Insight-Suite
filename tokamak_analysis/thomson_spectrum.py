@@ -48,7 +48,7 @@ def fit_thomson_spectrum(
         linear background.
 
     Temperature uses sigma_physical^2 = sigma_fit^2 - sigma_instrument^2 and
-    T_e[eV] = (sigma_physical / lambda_0)^2 * (m_e c^2 / 2) /
+    T_e[eV] = (sigma_physical / lambda_0)^2 * (m_e c^2 / 4) /
               sin(scattering_angle / 2)^2.
     By default, signal amplitude is not converted to power or density. If
     spectral_power_density_calibrated=True, signal must be calibrated in W/nm;
@@ -122,7 +122,7 @@ def fit_thomson_spectrum(
     angular_factor = float(np.sin(scattering_angle_rad / 2.0) ** 2)
     temperature_ev = float(
         (sigma_physical / laser_wavelength_nm) ** 2
-        * (ELECTRON_REST_ENERGY_EV / 2.0)
+        * (ELECTRON_REST_ENERGY_EV / 4.0)
         / angular_factor
     )
 
