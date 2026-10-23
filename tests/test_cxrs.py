@@ -56,6 +56,26 @@ def test_rejects_bad_axis_and_uncertainty():
                           instrument_sigma_nm=.008, signal_uncertainty=np.zeros_like(y))
 
 
+def test_instrument_width_uncertainty_is_propagated_to_temperature():
+    x, y, *_ = synthetic()
+    base = analyze_cxrs_line(x, y, rest_wavelength_nm=530, ion_mass_amu=12,
+                             instrument_sigma_nm=0.008)
+    with_instrument_uncertainty = analyze_cxrs_line(
+        x, y, rest_wavelength_nm=530, ion_mass_amu=12,
+        instrument_sigma_nm=0.008, instrument_sigma_uncertainty_nm=0.001)
+    assert with_instrument_uncertainty.instrument_sigma_uncertainty_nm == pytest.approx(0.001)
+    assert with_instrument_uncertainty.ion_temperature_uncertainty_eV > base.ion_temperature_uncertainty_eV
+
+
+def test_rejects_invalid_instrument_width_uncertainty():
+    x, y, *_ = synthetic()
+    for uncertainty in (-0.1, np.nan, np.inf):
+        with pytest.raises(ValueError, match="instrument_sigma_uncertainty_nm"):
+            analyze_cxrs_line(x, y, rest_wavelength_nm=530, ion_mass_amu=12,
+                              instrument_sigma_nm=0.008,
+                              instrument_sigma_uncertainty_nm=uncertainty)
+
+
 def test_rejects_unresolved_instrument_width():
     x, y, *_ = synthetic()
     with pytest.raises(ValueError, match="unresolved"):
