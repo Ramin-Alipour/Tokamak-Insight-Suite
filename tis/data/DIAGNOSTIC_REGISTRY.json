@@ -115,25 +115,25 @@
         {
           "name": "custom_model_function",
           "unit": "callable",
-          "description": "User-defined Python callable accepting wavelength_nm and positional fit parameters; explicitly registered by the user.",
+          "description": "Registration-time input: user-defined Python callable accepting wavelength_nm and positional fit parameters; explicitly registered before the custom fitting mode is run.",
           "required": false
         },
         {
           "name": "custom_model_parameter_names",
           "unit": "list[text]",
-          "description": "Unique names corresponding to the custom model's fitted parameters.",
+          "description": "Registration-time input: unique names corresponding to the custom model's fitted parameters.",
           "required": false
         },
         {
           "name": "custom_model_initial_values",
           "unit": "list[number]",
-          "description": "Finite initial parameter estimates corresponding to the custom model's parameter names.",
+          "description": "Registration-time input: finite initial parameter estimates corresponding to the custom model's parameter names.",
           "required": false
         },
         {
           "name": "custom_model_bounds",
           "unit": "pair of lists",
-          "description": "Optional lower and upper parameter bounds; defaults to unbounded parameters.",
+          "description": "Registration-time input: optional lower and upper parameter bounds; defaults to unbounded parameters.",
           "required": false
         }
       ],
@@ -286,7 +286,7 @@
         "tokamak_analysis.thomson_models.fit_custom_spectral_model"
       ],
       "raw_data_to_physics": true,
-      "note": "Overall analysis remains incomplete until the supported paths and UI are confirmed end-to-end and the contract/test suite is synchronized. User-defined model fitting returns generic fit parameters only; physical interpretation and validation remain the model author's responsibility.",
+      "note": "Overall analysis remains incomplete until the supported paths and UI are confirmed end-to-end and the contract/test suite is synchronized. User-defined model fitting returns generic fit parameters only; physical interpretation and validation remain the model author's responsibility. The built-in custom-model registry is process-local and shared by code in the same Python process; it is not per-user isolation for multi-user web deployments.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
