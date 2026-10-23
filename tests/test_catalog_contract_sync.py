@@ -34,6 +34,28 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
         assert contract["function_links"] == [f'{entry["module"]}.{entry["function"]}']
 
 
+def test_thomson_registry_links_resolve_to_real_callables():
+    import importlib
+
+    thomson = next(row for row in DIAGNOSTICS if row["diagnostic"].casefold() == "thomson scattering")
+    links = thomson["implementation_functions"]
+    assert len(links) == 3
+    for link in links:
+        module_name, function_name = link.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        assert callable(getattr(module, function_name, None)), link
+
+
+def test_diagnostic_registry_does_not_claim_all_80_analyses_are_complete():
+    from collections import Counter
+
+    counts = Counter(row["implementation_status"] for row in DIAGNOSTICS)
+    assert counts["Registry reference only"] == 59
+    assert counts["Implemented numerical workflow (see limits)"] == 20
+    assert sum("overall analysis remains incomplete" in status for status in counts) == 1
+    assert all(row["execution_contract"]["completeness"] == "incomplete" for row in DIAGNOSTICS)
+
+
 def test_packaged_registry_data_matches_repository_registries():
     for name in ("DIAGNOSTIC_REGISTRY.json", "FORMULA_REGISTRY.json"):
         repository_copy = json.loads((ROOT / name).read_text(encoding="utf-8"))
