@@ -80,8 +80,16 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("frequency_Hz must be a non-empty finite positive 1-D array.")
     if np.any(np.diff(f) <= 0):
         raise ValueError("frequency_Hz must be strictly increasing.")
+    if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
+        raise ValueError("harmonic must be a positive integer.")
     if mode not in {"brightness_temperature", "channel_fluctuations", "resonance_mapping"}:
         raise ValueError("Unsupported mode.")
+    if mode == "resonance_mapping" and (spectral_radiance_W_m2_sr_Hz is not None or signal is not None or time_s is not None):
+        raise ValueError("resonance_mapping accepts resonance inputs only; omit radiance, signal, and time_s.")
+    if mode == "brightness_temperature" and (signal is not None or time_s is not None):
+        raise ValueError("brightness_temperature does not consume signal or time_s; use channel_fluctuations for time series.")
+    if mode == "channel_fluctuations" and spectral_radiance_W_m2_sr_Hz is not None:
+        raise ValueError("channel_fluctuations does not consume spectral radiance; use brightness_temperature mode.")
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
            "resonance_field_T": resonance_field_T(f, harmonic),
            "assumptions": ["non-relativistic resonance", "cold-plasma frequency mapping"]}
@@ -105,8 +113,10 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         if spectral_radiance_W_m2_sr_Hz is None:
             raise ValueError("Calibrated spectral_radiance_W_m2_sr_Hz is required for temperature mode.")
         rad = np.asarray(spectral_radiance_W_m2_sr_Hz, dtype=float)
-        if rad.shape[-1:] != f.shape:
-            raise ValueError("Last radiance dimension must match frequency_Hz.")
+        if rad.ndim == 0 or rad.shape[-1:] != f.shape:
+            raise ValueError("spectral_radiance_W_m2_sr_Hz must have a final channel dimension matching frequency_Hz.")
+        if np.any(~np.isfinite(rad)) or np.any(rad < 0):
+            raise ValueError("spectral_radiance_W_m2_sr_Hz must contain finite non-negative values.")
         out["brightness_temperature_K"] = brightness_temperature_K(rad, f)
         out["brightness_temperature_eV"] = brightness_temperature_eV(rad, f)
         out["temperature_interpretation"] = (
@@ -132,6 +142,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             raise ValueError("time_s must be finite, strictly increasing, and contain at least 3 samples.")
         if np.any(~np.isfinite(y)):
             raise ValueError("signal must contain only finite samples.")
+        if y.shape[0] < 3:
+            raise ValueError("signal must contain at least 3 time samples.")
         dt = np.diff(t)
         if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
             raise ValueError("Sampling must be approximately uniform for FFT-based spectra.")
