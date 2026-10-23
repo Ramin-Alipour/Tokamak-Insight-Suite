@@ -57,7 +57,7 @@ def test_thermal_stored_energy_integral_reference():
 def test_line_integrated_density_reference():
     r=line_integrated_density([1e19,1e19,1e19],[0,0.5,1.0],sigma_density_m3=[1e17]*3)
     assert r["line_integrated_density_m-2"] == pytest.approx(1e19)
-    assert r["uncertainty_line_integrated_density_m-2"] == pytest.approx(0.5e17*math.sqrt(2))
+    assert r["uncertainty_line_integrated_density_m-2"] == pytest.approx(1e17*math.sqrt(0.375))
 
 @pytest.mark.parametrize("call", [
     lambda: electron_plasma_frequency(0), lambda: debye_length(-1,1e19),
