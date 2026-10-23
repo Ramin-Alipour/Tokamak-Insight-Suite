@@ -975,21 +975,126 @@
     "family": "Plasma parameters",
     "diagnostic": "Ion temperature from Doppler spectroscopy",
     "quantities": "T_i from corrected Gaussian thermal width",
-    "status": "M→D/I",
+    "status": "D/I",
     "method": "Fit isolated calibrated line; subtract instrument width in quadrature only for compatible Gaussian responses.",
     "caveat": "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i.",
     "implementation_functions": [
-      "fit_spectral_line",
-      "doppler_temperature_with_uncertainty_eV"
+      "tokamak_analysis.ion_temperature.ion_temperature_from_doppler_spectrum",
+      "tokamak_analysis.doppler_temperature.ion_temperature_from_doppler_fwhm",
+      "tis.doppler_temperature.doppler_temperature_eV",
+      "tis.core.fit_spectral_line"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Implemented end-to-end spectrum-to-Ti workflow with explicit instrumental deconvolution, fit diagnostics, uncertainty propagation and physical caveats",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true,
+          "description": "Finite, strictly increasing calibrated wavelength axis; at least seven samples."
+        },
+        {
+          "name": "intensity",
+          "unit": "detector units",
+          "required": true,
+          "description": "Finite one-dimensional spectrum matching wavelength_nm; isolated emission line with positive contrast."
+        },
+        {
+          "name": "rest_wavelength_nm",
+          "unit": "nm",
+          "required": true,
+          "minimum": 0,
+          "description": "Positive laboratory rest wavelength for the identified transition."
+        },
+        {
+          "name": "ion_mass_amu",
+          "unit": "amu",
+          "required": true,
+          "minimum": 0,
+          "description": "Positive mass of the emitting ion species/isotope."
+        },
+        {
+          "name": "instrumental_fwhm_nm",
+          "unit": "nm",
+          "required": true,
+          "minimum": 0,
+          "description": "Measured Gaussian instrument line-spread FWHM at the relevant wavelength and setup; must be smaller than fitted observed FWHM."
+        },
+        {
+          "name": "instrumental_fwhm_uncertainty_nm",
+          "unit": "nm",
+          "required": false,
+          "minimum": 0,
+          "description": "Optional 1-sigma uncertainty; used with fitted line-width covariance to propagate local Ti uncertainty."
+        },
+        {
+          "name": "intensity_uncertainty",
+          "unit": "detector units",
+          "required": false,
+          "description": "Optional positive per-sample 1-sigma uncertainty array matching intensity."
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "description": "Ti inferred from instrument-corrected Gaussian thermal Doppler FWHM."
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional first-order uncertainty propagated from line-width fit and instrument-width uncertainty."
+        },
+        {
+          "name": "observed_fwhm_nm",
+          "unit": "nm",
+          "description": "Fitted observed Gaussian line FWHM."
+        },
+        {
+          "name": "thermal_doppler_fwhm_nm",
+          "unit": "nm",
+          "description": "Observed FWHM corrected in quadrature for Gaussian instrumental broadening."
+        },
+        {
+          "name": "line_center_nm",
+          "unit": "nm",
+          "description": "Fitted line center; wavelength shift is also reported relative to rest wavelength."
+        },
+        {
+          "name": "fit_r_squared",
+          "unit": "dimensionless",
+          "description": "Descriptive goodness-of-fit statistic, not a physical validity test."
+        },
+        {
+          "name": "fitted_intensity",
+          "unit": "detector units",
+          "description": "Fitted Gaussian line plus local linear background evaluated at input wavelengths."
+        },
+        {
+          "name": "fit_residuals",
+          "unit": "detector units",
+          "description": "Input minus fitted intensity."
+        },
+        {
+          "name": "fit_covariance",
+          "unit": "parameter covariance",
+          "description": "Local nonlinear-fit covariance matrix."
+        },
+        {
+          "name": "assumptions",
+          "unit": "list",
+          "description": "Explicit model and uncertainty assumptions."
+        }
+      ],
+      "assumptions": [
+        "Wavelength axis is calibrated and the rest transition and ion species are correctly identified.",
+        "The feature is an isolated Gaussian emission line over a locally linear background.",
+        "Instrumental and thermal Doppler profiles are Gaussian and independent, permitting quadrature width subtraction.",
+        "Nonthermal flow distributions and Stark, Zeeman, opacity, unresolved blend/fine-structure broadening are negligible or separately corrected."
+      ],
       "preprocessing": [
         "Reject nonfinite, mismatched, non-1D, too-short, or non-increasing wavelength arrays.",
         "Require positive rest wavelength and ion mass; the rest wavelength must fall within the measured wavelength window.",
@@ -999,16 +1104,22 @@
         "Reject fitted centers at the wavelength-window boundary, excessively broad fits, and unresolved widths when observed FWHM does not exceed instrumental FWHM."
       ],
       "algorithm": "Fit an isolated line to a Gaussian with linear background. Reject out-of-window rest wavelengths, boundary-truncated peaks/centers, failed/nonphysical fits and line widths too broad for the selected window. Convert fitted sigma to observed FWHM, deconvolve known Gaussian instrumental FWHM in quadrature, then calculate Ti using Ti[eV] = (mi c^2/e) (FWHM_D/lambda0)^2/(8 ln 2). Return fitted spectrum, residuals, fit covariance, R-squared and assumptions.",
-      "uncertainty_model": "not_specified",
+      "uncertainty_model": "When intensity uncertainties are supplied, use weighted nonlinear least squares with absolute sigma. Otherwise use the fitter's residual-scaled covariance. Propagate observed-width and instrumental-width uncertainty to Ti by first-order independent-error propagation when both are available. Excludes wavelength calibration, ion-mass, instrument-model and physical-model discrepancy.",
       "limitations": [
-        "Other broadening, blends, opacity, unresolved fine structure and non-thermal distributions bias T_i."
+        "Not a general Voigt, Stark/Zeeman, opacity, unresolved multiplet or non-Maxwellian line-shape solver.",
+        "Fit quality metrics do not prove that the fitted width is thermal.",
+        "Instrument width must correspond to the same wavelength, spectrometer configuration, slit/grating and optical path.",
+        "Near the instrumental-resolution limit, Ti and its uncertainty become poorly identifiable; unresolved widths are rejected.",
+        "Temperature uncertainty excludes systematic wavelength calibration, rest-wavelength, mass, calibration and model uncertainties."
       ],
       "function_links": [
-        "fit_spectral_line",
-        "doppler_temperature_with_uncertainty_eV"
+        "tokamak_analysis.ion_temperature.ion_temperature_from_doppler_spectrum",
+        "tokamak_analysis.doppler_temperature.ion_temperature_from_doppler_fwhm",
+        "tis.doppler_temperature.doppler_temperature_eV",
+        "tis.core.fit_spectral_line"
       ],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "raw_data_to_physics": true,
+      "note": "Complete only within the explicitly scoped Gaussian isolated-line workflow; experimental physical review remains required."
     }
   },
   {
@@ -1022,11 +1133,11 @@
       "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
       "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
     ],
-    "implementation_status": "Complete within the explicitly bounded feature-extraction and user-defined-model-fitting scope; molecular species/temperature inversion and independent experimental validation are not claimed.",
+    "implementation_status": "Implemented numerical workflow (see limits)",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "wavelength_nm",
