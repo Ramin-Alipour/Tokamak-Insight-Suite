@@ -434,19 +434,68 @@
       "langmuir_iv_analysis",
       "probe_iv_summary"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Implemented single-sweep I–V analysis with explicit current convention, descriptive saturation-tail fallbacks, optional fit-window-based Te and ion-branch estimates, and optional model-dependent density inference. Independent experimental validation and full uncertainty propagation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "limited_calculation",
       "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
+      "input_specs": [
+        {
+          "name": "ti_eV",
+          "unit": "eV",
+          "description": "Assumed ion temperature used by the optional sound-speed/density model.",
+          "required": false,
+          "minimum": 0,
+          "default": 0
+        },
+        {
+          "name": "sheath_factor",
+          "unit": "dimensionless",
+          "description": "Positive sheath collection coefficient for the density model.",
+          "required": false,
+          "minimum": 1e-15,
+          "default": 0.61
+        },
+        {
+          "name": "gamma_i",
+          "unit": "dimensionless",
+          "description": "Non-negative coefficient multiplying ion temperature in the adopted sound-speed expression.",
+          "required": false,
+          "minimum": 0,
+          "default": 1
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_saturation_current_A",
+          "unit": "A",
+          "description": "Median of the highest-voltage tail; descriptive only, not a validated saturation-branch fit."
+        },
+        {
+          "name": "ion_saturation_current_method",
+          "unit": "text",
+          "description": "Indicates whether ion current came from the analyst-selected fit interval or a low-voltage-tail fallback."
+        },
+        {
+          "name": "electron_temperature_uncertainty_note",
+          "unit": "text",
+          "description": "Statistical fit uncertainty excludes calibration, fit-window, sheath and instrumental systematics."
+        }
+      ],
       "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit a justified I–V/sheath model; estimate density only with collection-area and regime assumptions.",
+      "preprocessing": [
+        "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
+        "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
+        "Validate current polarity, fit windows, and positive finite geometry/model inputs.",
+        "Use explicit analyst-selected fit windows; no automatic physical regime selection."
+      ],
+      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate floating-potential crossings, dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
       "uncertainty_model": "not_specified",
       "limitations": [
-        "Probe perturbation, magnetization, sheath expansion, RF pickup, secondary emission and geometry matter."
+        "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
+        "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
+        "Density is a model-dependent estimate; calibration and full uncertainty propagation are not automatic.",
+        "Check fit quality and probe-specific sheath, magnetic-field, RF, collision, surface and sweep-direction effects."
       ],
       "function_links": [
         "langmuir_iv_analysis",
