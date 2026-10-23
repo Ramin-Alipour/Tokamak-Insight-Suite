@@ -410,7 +410,7 @@
     "equation": "f_pe≈8.98×10^3 sqrt(n_e[cm^-3]) Hz",
     "inputs": "n_e [cm^-3]",
     "output": "Hz",
-    "assumptions": "Approximate electron plasma frequency.",
+    "assumptions": "Approximate electron plasma frequency; exact SI-constant implementation converts cm^-3 to m^-3.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -446,9 +446,9 @@
   {
     "name": "Doppler line-of-sight velocity",
     "equation": "v_LOS/c≈Δλ/λ₀ for |v|≪c",
-    "inputs": "Calibrated centroid shift Δλ; rest wavelength λ₀",
+    "inputs": "Calibrated centroid shift Δλ and rest wavelength λ₀ in the same wavelength unit",
     "output": "m/s",
-    "assumptions": "Non-relativistic Doppler approximation and correct viewing geometry.",
+    "assumptions": "Non-relativistic Doppler approximation; correct wavelength calibration and viewing geometry are required.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -490,9 +490,9 @@
   {
     "name": "Ion temperature from Gaussian Doppler sigma",
     "equation": "T_i[eV]=(m_i c²/e)(σ_λ/λ₀)²",
-    "inputs": "Corrected σ_λ and λ₀ in same units; ion mass in kg for SI form",
+    "inputs": "Instrument-corrected Gaussian σ_λ and λ₀ in the same wavelength unit; ion mass [kg]",
     "output": "eV",
-    "assumptions": "Thermal Gaussian Doppler width only; instrument response and other broadening removed.",
+    "assumptions": "Thermal Gaussian Doppler width only; instrumental and non-thermal broadening must already be corrected.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -540,9 +540,9 @@
   {
     "name": "Gaussian FWHM and sigma",
     "equation": "FWHM=2 sqrt(2 ln 2) σ≈2.35482 σ",
-    "inputs": "Gaussian profile width",
+    "inputs": "Gaussian standard deviation σ",
     "output": "same width unit",
-    "assumptions": "Gaussian profile only.",
+    "assumptions": "Gaussian profile only; sigma and FWHM are in the same unit.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -585,7 +585,7 @@
     "equation": "u_B=B²/(2 μ₀)",
     "inputs": "B [T]",
     "output": "J/m³ = Pa",
-    "assumptions": "Magnetic energy density in vacuum approximation.",
+    "assumptions": "Vacuum magnetic energy-density approximation.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -621,9 +621,9 @@
   {
     "name": "Toroidal beta",
     "equation": "β_t=<p>/(B_t²/(2μ₀))",
-    "inputs": "Defined pressure average and reference toroidal field",
+    "inputs": "Pressure p [Pa] and toroidal field B_t [T]",
     "output": "dimensionless",
-    "assumptions": "State volume/local average and field convention.",
+    "assumptions": "Local pressure or explicitly defined average; state averaging volume and field convention.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -720,10 +720,10 @@
   },
   {
     "name": "Faraday induction",
-    "equation": "V_coil=−N dΦ_B/dt; Φ_B=∫B·dA",
-    "inputs": "Calibrated coil voltage and geometry",
-    "output": "V, Wb",
-    "assumptions": "Sign, turns, area and electronics response documented.",
+    "equation": "V_coil = −N dΦ_B/dt",
+    "inputs": "Magnetic-flux derivative dΦ_B/dt [Wb/s] and positive integer coil turns N",
+    "output": "V",
+    "assumptions": "Coil polarity/orientation and electronics response must be documented; Φ_B is the flux through one turn.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -767,7 +767,7 @@
     "equation": "R_p=V_loop/I_p",
     "inputs": "V_loop [V], I_p [A]",
     "output": "Ω",
-    "assumptions": "Only under consistent sign/definition; inductive terms can complicate interpretation.",
+    "assumptions": "Signed ratio; consistent sign/time conventions are required and inductive terms can complicate interpretation.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -811,7 +811,7 @@
     "equation": "P_Ω≈V_loop I_p",
     "inputs": "V_loop [V], I_p [A]",
     "output": "W",
-    "assumptions": "Not generally the same as net loss power or total input power.",
+    "assumptions": "Signed product; not generally the same as net loss power or total input power.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -855,7 +855,7 @@
     "equation": "τ_E=W_th/P_loss",
     "inputs": "W_th [J], P_loss [W]",
     "output": "s",
-    "assumptions": "Use consistent boundary, time window and loss-power definition.",
+    "assumptions": "Use consistent boundary, time window and loss-power definition; P_loss must be positive.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -898,7 +898,7 @@
     "name": "Greenwald density reference",
     "equation": "n_G[10^20 m^-3]=I_p[MA]/(π a²[m²])",
     "inputs": "I_p [MA], minor radius a [m]",
-    "output": "10^20 m^-3",
+    "output": "10^20 m^-3 and SI equivalent m^-3",
     "assumptions": "Empirical reference scaling, not a universal physical limit.",
     "status": "D",
     "category": "Core physics",
@@ -947,7 +947,7 @@
     "name": "Debye parameter",
     "equation": "N_D=(4π/3)n_e λ_D³",
     "inputs": "n_e [m^-3], λ_D [m]",
-    "output": "dimensionless particles",
+    "output": "dimensionless particle count",
     "assumptions": "Number of particles in a Debye sphere.",
     "status": "D",
     "category": "Core physics",
@@ -992,7 +992,7 @@
     "equation": "ω_pe=sqrt(n_e e²/(ε₀m_e))",
     "inputs": "n_e [m^-3]",
     "output": "rad/s",
-    "assumptions": "Local electron density.",
+    "assumptions": "Local electron density; cold-plasma definition.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1027,10 +1027,10 @@
   },
   {
     "name": "Ion saturation particle flux proxy",
-    "equation": "Γ_i≈I_sat/(e A_eff)",
-    "inputs": "I_sat [A], effective area A_eff [m²]",
+    "equation": "Γ_i≈|I_sat|/(e A_eff)",
+    "inputs": "|I_sat| [A], effective collection area A_eff [m²]",
     "output": "m^-2 s^-1",
-    "assumptions": "Converts charge current to particle flux only with valid collection geometry/model.",
+    "assumptions": "Current magnitude is used; conversion is a proxy valid only with a justified collection geometry/model.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1072,9 +1072,9 @@
   {
     "name": "Radiated power fraction",
     "equation": "f_rad=P_rad/P_in",
-    "inputs": "P_rad and defined input power, both W",
+    "inputs": "P_rad and defined input power P_in [W]",
     "output": "dimensionless",
-    "assumptions": "Input-power convention and time averaging must be specified.",
+    "assumptions": "Input-power convention and time averaging must be specified; ratios above unity are flagged for review.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1116,9 +1116,9 @@
   {
     "name": "Integrated surface power",
     "equation": "P_target=∫_A q_perp dA",
-    "inputs": "Heat flux q_perp [W/m²] and surface area",
+    "inputs": "Heat flux q_perp [W/m²] and matching surface-area weights [m²]",
     "output": "W",
-    "assumptions": "Surface mapping, geometry and heat-flux calibration required.",
+    "assumptions": "Surface mapping, geometry, heat-flux calibration and quadrature weights are required.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1160,9 +1160,9 @@
   {
     "name": "Apparent feature speed",
     "equation": "v_app=Δx/Δt",
-    "inputs": "Calibrated image displacement and frame interval",
+    "inputs": "Calibrated projected displacement Δx [m] and frame interval Δt [s]",
     "output": "m/s",
-    "assumptions": "Projected apparent velocity, not necessarily plasma flow velocity.",
+    "assumptions": "Signed projected apparent velocity, not necessarily plasma-flow velocity.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1204,9 +1204,9 @@
   {
     "name": "Gas pumping speed",
     "equation": "S=Q/p",
-    "inputs": "Throughput Q and pressure p in consistent units",
-    "output": "m³/s (SI throughput convention)",
-    "assumptions": "Gauge position, conductance and throughput convention matter.",
+    "inputs": "Throughput Q [Pa m³/s] and pressure p [Pa]",
+    "output": "m³/s",
+    "assumptions": "Gauge location, conductance and throughput convention matter; SI Q/p units are required.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1248,9 +1248,9 @@
   {
     "name": "Injected particle number",
     "equation": "N_injected=∫ Ṅ(t) dt",
-    "inputs": "Particle injection rate Ṅ(t) [s^-1]",
+    "inputs": "Particle injection rate Ṅ(t) [s^-1] and matching time coordinate t [s]",
     "output": "particles",
-    "assumptions": "Rate calibration and time base required.",
+    "assumptions": "Rate calibration and strictly increasing time base are required.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1292,7 +1292,7 @@
   {
     "name": "Particle confinement time proxy",
     "equation": "τ_p=N_p/Ṅ_loss",
-    "inputs": "Stored particle number and loss rate",
+    "inputs": "Stored particle number N_p and loss rate Ṅ_loss [particles/s]",
     "output": "s",
     "assumptions": "Requires consistent control volume and particle balance.",
     "status": "D",
@@ -1335,10 +1335,10 @@
   },
   {
     "name": "Relative fluctuation level",
-    "equation": "δx_rel=RMS(x−mean(x))/mean(x)",
-    "inputs": "Time series x with nonzero mean",
+    "equation": "δx_rel=RMS(x−mean(x))/|mean(x)|",
+    "inputs": "Finite time series x with a nonzero, numerically stable mean",
     "output": "dimensionless",
-    "assumptions": "Window and detrending must be specified; unstable near zero mean.",
+    "assumptions": "Population RMS after mean removal; window and detrending must be specified; unstable near zero mean.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1384,9 +1384,9 @@
   {
     "name": "RMS signal",
     "equation": "x_RMS=sqrt(mean(x²))",
-    "inputs": "Signal samples",
+    "inputs": "Finite signal samples",
     "output": "same as signal",
-    "assumptions": "Specify whether DC component is included.",
+    "assumptions": "DC component is included; subtract the mean first if AC-only RMS is intended.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1422,9 +1422,9 @@
   {
     "name": "Nyquist frequency",
     "equation": "f_N=f_s/2",
-    "inputs": "Sampling frequency f_s [Hz]",
+    "inputs": "Uniform sampling frequency f_s [Hz]",
     "output": "Hz",
-    "assumptions": "Frequencies above Nyquist alias unless anti-alias filtering was applied.",
+    "assumptions": "Frequencies above Nyquist alias unless suitable anti-alias filtering is applied before sampling/downsampling.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1460,9 +1460,9 @@
   {
     "name": "Cross-correlation lag",
     "equation": "τ_peak=argmax_τ R_xy(τ)",
-    "inputs": "Synchronized x(t), y(t)",
+    "inputs": "Synchronized, uniformly sampled x(t), y(t) and sample interval Δt [s]",
     "output": "s",
-    "assumptions": "Correlation lag does not establish causality; periodic signals can create ambiguous peaks.",
+    "assumptions": "Returns the lag of maximum positive cross-correlation; positive lag means y lags x; correlation does not establish causality.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1515,9 +1515,9 @@
   {
     "name": "Magnitude-squared coherence",
     "equation": "C_xy(f)=|S_xy(f)|²/(S_xx(f)S_yy(f))",
-    "inputs": "Synchronized channel time series",
-    "output": "0–1",
-    "assumptions": "Estimator uncertainty depends on segment count and stationarity.",
+    "inputs": "Synchronized, uniformly sampled channel time series and sampling frequency [Hz]",
+    "output": "frequency bins [Hz] and coherence [0,1]",
+    "assumptions": "Welch estimator; estimator uncertainty depends on segment count, overlap, window and stationarity.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1575,10 +1575,10 @@
   },
   {
     "name": "Bolometry inverse problem",
-    "equation": "y=A x+ε; estimate x by regularized inverse",
-    "inputs": "Line-integrated signals y, geometry matrix A",
-    "output": "Spatial emissivity x",
-    "assumptions": "Ill-posed inverse problem; save regularization and uncertainty.",
+    "equation": "x=(AᵀA+λ²I)⁻¹Aᵀy (Tikhonov estimate)",
+    "inputs": "Line-integrated measurements y, geometry/response matrix A, positive regularization λ",
+    "output": "Spatial emissivity estimate x",
+    "assumptions": "Ill-posed inverse problem; this implementation is unconstrained, retains/flags negative emissivity and propagates measurement uncertainty only when supplied.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {
@@ -1641,9 +1641,9 @@
   {
     "name": "Continuity / particle balance",
     "equation": "dN/dt=Ṅ_in−Ṅ_out+S−L",
-    "inputs": "Stored particles, input/output and source/loss rates",
+    "inputs": "Input/output and source/loss rates [particles/s]",
     "output": "particles/s",
-    "assumptions": "Define volume and avoid double-counting source/loss terms.",
+    "assumptions": "dN/dt=Ṅ_in−Ṅ_out+S−L; define the control volume and avoid double-counting source/loss terms.",
     "status": "D",
     "category": "Core physics",
     "execution_contract": {

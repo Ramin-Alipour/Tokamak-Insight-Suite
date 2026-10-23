@@ -16,8 +16,8 @@ def test_formula_catalogue_is_loaded_from_canonical_formula_registry():
     assert FORMULAS == rows
     from importlib import import_module
     mapped = [row for row in FORMULAS if row["execution_contract"]["implementation_link_status"] == "mapped"]
-    assert len(mapped) == 9
-    assert sum(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS) == 28
+    assert len(mapped) == 37
+    assert sum(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS) == 0
     for row in mapped:
         contract = row["execution_contract"]
         module_name, function_name = contract["function_link"].rsplit(".", 1)
