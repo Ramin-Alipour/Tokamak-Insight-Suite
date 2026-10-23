@@ -42,7 +42,7 @@ def test_uncertainty_propagation_and_nonuniform_time():
     ([0, 1], [1, 2]),
     ([0, 1, 1], [1, 2, 3]),
     ([0, 1, 2], [1, np.nan, 3]),
-    ([0, 1, 2], [[1, 2], [3, 4], [5, 6]]),
+    ([0, 1, 2], [[1, 2], [3, 4]]),
 ])
 def test_rejects_invalid_input(time, signal):
     with pytest.raises(ValueError):
