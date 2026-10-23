@@ -114,7 +114,7 @@ def analyze_thomson_spectral_distribution(
     chi_square = None if uncertainty is None else float(np.sum((residual / uncertainty) ** 2))
     reduced_chi_square = None if chi_square is None else chi_square / dof
     ss_total = float(np.sum((y - np.mean(y))**2))
-    r_squared = float(1.0 - np.sum(residual**2) / ss_total) if ss_total > 0 else float("nan")
+    r_squared = float(1.0 - np.sum(residual**2) / ss_total) if ss_total > 0 else None
     parameter_uncertainties = np.sqrt(np.maximum(np.diag(covariance), 0.0))
     return {
         "wavelength_nm": x.copy(),
