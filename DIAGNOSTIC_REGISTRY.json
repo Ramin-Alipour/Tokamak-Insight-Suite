@@ -5,7 +5,7 @@
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "D",
     "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature.",
-    "caveat": "The raw-spectrum fit is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. It does not infer density from spectral amplitude; calibrated profile and single-band power density workflows remain separate.",
+    "caveat": "Raw-spectrum fitting is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. Density is never inferred from uncalibrated spectral amplitude; calibrated profile, calibrated single-band power-density, and combined spectrum-to-temperature/density workflows are separate explicit modes.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
@@ -19,43 +19,89 @@
       "completeness": "complete",
       "input_specs": [
         {
+          "name": "workflow_mode",
+          "unit": "text",
+          "description": "Select calibrated_profile, raw_spectrum_temperature_fit, calibrated_power_density, or calibrated_spectrum_temperature_density; required inputs depend on the selected mode.",
+          "required": true
+        },
+        {
           "name": "radius_m",
           "unit": "m",
-          "description": "Unique radial coordinate of calibrated Thomson-scattering profile samples.",
-          "required": true
+          "description": "Mode-specific: unique radial coordinate for calibrated_profile.",
+          "required": false
         },
         {
           "name": "density_m3",
           "unit": "m^-3",
-          "description": "Calibrated electron-density profile; same length and order as radius_m.",
-          "required": true,
+          "description": "Mode-specific: calibrated electron-density profile for calibrated_profile.",
+          "required": false,
           "minimum": 0
         },
         {
           "name": "temperature_ev",
           "unit": "eV",
-          "description": "Calibrated electron-temperature profile; same length and order as radius_m.",
-          "required": true,
-          "minimum": 0
-        },
-        {
-          "name": "density_uncertainty_m3",
-          "unit": "m^-3",
-          "description": "Optional pointwise 1-sigma density uncertainty; non-negative.",
+          "description": "Mode-specific: calibrated electron-temperature profile for calibrated_profile.",
           "required": false,
           "minimum": 0
         },
         {
-          "name": "temperature_uncertainty_ev",
-          "unit": "eV",
-          "description": "Optional pointwise 1-sigma temperature uncertainty; non-negative.",
-          "required": false,
-          "minimum": 0
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "description": "Mode-specific: finite, strictly increasing calibrated wavelength axis for raw-spectrum and combined spectral modes.",
+          "required": false
         },
         {
-          "name": "major_radius_m",
+          "name": "signal",
+          "unit": "detector units or W/nm",
+          "description": "Mode-specific: measured spectral signal; W/nm is mandatory for combined density extraction.",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "description": "Mode-specific: positive laser wavelength for spectral modes.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "description": "Mode-specific: scattering angle in (0, pi] for spectral/power-density modes.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm",
+          "description": "Mode-specific: known positive Gaussian instrumental standard deviation for spectral fitting.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "incident_power_W",
+          "unit": "W",
+          "description": "Mode-specific: calibrated incident laser power for density extraction.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "interaction_length_m",
           "unit": "m",
-          "description": "Optional positive major radius; enables approximate circular large-aspect-ratio volume-weighted averages.",
+          "description": "Mode-specific: effective scattering interaction length for density extraction.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "collection_solid_angle_sr",
+          "unit": "sr",
+          "description": "Mode-specific: calibrated collection solid angle for density extraction.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "optical_efficiency",
+          "unit": "dimensionless",
+          "description": "Mode-specific: total optical efficiency in (0, 1].",
           "required": false,
           "minimum": 1e-15
         }
@@ -115,6 +161,46 @@
           "name": "temperature_normalized_gradient_uncertainty_m-1",
           "unit": "m^-1",
           "description": "First-order uncertainty of the normalized temperature gradient under independent pointwise measurement errors."
+        },
+        {
+          "name": "density_normalized_gradient_m-1",
+          "unit": "m^-1",
+          "description": "Radial density gradient normalized by density; NaN where density is zero."
+        },
+        {
+          "name": "temperature_normalized_gradient_m-1",
+          "unit": "m^-1",
+          "description": "Radial temperature gradient normalized by temperature; NaN where temperature is zero."
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Electron temperature from supported raw-spectrum fit or combined calibrated-spectrum workflow."
+        },
+        {
+          "name": "electron_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Local covariance-based fit uncertainty; excludes calibration, geometry, and instrument-width uncertainty."
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Density from calibrated single-band scattered power, only when optical power and geometry inputs satisfy the documented model."
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3",
+          "description": "Optional first-order propagated uncertainty under independent-input assumptions."
+        },
+        {
+          "name": "integrated_scattered_power_W",
+          "unit": "W",
+          "description": "Fitted Gaussian spectral area, available only for signal calibrated in W/nm."
+        },
+        {
+          "name": "fit_diagnostics",
+          "unit": "structured",
+          "description": "Fitted spectrum, residuals, covariance, and available fit-quality metrics."
         }
       ],
       "assumptions": [
@@ -143,7 +229,7 @@
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete within the declared scope. The callable profile, spectral-fit, calibrated-power-density, and combined spectrum-to-temperature/density paths are present; the dashboard exposes the relevant workflows and the test suite includes numerical recovery, validation failures, instrument-width deconvolution, uncertainty propagation, and the combined pipeline. This is software verification, not independent experimental validation. Uncalibrated spectral amplitude is not density; collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope.",
+      "note": "Complete within the declared scope, not independently experimentally validated. Workflow-specific requirements are defined by workflow_modes; the global input list is a cross-mode catalog, not a claim that all inputs are required simultaneously. Profile, spectral-fit, calibrated-power-density, and combined spectrum-to-temperature/density paths are callable; dashboard access and focused numerical/validation tests exist. Uncalibrated spectral amplitude is not density. Collective, relativistic, non-Maxwellian and non-Gaussian-response models remain out of scope.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
