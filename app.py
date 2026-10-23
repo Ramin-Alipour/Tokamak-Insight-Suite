@@ -89,8 +89,8 @@ with st.sidebar:
             sheet_value=int(sheet_value) if sheet_value.isdigit() else (sheet_value or 0)
             import_signature=uploaded_sha+json.dumps({"delimiter":import_delimiter,"decimal":import_decimal,
                 "skiprows":int(import_skiprows),"comment":import_comment,"sheet_name":sheet_value,"drop_units_row":bool(import_drop_units),"encoding":import_encoding},sort_keys=True)
-            needs_import=(new_upload or (st.session_state.get("tis_active_source")=="upload" and
-                import_signature != st.session_state.get("tis_upload_signature")))
+            needs_import=(new_upload or st.session_state.get("tis_active_source")!="upload" or
+                import_signature != st.session_state.get("tis_upload_signature"))
             if needs_import:
                 frame=load_table(uploaded_bytes,upload.name,sheet_name=sheet_value,
                                  delimiter=delimiter_map[import_delimiter],decimal=import_decimal,
