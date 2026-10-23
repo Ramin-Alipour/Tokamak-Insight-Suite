@@ -24,6 +24,7 @@ class CXRSResult:
     intrinsic_sigma_nm: float
     ion_temperature_eV: float
     ion_temperature_uncertainty_eV: float
+    instrument_sigma_uncertainty_nm: float
     line_of_sight_velocity_m_s: float
     velocity_uncertainty_m_s: float
     amplitude: float
@@ -55,6 +56,7 @@ def analyze_cxrs_line(
     viewing_angle_rad: float = 0.0,
     signal_uncertainty=None,
     initial_center_nm: float | None = None,
+    instrument_sigma_uncertainty_nm: float = 0.0,
 ) -> CXRSResult:
     """Fit one calibrated CXRS line and derive Ti and line-of-sight velocity.
 
@@ -78,6 +80,8 @@ def analyze_cxrs_line(
         Positive 1-sigma uncertainty per sample; if supplied, used as fit weights.
     initial_center_nm : float, optional
         Initial line-center estimate. Defaults to wavelength at maximum signal.
+    instrument_sigma_uncertainty_nm : float, default 0
+        1-sigma uncertainty of the independently measured instrumental sigma.
 
     Notes
     -----
@@ -102,6 +106,8 @@ def analyze_cxrs_line(
             raise ValueError(f"{name} must be finite and positive")
     if not np.isfinite(viewing_angle_rad) or not 0 <= viewing_angle_rad <= np.pi:
         raise ValueError("viewing_angle_rad must be finite and within [0, pi]")
+    if not np.isfinite(instrument_sigma_uncertainty_nm) or instrument_sigma_uncertainty_nm < 0:
+        raise ValueError("instrument_sigma_uncertainty_nm must be finite and non-negative")
     sy = None
     if signal_uncertainty is not None:
         sy = np.asarray(signal_uncertainty, dtype=float)
@@ -137,7 +143,9 @@ def analyze_cxrs_line(
     ti = mass * _C**2 * (intrinsic_sigma / rest_wavelength_nm) ** 2 / _E_CHARGE
     center_unc = float(np.sqrt(max(0.0, pcov[1, 1]))) if np.isfinite(pcov[1, 1]) else float("nan")
     sigma_unc = float(np.sqrt(max(0.0, pcov[2, 2]))) if np.isfinite(pcov[2, 2]) else float("nan")
-    ti_unc = float(2 * ti * observed_sigma * sigma_unc / intrinsic_sigma**2)
+    ti_unc_fit = 2 * ti * observed_sigma * sigma_unc / intrinsic_sigma**2
+    ti_unc_instrument = 2 * ti * instrument_sigma_nm * instrument_sigma_uncertainty_nm / intrinsic_sigma**2
+    ti_unc = float(np.hypot(ti_unc_fit, ti_unc_instrument))
     velocity = _C * (center - rest_wavelength_nm) / rest_wavelength_nm
     velocity_unc = _C * center_unc / rest_wavelength_nm
     fitted = _line_model(x, *popt)
@@ -154,6 +162,7 @@ def analyze_cxrs_line(
         intrinsic_sigma_nm=intrinsic_sigma,
         ion_temperature_eV=float(ti),
         ion_temperature_uncertainty_eV=ti_unc,
+        instrument_sigma_uncertainty_nm=float(instrument_sigma_uncertainty_nm),
         line_of_sight_velocity_m_s=float(velocity),
         velocity_uncertainty_m_s=float(velocity_unc),
         amplitude=amp,
