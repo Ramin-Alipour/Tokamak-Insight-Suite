@@ -56,3 +56,11 @@ def test_project_export_excludes_history_that_predates_loading_a_project():
         excluded_history_keys={_history_item_key(old_item)},
     )
     assert [run.analysis_name for run in project.analysis_runs] == ["analysis after loading"]
+
+
+def test_existing_project_records_new_shot_ids_without_duplicates():
+    from tis.ui.project_page import _ensure_project_shot
+    project = Project(title="multi-shot", shots=[{"shot_id": "100"}])
+    _ensure_project_shot(project, "200")
+    _ensure_project_shot(project, "200")
+    assert project.shots == [{"shot_id": "100"}, {"shot_id": "200"}]
