@@ -11,6 +11,7 @@ from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum
+from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
@@ -982,7 +983,63 @@ elif page=='Spectral Analysis':
             except Exception as e: st.error(str(e))
 
 elif page=='Probe Analysis':
-    st.title('Langmuir, Ball-Pen & Probe Analysis'); need_data()
+    st.title('Langmuir, Ball-Pen & Magnetic Probe Analysis'); need_data()
+    with st.expander('Poloidal-field coils / magnetic probes', expanded=True):
+        st.caption('Calibrated signal analysis only. Supply gain/offset from the documented probe and acquisition-chain calibration; this workflow does not reconstruct poloidal flux or equilibrium.')
+        time_col=col_select('Time column (s)',numeric,'pf_probe_time')
+        pf_channels=st.multiselect('Poloidal-field probe signal channel(s)',[c for c in numeric if c != time_col],default=[],key='pf_probe_channels')
+        st.caption('Enter one comma-separated value for all channels, or one value per selected channel, in the same order.')
+        c1,c2,c3=st.columns(3)
+        with c1: pf_gain_text=st.text_input('Calibration gain (T / digitizer unit)','1.0',key='pf_gain')
+        with c2: pf_offset_text=st.text_input('Calibration offset (T)','0.0',key='pf_offset')
+        with c3: pf_unc_text=st.text_input('Signal uncertainty 1σ (digitizer units; optional)','',key='pf_uncertainty')
+        use_baseline=st.checkbox('Subtract mean baseline over a time interval',value=False,key='pf_use_baseline')
+        baseline_interval=None
+        if use_baseline:
+            tmin=float(pd.to_numeric(df[time_col],errors='coerce').min())
+            tmax=float(pd.to_numeric(df[time_col],errors='coerce').max())
+            if not np.isfinite(tmin) or not np.isfinite(tmax) or tmin >= tmax:
+                st.warning('The selected time column must have a finite, nonzero range.')
+            else:
+                baseline_interval=st.slider('Baseline interval (s)',min_value=tmin,max_value=tmax,value=(tmin,tmin+(tmax-tmin)*0.1),key='pf_baseline_interval')
+        if st.button('Analyze poloidal-field probes',type='primary',key='analyze_pf_probes'):
+            try:
+                if not pf_channels:
+                    raise ValueError('Select at least one magnetic-probe signal channel.')
+                def _parse_pf_values(raw, label, count):
+                    values=[float(part.strip()) for part in raw.split(',') if part.strip()]
+                    if len(values)==1: values=values*count
+                    if len(values)!=count or not np.all(np.isfinite(values)):
+                        raise ValueError(f'{label} must be one finite value or exactly {count} comma-separated finite values.')
+                    return values[0] if count==1 else values
+                gain_value=_parse_pf_values(pf_gain_text,'Calibration gain',len(pf_channels))
+                offset_value=_parse_pf_values(pf_offset_text,'Calibration offset',len(pf_channels))
+                uncertainty_value=None
+                if pf_unc_text.strip():
+                    uncertainty_value=_parse_pf_values(pf_unc_text,'Signal uncertainty',len(pf_channels))
+                time_values=pd.to_numeric(df[time_col],errors='coerce').to_numpy(dtype=float)
+                signal_values=df[pf_channels].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
+                result=analyze_poloidal_field_probes(
+                    time_values,signal_values,
+                    calibration_gain_T_per_unit=gain_value,
+                    calibration_offset_T=offset_value,
+                    signal_uncertainty=uncertainty_value,
+                    baseline_interval_s=baseline_interval,
+                    probe_names=pf_channels,
+                )
+                st.success('Poloidal-field probe analysis completed for the selected calibrated-signal scope.')
+                st.json(result)
+                for channel_index,channel_name in enumerate(pf_channels):
+                    st.markdown(f'**{channel_name}**')
+                    plot_line(result['time_s'],result['B_poloidal_T'][:,channel_index],time_col,'Bp (T)',f'{channel_name}: calibrated poloidal field')
+                    plot_line(result['time_s'],result['dB_poloidal_dt_T_s'][:,channel_index],time_col,'dBp/dt (T/s)',f'{channel_name}: time derivative')
+                json_download('Export poloidal-field analysis JSON',result,'tis_poloidal_field_probe_analysis.json')
+            except Exception as e:
+                st.error(f'Poloidal-field probe analysis failed: {e}')
+        st.info('Interpretation limits: gain/offset calibration uncertainty, probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
+    st.divider()
+    st.markdown('### Langmuir probe I–V analysis')
+    vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     vmin=float(pd.to_numeric(df[vcol],errors='coerce').min()); vmax=float(pd.to_numeric(df[vcol],errors='coerce').max())
     st.markdown('### Fit-window and probe geometry')
