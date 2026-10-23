@@ -210,6 +210,15 @@ def test_fluctuation_flux_covariance():
     assert r['particle_flux_covariance_m-2_s-1']==pytest.approx(1.0)
 
 
+def test_transport_profile_functions_reject_mismatched_lengths():
+    with pytest.raises(ValueError, match="equal lengths"):
+        exponential_heat_flux_fit([0, 1, 2], [1, 2])
+    with pytest.raises(ValueError, match="equal lengths"):
+        eich_heat_flux_fit([0, 1, 2], [1, 2])
+    with pytest.raises(ValueError, match="equal lengths"):
+        integrate_profile([0, 1, 2], [1, 2])
+
+
 def test_heat_flux_exponential_fit():
     from tis.core import exponential_heat_flux_fit
     x=np.linspace(0,.05,80); y=1000*np.exp(-x/.01)+10
