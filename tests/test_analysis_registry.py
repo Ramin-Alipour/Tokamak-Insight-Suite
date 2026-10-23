@@ -109,5 +109,5 @@ def test_cxrs_is_analysis_four_with_explicit_physics_contract():
         "ion_temperature_eV", "line_of_sight_velocity_m_s",
         "fitted_signal", "residual", "fit_r_squared",
     }
-    assert any("instrument-width" in item for item in contract["limitations"])
+    assert any("instrumental width" in item for item in contract["limitations"])
     assert callable(resolve_analysis(4))
