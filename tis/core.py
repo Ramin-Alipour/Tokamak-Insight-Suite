@@ -751,17 +751,18 @@ def spectrum_moments(energy_eV: Any, counts: Any, background: Any | None = None,
                 'moment_status':'not_defined_negative_second_moment',
                 'note':'Signed background-subtracted bins produce a negative second central moment. No bins were clipped; inspect background subtraction, bin uncertainties and fit a physically constrained spectral model if appropriate.'}
     spread=math.sqrt(max(var,0))
-    result={'integrated_signal':area,
-            'integrated_signal_unit':'counts' if bin_representation=="counts_per_bin" else 'signal·energy_unit',
-            'bin_representation':bin_representation,'moments_valid':True,'moment_status':'valid_signed_net_moments',
+    result={**base,
+            'moments_valid':True,'moment_status':'valid_signed_net_moments',
             'mean_energy_eV':mean,'rms_energy_spread_eV':spread,
-            'peak_energy_eV':float(e[np.argmax(c)]),'n_points':int(len(e)),
-            'uncertainty_propagated':sigma is not None,
+            'peak_energy_eV':float(e[np.argmax(c)]),
             'note':'Moments retain signed background-subtracted bins. Detector response, efficiency, pile-up and background covariance are not corrected automatically.'}
     # The unweighted integral is the total signal. Keep one unit-stable key
     # for both input representations; the energy-weighted integral is reported
     # separately and is never confused with the total signal.
     result['integrated_counts'] = area
+    if bin_representation == "density_per_eV":
+        # Backward-compatible alias for the unweighted integrated signal.
+        result['integrated_counts_eV'] = area
     if sigma is not None:
         dmean=quad*(e-mean)/area
         var_derivative=quad*((e-mean)**2-var)/area
@@ -799,12 +800,30 @@ def equilibrium_grid_derivatives(R_m: Any, Z_m: Any, psi: Any, Bphi_T: float) ->
 def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None = None,
                           count_uncertainty: Any | None = None,
                           assume_poisson_counts: bool = False,
-                          bin_representation: str = "density_per_eV") -> dict[str, Any]:
-    # The shared moment routine expects its energy coordinate in eV. Convert
-    # the X-ray API's keV input before integration, then convert energy moments back.
+                          bin_representation: str = "density_per_keV") -> dict[str, Any]:
+    """Summarize a spectrum with energy coordinates supplied in keV.
+
+    density_per_keV is the default for this API. Explicit density_per_eV
+    inputs are interpreted literally as signal per eV; counts_per_bin values
+    are already integrated counts for each bin.
+    """
+    if bin_representation not in {"density_per_keV", "density_per_eV", "counts_per_bin"}:
+        raise ValueError("bin_representation must be density_per_keV, density_per_eV, or counts_per_bin.")
     energy_eV = np.asarray(energy_keV, dtype=float) * 1000.0
-    r=spectrum_moments(energy_eV, counts, background, count_uncertainty,
-                       assume_poisson_counts, bin_representation)
+    signal = np.asarray(counts, dtype=float)
+    background_for_moments = background
+    uncertainty_for_moments = count_uncertainty
+    internal_representation = bin_representation
+    if bin_representation == "density_per_keV":
+        signal = signal / 1000.0
+        if background is not None:
+            background_for_moments = np.asarray(background, dtype=float) / 1000.0
+        if count_uncertainty is not None:
+            uncertainty_for_moments = np.asarray(count_uncertainty, dtype=float) / 1000.0
+        internal_representation = "density_per_eV"
+    r=spectrum_moments(energy_eV, signal, background_for_moments,
+                       uncertainty_for_moments, assume_poisson_counts, internal_representation)
+    r["bin_representation"] = bin_representation
     for source, target in (
         ('peak_energy_eV', 'peak_energy_keV'),
         ('mean_energy_eV', 'mean_energy_keV'),
@@ -815,13 +834,14 @@ def xray_spectrum_summary(energy_keV: Any, counts: Any, background: Any | None =
         if source in r:
             value = r.pop(source)
             r[target] = None if value is None else float(value) / 1000.0
-    # Convert the explicitly energy-weighted integral from signal·eV to
-    # signal·keV. Do not scale the unweighted total signal by 1/1000.
+    # Convert the first energy-weighted moment from signal·eV to signal·keV.
     weighted_eV = r.get('integrated_signal_energy_weighted_eV')
     r['integrated_signal_keV_weighted'] = (
         None if weighted_eV is None else float(weighted_eV) / 1000.0
     )
-    r['integrated_counts_keV'] = r['integrated_signal_keV_weighted']
+    # Historical name retained for compatibility: this is the unweighted
+    # total integrated signal, not an energy-weighted quantity.
+    r['integrated_counts_keV'] = r.get('integrated_signal')
     r['integrated_signal_keV_weighted_definition'] = (
         'Integral of energy_keV times spectral signal over energy; '
         'not the unweighted total signal.'
