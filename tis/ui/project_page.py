@@ -61,6 +61,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 source_path.write_bytes(uploaded_project.getvalue())
                 loaded_project = ProjectStore.load(source_path)
             session_state["tis_active_project"] = loaded_project
+            session_state.pop("tis_project_export_bytes", None)
             st.success(f"Loaded project: {loaded_project.title} ({len(loaded_project.analysis_runs)} saved analysis runs)")
         except Exception as exc:
             st.error(f"Project could not be loaded: {exc}")
