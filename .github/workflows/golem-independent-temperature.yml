@@ -40,8 +40,8 @@ jobs:
                   f"{root}/cgi-bin/data/{shot}/ElectronTemp",
                   # Official Data.php identifies ElectronTemp as the published
                   # Pygolem identifier; query the documented /utils/data endpoint.
-                  f"{root}/utils/data/{shot}/ElectronTemp",
-                  f"{root}/utils/data/{shot}/ElectronTemp.txt",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/ElectronTemp",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/ElectronTemp.txt",
                   f"{root}/utils/data/{shot}/electron_temperature.txt",
                   f"http://golem.fjfi.cvut.cz/utils/data/{shot}/electron_temperature",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemp",
@@ -57,8 +57,8 @@ jobs:
                   f"{root}/cgi-bin/data/{shot}/electron_temp_probe",
                   f"{root}/cgi-bin/data/{shot}/electron_temp_probe.txt",
                   f"{root}/utils/data/{shot}/electron_temp_probe",
-                  f"{root}/utils/data/{shot}/Te_probe",
-                  f"{root}/utils/data/{shot}/Te_probe.txt",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/Te_probe",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/Te_probe.txt",
                   f"{root}/operation/shots/{shot}/diagnostics/ParticleFlux/1012RakeProbe.ON/Te_probe",
               ],
               "spectrometer_mean_estimated_temperature": [
@@ -71,8 +71,8 @@ jobs:
                   f"{root}/cgi-bin/data/{shot}/temperature_mean",
                   f"{root}/cgi-bin/data/{shot}/ElectronTemperatureMean",
                   # This identifier is explicitly listed for the published mean.
-                  f"{root}/utils/data/{shot}/ElectronTemperatureMean",
-                  f"{root}/utils/data/{shot}/ElectronTemperatureMean.txt",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/ElectronTemperatureMean",
+                  f"http://golem.fjfi.cvut.cz/utils/data/{shot}/ElectronTemperatureMean.txt",
                   f"{root}/operation/shots/{shot}/basicdiagn/ElectronTemperatureMean",
                   f"{root}/operation/shots/{shot}/temperature_mean",
               ],
