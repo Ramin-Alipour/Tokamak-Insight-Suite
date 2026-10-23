@@ -30,7 +30,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
         contract = entry["execution_contract"]
         assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
         assert contract["completeness"] == "incomplete"
-        assert contract["raw_data_to_physics"] is (entry["name"] == "Thomson scattering")
+        assert contract["raw_data_to_physics"] is (entry["name"].casefold() == "thomson scattering")
         assert contract["function_links"] == [f'{entry["module"]}.{entry["function"]}']
 
 
