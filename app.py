@@ -1263,6 +1263,9 @@ elif page=='Advanced Analysis':
                     if isinstance(value,list): return [resolve_value(v) for v in value]
                     if isinstance(value,dict): return {k:resolve_value(v) for k,v in value.items()}
                     return value
+                # Validate the optional reference before running or recording an analysis.
+                # Otherwise malformed reference JSON reports a failure after the result has
+                # already been added to session history.
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.write(result)
