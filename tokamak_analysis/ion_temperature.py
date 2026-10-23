@@ -90,10 +90,6 @@ def ion_temperature_from_doppler_spectrum(
     )
     fitted = gaussian(x, *popt)
     residual = y - fitted
-    dof = max(1, x.size - len(popt))
-    if uy is None:
-        scale = float(np.sum(residual**2) / dof)
-        pcov = pcov * scale if np.all(np.isfinite(pcov)) else pcov
     sigma_nm = float(popt[2])
     fwhm_nm = 2.354820045 * sigma_nm
     fwhm_unc = None
