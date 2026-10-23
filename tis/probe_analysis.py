@@ -56,7 +56,10 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("Ion mass must be positive and finite.")
     if not np.all(np.isfinite([ti_eV, sheath_factor, gamma_i])) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0:
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
-    v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
+    raw_v=np.asarray(voltage,float); raw_i=np.asarray(current,float)
+    if raw_v.ndim != 1 or raw_i.ndim != 1:
+        raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
+    v=raw_v.copy(); i=raw_i.copy()
     if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
     if current_convention=="ion_positive": i=-i
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
@@ -95,7 +98,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
             p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
-            out['ion_saturation_current_A']=float(np.median(i[m]))
+            out['ion_saturation_current_A']=float(np.median(i[m])); out['ion_saturation_current_method']='median_user_selected_ion_fit_range'
         else:
             raise ValueError("ion_fit_range must contain at least 3 valid samples.")
     if electron_fit_range is not None:
