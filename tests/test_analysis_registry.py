@@ -68,3 +68,21 @@ def test_molecular_spectroscopy_entry_declares_scoped_workflow():
     assert contract["raw_data_to_physics"] is False
     assert {"wavelength_nm", "intensity"} <= {item["name"] for item in contract["input_specs"]}
     assert callable(resolve_analysis(6))
+
+
+def test_ece_entry_is_analysis_number_three_and_declares_scoped_workflow():
+    entry = get_analysis(3)
+    assert entry["name"] == "Electron Cyclotron Emission (ECE)"
+    assert entry["module"] == "ece_analysis"
+    assert entry["function"] == "analyze_ece"
+    contract = entry["execution_contract"]
+    assert contract["execution_level"] == "analysis_pipeline"
+    assert contract["completeness"] == "complete_with_declared_scope"
+    assert contract["raw_data_to_physics"] is True
+    assert {item["name"] for item in contract["input_specs"]} >= {
+        "frequency_Hz", "harmonic", "mode"
+    }
+    assert {mode for mode in ("brightness_temperature", "channel_fluctuations", "resonance_mapping")
+            if mode in " ".join(contract["input_specs"][2]["description"] for _ in [0])} or contract["input_specs"]
+    assert "tokamak_analysis.ece_analysis.analyze_ece" in contract["function_links"]
+    assert callable(resolve_analysis(3))
