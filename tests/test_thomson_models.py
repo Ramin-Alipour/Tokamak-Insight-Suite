@@ -161,3 +161,18 @@ def test_fit_requires_more_samples_than_parameters(registered_model):
 
 def test_unregister_returns_false_for_missing_model():
     assert unregister_spectral_model("model_that_does_not_exist") is False
+
+
+def test_model_name_whitespace_is_normalized_consistently(registered_model):
+    x = np.linspace(531.0, 533.0, 31)
+    y = 4.0 * np.exp(-0.5 * ((x - 532.0) / 0.18) ** 2) + 0.5
+    out = fit_custom_spectral_model(x, y, model_name=f" {registered_model} ")
+    assert out["model_name"] == registered_model
+    assert unregister_spectral_model(f" {registered_model} ") is False
+    assert unregister_spectral_model(registered_model) is True
+
+
+def test_unregister_invalid_or_blank_name_is_safe():
+    assert unregister_spectral_model("") is False
+    assert unregister_spectral_model("   ") is False
+    assert unregister_spectral_model(None) is False
