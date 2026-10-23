@@ -91,12 +91,12 @@
 - Reject singular first-order uncertainty propagation for magnetic energy at zero field when field uncertainty is nonzero.
 - Reject singular first-order uncertainty propagation for absolute ion-saturation current at zero current when current uncertainty is nonzero.
 - Reject coherence estimates for constant signals and verify returned estimates are finite; clip only floating-point roundoff to the mathematical [0,1] bounds.
-- Add regression tests for these edge cases and for the explicit model-limited status of the bolometry inverse.
+- Add regression tests for these edge cases, independent analytic checks for the mapped formula primitives, and an explicit model-limited test plus diagonal-matrix analytic reference for the bolometry inverse.
 
 ## What remains required before claiming full scientific verification
 
 - Run the full CI matrix (Python 3.10, 3.11, 3.12) on the exact audited commit, including package installation, Ruff, pytest/coverage, Streamlit AppTest, and HTTP health check.
-- Add independent-reference numerical tests for every mapped callable, not only a representative subset; add dimensional/unit tests and tests for all uncertainty branches and singular boundaries.
+- The current main branch now has regression coverage touching all 37 mapped formula callables, including independent numerical references for the analytic primitives and analytic/property checks for coherence and bolometry. Continue expanding dimensional/unit tests and the remaining uncertainty branches, including covariance and systematic-error policies.
 - Execute the complete UI/CLI workflow matrix with representative valid and invalid files, and assert no stale results survive failed imports or failed analysis.
 - Validate each promoted diagnostic with a compatible independent experimental reference, archived fixture, provenance manifest, and quantitative discrepancy/uncertainty report.
 - Keep diagnostic registry, formula registry, packaged registry copy, CLI/UI labels, and implementation-status metadata synchronized.
