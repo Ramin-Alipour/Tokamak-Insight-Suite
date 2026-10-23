@@ -85,6 +85,17 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 Install test tools with `pip install -e '.[test]'`; data archive support is optional via `pip install -e '.[data]'`. Excel support (`.xlsx` and legacy `.xls`) is included in the base dependencies.
 
+For a **reproducible dependency environment**, the committed `uv.lock` pins the resolved runtime, test, and optional data dependencies (including hashes) without narrowing the version ranges used by ordinary `pip install` workflows. Install [uv](https://docs.astral.sh/uv/) and run:
+
+```bash
+uv sync --locked --extra test
+# Include public-data archive support when needed:
+uv sync --locked --extra test --extra data
+uv run --locked python -m pytest -q
+```
+
+When intentionally changing dependencies, regenerate `uv.lock` with `uv lock`, review the lockfile diff, and run the full CI suite before committing. CI checks that the lockfile matches `pyproject.toml` and tests the locked environment.
+
 The `Continuous validation` workflow tests Python 3.10–3.12 from a clean package install, compiles the source, runs critical Ruff checks, executes numerical tests with coverage, smoke-tests the `tis` CLI (QC, FFT/Welch PSD, and registry export), and uses Streamlit AppTest to exercise every workspace page. An HTTP health check supplements these runtime tests; it is not treated as proof of scientific validity. Results are recorded in [GitHub Actions](https://github.com/Ramin-Alipour/Tokamak-Insight-Suite/actions).
 
 ## Scientific scope and limitations
