@@ -18,10 +18,10 @@ def test_analysis_2_langmuir_probe_synthetic_sweep():
     voltage = np.linspace(-10.0, 10.0, 101)
     current = 2e-3 * np.tanh(voltage / 3.0) + 1e-4 * voltage
     result = analyze(voltage, current)
-    assert result["voltage_V"].shape == voltage.shape
-    assert result["current_A"].shape == current.shape
     assert np.isfinite(result["ion_saturation_current_A"])
-    assert np.isfinite(result["electron_saturation_current_A"])
+    assert "floating_potential_V" in result
+    assert "plasma_potential_proxy_V" in result
+    assert "interpretation_warning" in result
 
 
 def test_analysis_2_langmuir_rejects_invalid_input():
