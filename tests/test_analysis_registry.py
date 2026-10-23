@@ -32,7 +32,7 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["major_radius_m"]["minimum"] > 0
     assert any("Gaussian" in item for item in contract["limitations"])
     assert "thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
-    assert {mode["name"] for mode in contract["workflow_modes"]} == {"calibrated_profile", "raw_spectrum_temperature_fit", "calibrated_power_density", "calibrated_spectrum_temperature_density"}
+    assert {mode["name"] for mode in contract["workflow_modes"]} == {"calibrated_profile", "raw_spectrum_temperature_fit", "calibrated_power_density", "calibrated_spectrum_temperature_density", "user_defined_spectral_model"}
     assert callable(resolve_analysis(1))
 
 
