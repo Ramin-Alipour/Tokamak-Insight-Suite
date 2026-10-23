@@ -36,3 +36,11 @@ def test_monte_carlo_rejects_materially_indefinite_small_covariance():
     covariance = np.array([[1e-12, 0.0], [0.0, -1e-11]])
     with pytest.raises(UncertaintyError, match="positive semidefinite"):
         propagate_monte_carlo(lambda samples: samples[:, 0], [0.0, 0.0], covariance, n_samples=100)
+
+
+def test_covariance_symmetry_check_scales_with_small_magnitudes():
+    nonsymmetric = np.array([[1e-12, 1e-15], [0.0, 1e-12]])
+    with pytest.raises(UncertaintyError, match="must be symmetric"):
+        propagate_covariance(np.eye(2), nonsymmetric)
+    with pytest.raises(UncertaintyError, match="must be symmetric"):
+        propagate_monte_carlo(lambda samples: samples[:, 0], [0.0, 0.0], nonsymmetric, n_samples=100)
