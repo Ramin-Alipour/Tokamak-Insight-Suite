@@ -142,8 +142,8 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
         raise ValueError('Sampling frequency must be positive and finite.')
     if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
         raise ValueError('Both signals must contain only finite values.')
-    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 1):
-        raise ValueError('nperseg must be a positive integer when supplied.')
+    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 8):
+        raise ValueError('nperseg must be an integer of at least 8 samples when supplied.')
     n = min(len(a), int(nperseg) if nperseg is not None else min(1024, max(8, len(a)//4)))
     overlap=n//2
     f, coh = signal.coherence(a,b,fs=fs,nperseg=n,noverlap=overlap,window='hann')
