@@ -90,8 +90,10 @@ ANALYSES = [{"id":1,"name":"Thomson Scattering","module":"thomson_workflow","fun
 
 def get_analysis(analysis_id: int) -> dict:
     """Return a copy of a registered analysis entry by ordered list ID."""
+    if isinstance(analysis_id, bool) or not isinstance(analysis_id, int):
+        raise ValueError("analysis_id must be an integer.")
     for entry in ANALYSES:
-        if entry["id"] == int(analysis_id):
+        if entry["id"] == analysis_id:
             return deepcopy(entry)
     raise KeyError(f"Unknown analysis ID: {analysis_id}")
 
