@@ -20,7 +20,10 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
         raise ValueError(f"At least {min_n} finite samples are required.")
     if np.any(np.diff(t) <= 0):
         raise ValueError("Time must be strictly increasing.")
-    dt = float(np.median(np.diff(t)))
+    intervals = np.diff(t)
+    dt = float(np.median(intervals))
+    if np.max(intervals) > 1.5 * dt or float(np.std(intervals) / dt) > 0.02:
+        raise ValueError("Event detection requires approximately uniform sampling; resample irregular timestamps and handle missing samples explicitly first.")
     return t, y, dt
 
 
