@@ -87,3 +87,32 @@ def test_molecular_spectrum_rejects_duplicate_wavelength_and_invalid_ranges():
             np.arange(5, dtype=float) + 400.0, y,
             band_ranges_nm=[(399.0, 402.0)],
         )
+
+
+def test_custom_model_rejects_invalid_bounds_and_out_of_bounds_initial_values():
+    x = np.linspace(400.0, 410.0, 20)
+    y = np.ones_like(x)
+    def model(w, amplitude):
+        return np.full_like(w, amplitude)
+    common = dict(parameter_names=("amplitude",), initial_values=(1.0,))
+    with pytest.raises(ValueError, match="lower bound"):
+        fit_custom_molecular_model(x, y, model, bounds=(2.0, 1.0), **common)
+    with pytest.raises(ValueError, match="within the supplied"):
+        fit_custom_molecular_model(x, y, model, bounds=(2.0, 3.0), **common)
+
+
+def test_custom_model_rejects_nonfinite_or_wrong_shape_output():
+    x = np.linspace(400.0, 410.0, 20)
+    y = np.ones_like(x)
+    def wrong_shape(w, amplitude):
+        return np.array([amplitude])
+    with pytest.raises(ValueError, match="Custom molecular model fitting failed"):
+        fit_custom_molecular_model(
+            x, y, wrong_shape, parameter_names=("amplitude",), initial_values=(1.0,)
+        )
+    def nonfinite(w, amplitude):
+        return np.full_like(w, np.nan)
+    with pytest.raises(ValueError, match="Custom molecular model fitting failed"):
+        fit_custom_molecular_model(
+            x, y, nonfinite, parameter_names=("amplitude",), initial_values=(1.0,)
+        )
