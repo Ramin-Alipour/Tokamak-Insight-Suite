@@ -117,3 +117,47 @@ def test_fit_rejects_nonfinite_custom_model_output():
             )
     finally:
         unregister_spectral_model("nonfinite_model")
+
+
+def test_registration_rejects_string_instead_of_parameter_name_sequence():
+    with pytest.raises(ValueError, match="not a string"):
+        register_spectral_model(
+            "string_names", lambda x, a: a * x,
+            parameter_names="amplitude", initial_values=(1.0,),
+        )
+
+
+def test_registration_rejects_malformed_numeric_bounds():
+    with pytest.raises(ValueError, match="numeric lower and upper sequences"):
+        register_spectral_model(
+            "malformed_bounds", lambda x, a: a * x,
+            parameter_names=("a",), initial_values=(1.0,),
+            bounds=("not-a-bound-sequence", (2.0,)),
+        )
+
+
+def test_fit_rejects_wrong_uncertainty_shape(registered_model):
+    with pytest.raises(ValueError, match="match the signal shape"):
+        fit_custom_spectral_model(
+            np.linspace(531.0, 533.0, 10), np.ones(10),
+            model_name=registered_model, signal_uncertainty=np.ones(9),
+        )
+
+
+def test_fit_rejects_non_boolean_absolute_sigma(registered_model):
+    with pytest.raises(ValueError, match="absolute_sigma must be boolean"):
+        fit_custom_spectral_model(
+            np.linspace(531.0, 533.0, 10), np.ones(10),
+            model_name=registered_model, absolute_sigma="yes",
+        )
+
+
+def test_fit_requires_more_samples_than_parameters(registered_model):
+    with pytest.raises(ValueError, match="more spectral samples"):
+        fit_custom_spectral_model(
+            np.linspace(531.0, 533.0, 4), np.ones(4), model_name=registered_model,
+        )
+
+
+def test_unregister_returns_false_for_missing_model():
+    assert unregister_spectral_model("model_that_does_not_exist") is False
