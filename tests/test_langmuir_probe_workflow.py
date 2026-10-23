@@ -5,8 +5,8 @@ from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
 
 
 def synthetic_iv():
-    voltage = np.linspace(-5.0, 10.0, 61)
-    current = -1.0e-3 + 2.0e-5 * np.exp(voltage / 3.0)
+    voltage = np.linspace(-5.0, 20.0, 101)
+    current = -1.0e-3 + 2.0e-5 * np.exp((voltage - 10.0) / 3.0)
     return voltage, current
 
 
@@ -15,8 +15,8 @@ def test_langmuir_probe_recovers_floating_potential_and_electron_temperature():
     result = analyze_langmuir_probe(
         voltage,
         current,
-        electron_fit_range=(2.0, 10.0),
-        ion_fit_range=(-5.0, -1.0),
+        electron_fit_range=(10.0, 20.0),
+        ion_fit_range=(-5.0, 0.0),
     )
     assert result["floating_potential_V"] is not None
     assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.04)
