@@ -4,7 +4,49 @@ from pathlib import Path
 import tempfile
 from typing import Any
 import pandas as pd
-from tis.project import AnalysisRun, Project, ProjectStore
+from tis.project import AnalysisRun, Project, ProjectStore, stable_digest
+
+
+def _sync_analysis_history(active_project: Project, history: list[dict[str, Any]],
+                           software_version: str) -> None:
+    """Append session history entries not already represented in the saved project."""
+    existing_keys = {
+        run.inputs.get("history_key")
+        for run in active_project.analysis_runs
+        if isinstance(run.inputs, dict) and run.inputs.get("history_key")
+    }
+    for item in reversed(history):
+        history_key = str(item.get("result_sha256") or stable_digest({
+            key: item.get(key) for key in (
+                "name", "created_at_utc", "parameter_snapshot", "result_summary",
+                "source_filename", "source_sha256", "shot_id"
+            )
+        }))
+        if history_key in existing_keys:
+            continue
+        active_project.add_run(AnalysisRun(
+            analysis_name=str(item.get("name", "Unnamed UI result")),
+            inputs={
+                "history_key": history_key,
+                "source_filename": item.get("source_filename"),
+                "shot_id": item.get("shot_id")
+            },
+            settings=item.get("parameter_snapshot", {}),
+            algorithm_version=str(item.get("algorithm_version", software_version)),
+            outputs=item.get("result_summary", {}),
+            input_provenance={
+                "source_filename": item.get("source_filename"),
+                "source_sha256": item.get("source_sha256"),
+                "shot_id": item.get("shot_id"),
+                "source_manifest": item.get("source_manifest"),
+                "import_parameters": item.get("import_parameters")
+            },
+            warnings=tuple(item.get("warnings", ())) + (
+                "Raw input data is referenced, not embedded in the project.",
+            ),
+            status="warning"
+        ))
+        existing_keys.add(history_key)
 
 
 def render_project_page(st: Any, *, session_state: Any, project_title: str, shot_id: str,
@@ -44,22 +86,8 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
             active_project = session_state.get("tis_active_project")
             if active_project is None:
                 active_project = Project(title=project_title, shots=([{"shot_id": shot_id}] if shot_id else []))
-                history = list(session_state.get("tis_analysis_history", []))
-                for item in reversed(history):
-                    active_project.add_run(AnalysisRun(
-                        analysis_name=str(item.get("name", "Unnamed UI result")),
-                        inputs={"source_filename": item.get("source_filename"), "shot_id": item.get("shot_id")},
-                        settings=item.get("parameter_snapshot", {}),
-                        algorithm_version=str(item.get("algorithm_version", software_version)),
-                        outputs=item.get("result_summary", {}),
-                        input_provenance={
-                            "source_filename": item.get("source_filename"),
-                            "source_sha256": item.get("source_sha256"),
-                            "shot_id": item.get("shot_id"),
-                            "source_manifest": item.get("source_manifest"),
-                            "import_parameters": item.get("import_parameters")},
-                        warnings=tuple(item.get("warnings", ())) + ("Raw input data is referenced, not embedded in the project.",),
-                        status="warning"))
+            history = list(session_state.get("tis_analysis_history", []))
+            _sync_analysis_history(active_project, history, software_version)
             if project_title and project_title != "Untitled tokamak analysis":
                 active_project.title = project_title
             active_project.metadata.update({
