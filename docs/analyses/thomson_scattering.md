@@ -1,8 +1,12 @@
 # Thomson Scattering (Analysis 1 of 80)
 
-## Current implementation status
+## Completion status
 
-**Status: incomplete overall.** Two computational paths are available:
+**Complete within the explicitly declared scope; not independently experimentally validated.** The supported calibrated-profile, raw-spectrum temperature-fit, calibrated single-band power-density, and combined calibrated spectrum-to-temperature/density paths have callable implementations, documented contracts, dashboard entry points, and focused numerical/validation tests.
+
+The scope is intentionally bounded: no density inference from uncalibrated amplitude; no collective, relativistic, non-Maxwellian, or non-Gaussian instrument-response inversion; no automatic stray-light correction, full spectral-response correction, or complete calibration/model-discrepancy uncertainty budget. Users must verify instrument calibration, spectral-band coverage, optical geometry, time-gate compatibility, and residuals against the experiment.
+
+## Supported implementation paths
 
 1. **Calibrated profile analysis** (tokamak_analysis.thomson_workflow.analyze_thomson_profile): computes profile extrema, line averages, optional approximate volume averages, radial gradients, normalized gradients, and local scale lengths from already-calibrated electron-density and electron-temperature profiles.
 2. **Raw spectral-shape temperature fit** (tokamak_analysis.thomson_spectrum.fit_thomson_spectrum): fits a Gaussian Doppler profile plus a linear local background, deconvolves a known Gaussian instrument width, and estimates electron temperature for a non-collective, non-relativistic Maxwellian model.
