@@ -55,7 +55,7 @@ def propagate_monte_carlo(model: Callable[[np.ndarray], Any], mean: Any, covaria
         raise UncertaintyError("covariance must be symmetric")
     C = 0.5 * (C + C.T)
     eigenvalues, eigenvectors = np.linalg.eigh(C)
-    scale = max(1.0, float(np.max(np.abs(eigenvalues))))
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
     if float(np.min(eigenvalues)) < -1e-10 * scale:
         raise UncertaintyError("covariance must be positive semidefinite")
     factor = eigenvectors @ np.diag(np.sqrt(np.maximum(eigenvalues, 0.0)))
