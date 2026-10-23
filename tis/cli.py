@@ -14,7 +14,7 @@ def main() -> int:
     sub=parser.add_subparsers(dest='command',required=True)
     p=sub.add_parser('qc',help='Audit columns and write a JSON report'); p.add_argument('input'); p.add_argument('--output',default='tis_qc.json')
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True)
-    sampling=sub.add_mutually_exclusive_group(required=True); sampling.add_argument('--time'); sampling.add_argument('--fs',type=float)
+    sampling=p.add_mutually_exclusive_group(required=True); sampling.add_argument('--time'); sampling.add_argument('--fs',type=float)
     p.add_argument('--output',default='tis_fft.csv')
     p=sub.add_parser('catalog',help='Export diagnostic/formula registry JSON'); p.add_argument('--kind',choices=['diagnostics','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
     p=sub.add_parser('events',help='Detect ELMs / sawtooth crashes or analyse a current quench'); p.add_argument('input'); p.add_argument('--kind',choices=['elm','sawtooth','quench'],required=True); p.add_argument('--time',required=True); p.add_argument('--signal',required=True); p.add_argument('--n-sigmas',type=float,default=None); p.add_argument('--output',default='tis_events.json')
