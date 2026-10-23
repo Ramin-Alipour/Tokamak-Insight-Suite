@@ -13,3 +13,14 @@ def test_cli_qc_exports_missing_counts_as_json_integers(tmp_path, monkeypatch):
     report = json.loads(output.read_text(encoding="utf-8"))
     assert report["missing_by_column"]["signal"] == 1
     assert isinstance(report["missing_by_column"]["signal"], int)
+
+
+def test_cli_scalings_creates_output_parent_directory(tmp_path, monkeypatch):
+    output = tmp_path / "reports" / "scalings.json"
+    monkeypatch.setattr(sys, "argv", [
+        "tis", "scalings", "--ip-A", "1000000", "--bt-T", "2", "--r-m", "1.5",
+        "--a-m", "0.5", "--kappa", "1.7", "--ne-line-avg-m3", "1e19",
+        "--p-loss-W", "1000000", "--output", str(output),
+    ])
+    assert main() == 0
+    assert json.loads(output.read_text(encoding="utf-8"))
