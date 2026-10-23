@@ -636,6 +636,17 @@ def test_public_table_fetcher_blocks_loopback_before_network_access():
         fetch_public_table_bytes("http://127.0.0.1/private.csv")
 
 
+def test_mode_number_from_channels_uses_multiple_segments_at_minimum_length():
+    from tis.core import mode_number_from_channels
+    fs = 256.0
+    time = np.arange(64) / fs
+    theta = np.linspace(0, 2*np.pi, 8, endpoint=False)
+    signals = np.vstack([np.sin(2*np.pi*32*time + 2*angle) for angle in theta])
+    result = mode_number_from_channels(theta, signals, fs, frequency_range_hz=(24, 40))
+    assert result["welch_segment_count"] >= 2
+    assert result["coherence_significance_threshold"] < 1.0
+
+
 def test_mode_number_from_channels_extracts_cross_spectral_phase_with_coherence():
     from tis.core import mode_number_from_channels
     fs = 2000.0
