@@ -98,8 +98,8 @@ def fetch_fair_mast_signal(
     group = str(group).strip()
     if not group or "/" in group or "\\" in group:
         raise ValueError("Group must be a single FAIR-MAST group name.")
-    if max_samples < 1024:
-        raise ValueError("max_samples must be at least 1024.")
+    if isinstance(max_samples, bool) or not isinstance(max_samples, (int, np.integer)) or max_samples < 1024:
+        raise ValueError("max_samples must be an integer of at least 1024.")
 
     try:
         import xarray as xr
