@@ -60,3 +60,10 @@ def test_rejects_unresolved_instrument_width():
     x, y, *_ = synthetic()
     with pytest.raises(ValueError, match="unresolved"):
         analyze_cxrs_line(x, y, rest_wavelength_nm=530, ion_mass_amu=12, instrument_sigma_nm=.2)
+
+
+def test_rejects_rest_wavelength_outside_measured_window():
+    x, y, *_ = synthetic()
+    with pytest.raises(ValueError, match="within the measured wavelength range"):
+        analyze_cxrs_line(x, y, rest_wavelength_nm=600.0, ion_mass_amu=12,
+                          instrument_sigma_nm=0.008)
