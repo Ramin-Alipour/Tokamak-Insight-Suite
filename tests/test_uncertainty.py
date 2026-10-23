@@ -30,3 +30,9 @@ def test_monte_carlo_recovers_linear_mean_and_uncertainty():
 def test_monte_carlo_rejects_nonfinite_model_output():
     with pytest.raises(UncertaintyError, match="non-finite"):
         propagate_monte_carlo(lambda x: np.full(x.shape[0], np.nan), [1.0], [[1.0]], n_samples=100)
+
+
+def test_monte_carlo_rejects_materially_indefinite_small_covariance():
+    covariance = np.array([[1e-12, 0.0], [0.0, -1e-11]])
+    with pytest.raises(UncertaintyError, match="positive semidefinite"):
+        propagate_monte_carlo(lambda samples: samples[:, 0], [0.0, 0.0], covariance, n_samples=100)
