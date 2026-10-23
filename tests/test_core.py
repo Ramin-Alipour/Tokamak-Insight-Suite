@@ -62,6 +62,11 @@ def test_cross_correlation_lag():
     assert abs(abs(lag)-.004)<.001
 
 
+def test_spectral_fit_rejects_mismatched_input_lengths():
+    with pytest.raises(ValueError, match="equal lengths"):
+        fit_spectral_line([1, 2, 3], [1, 2])
+
+
 def test_gaussian_spectral_fit():
     x=np.linspace(654,658,401);y=3+10*np.exp(-.5*((x-656.3)/.12)**2)
     fit=fit_spectral_line(x,y,model='Gaussian')
