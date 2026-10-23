@@ -168,8 +168,8 @@ def test_model_name_whitespace_is_normalized_consistently(registered_model):
     y = 4.0 * np.exp(-0.5 * ((x - 532.0) / 0.18) ** 2) + 0.5
     out = fit_custom_spectral_model(x, y, model_name=f" {registered_model} ")
     assert out["model_name"] == registered_model
-    assert unregister_spectral_model(f" {registered_model} ") is False
-    assert unregister_spectral_model(registered_model) is True
+    assert unregister_spectral_model(f" {registered_model} ") is True
+    assert unregister_spectral_model(registered_model) is False
 
 
 def test_unregister_invalid_or_blank_name_is_safe():
