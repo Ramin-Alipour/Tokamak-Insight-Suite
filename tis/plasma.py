@@ -101,9 +101,18 @@ def q95_iter_formula(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa95:
 
 
 def q_star_cylindrical(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa: float) -> float:
-    """Cylindrical-equivalent edge safety factor q* = 5 a^2 B (1+kappa^2)/(2 R I[MA])."""
-    return float(5 * _pos("a", a_m) ** 2 * _pos("|Bt|", abs(bt_T)) * (1 + _pos("kappa", kappa) ** 2)
-                 / (2 * _pos("R", r_m) * _pos("|Ip| (MA)", abs(ip_MA))))
+    """Cylindrical-equivalent edge safety factor q* = 5 a^2 B (1+kappa^2)/(2 R I[MA]).
+
+    The large-aspect-ratio cylindrical approximation requires 0 < a/R < 1.
+    Reject geometrically invalid inputs rather than returning a plausible-looking q*.
+    """
+    r = _pos("R", r_m)
+    a = _pos("a", a_m)
+    eps = a / r
+    if not 0 < eps < 1:
+        raise ValueError("Inverse aspect ratio a/R must be in (0,1).")
+    return float(5 * a ** 2 * _pos("|Bt|", abs(bt_T)) * (1 + _pos("kappa", kappa) ** 2)
+                 / (2 * r * _pos("|Ip| (MA)", abs(ip_MA))))
 
 
 def beta_metrics(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, bt_T: float,
