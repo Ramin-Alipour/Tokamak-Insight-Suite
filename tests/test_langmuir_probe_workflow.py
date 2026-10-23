@@ -109,3 +109,13 @@ def test_langmuir_probe_selected_ion_range_overrides_tail_fallback():
     )
     assert result["ion_saturation_current_method"] == "median_user_selected_ion_fit_range"
     assert result["ion_saturation_current_A"] == pytest.approx(-1e-3, abs=1e-7)
+
+
+def test_langmuir_probe_does_not_infer_density_from_tail_fallback():
+    voltage = np.linspace(-10.0, 10.0, 101)
+    current = 2e-3 * np.tanh(voltage / 3.0) + 1e-4 * voltage
+    result = analyze_langmuir_probe(
+        voltage, current, area_m2=1e-5, ion_mass_amu=2.0
+    )
+    assert "ion_density_estimate_m-3" not in result
+    assert result["ion_density_status"].startswith("not_estimated:")
