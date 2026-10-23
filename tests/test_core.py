@@ -184,6 +184,16 @@ def test_catalog_has_distinct_measured_derived_inferred_labels():
     assert 'M' in statuses and 'D' in statuses and 'I' in statuses
 
 
+def test_probe_analyses_reject_mismatched_voltage_current_lengths():
+    from tis.probe_analysis import floating_potential
+    with pytest.raises(ValueError, match="equal lengths"):
+        probe_iv_summary([0, 1, 2], [0, 1])
+    with pytest.raises(ValueError, match="equal lengths"):
+        langmuir_iv_analysis([0, 1, 2], [0, 1])
+    with pytest.raises(ValueError, match="equal lengths"):
+        floating_potential([0, 1, 2], [0, 1])
+
+
 def test_langmuir_iv_estimates_floating_potential_and_temperature():
     from tis.core import langmuir_iv_analysis
     v=np.linspace(-10,10,301)
