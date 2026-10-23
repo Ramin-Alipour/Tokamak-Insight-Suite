@@ -6,7 +6,6 @@ import pytest
 
 from tokamak_analysis.formula_library import (
     bolometry_regularized_inverse,
-    cross_correlation_lag,
     faraday_induction,
     magnitude_squared_coherence,
     magnetic_energy_density,
