@@ -1,0 +1,77 @@
+import numpy as np
+import pytest
+
+from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
+
+
+def synthetic_iv():
+    voltage = np.linspace(-5.0, 10.0, 61)
+    current = -1.0e-3 + 2.0e-5 * np.exp(voltage / 3.0)
+    return voltage, current
+
+
+def test_langmuir_probe_recovers_floating_potential_and_electron_temperature():
+    voltage, current = synthetic_iv()
+    result = analyze_langmuir_probe(
+        voltage,
+        current,
+        electron_fit_range=(2.0, 10.0),
+        ion_fit_range=(-5.0, -1.0),
+    )
+    assert result["floating_potential_V"] is not None
+    assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.04)
+    assert result["electron_retarding_fit_R2"] > 0.999
+    assert result["ion_saturation_current_A"] < 0
+
+
+def test_langmuir_probe_optional_density_estimate_requires_fit_and_geometry():
+    voltage, current = synthetic_iv()
+    result = analyze_langmuir_probe(
+        voltage,
+        current,
+        electron_fit_range=(2.0, 10.0),
+        ion_fit_range=(-5.0, -1.0),
+        area_m2=1.0e-5,
+        ion_mass_amu=2.0,
+        ti_eV=1.0,
+        sheath_factor=0.61,
+        gamma_i=1.0,
+    )
+    assert result["ion_density_estimate_m-3"] > 0
+    assert result["ion_sound_speed_m_s"] > 0
+
+
+def test_langmuir_probe_accepts_ion_positive_circuit_convention():
+    voltage, current = synthetic_iv()
+    result = analyze_langmuir_probe(
+        voltage,
+        -current,
+        electron_fit_range=(2.0, 10.0),
+        ion_fit_range=(-5.0, -1.0),
+        current_convention="ion_positive",
+    )
+    assert result["current_convention"] == "ion_positive"
+    assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.04)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"area_m2": 1.0e-5},
+        {"ion_mass_amu": 2.0},
+        {"area_m2": 0.0, "ion_mass_amu": 2.0},
+        {"area_m2": 1.0e-5, "ion_mass_amu": -2.0},
+        {"current_convention": "unknown"},
+    ],
+)
+def test_langmuir_probe_rejects_invalid_model_inputs(kwargs):
+    voltage, current = synthetic_iv()
+    with pytest.raises(ValueError):
+        analyze_langmuir_probe(voltage, current, **kwargs)
+
+
+def test_langmuir_probe_rejects_mismatched_and_undersampled_sweeps():
+    with pytest.raises(ValueError, match="equal lengths"):
+        analyze_langmuir_probe([0, 1, 2], [0, 1])
+    with pytest.raises(ValueError, match="8 valid"):
+        analyze_langmuir_probe([0, 1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6])
