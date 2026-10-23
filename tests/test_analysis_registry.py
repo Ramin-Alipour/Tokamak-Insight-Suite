@@ -31,10 +31,15 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["temperature_ev"]["unit"] == "eV"
     assert inputs["major_radius_m"]["minimum"] > 0
     assert any("Gaussian" in item for item in contract["limitations"])
-    assert "thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
-    assert {mode["name"] for mode in contract["workflow_modes"]} == {"calibrated_profile", "raw_spectrum_temperature_fit", "calibrated_power_density", "calibrated_spectrum_temperature_density", "user_defined_spectral_model"}
+    assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
+    assert {mode["name"] for mode in contract["workflow_modes"]} == {
+        "calibrated_profile",
+        "raw_spectrum_temperature_fit",
+        "calibrated_power_density",
+        "calibrated_spectrum_temperature_density",
+        "user_defined_spectral_model",
+    }
     assert callable(resolve_analysis(1))
-
 
 
 def test_get_analysis_returns_deep_copy_of_nested_contract():
@@ -46,6 +51,7 @@ def test_get_analysis_returns_deep_copy_of_nested_contract():
 
 def test_get_analysis_rejects_noninteger_ids_instead_of_truncating():
     import pytest
+
     with pytest.raises(ValueError, match="analysis_id must be an integer"):
         get_analysis(1.5)
     with pytest.raises(ValueError, match="analysis_id must be an integer"):
