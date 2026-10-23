@@ -32,7 +32,6 @@ def electron_plasma_frequency(n_e_m3, *, sigma_n_e_m3=None):
     out={"omega_pe_rad_s":omega,"frequency_pe_Hz":omega/(2*math.pi)}
     if sigma_n_e_m3 is not None:
         s=_nonnegative("sigma_n_e_m3",sigma_n_e_m3)
-        if s/n > float("inf"): raise ValueError("Invalid density uncertainty.")
         out["uncertainty_omega_pe_rad_s"]=0.5*omega*s/n
         out["uncertainty_frequency_pe_Hz"]=out["uncertainty_omega_pe_rad_s"]/(2*math.pi)
     return out
