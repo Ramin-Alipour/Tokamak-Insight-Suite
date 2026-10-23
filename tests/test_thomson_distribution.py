@@ -33,7 +33,7 @@ def test_spectral_distribution_flags_unresolved_instrument_width():
 
 @pytest.mark.parametrize("x,y,kwargs,match", [
     ([1, 2, 2, 4, 5, 6, 7, 8, 9], [1]*9, {"instrument_sigma_nm": 0.1}, "strictly increasing"),
-    (np.arange(9), np.ones(8), {"instrument_sigma_nm": 0.1}, "equal lengths"),
+    (np.arange(10), np.ones(9), {"instrument_sigma_nm": 0.1}, "equal lengths"),
     (np.arange(9), np.ones(9), {"instrument_sigma_nm": 0}, "positive and finite"),
     (np.arange(9), np.ones(9), {"instrument_sigma_nm": 0.1}, "positive spectral area"),
 ])
