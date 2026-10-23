@@ -456,7 +456,7 @@
         {
           "name": "current_convention",
           "unit": "text",
-          "description": "Current polarity convention: electron_positive (ion current normally negative) or ion_positive (internally sign-flipped). The lower-level core function supports both; the registry entry-point currently uses electron_positive.",
+          "description": "Current polarity convention: electron_positive (ion saturation current normally negative) or ion_positive (internally sign-flipped); both are supported by the analysis entry point.",
           "required": false
         },
         {
