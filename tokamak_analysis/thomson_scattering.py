@@ -242,6 +242,8 @@ def density_from_thomson_scattered_power(
         raise ValueError("All inputs must be finite")
     if np.any(ps < 0) or np.any(pi <= 0) or np.any(length <= 0) or np.any(omega <= 0):
         raise ValueError("Scattered power must be nonnegative; incident power, length, and solid angle must be positive")
+    if np.any(omega > 4.0 * np.pi):
+        raise ValueError("collection_solid_angle_sr cannot exceed 4*pi steradians")
     if np.any((eta <= 0) | (eta > 1)):
         raise ValueError("optical_efficiency must be in (0, 1]")
     cross_section = thomson_differential_cross_section_m2_sr(theta)
