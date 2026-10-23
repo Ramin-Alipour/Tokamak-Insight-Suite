@@ -825,9 +825,16 @@
         {
           "name": "instrument_sigma_nm",
           "unit": "nm",
-          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use.",
+          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use. Optional 1-sigma uncertainty is supplied separately as instrument_sigma_uncertainty_nm.",
           "required": true,
           "minimum": 1e-15
+        },
+        {
+          "name": "instrument_sigma_uncertainty_nm",
+          "unit": "nm",
+          "description": "Optional finite non-negative 1-sigma uncertainty of the instrumental standard deviation; propagated into ion-temperature uncertainty.",
+          "required": false,
+          "minimum": 0
         },
         {
           "name": "viewing_angle_rad",
