@@ -30,8 +30,8 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
         "reference_only": 52,
     }
     assert report["diagnostic_completeness_counts"] == {
-        "complete": 8,
-        "complete_with_declared_scope": 3,
+        "complete": 7,
+        "complete_with_declared_scope": 4,
         "incomplete": 69,
     }
     assert report["callable_analysis_entry_point_count"] == 81
@@ -43,7 +43,7 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     assert first_ten[0]["diagnostic"] == "Thomson scattering"
     assert first_ten[0]["completeness"] == "complete_with_declared_scope"
     assert first_ten[1]["diagnostic"] == "Langmuir probe"
-    assert first_ten[1]["completeness"] == "complete"
+    assert first_ten[1]["completeness"] == "complete_with_declared_scope"
     assert first_ten[9]["diagnostic"] == "Mirnov / pickup coils"
     assert first_ten[9]["completeness"] == "complete"
     assert report["interpretation"]["completeness_is_software_scope_not_independent_experimental_validation"] is True
