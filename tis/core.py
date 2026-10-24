@@ -22,6 +22,15 @@ from .constants import E_CHARGE, K_B, EPS0, MU0, M_E, C_LIGHT, AMU
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
+def _is_finite_real_scalar(value: Any) -> bool:
+    """Return whether value is a finite real numeric scalar (excluding booleans)."""
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
 
 def load_table(data: bytes, filename: str, sheet_name: str | int = 0, *,
                delimiter: str | None = None, decimal: str = ".", skiprows: int = 0,
@@ -192,8 +201,8 @@ def integrate_time_series(
         raise ValueError('Time and signal must contain only finite values.')
     if np.any(np.diff(t) <= 0):
         raise ValueError('Time values must be strictly increasing with no duplicates.')
-    if not np.isfinite(scale) or not np.isfinite(initial_value):
-        raise ValueError('Scale and initial value must be finite.')
+    if not _is_finite_real_scalar(scale) or not _is_finite_real_scalar(initial_value):
+        raise ValueError('Scale and initial value must be finite real numeric scalars.')
     if (baseline_start_s is None) != (baseline_end_s is None):
         raise ValueError('Specify both baseline start and end, or neither.')
     if (drift_start_s is None) != (drift_end_s is None):
@@ -204,15 +213,19 @@ def integrate_time_series(
     baseline = 0.0
     drift_rate = None
     if baseline_start_s is not None:
-        if not np.isfinite(baseline_start_s) or not np.isfinite(baseline_end_s) or baseline_start_s >= baseline_end_s:
-            raise ValueError('Baseline interval must be finite with start < end.')
+        if (not _is_finite_real_scalar(baseline_start_s)
+                or not _is_finite_real_scalar(baseline_end_s)
+                or baseline_start_s >= baseline_end_s):
+            raise ValueError('Baseline interval must be finite real numeric scalars with start < end.')
         mask = (t >= baseline_start_s) & (t <= baseline_end_s)
         if np.count_nonzero(mask) < 2:
             raise ValueError('Baseline interval must include at least two samples.')
         baseline = float(np.mean(calibrated[mask]))
         if drift_start_s is not None:
-            if not np.isfinite(drift_start_s) or not np.isfinite(drift_end_s) or drift_start_s >= drift_end_s:
-                raise ValueError('Drift window must be finite with start < end.')
+            if (not _is_finite_real_scalar(drift_start_s)
+                    or not _is_finite_real_scalar(drift_end_s)
+                    or drift_start_s >= drift_end_s):
+                raise ValueError('Drift window must be finite real numeric scalars with start < end.')
             if drift_start_s <= baseline_end_s:
                 raise ValueError("Drift window must start after the baseline window ends (post-shot drift window).")
             mask2 = (t >= drift_start_s) & (t <= drift_end_s)
@@ -244,8 +257,8 @@ def integrate_time_series(
 def prepare_time_series(time: Any, values: Any, sample_rate: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
     y = np.asarray(values, dtype=float).ravel()
     if time is None:
-        if sample_rate is None or not np.isfinite(sample_rate) or sample_rate <= 0:
-            raise ValueError('A positive sample rate is required when no time column is supplied.')
+        if (not _is_finite_real_scalar(sample_rate) or sample_rate <= 0):
+            raise ValueError('A positive finite real numeric sample rate is required when no time column is supplied.')
         t = np.arange(len(y), dtype=float) / sample_rate
     else:
         t = np.asarray(time, dtype=float).ravel()
