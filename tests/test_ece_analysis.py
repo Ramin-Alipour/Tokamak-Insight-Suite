@@ -124,3 +124,13 @@ def test_multitime_multichannel_radiance_shape_is_preserved():
 def test_resonance_mapping_does_not_fabricate_high_field_side_radius():
     with pytest.raises(ValueError, match="viewing geometry and equilibrium"):
         resonance_radius_m(56e9, 1.0, 2.0, harmonic=2, sign=-1)
+
+
+def test_resonance_mapping_rejects_numpy_boolean_sign():
+    with pytest.raises(ValueError, match="sign=-1"):
+        resonance_radius_m(56e9, 1.0, 2.0, harmonic=2, sign=np.bool_(True))
+
+
+def test_ece_rejects_unhashable_mode_cleanly():
+    with pytest.raises(ValueError, match="Unsupported mode"):
+        analyze_ece([80e9, 90e9], mode=[])
