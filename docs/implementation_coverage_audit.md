@@ -1,19 +1,23 @@
 # Implementation coverage and scientific validation status
 
-**Status snapshot:** 2026-10-23  
+**Status snapshot:** 2026-10-24  
 **Scope:** the main-branch registries and the executable/validation contracts they declare.
 
-## Diagnostic coverage is not 80 complete analyses
+## Diagnostic categories versus callable analysis entry points
 
-The canonical `DIAGNOSTIC_REGISTRY.json` contains 80 diagnostic entries. Its implementation-status labels currently classify them as:
+The canonical `DIAGNOSTIC_REGISTRY.json` contains 80 diagnostic categories. The separate callable `tokamak_analysis.analysis_registry.ANALYSES` contains 81 entry points: Thomson spectral-distribution characterization is exposed as a separate analysis workflow under the Thomson diagnostic family, not as an 81st catalog category.
 
-| Registry status | Count | What this means |
+The 80 diagnostic contracts currently classify execution level as:
+
+| Execution level | Count | What this means |
 |---|---:|---|
-| `Implemented numerical workflow (see limits)` | 20 | Some executable calculations exist, with the limitations in each contract; this is not a claim of complete raw-instrument-to-physics analysis. |
-| `Registry reference only` | 59 | The catalog entry is not evidence of an implemented, callable end-to-end analysis. |
-| Thomson scattering: scoped workflows; overall analysis incomplete | 1 | Several limited workflows are linked, but the overall diagnostic remains explicitly incomplete. |
+| `reference_only` | 52 | The catalog entry is not evidence of an implemented callable numerical workflow. |
+| `limited_calculation` | 17 | A scoped numerical calculation exists, with assumptions and limitations. |
+| `analysis_pipeline` | 11 | A multi-step executable workflow exists; this does not imply independent experimental validation. |
 
-All 80 entries are conservatively marked `completeness: incomplete` in their execution contracts. Do not advertise the registry as 80 complete analyses. A Python module existing somewhere in the repository does not promote an entry to implemented or validated.
+Contract completeness is currently `incomplete` for 70 diagnostics, `complete` for 8 within the declared computational scope, and `complete_with_declared_scope` for 2. These are software-scope labels only. They do **not** certify device-specific calibration, agreement with experimental references, or independent scientific validation. Thomson scattering remains marked incomplete until its calibration assumptions and spectrum-to-density path are independently validated against compatible reference data.
+
+A Python module existing somewhere in the repository does not by itself promote a diagnostic to implemented or experimentally validated.
 
 ## Formula coverage: 37/37 callable mappings
 
