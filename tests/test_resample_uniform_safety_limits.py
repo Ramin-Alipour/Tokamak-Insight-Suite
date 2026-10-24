@@ -13,7 +13,7 @@ def test_resampling_epoch_timestamps_does_not_extend_endpoint_by_absolute_time_t
     result = resample_uniform(time_s, values, fs=10.0)
 
     assert len(result["time_s"]) <= 12
-    assert result["time_s"][-1] <= time_s[-1] + 8 * abs(np.spacing(time_s[-1]))
+    assert result["time_s"][-1] <= time_s[-1] + abs(np.spacing(time_s[-1]))
 
 
 def test_resampling_rejects_unbounded_grid_before_allocating():
@@ -59,3 +59,4 @@ def test_resampling_large_epoch_does_not_snap_distinct_grid_points_to_duplicates
     result = resample_uniform(time_s, values, fs=1.05e6)
 
     assert np.all(np.diff(result["time_s"]) > 0)
+    assert result["time_s"][-1] <= time_s[-1] + abs(np.spacing(time_s[-1]))
