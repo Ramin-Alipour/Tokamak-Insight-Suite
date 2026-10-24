@@ -214,6 +214,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             float(np.sqrt(np.mean(residual ** 2)) / signal_scale) if signal_scale > 0 else None
         )
         out["electron_retarding_fit_points"] = int(np.count_nonzero(m))
+        out["electron_fit_points"] = int(np.count_nonzero(m))  # Backward-compatible field name.
         out["electron_retarding_fit_status"] = (
             "fit_completed_review_R2_and_residuals"
             if np.isfinite(out["electron_retarding_fit_R2"])
