@@ -3848,27 +3848,82 @@
     "method": "Estimate from background/no-signal data using a stated detection criterion.",
     "caveat": "Detection limit depends on bandwidth, false-positive rate and averaging.",
     "implementation_functions": [
-      "hampel_despike"
+      "noise_floor_detection_limit"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Implemented background-noise statistics (declared scope; not device-calibrated)",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "limited_calculation",
       "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Estimate from background/no-signal data using a stated detection criterion.",
-      "uncertainty_model": "not_specified",
+      "input_specs": [
+        {
+          "name": "background_values",
+          "unit": "detector units",
+          "description": "Finite one-dimensional samples from a documented background/no-signal interval; retain the original signal units.",
+          "required": true,
+          "minimum": 8
+        },
+        {
+          "name": "false_alarm_probability",
+          "unit": "1",
+          "description": "Per-sample tail probability strictly between 0 and 0.5.",
+          "required": false,
+          "minimum": 0,
+          "maximum": 0.5
+        },
+        {
+          "name": "two_sided",
+          "unit": "boolean",
+          "description": "Use an absolute-residual empirical threshold and two-sided Gaussian reference when true.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "baseline",
+          "unit": "detector units",
+          "description": "Median of background samples."
+        },
+        {
+          "name": "noise_floor_sigma",
+          "unit": "detector units",
+          "description": "Robust noise scale from 1.4826 times MAD, with standard-deviation fallback for degenerate MAD."
+        },
+        {
+          "name": "empirical_detection_threshold_above_baseline",
+          "unit": "detector units",
+          "description": "Observed residual quantile for the selected per-sample tail probability."
+        },
+        {
+          "name": "gaussian_reference_threshold_above_baseline",
+          "unit": "detector units",
+          "description": "Gaussian-reference threshold; assumes independent Gaussian noise only as a comparison."
+        },
+        {
+          "name": "noise_estimate_degenerate",
+          "unit": "boolean",
+          "description": "True when the robust scale is numerically degenerate and a fallback estimate was used."
+        }
+      ],
+      "assumptions": [
+        "Input samples represent a background/no-signal interval.",
+        "False-alarm probability is interpreted per sample.",
+        "The baseline is represented by the median."
+      ],
+      "preprocessing": [
+        "Reject fewer than eight samples, non-finite samples, booleans and invalid false-alarm probabilities."
+      ],
+      "algorithm": "Subtract the median baseline, estimate scale with 1.4826*MAD, and estimate an empirical tail threshold from residual quantiles; also report a Gaussian-reference threshold.",
+      "uncertainty_model": "No confidence interval is estimated for the noise scale or empirical quantile.",
       "limitations": [
-        "Detection limit depends on bandwidth, false-positive rate and averaging."
+        "Does not infer instrument bandwidth, temporal correlation, averaging, family-wise false-alarm probability, calibration or physical units.",
+        "Threshold is not a substitute for a device-specific detection-limit study."
       ],
       "function_links": [
-        "hampel_despike"
+        "tis.signals.noise_floor_detection_limit"
       ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Callable noise-only sample statistics; experimental/device validation and bandwidth-aware detection-limit interpretation remain outside the declared scope."
     }
   },
   {

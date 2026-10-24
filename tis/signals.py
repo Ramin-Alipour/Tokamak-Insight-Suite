@@ -73,6 +73,56 @@ def hampel_despike(values: Any, window: int = 11, n_sigmas: float = 6.0) -> dict
             "method": f"Hampel filter, window={window}, threshold={n_sigmas}*1.4826*MAD"}
 
 
+def noise_floor_detection_limit(
+    background_values: Any,
+    false_alarm_probability: float = 1e-3,
+    two_sided: bool = False,
+) -> dict[str, Any]:
+    """Estimate a noise floor and per-sample detection threshold from background-only samples.
+
+    The robust noise scale is 1.4826*MAD. The empirical threshold is taken from
+    the observed residual distribution, so Gaussianity is not required for that
+    threshold. The optional Gaussian threshold is a reference only. Correlation,
+    instrument bandwidth, averaging and multiple comparisons are not inferred;
+    choose a background-only interval and interpret thresholds for the acquisition.
+    """
+    x = np.asarray(background_values, dtype=float).ravel()
+    if len(x) < 8:
+        raise ValueError("At least 8 background samples are required.")
+    if not np.all(np.isfinite(x)):
+        raise ValueError("Background samples must contain only finite values.")
+    if (isinstance(false_alarm_probability, (bool, np.bool_))
+            or not isinstance(false_alarm_probability, (int, float, np.integer, np.floating))
+            or not np.isfinite(false_alarm_probability)
+            or not 0.0 < false_alarm_probability < 0.5):
+        raise ValueError("false_alarm_probability must be a finite real number strictly between 0 and 0.5.")
+    alpha = float(false_alarm_probability)
+    baseline = float(np.median(x))
+    residual = x - baseline
+    mad = float(np.median(np.abs(residual - np.median(residual))))
+    sigma = 1.4826 * mad
+    degenerate = sigma <= np.finfo(float).eps * max(float(np.max(np.abs(x))), 1.0)
+    if degenerate:
+        sigma = float(np.std(residual, ddof=1))
+    tail = np.abs(residual) if two_sided else residual
+    empirical_threshold = max(0.0, float(np.quantile(tail, 1.0 - alpha)))
+    from scipy.stats import norm
+    gaussian_probability = 1.0 - alpha / 2.0 if two_sided else 1.0 - alpha
+    gaussian_threshold = float(norm.ppf(gaussian_probability) * sigma)
+    return {
+        "baseline": baseline,
+        "noise_floor_sigma": float(sigma),
+        "empirical_detection_threshold_above_baseline": empirical_threshold,
+        "gaussian_reference_threshold_above_baseline": gaussian_threshold,
+        "false_alarm_probability_per_sample": alpha,
+        "two_sided": bool(two_sided),
+        "n_background_samples": int(len(x)),
+        "noise_estimate_degenerate": bool(degenerate),
+        "method": "median baseline; 1.4826*MAD robust scale; empirical residual quantile",
+        "note": "Use background-only samples. Threshold is per sample and does not account for bandwidth, temporal correlation, averaging or multiple comparisons; no device calibration is inferred.",
+    }
+
+
 def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
                        fit_window_s: tuple[float, float] | None = None) -> dict[str, Any]:
     """Subtract a polynomial trend fitted (optionally) only inside a quiet window."""
