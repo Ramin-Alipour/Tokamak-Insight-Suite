@@ -34,3 +34,24 @@ def test_decimator_rejects_invalid_sample_limits(bad_max_samples):
     values = np.sin(np.arange(1024, dtype=float) * 0.1)
     with pytest.raises(ValueError, match="max_samples"):
         anti_alias_decimate(time_s, values, max_samples=bad_max_samples)
+
+
+from tis.data_sources import fetch_fair_mast_efit_snapshot, fetch_public_table_bytes
+
+
+@pytest.mark.parametrize("timeout", [True, np.bool_(True), "30", np.nan, np.inf, 10**1000])
+def test_public_download_rejects_invalid_timeout_before_network(timeout):
+    with pytest.raises(ValueError, match="Timeout"):
+        fetch_public_table_bytes("https://example.com/data.csv", timeout=timeout)
+
+
+@pytest.mark.parametrize("max_bytes", [True, np.bool_(True), 1023, 1_000_000_001, 10**1000])
+def test_public_download_enforces_reasonable_size_limit(max_bytes):
+    with pytest.raises(ValueError, match="Maximum download size"):
+        fetch_public_table_bytes("https://example.com/data.csv", max_bytes=max_bytes)
+
+
+@pytest.mark.parametrize("time_s", [True, np.bool_(True), "0.2", np.nan, np.inf, 10**1000])
+def test_efit_snapshot_rejects_invalid_requested_time(time_s):
+    with pytest.raises(ValueError, match="Requested EFIT time"):
+        fetch_fair_mast_efit_snapshot(time_s=time_s)
