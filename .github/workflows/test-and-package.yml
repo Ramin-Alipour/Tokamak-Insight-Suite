@@ -50,7 +50,25 @@ jobs:
           assert len(DIAGNOSTICS) == 80
           assert len(FORMULAS) == 37
           assert len(get_diagnostic_contracts()) == 80
-          print("Installed wheel registry and contract checks passed.")
+
+          # Exercise the installed console-entry-point implementation, not the
+          # checkout's source tree, and verify its generated registry artifact.
+          import json
+          import sys
+          import tempfile
+          from pathlib import Path
+          from tis import __version__
+          from tis.cli import main
+
+          assert __version__ == "0.5.1"
+          with tempfile.TemporaryDirectory() as tmp:
+              sys.argv = ["tis", "catalog", "--kind", "analyses", "--output-dir", tmp]
+              assert main() == 0
+              output = Path(tmp) / "ANALYSIS_REGISTRY.json"
+              rows = json.loads(output.read_text(encoding="utf-8"))
+              assert len(rows) == 81
+              assert [row["id"] for row in rows] == list(range(1, 82))
+          print("Installed wheel registries, contracts, version, and CLI smoke test passed.")
           PY
 
       - name: Launch dashboard smoke test
