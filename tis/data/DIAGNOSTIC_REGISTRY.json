@@ -456,7 +456,7 @@
         {
           "name": "current_convention",
           "unit": "text",
-          "description": "Current polarity convention: electron_positive (ion saturation current normally negative) or ion_positive (internally sign-flipped); both are supported by the analysis entry point.",
+          "description": "Current polarity convention: electron_positive (ion saturation normally negative) or ion_positive (internally sign-flipped).",
           "required": false
         },
         {
@@ -488,14 +488,14 @@
         {
           "name": "ti_eV",
           "unit": "eV",
-          "description": "Non-negative assumed ion temperature used by the ion-sound-speed model; core default is 0 eV.",
+          "description": "Non-negative assumed ion temperature for the declared ion-sound-speed model; core default is 0 eV.",
           "required": false,
           "minimum": 0
         },
         {
           "name": "sheath_factor",
           "unit": "dimensionless",
-          "description": "Positive sheath collection coefficient; core default is 0.61.",
+          "description": "Positive sheath collection coefficient for the optional ion-density model; core default is 0.61.",
           "required": false,
           "minimum": 1e-15
         },
@@ -662,6 +662,26 @@
           "name": "electron_retarding_fit_status",
           "unit": "text",
           "description": "Indicates that fit quality must be reviewed using R-squared and residual diagnostics; does not automatically certify physical validity."
+        },
+        {
+          "name": "electron_retarding_fit_points",
+          "unit": "count",
+          "description": "Number of samples in the electron-retarding fit window."
+        },
+        {
+          "name": "ion_current_baseline_subtracted_A",
+          "unit": "A",
+          "description": "Offset current fitted jointly with the exponential electron-retarding branch."
+        },
+        {
+          "name": "electron_retarding_log_slope_per_V",
+          "unit": "V^-1",
+          "description": "Positive exponential slope used for Te=1/slope."
+        },
+        {
+          "name": "ion_density_model",
+          "unit": "text",
+          "description": "Explicit model used for optional ion density inference."
         }
       ],
       "assumptions": [
@@ -691,9 +711,9 @@
         "tis.core.probe_iv_summary"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete only within this declared calibrated single-sweep I–V model scope. Fit-window validation and zero-crossing ambiguity are explicit. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
+      "note": "Implemented and exposed in the dashboard within the declared calibrated single-sweep I–V model scope. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. Density is only inferred when a selected ion branch, positive fitted Te, and valid geometry/model inputs are supplied. Calibration, physical fit-window selection, systematic uncertainty propagation and independent device validation remain analyst responsibilities."
     },
-    "note": "Complete within the declared calibrated single-sweep I–V computational scope; includes auditable preprocessing and fit residual diagnostics. Fit-window selection, calibration, device-specific sheath interpretation and systematic uncertainty propagation remain analyst responsibilities."
+    "note": "Implemented and exposed in the dashboard within the declared calibrated single-sweep I–V model scope. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. Density is only inferred when a selected ion branch, positive fitted Te, and valid geometry/model inputs are supplied. Calibration, physical fit-window selection, systematic uncertainty propagation and independent device validation remain analyst responsibilities."
   },
   {
     "family": "Plasma parameters",
