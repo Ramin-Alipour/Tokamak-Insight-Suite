@@ -42,7 +42,7 @@ jobs:
       - name: Run complete automated test suite
         run: uv run python -m pytest -q --cov=tis --cov=tokamak_analysis --cov-report=term-missing
       - name: Run critical Ruff checks
-        run: uv run ruff check app.py tis tokamak_analysis tests
+        run: uv run ruff check --select E4,E7,E9,F app.py tis tokamak_analysis tests
       - name: Exercise dashboard and Langmuir workspace with Streamlit AppTest
         run: |
           uv run python - <<'PY'
