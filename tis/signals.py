@@ -131,15 +131,25 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     med = float(np.median(np.diff(t)))
     if fs is None:
         fs = 1.0 / med
-    if not np.isfinite(fs) or fs <= 0:
-        raise ValueError("fs must be positive and finite.")
+    if (isinstance(fs, (bool, np.bool_))
+            or not isinstance(fs, (int, float, np.integer, np.floating))
+            or not np.isfinite(fs) or fs <= 0):
+        raise ValueError("fs must be a positive finite real number.")
     if (isinstance(max_output_samples, (bool, np.bool_))
             or not isinstance(max_output_samples, (int, np.integer))
             or max_output_samples < 8):
         raise ValueError("max_output_samples must be an integer >= 8.")
-    limit = 3.0 * med if max_interp_gap_s is None else float(max_interp_gap_s)
-    if limit <= 0 or not np.isfinite(limit):
-        raise ValueError("max_interp_gap_s must be positive and finite.")
+    if max_interp_gap_s is None:
+        limit = 3.0 * med
+    else:
+        if isinstance(max_interp_gap_s, (bool, np.bool_)):
+            raise ValueError("max_interp_gap_s must be a positive finite real number.")
+        try:
+            limit = float(max_interp_gap_s)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("max_interp_gap_s must be a positive finite real number.") from exc
+    if not np.isfinite(limit) or limit <= 0:
+        raise ValueError("max_interp_gap_s must be a positive finite real number.")
     span = float(t[-1] - t[0])
     if not np.isfinite(span) or span < 0:
         raise ValueError("Time span must be finite and non-negative.")
