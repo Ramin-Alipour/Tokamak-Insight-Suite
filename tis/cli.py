@@ -42,13 +42,28 @@ def main() -> int:
             level_counts=Counter((row.get('execution_contract') or {}).get('execution_level','reference_only') for row in DIAGNOSTICS)
             completeness_counts=Counter((row.get('execution_contract') or {}).get('completeness','incomplete') for row in DIAGNOSTICS)
             analysis_completeness=Counter((row.get('execution_contract') or {}).get('completeness','incomplete') for row in ANALYSES)
+            import hashlib
+            from tis import __version__
+            from tis.catalog import _DIAGNOSTICS_PATH
+            registry_bytes = _DIAGNOSTICS_PATH.read_bytes()
             report={
+                'report_schema_version':'2.0',
+                'software_version':__version__,
                 'source_of_truth':'DIAGNOSTIC_REGISTRY.json',
+                'source_registry_path':str(_DIAGNOSTICS_PATH),
+                'source_registry_sha256':hashlib.sha256(registry_bytes).hexdigest(),
                 'diagnostic_record_count':len(DIAGNOSTICS),
                 'diagnostic_execution_level_counts':dict(sorted(level_counts.items())),
                 'diagnostic_completeness_counts':dict(sorted(completeness_counts.items())),
                 'callable_analysis_entry_point_count':len(ANALYSES),
+                'callable_analysis_execution_level_counts':dict(sorted(Counter((row.get('execution_contract') or {}).get('execution_level','reference_only') for row in ANALYSES).items())),
                 'callable_analysis_completeness_counts':dict(sorted(analysis_completeness.items())),
+                'registry_consistency':{
+                    'diagnostic_registry_count_is_80':len(DIAGNOSTICS)==80,
+                    'callable_analysis_registry_count_is_81':len(ANALYSES)==81,
+                    'diagnostic_completeness_totals_match_record_count':sum(completeness_counts.values())==len(DIAGNOSTICS),
+                    'analysis_completeness_totals_match_entry_point_count':sum(analysis_completeness.values())==len(ANALYSES),
+                },
                 'first_ten_diagnostics':[{
                     'catalog_position':i+1,
                     'diagnostic':row.get('diagnostic'),
