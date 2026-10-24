@@ -56,3 +56,14 @@ def test_cross_analysis_rejects_invalid_segment_length_without_overflow(bad):
     x = np.sin(np.arange(64.0))
     with pytest.raises(ValueError):
         cross_analysis(x, np.cos(np.arange(64.0)), 100.0, nperseg=bad)
+
+
+@pytest.mark.parametrize("analysis", [cross_analysis, cross_correlation_lag])
+def test_cross_diagnostics_reject_constant_signals(analysis):
+    x = np.ones(64)
+    y = np.cos(np.arange(64.0))
+    with pytest.raises(ValueError, match="constant or numerically flat"):
+        if analysis is cross_analysis:
+            analysis(x, y, 100.0)
+        else:
+            analysis(x, y, 100.0)
