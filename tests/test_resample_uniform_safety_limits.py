@@ -31,3 +31,20 @@ def test_resampling_validates_output_sample_limit(limit):
 
     with pytest.raises(ValueError, match="max_output_samples"):
         resample_uniform(time_s, values, max_output_samples=limit)
+
+@pytest.mark.parametrize("bad_fs", [True, "10", np.nan, np.inf, 0, -1])
+def test_resampling_rejects_invalid_sampling_rate(bad_fs):
+    time_s = np.arange(8, dtype=float)
+    values = np.arange(8, dtype=float)
+
+    with pytest.raises(ValueError, match="fs"):
+        resample_uniform(time_s, values, fs=bad_fs)
+
+
+@pytest.mark.parametrize("bad_gap", [True, "bad", np.nan, np.inf, 0, -1])
+def test_resampling_rejects_invalid_gap_threshold(bad_gap):
+    time_s = np.arange(8, dtype=float)
+    values = np.arange(8, dtype=float)
+
+    with pytest.raises(ValueError, match="max_interp_gap_s"):
+        resample_uniform(time_s, values, max_interp_gap_s=bad_gap)
