@@ -5,12 +5,22 @@ import numpy as np
 from scipy import optimize
 from scipy.special import voigt_profile
 
+def _is_finite_real_scalar(value: Any) -> bool:
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | None = None, model: str = 'Gaussian', sigma_y: Any | None = None) -> dict[str, float | str]:
     xx, yy = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
     if len(xx) != len(yy):
         raise ValueError("Spectral coordinates and intensity values must have equal lengths.")
-    if (xmin is not None and not np.isfinite(xmin)) or (xmax is not None and not np.isfinite(xmax)):
-        raise ValueError("Fit limits must be finite when supplied.")
+    if ((xmin is not None and not _is_finite_real_scalar(xmin))
+            or (xmax is not None and not _is_finite_real_scalar(xmax))):
+        raise ValueError("Fit limits must be finite real numeric scalars when supplied.")
     if xmin is not None and xmax is not None and xmin >= xmax:
         raise ValueError("xmin must be smaller than xmax.")
     sigma_all=None
@@ -40,6 +50,8 @@ def fit_spectral_line(x: Any, y: Any, xmin: float | None = None, xmax: float | N
     if abs(amp0)<=np.finfo(float).eps:
         raise ValueError("No resolvable emission or absorption feature is present in the selected fit range.")
     step=float(np.median(np.diff(xx)))
+    if not isinstance(model, str):
+        raise ValueError('Model must be a string: Gaussian, Lorentzian or Voigt.')
     model=model.lower()
     if model not in {"gaussian","lorentzian","voigt"}:
         raise ValueError('Model must be Gaussian, Lorentzian or Voigt.')
