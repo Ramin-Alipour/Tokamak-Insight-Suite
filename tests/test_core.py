@@ -66,6 +66,12 @@ def test_polynomial_calibration():
     np.testing.assert_allclose(polynomial_calibration([0,1,2],[1,0,1]),[1,2,5])
 
 
+@pytest.mark.parametrize("coefficients", ([True, 1.0], [np.bool_(True), 1.0]))
+def test_polynomial_calibration_rejects_boolean_coefficients(coefficients):
+    with pytest.raises(ValueError, match="one-dimensional sequence of finite real polynomial coefficients"):
+        polynomial_calibration([0, 1], coefficients)
+
+
 def test_prepare_time_series_and_fs():
     t,y,fs=prepare_time_series([0,.001,.002,.003,.004,.005,.006,.007],[0,1,0,-1,0,1,0,-1])
     assert fs==pytest.approx(1000)
