@@ -48,3 +48,14 @@ def test_resampling_rejects_invalid_gap_threshold(bad_gap):
 
     with pytest.raises(ValueError, match="max_interp_gap_s"):
         resample_uniform(time_s, values, max_interp_gap_s=bad_gap)
+
+def test_resampling_large_epoch_does_not_snap_distinct_grid_points_to_duplicates():
+    # At Unix-epoch magnitudes, several ULPs can exceed a high-rate sample
+    # interval. Snapping by a broad ULP multiple can collapse distinct grid
+    # points onto the same source timestamp.
+    time_s = 1_700_000_000.0 + np.arange(100) * 1e-6
+    values = np.sin(np.arange(100, dtype=float))
+
+    result = resample_uniform(time_s, values, fs=1.05e6)
+
+    assert np.all(np.diff(result["time_s"]) > 0)
