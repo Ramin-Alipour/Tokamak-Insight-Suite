@@ -162,7 +162,7 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
             "reduce fs or process a shorter time window."
         )
     step = 1.0 / float(fs)
-    endpoint_tol = 8.0 * max(
+    endpoint_tol = 1.0 * max(
         abs(float(np.spacing(t[0]))), abs(float(np.spacing(t[-1]))),
         abs(float(np.spacing(step))), np.finfo(float).tiny,
     )
