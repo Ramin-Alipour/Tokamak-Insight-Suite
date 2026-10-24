@@ -66,7 +66,11 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
-    if lam<0 or not np.isfinite(lam): raise ValueError('Regularization must be finite and nonnegative.')
+    if (isinstance(lam, (bool, np.bool_)) or not isinstance(lam, (int, float, np.integer, np.floating))
+            or not np.isfinite(lam) or lam < 0):
+        raise ValueError('Regularization must be a finite, nonnegative real numeric scalar.')
+    if not isinstance(nonnegative, (bool, np.bool_)):
+        raise ValueError("nonnegative must be a boolean.")
     if isinstance(regularization_order, bool) or not isinstance(regularization_order, (int, np.integer)) or regularization_order not in (0, 1, 2):
         raise ValueError("regularization_order must be an integer: 0 (magnitude), 1 (gradient) or 2 (curvature).")
     if measurement_sigma is not None:
