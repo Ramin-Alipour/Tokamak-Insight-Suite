@@ -29,7 +29,8 @@ def _open_zarr_with_retry(xr: Any, url: str, group: str, attempts: int = 3,
                           timeout_s: float = 30.0):
     """Open a public Zarr group with bounded request timeout and transient retries."""
     import time
-    if isinstance(attempts, bool) or int(attempts) != attempts or attempts < 1 or attempts > 5:
+    if (isinstance(attempts, (bool, np.bool_)) or not isinstance(attempts, (int, float, np.integer, np.floating))
+            or not np.isfinite(attempts) or int(attempts) != attempts or attempts < 1 or attempts > 5):
         raise ValueError("attempts must be an integer in [1, 5].")
     if not np.isfinite(timeout_s) or timeout_s <= 0 or timeout_s > 120:
         raise ValueError("timeout_s must be positive and no greater than 120 seconds.")
@@ -55,7 +56,8 @@ def anti_alias_decimate(time_s: Any, values: Any, max_samples: int = 70000) -> t
         raise ValueError("Time and signal must have equal lengths and at least 1024 samples.")
     if not np.all(np.isfinite(t)) or not np.all(np.isfinite(x)) or not np.all(np.diff(t) > 0):
         raise ValueError("Time and signal must be finite and timestamps strictly increasing.")
-    if isinstance(max_samples, bool) or int(max_samples) != max_samples or max_samples < 1024:
+    if (isinstance(max_samples, (bool, np.bool_)) or not isinstance(max_samples, (int, float, np.integer, np.floating))
+            or not np.isfinite(max_samples) or int(max_samples) != max_samples or max_samples < 1024):
         raise ValueError("max_samples must be an integer of at least 1024.")
     dt = np.diff(t)
     median_dt = float(np.median(dt))
