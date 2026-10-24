@@ -85,9 +85,12 @@ def build_profile(
 def _optional_uncertainty(values, size: int, name: str, order: np.ndarray):
     if values is None:
         return None
-    arr = np.asarray(values, dtype=float)
-    if arr.ndim != 1 or arr.size != size:
-        raise ValueError(f"{name} must have the same length as the profile")
+    raw = np.asarray(values)
+    if raw.ndim != 1 or raw.size != size:
+        raise ValueError(f"{name} must have the same length as the profile and be one-dimensional")
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+    arr = raw.astype(float, copy=False)
     if not np.all(np.isfinite(arr)) or np.any(arr < 0):
         raise ValueError(f"{name} must contain finite, non-negative uncertainties")
     return arr[order]
