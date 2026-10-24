@@ -14,7 +14,13 @@ def analyze_bolometry(time_s, channel_power_W_m2, *, channel_weights=None):
 
 def radiated_power_from_axisymmetric_emissivity(radius_m, emissivity_W_m3, major_radius_m):
     """Integrate toroidally symmetric emissivity: P_rad=4*pi^2*R0*integral(epsilon(r)*r dr)."""
-    r=np.asarray(radius_m,dtype=float); eps=np.asarray(emissivity_W_m3,dtype=float); R0=float(major_radius_m)
+    r=np.asarray(radius_m,dtype=float); eps=np.asarray(emissivity_W_m3,dtype=float)
+    if not isinstance(major_radius_m, (int, float, np.integer, np.floating)) or isinstance(major_radius_m, (bool, np.bool_)):
+        raise ValueError("Major radius must be a finite real scalar.")
+    try:
+        R0=float(major_radius_m)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError("Major radius must be a finite real scalar.") from exc
     if r.ndim!=1 or eps.shape!=r.shape or len(r)<2 or not np.all(np.isfinite(r)) or not np.all(np.isfinite(eps)) or not np.isfinite(R0):
         raise ValueError("Radius and emissivity must be finite matching 1-D arrays; major radius finite")
     if np.any(np.diff(r)<=0) or not np.isclose(r[0],0.0,atol=1e-12) or r[-1]<=0 or np.any(eps<0) or R0<=r[-1]:
