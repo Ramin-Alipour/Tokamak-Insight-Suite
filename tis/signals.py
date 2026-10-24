@@ -76,21 +76,32 @@ def hampel_despike(values: Any, window: int = 11, n_sigmas: float = 6.0) -> dict
 def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
                        fit_window_s: tuple[float, float] | None = None) -> dict[str, Any]:
     """Subtract a polynomial trend fitted (optionally) only inside a quiet window."""
-    t = np.asarray(time_s, dtype=float).ravel(); y = np.asarray(values, dtype=float).ravel()
-    if len(t) != len(y) or len(t) < order + 2:
-        raise ValueError("Time/signal length mismatch or too few samples for the polynomial order.")
-    if isinstance(order, bool) or int(order) != order or not 0 <= order <= 8:
+    t = np.asarray(time_s, dtype=float).ravel()
+    y = np.asarray(values, dtype=float).ravel()
+    if isinstance(order, (bool, np.bool_)) or not isinstance(order, (int, float, np.integer, np.floating)) or not np.isfinite(order) or int(order) != order or not 0 <= int(order) <= 8:
         raise ValueError("order must be an integer in [0, 8].")
+    order = int(order)
+    if len(t) != len(y):
+        raise ValueError("Time and signal must have equal lengths.")
+    if not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)):
+        raise ValueError("Time and signal must contain only finite values.")
+    if len(t) < order + 2:
+        raise ValueError("Too few samples for the requested polynomial order.")
+    window = None
     m = np.ones(len(t), bool)
     if fit_window_s is not None:
-        m = (t >= min(fit_window_s)) & (t <= max(fit_window_s))
+        window = np.asarray(fit_window_s, dtype=float)
+        if window.shape != (2,) or not np.all(np.isfinite(window)):
+            raise ValueError("fit_window_s must contain exactly two finite time bounds.")
+        lo, hi = float(np.min(window)), float(np.max(window))
+        m = (t >= lo) & (t <= hi)
         if m.sum() < order + 2:
             raise ValueError("Fit window contains too few samples for the polynomial order.")
     tc = t - t[m].mean()
-    coeff = np.polyfit(tc[m], y[m], int(order))
+    coeff = np.polyfit(tc[m], y[m], order)
     trend = np.polyval(coeff, tc)
     return {"values": y - trend, "trend": trend, "coefficients_high_to_low_centered_time": coeff.tolist(),
-            "order": int(order), "fit_window_s": None if fit_window_s is None else [float(v) for v in fit_window_s]}
+            "order": order, "fit_window_s": None if window is None else [float(v) for v in window]}
 
 
 def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
