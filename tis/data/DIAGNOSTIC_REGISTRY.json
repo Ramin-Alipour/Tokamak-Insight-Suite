@@ -13,11 +13,11 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Complete within the explicitly supported computational scope; experimental calibration and independent device-specific validation remain the user's responsibility.",
+    "implementation_status": "Scoped profile and spectrum workflows are implemented, but the overall analysis remains incomplete pending independent experimental validation and device-specific calibration.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "workflow_mode",
@@ -794,7 +794,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "wavelength_nm",
@@ -825,9 +825,16 @@
         {
           "name": "instrument_sigma_nm",
           "unit": "nm",
-          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use.",
+          "description": "Known Gaussian instrumental standard deviation; FWHM must be converted before use. Optional 1-sigma uncertainty is supplied separately as instrument_sigma_uncertainty_nm.",
           "required": true,
           "minimum": 1e-15
+        },
+        {
+          "name": "instrument_sigma_uncertainty_nm",
+          "unit": "nm",
+          "description": "Optional finite non-negative 1-sigma uncertainty of the instrumental standard deviation; propagated into ion-temperature uncertainty.",
+          "required": false,
+          "minimum": 0
         },
         {
           "name": "viewing_angle_rad",
@@ -946,8 +953,8 @@
       "function_links": [
         "tokamak_analysis.cxrs.analyze_cxrs_line"
       ],
-      "raw_data_to_physics": false,
-      "note": "Complete for calibrated isolated-line fitting and its documented outputs. Not a full CXRS diagnostic suite: impurity density, atomic-rate modelling, neutral-beam attenuation, line deblending, multi-view toroidal/poloidal inversion, and independent device-specific validation are outside scope.",
+      "raw_data_to_physics": true,
+      "note": "Complete for calibrated isolated-line fitting from spectral samples to line-of-sight velocity and ion temperature within the documented Gaussian/Maxwellian model. This flag denotes a numerical raw-spectrum-to-physics path, not raw detector calibration or a complete device-specific CXRS inversion. Impurity density, atomic-rate modelling, neutral-beam attenuation, line deblending, multi-view toroidal/poloidal inversion, and independent device-specific validation remain outside scope.",
       "workflow_modes": [
         {
           "name": "calibrated_isolated_line",
@@ -1389,17 +1396,18 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Toroidal-field coils / magnetic probes",
     "quantities": "Calibrated toroidal magnetic-field time series B_t(t), summary statistics, sampling quality and optional propagated uncertainty",
-    "status": "D/I",
-    "method": "Analyze calibrated toroidal-field coil/current signals with explicit calibration, baseline correction, sampling-quality metrics and optional first-order uncertainty propagation. Voltage is converted only when its transfer/calibration coefficient is explicitly supplied; no implicit Faraday-law integration.",
-    "caveat": "This is a calibrated-signal workflow, not a coil-design or equilibrium solver. A pickup-coil voltage generally measures changing linked flux; recovering B requires a validated transfer function/integration and boundary condition. Total toroidal field cannot be inferred from coil current without geometry and machine-specific calibration.",
+    "status": "D",
+    "method": "Analyze calibrated field/current signals and explicitly calibrated pickup-coil voltage. Supports baseline correction, field statistics, sampling-quality metrics, first-order uncertainty propagation, and cumulative trapezoidal reconstruction of field change from V=S·dB/dt when a validated sensitivity and initial-field boundary condition are supplied.",
+    "caveat": "Complete only within the documented calibrated-signal and calibrated pickup-voltage-integration modes. No universal inversion is possible without device-specific sensitivity/transfer function, bandwidth response, baseline control, and initial-field boundary condition. Coil current alone does not determine total toroidal field without geometry and machine-specific calibration.",
     "implementation_functions": [
-      "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+      "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil",
+      "tokamak_analysis.toroidal_field_coils.integrate_pickup_coil_voltage"
     ],
-    "implementation_status": "Toroidal-field calibrated-signal workflow (scoped)",
+    "implementation_status": "Complete within explicitly supported calibrated-signal and pickup-coil integration scope; independent device-specific validation remains the user's responsibility.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "incomplete",
+      "completeness": "complete",
       "input_specs": [
         {
           "name": "time_s",
@@ -1441,6 +1449,48 @@
           "name": "calibration_uncertainty_T_per_unit",
           "unit": "T per input unit, 1-sigma",
           "description": "Non-negative calibration coefficient uncertainty.",
+          "required": false
+        },
+        {
+          "name": "pickup_voltage_V",
+          "unit": "V",
+          "description": "Optional calibrated pickup-coil voltage samples for the integrated-field workflow; aligned with time_s.",
+          "required": false
+        },
+        {
+          "name": "pickup_sensitivity_V_per_T_per_s",
+          "unit": "V/(T s^-1)",
+          "description": "Required for pickup-voltage integration: validated transfer coefficient S in V=S·dB/dt over the sampled bandwidth; non-zero.",
+          "required": false
+        },
+        {
+          "name": "initial_field_T",
+          "unit": "T",
+          "description": "Required for pickup-voltage integration; boundary condition B(t0), since voltage integration yields field change only.",
+          "required": false
+        },
+        {
+          "name": "pickup_voltage_baseline_V",
+          "unit": "V",
+          "description": "Optional finite voltage offset subtracted before integration.",
+          "required": false
+        },
+        {
+          "name": "pickup_voltage_uncertainty_V",
+          "unit": "V, 1-sigma",
+          "description": "Optional non-negative independent pointwise voltage uncertainty for first-order integral uncertainty propagation.",
+          "required": false
+        },
+        {
+          "name": "pickup_sensitivity_uncertainty_V_per_T_per_s",
+          "unit": "V/(T s^-1), 1-sigma",
+          "description": "Optional non-negative sensitivity uncertainty.",
+          "required": false
+        },
+        {
+          "name": "initial_field_uncertainty_T",
+          "unit": "T, 1-sigma",
+          "description": "Optional non-negative uncertainty in the initial-field boundary condition.",
           "required": false
         }
       ],
@@ -1484,42 +1534,67 @@
           "name": "B_toroidal_uncertainty_T",
           "unit": "T, 1-sigma",
           "description": "Optional first-order independent signal/calibration uncertainty propagation."
+        },
+        {
+          "name": "dB_dt_T_s",
+          "unit": "T s^-1",
+          "description": "Field time derivative inferred from calibrated pickup-coil voltage and sensitivity."
+        },
+        {
+          "name": "delta_B_T",
+          "unit": "T",
+          "description": "Cumulative trapezoidal field change relative to the initial time."
+        },
+        {
+          "name": "pickup_integration_B_toroidal_T",
+          "unit": "T",
+          "description": "Field reconstructed from integrated calibrated pickup voltage plus supplied initial-field boundary condition."
+        },
+        {
+          "name": "pickup_integration_B_uncertainty_T",
+          "unit": "T, 1-sigma",
+          "description": "First-order uncertainty from independent voltage noise, sensitivity and initial-field uncertainty; excludes correlated drift and model discrepancy."
         }
       ],
       "assumptions": [
         "Calibration coefficient and signal units are documented and valid over the sampled range and bandwidth.",
         "Signal and calibration uncertainties are independent for the reported first-order propagation.",
-        "The supplied signal is a field/current or explicitly calibrated voltage quantity, not an unprocessed pickup-coil voltage requiring integration."
+        "The supplied signal is a field/current or explicitly calibrated voltage quantity, not an unprocessed pickup-coil voltage requiring integration.",
+        "Pickup-voltage integration is used only when a validated sensitivity/transfer coefficient and initial-field boundary condition are supplied."
       ],
       "preprocessing": [
-        "Validate dimensionality, matching lengths, finite values, strictly increasing timestamps, signal kind, calibration coefficient, baseline, and uncertainty arrays."
+        "Validate dimensionality, matching lengths, finite values, strictly increasing timestamps, signal kind, calibration coefficient, baseline, and uncertainty arrays.",
+        "For pickup-voltage integration, validate non-zero finite sensitivity, finite initial field and baseline, strictly increasing time, and optional non-negative pointwise uncertainty."
       ],
-      "algorithm": "Subtract optional baseline, apply explicit B_t=k_cal(signal-baseline), calculate descriptive statistics and sampling interval metrics, and propagate optional independent signal and calibration uncertainties.",
-      "uncertainty_model": "sigma_B=sqrt((k_cal sigma_signal)^2+((signal-baseline) sigma_k)^2); baseline uncertainty, covariance and model/calibration discrepancy are not included.",
+      "algorithm": "Two explicit modes: calibrated field/current/directly calibrated voltage conversion and statistics; or calibrated pickup-coil voltage integration using cumulative trapezoidal integration of dB/dt=V_corrected/S plus a required initial-field boundary condition.",
+      "uncertainty_model": "For calibrated signal, sigma_B=sqrt((k sigma_signal)^2+((signal-baseline) sigma_k)^2). For integrated pickup voltage, propagate independent pointwise voltage noise through trapezoidal increments and combine with sensitivity and initial-field uncertainty in quadrature. Baseline uncertainty, covariance, correlated drift, bandwidth error and model discrepancy are excluded.",
       "limitations": [
-        "No coil geometry, mutual inductance, plasma-current contribution, ferromagnetic response, saturation or frequency-response correction is inferred.",
-        "Pickup-coil voltage must not be treated as instantaneous magnetic field without a validated transfer function or justified integration and boundary condition.",
-        "No equilibrium reconstruction or total toroidal-field inference from current alone.",
-        "Sampling metrics do not replace a full aliasing, bandwidth or synchronization audit."
+        "Calibration coefficient and signal units must be documented and valid over the sampled range and bandwidth.",
+        "Pickup-coil voltage must not be treated as instantaneous magnetic field; integration requires validated transfer function/sensitivity and a justified initial-field boundary condition.",
+        "Integration drift from voltage offsets and frequency-response correction are not automatically removed.",
+        "No coil geometry, mutual inductance, plasma-current contribution, ferromagnetic response, saturation, or equilibrium reconstruction is inferred.",
+        "Total toroidal field cannot be inferred from coil current alone without geometry and machine-specific calibration.",
+        "Sampling metrics do not replace full aliasing, bandwidth or synchronization audits."
       ],
       "function_links": [
-        "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"
+        "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil",
+        "tokamak_analysis.toroidal_field_coils.integrate_pickup_coil_voltage"
       ],
-      "raw_data_to_physics": false,
-      "note": "Implemented calibrated-signal workflow with focused tests; completeness remains conservative because uncalibrated pickup-coil inversion and independent device-specific validation are outside the implemented scope."
+      "raw_data_to_physics": true,
+      "note": "Executable calibrated-signal and calibrated pickup-voltage integration workflows have focused tests. Completeness applies only to declared inputs and assumptions; machine-specific calibration and independent experimental validation remain external."
     }
   },
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Poloidal-field coils / magnetic probes",
     "quantities": "Calibrated local B_p(t), dB_p/dt, channel statistics, sampling diagnostics, optional uncertainty",
-    "status": "M→D/I",
-    "method": "Calibrate digitized poloidal-field probe signals with documented per-channel gain and offset; optionally remove a defined baseline; calculate dB_p/dt on the measured time grid and propagate supplied independent signal uncertainty. Use probe geometry/transfer functions and equilibrium constraints in a separate, validated workflow for flux or reconstruction.",
+    "status": "D",
+    "method": "Analyze calibrated poloidal-field probe channels using documented per-channel gain and offset, optional baseline subtraction, nonuniform-time dBp/dt, per-channel statistics, sampling-interval diagnostics, and first-order propagation of independent signal uncertainty. Expose this workflow in the Probe Analysis UI.",
     "caveat": "Local fields and derivatives do not uniquely determine PF-coil currents, poloidal flux, plasma boundary, or equilibrium. This workflow does not perform coil inversion or Grad–Shafranov reconstruction.",
     "implementation_functions": [
       "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
     ],
-    "implementation_status": "Implemented calibrated-signal analysis with validation, optional baseline correction, nonuniform-time derivatives, channel metrics, sampling-jitter flag, and first-order independent-noise uncertainty propagation. Raw voltage-to-field calibration, frequency response, geometry, and device-specific validation remain user supplied.",
+    "implementation_status": "Implemented and exposed in the Probe Analysis UI: calibrated single-/multi-channel signals, validation, optional baseline correction, nonuniform-grid derivatives, channel statistics, sampling-jitter warning, and first-order signal/derivative uncertainty. Raw-voltage transfer calibration and device-specific validation remain user supplied.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -1636,7 +1711,7 @@
         "tokamak_analysis.poloidal_field_probes.analyze_poloidal_field_probes"
       ],
       "raw_data_to_physics": true,
-      "note": "Complete only for the declared calibrated digitized-signal processing scope; not a complete magnetic-equilibrium or coil-inversion pipeline."
+      "note": "The executable Python API and Probe Analysis dashboard workflow cover calibrated digitized poloidal-field signals only. They do not infer flux, PF-coil currents, plasma boundary or equilibrium. Calibration, transfer response, geometry, bandwidth and independent experimental validation remain user responsibilities."
     }
   },
   {
@@ -1732,6 +1807,19 @@
           "unit": "dimensionless",
           "description": "Integration polarity convention, either -1 or +1.",
           "required": false
+        },
+        {
+          "name": "reference_channel",
+          "unit": "zero-based channel index",
+          "description": "Reference channel for cross-spectral phase/coherence analysis; must be an integer index within the channel matrix.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "initial_delta_B_T",
+          "unit": "T",
+          "description": "Initial relative perturbation used by trapezoidal voltage integration.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -1779,6 +1867,46 @@
           "name": "estimated_toroidal_mode_number",
           "unit": "integer",
           "description": "Alias-prone integer candidate selected by weighted circular phase residual."
+        },
+        {
+          "name": "approx_Bdot_detrended_T_s",
+          "unit": "T/s",
+          "description": "Ideal dB/dt estimate from the selected detrended voltage trace when geometry is supplied."
+        },
+        {
+          "name": "mean_voltage_V",
+          "unit": "V",
+          "description": "Arithmetic mean of the original voltage trace."
+        },
+        {
+          "name": "rms_voltage_V",
+          "unit": "V",
+          "description": "Root-mean-square voltage including DC component."
+        },
+        {
+          "name": "ac_rms_voltage_V",
+          "unit": "V",
+          "description": "Standard deviation of voltage after removing its mean."
+        },
+        {
+          "name": "peak_to_peak_voltage_V",
+          "unit": "V",
+          "description": "Maximum minus minimum measured voltage."
+        },
+        {
+          "name": "phase_fit_rms_rad",
+          "unit": "rad",
+          "description": "Coherence-weighted circular phase residual RMS for the selected integer mode candidate."
+        },
+        {
+          "name": "minimum_toroidal_sensor_spacing_rad",
+          "unit": "rad",
+          "description": "Minimum circular angular spacing among supplied sensors."
+        },
+        {
+          "name": "approximate_mode_alias_limit",
+          "unit": "integer",
+          "description": "Coarse pi/minimum-spacing diagnostic; not a guarantee of mode-number uniqueness."
         }
       ],
       "assumptions": [
@@ -1789,7 +1917,8 @@
       "preprocessing": [
         "Reject mismatched, non-finite, non-monotonic or non-uniform spectral inputs.",
         "Remove constant or linear trend only according to the explicitly selected detrend mode.",
-        "Use Welch PSD and cross-spectral estimates; no hidden smoothing or transfer-function correction."
+        "Use Welch PSD and cross-spectral estimates; no hidden smoothing or transfer-function correction.",
+        "For array analysis, require at least three channels, finite samples, unique sensor angles modulo 2*pi, valid reference-channel index and segment length no larger than sample count."
       ],
       "algorithm": "Compute signal statistics and Welch PSD; select local PSD peaks within the optional band; optionally estimate ideal dB/dt from Faraday's law, integrate baseline-corrected voltage by the trapezoidal rule, or fit integer toroidal mode candidates to inter-channel cross-spectral phase weighted by coherence.",
       "uncertainty_model": "No full uncertainty propagation is implemented. Spectral resolution is limited by sample duration and Welch segment length; calibration, geometry, phase and mode-number uncertainties require external assessment.",
@@ -1798,14 +1927,16 @@
         "Integrated perturbations are sensitive to baseline offsets and drift.",
         "Spectral peaks are not automatically classified as MHD modes.",
         "Toroidal mode-number estimates are alias-prone and depend on geometry, polarity, coherence and mode structure.",
-        "Independent device-specific experimental validation remains required."
+        "Independent device-specific experimental validation remains required.",
+        "The reported pi/minimum-angular-spacing alias limit is a coarse geometry diagnostic and must not be interpreted as a rigorous uniqueness guarantee for irregular arrays."
       ],
       "function_links": [
         "tokamak_analysis.mirnov_analysis.analyze_mirnov_signal",
         "tokamak_analysis.mirnov_analysis.magnetic_perturbation_from_mirnov_voltage",
         "tokamak_analysis.mirnov_analysis.analyze_mirnov_array"
       ],
-      "raw_data_to_physics": true
+      "raw_data_to_physics": true,
+      "note": "Complete within the declared numerical scope. Single-channel PSD/peak analysis, ideal geometry-based dB/dt, baseline-explicit relative delta-B integration, and multi-channel coherence-weighted mode candidates are implemented. Instrument transfer functions, calibration uncertainties and independent experimental validation remain external."
     }
   },
   {
