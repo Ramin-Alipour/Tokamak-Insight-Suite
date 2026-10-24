@@ -34,11 +34,13 @@ def test_package_and_runtime_versions_are_consistent():
 
 def test_all_analysis_entry_points_declare_conservative_contracts():
     from tokamak_analysis.analysis_registry import ANALYSES
-    assert len(ANALYSES) == 80
+    assert len(ANALYSES) == 81
     for entry in ANALYSES:
         contract = entry["execution_contract"]
         assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
-        assert contract["completeness"] == "incomplete"
+        assert contract["completeness"] in {"incomplete", "complete", "complete_with_declared_scope"}
+        if contract["completeness"] != "incomplete":
+            assert contract["limitations"], "Scoped completion needs limitations: " + entry["name"]
         assert contract["raw_data_to_physics"] is (entry["name"].casefold() == "thomson scattering")
         primary_link = f'{entry["module"]}.{entry["function"]}'
         assert contract["function_links"][0] == primary_link
@@ -60,14 +62,21 @@ def test_thomson_registry_links_resolve_to_real_callables():
         assert callable(getattr(module, function_name, None)), link
 
 
-def test_diagnostic_registry_does_not_claim_all_80_analyses_are_complete():
+def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_scope():
     from collections import Counter
 
-    counts = Counter(row["implementation_status"] for row in DIAGNOSTICS)
-    assert counts["Registry reference only"] == 56
-    assert counts["Implemented numerical workflow (see limits)"] == 20
-    assert sum("overall analysis remains incomplete" in status for status in counts) == 1
-    assert all(row["execution_contract"]["completeness"] == "incomplete" for row in DIAGNOSTICS)
+    levels = Counter(row["execution_contract"]["execution_level"] for row in DIAGNOSTICS)
+    completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
+    assert len(DIAGNOSTICS) == 80
+    assert levels == {"reference_only": 52, "limited_calculation": 17, "analysis_pipeline": 11}
+    assert completeness == {"incomplete": 70, "complete": 8, "complete_with_declared_scope": 2}
+    assert all(row["implementation_status"] for row in DIAGNOSTICS)
+    # "Complete" describes the declared computational scope, not empirical
+    # validation of a particular machine or calibration.
+    for row in DIAGNOSTICS:
+        contract = row["execution_contract"]
+        if contract["completeness"] != "incomplete":
+            assert contract["limitations"], row["diagnostic"]
 
 
 def test_packaged_registry_data_matches_repository_registries():
@@ -81,7 +90,7 @@ def test_cxrs_registry_links_resolve_and_contract_is_scoped():
     import importlib
     rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
     row = next(item for item in rows if item["diagnostic"] == "Charge-exchange recombination spectroscopy (CXRS)")
-    assert row["execution_contract"]["completeness"] == "incomplete"
+    assert row["execution_contract"]["completeness"] == "complete_with_declared_scope"
     assert row["execution_contract"]["input_specs"]
     assert row["execution_contract"]["output_specs"]
     assert row["execution_contract"]["uncertainty_model"] != "not_specified"
@@ -95,7 +104,7 @@ def test_toroidal_field_coil_analysis_contract_and_callable():
     rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
     row = next(item for item in rows if item["diagnostic"] == "Toroidal-field coils / magnetic probes")
     contract = row["execution_contract"]
-    assert contract["completeness"] == "incomplete"
+    assert contract["completeness"] == "complete"
     assert contract["input_specs"] and contract["output_specs"]
     assert contract["uncertainty_model"] != "not_specified"
     assert row["implementation_functions"] == ["tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"]
