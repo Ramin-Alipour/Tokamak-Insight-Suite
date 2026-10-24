@@ -4,6 +4,15 @@ from typing import Any
 import numpy as np
 from scipy import signal
 
+
+def _is_finite_real(value: Any) -> bool:
+    """Return whether a public numeric parameter is a finite real scalar (not bool)."""
+    return (
+        isinstance(value, (int, float, np.integer, np.floating))
+        and not isinstance(value, (bool, np.bool_))
+        and bool(np.isfinite(value))
+    )
+
 def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lowpass: float | None = None, order: int = 3) -> np.ndarray:
     x = np.asarray(values, dtype=float).ravel()
     if (isinstance(order, (bool, np.bool_)) or not isinstance(order, (int, float, np.integer, np.floating))
@@ -12,20 +21,20 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
     order = int(order)
     if len(x) < max(12, 3*order+1):
         raise ValueError('Signal is too short for the selected filter.')
-    if not np.isfinite(fs) or fs <= 0:
+    if not _is_finite_real(fs) or fs <= 0:
         raise ValueError('Sampling frequency must be positive and finite.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; handle missing samples before filtering.')
     nyq = fs/2
-    if highpass is not None and (not np.isfinite(highpass) or highpass <= 0):
+    if highpass is not None and (not _is_finite_real(highpass) or highpass <= 0):
         raise ValueError('High-pass cutoff must be positive and finite when supplied.')
-    if lowpass is not None and (not np.isfinite(lowpass) or lowpass <= 0):
+    if lowpass is not None and (not _is_finite_real(lowpass) or lowpass <= 0):
         raise ValueError('Low-pass cutoff must be positive and finite when supplied.')
     if highpass is None and lowpass is None:
         return x.copy()
-    if highpass is not None and (highpass >= nyq or not np.isfinite(highpass)):
+    if highpass is not None and (not _is_finite_real(highpass) or highpass >= nyq):
         raise ValueError('High-pass cutoff must be between 0 and Nyquist.')
-    if lowpass is not None and (lowpass >= nyq or not np.isfinite(lowpass)):
+    if lowpass is not None and (not _is_finite_real(lowpass) or lowpass >= nyq):
         raise ValueError('Low-pass cutoff must be between 0 and Nyquist.')
     if highpass is not None and lowpass is not None:
         if highpass >= lowpass: raise ValueError('High-pass cutoff must be below low-pass cutoff.')
@@ -38,7 +47,7 @@ def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lo
 
 def fft_spectrum(values: Any, fs: float, window: str = 'hann', detrend: bool = True) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(values, dtype=float).ravel()
-    if len(x) < 2 or not np.isfinite(fs) or fs <= 0:
+    if len(x) < 2 or not _is_finite_real(fs) or fs <= 0:
         raise ValueError('Need at least two samples and a positive finite sampling rate.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before FFT.')
@@ -59,7 +68,7 @@ def welch_psd(values: Any, fs: float, nperseg: int | None = None,
               noverlap: int | None = None, window: str = 'hann') -> tuple[np.ndarray, np.ndarray]:
     """Estimate PSD with explicit segment length, overlap, and window choices."""
     x = np.asarray(values, dtype=float).ravel()
-    if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
+    if len(x) < 8 or not _is_finite_real(fs) or fs <= 0:
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before PSD analysis.')
@@ -94,7 +103,7 @@ def autocorrelation_analysis(values: Any, fs: float, max_lag_s: float | None = N
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values.')
-    if max_lag_s is not None and (not np.isfinite(max_lag_s) or max_lag_s < 0):
+    if max_lag_s is not None and (not _is_finite_real(max_lag_s) or max_lag_s < 0):
         raise ValueError('Maximum lag must be finite and nonnegative.')
     x = x - np.mean(x)
     energy = float(np.dot(x, x))
@@ -194,11 +203,11 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
 def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = None) -> tuple[np.ndarray, np.ndarray, float]:
     """Return lag at maximum absolute correlation; y delayed relative to x gives a negative lag."""
     a, b = np.asarray(x,float).ravel(), np.asarray(y,float).ravel()
-    if len(a) != len(b) or len(a) < 3 or not np.isfinite(fs) or fs <= 0:
+    if len(a) != len(b) or len(a) < 3 or not _is_finite_real(fs) or fs <= 0:
         raise ValueError('Equal-length signals and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
         raise ValueError('Both signals must contain only finite values.')
-    if max_lag_s is not None and (not np.isfinite(max_lag_s) or max_lag_s < 0):
+    if max_lag_s is not None and (not _is_finite_real(max_lag_s) or max_lag_s < 0):
         raise ValueError('Maximum lag must be finite and nonnegative when supplied.')
     a, b = signal.detrend(a), signal.detrend(b)
     corr = signal.correlate(a,b,mode='full',method='auto')
