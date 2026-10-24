@@ -1082,14 +1082,24 @@ elif page=='Probe Analysis':
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     vmin=float(pd.to_numeric(df[vcol],errors='coerce').min()); vmax=float(pd.to_numeric(df[vcol],errors='coerce').max())
     st.markdown('### Fit-window and probe geometry')
+    st.caption('Fit windows are experiment-specific and are not inferred automatically. Enable each fit only after selecting a physically justified interval from the measured I–V curve. Default analysis reports descriptive quantities only.')
+    efit=None
+    if st.checkbox('Enable electron-retarding exponential fit (Te)',value=False,key='probe_enable_electron_fit'):
+        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin>=vmax:
+            st.error('The selected voltage column must contain a finite, nonzero voltage range.')
+        else:
+            efit=st.slider('Electron-retarding fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin+(vmax-vmin)*.35),float(vmin+(vmax-vmin)*.75)),key='probe_electron_fit_range')
+    ifit=None
+    if st.checkbox('Enable ion-branch fit (required for density estimate)',value=False,key='probe_enable_ion_fit'):
+        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin>=vmax:
+            st.error('The selected voltage column must contain a finite, nonzero voltage range.')
+        else:
+            ifit=st.slider('Ion-branch fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)),key='probe_ion_fit_range')
     c1,c2,c3=st.columns(3)
-    with c1: efit=st.slider('Electron-retarding fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin+(vmax-vmin)*.35),float(vmin+(vmax-vmin)*.75)))
-    with c2: ifit=st.slider('Ion-saturation range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)))
-    with c3: area=st.number_input('Effective collection area (m²; 0=omit density)',min_value=0.0,value=0.0,format='%.8g')
-    c1,c2,c3=st.columns(3)
-    with c1: mass=st.number_input('Main ion mass (amu; 0 = do not estimate density)',min_value=0.0,value=0.0)
-    with c2: ti=st.number_input('Ion temperature (eV; model input)',min_value=0.0,value=0.0)
-    with c3: sheath=st.number_input('Sheath coefficient',min_value=0.01,value=.61)
+    with c1: area=st.number_input('Effective collection area (m²; 0=omit density)',min_value=0.0,value=0.0,format='%.8g')
+    with c2: mass=st.number_input('Main ion mass (amu; 0 = do not estimate density)',min_value=0.0,value=0.0)
+    with c3: ti=st.number_input('Ion temperature (eV; model input)',min_value=0.0,value=0.0)
+    sheath=st.number_input('Sheath coefficient',min_value=0.01,value=.61)
     cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
         help='electron_positive: ion-saturation current is negative (default). ion_positive: collected ion current is positive; it is flipped internally.')
     if st.button('Analyze probe I–V',type='primary'):
