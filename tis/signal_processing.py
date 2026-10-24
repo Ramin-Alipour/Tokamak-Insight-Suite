@@ -132,7 +132,7 @@ def time_frequency_spectrogram(
 ) -> dict[str, np.ndarray]:
     """Return a Welch-style short-time power spectrum for transient/frequency-evolving signals."""
     x = np.asarray(values, dtype=float).ravel()
-    if len(x) < 8 or not np.isfinite(fs) or fs <= 0:
+    if len(x) < 8 or not _is_finite_real(fs) or fs <= 0:
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before spectrogram analysis.')
@@ -163,7 +163,7 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
     if nperseg is not None and (
         isinstance(nperseg, (bool, np.bool_))
         or not isinstance(nperseg, (int, float, np.integer, np.floating))
-        or not np.isfinite(nperseg) or int(nperseg) != nperseg or nperseg < 8
+        or not _is_finite_real(nperseg) or int(nperseg) != nperseg or nperseg < 8
     ):
         raise ValueError('nperseg must be an integer of at least 8 samples when supplied.')
     n = min(len(a), int(nperseg) if nperseg is not None else min(1024, max(8, len(a)//4)))
