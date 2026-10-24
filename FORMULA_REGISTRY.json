@@ -1233,8 +1233,8 @@
   },
   {
     "name": "Greenwald density reference",
-    "equation": "n_G[10^20 m^-3]=I_p[MA]/(π a²[m²])",
-    "inputs": "I_p [MA], minor radius a [m]",
+    "equation": "n_G[10^20 m^-3]=|I_p|[MA]/(π a²[m²])",
+    "inputs": "|I_p| [MA], minor radius a [m]",
     "output": "10^20 m^-3 and SI equivalent m^-3",
     "assumptions": "Empirical reference scaling, not a universal physical limit.",
     "status": "D",
@@ -1248,7 +1248,7 @@
         {
           "name": "plasma_current_MA",
           "unit": "MA",
-          "description": "Non-negative plasma-current magnitude in megaamperes.",
+          "description": "Signed plasma current in megaamperes; its magnitude is used.",
           "required": true
         },
         {
