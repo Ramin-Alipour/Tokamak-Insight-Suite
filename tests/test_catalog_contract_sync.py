@@ -33,6 +33,7 @@ def test_package_and_runtime_versions_are_consistent():
 
 
 def test_all_analysis_entry_points_declare_conservative_contracts():
+    import importlib
     from tokamak_analysis.analysis_registry import ANALYSES
     assert len(ANALYSES) == 81
     for entry in ANALYSES:
@@ -46,10 +47,11 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
             assert contract["limitations"], entry["name"]
         primary_link = f'tokamak_analysis.{entry["module"]}.{entry["function"]}'
         assert contract["function_links"][0] == primary_link
+        for link in contract["function_links"]:
+            module_name, function_name = link.rsplit(".", 1)
+            assert callable(getattr(importlib.import_module(module_name), function_name, None)), link
         if entry["name"].casefold() == "thomson scattering":
             assert len(contract["function_links"]) == 5
-        else:
-            assert contract["function_links"] == [primary_link]
 
 
 def test_thomson_registry_links_resolve_to_real_callables():
