@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from .catalog import DIAGNOSTICS, FORMULAS
+from .catalog import DIAGNOSTICS, FORMULAS, maturity_label
+from tokamak_analysis.analysis_registry import ANALYSES
 from .core import load_table, signal_quality, prepare_time_series, fft_spectrum, welch_psd, sha256_bytes
 
 
@@ -16,7 +17,7 @@ def main() -> int:
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True)
     sampling=p.add_mutually_exclusive_group(required=True); sampling.add_argument('--time'); sampling.add_argument('--fs',type=float)
     p.add_argument('--output',default='tis_fft.csv')
-    p=sub.add_parser('catalog',help='Export diagnostic/formula registry JSON'); p.add_argument('--kind',choices=['diagnostics','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
+    p=sub.add_parser('catalog',help='Export diagnostic, analysis-maturity, and formula registries'); p.add_argument('--kind',choices=['diagnostics','analyses','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
     p=sub.add_parser('events',help='Detect ELMs / sawtooth crashes or analyse a current quench'); p.add_argument('input'); p.add_argument('--kind',choices=['elm','sawtooth','quench'],required=True); p.add_argument('--time',required=True); p.add_argument('--signal',required=True); p.add_argument('--n-sigmas',type=float,default=None); p.add_argument('--output',default='tis_events.json')
     p=sub.add_parser('scalings',help='Confinement summary: Greenwald, q95, IPB98(y,2), H98, Martin-08 L-H threshold')
     for flag in ('ip-A','bt-T','r-m','a-m','kappa','ne-line-avg-m3','p-loss-W'): p.add_argument('--'+flag,type=float,required=True)
@@ -32,7 +33,12 @@ def main() -> int:
         print(f'Wrote {output_path.resolve()}'); return 0
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
-        if args.kind in ('diagnostics','both'):(out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(DIAGNOSTICS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+        if args.kind in ('diagnostics','both'):
+            diagnostics=[{**row,'maturity_level':maturity_label(row)} for row in DIAGNOSTICS]
+            (out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(diagnostics,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+        if args.kind == 'analyses':
+            analyses=[{**row,'maturity_level':maturity_label(row)} for row in ANALYSES]
+            (out/'ANALYSIS_REGISTRY.json').write_text(json.dumps(analyses,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
         if args.kind in ('formulas','both'):(out/'FORMULA_REGISTRY.json').write_text(json.dumps(FORMULAS,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
         print(f'Wrote registry file(s) to {out.resolve()}'); return 0
     data=Path(args.input).read_bytes(); frame=load_table(data,Path(args.input).name)

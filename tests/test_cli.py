@@ -38,3 +38,13 @@ def test_cli_fft_requires_exactly_one_sampling_source(tmp_path, monkeypatch):
     ])
     with pytest.raises(SystemExit):
         main()
+
+def test_cli_catalog_exports_analysis_maturity(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "argv", [
+        "tis", "catalog", "--kind", "analyses", "--output-dir", str(tmp_path)
+    ])
+    assert main() == 0
+    registry = json.loads((tmp_path / "ANALYSIS_REGISTRY.json").read_text(encoding="utf-8"))
+    assert len(registry) == 81
+    assert all(row.get("maturity_level") for row in registry)
+    assert any(row["maturity_level"] == "Analysis pipeline — incomplete" for row in registry)

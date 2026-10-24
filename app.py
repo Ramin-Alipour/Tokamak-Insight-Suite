@@ -18,7 +18,7 @@ from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distr
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
-from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families
+from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families, maturity_counts
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
 from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_star, spitzer_resistivity,
@@ -1664,7 +1664,7 @@ elif page=='Reports & Export':
     st.markdown("### Input data quality summary")
     if not quality_frame.empty: st.dataframe(quality_frame,use_container_width=True)
     history=st.session_state.get("tis_analysis_history",[])
-    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance and QC report; scientific validity still depends on calibration, geometry, uncertainty and model assumptions.'}
+    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'diagnostic_maturity_counts':maturity_counts(DIAGNOSTICS),'analysis_maturity_counts':maturity_counts(ANALYSES),'scientific_validation_status':'Not independently validated; experimental claims require compatible external reference data and device-specific calibration.','python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance and QC report; scientific validity still depends on calibration, geometry, uncertainty and model assumptions.'}
     st.markdown("### Analysis history")
     if history:
         st.dataframe(pd.DataFrame([{"analysis":h["name"],"created_at_utc":h["created_at_utc"]} for h in history]),use_container_width=True)

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from tis.catalog import DIAGNOSTICS, FORMULAS
+from tis.catalog import DIAGNOSTICS, FORMULAS, maturity_label
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -110,3 +110,13 @@ def test_toroidal_field_coil_analysis_contract_and_callable():
     assert row["implementation_functions"] == ["tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"]
     module = importlib.import_module("tokamak_analysis.toroidal_field_coils")
     assert callable(module.analyze_toroidal_field_coil)
+
+def test_maturity_labels_distinguish_reference_calculation_and_unvalidated_pipeline():
+    reference = next(row for row in DIAGNOSTICS if row["execution_contract"]["execution_level"] == "reference_only")
+    limited = next(row for row in DIAGNOSTICS if row["execution_contract"]["execution_level"] == "limited_calculation")
+    thomson = next(row for row in DIAGNOSTICS if row["diagnostic"].casefold() == "thomson scattering")
+    scoped = next(row for row in DIAGNOSTICS if row["execution_contract"]["completeness"] == "complete_with_declared_scope")
+    assert maturity_label(reference) == "Reference only"
+    assert maturity_label(limited) == "Limited calculation"
+    assert maturity_label(thomson) == "Analysis pipeline — incomplete"
+    assert "not independently validated" in maturity_label(scoped)

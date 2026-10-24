@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, Iterable, Mapping
 
 _ROOT = Path(__file__).resolve().parents[1]
 _PACKAGE_DATA = Path(__file__).resolve().parent / "data"
@@ -38,6 +39,34 @@ def _cached_formulas() -> tuple[dict, ...]:
 # Public list-compatible copies preserve the existing API while reading canonical JSON.
 DIAGNOSTICS = [dict(item) for item in _cached_diagnostics()]
 FORMULAS = [dict(item) for item in _cached_formulas()]
+
+def maturity_label(record: Mapping[str, Any]) -> str:
+    """Return a conservative, user-facing implementation maturity label.
+
+    These labels describe software scope only; none means experimentally validated.
+    """
+    contract = record.get("execution_contract") or {}
+    level = contract.get("execution_level", "reference_only")
+    completeness = contract.get("completeness", "incomplete")
+    if level == "reference_only":
+        return "Reference only"
+    if level == "limited_calculation":
+        return "Limited calculation"
+    if completeness == "complete_with_declared_scope":
+        return "Complete within declared scope — not independently validated"
+    if completeness == "complete":
+        return "Complete within declared computational scope — not independently validated"
+    if level == "analysis_pipeline":
+        return "Analysis pipeline — incomplete"
+    return "Unclassified — incomplete"
+
+
+def maturity_counts(records: Iterable[Mapping[str, Any]]) -> dict[str, int]:
+    """Count maturity labels for provenance and report summaries."""
+    from collections import Counter
+
+    return dict(sorted(Counter(maturity_label(record) for record in records).items()))
+
 
 def diagnostic_families() -> list[str]:
     return sorted({str(item["family"]) for item in DIAGNOSTICS if item.get("family")})

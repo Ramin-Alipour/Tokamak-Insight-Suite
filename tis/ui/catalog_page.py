@@ -2,6 +2,8 @@
 from __future__ import annotations
 from typing import Callable, Iterable, Mapping, Any
 
+from tis.catalog import maturity_label
+
 
 def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                         formulas: Iterable[Mapping[str, Any]],
@@ -37,6 +39,7 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                     f"**Quantity class (M=measured, D=derived, I=inferred):** {diagnostic['status']}\n\n"
                     f"**Execution level:** `{level}`\n\n"
                     f"**Contract completeness:** {completeness}\n\n"
+                    f"**Maturity level:** {maturity_label(diagnostic)}\n\n"
                     f"**Declared inputs / outputs:** {len(inputs)} / {len(outputs)}\n\n"
                     f"**Raw data → physical result:** {'Declared' if raw_to_physics else 'Not claimed'}\n\n"
                     f"**Implementation status:** {diagnostic.get('implementation_status', 'Registry reference only')}\n\n"
@@ -57,6 +60,7 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                     f"**Callable:** `{analysis['module']}.{analysis['function']}`\n\n"
                     f"**Execution level:** `{contract.get('execution_level', 'reference_only')}`\n\n"
                     f"**Contract completeness:** {contract.get('completeness', 'incomplete')}\n\n"
+                    f"**Maturity level:** {maturity_label(analysis)}\n\n"
                     f"**Declared input / output specifications:** {len(contract.get('input_specs', []))} / {len(contract.get('output_specs', []))}\n\n"
                     f"**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics', False) and contract.get('completeness') == 'complete' else 'Not claimed'}\n\n"
                     f"**Limitations:** {'; '.join(contract.get('limitations', [])) or 'Not yet documented'}"
