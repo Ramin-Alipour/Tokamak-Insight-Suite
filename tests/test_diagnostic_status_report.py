@@ -31,8 +31,8 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     }
     assert report["diagnostic_completeness_counts"] == {
         "complete": 8,
-        "complete_with_declared_scope": 2,
-        "incomplete": 70,
+        "complete_with_declared_scope": 3,
+        "incomplete": 69,
     }
     assert report["callable_analysis_entry_point_count"] == 81
     assert sum(report["callable_analysis_completeness_counts"].values()) == 81
@@ -41,7 +41,7 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     assert len(first_ten) == 10
     assert [row["catalog_position"] for row in first_ten] == list(range(1, 11))
     assert first_ten[0]["diagnostic"] == "Thomson scattering"
-    assert first_ten[0]["completeness"] == "incomplete"
+    assert first_ten[0]["completeness"] == "complete_with_declared_scope"
     assert first_ten[1]["diagnostic"] == "Langmuir probe"
     assert first_ten[1]["completeness"] == "complete"
     assert first_ten[9]["diagnostic"] == "Mirnov / pickup coils"
