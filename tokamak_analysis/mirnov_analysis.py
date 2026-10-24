@@ -92,7 +92,7 @@ def analyze_mirnov_signal(
     """
     t, v = _signal(time_s, voltage_V, minimum=8)
     dt = _dt(t)
-    if detrend not in {"constant", "linear", "none"}:
+    if not isinstance(detrend, str) or detrend not in {"constant", "linear", "none"}:
         raise ValueError("detrend must be 'constant', 'linear', or 'none'")
     try:
         if not _is_finite_real_scalar(peak_prominence_fraction):
