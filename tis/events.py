@@ -40,7 +40,7 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
     # sub-femtosecond tick and rejecting otherwise valid quantized timestamps.
     interval_tol = max(
         1e-9 * dt,
-        8.0 * np.finfo(float).eps * max(float(np.max(np.abs(t))), float(np.max(intervals)), 1e-12),
+        2.0 * np.finfo(float).eps * max(float(np.max(np.abs(t))), float(np.max(intervals)), 1e-12),
     )
     sorted_intervals = np.sort(intervals)
     clusters: list[list[float]] = []
