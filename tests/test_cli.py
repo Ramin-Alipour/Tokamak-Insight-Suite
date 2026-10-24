@@ -72,7 +72,7 @@ def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monk
     assert len(first_ten) == 10
     assert [row["catalog_position"] for row in first_ten] == list(range(1, 11))
     assert [row["completeness"] for row in first_ten] == [
-        "complete_with_declared_scope", "complete",
+        "complete_with_declared_scope", "complete_with_declared_scope",
         "complete_with_declared_scope", "complete_with_declared_scope",
         "complete", "complete", "complete", "complete", "complete", "complete",
     ]
