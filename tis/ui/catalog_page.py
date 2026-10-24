@@ -33,7 +33,7 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                 functions = ", ".join(diagnostic.get("implementation_functions", []))
                 if not functions:
                     functions = "No direct callable workflow is mapped; registry description only."
-                raw_to_physics = contract.get("raw_data_to_physics", False) and completeness == "complete"
+                raw_to_physics = contract.get("raw_data_to_physics", False) and completeness in {"complete", "complete_with_declared_scope"}
                 st.markdown(
                     f"**Observables:** {diagnostic['quantities']}\n\n"
                     f"**Quantity class (M=measured, D=derived, I=inferred):** {diagnostic['status']}\n\n"
@@ -62,7 +62,7 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                     f"**Contract completeness:** {contract.get('completeness', 'incomplete')}\n\n"
                     f"**Maturity level:** {maturity_label(analysis)}\n\n"
                     f"**Declared input / output specifications:** {len(contract.get('input_specs', []))} / {len(contract.get('output_specs', []))}\n\n"
-                    f"**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics', False) and contract.get('completeness') == 'complete' else 'Not claimed'}\n\n"
+                    f"**Raw data → physical result:** {'Declared' if contract.get('raw_data_to_physics', False) and contract.get('completeness') in {'complete', 'complete_with_declared_scope'} else 'Not claimed'}\n\n"
                     f"**Limitations:** {'; '.join(contract.get('limitations', [])) or 'Not yet documented'}"
                 )
         json_download("Export analysis entry-point contracts JSON", entries, "tis_analysis_contracts.json")
