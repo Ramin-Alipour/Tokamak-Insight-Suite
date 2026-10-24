@@ -93,7 +93,11 @@ def larmor_radii_and_speeds(te_eV: float, ti_eV: float, b_T: float, ne_m3: float
 
 def shaping_surface_area(r_m: float, a_m: float, kappa: float) -> float:
     """Approximate plasma surface area S ~ 4 pi^2 R a sqrt((1+kappa^2)/2) [m^2] (ITER Physics Basis)."""
-    return float(4 * math.pi ** 2 * _pos("R", r_m) * _pos("a", a_m) * math.sqrt((1 + _pos("kappa", kappa) ** 2) / 2))
+    r = _pos("R", r_m)
+    a = _pos("a", a_m)
+    if a >= r:
+        raise ValueError("Inverse aspect ratio a/R must be in (0,1) for toroidal surface-area scaling.")
+    return float(4 * math.pi ** 2 * r * a * math.sqrt((1 + _pos("kappa", kappa) ** 2) / 2))
 
 
 def q95_iter_formula(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa95: float,
@@ -182,6 +186,8 @@ def ipb98y2_confinement_time(ip_MA: float, bt_T: float, p_loss_MW: float, ne_19:
     ip = _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA))); b = _pos("|Bt|", abs(_finite_real("bt_T", bt_T))); p = _pos("p_loss_MW", p_loss_MW)
     n = _pos("ne_19", ne_19); m = _pos("mass_amu", mass_amu); r = _pos("R", r_m); a = _pos("a", a_m); k = _pos("kappa_a", kappa_a)
     eps = a / r
+    if not 0 < eps < 1:
+        raise ValueError("Inverse aspect ratio a/R must be in (0,1) for IPB98(y,2).")
     tau = 0.0562 * ip ** 0.93 * b ** 0.15 * p ** -0.69 * n ** 0.41 * m ** 0.19 * r ** 1.97 * eps ** 0.58 * k ** 0.78
     return {"tau_E_IPB98y2_s": float(tau), "scaling": "IPB98(y,2)",
             "note": "Empirical H-mode scaling; P_loss must be the net loss power (P_heat - dW/dt, optionally minus radiated core power by convention)."}
