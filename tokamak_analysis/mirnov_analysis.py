@@ -21,7 +21,9 @@ def _signal(time_s: Any, values: Any, minimum: int = 2):
         raise ValueError("time and signal must be matching one-dimensional arrays")
     if len(t) < minimum or not np.all(np.isfinite(t)) or not np.all(np.isfinite(y)):
         raise ValueError(f"At least {minimum} finite matching samples are required")
-    if np.any(np.diff(t) <= 0):
+    with np.errstate(over="ignore", invalid="ignore"):
+        time_differences = np.diff(t)
+    if np.any(time_differences <= 0):
         raise ValueError("time_s must be strictly increasing")
     return t, y
 
@@ -42,7 +44,8 @@ def _integer(value: Any, name: str) -> int:
 
 
 def _dt(t: np.ndarray) -> float:
-    d = np.diff(t)
+    with np.errstate(over="ignore", invalid="ignore"):
+        d = np.diff(t)
     dt = float(np.median(d))
     if not np.isfinite(dt) or dt <= 0 or not np.all(np.isfinite(d)) or not np.allclose(
         d, dt, rtol=1e-3, atol=max(1e-15, dt * 1e-12)
