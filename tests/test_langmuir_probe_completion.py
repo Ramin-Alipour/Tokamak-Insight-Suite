@@ -66,3 +66,46 @@ def test_nonfinite_samples_are_removed_but_reported_point_count_is_cleaned():
     result = langmuir_iv_analysis(v, i)
     assert result["n_points"] == 9
     assert np.isfinite(result["max_dIdV_A_per_V"])
+
+
+def _synthetic_iv_for_regression():
+    voltage = np.linspace(-20.0, 20.0, 81)
+    current = -1.0e-3 + 2.0e-6 * np.exp((voltage + 20.0) / 5.0)
+    return voltage, current
+
+
+def test_langmuir_iv_recovers_synthetic_electron_temperature():
+    voltage, current = _synthetic_iv_for_regression()
+    result = langmuir_iv_analysis(
+        voltage, current, electron_fit_range=(-5.0, 10.0),
+        ion_fit_range=(-20.0, -12.0),
+    )
+    assert result["electron_temperature_eV"] == pytest.approx(5.0, rel=0.08)
+    assert result["electron_retarding_fit_R2"] > 0.99
+
+
+@pytest.mark.parametrize("bad", [
+    ["1", "2", "3", "4", "5", "6", "7", "8"],
+    [True, False, True, False, True, False, True, False],
+])
+def test_langmuir_iv_rejects_non_numeric_or_boolean_voltage(bad):
+    with pytest.raises(ValueError, match="real numeric"):
+        langmuir_iv_analysis(bad, np.arange(8, dtype=float))
+
+
+def test_langmuir_iv_rejects_electron_window_without_positive_excess():
+    voltage = np.linspace(-10.0, 10.0, 41)
+    current = np.full_like(voltage, -1.0e-3)
+    with pytest.raises(ValueError, match="above the estimated ion-current baseline"):
+        langmuir_iv_analysis(
+            voltage, current, electron_fit_range=(-5.0, 5.0)
+        )
+
+
+def test_langmuir_iv_density_does_not_use_descriptive_tail_without_fit_window():
+    voltage, current = _synthetic_iv_for_regression()
+    result = langmuir_iv_analysis(
+        voltage, current, area_m2=1.0e-6, ion_mass_amu=2.0
+    )
+    assert "ion_density_estimate_m-3" not in result
+    assert result["ion_density_status"].startswith("not_estimated:")
