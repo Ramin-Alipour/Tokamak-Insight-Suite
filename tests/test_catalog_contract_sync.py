@@ -44,7 +44,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
         if contract["raw_data_to_physics"]:
             assert contract["execution_level"] == "analysis_pipeline"
             assert contract["limitations"], entry["name"]
-        primary_link = f'{entry["module"]}.{entry["function"]}'
+        primary_link = f'tokamak_analysis.{entry["module"]}.{entry["function"]}'
         assert contract["function_links"][0] == primary_link
         if entry["name"].casefold() == "thomson scattering":
             assert len(contract["function_links"]) == 5
