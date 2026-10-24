@@ -118,7 +118,9 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     t = np.asarray(time_s, dtype=float).ravel(); y = np.asarray(values, dtype=float).ravel()
     if len(t) != len(y):
         raise ValueError("Time and signal must have equal lengths.")
+    n_input_raw = len(t)
     good = np.isfinite(t) & np.isfinite(y)
+    n_nonfinite_dropped = int(np.count_nonzero(~good))
     t, y = t[good], y[good]
     if len(t) < 8:
         raise ValueError("At least 8 finite samples are required.")
@@ -165,7 +167,8 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     inside_gap = (span > limit) & strictly_inside_interval
     out[inside_gap] = np.nan
     return {"time_s": grid, "values": out, "fs_Hz": float(fs), "n_nan_in_long_gaps": int(inside_gap.sum()),
-            "n_input": int(len(t)), "n_output": int(len(grid)),
+            "n_input": int(len(t)), "n_input_raw": int(n_input_raw),
+            "n_nonfinite_dropped": n_nonfinite_dropped, "n_output": int(len(grid)),
             "method": f"linear interpolation; gaps > {limit:.6g} s left as NaN"}
 
 
