@@ -48,3 +48,21 @@ def test_catalogue_contract_fields_are_machine_readable():
     rows = json.loads(path.read_text(encoding="utf-8"))
     assert all("execution_contract" in row for row in rows)
     assert all("execution_level" in row["execution_contract"] for row in rows)
+
+
+def test_registry_loader_falls_back_to_packaged_data_when_root_copy_is_absent(tmp_path, monkeypatch):
+    import tis.contracts as contracts
+
+    monkeypatch.setattr(contracts, "_ROOT_REGISTRY_PATH", tmp_path / "missing" / "DIAGNOSTIC_REGISTRY.json")
+    monkeypatch.setattr(
+        contracts,
+        "_PACKAGE_REGISTRY_PATH",
+        Path(__file__).resolve().parents[1] / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json",
+    )
+    contracts.clear_registry_cache()
+    try:
+        rows = contracts.load_diagnostic_registry()
+        assert len(rows) == 80
+        assert rows[0]["diagnostic"] == "Thomson scattering"
+    finally:
+        contracts.clear_registry_cache()

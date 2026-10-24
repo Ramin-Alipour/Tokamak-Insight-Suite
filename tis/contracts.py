@@ -76,12 +76,26 @@ class ExecutionContract:
                    (spec.maximum is not None and v > spec.maximum) for v in numbers):
                 raise ContractError(f"Input '{name}' is outside its declared bounds")
 
-_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+_ROOT_REGISTRY_PATH = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+_PACKAGE_REGISTRY_PATH = Path(__file__).resolve().parent / "data" / "DIAGNOSTIC_REGISTRY.json"
+
 
 @lru_cache(maxsize=1)
 def load_diagnostic_registry() -> tuple[dict[str, Any], ...]:
-    with _REGISTRY_PATH.open("r", encoding="utf-8") as stream:
-        rows = json.load(stream)
+    # Source checkouts use the repository-root registry; installed wheels ship
+    # the canonical copy as package data under tis/data/.
+    registry_path = (
+        _ROOT_REGISTRY_PATH
+        if _ROOT_REGISTRY_PATH.is_file()
+        else _PACKAGE_REGISTRY_PATH
+    )
+    try:
+        with registry_path.open("r", encoding="utf-8") as stream:
+            rows = json.load(stream)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ContractError(
+            f"Cannot load canonical diagnostic registry at {registry_path}: {exc}"
+        ) from exc
     if not isinstance(rows, list):
         raise ContractError("DIAGNOSTIC_REGISTRY.json must contain a JSON list")
     return tuple(rows)
