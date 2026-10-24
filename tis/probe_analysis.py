@@ -7,6 +7,17 @@ from scipy import optimize
 from .constants import E_CHARGE, AMU
 from .spectral_analysis import _r2
 
+
+def _is_finite_real_scalar(value: Any) -> bool:
+    """Accept finite real scalars while rejecting booleans and numeric strings."""
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
     """Descriptive I-V preprocessing only; does not silently infer Te/ne without a validated regime model."""
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
@@ -41,23 +52,27 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     or "ion_positive" (collected-ion current is positive, as in many probe circuits); the
     latter is flipped internally so the analysis always works in the electron-positive form.
     """
-    if current_convention not in {"electron_positive", "ion_positive"}:
+    if not isinstance(current_convention, str) or current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
         if fit_range is not None:
             try:
-                limits = np.asarray(fit_range, dtype=float)
+                raw_limits = list(fit_range)
             except (TypeError, ValueError) as exc:
                 raise ValueError(f"{name} must contain exactly two finite voltage limits.") from exc
-            if limits.shape != (2,) or not np.all(np.isfinite(limits)) or limits[1] <= limits[0]:
+            if len(raw_limits) != 2 or not all(_is_finite_real_scalar(value) for value in raw_limits):
+                raise ValueError(f"{name} must contain exactly two finite numeric voltage limits.")
+            limits = np.asarray(raw_limits, dtype=float)
+            if limits[1] <= limits[0]:
                 raise ValueError(f"{name} must contain exactly two finite voltage limits in strictly increasing order.")
     if (area_m2 is None) != (ion_mass_amu is None):
         raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
-    if area_m2 is not None and (not np.isfinite(area_m2) or area_m2 <= 0):
+    if area_m2 is not None and (not _is_finite_real_scalar(area_m2) or area_m2 <= 0):
         raise ValueError("Collection area must be positive and finite.")
-    if ion_mass_amu is not None and (not np.isfinite(ion_mass_amu) or ion_mass_amu <= 0):
+    if ion_mass_amu is not None and (not _is_finite_real_scalar(ion_mass_amu) or ion_mass_amu <= 0):
         raise ValueError("Ion mass must be positive and finite.")
-    if not np.all(np.isfinite([ti_eV, sheath_factor, gamma_i])) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0:
+    if (not _is_finite_real_scalar(ti_eV) or not _is_finite_real_scalar(sheath_factor)
+            or not _is_finite_real_scalar(gamma_i) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0):
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     raw_v=np.asarray(voltage,float); raw_i=np.asarray(current,float)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
@@ -207,7 +222,8 @@ def floating_potential(voltage: Any, current: Any) -> float | None:
 
 def triple_probe_temperature_eV(v_difference_V: float, model_factor: float = 1.0) -> dict[str, float | str]:
     """First-order triple-probe Te estimate under a user-selected idealized exponential-current model."""
-    if not np.isfinite(v_difference_V) or v_difference_V<=0 or not np.isfinite(model_factor) or model_factor<=0:
+    if (not _is_finite_real_scalar(v_difference_V) or v_difference_V <= 0
+            or not _is_finite_real_scalar(model_factor) or model_factor <= 0):
         raise ValueError('Voltage difference and model factor must be positive and finite.')
     te=float(v_difference_V/(np.log(2)*model_factor))
     return {'electron_temperature_estimate_eV':te,'voltage_difference_V':float(v_difference_V),'model_factor':float(model_factor),'assumption':'Idealized triple-probe relation; confirm the actual electrode configuration, current balance, sheath model and circuit definition before use.'}
