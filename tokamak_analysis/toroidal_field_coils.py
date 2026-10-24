@@ -106,10 +106,19 @@ def integrate_pickup_coil_voltage(
         sv = np.asarray(voltage_uncertainty_V, dtype=float)
         if sv.shape != v.shape or not np.all(np.isfinite(sv)) or np.any(sv < 0):
             raise ValueError("voltage_uncertainty_V must match voltage and be finite/non-negative")
-        # Independent voltage-noise propagation through the trapezoidal integral.
+        # Exact propagation for independent sample noise through cumulative
+        # trapezoidal integration. Adjacent intervals share an interior voltage
+        # sample, so their contributions are correlated even when the raw sample
+        # errors are independent. Add the resulting cross terms at each interior
+        # time point instead of treating interval integrals as independent.
         q = dt / (2.0 * s)
         interval_variance = q**2 * (sv[:-1]**2 + sv[1:]**2)
         cumulative_variance = np.concatenate(([0.0], np.cumsum(interval_variance)))
+        if sv.size > 2:
+            shared_sample_cross_terms = (
+                2.0 * q[:-1] * q[1:] * sv[1:-1]**2
+            )
+            cumulative_variance[2:] += np.cumsum(shared_sample_cross_terms)
         # Sensitivity and initial-condition terms are propagated separately.
         sigma_voltage_integral = np.sqrt(cumulative_variance)
         sigma_sensitivity = np.abs(delta_b / s) * ss

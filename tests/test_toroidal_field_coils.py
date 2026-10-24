@@ -55,3 +55,29 @@ def test_pickup_voltage_integration_rejects_bad_uncertainty():
             [0, 1], [1, 1], sensitivity_V_per_T_per_s=1,
             initial_field_T=0, voltage_uncertainty_V=[0, -1]
         )
+
+def test_pickup_voltage_uncertainty_accounts_for_shared_trapezoid_samples():
+    # Unequal time steps and independent pointwise noise. The interior samples
+    # contribute to two adjacent trapezoids, so interval variances alone
+    # underestimate cumulative uncertainty.
+    time = np.array([0.0, 0.1, 0.3, 0.6])
+    sigma_v = np.array([0.1, 0.2, 0.3, 0.4])
+    sensitivity = 2.0
+    result = integrate_pickup_coil_voltage(
+        time, np.zeros_like(time),
+        sensitivity_V_per_T_per_s=sensitivity,
+        initial_field_T=0.0,
+        voltage_uncertainty_V=sigma_v,
+    )
+    q = np.diff(time) / (2.0 * sensitivity)
+    expected_weights = np.array([
+        [0.0, 0.0, 0.0, 0.0],
+        [q[0], q[0], 0.0, 0.0],
+        [q[0], q[0] + q[1], q[1], 0.0],
+        [q[0], q[0] + q[1], q[1] + q[2], q[2]],
+    ])
+    expected = np.sqrt(np.sum((expected_weights * sigma_v) ** 2, axis=1))
+    np.testing.assert_allclose(
+        result["B_toroidal_uncertainty_T"], expected, rtol=1e-13, atol=0.0
+    )
+
