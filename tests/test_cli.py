@@ -39,6 +39,7 @@ def test_cli_fft_requires_exactly_one_sampling_source(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         main()
 
+
 def test_cli_catalog_exports_analysis_maturity(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", [
         "tis", "catalog", "--kind", "analyses", "--output-dir", str(tmp_path)
@@ -47,7 +48,10 @@ def test_cli_catalog_exports_analysis_maturity(tmp_path, monkeypatch):
     registry = json.loads((tmp_path / "ANALYSIS_REGISTRY.json").read_text(encoding="utf-8"))
     assert len(registry) == 81
     assert all(row.get("maturity_level") for row in registry)
-    assert any(row["maturity_level"] == "Analysis pipeline — incomplete" for row in registry)
+    assert registry[0]["execution_contract"]["completeness"] == "complete_with_declared_scope"
+    assert registry[0]["maturity_level"] == "Complete within declared scope — not independently validated"
+    assert any(row["maturity_level"] == "Complete within declared scope — not independently validated" for row in registry)
+
 
 def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "argv", [
@@ -73,4 +77,3 @@ def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monk
         "complete", "complete", "complete", "complete", "complete", "complete",
     ]
     assert all(row["maturity_level"] for row in first_ten)
-
