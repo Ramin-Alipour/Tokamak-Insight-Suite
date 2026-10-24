@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -26,8 +27,6 @@ def test_probe_page_renders_with_default_geometry_without_error():
     app.radio[0].set_value("Probe Analysis").run()
     assert not app.exception, [str(error.value) for error in app.exception]
 
-
-import pytest
 
 ALL_PAGES = [
     "Home", "Public Data Access", "Data Import & QC", "Time Series & MHD", "Events & Transients",
