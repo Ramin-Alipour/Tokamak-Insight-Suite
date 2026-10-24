@@ -1,4 +1,4 @@
-name: Continuous validation
+name: Continuous software tests
 
 on:
   push:
