@@ -53,8 +53,16 @@ def build_tomography_matrix_2d(ray_start_xz: Any, ray_end_xz: Any,
 
 def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool = True,
                           measurement_sigma: Any | None = None,
-                          regularization_order: int = 1) -> dict[str, Any]:
-    """Solve a normalized Tikhonov inverse problem with order-0/1/2 regularization."""
+                          regularization_order: int = 1,
+                          grid_shape: tuple[int, int] | None = None) -> dict[str, Any]:
+    """Solve a normalized Tikhonov inverse problem with order-0/1/2 regularization.
+
+    With grid_shape=(nz, nx), unknowns follow the iz * nx + ix flattening
+    used by build_tomography_matrix_2d. Spatial penalties use horizontal and
+    vertical neighbors, avoiding artificial links across flattened row boundaries.
+    Without grid_shape, the unknown vector is regularized as a one-dimensional
+    sequence.
+    """
     A=np.asarray(A,float); y=np.asarray(y,float).ravel()
     if A.ndim!=2 or A.shape[0]!=len(y) or A.size==0: raise ValueError('A must be a nonempty 2D matrix with one row per measurement.')
     if not np.all(np.isfinite(A)) or not np.all(np.isfinite(y)): raise ValueError('Response matrix and measurements must contain only finite values.')
@@ -77,7 +85,30 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
     An=Aw/response_scale
     yn=yw/response_scale
     identity=np.eye(A.shape[1])
-    operator=identity if regularization_order==0 else np.diff(identity,n=regularization_order,axis=0)
+    if grid_shape is None:
+        operator = identity if regularization_order == 0 else np.diff(identity, n=regularization_order, axis=0)
+    else:
+        if (not isinstance(grid_shape, (tuple, list)) or len(grid_shape) != 2
+                or any(isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, np.integer)) or v < 1
+                       for v in grid_shape)):
+            raise ValueError("grid_shape must be a pair of positive integers (nz, nx).")
+        nz, nx = map(int, grid_shape)
+        if nz * nx != A.shape[1]:
+            raise ValueError("grid_shape product must equal the number of tomography unknowns.")
+        if regularization_order == 0:
+            operator = identity
+        else:
+            basis = identity.reshape(A.shape[1], nz, nx)
+            terms = []
+            if nx > regularization_order:
+                dx = np.diff(basis, n=regularization_order, axis=2)
+                terms.append(dx.transpose(1, 2, 0).reshape(-1, A.shape[1]))
+            if nz > regularization_order:
+                dz = np.diff(basis, n=regularization_order, axis=1)
+                terms.append(dz.transpose(1, 2, 0).reshape(-1, A.shape[1]))
+            if not terms:
+                raise ValueError("grid_shape is too small for the requested spatial regularization order.")
+            operator = np.vstack(terms)
     operator_norm=float(np.linalg.norm(operator,ord=2)) if operator.size else 1.0
     if operator_norm>0: operator=operator/operator_norm
     if nonnegative:
@@ -105,7 +136,9 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
 
 
 def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
-                           nonnegative: bool = True, measurement_sigma: Any | None = None) -> dict[str, Any]:
+                           nonnegative: bool = True, measurement_sigma: Any | None = None,
+                           regularization_order: int = 1,
+                           grid_shape: tuple[int, int] | None = None) -> dict[str, Any]:
     """Choose a candidate Tikhonov parameter from discrete L-curve curvature.
 
     This is a heuristic selection aid, not a substitute for a noise model or validation
@@ -116,7 +149,10 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
         raise ValueError("Provide at least three finite, positive, strictly increasing candidate lambdas.")
     residuals=[]; norms=[]; solution_norms=[]
     for value in candidates:
-        result=regularized_tomography(A,y,float(value),nonnegative,measurement_sigma)
+        result=regularized_tomography(
+            A, y, float(value), nonnegative, measurement_sigma,
+            regularization_order=regularization_order, grid_shape=grid_shape,
+        )
         residuals.append(max(result['weighted_residual_norm'],np.finfo(float).tiny))
         norms.append(max(float(result['regularization_operator_norm']),np.finfo(float).tiny))
         solution_norms.append(float(np.linalg.norm(result['solution'])))
