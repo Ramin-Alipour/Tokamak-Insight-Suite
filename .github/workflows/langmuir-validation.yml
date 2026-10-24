@@ -76,7 +76,7 @@ jobs:
           app.selectbox(key="probe_i").set_value("current_A")
           app.checkbox(key="probe_enable_electron_fit").check()
           app.run(timeout=90)
-          app.button(label="Analyze probe I–V").click()
+          next(button for button in app.button if button.label == "Analyze probe I–V").click()
           app.run(timeout=90)
           assert not app.exception, f"Interactive Langmuir analysis failed: {app.exception}"
           assert any(
