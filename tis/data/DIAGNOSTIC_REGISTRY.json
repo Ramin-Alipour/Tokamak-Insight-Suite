@@ -13,7 +13,7 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Scoped profile and spectrum workflows are implemented, but the overall analysis remains incomplete pending independent experimental validation and device-specific calibration.",
+    "implementation_status": "Complete within the declared software scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, combined spectrum-to-temperature/density workflow, and user-defined spectral-model fitting are implemented. Independent experimental validation and device-specific calibration are important user responsibilities but are not software-completion gates; unsupported physics models remain explicitly out of scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
