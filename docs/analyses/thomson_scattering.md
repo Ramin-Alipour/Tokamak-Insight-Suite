@@ -131,6 +131,7 @@ The built-in registry is process-local, not isolated per web-app user: registere
 - Does not fit collective spectra, relativistic/non-Maxwellian spectra, or non-Gaussian instrument responses.
 - Does not infer density from uncalibrated spectral amplitude. Absolute density needs calibrated spectral power density or collected power, laser power, interaction length, differential cross-section, collection solid angle, optical efficiency, and appropriate spectral-band treatment.
 - Synthetic tests establish numerical recovery for the stated model only; they do not constitute independent experimental validation.
+- A provisional MAST shot 28830 cross-diagnostic check compared archived Thomson-derived edge density and independent interferometer line density with rounded published Table II values. Relative differences were −3.77% and −1.74%, respectively, within a predeclared 10% tolerance. The paper's exact averaging interval is unspecified, so this is not a raw-spectrum or full spectrum-to-density validation.
 
 ## Completion gate
 
