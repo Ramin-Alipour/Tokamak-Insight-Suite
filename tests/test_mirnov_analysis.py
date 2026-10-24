@@ -189,3 +189,28 @@ def test_array_reports_sampling_and_alias_diagnostics():
     assert out["nyquist_frequency_Hz"] == pytest.approx(fs/2)
     assert out["approximate_mode_alias_limit"] >= 1
     assert out["minimum_toroidal_sensor_spacing_rad"] > 0
+
+
+@pytest.mark.parametrize("turns", ["10", 10**1000])
+def test_mirnov_rejects_string_or_oversized_turn_count(turns):
+    t = np.arange(16, dtype=float) * 1e-4
+    with pytest.raises(ValueError, match="turns"):
+        analyze_mirnov_signal(t, np.sin(np.arange(16.0)), coil_area_m2=1e-4, turns=turns)
+
+
+def test_mirnov_rejects_boolean_peak_prominence():
+    t = np.arange(16, dtype=float) * 1e-4
+    with pytest.raises(ValueError, match="peak_prominence_fraction"):
+        analyze_mirnov_signal(t, np.sin(np.arange(16.0)), peak_prominence_fraction=True)
+
+
+def test_mirnov_rejects_non_numeric_frequency_band():
+    t = np.arange(16, dtype=float) * 1e-4
+    with pytest.raises(ValueError, match="frequency range"):
+        analyze_mirnov_signal(t, np.sin(np.arange(16.0)), frequency_range_Hz=("10", "100"))
+
+
+def test_mirnov_rejects_overflowing_time_differences():
+    t = np.array([-1e308, 1e308, 1.1e308, 1.2e308, 1.3e308, 1.4e308, 1.5e308, 1.6e308])
+    with pytest.raises(ValueError, match="Uniform sampling"):
+        analyze_mirnov_signal(t, np.sin(np.arange(8.0)))
