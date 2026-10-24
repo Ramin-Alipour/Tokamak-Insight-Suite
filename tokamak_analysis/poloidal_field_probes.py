@@ -142,9 +142,25 @@ def analyze_poloidal_field_probes(
         if u.shape != y.shape or not np.all(np.isfinite(u)) or np.any(u < 0):
             raise ValueError("signal_uncertainty must be non-negative, finite, and broadcastable to signal.")
         ub = u * np.abs(gain)[None, :]
-        out["B_poloidal_uncertainty_T"] = ub[:, 0] if squeeze else ub
-        # Independent-sample uncertainty for a three-point central difference.
-        # Edge points use NumPy's one-sided second-order gradient coefficients.
+        # Baseline subtraction uses the same estimated mean at every sample,
+        # creating covariance between corrected samples. Propagate that shared
+        # mean into each marginal B uncertainty instead of treating the
+        # baseline-corrected samples as independent.
+        if baseline_mask is not None:
+            baseline_count = int(np.count_nonzero(baseline_mask))
+            baseline_variance = np.sum(ub[baseline_mask] ** 2, axis=0) / baseline_count**2
+            corrected_variance = (
+                ub**2
+                + baseline_variance[None, :]
+                - 2.0 * baseline_mask[:, None] * ub**2 / baseline_count
+            )
+            ub_corrected = np.sqrt(np.maximum(corrected_variance, 0.0))
+        else:
+            ub_corrected = ub
+        out["B_poloidal_uncertainty_T"] = ub_corrected[:, 0] if squeeze else ub_corrected
+        # A constant baseline cancels from dBp/dt. Propagate the derivative
+        # directly from the independent raw-sample errors, not from marginal
+        # uncertainties that share the estimated baseline.
         coeff = np.gradient(np.eye(t.size), t, axis=0, edge_order=2)
         ud = np.sqrt((coeff**2) @ (ub**2))
         out["dB_poloidal_dt_uncertainty_T_s"] = ud[:, 0] if squeeze else ud

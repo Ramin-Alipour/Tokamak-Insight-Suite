@@ -109,3 +109,31 @@ def test_uncertainty_is_scaled_by_absolute_gain_and_derivative_has_units_scope()
     np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][:, 0], -2.0, atol=1e-12)
     np.testing.assert_allclose(result["dB_poloidal_dt_T_s"][:, 1], 1.0, atol=1e-12)
     assert "not a spatial derivative" in result["physical_relations"]["time_derivative"]
+
+def test_baseline_subtraction_propagates_shared_mean_uncertainty():
+    t = np.arange(4.0)
+    y = np.array([1.0, 2.0, 5.0, 8.0])
+    uncertainty = np.array([1.0, 2.0, 3.0, 4.0])
+    result = analyze_poloidal_field_probes(
+        t, y, calibration_gain_T_per_unit=2.0,
+        signal_uncertainty=uncertainty, baseline_interval_s=(0.0, 1.0),
+    )
+    calibrated_sigma = 2.0 * uncertainty
+    baseline_variance = np.sum(calibrated_sigma[:2] ** 2) / 2**2
+    expected_variance = calibrated_sigma**2 + baseline_variance
+    expected_variance[:2] -= calibrated_sigma[:2] ** 2
+    np.testing.assert_allclose(
+        result["B_poloidal_uncertainty_T"], np.sqrt(expected_variance)
+    )
+
+    without_baseline = analyze_poloidal_field_probes(
+        t, y, calibration_gain_T_per_unit=2.0,
+        signal_uncertainty=uncertainty,
+    )
+    # Subtracting a constant baseline does not change the derivative, and its
+    # uncertainty must therefore be propagated from the original samples.
+    np.testing.assert_allclose(
+        result["dB_poloidal_dt_uncertainty_T_s"],
+        without_baseline["dB_poloidal_dt_uncertainty_T_s"],
+    )
+
