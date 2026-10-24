@@ -26,22 +26,25 @@ def _signal(time_s: Any, values: Any, minimum: int = 2):
     return t, y
 
 
-def _integer(value: Any, name: str) -> int:
-    if isinstance(value, (bool, np.bool_)):
-        raise ValueError(f"{name} must be a positive integer")
+def _is_finite_real_scalar(value: Any) -> bool:
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        return False
     try:
-        x = float(value)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError(f"{name} must be a positive integer") from exc
-    if not np.isfinite(x) or x < 1 or not x.is_integer():
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
+def _integer(value: Any, name: str) -> int:
+    if not _is_finite_real_scalar(value) or value < 1 or int(value) != value:
         raise ValueError(f"{name} must be a positive integer")
-    return int(x)
+    return int(value)
 
 
 def _dt(t: np.ndarray) -> float:
     d = np.diff(t)
     dt = float(np.median(d))
-    if not np.isfinite(dt) or dt <= 0 or not np.allclose(
+    if not np.isfinite(dt) or dt <= 0 or not np.all(np.isfinite(d)) or not np.allclose(
         d, dt, rtol=1e-3, atol=max(1e-15, dt * 1e-12)
     ):
         raise ValueError("Uniform sampling is required for spectral analysis")
@@ -52,9 +55,12 @@ def _frequency_band(frequency_range_Hz, nyquist: float):
     if frequency_range_Hz is None:
         return 0.0, nyquist
     try:
-        low, high = map(float, frequency_range_Hz)
+        raw_band = list(frequency_range_Hz)
     except (TypeError, ValueError) as exc:
         raise ValueError("frequency range must be a (low, high) pair") from exc
+    if len(raw_band) != 2 or not all(_is_finite_real_scalar(value) for value in raw_band):
+        raise ValueError("frequency range must be a pair of finite real scalars")
+    low, high = map(float, raw_band)
     if (
         not np.isfinite(low)
         or not np.isfinite(high)
@@ -89,6 +95,8 @@ def analyze_mirnov_signal(
     if detrend not in {"constant", "linear", "none"}:
         raise ValueError("detrend must be 'constant', 'linear', or 'none'")
     try:
+        if not _is_finite_real_scalar(peak_prominence_fraction):
+            raise ValueError("peak_prominence_fraction must be finite and in [0, 1]")
         prominence = float(peak_prominence_fraction)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("peak_prominence_fraction must be finite and in [0, 1]") from exc
@@ -147,12 +155,9 @@ def analyze_mirnov_signal(
     if coil_area_m2 is not None or turns is not None:
         if coil_area_m2 is None or turns is None:
             raise ValueError("coil_area_m2 and turns must be supplied together")
-        if isinstance(coil_area_m2, (bool, np.bool_)):
+        if not _is_finite_real_scalar(coil_area_m2):
             raise ValueError("coil area must be finite and positive")
-        try:
-            area = float(coil_area_m2)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("coil area must be finite and positive") from exc
+        area = float(coil_area_m2)
         count = _integer(turns, "turns")
         if not np.isfinite(area) or area <= 0:
             raise ValueError("coil area must be finite and positive")
@@ -184,12 +189,11 @@ def magnetic_perturbation_from_mirnov_voltage(
     """
     t, v = _signal(time_s, coil_voltage_V)
     count = _integer(turns, "turns")
-    try:
-        area = float(coil_area_m2)
-        b0 = float(initial_delta_B_T)
-        baseline = float(baseline_voltage_V)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ValueError("area, initial field and baseline must be finite numbers") from exc
+    if not all(_is_finite_real_scalar(value) for value in (coil_area_m2, initial_delta_B_T, baseline_voltage_V)):
+        raise ValueError("area, initial field and baseline must be finite real scalars")
+    area = float(coil_area_m2)
+    b0 = float(initial_delta_B_T)
+    baseline = float(baseline_voltage_V)
     if not np.isfinite(area) or area <= 0:
         raise ValueError("coil_area_m2 must be finite and positive")
     if not np.isfinite(b0) or not np.isfinite(baseline):
