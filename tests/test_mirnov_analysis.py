@@ -214,3 +214,9 @@ def test_mirnov_rejects_overflowing_time_differences():
     t = np.array([-1e308, 1e308, 1.1e308, 1.2e308, 1.3e308, 1.4e308, 1.5e308, 1.6e308])
     with pytest.raises(ValueError, match="Uniform sampling"):
         analyze_mirnov_signal(t, np.sin(np.arange(8.0)))
+
+
+def test_mirnov_rejects_unhashable_detrend_mode_cleanly():
+    t = np.arange(16, dtype=float) * 1e-4
+    with pytest.raises(ValueError, match="detrend"):
+        analyze_mirnov_signal(t, np.sin(np.arange(16.0)), detrend=[])
