@@ -62,7 +62,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **Formula and physics audit:** [equations, units, assumptions, uncertainty limitations, edge-case hardening, and remaining validation gates](docs/formula_physics_audit.md).
 
-**Implementation coverage audit:** [current 80-entry diagnostic status, 37-formula mapping gap, and promotion gates](docs/implementation_coverage_audit.md). The 80 catalog entries are not 80 complete analyses; incomplete status is intentionally explicit.
+**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, 37 formula contracts, and scientific promotion gates](docs/implementation_coverage_audit.md). The registries distinguish implementation scope from experimental validation; Thomson Scattering remains explicitly incomplete pending broader independent validation.
 
 ## Workspace
 
