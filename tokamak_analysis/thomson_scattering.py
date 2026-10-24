@@ -98,8 +98,15 @@ def weighted_mean(values: Iterable[float], uncertainties: Iterable[float]) -> fl
         raise ValueError("values and uncertainties must have equal lengths")
     if np.any(s <= 0):
         raise ValueError("uncertainties must be strictly positive for inverse-variance weighting")
-    w = 1.0 / np.square(s)
-    return float(np.sum(w * y) / np.sum(w))
+    # Normalize by the smallest uncertainty before squaring. Direct 1/s**2
+    # overflows for valid tiny uncertainties (and can turn the weighted mean
+    # into NaN even when the relative weights and answer are well-defined).
+    relative = float(np.min(s)) / s
+    w = np.square(relative)
+    weight_sum = float(np.sum(w))
+    if not np.isfinite(weight_sum) or weight_sum <= 0:
+        raise ValueError("uncertainties do not yield a numerically usable weighted mean")
+    return float(np.sum(w * y) / weight_sum)
 
 
 def _trapezoid(y, x):
