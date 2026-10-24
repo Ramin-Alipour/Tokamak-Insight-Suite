@@ -14,6 +14,19 @@ ELECTRON_REST_ENERGY_EV = 510_998.95069
 SPEED_OF_LIGHT_M_S = 299_792_458.0
 
 
+
+def _is_finite_real(value) -> bool:
+    """Accept finite real scalar parameters, but not booleans or numeric strings."""
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _finite_vector(values, name: str, *, minimum_size: int = 7) -> np.ndarray:
     arr = np.asarray(values, dtype=float)
     if arr.ndim != 1 or arr.size < minimum_size:
@@ -64,11 +77,11 @@ def fit_thomson_spectrum(
         raise ValueError("wavelength_nm and signal must have equal lengths")
     if np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm must be strictly increasing")
-    if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0:
+    if not _is_finite_real(laser_wavelength_nm) or laser_wavelength_nm <= 0:
         raise ValueError("laser_wavelength_nm must be positive and finite")
-    if not np.isfinite(scattering_angle_rad) or not (0 < scattering_angle_rad <= np.pi):
+    if not _is_finite_real(scattering_angle_rad) or not (0 < scattering_angle_rad <= np.pi):
         raise ValueError("scattering_angle_rad must be finite and in (0, pi]")
-    if not np.isfinite(instrument_sigma_nm) or instrument_sigma_nm <= 0:
+    if not _is_finite_real(instrument_sigma_nm) or instrument_sigma_nm <= 0:
         raise ValueError("instrument_sigma_nm must be positive and finite")
     if not np.all(np.isfinite(y)):
         raise ValueError("signal must contain only finite values")
