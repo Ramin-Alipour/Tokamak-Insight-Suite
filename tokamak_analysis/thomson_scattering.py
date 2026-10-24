@@ -126,6 +126,15 @@ def _weighted_standard_uncertainty(weights, uncertainty) -> float | None:
     return float(np.sqrt(np.sum(np.square(weights * uncertainty))))
 
 
+def _is_finite_real_scalar(value) -> bool:
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None) -> ThomsonSummary:
     """Summarize measured profiles and propagate independent pointwise errors.
 
@@ -149,7 +158,7 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
     volume_domain = None
     volume_scope = None
     if major_radius_m is not None:
-        if not np.isfinite(major_radius_m) or major_radius_m <= 0:
+        if not _is_finite_real_scalar(major_radius_m) or major_radius_m <= 0:
             raise ValueError("major_radius_m must be positive and finite")
         if np.any(r < 0):
             raise ValueError("volume averaging requires a non-negative minor-radius coordinate")
