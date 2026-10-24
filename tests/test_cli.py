@@ -48,3 +48,29 @@ def test_cli_catalog_exports_analysis_maturity(tmp_path, monkeypatch):
     assert len(registry) == 81
     assert all(row.get("maturity_level") for row in registry)
     assert any(row["maturity_level"] == "Analysis pipeline — incomplete" for row in registry)
+
+def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "argv", [
+        "tis", "catalog", "--kind", "status", "--output-dir", str(tmp_path)
+    ])
+    assert main() == 0
+    report = json.loads(
+        (tmp_path / "DIAGNOSTIC_STATUS_REPORT.json").read_text(encoding="utf-8")
+    )
+    assert report["diagnostic_record_count"] == 80
+    assert report["callable_analysis_entry_point_count"] == 81
+    assert report["diagnostic_completeness_counts"] == {
+        "complete": 8,
+        "complete_with_declared_scope": 2,
+        "incomplete": 70,
+    }
+    first_ten = report["first_ten_diagnostics"]
+    assert len(first_ten) == 10
+    assert [row["catalog_position"] for row in first_ten] == list(range(1, 11))
+    assert [row["completeness"] for row in first_ten] == [
+        "complete_with_declared_scope", "complete",
+        "complete_with_declared_scope", "complete_with_declared_scope",
+        "complete", "complete", "complete", "complete", "complete", "complete",
+    ]
+    assert all(row["maturity_level"] for row in first_ten)
+
