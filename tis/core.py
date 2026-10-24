@@ -160,15 +160,22 @@ def signal_quality(values: Any) -> dict[str, Any]:
 
 
 def linear_calibration(values: Any, slope: float, intercept: float = 0.0) -> np.ndarray:
-    if not np.isfinite(slope) or not np.isfinite(intercept):
-        raise ValueError('Calibration slope and intercept must be finite.')
-    return np.asarray(values, dtype=float) * slope + intercept
+    if not _is_finite_real_scalar(slope) or not _is_finite_real_scalar(intercept):
+        raise ValueError('Calibration slope and intercept must be finite real numeric scalars.')
+    return np.asarray(values, dtype=float) * float(slope) + float(intercept)
 
 
 def polynomial_calibration(values: Any, coefficients: list[float]) -> np.ndarray:
-    if not coefficients or not np.all(np.isfinite(coefficients)):
-        raise ValueError('Provide finite polynomial coefficients, highest order first.')
-    return np.polyval(np.asarray(coefficients, dtype=float), np.asarray(values, dtype=float))
+    try:
+        raw_coefficients = np.asarray(coefficients)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError('Provide a one-dimensional sequence of finite real polynomial coefficients, highest order first.') from exc
+    if raw_coefficients.ndim != 1 or raw_coefficients.size == 0 or raw_coefficients.dtype.kind not in 'iuf':
+        raise ValueError('Provide a one-dimensional sequence of finite real polynomial coefficients, highest order first.')
+    coeff = raw_coefficients.astype(float)
+    if not np.all(np.isfinite(coeff)):
+        raise ValueError('Polynomial coefficients must be finite.')
+    return np.polyval(coeff, np.asarray(values, dtype=float))
 
 
 

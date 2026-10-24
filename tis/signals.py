@@ -96,6 +96,8 @@ def noise_floor_detection_limit(
             or not np.isfinite(false_alarm_probability)
             or not 0.0 < false_alarm_probability < 0.5):
         raise ValueError("false_alarm_probability must be a finite real number strictly between 0 and 0.5.")
+    if not isinstance(two_sided, (bool, np.bool_)):
+        raise ValueError("two_sided must be a boolean.")
     alpha = float(false_alarm_probability)
     baseline = float(np.median(x))
     residual = x - baseline

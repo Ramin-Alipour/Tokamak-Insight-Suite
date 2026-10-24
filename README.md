@@ -76,7 +76,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
 - **Events & Transients:** ELM detection and repetition statistics, sawtooth crash detection (period, amplitude), plasma-current-quench analysis (ITER 80 %→20 % convention). Statistical detectors; always confirm against the raw trace.
 - **Confinement & Scalings:** Greenwald fraction, q95 (ITER formula), β_t/β_p/β_N, ν*ₑ, Spitzer resistivity, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold. Empirical comparison tools, not device-validated predictions. Safety-factor profile coordinate conventions are documented in [the q95 coordinate contract](docs/analyses/safety_factor_profile_coordinates.md).
-- **Signal conditioning:** explicit gap policies, Hampel despiking, drift-corrected integration. Every repair is reported.
+- **Signal conditioning and detection limits:** explicit gap policies, Hampel despiking, drift-corrected integration, and background-only robust noise-floor/per-sample detection-threshold estimates. Every repair is reported; detection thresholds require bandwidth/temporal-correlation interpretation. See [Noise floor and detection limit](docs/analyses/noise_floor_detection_limit.md).
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
 - **Molecular Spectroscopy (analysis 6/81):** [feature extraction, user-defined molecular-model fitting, input contract, and physical limitations](docs/analyses/molecular_spectroscopy.md).
 - **Thomson Scattering (analysis 1/81):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).

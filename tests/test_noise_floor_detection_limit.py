@@ -48,3 +48,8 @@ def test_noise_floor_rejects_nonfinite_or_short_background():
     values[3] = np.nan
     with pytest.raises(ValueError, match="finite"):
         noise_floor_detection_limit(values)
+
+@pytest.mark.parametrize("two_sided", [1, 0, "true", None])
+def test_noise_floor_rejects_non_boolean_two_sided_flag(two_sided):
+    with pytest.raises(ValueError, match="two_sided"):
+        noise_floor_detection_limit(np.arange(16, dtype=float), two_sided=two_sided)
