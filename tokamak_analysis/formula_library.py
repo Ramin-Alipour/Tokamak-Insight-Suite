@@ -345,11 +345,19 @@ def energy_confinement_time(stored_energy_J, loss_power_W, *, sigma_stored_energ
 
 
 def greenwald_density_reference(plasma_current_MA, minor_radius_m, *, sigma_plasma_current_MA=None, sigma_minor_radius_m=None):
-    """Greenwald empirical reference: n_G = I_p[MA]/(pi a^2) in units of 10^20 m^-3."""
-    Ip = _nonnegative("plasma_current_MA", plasma_current_MA)
+    """Greenwald empirical reference: n_G = |I_p|[MA]/(pi a^2), in units of 10^20 m^-3."""
+    raw_Ip = _finite("plasma_current_MA", plasma_current_MA)
+    Ip = abs(raw_Ip)
     a = _positive("minor_radius_m", minor_radius_m)
     if (sigma_plasma_current_MA is None) != (sigma_minor_radius_m is None):
         raise ValueError("Provide both current and radius uncertainties, or neither.")
+    if sigma_plasma_current_MA is not None and raw_Ip == 0.0 and _nonnegative(
+        "sigma_plasma_current_MA", sigma_plasma_current_MA
+    ) > 0.0:
+        raise ValueError(
+            "First-order Greenwald-density uncertainty is undefined at zero current with "
+            "non-zero current uncertainty because the formula uses absolute current."
+        )
     scaled = Ip / (math.pi * a**2)
     out = {"greenwald_density_1e20_m3": scaled, "greenwald_density_m3": scaled * 1.0e20}
     if sigma_plasma_current_MA is not None:
