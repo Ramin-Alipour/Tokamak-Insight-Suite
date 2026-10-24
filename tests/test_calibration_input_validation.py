@@ -20,5 +20,5 @@ def test_polynomial_calibration_accepts_numpy_coefficient_array():
 
 @pytest.mark.parametrize("bad", [[], [1.0, np.nan], [True, 2.0], ["1", "2"], [[1.0, 2.0]]])
 def test_polynomial_calibration_rejects_invalid_coefficients(bad):
-    with pytest.raises(ValueError, match="polynomial coefficients"):
+    with pytest.raises(ValueError, match="[Pp]olynomial coefficients"):
         polynomial_calibration([0.0, 1.0], bad)
