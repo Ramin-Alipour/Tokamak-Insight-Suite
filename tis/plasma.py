@@ -15,11 +15,24 @@ from .core import AMU, E_CHARGE, EPS0, MU0
 
 # --- helpers ---------------------------------------------------------------
 
+def _finite_real(name: str, value: Any) -> float:
+    """Validate a real numeric scalar without coercing booleans or strings."""
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a finite real scalar.")
+    try:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite real scalar.") from exc
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite.")
+    return result
+
+
 def _pos(name: str, v: float) -> float:
-    v = float(v)
-    if not math.isfinite(v) or v <= 0:
+    value = _finite_real(name, v)
+    if value <= 0:
         raise ValueError(f"{name} must be positive and finite.")
-    return v
+    return value
 
 
 def coulomb_logarithm_electron(ne_m3: float, te_eV: float) -> float:
@@ -63,7 +76,7 @@ def larmor_radii_and_speeds(te_eV: float, ti_eV: float, b_T: float, ne_m3: float
                             ion_mass_amu: float = 2.0) -> dict[str, float]:
     """Gyro-radius family. rho_s = c_s/Omega_i with c_s = sqrt(Te/m_i); rho_i uses v_th = sqrt(2 Ti/m_i);
     rho_e uses v_th = sqrt(2 Te/m_e). Alfven speed needs ne (quasi-neutral, n_i=n_e, single species)."""
-    te = _pos("te_eV", te_eV); ti = _pos("ti_eV", ti_eV); b = _pos("|B|", abs(b_T)); mi = _pos("ion_mass_amu", ion_mass_amu) * AMU
+    te = _pos("te_eV", te_eV); ti = _pos("ti_eV", ti_eV); b = _pos("|B|", abs(_finite_real("b_T", b_T))); mi = _pos("ion_mass_amu", ion_mass_amu) * AMU
     me = 9.1093837139e-31
     omega_i = E_CHARGE * b / mi
     out = {"ion_cyclotron_frequency_Hz": omega_i / (2 * math.pi),
@@ -89,12 +102,12 @@ def q95_iter_formula(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa95:
 
     Units: I [MA], B [T], R, a [m]. kappa95 and delta95 are the 95%-flux-surface shaping values.
     """
-    ip = _pos("|Ip| (MA)", abs(ip_MA)); b = _pos("|Bt|", abs(bt_T)); r = _pos("R", r_m); a = _pos("a", a_m); k = _pos("kappa95", kappa95)
+    ip = _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA))); b = _pos("|Bt|", abs(_finite_real("bt_T", bt_T))); r = _pos("R", r_m); a = _pos("a", a_m); k = _pos("kappa95", kappa95)
     eps = a / r
     if not 0 < eps < 1:
         raise ValueError("Inverse aspect ratio a/R must be in (0,1).")
-    d = float(delta95)
-    if not math.isfinite(d) or not -1 < d < 1:
+    d = _finite_real("delta95", delta95)
+    if not -1 < d < 1:
         raise ValueError("delta95 must be finite and lie strictly between -1 and 1.")
     shape = (1 + k ** 2 * (1 + 2 * d ** 2 - 1.2 * d ** 3)) / 2
     return float(5 * a ** 2 * b / (r * ip) * shape * (1.17 - 0.65 * eps) / (1 - eps ** 2) ** 2)
@@ -111,8 +124,8 @@ def q_star_cylindrical(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa:
     eps = a / r
     if not 0 < eps < 1:
         raise ValueError("Inverse aspect ratio a/R must be in (0,1).")
-    return float(5 * a ** 2 * _pos("|Bt|", abs(bt_T)) * (1 + _pos("kappa", kappa) ** 2)
-                 / (2 * r * _pos("|Ip| (MA)", abs(ip_MA))))
+    return float(5 * a ** 2 * _pos("|Bt|", abs(_finite_real("bt_T", bt_T))) * (1 + _pos("kappa", kappa) ** 2)
+                 / (2 * r * _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA))))
 
 
 def beta_metrics(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, bt_T: float,
@@ -124,7 +137,7 @@ def beta_metrics(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, bt_T: fl
     """
     ne = _pos("ne_m3", ne_m3); te = _pos("te_eV", te_eV); ti = _pos("ti_eV", ti_eV)
     ni = ne if ni_m3 is None else _pos("ni_m3", ni_m3)
-    ip = _pos("|Ip| (A)", abs(ip_A)); b = _pos("|Bt|", abs(bt_T)); a = _pos("a", a_m)
+    ip = _pos("|Ip| (A)", abs(_finite_real("ip_A", ip_A))); b = _pos("|Bt|", abs(_finite_real("bt_T", bt_T))); a = _pos("a", a_m)
     p = E_CHARGE * (ne * te + ni * ti)
     beta_t = 2 * MU0 * p / b ** 2
     circ = 2 * math.pi * a * math.sqrt((1 + _pos("kappa", kappa) ** 2) / 2)
@@ -152,7 +165,7 @@ def collisionality_nu_star(ne_m3: float, te_eV: float, q: float, r_m: float, a_m
 
 def greenwald(ne_line_avg_m3: float, ip_A: float, a_m: float) -> dict[str, float]:
     """Greenwald density n_G = I[MA]/(pi a^2) [1e20 m^-3] and fraction n_e/n_G (line-averaged n_e)."""
-    ng = _pos("|Ip|", abs(ip_A)) / 1e6 / (math.pi * _pos("a", a_m) ** 2)
+    ng = _pos("|Ip|", abs(_finite_real("ip_A", ip_A))) / 1e6 / (math.pi * _pos("a", a_m) ** 2)
     ne20 = _pos("ne_line_avg_m3", ne_line_avg_m3) / 1e20
     return {"greenwald_density_1e20_m-3": ng, "greenwald_fraction": ne20 / ng}
 
@@ -187,7 +200,7 @@ def lh_threshold_martin08(ne_line_avg_m3: float, bt_T: float, surface_m2: float,
     The scaling has ~±30% scatter and does not capture low-density branch/ isotope/ divertor effects.
     """
     n20 = _pos("ne_line_avg_m3", ne_line_avg_m3) / 1e20
-    p = 0.0488 * n20 ** 0.717 * _pos("|Bt|", abs(bt_T)) ** 0.803 * _pos("surface_m2", surface_m2) ** 0.941
+    p = 0.0488 * n20 ** 0.717 * _pos("|Bt|", abs(_finite_real("bt_T", bt_T))) ** 0.803 * _pos("surface_m2", surface_m2) ** 0.941
     m = _pos("ion_mass_amu", ion_mass_amu)
     if m < 2.0:
         p *= 2.0 / m
