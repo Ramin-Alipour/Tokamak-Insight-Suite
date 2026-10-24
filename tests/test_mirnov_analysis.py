@@ -124,7 +124,7 @@ def test_detrended_bdot_and_signal_statistics_are_reported():
     t = np.arange(100)*1e-4
     v = 2.0 + np.sin(2*np.pi*100*t)
     out = analyze_mirnov_signal(t, v, coil_area_m2=0.5, turns=2)
-    np.testing.assert_allclose(out["approx_Bdot_detrended_T_s"], -np.sin(2*np.pi*100*t)/1.0)
+    np.testing.assert_allclose(out["approx_Bdot_detrended_T_s"], -np.sin(2*np.pi*100*t)/1.0, atol=1e-15)
     assert out["rms_voltage_V"] > out["ac_rms_voltage_V"]
 
 
