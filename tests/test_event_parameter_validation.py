@@ -37,3 +37,11 @@ def test_quench_rejects_malformed_reference_window():
 
     with pytest.raises(ValueError, match="reference_window_s"):
         current_quench_analysis(time, current, reference_window_s=("bad", "window"))
+
+@pytest.mark.parametrize("bad_window", [("bad", "window"), (0.0,), (np.nan, 2.0)])
+def test_elm_detector_rejects_malformed_analysis_window(bad_window):
+    time = np.arange(64, dtype=float)
+    signal = np.sin(time)
+
+    with pytest.raises(ValueError, match="window_s"):
+        detect_elms(time, signal, window_s=bad_window)
