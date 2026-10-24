@@ -76,3 +76,27 @@ def test_analysis_2_density_requires_explicit_ion_window_and_positive_temperatur
 def test_analysis_2_rejects_malformed_or_insufficient_sweeps(voltage, current):
     with pytest.raises((TypeError, ValueError)):
         analyze_langmuir_probe(voltage, current)
+
+
+def test_analysis_2_current_polarity_conventions_produce_equivalent_physics():
+    voltage, current = _synthetic_sweep()
+    electron_positive = analyze_langmuir_probe(
+        voltage,
+        current,
+        electron_fit_range=(-8.0, 0.0),
+        current_convention="electron_positive",
+    )
+    ion_positive = analyze_langmuir_probe(
+        voltage,
+        -current,
+        electron_fit_range=(-8.0, 0.0),
+        current_convention="ion_positive",
+    )
+    assert ion_positive["electron_temperature_eV"] == pytest.approx(
+        electron_positive["electron_temperature_eV"], rel=1e-10
+    )
+    assert ion_positive["floating_potential_V"] == pytest.approx(
+        electron_positive["floating_potential_V"], abs=1e-10
+    )
+    assert ion_positive["current_convention"] == "ion_positive"
+    assert electron_positive["current_convention"] == "electron_positive"
