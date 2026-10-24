@@ -140,7 +140,12 @@ def signal_quality(values: Any) -> dict[str, Any]:
         'mean': float(np.mean(v)), 'std_sample': float(np.std(v, ddof=1)) if len(v)>1 else 0.0,
         'median': float(np.median(v)), 'min': float(np.min(v)), 'max': float(np.max(v)),
         'rms_including_dc': float(np.sqrt(np.mean(v*v))), 'peak_to_peak': float(np.ptp(v)),
-        'relative_rms_fluctuation': float(np.std(v)/abs(np.mean(v))) if abs(np.mean(v))>np.finfo(float).eps else None,
+        'relative_rms_fluctuation': (
+            float(np.std(v) / abs(np.mean(v)))
+            if float(np.max(np.abs(v))) > 0.0
+            and abs(float(np.mean(v))) > np.finfo(float).eps * float(np.max(np.abs(v))) * 10.0
+            else None
+        ),
         'duplicate_fraction': float((len(v)-len(np.unique(v)))/len(v)),
     }
 
