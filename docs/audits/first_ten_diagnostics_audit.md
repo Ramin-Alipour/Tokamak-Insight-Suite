@@ -1,19 +1,19 @@
 # First-ten diagnostic audit (main)
 
-Audit baseline: `95ae6ed1ef245d37413f0e69174b02669e114b63`  
-Scope: first ten entries in `DIAGNOSTIC_REGISTRY.json`, implementation modules and focused tests inspected through GitHub. This is a source review, not a locally executed test run; a clean clone/test execution was unavailable in the review environment.
+Audit baseline reviewed against current `main` on 2026-10-24.  
+Scope: first ten entries in `DIAGNOSTIC_REGISTRY.json`, implementation modules and focused tests inspected through GitHub. This is a source review, not a locally executed test run; a clean clone/test execution was unavailable in the review environment. The current canonical registry and `tests/test_catalog_contract_sync.py` supersede the stale status/count snapshot in earlier versions of this audit.
 
 ## Executive finding
 
-The registry is not saying that all ten entries lack code. It says nine have a declared executable analysis pipeline and Thomson scattering is deliberately still `incomplete`. Eight entries are `complete` within their declared computational scope and two (`ECE`, `CXRS`) are `complete_with_declared_scope`. These metadata labels do not mean independent experimental validation.
+The registry is not saying that all ten entries lack code. Current `main` declares Thomson scattering `complete_with_declared_scope`, ECE and CXRS `complete_with_declared_scope`, and the other seven entries in the first ten `complete` within their declared computational scope. These metadata labels do not mean independent experimental validation.
 
-The status report's global counts are internally consistent with the canonical registry: 80 records = 8 complete + 2 complete-with-scope + 70 incomplete. The first ten include seven complete, two complete-with-scope, and one incomplete; the eighth complete record is elsewhere in the catalogue. Do not change Thomson's flag merely to make the count green.
+The current status-report test requires the global canonical counts to be 80 records = 8 `complete` + 3 `complete_with_declared_scope` + 69 `incomplete`. The first ten include seven `complete` and three `complete_with_declared_scope`. Do not mark Thomson incomplete solely because it lacks independent experimental validation; equally, do not describe it as independently validated.
 
 ## Per-diagnostic findings
 
 | # | Diagnostic | Code/test evidence inspected | Audit conclusion / remaining scientific boundary |
 |---|---|---|---|
-| 1 | Thomson scattering | `tokamak_analysis.thomson_workflow`, `thomson_scattering`, `thomson_spectrum`, `thomson_models`; registry declares five modes and focused numerical/input-validation tests | **Implemented, still incomplete overall.** Profile summaries are not raw-data inversion; raw spectrum fit uses a non-relativistic Gaussian Maxwellian approximation; density requires calibrated power/geometry. Independent device-specific validation and broader spectral physics remain missing. Keep `incomplete`. |
+| 1 | Thomson scattering | `tokamak_analysis.thomson_workflow`, `thomson_scattering`, `thomson_spectrum`, `thomson_models`; registry declares five modes and focused numerical/input-validation tests | **Complete within declared software scope; not independently experimentally validated.** The supported calibrated-profile, raw-spectrum electron-temperature fit, calibrated power-density, combined workflow, and custom-model paths are implemented and covered by focused numerical/input-contract tests. Limitations remain: non-relativistic Gaussian Maxwellian spectral approximation, known Gaussian instrument response, calibrated power/geometry for density, and no device-specific empirical validation fixture. The canonical registry therefore uses `complete_with_declared_scope`; this must not be mistaken for a claim of experimental validation. |
 | 2 | Langmuir probe | `tokamak_analysis.langmuir_probe`, `tis.core`; contract and warnings inspected | **Complete within declared single-sweep model scope.** Fit-window selection, calibration, sheath assumptions and uncertainty limitations remain user responsibilities; do not imply automatic experimental validation. |
 | 3 | ECE | `tokamak_analysis/ece_analysis.py`, `tests/test_ece_analysis.py` | **Complete with declared scope.** Resonance mapping uses a simplified circular toroidal-field model; brightness temperature needs calibrated spectral radiance and only approximates electron temperature when optically thick/thermalized. No EFIT-grade localization. |
 | 4 | CXRS | `tokamak_analysis/cxrs.py`, `tests/test_cxrs.py` | **Complete with declared scope.** Isolated calibrated Gaussian line fitting can estimate line-of-sight velocity and ion temperature. No impurity-density/atomic-kinetics, beam attenuation, line deblending, multi-view inversion or independent device validation. |
