@@ -53,8 +53,8 @@ def hampel_despike(values: Any, window: int = 11, n_sigmas: float = 6.0) -> dict
     x = np.asarray(values, dtype=float).ravel()
     if isinstance(window, (bool, np.bool_)) or not isinstance(window, (int, np.integer)) or window < 3 or window % 2 == 0:
         raise ValueError("window must be an odd integer >= 3.")
-    if n_sigmas <= 0 or not np.isfinite(n_sigmas):
-        raise ValueError("n_sigmas must be positive and finite.")
+    if isinstance(n_sigmas, (bool, np.bool_)) or not isinstance(n_sigmas, (int, float, np.integer, np.floating)) or not np.isfinite(n_sigmas) or n_sigmas <= 0:
+        raise ValueError("n_sigmas must be a positive finite real number.")
     if len(x) < window or not np.all(np.isfinite(x)):
         raise ValueError("Signal must be finite and at least one window long.")
     med = ndimage.median_filter(x, size=window, mode="nearest")
