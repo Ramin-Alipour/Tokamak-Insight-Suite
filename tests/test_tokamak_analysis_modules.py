@@ -81,8 +81,8 @@ def test_invalid_input_rejected():
 
 def test_analysis_registry_resolves_every_callable():
     from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
-    assert len(ANALYSES) == 80
-    assert [x["id"] for x in ANALYSES] == list(range(1, 81))
+    assert len(ANALYSES) == 81
+    assert [x["id"] for x in ANALYSES] == list(range(1, 82))
     for entry in ANALYSES:
         assert callable(resolve_analysis(entry["id"]))
 
@@ -645,7 +645,7 @@ def test_mirnov_signal_known_frequency_and_coil_conversion():
     voltage = np.sin(2*np.pi*frequency*time)
     out = analyze_mirnov_signal(time, voltage, coil_area_m2=0.01, turns=10)
     assert out["frequency_Hz"][np.argmax(out["power_spectral_density"])] == pytest.approx(frequency)
-    assert out["rms_voltage_V"] == pytest.approx(np.sqrt(1024/(2*1023)), rel=1e-10)
+    assert out["rms_voltage_V"] == pytest.approx(1 / np.sqrt(2), rel=1e-10)
     np.testing.assert_allclose(out["approx_Bdot_T_s"], -voltage/0.1, atol=1e-12)
 
 
