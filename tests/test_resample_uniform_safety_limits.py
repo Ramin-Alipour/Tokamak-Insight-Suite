@@ -1,0 +1,33 @@
+import numpy as np
+import pytest
+
+from tis.signals import resample_uniform
+
+
+def test_resampling_epoch_timestamps_does_not_extend_endpoint_by_absolute_time_tolerance():
+    # Unix-like timestamps expose tolerances accidentally scaled by |t| rather
+    # than local floating-point precision / sampling interval.
+    time_s = 1_700_000_000.0 + np.arange(12) * 0.1
+    values = np.arange(12, dtype=float)
+
+    result = resample_uniform(time_s, values, fs=10.0)
+
+    assert len(result["time_s"]) <= 12
+    assert result["time_s"][-1] <= time_s[-1] + 8 * abs(np.spacing(time_s[-1]))
+
+
+def test_resampling_rejects_unbounded_grid_before_allocating():
+    time_s = np.linspace(0.0, 1.0, 8)
+    values = np.arange(8, dtype=float)
+
+    with pytest.raises(ValueError, match="safety limit"):
+        resample_uniform(time_s, values, fs=20_000_000.0, max_output_samples=100_000)
+
+
+@pytest.mark.parametrize("limit", [True, 7, 3.5, "100"])
+def test_resampling_validates_output_sample_limit(limit):
+    time_s = np.arange(8, dtype=float)
+    values = np.arange(8, dtype=float)
+
+    with pytest.raises(ValueError, match="max_output_samples"):
+        resample_uniform(time_s, values, max_output_samples=limit)
