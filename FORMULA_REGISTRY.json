@@ -1297,7 +1297,8 @@
       ],
       "uncertainty_model": "Optional independent current and radius uncertainties propagated by first-order linearization.",
       "test_links": [
-        "tests/test_formula_registry_complete.py::test_greenwald_density_reference"
+        "tests/test_formula_registry_complete.py::test_greenwald_density_reference",
+        "tests/test_formula_scalar_validation.py::test_greenwald_density_is_invariant_to_plasma_current_sign"
       ],
       "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
