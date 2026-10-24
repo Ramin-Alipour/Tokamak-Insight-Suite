@@ -64,7 +64,7 @@ def build_html_report(record: dict[str, Any], sections: list[dict[str, Any]] | N
              f"<p>Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}.</p>",
              "<div class='warn'>Research analysis output. Results are valid only for the supplied calibration, units, geometry and "
              "assumptions. This software is not a control, interlock or safety system.</div>",
-             "<h2>Provenance</h2>", _kv_table({k: v for k, v in record.items() if k not in {"analysis_history", "data_quality", "diagnostic_maturity_counts", "analysis_maturity_counts"}})]
+             "<h2>Provenance</h2>", _kv_table({k: v for k, v in record.items() if k not in {"analysis_history", "data_quality", "diagnostic_maturity_counts", "analysis_maturity_counts", "analysis_maturity_registry"}})]
     diagnostic_maturity = record.get("diagnostic_maturity_counts") or {}
     analysis_maturity = record.get("analysis_maturity_counts") or {}
     if diagnostic_maturity or analysis_maturity:
@@ -76,6 +76,19 @@ def build_html_report(record: dict[str, Any], sections: list[dict[str, Any]] | N
             parts.append("<h3>Callable analysis entry points</h3>")
             parts.append(_kv_table(analysis_maturity))
         parts.append("<p>Implementation maturity describes declared software scope only. It is not independent experimental validation or evidence of device-specific calibration.</p>")
+    analysis_registry = record.get("analysis_maturity_registry") or []
+    if analysis_registry:
+        parts.append("<h3>Per-analysis entry-point maturity</h3>")
+        parts.append("<table><thead><tr><th>ID</th><th>Analysis</th><th>Maturity level</th></tr></thead><tbody>")
+        for entry in analysis_registry:
+            parts.append(
+                "<tr><td>{}</td><td>{}</td><td>{}</td></tr>".format(
+                    html.escape(str(entry.get("id", ""))),
+                    html.escape(str(entry.get("name", ""))),
+                    html.escape(str(entry.get("maturity_level", "Unclassified — incomplete"))),
+                )
+            )
+        parts.append("</tbody></table>")
     for sec in sections:
         parts.append(f"<h2>{html.escape(str(sec.get('title', 'Result')))}</h2>")
         if sec.get("notes"):
