@@ -435,7 +435,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented single-sweep I–V analysis with explicit current convention, descriptive saturation-tail fallbacks, optional fit-window-based Te and ion-branch estimates, and optional model-dependent density inference. Independent experimental validation and full uncertainty propagation are not claimed.",
+    "implementation_status": "Implemented single-sweep I–V analysis with explicit current convention, auditable preprocessing quality, descriptive saturation-tail fallbacks, optional fit-window-based Te and ion-branch estimates, electron-fit residual diagnostics, and optional model-dependent density inference. Independent experimental validation and full uncertainty propagation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -642,6 +642,26 @@
           "name": "interpretation_warning",
           "unit": "text",
           "description": "Device-specific caveats for sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice."
+        },
+        {
+          "name": "input_quality",
+          "unit": "structured",
+          "description": "Input, finite-pair, discarded-pair and duplicate-voltage counts, processed voltage span, and normalized current convention."
+        },
+        {
+          "name": "electron_retarding_fit_residual_rms_A",
+          "unit": "A",
+          "description": "Root-mean-square current residual for the fitted electron-retarding branch."
+        },
+        {
+          "name": "electron_retarding_fit_normalized_rmse",
+          "unit": "dimensionless",
+          "description": "Electron-branch residual RMS normalized by the measured current range in the selected fit window."
+        },
+        {
+          "name": "electron_retarding_fit_status",
+          "unit": "text",
+          "description": "Indicates that fit quality must be reviewed using R-squared and residual diagnostics; does not automatically certify physical validity."
         }
       ],
       "assumptions": [
@@ -654,10 +674,11 @@
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
         "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
         "Validate current polarity, fit windows, and positive finite geometry/model inputs; fit windows must have two finite strictly increasing bounds.",
-        "Use explicit analyst-selected fit windows; no automatic physical regime selection."
+        "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
+        "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
       "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate every floating-potential zero crossing (including zero-plateau midpoint handling and explicit ambiguity), dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
-      "uncertainty_model": "Only the optional electron-temperature fit returns a local regression standard error when enough fit points are available. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
+      "uncertainty_model": "Only the optional electron-temperature fit returns a local covariance-based standard error. Electron-branch residual RMS, normalized RMSE and R-squared are exposed for fit review. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
         "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
@@ -672,7 +693,7 @@
       "raw_data_to_physics": true,
       "note": "Complete only within this declared calibrated single-sweep I–V model scope. Fit-window validation and zero-crossing ambiguity are explicit. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
     },
-    "note": "Complete within the declared calibrated single-sweep I–V computational scope; not independently experimentally validated. The registry output contract is aligned with the implemented return fields. Calibration, physically justified fit-window selection, device-specific sheath interpretation and systematic uncertainty propagation remain analyst responsibilities."
+    "note": "Complete within the declared calibrated single-sweep I–V computational scope; includes auditable preprocessing and fit residual diagnostics. Fit-window selection, calibration, device-specific sheath interpretation and systematic uncertainty propagation remain analyst responsibilities."
   },
   {
     "family": "Plasma parameters",
