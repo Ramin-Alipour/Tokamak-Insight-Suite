@@ -4,17 +4,17 @@ from tis.probe_analysis import langmuir_iv_analysis
 
 
 def test_langmuir_analysis_reports_preprocessing_quality_and_duplicate_aggregation():
-    voltage = np.r_[np.linspace(-5.0, 5.0, 10), 0.0, np.nan]
-    current = np.r_[np.linspace(-2e-3, 2e-3, 10), 1e-3, 0.0]
+    voltage = np.r_[np.linspace(-5.0, 5.0, 11), 0.0, np.nan]
+    current = np.r_[np.linspace(-2e-3, 2e-3, 11), 1e-3, 0.0]
 
     result = langmuir_iv_analysis(voltage, current)
 
     quality = result["input_quality"]
-    assert quality["input_pair_count"] == 12
-    assert quality["finite_pair_count"] == 11
+    assert quality["input_pair_count"] == 13
+    assert quality["finite_pair_count"] == 12
     assert quality["discarded_nonfinite_pair_count"] == 1
     assert quality["duplicate_voltage_pair_count_aggregated"] == 1
-    assert quality["processed_unique_voltage_count"] == 10
+    assert quality["processed_unique_voltage_count"] == 11
     assert quality["current_convention_normalized"] == "electron_positive"
 
 
