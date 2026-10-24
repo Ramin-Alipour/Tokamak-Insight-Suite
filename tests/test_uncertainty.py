@@ -49,3 +49,18 @@ def test_covariance_symmetry_check_scales_with_small_magnitudes():
 def test_covariance_propagation_rejects_empty_dimensions():
     with pytest.raises(UncertaintyError, match="nonempty"):
         propagate_covariance(np.empty((1, 0)), np.empty((0, 0)))
+
+
+@pytest.mark.parametrize("n_samples", [None, "many", 99, 100.5, True, np.inf])
+def test_monte_carlo_invalid_sample_count_uses_domain_error(n_samples):
+    with pytest.raises(UncertaintyError, match="n_samples"):
+        propagate_monte_carlo(lambda samples: samples[:, 0], [0.0], [[1.0]], n_samples=n_samples)
+
+
+@pytest.mark.parametrize("confidence_level", [None, "high", 0.0, 1.0, np.nan, np.inf])
+def test_monte_carlo_invalid_confidence_level_uses_domain_error(confidence_level):
+    with pytest.raises(UncertaintyError, match="confidence_level"):
+        propagate_monte_carlo(
+            lambda samples: samples[:, 0], [0.0], [[1.0]],
+            n_samples=100, confidence_level=confidence_level,
+        )
