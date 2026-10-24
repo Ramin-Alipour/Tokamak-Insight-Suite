@@ -83,10 +83,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if (not _is_finite_real_scalar(ti_eV) or not _is_finite_real_scalar(sheath_factor)
             or not _is_finite_real_scalar(gamma_i) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0):
         raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
-    raw_v=np.asarray(voltage,float); raw_i=np.asarray(current,float)
+    raw_v=np.asarray(voltage); raw_i=np.asarray(current)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
         raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
-    v=raw_v.copy(); i=raw_i.copy()
+    if raw_v.dtype.kind not in "iuf" or raw_i.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must contain real numeric values; booleans, strings and complex values are not accepted.")
+    v=raw_v.astype(float, copy=True); i=raw_i.astype(float, copy=True)
     if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
     if current_convention=="ion_positive": i=-i
     good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
@@ -165,7 +167,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             trial_slope = float(np.polyfit(x[positive], np.log(excess[positive]), 1)[0])
             if np.isfinite(trial_slope) and trial_slope > 0:
                 slope0 = trial_slope
-        first_positive = int(np.flatnonzero(positive)[0]) if np.any(positive) else 0
+        if np.count_nonzero(positive) < 3:
+            raise ValueError("Electron-retarding fit requires at least three samples above the estimated ion-current baseline; choose a physically justified electron_fit_range.")
+        first_positive = int(np.flatnonzero(positive)[0])
         amplitude_at_first_positive = excess[first_positive] * np.exp(-slope0 * (x[first_positive] - x_ref))
         amplitude0 = max(float(amplitude_at_first_positive) / current_scale, 1e-12)
 
@@ -192,10 +196,13 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         out["electron_fit_points"] = int(np.count_nonzero(m))
         out["electron_retarding_log_slope_per_V"] = slope
         out["electron_retarding_fit_intercept"] = float(np.log(max(parameters[1] * current_scale, np.finfo(float).tiny)) - slope * x_ref)
-        if slope > 0 and np.isfinite(slope):
-            out["electron_temperature_eV"] = 1.0 / slope
-            slope_se = float(np.sqrt(max(float(covariance[2, 2]), 0.0))) if covariance.shape == (3, 3) and np.isfinite(covariance[2, 2]) else None
-            out["electron_temperature_standard_error_eV"] = (slope_se / slope**2) if slope_se is not None else None
+        if not np.isfinite(slope) or slope <= 0:
+            raise ValueError("Electron-retarding exponential fit returned a non-positive or non-finite slope; electron temperature is undefined.")
+        if not np.isfinite(out["electron_retarding_fit_R2"]):
+            raise ValueError("Electron-retarding fit quality is non-finite; check the selected fit range and data.")
+        out["electron_temperature_eV"] = 1.0 / slope
+        slope_se = float(np.sqrt(max(float(covariance[2, 2]), 0.0))) if covariance.shape == (3, 3) and np.isfinite(covariance[2, 2]) else None
+        out["electron_temperature_standard_error_eV"] = (slope_se / slope**2) if slope_se is not None else None
         out["electron_temperature_uncertainty_note"] = (
             "Local covariance from a joint offset-plus-exponential fit; excludes calibration, "
             "fit-window choice, sheath expansion and RF/noise systematics."
