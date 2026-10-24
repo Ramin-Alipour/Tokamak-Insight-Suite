@@ -76,8 +76,30 @@ def test_integration_recovers_known_linear_perturbation():
 
 def test_integration_baseline_removal():
     t = np.linspace(0, 1, 11)
-    out = magnetic_perturbation_from_mirnov_voltage(t, np.full_like(t, 3.0), 1, 1.0, baseline_voltage_V=3.0, polarity_sign=1)
-    np.testing.assert_allclose(out["delta_B_T"], 0.0)
+    out = magnetic_perturbation_from_mirnov_voltage(
+        t, np.full_like(t, 3.0), 1, 1.0,
+        baseline_voltage_V=3.0, polarity_sign=1,
+    )
+    # Exact-zero invariant: default assert_allclose tolerances can hide small
+    # non-zero errors when the expected value is zero.
+    np.testing.assert_array_equal(out["dB_dt_T_s"], np.zeros_like(t))
+    np.testing.assert_array_equal(out["delta_B_T"], np.zeros_like(t))
+
+
+def test_integration_preserves_small_nonzero_residual_above_baseline():
+    t = np.linspace(0, 1e-3, 11)
+    residual_V = 1e-10
+    out = magnetic_perturbation_from_mirnov_voltage(
+        t, np.full_like(t, 3.0 + residual_V), 1, 1.0,
+        baseline_voltage_V=3.0, polarity_sign=1,
+    )
+    np.testing.assert_allclose(
+        out["dB_dt_T_s"], residual_V, rtol=1e-6, atol=0.0
+    )
+    assert out["delta_B_T"][-1] > 0.0
+    np.testing.assert_allclose(
+        out["delta_B_T"][-1], residual_V * t[-1], rtol=1e-6, atol=0.0
+    )
 
 
 def test_array_candidate_mode_number():
