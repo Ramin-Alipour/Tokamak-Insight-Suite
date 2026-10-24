@@ -1237,7 +1237,17 @@ elif page=='Tomography & Bolometry':
                     plot_line(np.log10(np.maximum(choice['weighted_residual_norms'],np.finfo(float).tiny)),np.log10(np.maximum(choice['regularization_norms'],np.finfo(float).tiny)),'log₁₀ weighted residual norm','log₁₀ regularization-operator norm','Tikhonov L-curve')
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
                 r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma,grid_shape=grid_shape)
-                st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
+                st.json({k:v for k,v in r.items() if k!='solution'})
+                if grid_shape is not None:
+                    nz, nx = grid_shape
+                    out = pd.DataFrame({'iz':np.repeat(np.arange(nz), nx),
+                                        'ix':np.tile(np.arange(nx), nz),
+                                        'reconstructed_value':r['solution']})
+                else:
+                    out = pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),
+                                        'reconstructed_value':r['solution']})
+                st.dataframe(out)
+                download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Build 2-D ray geometry matrix':
         st.write('Build a path-length response matrix from straight diagnostic lines of sight crossing a rectangular (x,z) pixel grid. This is geometry-based; it does not infer detector response, attenuation or equilibrium mapping.')
