@@ -6,7 +6,8 @@ from scipy import signal
 
 def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lowpass: float | None = None, order: int = 3) -> np.ndarray:
     x = np.asarray(values, dtype=float).ravel()
-    if isinstance(order, bool) or int(order) != order or order < 1:
+    if (isinstance(order, (bool, np.bool_)) or not isinstance(order, (int, float, np.integer, np.floating))
+            or not np.isfinite(order) or int(order) != order or order < 1):
         raise ValueError('Filter order must be a positive integer.')
     order = int(order)
     if len(x) < max(12, 3*order+1):
@@ -62,10 +63,19 @@ def welch_psd(values: Any, fs: float, nperseg: int | None = None,
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before PSD analysis.')
-    if nperseg is not None and (isinstance(nperseg, bool) or int(nperseg) != nperseg or nperseg < 8):
+    if nperseg is not None and (
+        isinstance(nperseg, (bool, np.bool_))
+        or not isinstance(nperseg, (int, float, np.integer, np.floating))
+        or not np.isfinite(nperseg) or int(nperseg) != nperseg or nperseg < 8
+    ):
         raise ValueError('nperseg must be an integer of at least 8 when supplied.')
     nperseg = min(len(x), int(nperseg) if nperseg is not None else min(4096, max(8, len(x)//4)))
-    if noverlap is not None and (isinstance(noverlap, bool) or int(noverlap) != noverlap or noverlap < 0 or noverlap >= nperseg):
+    if noverlap is not None and (
+        isinstance(noverlap, (bool, np.bool_))
+        or not isinstance(noverlap, (int, float, np.integer, np.floating))
+        or not np.isfinite(noverlap) or int(noverlap) != noverlap
+        or noverlap < 0 or noverlap >= nperseg
+    ):
         raise ValueError('noverlap must be an integer in [0, nperseg).')
     if not isinstance(window, str) or not window.strip():
         raise ValueError('window must be a valid SciPy window name.')
@@ -119,11 +129,16 @@ def time_frequency_spectrogram(
         raise ValueError('At least 8 samples and a positive finite sampling rate are required.')
     if not np.all(np.isfinite(x)):
         raise ValueError('Signal must contain only finite values; clean missing samples before spectrogram analysis.')
-    if isinstance(nperseg, (bool, np.bool_)) or int(nperseg) != nperseg or nperseg < 8:
+    if (isinstance(nperseg, (bool, np.bool_))
+            or not isinstance(nperseg, (int, float, np.integer, np.floating))
+            or not np.isfinite(nperseg) or int(nperseg) != nperseg or nperseg < 8):
         raise ValueError('nperseg must be an integer of at least 8.')
     nperseg = min(int(nperseg), len(x))
     if noverlap is not None:
-        if isinstance(noverlap, (bool, np.bool_)) or int(noverlap) != noverlap or noverlap < 0 or noverlap >= nperseg:
+        if (isinstance(noverlap, (bool, np.bool_))
+                or not isinstance(noverlap, (int, float, np.integer, np.floating))
+                or not np.isfinite(noverlap) or int(noverlap) != noverlap
+                or noverlap < 0 or noverlap >= nperseg):
             raise ValueError('noverlap must be an integer in [0, nperseg).')
         noverlap = int(noverlap)
     f, t, pxx = signal.spectrogram(
