@@ -98,6 +98,10 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("brightness_temperature does not consume signal or time_s; use channel_fluctuations for time series.")
     if mode == "channel_fluctuations" and spectral_radiance_W_m2_sr_Hz is not None:
         raise ValueError("channel_fluctuations does not consume spectral radiance; use brightness_temperature mode.")
+    if mode != "brightness_temperature" and optical_depth is not None:
+        raise ValueError("optical_depth is only consumed in brightness_temperature mode.")
+    if mode != "channel_fluctuations" and noise_std is not None:
+        raise ValueError("noise_std is only consumed in channel_fluctuations mode.")
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
            "resonance_field_T": resonance_field_T(f, harmonic),
            "assumptions": ["non-relativistic resonance", "cold-plasma frequency mapping"]}
