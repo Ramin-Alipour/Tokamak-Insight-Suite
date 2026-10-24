@@ -28,9 +28,12 @@ def _is_finite_real(value) -> bool:
 
 
 def _finite_vector(values, name: str, *, minimum_size: int = 7) -> np.ndarray:
-    arr = np.asarray(values, dtype=float)
-    if arr.ndim != 1 or arr.size < minimum_size:
+    raw = np.asarray(values)
+    if raw.ndim != 1 or raw.size < minimum_size:
         raise ValueError(f"{name} must be a 1-D array with at least {minimum_size} samples")
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+    arr = raw.astype(float, copy=False)
     if not np.all(np.isfinite(arr)):
         raise ValueError(f"{name} must contain only finite values")
     return arr
