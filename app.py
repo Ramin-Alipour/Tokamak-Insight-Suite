@@ -18,7 +18,7 @@ from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distr
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
-from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families, maturity_counts
+from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families, maturity_counts, maturity_label
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
 from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_star, spitzer_resistivity,
