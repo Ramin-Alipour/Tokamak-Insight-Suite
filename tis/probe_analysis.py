@@ -59,12 +59,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             try:
                 raw_limits = list(fit_range)
             except (TypeError, ValueError) as exc:
-                raise ValueError(f"{name} must contain exactly two finite voltage limits.") from exc
+                raise ValueError(f"{name} must contain exactly two finite voltage limits in strictly increasing order; limits must be real numeric scalars.") from exc
             if len(raw_limits) != 2 or not all(_is_finite_real_scalar(value) for value in raw_limits):
-                raise ValueError(f"{name} must contain exactly two finite numeric voltage limits.")
+                raise ValueError(f"{name} must contain exactly two finite voltage limits in strictly increasing order; limits must be real numeric scalars.")
             limits = np.asarray(raw_limits, dtype=float)
             if limits[1] <= limits[0]:
-                raise ValueError(f"{name} must contain exactly two finite voltage limits in strictly increasing order.")
+                raise ValueError(f"{name} must contain exactly two finite voltage limits in strictly increasing order; limits must be real numeric scalars.")
     if (area_m2 is None) != (ion_mass_amu is None):
         raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
     if area_m2 is not None and (not _is_finite_real_scalar(area_m2) or area_m2 <= 0):
