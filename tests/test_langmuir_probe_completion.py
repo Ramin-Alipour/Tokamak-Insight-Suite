@@ -109,3 +109,26 @@ def test_langmuir_iv_density_does_not_use_descriptive_tail_without_fit_window():
     )
     assert "ion_density_estimate_m-3" not in result
     assert result["ion_density_status"].startswith("not_estimated:")
+
+
+def test_one_shot_fit_range_iterables_are_normalized_and_reusable():
+    voltage, current = _synthetic_iv_for_regression()
+    expected = langmuir_iv_analysis(
+        voltage, current,
+        electron_fit_range=(-5.0, 10.0),
+        ion_fit_range=(-20.0, -12.0),
+    )
+    actual = langmuir_iv_analysis(
+        voltage, current,
+        electron_fit_range=iter((-5.0, 10.0)),
+        ion_fit_range=iter((-20.0, -12.0)),
+    )
+    assert actual["electron_temperature_eV"] == pytest.approx(
+        expected["electron_temperature_eV"], rel=1e-12
+    )
+    assert actual["ion_saturation_current_A"] == pytest.approx(
+        expected["ion_saturation_current_A"], rel=1e-12
+    )
+    assert actual["electron_retarding_fit_R2"] == pytest.approx(
+        expected["electron_retarding_fit_R2"], rel=1e-12
+    )
