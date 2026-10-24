@@ -15,6 +15,29 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
     formulas = list(formulas)
     analyses = list(analyses)
     st.title("Diagnostic Knowledge Base")
+    # Diagnostic records and callable entry points are separate registry layers.
+    from collections import Counter
+    diagnostic_status = Counter((row.get("execution_contract") or {}).get("completeness", "incomplete") for row in diagnostics)
+    analysis_status = Counter((row.get("execution_contract") or {}).get("completeness", "incomplete") for row in analyses)
+    st.caption(
+        f"Canonical registry: {len(diagnostics)} diagnostic records · {len(analyses)} callable analysis entry points. "
+        "Completeness describes declared software scope, not independent experimental validation."
+    )
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Diagnostic records**")
+        st.write(
+            f"Complete: {diagnostic_status.get('complete', 0)} · "
+            f"Scoped complete: {diagnostic_status.get('complete_with_declared_scope', 0)} · "
+            f"Incomplete: {diagnostic_status.get('incomplete', 0)}"
+        )
+    with right:
+        st.markdown("**Callable analysis entry points**")
+        st.write(
+            f"Complete: {analysis_status.get('complete', 0)} · "
+            f"Scoped complete: {analysis_status.get('complete_with_declared_scope', 0)} · "
+            f"Incomplete: {analysis_status.get('incomplete', 0)}"
+        )
     view = st.radio("Catalog", ["Diagnostic families", "Analysis entry points", "Formula reference"], horizontal=True)
     query = st.text_input("Search by diagnostic, observable, formula, method or caveat", "").strip().lower()
     if view == "Diagnostic families":
