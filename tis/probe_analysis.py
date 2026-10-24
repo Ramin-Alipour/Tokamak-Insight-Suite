@@ -141,7 +141,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             trial_slope = float(np.polyfit(x[positive], np.log(excess[positive]), 1)[0])
             if np.isfinite(trial_slope) and trial_slope > 0:
                 slope0 = trial_slope
-        amplitude0 = max(float(np.max(excess)) / current_scale, 1e-12)
+        first_positive = int(np.flatnonzero(positive)[0]) if np.any(positive) else 0
+        amplitude_at_first_positive = excess[first_positive] * np.exp(-slope0 * (x[first_positive] - x_ref))
+        amplitude0 = max(float(amplitude_at_first_positive) / current_scale, 1e-12)
 
         def _electron_branch_model(x_values, baseline_scaled_fit, amplitude_scaled_fit, slope_per_V):
             exponent = np.clip(slope_per_V * (np.asarray(x_values) - x_ref), -700.0, 700.0)
@@ -165,7 +167,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         out["ion_current_baseline_subtracted_A"] = baseline_fit_A
         out["electron_fit_points"] = int(np.count_nonzero(m))
         out["electron_retarding_log_slope_per_V"] = slope
-        out["electron_retarding_fit_intercept"] = baseline_fit_A
+        out["electron_retarding_fit_intercept"] = float(np.log(max(parameters[1] * current_scale, np.finfo(float).tiny)) - slope * x_ref)
         if slope > 0 and np.isfinite(slope):
             out["electron_temperature_eV"] = 1.0 / slope
             slope_se = float(np.sqrt(max(float(covariance[2, 2]), 0.0))) if covariance.shape == (3, 3) and np.isfinite(covariance[2, 2]) else None
