@@ -90,17 +90,32 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("Voltage and current must contain real numeric values; booleans, strings and complex values are not accepted.")
     v=raw_v.astype(float, copy=True); i=raw_i.astype(float, copy=True)
     if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
+    input_points = int(len(v))
     if current_convention=="ion_positive": i=-i
-    good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
+    good=np.isfinite(v)&np.isfinite(i)
+    finite_pair_count = int(np.count_nonzero(good))
+    v,i=v[good],i[good]
     if len(v)<8: raise ValueError('At least 8 valid voltage points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
     unique_v, inverse = np.unique(v, return_inverse=True)
     if len(unique_v)<8: raise ValueError('At least 8 distinct voltage points are required after duplicate aggregation.')
-    if len(unique_v)<len(v):
+    duplicate_count = int(len(v) - len(unique_v))
+    if duplicate_count:
         sums=np.bincount(inverse,weights=i)
         counts=np.bincount(inverse)
         v,i=unique_v,sums/counts
     out=probe_iv_summary(v,i)
+    # Keep preprocessing decisions machine-readable so exported results can be
+    # audited without reconstructing how many points were dropped or averaged.
+    out["input_quality"] = {
+        "input_pair_count": input_points,
+        "finite_pair_count": finite_pair_count,
+        "discarded_nonfinite_pair_count": input_points - finite_pair_count,
+        "duplicate_voltage_pair_count_aggregated": duplicate_count,
+        "processed_unique_voltage_count": int(len(v)),
+        "voltage_span_V": float(v[-1] - v[0]),
+        "current_convention_normalized": "electron_positive",
+    }
     out['electron_temperature_eV'] = None
     out['electron_temperature_standard_error_eV'] = None
     # Always provide explicitly labelled descriptive saturation-tail estimates.
@@ -192,8 +207,19 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         slope = float(parameters[2])
         fitted_current = _electron_branch_model(x, *parameters) * current_scale
         out["electron_retarding_fit_R2"] = _r2(measured, fitted_current)
+        residual = measured - fitted_current
+        out["electron_retarding_fit_residual_rms_A"] = float(np.sqrt(np.mean(residual ** 2)))
+        signal_scale = float(np.ptp(measured))
+        out["electron_retarding_fit_normalized_rmse"] = (
+            float(np.sqrt(np.mean(residual ** 2)) / signal_scale) if signal_scale > 0 else None
+        )
+        out["electron_retarding_fit_points"] = int(np.count_nonzero(m))
+        out["electron_retarding_fit_status"] = (
+            "fit_completed_review_R2_and_residuals"
+            if np.isfinite(out["electron_retarding_fit_R2"])
+            else "fit_quality_undefined"
+        )
         out["ion_current_baseline_subtracted_A"] = baseline_fit_A
-        out["electron_fit_points"] = int(np.count_nonzero(m))
         out["electron_retarding_log_slope_per_V"] = slope
         out["electron_retarding_fit_intercept"] = float(np.log(max(parameters[1] * current_scale, np.finfo(float).tiny)) - slope * x_ref)
         if not np.isfinite(slope) or slope <= 0:
