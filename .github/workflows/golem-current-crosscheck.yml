@@ -117,12 +117,12 @@ jobs:
           }
 
           window_diagnostics = out["comparisons"].get("plasma_current_mean_window_diagnostics", {})
-published_window = window_diagnostics.get("candidates", {}).get("published_start_end", {})
-out["status"] = (
-    "NUMERIC_CROSSCHECK_COMPLETE"
-    if out["comparisons"].get("rogowski_peak") and published_window.get("status") == "COMPUTED"
-    else "PARTIAL_NUMERIC_CROSSCHECK"
-)
+          published_window = window_diagnostics.get("candidates", {}).get("published_start_end", {})
+          out["status"] = (
+              "NUMERIC_CROSSCHECK_COMPLETE"
+              if out["comparisons"].get("rogowski_peak") and published_window.get("status") == "COMPUTED"
+              else "PARTIAL_NUMERIC_CROSSCHECK"
+          )
           out["method_note"]="Raw GOLEM NPZ signals were downloaded and metrics independently calculated. Mean-current comparison uses the shot page's stated plasma_start/plasma_end interval; interpretation remains conditional on the archive's documented units and interval semantics."
           Path("validation-output/report.json").write_text(json.dumps(out,indent=2))
           print(json.dumps(out,indent=2))
