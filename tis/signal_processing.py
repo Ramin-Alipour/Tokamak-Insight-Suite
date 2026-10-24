@@ -7,11 +7,14 @@ from scipy import signal
 
 def _is_finite_real(value: Any) -> bool:
     """Return whether a public numeric parameter is a finite real scalar (not bool)."""
-    return (
-        isinstance(value, (int, float, np.integer, np.floating))
-        and not isinstance(value, (bool, np.bool_))
-        and bool(np.isfinite(value))
-    )
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
 
 def butterworth_filter(values: Any, fs: float, highpass: float | None = None, lowpass: float | None = None, order: int = 3) -> np.ndarray:
     x = np.asarray(values, dtype=float).ravel()
