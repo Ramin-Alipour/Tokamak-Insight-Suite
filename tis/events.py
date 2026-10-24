@@ -38,9 +38,13 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
     # before estimating the clock tick. np.unique alone treats 2.0000000000000
     # and 2.0000000000001 microseconds as distinct values, producing a false
     # sub-femtosecond tick and rejecting otherwise valid quantized timestamps.
+    # Tolerance is for roundoff in interval values, not the absolute epoch.
+    # Scaling it by abs(t) makes a large Unix-time offset merge distinct
+    # microsecond interval levels into one cluster, destroying the clock-tick
+    # estimate needed to recognize quantized timestamps.
     interval_tol = max(
         1e-9 * dt,
-        2.0 * np.finfo(float).eps * max(float(np.max(np.abs(t))), float(np.max(intervals)), 1e-12),
+        2.0 * np.finfo(float).eps * max(float(np.max(np.abs(intervals))), 1e-12),
     )
     sorted_intervals = np.sort(intervals)
     clusters: list[list[float]] = []
