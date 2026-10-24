@@ -90,7 +90,10 @@ def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
     window = None
     m = np.ones(len(t), bool)
     if fit_window_s is not None:
-        window = np.asarray(fit_window_s, dtype=float)
+        try:
+            window = np.asarray(fit_window_s, dtype=float)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("fit_window_s must contain exactly two finite time bounds.") from exc
         if window.shape != (2,) or not np.all(np.isfinite(window)):
             raise ValueError("fit_window_s must contain exactly two finite time bounds.")
         lo, hi = float(np.min(window)), float(np.max(window))
