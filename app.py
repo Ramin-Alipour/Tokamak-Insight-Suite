@@ -66,6 +66,7 @@ def _clear_loaded_data(clear_uploader=True):
 with st.sidebar:
     st.markdown('## ⚛️ Tokamak Insight Suite')
     st.caption('Data Analysis · Diagnostics · Plasma Physics')
+    st.info('OPEN RESEARCH BETA · Scientific validation is not a prerequisite for using or contributing to TIS. Share reproducible cases and report issues; results remain the researcher’s responsibility.')
     st.divider()
     project=st.text_input('Project / experiment',st.session_state.get('project','Untitled tokamak analysis'),key='project')
     shot=st.text_input('Shot / discharge ID',st.session_state.get('shot',''),key='shot')
@@ -1540,9 +1541,9 @@ elif page=='Advanced Analysis':
         st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
         contract = entry.get('execution_contract', {})
         completeness = contract.get('completeness', 'incomplete')
-        status = ('Complete within declared scope — not independently validated'
+        status = ('Implemented within declared scope'
                   if completeness in {'complete', 'complete_with_declared_scope'}
-                  else 'Incomplete / limited scope')
+                  else 'Partial implementation / limited scope')
         st.info(f"Execution status: {status}")
         with st.expander('Scientific contract: inputs, outputs and limitations', expanded=(selected_id == 1)):
             st.write(contract.get('algorithm', 'No algorithm description declared.'))
@@ -1561,12 +1562,10 @@ elif page=='Advanced Analysis':
             if contract.get('limitations'):
                 st.markdown('**Scientific limitations**')
                 for item in contract['limitations']: st.warning(item)
-            st.caption('“Complete” refers only to the explicitly declared scope; it does not imply raw-instrument processing or independent experimental validation.')
+            st.caption('Implementation maturity describes declared software scope only; it is not a claim about device-specific suitability. Community use and reproducible feedback can improve these modules over time.')
         st.code(str(inspect.signature(fn)),language='python')
         st.write('Enter keyword arguments as JSON. To use an uploaded numeric column, set a value to {"column": "exact column name"}. Other values can be numbers, booleans, strings, lists, or nested arrays as required by the selected function.')
         arg_text=st.text_area('Function arguments (JSON)',value='{}',height=180,key='registered_analysis_args')
-        reference_text=st.text_area('Optional independent reference result (JSON)',value='',height=100,key='registered_analysis_reference',help='Use a result from a publication, another code, or an independently processed version of the same data. Leave blank if unavailable.')
-        reference_description=st.text_input('Reference source / method (optional)',value='',key='registered_analysis_reference_description')
         if st.button('Run registered analysis',key='run_registered_analysis'):
             try:
                 args=json.loads(arg_text)
@@ -1580,12 +1579,6 @@ elif page=='Advanced Analysis':
                     if isinstance(value,list): return [resolve_value(v) for v in value]
                     if isinstance(value,dict): return {k:resolve_value(v) for k,v in value.items()}
                     return value
-                # Validate the optional reference before running or recording an analysis.
-                # Otherwise malformed reference JSON reports a failure after the result has
-                # already been added to session history.
-                reference_result = None
-                if reference_text.strip():
-                    reference_result = json.loads(reference_text)
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
                 st.write(result)
@@ -1610,8 +1603,6 @@ elif page=='Advanced Analysis':
                     tokamak=str(st.session_state.get('tis_source_manifest', {}).get('tokamak', '') or '') or None,
                     shot_id=shot or st.session_state.get('tis_source_manifest', {}).get('shot'),
                     diagnostic=str(entry['name']),
-                    reference_result=reference_result,
-                    reference_description=reference_description.strip() or None,
                     researcher_notes="Review metadata and scientific assumptions before sharing.",
                 )
                 st.download_button(
@@ -1684,7 +1675,7 @@ elif page=='Reports & Export':
     st.markdown("### Input data quality summary")
     if not quality_frame.empty: st.dataframe(quality_frame,use_container_width=True)
     history=st.session_state.get("tis_analysis_history",[])
-    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'diagnostic_maturity_counts':maturity_counts(DIAGNOSTICS),'analysis_maturity_counts':maturity_counts(ANALYSES),'analysis_maturity_registry':[{'id':item['id'],'name':item['name'],'maturity_level':maturity_label(item)} for item in ANALYSES],'scientific_validation_status':'Not independently validated; experimental claims require compatible external reference data and device-specific calibration.','python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Provenance and QC report; scientific validity still depends on calibration, geometry, uncertainty and model assumptions.'}
+    record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'diagnostic_maturity_counts':maturity_counts(DIAGNOSTICS),'analysis_maturity_counts':maturity_counts(ANALYSES),'analysis_maturity_registry':[{'id':item['id'],'name':item['name'],'maturity_level':maturity_label(item)} for item in ANALYSES],'research_release_model':'Open research beta; independent scientific validation is not a prerequisite for use or contribution.','python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Software provenance and data-quality report. Researchers are responsible for confirming units, calibration, geometry, uncertainty and model assumptions for their use case.'}
     st.markdown("### Analysis history")
     if history:
         st.dataframe(pd.DataFrame([{"analysis":h["name"],"created_at_utc":h["created_at_utc"]} for h in history]),use_container_width=True)
