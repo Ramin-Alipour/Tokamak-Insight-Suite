@@ -29,6 +29,13 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
         st.error("Diagnostic completeness counts do not reconcile with the loaded registry; do not trust this status summary.")
     if len(diagnostics) != 80:
         st.warning(f"Expected 80 diagnostic records but loaded {len(diagnostics)}. This may be a stale or mismatched checkout.")
+    expected_completeness = {"complete": 8, "complete_with_declared_scope": 3, "incomplete": 69}
+    expected_levels = {"analysis_pipeline": 11, "limited_calculation": 17, "reference_only": 52}
+    if dict(diagnostic_status) != expected_completeness or dict(diagnostic_levels) != expected_levels:
+        st.warning(
+            "Loaded registry metadata differs from the reconciled main-branch baseline "
+            "(completeness 8/3/69; execution levels 11/17/52). Verify the deployed commit and registry SHA-256."
+        )
     st.caption(
         f"Canonical registry: {len(diagnostics)} diagnostic records · {len(analyses)} callable analysis entry points. "
         "Completeness describes declared software scope, not independent experimental validation."
