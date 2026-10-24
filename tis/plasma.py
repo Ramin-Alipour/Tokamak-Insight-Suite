@@ -125,7 +125,7 @@ def q_star_cylindrical(ip_MA: float, bt_T: float, r_m: float, a_m: float, kappa:
     if not 0 < eps < 1:
         raise ValueError("Inverse aspect ratio a/R must be in (0,1).")
     return float(5 * a ** 2 * _pos("|Bt|", abs(_finite_real("bt_T", bt_T))) * (1 + _pos("kappa", kappa) ** 2)
-                 / (2 * r * _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA))))
+                 / (2 * r * _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA)))))
 
 
 def beta_metrics(ne_m3: float, te_eV: float, ti_eV: float, ip_A: float, bt_T: float,
