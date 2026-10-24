@@ -1218,18 +1218,25 @@ elif page=='Tomography & Bolometry':
         st.write('Solve y = A x + noise using a calibrated geometry / response matrix.')
         Afile=st.file_uploader('Response / geometry matrix A (CSV, no header)',type=['csv'],key='tomo_A'); yfile=st.file_uploader('Measurements y (CSV, one column)',type=['csv'],key='tomo_y'); sigfile=st.file_uploader('Measurement standard uncertainties σ (optional CSV column)',type=['csv'],key='tomo_sigma')
         auto_lambda=st.checkbox('Select λ using an L-curve curvature heuristic',value=False,key='tomo_auto_lambda')
+        use_spatial_2d=st.checkbox('Use spatial 2-D regularization for a row-major (z, x) pixel grid',value=False,key='tomo_spatial_2d')
+        grid_shape=None
+        if use_spatial_2d:
+            nz=st.number_input('Grid rows (nz)',min_value=1,value=10,step=1,key='tomo_nz')
+            nx=st.number_input('Grid columns (nx)',min_value=1,value=10,step=1,key='tomo_nx')
+            grid_shape=(int(nz),int(nx))
+            st.caption('The grid must contain exactly nz × nx unknowns, flattened as iz * nx + ix. Spatial smoothing uses horizontal and vertical neighbors.')
         if Afile and yfile and st.button('Run regularized reconstruction',type='primary'):
             try:
                 A=pd.read_csv(Afile,header=None).to_numpy(float); y=pd.read_csv(yfile,header=None).to_numpy(float).ravel()
                 sigma=None if sigfile is None else pd.read_csv(sigfile,header=None).to_numpy(float).ravel()
                 lambda_used=lam
                 if auto_lambda:
-                    choice=select_tikhonov_lambda(A,y,nonnegative=nonneg,measurement_sigma=sigma)
+                    choice=select_tikhonov_lambda(A,y,nonnegative=nonneg,measurement_sigma=sigma,grid_shape=grid_shape)
                     lambda_used=choice['selected_lambda']
                     st.metric('L-curve selected λ',f'{lambda_used:.6g}')
                     plot_line(np.log10(np.maximum(choice['weighted_residual_norms'],np.finfo(float).tiny)),np.log10(np.maximum(choice['regularization_norms'],np.finfo(float).tiny)),'log₁₀ weighted residual norm','log₁₀ regularization-operator norm','Tikhonov L-curve')
                     json_download('Export L-curve selection',choice,'tis_tomography_lcurve.json')
-                r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma)
+                r=regularized_tomography(A,y,lambda_used,nonneg,measurement_sigma=sigma,grid_shape=grid_shape)
                 st.json({k:v for k,v in r.items() if k!='solution'}); out=pd.DataFrame({'basis_or_voxel_index':np.arange(len(r['solution'])),'reconstructed_value':r['solution']}); st.dataframe(out); download_df('Download reconstruction CSV',out,'tis_tomography_solution.csv')
             except Exception as e: st.error(str(e))
     elif tomo_mode=='Build 2-D ray geometry matrix':
