@@ -174,6 +174,8 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
 
 def longest_contiguous_segment(time_s: Any, values: Any, gap_factor: float = 1.5) -> dict[str, Any]:
     """Return the longest run with no gap larger than gap_factor * median dt (cut, never interpolate)."""
+    if isinstance(gap_factor, (bool, np.bool_)) or not isinstance(gap_factor, (int, float, np.integer, np.floating)) or not np.isfinite(gap_factor) or gap_factor <= 1:
+        raise ValueError("gap_factor must be a finite real number greater than 1.")
     t = np.asarray(time_s, dtype=float).ravel(); y = np.asarray(values, dtype=float).ravel()
     if len(t) != len(y):
         raise ValueError("Time and signal must have equal lengths.")
