@@ -14,6 +14,8 @@ def test_first_order_2d_regularization_uses_only_spatial_neighbors():
         A, y, lam=0.0, nonnegative=False, regularization_order=1, grid_shape=(2, 2)
     )
     assert result["regularization_operator_norm"] == pytest.approx(np.sqrt(2.0) / 2.0)
+    assert result["regularization_grid_shape"] == [2, 2]
+    assert result["regularization_geometry"] == "2D horizontal/vertical finite differences"
 
 
 def test_spatial_regularization_rejects_shape_mismatch():
@@ -29,6 +31,7 @@ def test_l_curve_selector_accepts_the_same_spatial_grid_contract():
         lambdas=[0.01, 0.1, 1.0], nonnegative=False, grid_shape=(2, 2),
     )
     assert result["selected_lambda"] in {0.01, 0.1, 1.0}
+    assert result["regularization_grid_shape"] == [2, 2]
 
 
 @pytest.mark.parametrize("bad_lambda", ["0.1", True, np.bool_(False), np.nan, np.inf, -1.0, 10**1000])
