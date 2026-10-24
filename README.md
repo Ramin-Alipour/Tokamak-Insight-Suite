@@ -2,6 +2,10 @@
 
 **Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source version: **v0.5.1**. See `docs/architecture/` for execution contracts, the canonical measurement model and reproducible project persistence.
 
+## Open research beta policy
+
+TIS is developed as an openly usable research toolkit. **Independent scientific validation is not a prerequisite for publishing, installing, running, or contributing analysis modules.** Development prioritizes implementation coverage, reproducibility, software correctness, explicit assumptions, and community feedback. Automated software tests remain in place; they check software behavior, not scientific truth. Researchers must judge whether a method, calibration, units, geometry, and uncertainty model are appropriate for their experiment. See [`docs/OPEN_RESEARCH_BETA.md`](docs/OPEN_RESEARCH_BETA.md).
+
 ![Dashboard design reference](docs/design_reference_dashboard.png)
 
 ## Run locally
@@ -58,11 +62,11 @@ This validates a real diagnostic time-series path only. Anti-aliasing is applied
 
 Public real-data archives and access notes: [Public Tokamak Data Sources](docs/public_tokamak_data_sources.md).
 
-**External empirical validation protocol:** [raw-data + independent-reference acceptance criteria, GOLEM candidates, and FAIR-MAST comparison requirements](docs/external_empirical_validation_protocol.md). Candidate datasets are not labeled validated until rawness, reference equivalence, numerical discrepancy, and reproducibility are all documented.
+**Optional community research:** existing public-data examples and benchmark notes are exploratory resources, not release gates. Researchers may share reproducible cases whether or not an independent reference result is available.
 
-**Formula and physics audit:** [equations, units, assumptions, uncertainty limitations, edge-case hardening, and remaining validation gates](docs/formula_physics_audit.md).
+**Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).
 
-**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, 37 formula contracts, and scientific promotion gates](docs/implementation_coverage_audit.md). The registries distinguish implementation scope from experimental validation; Thomson Scattering remains explicitly incomplete pending broader independent validation. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
+**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, and 37 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
 
 ## Workspace
 
