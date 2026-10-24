@@ -54,7 +54,7 @@ def _frequency_band(frequency_range_Hz, nyquist: float):
     try:
         low, high = map(float, frequency_range_Hz)
     except (TypeError, ValueError) as exc:
-        raise ValueError("frequency_range_Hz must be a (low, high) pair") from exc
+        raise ValueError("frequency range must be a (low, high) pair") from exc
     if (
         not np.isfinite(low)
         or not np.isfinite(high)
