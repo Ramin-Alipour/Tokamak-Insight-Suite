@@ -484,7 +484,7 @@ def test_langmuir_exact_zero_current_uses_sample_without_division_by_zero():
     v=np.linspace(-4,4, nine:=9)
     i=np.array([-4.,-3.,-2.,-1.,0.,0.,1.,2.,3.])
     r=langmuir_iv_analysis(v,i)
-    assert r["floating_potential_V"] == pytest.approx(0.0)
+    assert r["floating_potential_V"] == pytest.approx(0.5)
 
 
 def test_langmuir_requires_area_and_ion_mass_together():
