@@ -222,12 +222,22 @@ def prepare_time_series_robust(time: Any, values: Any, sample_rate: float | None
                           "note": "Longest gap-free segment retained; no data were interpolated."}
     rs = resample_uniform(tt, yy, None, max_interp_gap_s)
     finite = np.isfinite(rs["values"])
+    resampling_audit = {
+        "input_samples_raw": rs["n_input_raw"],
+        "finite_samples_used": rs["n_input"],
+        "nonfinite_samples_dropped": rs["n_nonfinite_dropped"],
+        "output_samples": rs["n_output"],
+        "nan_samples_in_long_gaps": rs["n_nan_in_long_gaps"],
+        "target_sample_rate_Hz": rs["fs_Hz"],
+    }
     if finite.all():
         t, y, fs = prepare_time_series(rs["time_s"], rs["values"], None)
         return t, y, fs, {"gap_policy": gap_policy, "modified": True, "audit": audit,
+                          "resampling": resampling_audit,
                           "note": "Short gaps linearly interpolated; spectra near Nyquist are attenuated."}
     seg = longest_contiguous_segment(rs["time_s"][finite], rs["values"][finite])
     t, y, fs = prepare_time_series(seg["time_s"], seg["values"], None)
     return t, y, fs, {"gap_policy": gap_policy, "modified": True, "audit": audit,
+                      "resampling": resampling_audit,
                       "samples_kept": seg["n_samples_kept"],
                       "note": "Long gaps present: interpolated short gaps, then kept the longest finite run."}
