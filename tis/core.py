@@ -167,6 +167,9 @@ def linear_calibration(values: Any, slope: float, intercept: float = 0.0) -> np.
 
 def polynomial_calibration(values: Any, coefficients: list[float]) -> np.ndarray:
     try:
+        object_coefficients = np.asarray(coefficients, dtype=object)
+        if any(isinstance(value, (bool, np.bool_)) for value in object_coefficients.ravel()):
+            raise ValueError('Provide a one-dimensional sequence of finite real polynomial coefficients, highest order first.')
         raw_coefficients = np.asarray(coefficients)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError('Provide a one-dimensional sequence of finite real polynomial coefficients, highest order first.') from exc
