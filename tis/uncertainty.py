@@ -47,8 +47,19 @@ def propagate_monte_carlo(model: Callable[[np.ndarray], Any], mean: Any, covaria
     C = np.asarray(covariance, dtype=float)
     if mu.ndim != 1 or mu.size < 1 or not np.all(np.isfinite(mu)):
         raise UncertaintyError("mean must be a finite 1-D vector")
-    if isinstance(n_samples, bool) or int(n_samples) != n_samples or n_samples < 100:
+    try:
+        if isinstance(n_samples, (bool, np.bool_)):
+            raise TypeError
+        sample_count = float(n_samples)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise UncertaintyError("n_samples must be an integer of at least 100") from exc
+    if not np.isfinite(sample_count) or not sample_count.is_integer() or sample_count < 100:
         raise UncertaintyError("n_samples must be an integer of at least 100")
+    n_samples = int(sample_count)
+    try:
+        confidence_level = float(confidence_level)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise UncertaintyError("confidence_level must lie strictly between 0 and 1") from exc
     if not np.isfinite(confidence_level) or not 0 < confidence_level < 1:
         raise UncertaintyError("confidence_level must lie strictly between 0 and 1")
     if C.shape != (mu.size, mu.size) or not np.all(np.isfinite(C)):
