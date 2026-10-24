@@ -182,6 +182,16 @@ def test_signal_quality_missing():
     assert r['n_finite']==2 and r['n_missing_or_nonfinite']==1
 
 
+def test_signal_quality_relative_fluctuation_is_invariant_to_physical_scale():
+    result = signal_quality([1e-20, 2e-20])
+    assert result["relative_rms_fluctuation"] == pytest.approx(1.0 / 3.0)
+
+
+def test_signal_quality_relative_fluctuation_is_undefined_near_zero_mean():
+    result = signal_quality([1.0, -1.0])
+    assert result["relative_rms_fluctuation"] is None
+
+
 def test_interferometry_phase_density_finite():
     assert np.isfinite(linear_phase_density(.1,140e9,sign_convention=1))
 
