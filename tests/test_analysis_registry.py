@@ -1,13 +1,13 @@
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_80_unique_ordered_analysis_ids():
+def test_registry_contains_81_unique_ordered_analysis_ids():
     ids = [entry["id"] for entry in ANALYSES]
     assert len(ANALYSES) == 81
     assert ids == list(range(1, 82))
 
 
-def test_registry_uses_distinct_entry_points_for_all_80_analyses():
+def test_registry_uses_distinct_entry_points_for_all_81_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
     assert len(set(pairs)) == 81
 

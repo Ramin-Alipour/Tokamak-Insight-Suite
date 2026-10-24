@@ -78,10 +78,10 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Confinement & Scalings:** Greenwald fraction, q95 (ITER formula), β_t/β_p/β_N, ν*ₑ, Spitzer resistivity, IPB98(y,2) τ_E and H98, Martin-08 L–H threshold. Empirical comparison tools, not device-validated predictions.
 - **Signal conditioning:** explicit gap policies, Hampel despiking, drift-corrected integration. Every repair is reported.
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
-- **Molecular Spectroscopy (analysis 6/80):** [feature extraction, user-defined molecular-model fitting, input contract, and physical limitations](docs/analyses/molecular_spectroscopy.md).
-- **Thomson Scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
-- **CXRS (analysis 4/80):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
-- **Electron Cyclotron Emission (analysis 3/80):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
+- **Molecular Spectroscopy (analysis 6/81):** [feature extraction, user-defined molecular-model fitting, input contract, and physical limitations](docs/analyses/molecular_spectroscopy.md).
+- **Thomson Scattering (analysis 1/81):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
+- **CXRS (analysis 4/81):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
+- **Electron Cyclotron Emission (analysis 3/81):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
 ## Tests and CI
