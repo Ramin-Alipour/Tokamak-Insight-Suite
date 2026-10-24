@@ -14,7 +14,7 @@ python -m venv .venv
 # Linux/macOS: source .venv/bin/activate
 python -m pip install --upgrade pip
 pip install -r requirements.txt
-# Optional extras: pip install '.[test,excel,data]'
+# Optional extras: pip install '.[test,data]'
 streamlit run app.py
 ```
 
