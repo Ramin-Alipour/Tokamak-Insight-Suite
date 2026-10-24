@@ -182,3 +182,20 @@ def test_thomson_density_rejects_collection_solid_angle_above_sphere():
             scattering_angle_rad=np.pi / 2,
             collection_solid_angle_sr=4.0 * np.pi + 1e-6,
         )
+
+
+def test_thomson_volume_average_reports_sampled_domain_and_scope():
+    from tokamak_analysis.thomson_scattering import build_profile, profile_summary
+
+    profile = build_profile(
+        [0.2, 0.3, 0.4],
+        [1.0e19, 2.0e19, 1.0e19],
+        [20.0, 40.0, 20.0],
+    )
+    summary = profile_summary(profile, major_radius_m=1.5)
+
+    assert summary.density_volume_average_m3 is not None
+    assert summary.temperature_volume_average_ev is not None
+    assert summary.volume_average_radial_domain_m == pytest.approx((0.2, 0.4))
+    assert "sampled radial interval only" in summary.volume_average_scope
+    assert "does not establish full-plasma coverage" in summary.volume_average_scope

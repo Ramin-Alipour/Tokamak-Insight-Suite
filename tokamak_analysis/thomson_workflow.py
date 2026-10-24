@@ -99,7 +99,7 @@ def analyze_thomson_profile(
         "notes": [
             "Input must be calibrated Thomson-scattering profile data.",
             "Gradient and derived uncertainty propagation assumes independent pointwise errors.",
-            "Volume averages, when requested, use circular large-aspect-ratio weighting.",
+            "Volume averages use circular large-aspect-ratio weighting over the sampled radial interval only; full-plasma coverage is not inferred.",
             "NaN scale lengths mark zero/near-zero gradients or profile values.",
             "Peak-location uncertainty is not estimated by this workflow.",
         ],
