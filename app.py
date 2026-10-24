@@ -1522,7 +1522,10 @@ elif page=='Advanced Analysis':
         import inspect
         st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
         contract = entry.get('execution_contract', {})
-        status = 'Complete within declared scope' if contract.get('completeness') == 'complete' else 'Incomplete / limited scope'
+        completeness = contract.get('completeness', 'incomplete')
+        status = ('Complete within declared scope — not independently validated'
+                  if completeness in {'complete', 'complete_with_declared_scope'}
+                  else 'Incomplete / limited scope')
         st.info(f"Execution status: {status}")
         with st.expander('Scientific contract: inputs, outputs and limitations', expanded=(selected_id == 1)):
             st.write(contract.get('algorithm', 'No algorithm description declared.'))
