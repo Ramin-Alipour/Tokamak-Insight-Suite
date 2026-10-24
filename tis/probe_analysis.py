@@ -20,9 +20,18 @@ def _is_finite_real_scalar(value: Any) -> bool:
 
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
     """Descriptive I-V preprocessing only; does not silently infer Te/ne without a validated regime model."""
-    v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
-    if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
-    good=np.isfinite(v)&np.isfinite(i); v,i=v[good],i[good]
+    raw_v = np.asarray(voltage)
+    raw_i = np.asarray(current)
+    if raw_v.ndim != 1 or raw_i.ndim != 1:
+        raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
+    if raw_v.dtype.kind not in "iuf" or raw_i.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current inputs must contain real numeric values, not booleans or strings.")
+    v = raw_v.astype(float, copy=False)
+    i = raw_i.astype(float, copy=False)
+    if len(v) != len(i):
+        raise ValueError("Voltage and current arrays must have equal lengths.")
+    good = np.isfinite(v) & np.isfinite(i)
+    v, i = v[good], i[good]
     if len(v)<5: raise ValueError('At least 5 finite I-V points are required.')
     order=np.argsort(v); v,i=v[order],i[order]
     unique_v, inverse = np.unique(v, return_inverse=True)
