@@ -236,7 +236,7 @@ def current_quench_analysis(time_s: Any, ip_A: Any, reference_current_A: float |
             raise ValueError("reference_window_s must contain two finite time bounds.") from exc
         if bounds.shape != (2,) or not np.all(np.isfinite(bounds)):
             raise ValueError("reference_window_s must contain two finite time bounds.")
-        m = (t >= float(np.min(bounds))) & (t <= float(np.max(bounds))
+        m = (t >= float(np.min(bounds))) & (t <= float(np.max(bounds)))
         if m.sum() < 2:
             raise ValueError("Reference window contains too few samples.")
         i0 = float(np.median(a[m]))
