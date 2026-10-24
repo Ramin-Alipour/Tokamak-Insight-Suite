@@ -69,6 +69,24 @@ def _mad_sigma(x: np.ndarray) -> float:
     return float(1.4826 * np.median(np.abs(x - np.median(x))))
 
 
+def _real_parameter(name: str, value: Any, *, positive: bool = False,
+                    minimum: float | None = None, maximum: float | None = None) -> float:
+    """Validate a real scalar without accepting booleans or coercing strings."""
+    if (isinstance(value, (bool, np.bool_))
+            or not isinstance(value, (int, float, np.integer, np.floating))):
+        raise ValueError(f"{name} must be a finite real number.")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be finite.")
+    if positive and result <= 0:
+        raise ValueError(f"{name} must be positive and finite.")
+    if minimum is not None and result < minimum:
+        raise ValueError(f"{name} must be >= {minimum}.")
+    if maximum is not None and result > maximum:
+        raise ValueError(f"{name} must be <= {maximum}.")
+    return result
+
+
 def interval_statistics(event_times_s: Any) -> dict[str, Any]:
     """Repetition statistics: mean/median period, frequency, coefficient of variation."""
     ev = np.asarray(event_times_s, dtype=float).ravel()
@@ -102,12 +120,19 @@ def detect_elms(time_s: Any, d_alpha: Any, baseline_window_s: float | None = Non
         t, y = t[m], y[m]
         if len(t) < 32:
             raise ValueError("Analysis window contains too few samples.")
-    if not np.isfinite(n_sigmas) or n_sigmas <= 0:
-        raise ValueError("n_sigmas must be positive and finite.")
-    if baseline_window_s is not None and (not np.isfinite(baseline_window_s) or baseline_window_s <= 0):
-        raise ValueError("baseline_window_s must be positive and finite when supplied.")
-    if min_separation_s is not None and (not np.isfinite(min_separation_s) or min_separation_s <= 0):
-        raise ValueError("min_separation_s must be positive and finite when supplied.")
+    n_sigmas = _real_parameter("n_sigmas", n_sigmas, positive=True)
+    if baseline_window_s is not None:
+        baseline_window_s = _real_parameter("baseline_window_s", baseline_window_s, positive=True)
+    if min_separation_s is not None:
+        min_separation_s = _real_parameter("min_separation_s", min_separation_s, positive=True)
+    if window_s is not None:
+        try:
+            bounds = np.asarray(window_s, dtype=float)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("window_s must contain two finite time bounds.") from exc
+        if bounds.shape != (2,) or not np.all(np.isfinite(bounds)):
+            raise ValueError("window_s must contain two finite time bounds.")
+        window_s = (float(bounds[0]), float(bounds[1]))
     span = t[-1] - t[0]
     bw = baseline_window_s if baseline_window_s is not None else max(span * 0.05, 20 * dt)
     size = max(3, int(round(bw / dt)) | 1)
@@ -148,14 +173,14 @@ def detect_sawteeth(time_s: Any, core_signal: Any, smooth_window_s: float | None
     exceedance is *expected* a few times per 10^4 Gaussian samples), so candidates whose drop is smaller
     than `min_relative_amplitude` x the median candidate drop are rejected and counted in `n_rejected_small`.
     """
-    if not np.isfinite(n_sigmas) or n_sigmas <= 0:
-        raise ValueError("n_sigmas must be positive and finite.")
-    if smooth_window_s is not None and (not np.isfinite(smooth_window_s) or smooth_window_s <= 0):
-        raise ValueError("smooth_window_s must be positive and finite when supplied.")
-    if min_period_s is not None and (not np.isfinite(min_period_s) or min_period_s <= 0):
-        raise ValueError("min_period_s must be positive and finite when supplied.")
-    if not np.isfinite(min_relative_amplitude) or not 0 <= min_relative_amplitude <= 1:
-        raise ValueError("min_relative_amplitude must be finite and between 0 and 1.")
+    n_sigmas = _real_parameter("n_sigmas", n_sigmas, positive=True)
+    if smooth_window_s is not None:
+        smooth_window_s = _real_parameter("smooth_window_s", smooth_window_s, positive=True)
+    if min_period_s is not None:
+        min_period_s = _real_parameter("min_period_s", min_period_s, positive=True)
+    min_relative_amplitude = _real_parameter(
+        "min_relative_amplitude", min_relative_amplitude, minimum=0.0, maximum=1.0
+    )
     t, y, dt = _clean(time_s, core_signal, 64)
     sw = smooth_window_s if smooth_window_s is not None else 5 * dt
     k = max(1, int(round(sw / dt)))
@@ -197,14 +222,22 @@ def current_quench_analysis(time_s: Any, ip_A: Any, reference_current_A: float |
     is the same number by construction. Runaway plateaus will keep |Ip| above the lower level and
     are reported as `disrupted=False, runaway_or_incomplete_quench=True`.
     """
+    lower_fraction = _real_parameter("lower_fraction", lower_fraction, minimum=0.0, maximum=1.0)
+    upper_fraction = _real_parameter("upper_fraction", upper_fraction, minimum=0.0, maximum=1.0)
     if not 0 < lower_fraction < upper_fraction < 1:
         raise ValueError("Need 0 < lower_fraction < upper_fraction < 1.")
     t, y, dt = _clean(time_s, ip_A, 16)
     a = np.abs(y)
     if reference_current_A is not None:
-        i0 = abs(float(reference_current_A))
+        i0 = abs(_real_parameter("reference_current_A", reference_current_A))
     elif reference_window_s is not None:
-        m = (t >= min(reference_window_s)) & (t <= max(reference_window_s))
+        try:
+            bounds = np.asarray(reference_window_s, dtype=float)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("reference_window_s must contain two finite time bounds.") from exc
+        if bounds.shape != (2,) or not np.all(np.isfinite(bounds)):
+            raise ValueError("reference_window_s must contain two finite time bounds.")
+        m = (t >= float(np.min(bounds))) & (t <= float(np.max(bounds))
         if m.sum() < 2:
             raise ValueError("Reference window contains too few samples.")
         i0 = float(np.median(a[m]))
