@@ -1107,7 +1107,7 @@ elif page=='Probe Analysis':
             result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,area or None,mass or None,ti,sheath,current_convention=cur_conv)
             st.json(result); plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V'); json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
-    st.warning('The automated fit is a first-pass estimate. Confirm sweep polarity, fit windows, saturation regions, magnetic-field effects and the probe/sheath model before interpreting Te or density.')
+    st.warning('Default output is descriptive only. Te and density are calculated only when their fit windows are explicitly enabled; inspect fit quality and confirm calibration, sweep polarity, saturation regions, magnetic-field effects and the probe/sheath model before interpreting results.')
 
 elif page=='Plasma Parameters':
     st.title('Plasma Parameters & Diagnostic Conversions')
