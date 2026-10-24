@@ -43,7 +43,7 @@ def resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T, *,
         raise ValueError("major_radius_m must be finite and positive.")
     if np.any(~np.isfinite(b0)) or np.any(b0 <= 0):
         raise ValueError("B_axis_T must be finite and positive.")
-    if isinstance(sign, bool) or sign != 1:
+    if isinstance(sign, (bool, np.bool_)) or sign != 1:
         raise ValueError(
             "sign=-1 cannot be represented by a 1-D major-radius mapping; "
             "supply viewing geometry and equilibrium for high/low-field-side localization."
@@ -90,7 +90,7 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("frequency_Hz must be strictly increasing.")
     if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
         raise ValueError("harmonic must be a positive integer.")
-    if mode not in {"brightness_temperature", "channel_fluctuations", "resonance_mapping"}:
+    if not isinstance(mode, str) or mode not in {"brightness_temperature", "channel_fluctuations", "resonance_mapping"}:
         raise ValueError("Unsupported mode.")
     if mode == "resonance_mapping" and (spectral_radiance_W_m2_sr_Hz is not None or signal is not None or time_s is not None):
         raise ValueError("resonance_mapping accepts resonance inputs only; omit radiance, signal, and time_s.")
