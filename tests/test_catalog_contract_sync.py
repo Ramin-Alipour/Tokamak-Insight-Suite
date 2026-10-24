@@ -73,7 +73,7 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
     assert len(DIAGNOSTICS) == 80
     assert levels == {"reference_only": 52, "limited_calculation": 17, "analysis_pipeline": 11}
-    assert completeness == {"incomplete": 70, "complete": 8, "complete_with_declared_scope": 2}
+    assert completeness == {"incomplete": 69, "complete": 8, "complete_with_declared_scope": 3}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.
@@ -125,5 +125,5 @@ def test_maturity_labels_distinguish_reference_calculation_and_unvalidated_pipel
     scoped = next(row for row in DIAGNOSTICS if row["execution_contract"]["completeness"] == "complete_with_declared_scope")
     assert maturity_label(reference) == "Reference only"
     assert maturity_label(limited) == "Limited calculation"
-    assert maturity_label(thomson) == "Analysis pipeline — incomplete"
+    assert "Complete within declared scope" in maturity_label(thomson)
     assert "not independently validated" in maturity_label(scoped)
