@@ -62,7 +62,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **Formula and physics audit:** [equations, units, assumptions, uncertainty limitations, edge-case hardening, and remaining validation gates](docs/formula_physics_audit.md).
 
-**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, 37 formula contracts, and scientific promotion gates](docs/implementation_coverage_audit.md). The registries distinguish implementation scope from experimental validation; Thomson Scattering remains explicitly incomplete pending broader independent validation.
+**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, 37 formula contracts, and scientific promotion gates](docs/implementation_coverage_audit.md). The registries distinguish implementation scope from experimental validation; Thomson Scattering remains explicitly incomplete pending broader independent validation. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
 
 ## Workspace
 
