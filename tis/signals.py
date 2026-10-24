@@ -108,7 +108,8 @@ def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
 
 
 def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
-                     max_interp_gap_s: float | None = None) -> dict[str, Any]:
+                     max_interp_gap_s: float | None = None,
+                     max_output_samples: int = 10_000_000) -> dict[str, Any]:
     """Linearly interpolate onto a uniform grid, without inventing data inside long gaps.
 
     Samples falling in a gap longer than `max_interp_gap_s` (default: 3 median intervals)
@@ -132,11 +133,37 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
         fs = 1.0 / med
     if not np.isfinite(fs) or fs <= 0:
         raise ValueError("fs must be positive and finite.")
+    if (isinstance(max_output_samples, (bool, np.bool_))
+            or not isinstance(max_output_samples, (int, np.integer))
+            or max_output_samples < 8):
+        raise ValueError("max_output_samples must be an integer >= 8.")
     limit = 3.0 * med if max_interp_gap_s is None else float(max_interp_gap_s)
     if limit <= 0 or not np.isfinite(limit):
         raise ValueError("max_interp_gap_s must be positive and finite.")
-    grid = np.arange(t[0], t[-1] + 0.5 / fs, 1.0 / fs)
-    grid = grid[grid <= t[-1] + 1e-12 * abs(t[-1])]
+    span = float(t[-1] - t[0])
+    if not np.isfinite(span) or span < 0:
+        raise ValueError("Time span must be finite and non-negative.")
+    # Bound allocations before constructing the grid: a mistaken fs or tiny
+    # timestamp interval must not allocate an unbounded array.
+    estimated_samples = span * float(fs)
+    if not np.isfinite(estimated_samples) or estimated_samples > max_output_samples:
+        raise ValueError(
+            f"Uniform grid would exceed the {max_output_samples:,}-sample safety limit; "
+            "reduce fs or process a shorter time window."
+        )
+    step = 1.0 / float(fs)
+    endpoint_tol = 8.0 * max(
+        abs(float(np.spacing(t[0]))), abs(float(np.spacing(t[-1]))),
+        abs(float(np.spacing(step))), np.finfo(float).tiny,
+    )
+    n_grid = int(np.floor(estimated_samples + endpoint_tol * float(fs))) + 1
+    if n_grid > max_output_samples:
+        raise ValueError(
+            f"Uniform grid would exceed the {max_output_samples:,}-sample safety limit; "
+            "reduce fs or process a shorter time window."
+        )
+    grid = t[0] + np.arange(n_grid, dtype=float) * step
+    grid = grid[grid <= t[-1] + endpoint_tol]
     # Snap grid points that differ from a measured timestamp only by floating-
     # point roundoff. Besides preserving measured values, this keeps endpoint
     # identity consistent for downstream masks using strict time comparisons.
