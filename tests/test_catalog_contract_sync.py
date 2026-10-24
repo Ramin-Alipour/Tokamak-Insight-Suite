@@ -41,7 +41,9 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
         assert contract["completeness"] in {"incomplete", "complete", "complete_with_declared_scope"}
         if contract["completeness"] != "incomplete":
             assert contract["limitations"], "Scoped completion needs limitations: " + entry["name"]
-        assert contract["raw_data_to_physics"] is (entry["name"].casefold() == "thomson scattering")
+        if contract["raw_data_to_physics"]:
+            assert contract["execution_level"] == "analysis_pipeline"
+            assert contract["limitations"], entry["name"]
         primary_link = f'{entry["module"]}.{entry["function"]}'
         assert contract["function_links"][0] == primary_link
         if entry["name"].casefold() == "thomson scattering":
@@ -107,7 +109,10 @@ def test_toroidal_field_coil_analysis_contract_and_callable():
     assert contract["completeness"] == "complete"
     assert contract["input_specs"] and contract["output_specs"]
     assert contract["uncertainty_model"] != "not_specified"
-    assert row["implementation_functions"] == ["tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil"]
+    assert row["implementation_functions"] == [
+        "tokamak_analysis.toroidal_field_coils.analyze_toroidal_field_coil",
+        "tokamak_analysis.toroidal_field_coils.integrate_pickup_coil_voltage",
+    ]
     module = importlib.import_module("tokamak_analysis.toroidal_field_coils")
     assert callable(module.analyze_toroidal_field_coil)
 

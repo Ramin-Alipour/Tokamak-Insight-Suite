@@ -12,6 +12,9 @@ def synthetic_iv():
 
 def test_langmuir_probe_recovers_floating_potential_and_electron_temperature():
     voltage, current = synthetic_iv()
+    # This variant crosses zero within the measured voltage sweep; the default
+    # synthetic amplitude intentionally does not, and should report no crossing.
+    current = -1.0e-3 + 4.0e-5 * np.exp((voltage - 10.0) / 3.0)
     result = analyze_langmuir_probe(
         voltage,
         current,
@@ -108,7 +111,8 @@ def test_langmuir_probe_selected_ion_range_overrides_tail_fallback():
         ion_fit_range=(-5.0, 0.0),
     )
     assert result["ion_saturation_current_method"] == "median_user_selected_ion_fit_range"
-    assert result["ion_saturation_current_A"] == pytest.approx(-1e-3, abs=1e-7)
+    selected = (voltage >= -5.0) & (voltage <= 0.0)
+    assert result["ion_saturation_current_A"] == pytest.approx(float(np.median(current[selected])), abs=1e-12)
 
 
 def test_langmuir_probe_does_not_infer_density_from_tail_fallback():

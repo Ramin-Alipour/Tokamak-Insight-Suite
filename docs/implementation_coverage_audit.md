@@ -5,7 +5,7 @@
 
 ## Diagnostic categories versus callable analysis entry points
 
-The canonical `DIAGNOSTIC_REGISTRY.json` contains 80 diagnostic categories. The separate callable `tokamak_analysis.analysis_registry.ANALYSES` contains 81 entry points: Thomson spectral-distribution characterization is exposed as a separate analysis workflow under the Thomson diagnostic family, not as an 81st catalog category.
+The canonical `DIAGNOSTIC_REGISTRY.json` contains 80 diagnostic records, while `tokamak_analysis.analysis_registry.ANALYSES` contains 81 callable entry points. These registries describe different layers and are not a one-to-one row mapping: one diagnostic may expose multiple callables, and a callable entry point is not itself a new diagnostic. The CI contract therefore verifies the two counts independently and resolves every callable by ID.
 
 The 80 diagnostic contracts currently classify execution level as:
 
