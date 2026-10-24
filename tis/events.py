@@ -116,6 +116,13 @@ def detect_elms(time_s: Any, d_alpha: Any, baseline_window_s: float | None = Non
     """
     t, y, dt = _clean(time_s, d_alpha, 32)
     if window_s is not None:
+        try:
+            bounds = np.asarray(window_s, dtype=float)
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("window_s must contain two finite time bounds.") from exc
+        if bounds.shape != (2,) or not np.all(np.isfinite(bounds)):
+            raise ValueError("window_s must contain two finite time bounds.")
+        window_s = (float(bounds[0]), float(bounds[1]))
         m = (t >= min(window_s)) & (t <= max(window_s))
         t, y = t[m], y[m]
         if len(t) < 32:
@@ -125,14 +132,6 @@ def detect_elms(time_s: Any, d_alpha: Any, baseline_window_s: float | None = Non
         baseline_window_s = _real_parameter("baseline_window_s", baseline_window_s, positive=True)
     if min_separation_s is not None:
         min_separation_s = _real_parameter("min_separation_s", min_separation_s, positive=True)
-    if window_s is not None:
-        try:
-            bounds = np.asarray(window_s, dtype=float)
-        except (TypeError, ValueError, OverflowError) as exc:
-            raise ValueError("window_s must contain two finite time bounds.") from exc
-        if bounds.shape != (2,) or not np.all(np.isfinite(bounds)):
-            raise ValueError("window_s must contain two finite time bounds.")
-        window_s = (float(bounds[0]), float(bounds[1]))
     span = t[-1] - t[0]
     bw = baseline_window_s if baseline_window_s is not None else max(span * 0.05, 20 * dt)
     size = max(3, int(round(bw / dt)) | 1)
