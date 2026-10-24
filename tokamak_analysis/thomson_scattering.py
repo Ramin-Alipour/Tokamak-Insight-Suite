@@ -43,9 +43,12 @@ class ThomsonSummary:
 
 
 def _array(values: Iterable[float], name: str) -> np.ndarray:
-    arr = np.asarray(values, dtype=float)
-    if arr.ndim != 1:
+    raw = np.asarray(values)
+    if raw.ndim != 1:
         raise ValueError(f"{name} must be a one-dimensional array")
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+    arr = raw.astype(float, copy=False)
     if arr.size < 2:
         raise ValueError(f"{name} must contain at least two samples")
     if not np.all(np.isfinite(arr)):
