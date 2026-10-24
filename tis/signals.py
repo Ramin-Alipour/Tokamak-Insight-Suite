@@ -184,7 +184,7 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     use_left = left_dist < right_dist
     nearest_idx = np.where(use_left, left_idx, right_idx)
     nearest_time = t[nearest_idx]
-    tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(nearest_time)))
+    tol = 1.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(nearest_time)))
     snap = np.abs(grid - nearest_time) <= tol
     grid[snap] = nearest_time[snap]
     out = np.interp(grid, t, y)
@@ -196,8 +196,8 @@ def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
     left_time = t[right - 1]
     right_time = t[right]
     span = right_time - left_time
-    left_tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(left_time)))
-    right_tol = 8.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(right_time)))
+    left_tol = 1.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(left_time)))
+    right_tol = 1.0 * np.maximum(np.abs(np.spacing(grid)), np.abs(np.spacing(right_time)))
     at_left_sample = np.abs(grid - left_time) <= left_tol
     at_right_sample = np.abs(grid - right_time) <= right_tol
     strictly_inside_interval = ~(at_left_sample | at_right_sample)
