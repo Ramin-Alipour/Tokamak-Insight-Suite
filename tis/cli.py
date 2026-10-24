@@ -17,7 +17,7 @@ def main() -> int:
     p=sub.add_parser('fft',help='Compute FFT and Welch PSD from a numeric column'); p.add_argument('input'); p.add_argument('--signal',required=True)
     sampling=p.add_mutually_exclusive_group(required=True); sampling.add_argument('--time'); sampling.add_argument('--fs',type=float)
     p.add_argument('--output',default='tis_fft.csv')
-    p=sub.add_parser('catalog',help='Export diagnostic, analysis-maturity, and formula registries'); p.add_argument('--kind',choices=['diagnostics','analyses','formulas','both'],default='both'); p.add_argument('--output-dir',default='.')
+    p=sub.add_parser('catalog',help='Export registries or a reconciled diagnostic status report'); p.add_argument('--kind',choices=['diagnostics','analyses','formulas','both','status'],default='both'); p.add_argument('--output-dir',default='.')
     p=sub.add_parser('events',help='Detect ELMs / sawtooth crashes or analyse a current quench'); p.add_argument('input'); p.add_argument('--kind',choices=['elm','sawtooth','quench'],required=True); p.add_argument('--time',required=True); p.add_argument('--signal',required=True); p.add_argument('--n-sigmas',type=float,default=None); p.add_argument('--output',default='tis_events.json')
     p=sub.add_parser('scalings',help='Confinement summary: Greenwald, q95, IPB98(y,2), H98, Martin-08 L-H threshold')
     for flag in ('ip-A','bt-T','r-m','a-m','kappa','ne-line-avg-m3','p-loss-W'): p.add_argument('--'+flag,type=float,required=True)
@@ -33,9 +33,37 @@ def main() -> int:
         print(f'Wrote {output_path.resolve()}'); return 0
     if args.command=='catalog':
         out=Path(args.output_dir); out.mkdir(parents=True,exist_ok=True)
-        if args.kind in ('diagnostics','both'):
+        if args.kind in ('diagnostics','both','status'):
             diagnostics=[{**row,'maturity_level':maturity_label(row)} for row in DIAGNOSTICS]
-            (out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(diagnostics,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+            if args.kind != 'status':
+                (out/'DIAGNOSTIC_REGISTRY.json').write_text(json.dumps(diagnostics,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+        if args.kind == 'status':
+            from collections import Counter
+            level_counts=Counter((row.get('execution_contract') or {}).get('execution_level','reference_only') for row in DIAGNOSTICS)
+            completeness_counts=Counter((row.get('execution_contract') or {}).get('completeness','incomplete') for row in DIAGNOSTICS)
+            analysis_completeness=Counter((row.get('execution_contract') or {}).get('completeness','incomplete') for row in ANALYSES)
+            report={
+                'source_of_truth':'DIAGNOSTIC_REGISTRY.json',
+                'diagnostic_record_count':len(DIAGNOSTICS),
+                'diagnostic_execution_level_counts':dict(sorted(level_counts.items())),
+                'diagnostic_completeness_counts':dict(sorted(completeness_counts.items())),
+                'callable_analysis_entry_point_count':len(ANALYSES),
+                'callable_analysis_completeness_counts':dict(sorted(analysis_completeness.items())),
+                'first_ten_diagnostics':[{
+                    'catalog_position':i+1,
+                    'diagnostic':row.get('diagnostic'),
+                    'execution_level':(row.get('execution_contract') or {}).get('execution_level','reference_only'),
+                    'completeness':(row.get('execution_contract') or {}).get('completeness','incomplete'),
+                    'maturity_level':maturity_label(row),
+                } for i,row in enumerate(DIAGNOSTICS[:10])],
+                'interpretation':{
+                    'diagnostic_records_and_callable_entry_points_are_distinct':True,
+                    'completeness_is_software_scope_not_independent_experimental_validation':True,
+                    'reference_only_means_no_callable_numerical_workflow_is_declared':True,
+                },
+            }
+            (out/'DIAGNOSTIC_STATUS_REPORT.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+            print(f'Wrote reconciled diagnostic status report to {(out/"DIAGNOSTIC_STATUS_REPORT.json").resolve()}'); return 0
         if args.kind == 'analyses':
             analyses=[{**row,'maturity_level':maturity_label(row)} for row in ANALYSES]
             (out/'ANALYSIS_REGISTRY.json').write_text(json.dumps(analyses,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
