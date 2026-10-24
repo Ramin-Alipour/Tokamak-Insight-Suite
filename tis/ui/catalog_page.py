@@ -17,11 +17,26 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
     st.title("Diagnostic Knowledge Base")
     # Diagnostic records and callable entry points are separate registry layers.
     from collections import Counter
+    import hashlib
+    from tis.catalog import _DIAGNOSTICS_PATH
+
     diagnostic_status = Counter((row.get("execution_contract") or {}).get("completeness", "incomplete") for row in diagnostics)
     analysis_status = Counter((row.get("execution_contract") or {}).get("completeness", "incomplete") for row in analyses)
+    diagnostic_levels = Counter((row.get("execution_contract") or {}).get("execution_level", "reference_only") for row in diagnostics)
+    registry_sha256 = hashlib.sha256(_DIAGNOSTICS_PATH.read_bytes()).hexdigest()
+    completeness_total = sum(diagnostic_status.values())
+    if completeness_total != len(diagnostics):
+        st.error("Diagnostic completeness counts do not reconcile with the loaded registry; do not trust this status summary.")
+    if len(diagnostics) != 80:
+        st.warning(f"Expected 80 diagnostic records but loaded {len(diagnostics)}. This may be a stale or mismatched checkout.")
     st.caption(
         f"Canonical registry: {len(diagnostics)} diagnostic records · {len(analyses)} callable analysis entry points. "
         "Completeness describes declared software scope, not independent experimental validation."
+    )
+    st.caption(f"Registry SHA-256: `{registry_sha256}`")
+    st.write(
+        "Execution levels — " +
+        " · ".join(f"{key}: {value}" for key, value in sorted(diagnostic_levels.items()))
     )
     left, right = st.columns(2)
     with left:
