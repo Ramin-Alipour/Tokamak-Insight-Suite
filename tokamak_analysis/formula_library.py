@@ -11,7 +11,12 @@ from scipy.integrate import trapezoid
 from tis.constants import E_CHARGE, EPS0, M_E, MU0, C_LIGHT
 
 def _finite(name, value):
-    x=float(value)
+    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
+        raise ValueError(f"{name} must be a finite real scalar.")
+    try:
+        x = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must be a finite real scalar.") from exc
     if not math.isfinite(x):
         raise ValueError(f"{name} must be finite.")
     return x
