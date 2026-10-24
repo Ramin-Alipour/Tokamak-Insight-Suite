@@ -106,3 +106,19 @@ def test_thomson_spectral_power_mode_reveals_density_geometry_controls():
     calibrated_checkbox.set_value(True).run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Incident laser power" in item.label for item in app.number_input)
+
+
+def test_langmuir_analysis_button_executes_and_renders_physics_result():
+    """Exercise the real dashboard action, not only the page's initial render."""
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Probe Analysis").run()
+
+    analyze_button = next(item for item in app.button if item.label == "Analyze probe I–V")
+    analyze_button.click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    rendered_json = [str(item.value) for item in app.json]
+    assert any("floating_potential_V" in value for value in rendered_json)
+    assert any("ion_saturation_current_A" in value for value in rendered_json)
+    assert any("interpretation_warning" in value for value in rendered_json)
