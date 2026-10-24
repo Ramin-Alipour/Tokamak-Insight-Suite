@@ -13,11 +13,11 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
       "tokamak_analysis.thomson_models.fit_custom_spectral_model"
     ],
-    "implementation_status": "Complete within the explicitly supported computational scope; experimental calibration and independent device-specific validation remain the user's responsibility.",
+    "implementation_status": "Scoped profile and spectrum workflows are implemented, but the overall analysis remains incomplete pending independent experimental validation and device-specific calibration.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "incomplete",
       "input_specs": [
         {
           "name": "workflow_mode",
