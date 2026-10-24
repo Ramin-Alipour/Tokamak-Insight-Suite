@@ -179,7 +179,7 @@ def ipb98y2_confinement_time(ip_MA: float, bt_T: float, p_loss_MW: float, ne_19:
     kappa_a = V/(2 pi^2 R a^2). Derived from a *conventional-aspect-ratio* H-mode database;
     it is known to under-/over-predict spherical tokamaks, so use H98 there as a rough guide only.
     """
-    ip = _pos("|Ip| (MA)", abs(ip_MA)); b = _pos("|Bt|", abs(bt_T)); p = _pos("p_loss_MW", p_loss_MW)
+    ip = _pos("|Ip| (MA)", abs(_finite_real("ip_MA", ip_MA))); b = _pos("|Bt|", abs(_finite_real("bt_T", bt_T))); p = _pos("p_loss_MW", p_loss_MW)
     n = _pos("ne_19", ne_19); m = _pos("mass_amu", mass_amu); r = _pos("R", r_m); a = _pos("a", a_m); k = _pos("kappa_a", kappa_a)
     eps = a / r
     tau = 0.0562 * ip ** 0.93 * b ** 0.15 * p ** -0.69 * n ** 0.41 * m ** 0.19 * r ** 1.97 * eps ** 0.58 * k ** 0.78
@@ -220,6 +220,11 @@ def confinement_summary(*, ip_A: float, bt_T: float, r_m: float, a_m: float, kap
                         kappa_a: float | None = None) -> dict[str, Any]:
     """One-call bundle: Greenwald fraction, q*, q95 (ITER formula, kappa95 ~ kappa/1.12 estimate flagged),
     IPB98(y,2) tau_E, H98 (if stored energy supplied) and the Martin L-H threshold."""
+    ip_A = _finite_real("ip_A", ip_A)
+    bt_T = _finite_real("bt_T", bt_T)
+    ne_line_avg_m3 = _pos("ne_line_avg_m3", ne_line_avg_m3)
+    p_loss_W = _pos("p_loss_W", p_loss_W)
+    delta = _finite_real("delta", delta)
     ip_MA = abs(ip_A) / 1e6
     out: dict[str, Any] = {"greenwald": greenwald(ne_line_avg_m3, ip_A, a_m),
                            "q_star_cylindrical": q_star_cylindrical(ip_MA, bt_T, r_m, a_m, kappa)}
