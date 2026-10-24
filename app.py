@@ -1079,7 +1079,6 @@ elif page=='Probe Analysis':
     st.divider()
     st.markdown('### Langmuir probe I–V analysis')
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
-    vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     vmin=float(pd.to_numeric(df[vcol],errors='coerce').min()); vmax=float(pd.to_numeric(df[vcol],errors='coerce').max())
     st.markdown('### Fit-window and probe geometry')
     c1,c2,c3=st.columns(3)
