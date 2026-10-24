@@ -439,7 +439,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "voltage_V",
@@ -509,44 +509,49 @@
       ],
       "output_specs": [
         {
+          "name": "n_points",
+          "unit": "count",
+          "description": "Number of finite, distinct voltage samples after cleaning and duplicate aggregation."
+        },
+        {
+          "name": "voltage_min_V",
+          "unit": "V",
+          "description": "Minimum voltage in the processed sweep."
+        },
+        {
+          "name": "voltage_max_V",
+          "unit": "V",
+          "description": "Maximum voltage in the processed sweep."
+        },
+        {
+          "name": "current_min_A",
+          "unit": "A",
+          "description": "Minimum processed current in the normalized electron-positive convention."
+        },
+        {
+          "name": "current_max_A",
+          "unit": "A",
+          "description": "Maximum processed current in the normalized electron-positive convention."
+        },
+        {
           "name": "floating_potential_V",
           "unit": "V",
-          "description": "Unique interpolated zero-current crossing; null when no crossing or multiple distinct crossings are present."
+          "description": "Unique interpolated zero-current crossing; null unless exactly one distinct crossing exists."
+        },
+        {
+          "name": "floating_potential_candidates_V",
+          "unit": "V",
+          "description": "All distinct zero-current crossing candidates, including zero-plateau midpoints."
+        },
+        {
+          "name": "floating_potential_status",
+          "unit": "text",
+          "description": "single_zero_crossing, no_zero_crossing_in_measured_sweep, or ambiguous_multiple_zero_crossings."
         },
         {
           "name": "plasma_potential_proxy_V",
           "unit": "V",
-          "description": "Voltage at maximum measured dI/dV; proxy only, not a universally valid plasma-potential estimate."
-        },
-        {
-          "name": "ion_saturation_current_A",
-          "unit": "A",
-          "description": "Median current in the user-selected ion-fit interval, with linear-fit slope, intercept and R²."
-        },
-        {
-          "name": "electron_temperature_eV",
-          "unit": "eV",
-          "description": "Optional reciprocal slope from a log-linear electron-retarding branch fit after ion-baseline subtraction."
-        },
-        {
-          "name": "electron_temperature_standard_error_eV",
-          "unit": "eV",
-          "description": "Optional local statistical standard error from unweighted log-linear regression; excludes systematic and calibration uncertainties."
-        },
-        {
-          "name": "electron_retarding_fit_R2",
-          "unit": "dimensionless",
-          "description": "R² of the log-current linear fit over the selected electron-retarding interval."
-        },
-        {
-          "name": "ion_density_estimate_m-3",
-          "unit": "m^-3",
-          "description": "Optional model-dependent estimate from ion saturation current, collection area, ion mass, ion temperature and sheath coefficient."
-        },
-        {
-          "name": "ion_sound_speed_m_s",
-          "unit": "m s^-1",
-          "description": "Ion sound speed from the explicitly selected model assumptions when density estimation is enabled."
+          "description": "Voltage at maximum numerical dI/dV; explicitly a proxy, not a universally valid plasma-potential measurement."
         },
         {
           "name": "max_dIdV_A_per_V",
@@ -554,34 +559,89 @@
           "description": "Maximum numerical derivative of current with respect to voltage."
         },
         {
-          "name": "interpretation_warning",
-          "unit": "text",
-          "description": "Physical limitations and required experiment-specific checks."
+          "name": "min_dIdV_A_per_V",
+          "unit": "A V^-1",
+          "description": "Minimum numerical derivative of current with respect to voltage."
         },
         {
-          "name": "electron_saturation_current_A",
+          "name": "ion_saturation_current_A",
           "unit": "A",
-          "description": "Median of the highest-voltage tail; descriptive only, not a validated saturation-branch fit."
+          "description": "Median current in the selected ion-fit interval or descriptive low-voltage-tail fallback."
         },
         {
           "name": "ion_saturation_current_method",
           "unit": "text",
-          "description": "Indicates whether ion current came from the analyst-selected fit interval or a low-voltage-tail fallback."
+          "description": "Identifies whether the ion current is a user-selected fit-window estimate or descriptive tail fallback."
+        },
+        {
+          "name": "electron_saturation_current_A",
+          "unit": "A",
+          "description": "Descriptive median of the high-voltage tail; not a validated saturation-branch fit."
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Optional electron temperature from a user-selected electron-retarding exponential fit."
+        },
+        {
+          "name": "electron_temperature_standard_error_eV",
+          "unit": "eV",
+          "description": "Optional local covariance-based fit standard error; excludes systematic and calibration uncertainties."
+        },
+        {
+          "name": "electron_retarding_fit_R2",
+          "unit": "dimensionless",
+          "description": "R-squared of the electron-retarding branch fit when requested."
+        },
+        {
+          "name": "ion_saturation_linear_slope_A_per_V",
+          "unit": "A V^-1",
+          "description": "Optional linear slope of the user-selected ion-branch interval."
+        },
+        {
+          "name": "ion_saturation_intercept_A",
+          "unit": "A",
+          "description": "Optional intercept of the user-selected ion-branch linear fit."
+        },
+        {
+          "name": "ion_saturation_fit_R2",
+          "unit": "dimensionless",
+          "description": "Optional R-squared of the user-selected ion-branch linear fit."
+        },
+        {
+          "name": "ion_density_estimate_m-3",
+          "unit": "m^-3",
+          "description": "Optional model-dependent ion-density estimate; requires a selected ion fit, positive Te fit, area and ion mass."
+        },
+        {
+          "name": "ion_density_status",
+          "unit": "text",
+          "description": "Explains why density was not estimated when only the descriptive ion-tail fallback is available."
+        },
+        {
+          "name": "ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Ion sound speed under the explicitly supplied sheath/sound-speed model."
+        },
+        {
+          "name": "current_convention",
+          "unit": "text",
+          "description": "Input polarity convention; ion_positive is internally sign-flipped."
+        },
+        {
+          "name": "sign_warning",
+          "unit": "text",
+          "description": "Conditional warning when ion saturation current sign conflicts with the normalized convention."
         },
         {
           "name": "electron_temperature_uncertainty_note",
           "unit": "text",
-          "description": "Statistical fit uncertainty excludes calibration, fit-window, sheath and instrumental systematics."
+          "description": "Documents systematic uncertainties excluded from the fit covariance estimate."
         },
         {
-          "name": "floating_potential_candidates_V",
-          "unit": "V",
-          "description": "All distinct interpolated zero-current crossings; a zero-current plateau is represented by its voltage midpoint."
-        },
-        {
-          "name": "floating_potential_status",
+          "name": "interpretation_warning",
           "unit": "text",
-          "description": "Explicit status: single_zero_crossing, no_zero_crossing_in_measured_sweep, or ambiguous_multiple_zero_crossings."
+          "description": "Device-specific caveats for sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice."
         }
       ],
       "assumptions": [
@@ -611,7 +671,8 @@
       ],
       "raw_data_to_physics": true,
       "note": "Complete only within this declared calibrated single-sweep I–V model scope. Fit-window validation and zero-crossing ambiguity are explicit. The software does not calibrate the instrument or automatically choose physically valid fit intervals; independent device-specific validation remains necessary."
-    }
+    },
+    "note": "Complete within the declared calibrated single-sweep I–V computational scope; not independently experimentally validated. The registry output contract is aligned with the implemented return fields. Calibration, physically justified fit-window selection, device-specific sheath interpretation and systematic uncertainty propagation remain analyst responsibilities."
   },
   {
     "family": "Plasma parameters",
