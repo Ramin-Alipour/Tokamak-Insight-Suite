@@ -33,7 +33,7 @@ jobs:
           pip install '.[test]'
 
       - name: Compile Python sources
-        run: python -m compileall -q app.py tis tests
+        run: python -m compileall -q app.py tis tokamak_analysis tests
 
       - name: Run complete test suite
         run: python -m pytest -q
