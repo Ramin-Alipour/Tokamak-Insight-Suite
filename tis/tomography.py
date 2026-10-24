@@ -140,6 +140,8 @@ def regularized_tomography(A: Any, y: Any, lam: float = 1e-2, nonnegative: bool 
             'weighted_residual_norm':float(np.linalg.norm(weighted_residual)),
             'regularization':float(lam),'regularization_order':int(regularization_order),
             'regularization_operator_norm':regularization_norm,'response_spectral_norm':response_scale,
+            'regularization_geometry':'2D horizontal/vertical finite differences' if grid_shape is not None and regularization_order > 0 else ('identity/magnitude penalty' if regularization_order == 0 else '1D flattened-index differences'),
+            'regularization_grid_shape':None if grid_shape is None else [int(grid_shape[0]), int(grid_shape[1])],
             'success':success,'message':message,'nonnegative':bool(nonnegative),
             'measurement_weighting':'unweighted' if sigma is None else 'inverse-variance (1/sigma²)'}
 
@@ -174,6 +176,9 @@ def select_tikhonov_lambda(A: Any, y: Any, lambdas: Any | None = None,
     return {'selected_lambda':float(candidates[selected]),'candidate_lambdas':candidates,
             'weighted_residual_norms':np.asarray(residuals),
             'regularization_norms':np.asarray(norms),'solution_norms':np.asarray(solution_norms),
+            'regularization_order':int(regularization_order),
+            'regularization_geometry':'2D horizontal/vertical finite differences' if grid_shape is not None and regularization_order > 0 else ('identity/magnitude penalty' if regularization_order == 0 else '1D flattened-index differences'),
+            'regularization_grid_shape':None if grid_shape is None else [int(grid_shape[0]), int(grid_shape[1])],
             'discrete_log_lcurve_curvature':curvature,
             'selection_method':'maximum discrete curvature of log-weighted-residual vs log-regularization-norm L-curve',
             'warning':'Heuristic selection; inspect the returned L-curve and validate with measurement noise and synthetic/known-profile tests.'}
