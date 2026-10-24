@@ -456,7 +456,7 @@
         {
           "name": "current_convention",
           "unit": "text",
-          "description": "Current polarity convention: electron_positive (ion saturation current normally negative) or ion_positive (internally sign-flipped); both are supported by the analysis entry point.",
+          "description": "Current polarity convention: electron_positive (ion saturation normally negative) or ion_positive (internally sign-flipped).",
           "required": false
         },
         {
@@ -488,14 +488,14 @@
         {
           "name": "ti_eV",
           "unit": "eV",
-          "description": "Non-negative assumed ion temperature used by the ion-sound-speed model; core default is 0 eV.",
+          "description": "Non-negative assumed ion temperature for the declared ion-sound-speed model; core default is 0 eV.",
           "required": false,
           "minimum": 0
         },
         {
           "name": "sheath_factor",
           "unit": "dimensionless",
-          "description": "Positive sheath collection coefficient; core default is 0.61.",
+          "description": "Positive sheath collection coefficient for the optional ion-density model; core default is 0.61.",
           "required": false,
           "minimum": 1e-15
         },
@@ -503,33 +503,6 @@
           "name": "gamma_i",
           "unit": "dimensionless",
           "description": "Non-negative coefficient multiplying ion temperature in the adopted sound-speed expression; core default is 1.",
-          "required": false,
-          "minimum": 0
-        },
-        {
-          "name": "current_convention",
-          "unit": "text",
-          "description": "electron_positive (ion saturation normally negative) or ion_positive (internally sign-flipped).",
-          "required": false
-        },
-        {
-          "name": "ti_eV",
-          "unit": "eV",
-          "description": "Assumed ion temperature for the declared ion-sound-speed model.",
-          "required": false,
-          "minimum": 0
-        },
-        {
-          "name": "sheath_factor",
-          "unit": "dimensionless",
-          "description": "Positive sheath collection coefficient used by the density model.",
-          "required": false,
-          "minimum": 1e-15
-        },
-        {
-          "name": "gamma_i",
-          "unit": "dimensionless",
-          "description": "Non-negative coefficient multiplying ion temperature in the sound-speed expression.",
           "required": false,
           "minimum": 0
         }
