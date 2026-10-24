@@ -11,6 +11,8 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from http.client import IncompleteRead
+from time import sleep
 
 from statistics import median
 from urllib.error import HTTPError, URLError
@@ -23,12 +25,33 @@ USER_AGENT = "Tokamak-Insight-Suite empirical-validation inventory/1.1"
 EXPECTED_GOLEM_30622_SPECTRUM_SHA256 = "3450043b07322fc5516462cc826e53ce6e8c6bf447f61fc63b999a0755d3bc3d"
 
 
-def get(url: str) -> tuple[bytes, str, str]:
-    req = Request(url, headers={"User-Agent": USER_AGENT})
-    with urlopen(req, timeout=20) as response:
-        data = response.read()
-        content_type = response.headers.get("Content-Type", "")
-        return data, response.geturl(), content_type
+def get(url: str, *, attempts: int = 4, timeout: float = 20.0) -> tuple[bytes, str, str]:
+    """Fetch a complete response, retrying transient transport failures.
+
+    Public data servers occasionally close a response before Content-Length
+    bytes have arrived. Never treat a partial body as a valid scientific file.
+    Non-retryable HTTP errors (for example 404) are returned immediately.
+    """
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 1:
+        raise ValueError("attempts must be a positive integer")
+    last_error = None
+    for attempt in range(attempts):
+        req = Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urlopen(req, timeout=timeout) as response:
+                data = response.read()
+                content_type = response.headers.get("Content-Type", "")
+                return data, response.geturl(), content_type
+        except HTTPError as exc:
+            if exc.code not in (408, 425, 429) and exc.code < 500:
+                raise
+            last_error = exc
+        except (IncompleteRead, URLError, TimeoutError, OSError) as exc:
+            last_error = exc
+        if attempt + 1 < attempts:
+            sleep(0.5 * (2 ** attempt))
+    assert last_error is not None
+    raise last_error
 
 
 def _percentile(values: list[float], fraction: float) -> float:
