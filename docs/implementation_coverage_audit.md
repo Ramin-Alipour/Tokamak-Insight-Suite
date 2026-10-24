@@ -17,6 +17,8 @@ The 80 diagnostic contracts currently classify execution level as:
 
 Contract completeness is currently `incomplete` for 70 diagnostics, `complete` for 8 within the declared computational scope, and `complete_with_declared_scope` for 2. These are software-scope labels only. They do **not** certify device-specific calibration, agreement with experimental references, or independent scientific validation. Thomson scattering remains marked incomplete until its calibration assumptions and spectrum-to-density path are independently validated against compatible reference data.
 
+A provisional real-data cross-diagnostic consistency check for MAST shot 28830 passed the declared 10% tolerance against rounded published Table II values: edge density relative difference −3.77% and interferometer line-density relative difference −1.74%. The reference does not specify the exact averaging interval, and the input consists of archived Thomson-derived profiles plus an independent interferometer signal. This is a useful external consistency check, not validation of the raw-spectrum fit or a full Thomson spectrum-to-density inference chain.
+
 A Python module existing somewhere in the repository does not by itself promote a diagnostic to implemented or experimentally validated.
 
 ## Formula coverage: 37/37 callable mappings
