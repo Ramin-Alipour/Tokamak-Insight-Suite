@@ -23,12 +23,11 @@ def test_temperature_fit_is_invariant_to_current_unit_scale():
 
 def test_density_requires_temperature_fit_even_when_geometry_is_supplied():
     voltage, current = iv_sweep()
-    result = analyze_langmuir_probe(
-        voltage, current, ion_fit_range=(-20.0, -12.0),
-        area_m2=1e-5, ion_mass_amu=2.0,
-    )
-    assert "ion_density_estimate_m-3" not in result
-    assert result["ion_density_status"].startswith("not_estimated:")
+    with pytest.raises(ValueError, match="valid positive electron temperature"):
+        analyze_langmuir_probe(
+            voltage, current, ion_fit_range=(-20.0, -12.0),
+            area_m2=1e-5, ion_mass_amu=2.0,
+        )
 
 
 def test_density_estimate_scales_inverse_with_collection_area():
