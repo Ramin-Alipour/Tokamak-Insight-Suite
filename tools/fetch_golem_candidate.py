@@ -187,7 +187,7 @@ def main() -> None:
                 record.update(status="downloaded", final_url=final_url, content_type=content_type,
                               file=filename, bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
                 downloaded.append(record.copy())
-        except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        except (HTTPError, URLError, TimeoutError, OSError, IncompleteRead) as exc:
             record.update(status="failed", error=f"{type(exc).__name__}: {exc}")
         attempts.append(record)
 
