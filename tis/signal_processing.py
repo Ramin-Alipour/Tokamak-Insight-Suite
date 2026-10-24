@@ -160,10 +160,12 @@ def cross_analysis(x: Any, y: Any, fs: float, nperseg: int | None = None) -> dic
         raise ValueError('Sampling frequency must be positive and finite.')
     if not np.all(np.isfinite(a)) or not np.all(np.isfinite(b)):
         raise ValueError('Both signals must contain only finite values.')
+    for name, values in (('x', a), ('y', b)):
+        scale = max(float(np.max(np.abs(values))), np.finfo(float).tiny)
+        if float(np.ptp(values)) <= np.finfo(float).eps * scale:
+            raise ValueError(f'Coherence is undefined for constant or numerically flat {name} signal.')
     if nperseg is not None and (
-        isinstance(nperseg, (bool, np.bool_))
-        or not isinstance(nperseg, (int, float, np.integer, np.floating))
-        or not _is_finite_real(nperseg) or int(nperseg) != nperseg or nperseg < 8
+        not _is_finite_real(nperseg) or int(nperseg) != nperseg or nperseg < 8
     ):
         raise ValueError('nperseg must be an integer of at least 8 samples when supplied.')
     n = min(len(a), int(nperseg) if nperseg is not None else min(1024, max(8, len(a)//4)))
@@ -203,6 +205,10 @@ def cross_correlation_lag(x: Any, y: Any, fs: float, max_lag_s: float | None = N
         raise ValueError('Both signals must contain only finite values.')
     if max_lag_s is not None and (not _is_finite_real(max_lag_s) or max_lag_s < 0):
         raise ValueError('Maximum lag must be finite and nonnegative when supplied.')
+    for name, values in (('x', a), ('y', b)):
+        scale = max(float(np.max(np.abs(values))), np.finfo(float).tiny)
+        if float(np.ptp(values)) <= np.finfo(float).eps * scale:
+            raise ValueError(f'Cross-correlation is undefined for constant or numerically flat {name} signal.')
     a, b = signal.detrend(a), signal.detrend(b)
     corr = signal.correlate(a,b,mode='full',method='auto')
     corr /= max(np.linalg.norm(a)*np.linalg.norm(b), np.finfo(float).eps)
