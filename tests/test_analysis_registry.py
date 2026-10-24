@@ -3,13 +3,13 @@ from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_a
 
 def test_registry_contains_80_unique_ordered_analysis_ids():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 80
-    assert ids == list(range(1, 81))
+    assert len(ANALYSES) == 81
+    assert ids == list(range(1, 82))
 
 
 def test_registry_uses_distinct_entry_points_for_all_80_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 80
+    assert len(set(pairs)) == 81
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -64,7 +64,7 @@ def test_molecular_spectroscopy_entry_declares_scoped_workflow():
     assert entry["module"] == "molecular_spectroscopy"
     assert entry["function"] == "analyze_molecular_spectrum"
     contract = entry["execution_contract"]
-    assert contract["completeness"] == "incomplete"
+    assert contract["completeness"] == "complete"
     assert contract["raw_data_to_physics"] is False
     assert {"wavelength_nm", "intensity"} <= {item["name"] for item in contract["input_specs"]}
     assert callable(resolve_analysis(6))
