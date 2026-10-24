@@ -19,6 +19,19 @@ FAIR_MAST_BASE = "https://s3.echo.stfc.ac.uk/mast/level1/shots"
 FAIR_MAST_DOCS = "https://mastapp.site/level1-data.html"
 
 
+
+def _is_finite_real_scalar(value: Any) -> bool:
+    """Return whether a public numeric parameter is a finite real scalar (not bool)."""
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _safe_provenance_url(value: str) -> str:
     """Remove query strings and fragments that may contain signed-link secrets."""
     parsed = urlparse(str(value).strip())
@@ -29,10 +42,9 @@ def _open_zarr_with_retry(xr: Any, url: str, group: str, attempts: int = 3,
                           timeout_s: float = 30.0):
     """Open a public Zarr group with bounded request timeout and transient retries."""
     import time
-    if (isinstance(attempts, (bool, np.bool_)) or not isinstance(attempts, (int, float, np.integer, np.floating))
-            or not np.isfinite(attempts) or int(attempts) != attempts or attempts < 1 or attempts > 5):
+    if not _is_finite_real_scalar(attempts) or int(attempts) != attempts or attempts < 1 or attempts > 5:
         raise ValueError("attempts must be an integer in [1, 5].")
-    if not np.isfinite(timeout_s) or timeout_s <= 0 or timeout_s > 120:
+    if not _is_finite_real_scalar(timeout_s) or timeout_s <= 0 or timeout_s > 120:
         raise ValueError("timeout_s must be positive and no greater than 120 seconds.")
     last_error = None
     for attempt in range(int(attempts)):
@@ -56,8 +68,7 @@ def anti_alias_decimate(time_s: Any, values: Any, max_samples: int = 70000) -> t
         raise ValueError("Time and signal must have equal lengths and at least 1024 samples.")
     if not np.all(np.isfinite(t)) or not np.all(np.isfinite(x)) or not np.all(np.diff(t) > 0):
         raise ValueError("Time and signal must be finite and timestamps strictly increasing.")
-    if (isinstance(max_samples, (bool, np.bool_)) or not isinstance(max_samples, (int, float, np.integer, np.floating))
-            or not np.isfinite(max_samples) or int(max_samples) != max_samples or max_samples < 1024):
+    if not _is_finite_real_scalar(max_samples) or int(max_samples) != max_samples or max_samples < 1024:
         raise ValueError("max_samples must be an integer of at least 1024.")
     dt = np.diff(t)
     median_dt = float(np.median(dt))
