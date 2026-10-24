@@ -55,11 +55,14 @@ def _clean(time_s: Any, values: Any, min_n: int = 16) -> tuple[np.ndarray, np.nd
     tick = float(np.min(positive_differences)) if positive_differences.size else float(np.min(intervals))
     tick_ratios = intervals / tick
     quantized_ticks = np.all(np.abs(tick_ratios - np.rint(tick_ratios)) <= 0.05)
-    quantized_adjacent = (
-        quantized_ticks
-        and max_ratio <= 1.5
-        and float(np.max(tick_ratios) - np.min(tick_ratios)) <= 1.0 + 1e-9
-    )
+    # Epoch-based timestamps can lose sub-microsecond precision when absolute
+    # times are represented as float64. A nominal 2/3 us interval pattern may
+    # therefore appear as several adjacent clock-tick counts (e.g. 8, 9, 12,
+    # 13), not just two adjacent counts. The CV and max-ratio checks below
+    # still reject irregular timing and dropped-sample gaps; requiring the
+    # entire tick-count range to be <= 1 incorrectly rejects valid quantized
+    # timestamps with a large epoch offset.
+    quantized_adjacent = quantized_ticks and max_ratio <= 1.5
     if max_ratio > 1.5 or (cv > 0.02 and not quantized_adjacent):
         raise ValueError("Event detection requires approximately uniform sampling; resample irregular timestamps and handle missing samples explicitly first.")
     return t, y, dt
