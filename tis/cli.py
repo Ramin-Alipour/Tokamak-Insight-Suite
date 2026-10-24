@@ -62,7 +62,7 @@ def main() -> int:
                     'reference_only_means_no_callable_numerical_workflow_is_declared':True,
                 },
             }
-            (out/'DIAGNOSTIC_STATUS_REPORT.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\\n',encoding='utf-8')
+            (out/'DIAGNOSTIC_STATUS_REPORT.json').write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
             print(f'Wrote reconciled diagnostic status report to {(out/"DIAGNOSTIC_STATUS_REPORT.json").resolve()}'); return 0
         if args.kind == 'analyses':
             analyses=[{**row,'maturity_level':maturity_label(row)} for row in ANALYSES]
