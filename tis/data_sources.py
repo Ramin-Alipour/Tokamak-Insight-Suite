@@ -240,9 +240,9 @@ def fetch_public_table_bytes(url: str, max_bytes: int = 100_000_000, timeout: in
         raise ValueError("Enter a direct public http:// or https:// file URL.")
     if parsed.username or parsed.password:
         raise ValueError("URLs containing embedded credentials are not allowed.")
-    if isinstance(max_bytes,bool) or not isinstance(max_bytes,int) or max_bytes<1024:
-        raise ValueError("Maximum download size must be an integer of at least 1024 bytes.")
-    if isinstance(timeout,bool) or not isinstance(timeout,(int,float)) or not math.isfinite(timeout) or timeout<=0:
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or not 1024 <= max_bytes <= 1_000_000_000:
+        raise ValueError("Maximum download size must be an integer between 1024 bytes and 1,000,000,000 bytes.")
+    if not _is_finite_real_scalar(timeout) or timeout <= 0:
         raise ValueError("Timeout must be a positive finite number of seconds.")
     pinned_hosts: dict[str,str]={}
 
@@ -344,8 +344,8 @@ def fetch_fair_mast_efit_snapshot(
     """
     if isinstance(shot, bool) or not isinstance(shot, (int, np.integer)) or shot < 1:
         raise ValueError("Shot number must be a positive integer.")
-    if not np.isfinite(time_s):
-        raise ValueError("Requested EFIT time must be finite.")
+    if not _is_finite_real_scalar(time_s):
+        raise ValueError("Requested EFIT time must be a finite real scalar.")
     try:
         import xarray as xr
     except ImportError as exc:
