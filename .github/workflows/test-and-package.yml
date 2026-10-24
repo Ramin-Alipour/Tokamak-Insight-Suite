@@ -43,7 +43,15 @@ jobs:
           python -m pip wheel --no-deps --wheel-dir /tmp/tis-wheel .
           python -m pip install --no-deps --target /tmp/tis-installed /tmp/tis-wheel/*.whl
           cd /tmp
-          PYTHONPATH=/tmp/tis-installed python -c "from tis.catalog import DIAGNOSTICS, FORMULAS; assert len(DIAGNOSTICS) == 80; assert len(FORMULAS) == 37; print('Installed wheel registry check passed.')"
+          PYTHONPATH=/tmp/tis-installed python - <<'PY'
+          from tis.catalog import DIAGNOSTICS, FORMULAS
+          from tis.contracts import get_diagnostic_contracts
+
+          assert len(DIAGNOSTICS) == 80
+          assert len(FORMULAS) == 37
+          assert len(get_diagnostic_contracts()) == 80
+          print("Installed wheel registry and contract checks passed.")
+          PY
 
       - name: Launch dashboard smoke test
         run: |
