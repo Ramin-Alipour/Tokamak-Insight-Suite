@@ -4,6 +4,7 @@ import pytest
 
 from tis.signal_processing import (
     butterworth_filter,
+    cross_analysis,
     time_frequency_spectrogram,
     welch_psd,
 )
@@ -39,3 +40,10 @@ def test_spectrogram_noverlap_invalid_values_raise_value_error(value):
         time_frequency_spectrogram(
             np.arange(128.0), fs=1000.0, nperseg=32, noverlap=value
         )
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf, True, 7.5, "8"])
+def test_coherence_nperseg_invalid_values_raise_value_error(value):
+    values = np.arange(128.0)
+    with pytest.raises(ValueError, match="nperseg"):
+        cross_analysis(values, values, fs=1000.0, nperseg=value)
