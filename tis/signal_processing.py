@@ -140,8 +140,8 @@ def time_frequency_spectrogram(
         raise ValueError('nperseg must be an integer of at least 8.')
     nperseg = min(int(nperseg), len(x))
     if noverlap is not None:
-        if not _is_finite_real(noverlap) or int(noverlap) != noverlap
-                or noverlap < 0 or noverlap >= nperseg:
+        if (not _is_finite_real(noverlap) or int(noverlap) != noverlap
+                or noverlap < 0 or noverlap >= nperseg):
             raise ValueError('noverlap must be an integer in [0, nperseg).')
         noverlap = int(noverlap)
     f, t, pxx = signal.spectrogram(
