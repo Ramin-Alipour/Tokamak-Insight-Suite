@@ -109,7 +109,7 @@ def detrend_polynomial(time_s: Any, values: Any, order: int = 1,
 
 def resample_uniform(time_s: Any, values: Any, fs: float | None = None,
                      max_interp_gap_s: float | None = None,
-                     max_output_samples: int = 10_000_000) -> dict[str, Any]:
+                     max_output_samples: int = 2_000_000) -> dict[str, Any]:
     """Linearly interpolate onto a uniform grid, without inventing data inside long gaps.
 
     Samples falling in a gap longer than `max_interp_gap_s` (default: 3 median intervals)
