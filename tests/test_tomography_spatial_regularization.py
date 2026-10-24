@@ -31,7 +31,7 @@ def test_l_curve_selector_accepts_the_same_spatial_grid_contract():
     assert result["selected_lambda"] in {0.01, 0.1, 1.0}
 
 
-@pytest.mark.parametrize("bad_lambda", ["0.1", True, np.bool_(False), np.nan, np.inf, -1.0])
+@pytest.mark.parametrize("bad_lambda", ["0.1", True, np.bool_(False), np.nan, np.inf, -1.0, 10**1000])
 def test_tomography_rejects_invalid_regularization_scalar(bad_lambda):
     with pytest.raises(ValueError, match="Regularization"):
         regularized_tomography(np.eye(2), np.ones(2), lam=bad_lambda)
