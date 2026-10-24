@@ -21,8 +21,10 @@ def radiated_power_from_axisymmetric_emissivity(radius_m, emissivity_W_m3, major
         R0=float(major_radius_m)
     except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError("Major radius must be a finite real scalar.") from exc
-    if r.ndim!=1 or eps.shape!=r.shape or len(r)<2 or not np.all(np.isfinite(r)) or not np.all(np.isfinite(eps)) or not np.isfinite(R0):
-        raise ValueError("Radius and emissivity must be finite matching 1-D arrays; major radius finite")
+    if not np.isfinite(R0):
+        raise ValueError("Major radius must be finite.")
+    if r.ndim!=1 or eps.shape!=r.shape or len(r)<2 or not np.all(np.isfinite(r)) or not np.all(np.isfinite(eps)):
+        raise ValueError("Radius and emissivity must be finite matching 1-D arrays.")
     if np.any(np.diff(r)<=0) or not np.isclose(r[0],0.0,atol=1e-12) or r[-1]<=0 or np.any(eps<0) or R0<=r[-1]:
         raise ValueError("Require increasing radius from zero, non-negative emissivity, and R0 greater than minor radius")
     power=4*np.pi**2*R0*float((getattr(np, "trapezoid", None) or getattr(np, "trapz"))(eps*r,r))
