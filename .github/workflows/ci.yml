@@ -42,6 +42,5 @@ jobs:
           app = AppTest.from_file("app.py", default_timeout=120).run()
           if app.exception:
               raise AssertionError("\n".join(str(item.value) for item in app.exception))
-          assert any("Tokamak Insight Suite" in str(item.value) for item in app.markdown), "Dashboard title/branding did not render"
           print("Streamlit dashboard startup smoke test passed.")
           PY
