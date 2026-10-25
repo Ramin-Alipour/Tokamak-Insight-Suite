@@ -121,3 +121,31 @@ def test_langmuir_analysis_button_executes_and_renders_physics_result():
     assert any("floating_potential_V" in value for value in rendered_json)
     assert any("ion_saturation_current_A" in value for value in rendered_json)
     assert any("interpretation_warning" in value for value in rendered_json)
+
+
+
+def test_ece_dashboard_resonance_mapping_executes_and_exports_result():
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Plasma Parameters").run()
+    ece_tab = app.tabs[2]
+    mode = next(item for item in app.selectbox if item.label == "ECE workflow")
+    mode.set_value("Resonance mapping").run()
+    button = next(item for item in app.button if item.label == "Map ECE resonance radii")
+    button.click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("resonance_field_T" in str(item.value) for item in app.json)
+    assert any("tis_ece_resonance_mapping.json" in str(item.label) for item in app.download_button)
+
+
+def test_ece_dashboard_brightness_temperature_executes_with_calibrated_radiance():
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Plasma Parameters").run()
+    mode = next(item for item in app.selectbox if item.label == "ECE workflow")
+    mode.set_value("Brightness temperature").run()
+    radiance = next(item for item in app.text_input if item.label.startswith("Calibrated spectral radiance"))
+    radiance.set_value("1e-10, 1.2e-10, 1.1e-10").run()
+    next(item for item in app.button if item.label == "Analyze ECE brightness temperature").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("brightness_temperature_eV" in str(item.value) for item in app.json)
