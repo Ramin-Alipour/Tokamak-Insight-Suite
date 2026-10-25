@@ -903,6 +903,7 @@ elif page=='Spectral Analysis':
         with c2:
             inst=st.number_input('Instrument Gaussian sigma (nm; not FWHM)',min_value=0.000001,value=0.008,format='%.9g',key='cxrs_inst_sigma')
             inst_unc=st.number_input('Instrument sigma uncertainty (nm; 1σ)',min_value=0.0,value=0.0,format='%.9g',key='cxrs_inst_sigma_unc')
+            viewing_angle=st.number_input('Viewing angle metadata (rad; no deprojection)',min_value=0.0,max_value=float(np.pi),value=0.0,format='%.8g',key='cxrs_viewing_angle')
             sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='cxrs_sigma')
         if st.button('Analyze CXRS line'):
             try:
@@ -916,15 +917,15 @@ elif page=='Spectral Analysis':
                 if sigma_col!='<none>': _kwargs['signal_uncertainty']=_spec['signal_uncertainty'].to_numpy(dtype=float)
                 _result=analyze_cxrs_line(_spec['wavelength_nm'].to_numpy(dtype=float),_spec['signal'].to_numpy(dtype=float),
                     rest_wavelength_nm=float(rest),ion_mass_amu=float(mass),instrument_sigma_nm=float(inst),
-                    instrument_sigma_uncertainty_nm=float(inst_unc),**_kwargs)
+                    instrument_sigma_uncertainty_nm=float(inst_unc),viewing_angle_rad=float(viewing_angle),**_kwargs)
                 _result_dict=_result.to_dict()
                 _result_dict['wavelength_nm']=_spec['wavelength_nm'].to_numpy(dtype=float).tolist()
                 _result_dict['measured_signal']=_spec['signal'].to_numpy(dtype=float).tolist()
-                st.session_state['tis_cxrs_result']={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'sigma_col':sigma_col,'result':_result_dict}
+                st.session_state['tis_cxrs_result']={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'viewing_angle':float(viewing_angle),'sigma_col':sigma_col,'result':_result_dict}
             except Exception as e:
                 st.error(str(e))
         _saved_cxrs=st.session_state.get('tis_cxrs_result')
-        if _saved_cxrs and all(_saved_cxrs.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'sigma_col':sigma_col}.items()):
+        if _saved_cxrs and all(_saved_cxrs.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'viewing_angle':float(viewing_angle),'sigma_col':sigma_col}.items()):
             _rr=_saved_cxrs['result']
             st.json({k:v for k,v in _rr.items() if k not in {'fitted_signal','residual'}})
             st.line_chart(pd.DataFrame({'measured':_rr['measured_signal'],'fitted':_rr['fitted_signal'],'residual':_rr['residual']},index=_rr['wavelength_nm']))
