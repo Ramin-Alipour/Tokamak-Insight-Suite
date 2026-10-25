@@ -113,10 +113,14 @@ def ion_temperature_from_doppler_spectrum(
     if pcov.shape == (5, 5) and np.isfinite(pcov[2, 2]) and pcov[2, 2] >= 0:
         fwhm_unc = 2.354820045 * float(np.sqrt(pcov[2, 2]))
     kwargs = {}
-    if fwhm_unc is not None and uinst is not None:
+    if fwhm_unc is not None:
+        # The fit covariance provides an observed-width uncertainty even when
+        # the user has no uncertainty estimate for the instrument calibration.
+        # In that case the instrument width is treated as fixed (zero uncertainty),
+        # and the returned uncertainty is explicitly a conditional estimate.
         kwargs = {
             "observed_fwhm_uncertainty_nm": fwhm_unc,
-            "instrumental_fwhm_uncertainty_nm": uinst,
+            "instrumental_fwhm_uncertainty_nm": 0.0 if uinst is None else uinst,
         }
     result = doppler_temperature_eV(
         rest, fwhm_nm, mass, instrumental_fwhm_nm=inst, **kwargs
@@ -157,6 +161,7 @@ def ion_temperature_from_doppler_spectrum(
         "assumptions": list(result.assumptions) + [
             "Single isolated Gaussian line with a locally linear background",
             "Uncertainty is local fit/covariance propagation and excludes wavelength, mass, calibration, and model-discrepancy uncertainty",
+            ("Instrumental-width uncertainty was supplied and propagated" if uinst is not None else "Instrumental width was treated as exact because no calibration uncertainty was supplied"),
         ],
         "caveat": "Review blends, opacity, unresolved fine structure, Stark/Zeeman broadening, rotation and non-thermal ion distributions before interpreting the result as physical Ti.",
     }
