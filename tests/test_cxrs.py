@@ -87,3 +87,19 @@ def test_rejects_rest_wavelength_outside_measured_window():
     with pytest.raises(ValueError, match="within the measured wavelength range"):
         analyze_cxrs_line(x, y, rest_wavelength_nm=600.0, ion_mass_amu=12,
                           instrument_sigma_nm=0.008)
+
+
+
+def test_viewing_angle_is_preserved_as_metadata_without_velocity_deprojection():
+    x, y, center, _ = synthetic()
+    angle = np.pi / 3
+    result = analyze_cxrs_line(
+        x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+        instrument_sigma_nm=0.008, viewing_angle_rad=angle,
+    )
+    assert result.viewing_angle_rad == pytest.approx(angle)
+    # The API reports line-of-sight velocity; angle metadata must not silently
+    # transform it into a toroidal/poloidal component.
+    assert result.line_of_sight_velocity_m_s == pytest.approx(
+        299792458.0 * (center - 530.0) / 530.0, abs=15
+    )
