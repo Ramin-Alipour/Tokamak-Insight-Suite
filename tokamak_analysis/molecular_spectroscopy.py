@@ -208,3 +208,112 @@ def fit_custom_molecular_model(wavelength_nm, intensity, model, *, parameter_nam
         out["chi_square"] = chi2
         out["reduced_chi_square"] = chi2 / dof if dof > 0 else float("nan")
     return out
+
+def fit_molecular_boltzmann_temperature(
+    upper_energy_eV,
+    integrated_intensity,
+    einstein_A_s,
+    degeneracy,
+    wavelength_nm,
+    *,
+    intensity_uncertainty=None,
+):
+    """Estimate an excitation temperature from a supplied molecular transition table.
+
+    Inputs are line-integrated *energy* intensities after background subtraction and
+    instrument-response correction, upper-state energies in eV, Einstein A values in
+    s^-1, upper-state statistical weights, and line wavelengths in nm. The fitted
+    Boltzmann ordinate is proportional to ln(N_u/g_u), using photon rate proportional
+    to energy intensity times wavelength. This is a generic caller-supplied line-list
+    workflow; it does not identify species or establish LTE/optical thinness.
+
+    At least four distinct upper-state energies are required. The returned temperature
+    is an excitation temperature in eV/K, not automatically electron or ion temperature.
+    """
+    energy = np.asarray(upper_energy_eV, dtype=float)
+    intensity = np.asarray(integrated_intensity, dtype=float)
+    einstein_a = np.asarray(einstein_A_s, dtype=float)
+    weight = np.asarray(degeneracy, dtype=float)
+    wavelength = np.asarray(wavelength_nm, dtype=float)
+    arrays = (energy, intensity, einstein_a, weight, wavelength)
+    if any(a.ndim != 1 for a in arrays) or any(a.shape != energy.shape for a in arrays):
+        raise ValueError("All transition columns must be matching one-dimensional arrays")
+    if energy.size < 4:
+        raise ValueError("At least four molecular transitions are required")
+    if not all(np.all(np.isfinite(a)) for a in arrays):
+        raise ValueError("Transition columns must contain only finite values")
+    if (np.any(energy < 0) or np.any(intensity <= 0) or np.any(einstein_a <= 0)
+            or np.any(weight <= 0) or np.any(wavelength <= 0)):
+        raise ValueError("Energies must be non-negative; intensity, Einstein A, degeneracy and wavelength must be positive")
+    if np.unique(energy).size < 3:
+        raise ValueError("At least three distinct upper-state energies are needed to constrain the fit")
+
+    # For energy-integrated line radiance, photon rate is proportional to I*lambda.
+    ordinate = np.log(intensity * wavelength / (einstein_a * weight))
+    sigma_log = None
+    if intensity_uncertainty is not None:
+        sigma_i = np.asarray(intensity_uncertainty, dtype=float)
+        if (sigma_i.shape != intensity.shape or not np.all(np.isfinite(sigma_i))
+                or np.any(sigma_i <= 0)):
+            raise ValueError("intensity_uncertainty must be positive, finite, and match integrated_intensity")
+        sigma_log = sigma_i / intensity
+
+    design = np.column_stack((energy, np.ones_like(energy)))
+    if sigma_log is None:
+        weights = np.ones_like(energy)
+    else:
+        weights = 1.0 / sigma_log**2
+    weighted_design = design * np.sqrt(weights)[:, None]
+    weighted_y = ordinate * np.sqrt(weights)
+    try:
+        coefficients, _, rank, _ = np.linalg.lstsq(weighted_design, weighted_y, rcond=None)
+        if rank != 2:
+            raise ValueError("Transition energies do not constrain a unique Boltzmann slope")
+        slope, intercept = map(float, coefficients)
+        covariance_base = np.linalg.inv(weighted_design.T @ weighted_design)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("Boltzmann fit is numerically singular") from exc
+    if not np.isfinite(slope) or slope >= 0:
+        raise ValueError("Boltzmann slope must be negative; no positive finite excitation temperature can be inferred")
+
+    fitted = design @ coefficients
+    residual = ordinate - fitted
+    dof = int(energy.size - 2)
+    chi_square = float(np.sum((residual / sigma_log)**2)) if sigma_log is not None else float(np.sum(residual**2))
+    if sigma_log is None:
+        covariance = covariance_base * (chi_square / dof)
+    else:
+        covariance = covariance_base
+    slope_uncertainty = float(np.sqrt(max(float(covariance[0, 0]), 0.0)))
+    temperature_eV = -1.0 / slope
+    temperature_uncertainty_eV = slope_uncertainty / slope**2
+    kelvin_per_eV = 11604.518121550082
+    total = float(np.sum((ordinate - np.mean(ordinate))**2))
+    r_squared = float(1.0 - np.sum(residual**2) / total) if total > 0 else float("nan")
+    return {
+        "excitation_temperature_eV": float(temperature_eV),
+        "excitation_temperature_uncertainty_eV": float(temperature_uncertainty_eV),
+        "excitation_temperature_K": float(temperature_eV * kelvin_per_eV),
+        "excitation_temperature_uncertainty_K": float(temperature_uncertainty_eV * kelvin_per_eV),
+        "boltzmann_slope_per_eV": slope,
+        "boltzmann_intercept": intercept,
+        "slope_uncertainty_per_eV": slope_uncertainty,
+        "r_squared": r_squared,
+        "chi_square": chi_square,
+        "degrees_of_freedom": dof,
+        "fitted_log_population_over_weight": fitted.tolist(),
+        "residual": residual.tolist(),
+        "line_count": int(energy.size),
+        "uncertainty_model": "First-order weighted log-intensity fit; excludes wavelength/A-value/degeneracy uncertainties, correlated errors, calibration systematics and model discrepancy.",
+        "assumptions": [
+            "All lines belong to the same correctly identified molecular species and compatible population distribution.",
+            "Line-integrated energy intensities are background-subtracted, absolutely or consistently response-corrected, and positive.",
+            "Optically thin emission and a Boltzmann population distribution are adequate for the selected transitions.",
+            "Einstein A values, upper-state energies, degeneracies and wavelengths come from an authoritative transition database.",
+        ],
+        "caveats": [
+            "This is an excitation temperature, not automatically electron or ion temperature.",
+            "A high R-squared does not prove LTE, optical thinness, correct species assignment or validity of the supplied molecular data.",
+            "Systematic calibration, blending, self-absorption and non-equilibrium populations can bias the result.",
+        ],
+    }
