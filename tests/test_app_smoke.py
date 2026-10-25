@@ -167,3 +167,34 @@ def test_ece_dashboard_channel_fluctuations_executes_and_exports_psd():
     next(item for item in app.button if item.label == "Analyze ECE fluctuations / PSD").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any(item.label == "Export ECE fluctuation / PSD result" for item in app.download_button)
+
+
+
+def test_molecular_spectroscopy_dashboard_executes_feature_and_gaussian_fit_workflows():
+    import numpy as np
+    import pandas as pd
+
+    wavelength = np.linspace(400.0, 410.0, 201)
+    intensity = 1.2 + 5.0 * np.exp(-0.5 * ((wavelength - 405.0) / 0.3) ** 2)
+    frame = pd.DataFrame({"wavelength_nm": wavelength, "intensity": intensity})
+    app = AppTest.from_file(APP_PATH, default_timeout=60)
+    app.session_state["tis_df"] = frame
+    app.session_state["tis_filename"] = "synthetic_molecular_spectrum.csv"
+    app.session_state["tis_raw"] = b"synthetic molecular spectrum"
+    app.session_state["tis_sha"] = "synthetic-molecular-spectrum"
+    app.run()
+
+    app.radio[0].set_value("Spectral Analysis").run()
+    workflow = next(item for item in app.radio if item.label == "Workflow")
+    workflow.set_value("Molecular spectroscopy").run()
+    next(item for item in app.selectbox if item.label == "Calibrated wavelength (nm)").set_value("wavelength_nm").run()
+    next(item for item in app.selectbox if item.label == "Molecular spectral intensity").set_value("intensity").run()
+    next(item for item in app.button if item.label == "Analyze molecular spectrum").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("peak_count" in str(item.value) for item in app.json)
+
+    next(item for item in app.text_input if item.label == "Initial band-center guesses (nm, comma-separated)").set_value("405.0").run()
+    next(item for item in app.button if item.label == "Fit empirical Gaussian bands").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("parameters" in str(item.value) for item in app.json)
+    assert any(item.label == "Export empirical molecular band fit" for item in app.get("download_button"))
