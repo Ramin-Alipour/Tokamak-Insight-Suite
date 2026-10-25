@@ -88,3 +88,26 @@ def test_thomson_raw_spectrum_dashboard_executes_fit_residuals_and_exports():
     result = app.session_state.get("tis_thomson_spectrum_fit")
     if result is not None:
         assert result["electron_temperature_eV"] == pytest.approx(0.01, rel=0.05)
+
+
+def test_thomson_calibrated_power_density_dashboard_executes_and_exports():
+    frame = pd.DataFrame({"unused_signal": [0.0, 1.0, 2.0]})
+    app = _app_with_table(frame)
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
+        "Thomson calibrated scattered-power density"
+    ).run()
+
+    next(item for item in app.checkbox if item.label == "Propagate independent input uncertainties").check().run()
+    next(item for item in app.button if item.label == "Estimate Thomson electron density").click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any(
+        "Calibrated scattered-power density estimate completed." in str(item.value)
+        for item in app.success
+    )
+    assert any(item.label == "Electron density" for item in app.metric)
+    assert any(item.label == "Propagated 1-sigma uncertainty" for item in app.metric)
+    assert any(
+        item.label == "Export Thomson power-density estimate"
+        for item in app.get("download_button")
+    )
