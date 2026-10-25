@@ -20,7 +20,6 @@ def analyze_probe_voltage_current(voltage_V, current_A, *, electron_fit_range=No
         raise ValueError("Voltage values must be unique.")
     dvdi = np.gradient(i, v, edge_order=2)
 
-    # Find zero crossings in voltage order; never sort current independently.
     zero = i == 0.0
     candidates = []
     zero_idx = np.flatnonzero(zero)
@@ -63,30 +62,56 @@ def analyze_probe_voltage_current(voltage_V, current_A, *, electron_fit_range=No
             raise ValueError("electron_fit_range must contain two finite increasing bounds.")
         if lo < v[0] or hi > v[-1]:
             raise ValueError("electron_fit_range must lie within the measured voltage range.")
-        electron_current = i - out["ion_saturation_current_A"]
-        mask = (v >= lo) & (v <= hi) & (electron_current > 0)
+        mask = (v >= lo) & (v <= hi)
         points = int(np.count_nonzero(mask))
         out["electron_fit_points"] = points
-        if points < 3:
+        if points < 4:
             out["electron_temperature_estimate_eV"] = None
             out["electron_fit_status"] = "insufficient_positive_points"
         else:
-            x, y = v[mask], np.log(electron_current[mask])
-            slope, intercept = np.polyfit(x, y, 1)
-            fitted = slope * x + intercept
-            ss_res = float(np.sum((y - fitted) ** 2))
-            ss_tot = float(np.sum((y - np.mean(y)) ** 2))
-            r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else (1.0 if ss_res == 0 else 0.0)
-            out["electron_temperature_estimate_eV"] = float(1.0 / slope) if slope > 0 else None
-            out["electron_fit_status"] = "ok" if slope > 0 else "nonpositive_log_slope"
-            out["electron_fit_slope_per_V"] = float(slope)
-            out["electron_fit_intercept"] = float(intercept)
-            out["electron_fit_r_squared"] = float(r_squared)
-            out["electron_current_used_A"] = electron_current[mask]
-            out["electron_fit_note"] = (
-                "Ion-tail median subtracted before log-linear fitting. R² is descriptive; "
-                "the fit is not a sheath-model validation and must be checked against raw I-V data."
-            )
+            # Fit the retarding branch as I(V) = I_ion + A exp(V/Te).
+            # A free offset avoids biasing Te when the selected voltage interval
+            # does not reach a true ion-saturation plateau. This is a diagnostic
+            # empirical fit, not a substitute for a validated sheath model.
+            from scipy.optimize import curve_fit
+
+            x, current = v[mask], i[mask]
+            baseline0 = float(np.min(current))
+            amplitude0 = max(float(np.ptp(current)), np.finfo(float).tiny)
+            slope0 = 1.0 / max(float(hi - lo) / 3.0, np.finfo(float).eps)
+
+            def exponential_branch(voltage, baseline, amplitude, slope):
+                return baseline + amplitude * np.exp(slope * (voltage - lo))
+
+            try:
+                params, _ = curve_fit(
+                    exponential_branch, x, current,
+                    p0=(baseline0 - amplitude0 * 0.05, amplitude0, slope0),
+                    bounds=([-np.inf, 0.0, np.finfo(float).eps],
+                            [np.inf, np.inf, np.inf]),
+                    maxfev=20000,
+                )
+                baseline, amplitude, slope = map(float, params)
+                fitted = exponential_branch(x, *params)
+                residual = current - fitted
+                ss_res = float(np.sum(residual ** 2))
+                ss_tot = float(np.sum((current - np.mean(current)) ** 2))
+                r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else (1.0 if ss_res == 0 else 0.0)
+                out["electron_temperature_estimate_eV"] = float(1.0 / slope)
+                out["electron_fit_status"] = "ok"
+                out["electron_fit_slope_per_V"] = slope
+                out["electron_fit_intercept"] = float(np.log(amplitude) - slope * lo)
+                out["electron_fit_baseline_A"] = baseline
+                out["electron_fit_r_squared"] = float(r_squared)
+                out["electron_current_used_A"] = current - baseline
+                out["electron_fit_note"] = (
+                    "Nonlinear exponential fit with a free current offset over the selected interval. "
+                    "R² is descriptive; verify fit region, current polarity, saturation behavior, "
+                    "and sheath-model assumptions against raw I-V data."
+                )
+            except (RuntimeError, ValueError, FloatingPointError):
+                out["electron_temperature_estimate_eV"] = None
+                out["electron_fit_status"] = "fit_failed"
     if ion_fit_range is not None:
         try:
             lo, hi = map(float, ion_fit_range)
