@@ -71,7 +71,11 @@ def analyze_thomson_spectral_distribution(
     corrected = y - background
     weights = np.clip(corrected, 0.0, None)
     area = float(np.trapezoid(weights, x) if hasattr(np, "trapezoid") else np.trapz(weights, x))
-    area_tolerance = 100.0 * np.finfo(float).eps * max(float(np.max(np.abs(y))), 1.0) * float(x[-1] - x[0])
+    # Keep the degeneracy threshold homogeneous in signal units. An absolute
+    # floor of 1.0 rejects physically valid low-amplitude spectra merely because
+    # the detector reports small units (e.g. W/nm rather than arbitrary counts).
+    signal_scale = float(np.max(np.abs(y)))
+    area_tolerance = 100.0 * np.finfo(float).eps * signal_scale * float(x[-1] - x[0])
     if not np.isfinite(area) or area <= area_tolerance:
         raise ValueError("No positive spectral area remains after background subtraction")
     # Use wavelength-space quadrature weights, not raw sample counts. This keeps
@@ -101,18 +105,23 @@ def analyze_thomson_spectral_distribution(
 
     # Fit a Gaussian plus linear background for a transparent shape comparison.
     peak = int(np.argmax(corrected))
-    amplitude0 = float(max(corrected[peak], np.finfo(float).eps))
+    amplitude0 = float(max(corrected[peak], np.finfo(float).tiny))
     spacing = float(np.median(np.diff(x)))
     span = float(x[-1] - x[0])
     p0 = [amplitude0, float(x[peak]), max(sigma_observed, spacing), float(intercept_at_zero), float(slope)]
     lower = [0.0, float(x[0]), max(spacing * 0.25, np.finfo(float).eps), -np.inf, -np.inf]
     upper = [np.inf, float(x[-1]), span, np.inf, np.inf]
     fit_sigma = None if uncertainty is None else uncertainty
-    params, covariance = curve_fit(
-        _gaussian_background, x, y, p0=p0, bounds=(lower, upper),
-        sigma=fit_sigma, absolute_sigma=uncertainty is not None, maxfev=50000,
-    )
-    fitted = _gaussian_background(x, *params)
+    try:
+        params, covariance = curve_fit(
+            _gaussian_background, x, y, p0=p0, bounds=(lower, upper),
+            sigma=fit_sigma, absolute_sigma=uncertainty is not None, maxfev=50000,
+        )
+        fitted = _gaussian_background(x, *params)
+    except (ValueError, RuntimeError, FloatingPointError, OverflowError) as exc:
+        raise ValueError(f"Gaussian spectral-shape fit failed: {exc}") from exc
+    if not np.all(np.isfinite(params)) or not np.all(np.isfinite(fitted)):
+        raise ValueError("Gaussian spectral-shape fit returned non-finite results")
     residual = y - fitted
     dof = max(1, x.size - len(params))
     chi_square_raw = None if uncertainty is None else float(np.sum((residual / uncertainty) ** 2))
