@@ -23,13 +23,13 @@ All wavelengths and widths use nm consistently in the ratios. The ion mass is su
 - `ion_mass_amu`: positive emitting-ion mass in u.
 - `instrument_sigma_nm`: independently measured Gaussian instrumental standard deviation (nm), not FWHM.
 - `instrument_sigma_uncertainty_nm`: optional non-negative 1-sigma uncertainty of the instrumental standard deviation (nm); propagated into the ion-temperature uncertainty.
-- `viewing_angle_rad`: optional metadata in [0, pi]; no geometric deprojection is performed.
+- `viewing_angle_rad`: optional viewing-angle metadata in [0, pi], preserved in the result and export; no geometric deprojection is performed.
 - `signal_uncertainty`: optional positive 1-sigma uncertainty per sample.
 - `initial_center_nm`: optional line-center initial estimate.
 
 ## Outputs
 
-Line center and uncertainty, observed/intrinsic width, Ti and uncertainty, line-of-sight velocity and uncertainty, amplitude, local linear-background coefficients, R², optional reduced chi-square, degrees of freedom, fitted samples, residuals, assumptions, and limitations.
+Line center and uncertainty, observed/intrinsic width, Ti and uncertainty, line-of-sight velocity and uncertainty, viewing-angle metadata, amplitude, local linear-background coefficients, R², optional reduced chi-square, degrees of freedom, fitted samples, residuals, assumptions, and limitations. The dashboard exposes the angle metadata and invalidates stale results when it changes.
 
 ## Scientific limits
 
