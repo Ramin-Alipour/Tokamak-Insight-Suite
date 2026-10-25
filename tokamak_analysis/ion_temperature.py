@@ -122,8 +122,15 @@ def ion_temperature_from_doppler_spectrum(
         rest, fwhm_nm, mass, instrumental_fwhm_nm=inst, **kwargs
     )
     variance_total = float(np.sum((y - np.mean(y))**2))
-    r_squared = (float(1.0 - np.sum(residual**2)/variance_total)
+    residual_sum_squares = float(np.sum(residual**2))
+    r_squared = (float(1.0 - residual_sum_squares/variance_total)
                  if variance_total > 0 else float("nan"))
+    residual_rms = float(np.sqrt(np.mean(residual**2)))
+    reduced_chi_square = None
+    if uy is not None:
+        degrees_of_freedom = int(y.size - len(popt))
+        if degrees_of_freedom > 0:
+            reduced_chi_square = float(np.sum((residual / uy) ** 2) / degrees_of_freedom)
     return {
         "ion_temperature_eV": result.temperature_eV,
         "ion_temperature_uncertainty_eV": result.uncertainty_eV,
@@ -136,6 +143,10 @@ def ion_temperature_from_doppler_spectrum(
         "ion_mass_amu": mass,
         "rest_wavelength_nm": rest,
         "fit_r_squared": r_squared,
+        "fit_residual_sum_squares": residual_sum_squares,
+        "fit_residual_rms": residual_rms,
+        "fit_reduced_chi_square": reduced_chi_square,
+        "fit_degrees_of_freedom": int(y.size - len(popt)),
         "fit_residuals": residual,
         "fitted_intensity": fitted,
         "fit_parameters": {"amplitude": float(popt[0]), "center_nm": float(popt[1]),
