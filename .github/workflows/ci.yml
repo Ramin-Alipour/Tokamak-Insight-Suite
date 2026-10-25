@@ -38,6 +38,10 @@ jobs:
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
         run: python -m pytest -q tests/test_langmuir_dashboard.py
+      - name: Run interactive Thomson-scattering dashboard regressions
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+        run: python -m pytest -q tests/test_thomson_dashboard.py
       - name: Run Streamlit dashboard smoke test
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
