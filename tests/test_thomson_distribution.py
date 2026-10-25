@@ -175,6 +175,12 @@ def test_spectral_distribution_is_invariant_to_signal_units(scale):
     baseline = analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
     scaled = analyze_thomson_spectral_distribution(x, y * scale, instrument_sigma_nm=0.06)
     assert scaled["spectral_centroid_nm"] == pytest.approx(baseline["spectral_centroid_nm"], abs=1e-8)
+    assert scaled["gaussian_fit_parameters"]["center_nm"] == pytest.approx(
+        baseline["gaussian_fit_parameters"]["center_nm"], abs=1e-6
+    )
+    assert scaled["gaussian_fit_parameters"]["amplitude"] == pytest.approx(
+        baseline["gaussian_fit_parameters"]["amplitude"] * scale, rel=1e-6
+    )
     assert scaled["observed_sigma_nm"] == pytest.approx(baseline["observed_sigma_nm"], rel=1e-8)
     assert scaled["instrument_corrected_sigma_nm"] == pytest.approx(
         baseline["instrument_corrected_sigma_nm"], rel=1e-7
