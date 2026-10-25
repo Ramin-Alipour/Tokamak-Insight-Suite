@@ -1242,11 +1242,12 @@
     "diagnostic": "Molecular spectroscopy",
     "quantities": "Molecular-band features, band-integrated signal, candidate bandhead matches; user-model fit parameters",
     "status": "D",
-    "method": "For calibrated wavelength-axis molecular emission spectra, estimate a documented constant quantile baseline, detect prominent local features, estimate approximate half-prominence widths, integrate baseline-subtracted signal globally and over user-selected windows, and optionally compare peaks to user-supplied reference bandheads. A separate Python API fits caller-supplied molecular spectral models and returns parameter covariance and residual diagnostics when identifiable.",
-    "caveat": "Exploratory feature extraction only: no automatic species identification or rotational/vibrational temperature inference. Quantitative inversion requires authoritative molecular constants, a species-specific model, instrument-response treatment and uncertainty analysis.",
+    "method": "For calibrated wavelength-axis molecular emission spectra, estimate a documented constant quantile baseline, detect prominent local features, estimate approximate half-prominence widths, integrate baseline-subtracted signal globally and over user-selected windows, and optionally compare peaks to user-supplied reference bandheads. A separate Python API fits caller-supplied molecular spectral models and returns parameter covariance and residual diagnostics when identifiable. A separate line-list Boltzmann workflow fits excitation temperature from response-corrected integrated line intensities, upper-state energies, Einstein A coefficients, statistical weights and wavelengths supplied by the user.",
+    "caveat": "Exploratory feature extraction only: no automatic species identification or rotational/vibrational temperature inference. Quantitative inversion requires authoritative molecular constants, a species-specific model, instrument-response treatment and uncertainty analysis. The Boltzmann estimate is conditional on compatible species/transitions, optically thin emission and a Boltzmann population distribution; it is not automatic species identification or an electron/ion temperature measurement.",
     "implementation_functions": [
       "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
-      "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
+      "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model",
+      "tokamak_analysis.molecular_spectroscopy.fit_molecular_boltzmann_temperature"
     ],
     "implementation_status": "Complete for exploratory calibrated-axis feature extraction, optional supplied-reference candidate matching, band integration, and caller-supplied model fitting. Does not claim molecular population inversion or device-independent physical inference.",
     "execution_contract": {
@@ -1316,29 +1317,56 @@
           "name": "custom_model_fit",
           "unit": "structured",
           "description": "Separate user-model fitting API with covariance and residual diagnostics."
+        },
+        {
+          "name": "excitation_temperature_eV",
+          "unit": "eV",
+          "description": "Boltzmann-slope excitation temperature from caller-supplied molecular transition data."
+        },
+        {
+          "name": "excitation_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "First-order slope-covariance uncertainty; excludes transition-data and calibration systematics."
+        },
+        {
+          "name": "boltzmann_slope_per_eV",
+          "unit": "eV^-1",
+          "description": "Weighted or unweighted linear Boltzmann-plot slope."
+        },
+        {
+          "name": "r_squared",
+          "unit": "dimensionless",
+          "description": "Descriptive linear-fit goodness-of-fit; not validation of LTE or species assignment."
         }
       ],
       "assumptions": [
         "Wavelength axis is calibrated before analysis.",
         "Feature detection is exploratory and not a molecular population inversion.",
-        "Reference bandheads are user supplied."
+        "Reference bandheads are user supplied.",
+        "Boltzmann temperature mode uses line-integrated energy intensities corrected for background and wavelength-dependent instrument response.",
+        "Supplied Einstein A values, upper-state energies, degeneracies and wavelengths are authoritative and correspond to compatible transitions.",
+        "Optically thin emission and a Boltzmann population distribution are adequate for the selected transitions."
       ],
       "preprocessing": [
-        "Validate finite matching arrays, positive increasing wavelength, model settings, reference entries and band integration ranges."
+        "Validate finite matching arrays, positive increasing wavelength, model settings, reference entries and band integration ranges.",
+        "For Boltzmann temperature, validate at least four matching finite transitions, positive line intensities/A values/weights/wavelengths, distinct upper-state energies, and optional positive intensity uncertainties."
       ],
-      "algorithm": "Validate finite matching arrays and calibrated positive strictly increasing wavelength axis; estimate a constant quantile baseline; detect peaks by prominence relative to spectral contrast; estimate approximate half-prominence widths in wavelength coordinates; integrate positive baseline-subtracted signal by trapezoidal quadrature; optionally integrate requested wavelength windows and compare peaks to caller-supplied references. The Python API separately fits a caller-supplied model and reports fitted parameters, local covariance, residuals and optional weighted chi-square.",
-      "uncertainty_model": "Feature-detection outputs are descriptive estimates and do not claim a full measurement uncertainty budget. Custom-model parameter covariance is local least-squares covariance (or sigma-weighted covariance when positive pointwise intensity uncertainties are supplied); it excludes wavelength calibration, instrument-response, baseline, correlated-noise and model-discrepancy uncertainties.",
+      "algorithm": "Validate finite matching arrays and calibrated positive strictly increasing wavelength axis; estimate a constant quantile baseline; detect peaks by prominence relative to spectral contrast; estimate approximate half-prominence widths in wavelength coordinates; integrate positive baseline-subtracted signal by trapezoidal quadrature; optionally integrate requested wavelength windows and compare peaks to caller-supplied references. The Python API separately fits a caller-supplied model and reports fitted parameters, local covariance, residuals and optional weighted chi-square. The optional Boltzmann workflow fits ln(I_line * wavelength / (Einstein_A * statistical_weight)) against upper-state energy; a negative slope yields excitation temperature in eV and K with covariance-based uncertainty.",
+      "uncertainty_model": "Feature-detection outputs are descriptive estimates and do not claim a full measurement uncertainty budget. Custom-model parameter covariance is local least-squares covariance (or sigma-weighted covariance when positive pointwise intensity uncertainties are supplied); it excludes wavelength calibration, instrument-response, baseline, correlated-noise and model-discrepancy uncertainties. The Boltzmann workflow propagates line-intensity uncertainties through the logarithm and weighted linear fit when supplied; it excludes transition-data uncertainties, wavelength calibration, instrument-response systematics, correlated errors and model discrepancy.",
       "limitations": [
         "No automatic molecular species identification, molecular density inference, rotational/vibrational temperature inference, or electron/ion temperature inference is performed.",
         "Peak widths are approximate widths at half prominence of the baseline-corrected sampled signal; they are not instrument-deconvolved molecular linewidths.",
         "Overlapping bands, blends, wavelength-dependent instrument response, noise, continuum emission and baseline choice can bias detected peaks and integrals.",
         "Nearest reference matches are candidates only; reference wavelengths and labels must come from authoritative molecular data, and users must judge tolerances and assignments.",
         "Quantitative molecular-state or temperature inference requires a validated species-specific model, transition data, instrument line-shape/response treatment, uncertainty propagation and independent validation.",
-        "Custom-model fit statistics and covariance do not validate physical model suitability or parameter identifiability."
+        "Custom-model fit statistics and covariance do not validate physical model suitability or parameter identifiability.",
+        "Boltzmann excitation temperature requires a user-supplied line list and does not identify molecular species.",
+        "Line blending, self-absorption, non-LTE populations, incorrect transition assignments or response errors can invalidate the inferred temperature."
       ],
       "function_links": [
         "tokamak_analysis.molecular_spectroscopy.analyze_molecular_spectrum",
-        "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model"
+        "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model",
+        "tokamak_analysis.molecular_spectroscopy.fit_molecular_boltzmann_temperature"
       ],
       "raw_data_to_physics": false,
       "workflow_modes": [
@@ -1351,6 +1379,27 @@
           "name": "user_defined_molecular_model_fit",
           "function": "fit_custom_molecular_model",
           "scope": "Caller-supplied model only; physical interpretation remains caller responsibility."
+        },
+        {
+          "name": "molecular_boltzmann_excitation_temperature",
+          "function": "fit_molecular_boltzmann_temperature",
+          "inputs": [
+            "upper_energy_eV",
+            "integrated_intensity (energy-integrated, response-corrected)",
+            "einstein_A_s",
+            "degeneracy",
+            "wavelength_nm",
+            "optional intensity_uncertainty"
+          ],
+          "outputs": [
+            "excitation_temperature_eV",
+            "excitation_temperature_K",
+            "slope uncertainty",
+            "R-squared",
+            "chi-square",
+            "residuals"
+          ],
+          "scope": "Conditional Boltzmann-plot excitation temperature from caller-supplied molecular transition data; not automatic species identification or Te/Ti inference."
         }
       ],
       "note": "The supported exploratory workflow and custom-model fitting API are implemented and tested. Completeness refers only to the declared computational scope; physical inversion and automatic species identification are explicitly out of scope."
