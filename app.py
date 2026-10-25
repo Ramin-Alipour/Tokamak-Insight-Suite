@@ -10,7 +10,7 @@ from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
-from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model
+from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
@@ -805,7 +805,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Thomson spectral distribution':
         st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
         xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
@@ -1040,6 +1040,64 @@ elif page=='Spectral Analysis':
             st.json({k:v for k,v in _fit.items() if k not in {'fitted_spectrum','residual','covariance'}})
             st.line_chart(pd.DataFrame({'measured':saved_fit['measured'],'fitted':_fit['fitted_spectrum'],'residual':_fit['residual']},index=saved_fit['wavelength_nm']))
             json_download('Export empirical molecular band fit',_fit,'tis_molecular_gaussian_fit.json')
+    elif mode=='Molecular Boltzmann temperature':
+        st.caption('Fit an excitation temperature from a supplied molecular transition table. Use response-corrected, background-subtracted integrated energy intensities and authoritative transition data; this is not automatic species identification or a Te/Ti measurement.')
+        st.info('Required line-list columns: upper-state energy (eV), integrated line intensity, Einstein A (s⁻¹), upper-state degeneracy, and wavelength (nm). The fit assumes compatible transitions, optically thin emission and a Boltzmann population distribution.')
+        energy_col=col_select('Upper-state energy (eV)',numeric,'mbt_energy')
+        intensity_col=col_select('Integrated line intensity (energy units)',numeric,'mbt_intensity')
+        einstein_col=col_select('Einstein A coefficient (s⁻¹)',numeric,'mbt_einstein')
+        degeneracy_col=col_select('Upper-state statistical weight',numeric,'mbt_degeneracy')
+        wavelength_col=col_select('Transition wavelength (nm)',numeric,'mbt_wavelength')
+        uncertainty_col=st.selectbox('Integrated-intensity uncertainty σ (optional)', ['<none>']+numeric, key='mbt_uncertainty')
+        if st.button('Fit molecular excitation temperature',key='mbt_fit_button'):
+            try:
+                columns={
+                    'energy':pd.to_numeric(df[energy_col],errors='coerce'),
+                    'intensity':pd.to_numeric(df[intensity_col],errors='coerce'),
+                    'einstein_a':pd.to_numeric(df[einstein_col],errors='coerce'),
+                    'degeneracy':pd.to_numeric(df[degeneracy_col],errors='coerce'),
+                    'wavelength':pd.to_numeric(df[wavelength_col],errors='coerce'),
+                }
+                if uncertainty_col!='<none>':
+                    columns['uncertainty']=pd.to_numeric(df[uncertainty_col],errors='coerce')
+                line_data=pd.DataFrame(columns).dropna()
+                if line_data.empty:
+                    raise ValueError('No complete finite transition rows remain after parsing the selected columns.')
+                fit_result=fit_molecular_boltzmann_temperature(
+                    line_data['energy'].to_numpy(dtype=float),
+                    line_data['intensity'].to_numpy(dtype=float),
+                    line_data['einstein_a'].to_numpy(dtype=float),
+                    line_data['degeneracy'].to_numpy(dtype=float),
+                    line_data['wavelength'].to_numpy(dtype=float),
+                    intensity_uncertainty=(line_data['uncertainty'].to_numpy(dtype=float) if uncertainty_col!='<none>' else None),
+                )
+                fit_result['input_columns']={
+                    'upper_energy_eV':energy_col,'integrated_intensity':intensity_col,
+                    'einstein_A_s':einstein_col,'degeneracy':degeneracy_col,
+                    'wavelength_nm':wavelength_col,'intensity_uncertainty':uncertainty_col,
+                }
+                ordinate=np.log(line_data['intensity'].to_numpy(dtype=float)*line_data['wavelength'].to_numpy(dtype=float)/(line_data['einstein_a'].to_numpy(dtype=float)*line_data['degeneracy'].to_numpy(dtype=float)))
+                st.session_state['tis_molecular_boltzmann_fit']={
+                    'data_sha':sha,'columns':fit_result['input_columns'],
+                    'energy':line_data['energy'].tolist(),'ordinate':ordinate.tolist(),'result':fit_result,
+                }
+            except Exception as e:
+                st.error(str(e))
+        saved_boltzmann=st.session_state.get('tis_molecular_boltzmann_fit')
+        selected_columns={
+            'upper_energy_eV':energy_col,'integrated_intensity':intensity_col,
+            'einstein_A_s':einstein_col,'degeneracy':degeneracy_col,
+            'wavelength_nm':wavelength_col,'intensity_uncertainty':uncertainty_col,
+        }
+        if saved_boltzmann and saved_boltzmann.get('data_sha')==sha and saved_boltzmann.get('columns')==selected_columns:
+            _br=saved_boltzmann['result']
+            st.json({k:v for k,v in _br.items() if k not in {'fitted_log_population_over_weight','residual'}})
+            st.line_chart(pd.DataFrame({
+                'log population / weight':saved_boltzmann['ordinate'],
+                'Boltzmann fit':_br['fitted_log_population_over_weight'],
+                'residual':_br['residual'],
+            },index=saved_boltzmann['energy']))
+            json_download('Export molecular Boltzmann temperature',_br,'tis_molecular_boltzmann_temperature.json')
     elif mode=='Line-ratio analysis':
         st.caption('Enter background-subtracted line intensities and relative instrument responses. Atomic modelling is needed to infer Te, ne or impurity concentration.')
         c1,c2=st.columns(2)
