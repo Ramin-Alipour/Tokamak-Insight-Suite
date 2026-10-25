@@ -115,3 +115,26 @@ def test_spectral_distribution_result_is_json_safe_for_degenerate_r_squared():
     x, y = _spectrum()
     out = analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
     assert np.isfinite(out["r_squared"])
+
+def test_complete_result_can_be_exported_as_strict_json_including_spectral_arrays():
+    import json
+
+    x, y = _spectrum()
+    out = analyze_thomson_spectral_distribution(
+        x, y, instrument_sigma_nm=0.06,
+        signal_uncertainty=np.full(x.size, 1.0),
+    )
+    payload = {
+        key: value.tolist() if isinstance(value, np.ndarray) else value
+        for key, value in out.items()
+    }
+    encoded = json.dumps(payload, allow_nan=False)
+    decoded = json.loads(encoded)
+    for key in (
+        "wavelength_nm", "signal", "background", "background_subtracted_signal",
+        "positive_spectral_weights", "wavelength_quadrature_weights_nm",
+        "integrated_spectral_measure", "fitted_spectrum", "residual",
+    ):
+        assert len(decoded[key]) == x.size
+    assert decoded["gaussian_fit_parameters"]["center_nm"] == pytest.approx(500.0, abs=0.01)
+
