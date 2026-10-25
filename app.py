@@ -1031,14 +1031,14 @@ elif page=='Spectral Analysis':
                     wx,wy,gaussian_bands,parameter_names=names,initial_values=p0,
                     bounds=(lower,upper))
                 st.session_state['tis_molecular_gaussian_fit']={
-                    'data_sha':sha,'xcol':xcol,'ycol':ycol,'centers':centers,'result':fit}
+                    'data_sha':sha,'xcol':xcol,'ycol':ycol,'centers':centers,'wavelength_nm':wx.tolist(),'measured':wy.tolist(),'result':fit}
             except Exception as e:
                 st.error(str(e))
         saved_fit=st.session_state.get('tis_molecular_gaussian_fit')
         if saved_fit and all(saved_fit.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'centers':[float(v.strip()) for v in centers_text.split(',') if v.strip()] if centers_text.strip() else []}.items()):
             _fit=saved_fit['result']
             st.json({k:v for k,v in _fit.items() if k not in {'fitted_spectrum','residual','covariance'}})
-            st.line_chart(pd.DataFrame({'measured':pd.to_numeric(df[ycol],errors='coerce').to_numpy(),'fitted':_fit['fitted_spectrum'],'residual':_fit['residual']},index=pd.to_numeric(df[xcol],errors='coerce').to_numpy()))
+            st.line_chart(pd.DataFrame({'measured':saved_fit['measured'],'fitted':_fit['fitted_spectrum'],'residual':_fit['residual']},index=saved_fit['wavelength_nm']))
             json_download('Export empirical molecular band fit',_fit,'tis_molecular_gaussian_fit.json')
     elif mode=='Line-ratio analysis':
         st.caption('Enter background-subtracted line intensities and relative instrument responses. Atomic modelling is needed to infer Te, ne or impurity concentration.')
