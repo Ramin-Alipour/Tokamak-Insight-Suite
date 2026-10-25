@@ -167,3 +167,31 @@ def test_analysis_81_contract_matches_executable_thomson_distribution_inputs_and
     assert {"spectral_centroid_nm", "observed_sigma_nm", "instrument_corrected_sigma_nm", "gaussian_fit_parameters", "residual", "reduced_chi_square"} <= outputs
     assert contract["raw_data_to_physics"] is False
     assert contract["completeness"] == "complete_with_declared_scope"
+
+
+@pytest.mark.parametrize("scale", [1e-20, 1e-12, 1.0, 1e12])
+def test_spectral_distribution_is_invariant_to_signal_units(scale):
+    x, y = _spectrum()
+    baseline = analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
+    scaled = analyze_thomson_spectral_distribution(x, y * scale, instrument_sigma_nm=0.06)
+    assert scaled["spectral_centroid_nm"] == pytest.approx(baseline["spectral_centroid_nm"], abs=1e-8)
+    assert scaled["observed_sigma_nm"] == pytest.approx(baseline["observed_sigma_nm"], rel=1e-8)
+    assert scaled["instrument_corrected_sigma_nm"] == pytest.approx(
+        baseline["instrument_corrected_sigma_nm"], rel=1e-7
+    )
+    assert scaled["integrated_positive_spectral_signal"] == pytest.approx(
+        baseline["integrated_positive_spectral_signal"] * scale, rel=1e-7
+    )
+
+
+def test_spectral_distribution_reports_optimizer_failure_as_actionable_value_error(monkeypatch):
+    import tokamak_analysis.thomson_distribution as module
+
+    x, y = _spectrum()
+
+    def fail_fit(*args, **kwargs):
+        raise RuntimeError("synthetic optimizer non-convergence")
+
+    monkeypatch.setattr(module, "curve_fit", fail_fit)
+    with pytest.raises(ValueError, match="Gaussian spectral-shape fit failed"):
+        module.analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
