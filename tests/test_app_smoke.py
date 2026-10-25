@@ -198,3 +198,43 @@ def test_molecular_spectroscopy_dashboard_executes_feature_and_gaussian_fit_work
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("parameters" in str(item.value) for item in app.json)
     assert any(item.label == "Export empirical molecular band fit" for item in app.get("download_button"))
+
+
+
+def test_molecular_boltzmann_dashboard_executes_temperature_fit():
+    import numpy as np
+    import pandas as pd
+
+    energy = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+    wavelength = np.array([400.0, 405.0, 410.0, 415.0, 420.0, 425.0])
+    einstein_a = np.array([1.0e7, 1.2e7, 1.4e7, 1.6e7, 1.8e7, 2.0e7])
+    degeneracy = np.array([1, 3, 5, 3, 5, 7], dtype=float)
+    intensity = 1.0e-12 * einstein_a * degeneracy / wavelength * np.exp(-energy / 0.8)
+    frame = pd.DataFrame({
+        "upper_energy_eV": energy, "integrated_intensity": intensity,
+        "einstein_A_s": einstein_a, "degeneracy": degeneracy,
+        "wavelength_nm": wavelength,
+    })
+    app = AppTest.from_file(APP_PATH, default_timeout=60)
+    app.session_state["tis_df"] = frame
+    app.session_state["tis_filename"] = "synthetic_molecular_lines.csv"
+    app.session_state["tis_raw"] = b"synthetic molecular lines"
+    app.session_state["tis_sha"] = "synthetic-molecular-lines"
+    app.run()
+
+    app.radio[0].set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value("Molecular Boltzmann temperature").run()
+    selections = {
+        "Upper-state energy (eV)": "upper_energy_eV",
+        "Integrated line intensity (energy units)": "integrated_intensity",
+        "Einstein A coefficient (s⁻¹)": "einstein_A_s",
+        "Upper-state statistical weight": "degeneracy",
+        "Transition wavelength (nm)": "wavelength_nm",
+    }
+    for label, value in selections.items():
+        next(item for item in app.selectbox if item.label == label).set_value(value).run()
+    next(item for item in app.button if item.label == "Fit molecular excitation temperature").click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("excitation_temperature_eV" in str(item.value) for item in app.json)
+    assert any("Export molecular Boltzmann temperature" == item.label for item in app.get("download_button"))
