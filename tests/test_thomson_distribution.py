@@ -138,3 +138,32 @@ def test_complete_result_can_be_exported_as_strict_json_including_spectral_array
         assert len(decoded[key]) == x.size
     assert decoded["gaussian_fit_parameters"]["center_nm"] == pytest.approx(500.0, abs=0.01)
 
+
+
+def test_fit_uncertainties_and_goodness_metrics_remain_strict_json_safe():
+    import json
+
+    x, y = _spectrum()
+    out = analyze_thomson_spectral_distribution(
+        x, y, instrument_sigma_nm=0.06,
+        signal_uncertainty=np.full(x.size, 1.0),
+    )
+    # Covariance-derived values may be unavailable for ill-conditioned fits, but
+    # the public result must use JSON null rather than NaN/Infinity.
+    encoded = json.dumps(out, default=lambda value: value.tolist() if isinstance(value, np.ndarray) else value, allow_nan=False)
+    assert json.loads(encoded)["chi_square"] is not None
+
+
+def test_analysis_81_contract_matches_executable_thomson_distribution_inputs_and_outputs():
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    entry = get_analysis(81)
+    assert entry["name"] == "Thomson Spectral Distribution Analysis"
+    contract = entry["execution_contract"]
+    inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert set(inputs) == {"wavelength_nm", "signal", "instrument_sigma_nm", "signal_uncertainty", "background_fraction"}
+    assert inputs["wavelength_nm"]["description"].find("nine") >= 0
+    outputs = {item["name"] for item in contract["output_specs"]}
+    assert {"spectral_centroid_nm", "observed_sigma_nm", "instrument_corrected_sigma_nm", "gaussian_fit_parameters", "residual", "reduced_chi_square"} <= outputs
+    assert contract["raw_data_to_physics"] is False
+    assert contract["completeness"] == "complete_with_declared_scope"
