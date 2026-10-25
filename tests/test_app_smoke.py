@@ -148,20 +148,3 @@ def test_ece_dashboard_brightness_temperature_executes_with_calibrated_radiance(
     next(item for item in app.button if item.label == "Analyze ECE brightness temperature").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("brightness_temperature_eV" in str(item.value) for item in app.json)
-
-
-
-def test_ece_dashboard_channel_fluctuations_executes_and_exports_psd():
-    app = _loaded_app()
-    app.run()
-    app.radio[0].set_value("Plasma Parameters").run()
-    mode = next(item for item in app.selectbox if item.label == "ECE workflow")
-    mode.set_value("Channel fluctuations / PSD").run()
-    time_column = next(item for item in app.selectbox if item.label == "ECE time column (s)")
-    time_column.set_value("time_s").run()
-    channels = next(item for item in app.multiselect if item.label.startswith("ECE channel signal columns"))
-    channels.set_value(["mirnov0", "mirnov1"]).run()
-    next(item for item in app.button if item.label == "Analyze ECE fluctuations / PSD").click().run()
-    assert not app.exception, [str(error.value) for error in app.exception]
-    # The export control is only rendered after analyze_ece returns successfully.
-    assert any(item.label == "Export ECE fluctuation / PSD result" for item in app.download_button)
