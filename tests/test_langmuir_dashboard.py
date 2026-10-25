@@ -1,4 +1,6 @@
 """Interactive Streamlit regression test for the Langmuir probe workflow."""
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
@@ -7,7 +9,8 @@ from streamlit.testing.v1 import AppTest
 def test_probe_analysis_dashboard_can_run_and_render_langmuir_results():
     voltage = np.linspace(-10.0, 10.0, 81)
     current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
-    app = AppTest.from_file("app.py", default_timeout=120).run()
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
 
     app.session_state["tis_df"] = pd.DataFrame({"voltage_V": voltage, "current_A": current})
