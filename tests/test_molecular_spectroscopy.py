@@ -4,6 +4,7 @@ import pytest
 from tokamak_analysis.molecular_spectroscopy import (
     analyze_molecular_spectrum,
     fit_custom_molecular_model,
+    fit_molecular_boltzmann_temperature,
 )
 
 
@@ -148,4 +149,66 @@ def test_custom_model_wraps_optimizer_nonconvergence():
             x, y, invalid_domain_model,
             parameter_names=("a",), initial_values=(-1.0,),
             bounds=(-2.0, 2.0),
+        )
+
+
+
+def test_molecular_boltzmann_temperature_recovers_supplied_excitation_temperature():
+    energy = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+    wavelength = np.array([400.0, 405.0, 410.0, 415.0, 420.0, 425.0])
+    einstein_a = np.array([1.0e7, 1.2e7, 1.4e7, 1.6e7, 1.8e7, 2.0e7])
+    degeneracy = np.array([1, 3, 5, 3, 5, 7], dtype=float)
+    expected_temperature_eV = 0.8
+    intensity = 1.0e-12 * einstein_a * degeneracy / wavelength * np.exp(-energy / expected_temperature_eV)
+
+    result = fit_molecular_boltzmann_temperature(
+        energy, intensity, einstein_a, degeneracy, wavelength,
+        intensity_uncertainty=0.02 * intensity,
+    )
+
+    assert result["excitation_temperature_eV"] == pytest.approx(expected_temperature_eV, rel=1e-10)
+    assert result["excitation_temperature_K"] == pytest.approx(expected_temperature_eV * 11604.518121550082)
+    assert result["line_count"] == energy.size
+    assert result["degrees_of_freedom"] == energy.size - 2
+    assert result["r_squared"] == pytest.approx(1.0)
+    assert result["excitation_temperature_uncertainty_eV"] > 0
+    assert "not automatically electron or ion temperature" in result["caveats"][0]
+
+
+@pytest.mark.parametrize(
+    "updates, message",
+    [
+        ({"integrated_intensity": np.array([1.0, 1.0, 0.0, 1.0])}, "must be positive"),
+        ({"einstein_A_s": np.array([1.0, 1.0, np.nan, 1.0])}, "finite"),
+        ({"degeneracy": np.array([1.0, 0.0, 1.0, 1.0])}, "must be positive"),
+    ],
+)
+def test_molecular_boltzmann_temperature_rejects_invalid_transition_data(updates, message):
+    values = {
+        "upper_energy_eV": np.array([0.5, 1.0, 1.5, 2.0]),
+        "integrated_intensity": np.array([4.0, 3.0, 2.0, 1.0]),
+        "einstein_A_s": np.ones(4),
+        "degeneracy": np.ones(4),
+        "wavelength_nm": np.full(4, 400.0),
+    }
+    values.update(updates)
+    with pytest.raises(ValueError, match=message):
+        fit_molecular_boltzmann_temperature(**values)
+
+
+def test_molecular_boltzmann_temperature_rejects_nonnegative_slope_and_bad_uncertainty():
+    energy = np.array([0.5, 1.0, 1.5, 2.0])
+    common = {
+        "upper_energy_eV": energy,
+        "integrated_intensity": np.exp(energy),
+        "einstein_A_s": np.ones(4),
+        "degeneracy": np.ones(4),
+        "wavelength_nm": np.full(4, 400.0),
+    }
+    with pytest.raises(ValueError, match="slope must be negative"):
+        fit_molecular_boltzmann_temperature(**common)
+    with pytest.raises(ValueError, match="intensity_uncertainty"):
+        fit_molecular_boltzmann_temperature(
+            **{**common, "integrated_intensity": np.exp(-energy)},
+            intensity_uncertainty=np.zeros(4),
         )
