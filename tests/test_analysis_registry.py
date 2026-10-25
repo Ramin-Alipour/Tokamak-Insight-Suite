@@ -110,4 +110,7 @@ def test_cxrs_is_analysis_four_with_explicit_physics_contract():
         "fitted_signal", "residual", "fit_r_squared",
     }
     assert any("instrumental width" in item for item in contract["limitations"])
+    assert "instrumental-width uncertainty" in inputs["instrument_sigma_uncertainty_nm"]["description"]
+    ti_uncertainty = next(item for item in contract["output_specs"] if item["name"] == "ion_temperature_uncertainty_eV")
+    assert "instrumental-width uncertainty" in ti_uncertainty["description"]
     assert callable(resolve_analysis(4))
