@@ -120,17 +120,17 @@ def test_custom_model_rejects_nonfinite_or_wrong_shape_output():
 
 
 def test_custom_model_requires_more_samples_than_parameters():
-    x = np.linspace(400.0, 410.0, 4)
+    x = np.linspace(400.0, 410.0, 5)
     y = np.ones_like(x)
 
-    def model(w, a, b, c, d):
-        return a * w + b * w**2 + c * w**3 + d
+    def model(w, a, b, c, d, e):
+        return a * w + b * w**2 + c * w**3 + d * w**4 + e
 
     with pytest.raises(ValueError, match="more samples than fitted parameters"):
         fit_custom_molecular_model(
             x, y, model,
-            parameter_names=("a", "b", "c", "d"),
-            initial_values=(0.0, 0.0, 0.0, 1.0),
+            parameter_names=("a", "b", "c", "d", "e"),
+            initial_values=(0.0, 0.0, 0.0, 0.0, 1.0),
         )
 
 
