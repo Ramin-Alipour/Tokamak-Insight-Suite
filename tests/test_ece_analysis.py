@@ -134,3 +134,30 @@ def test_resonance_mapping_rejects_numpy_boolean_sign():
 def test_ece_rejects_unhashable_mode_cleanly():
     with pytest.raises(ValueError, match="Unsupported mode"):
         analyze_ece([80e9, 90e9], mode=[])
+
+
+def test_scalar_noise_threshold_is_reported_per_channel():
+    t = np.arange(64) * 1e-6
+    y = np.column_stack([np.sin(2 * np.pi * 5e3 * t), 0.1 * np.sin(2 * np.pi * 8e3 * t)])
+    result = analyze_ece([80e9, 90e9], signal=y, time_s=t,
+                         noise_std=0.2, mode="channel_fluctuations")
+    assert result["noise_std"].ndim == 0
+    np.testing.assert_array_equal(result["above_noise_rms"], [True, False])
+
+
+def test_fluctuation_input_rejects_nonfinite_samples_and_bad_noise_shape():
+    t = np.arange(8, dtype=float)
+    y = np.ones((8, 2), dtype=float)
+    y[3, 0] = np.nan
+    with pytest.raises(ValueError, match="finite samples"):
+        analyze_ece([80e9, 90e9], signal=y, time_s=t,
+                    mode="channel_fluctuations")
+    with pytest.raises(ValueError, match="noise_std"):
+        analyze_ece([80e9, 90e9], signal=np.ones((8, 2)), time_s=t,
+                    noise_std=[0.1, 0.2, 0.3], mode="channel_fluctuations")
+
+
+def test_resonance_mapping_requires_paired_field_geometry():
+    with pytest.raises(ValueError, match="provided together"):
+        analyze_ece([80e9, 90e9], major_radius_m=1.0,
+                    mode="resonance_mapping")
