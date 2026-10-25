@@ -10,7 +10,7 @@ from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
-from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum
+from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
@@ -980,6 +980,66 @@ elif page=='Spectral Analysis':
             st.json(saved_molecular['result'])
             json_download('Export molecular spectroscopy JSON',saved_molecular['result'],'tis_molecular_spectroscopy.json')
             st.caption('Reference matches are candidates only. Integrated signal is intensity·nm, not radiated power unless the input is absolutely calibrated.')
+        st.markdown('#### Optional empirical Gaussian-band fit')
+        st.caption('Fits a sum of Gaussian features plus a constant baseline. This is a phenomenological fit, not a molecular transition/population model and does not infer rotational or vibrational temperature.')
+        centers_text=st.text_input('Initial band-center guesses (nm, comma-separated)',key='mol_fit_centers')
+        if st.button('Fit empirical Gaussian bands',key='mol_fit_button'):
+            try:
+                if not centers_text.strip():
+                    raise ValueError('Enter one or more initial band-center guesses in nm.')
+                fit_data=pd.DataFrame({
+                    'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),
+                    'intensity':pd.to_numeric(df[ycol],errors='coerce')
+                }).dropna().sort_values('wavelength_nm',kind='stable')
+                wx=fit_data['wavelength_nm'].to_numpy(dtype=float)
+                wy=fit_data['intensity'].to_numpy(dtype=float)
+                if wx.size < 5 or not np.all(np.isfinite(wx)) or not np.all(np.isfinite(wy)):
+                    raise ValueError('At least five finite wavelength/intensity samples are required.')
+                if np.any(np.diff(wx) <= 0):
+                    raise ValueError('Wavelength samples must be unique; remove duplicate wavelengths before fitting.')
+                centers=[float(v.strip()) for v in centers_text.split(',') if v.strip()]
+                if not centers or not np.all(np.isfinite(centers)) or any(c < wx[0] or c > wx[-1] for c in centers):
+                    raise ValueError('All initial band centers must be finite and inside the measured wavelength range.')
+                npeak=len(centers)
+                if wx.size <= 3*npeak+1:
+                    raise ValueError('Use fewer Gaussian components: the spectrum must have more samples than fitted parameters.')
+                span=float(wx[-1]-wx[0])
+                dx=float(np.min(np.diff(wx)))
+                baseline0=float(np.quantile(wy,0.1))
+                amp0=max(float(np.max(wy)-baseline0),np.finfo(float).eps)/npeak
+                width0=max(span/(10*npeak),dx)
+                names=[]
+                p0=[]
+                lower=[]
+                upper=[]
+                for i,c in enumerate(centers,1):
+                    names.extend([f'amplitude_{i}',f'center_{i}_nm',f'sigma_{i}_nm'])
+                    p0.extend([amp0,c,width0])
+                    lower.extend([0.0,float(wx[0]),dx/10])
+                    upper.extend([np.inf,float(wx[-1]),span])
+                names.append('baseline')
+                p0.append(baseline0)
+                lower.append(-np.inf)
+                upper.append(np.inf)
+                def gaussian_bands(w,*p):
+                    pred=np.full_like(np.asarray(w,dtype=float),p[-1])
+                    for j in range(npeak):
+                        amp,center,width=p[3*j:3*j+3]
+                        pred += amp*np.exp(-0.5*((w-center)/width)**2)
+                    return pred
+                fit=fit_custom_molecular_model(
+                    wx,wy,gaussian_bands,parameter_names=names,initial_values=p0,
+                    bounds=(lower,upper))
+                st.session_state['tis_molecular_gaussian_fit']={
+                    'data_sha':sha,'xcol':xcol,'ycol':ycol,'centers':centers,'result':fit}
+            except Exception as e:
+                st.error(str(e))
+        saved_fit=st.session_state.get('tis_molecular_gaussian_fit')
+        if saved_fit and all(saved_fit.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'centers':[float(v.strip()) for v in centers_text.split(',') if v.strip()] if centers_text.strip() else []}.items()):
+            _fit=saved_fit['result']
+            st.json({k:v for k,v in _fit.items() if k not in {'fitted_spectrum','residual','covariance'}})
+            st.line_chart(pd.DataFrame({'measured':pd.to_numeric(df[ycol],errors='coerce').to_numpy(),'fitted':_fit['fitted_spectrum'],'residual':_fit['residual']},index=pd.to_numeric(df[xcol],errors='coerce').to_numpy()))
+            json_download('Export empirical molecular band fit',_fit,'tis_molecular_gaussian_fit.json')
     elif mode=='Line-ratio analysis':
         st.caption('Enter background-subtracted line intensities and relative instrument responses. Atomic modelling is needed to infer Te, ne or impurity concentration.')
         c1,c2=st.columns(2)
