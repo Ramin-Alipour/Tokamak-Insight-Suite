@@ -108,15 +108,28 @@ def analyze_thomson_spectral_distribution(
     amplitude0 = float(max(corrected[peak], np.finfo(float).tiny))
     spacing = float(np.median(np.diff(x)))
     span = float(x[-1] - x[0])
-    p0 = [amplitude0, float(x[peak]), max(sigma_observed, spacing), float(intercept_at_zero), float(slope)]
+    p0 = [amplitude0, float(x[peak]), max(sigma_observed, spacing), float(np.interp(x[peak], x, background)), float(slope)]
     lower = [0.0, float(x[0]), max(spacing * 0.25, np.finfo(float).eps), -np.inf, -np.inf]
     upper = [np.inf, float(x[-1]), span, np.inf, np.inf]
-    fit_sigma = None if uncertainty is None else uncertainty
+    # Normalize signal and uncertainty for optimizer conditioning. Without this,
+    # physically valid small-unit spectra can satisfy the optimizer's absolute
+    # stopping tolerance before the line shape is fitted.
+    fit_scale = float(np.max(np.abs(y)))
+    if fit_scale <= 0:
+        raise ValueError("Signal must have nonzero scale for Gaussian fitting")
+    fit_y = y / fit_scale
+    fit_sigma = None if uncertainty is None else uncertainty / fit_scale
+    fit_p0 = [p0[0] / fit_scale, p0[1], p0[2], p0[3] / fit_scale, p0[4] / fit_scale]
+    fit_lower = [lower[0] / fit_scale, lower[1], lower[2], lower[3], lower[4] / fit_scale]
+    fit_upper = [upper[0] / fit_scale, upper[1], upper[2], upper[3], upper[4] / fit_scale]
     try:
-        params, covariance = curve_fit(
-            _gaussian_background, x, y, p0=p0, bounds=(lower, upper),
+        scaled_params, scaled_covariance = curve_fit(
+            _gaussian_background, x, fit_y, p0=fit_p0, bounds=(fit_lower, fit_upper),
             sigma=fit_sigma, absolute_sigma=uncertainty is not None, maxfev=50000,
         )
+        parameter_scales = np.array([fit_scale, 1.0, 1.0, fit_scale, fit_scale])
+        params = scaled_params * parameter_scales
+        covariance = scaled_covariance * np.outer(parameter_scales, parameter_scales)
         fitted = _gaussian_background(x, *params)
     except (ValueError, RuntimeError, FloatingPointError, OverflowError) as exc:
         raise ValueError(f"Gaussian spectral-shape fit failed: {exc}") from exc
