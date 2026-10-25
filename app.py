@@ -831,7 +831,7 @@ elif page=='Spectral Analysis':
             _r=_saved_tsd['result']
             st.json({k:v for k,v in _r.items() if not isinstance(v,(np.ndarray,dict)) and k not in {'signal','wavelength_nm','background','background_subtracted_signal','positive_spectral_weights','fitted_spectrum','residual'}} | {'gaussian_fit_parameters':_r['gaussian_fit_parameters'],'gaussian_fit_parameter_uncertainties':_r['gaussian_fit_parameter_uncertainties']})
             st.line_chart(pd.DataFrame({'measured':_r['signal'],'background-subtracted':_r['background_subtracted_signal'],'Gaussian fit':_r['fitted_spectrum']} ,index=_r['wavelength_nm']))
-            json_download('Export Thomson spectral-distribution results', {k:v for k,v in _r.items() if not isinstance(v,np.ndarray)}, 'thomson_spectral_distribution.json')
+            json_download('Export Thomson spectral-distribution results', {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in _r.items()}, 'thomson_spectral_distribution.json')
     elif mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
         model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
