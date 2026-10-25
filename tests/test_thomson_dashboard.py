@@ -59,7 +59,7 @@ def test_thomson_calibrated_profile_dashboard_executes_and_exports():
 
 def test_thomson_raw_spectrum_dashboard_executes_fit_residuals_and_exports():
     wavelength = np.linspace(530.8, 533.2, 241)
-    physical_sigma_nm = 532.0 * np.sqrt(4.0 * 100.0 / 510_998.95069) / np.sqrt(2.0)
+    physical_sigma_nm = 532.0 * np.sqrt(4.0 * 0.01 / 510_998.95069) * np.sin(np.pi / 4.0)
     fitted_sigma_nm = np.sqrt(physical_sigma_nm**2 + 0.05**2)
     signal = (
         1000.0 * np.exp(-0.5 * ((wavelength - 532.0) / fitted_sigma_nm) ** 2)
@@ -87,4 +87,4 @@ def test_thomson_raw_spectrum_dashboard_executes_fit_residuals_and_exports():
     assert any("Electron temperature" in str(item.label) for item in app.metric)
     result = app.session_state.get("tis_thomson_spectrum_fit")
     if result is not None:
-        assert result["electron_temperature_eV"] == pytest.approx(100.0, rel=0.05)
+        assert result["electron_temperature_eV"] == pytest.approx(0.01, rel=0.05)
