@@ -27,6 +27,7 @@ class CXRSResult:
     instrument_sigma_uncertainty_nm: float
     line_of_sight_velocity_m_s: float
     velocity_uncertainty_m_s: float
+    viewing_angle_rad: float
     amplitude: float
     background_intercept: float
     background_slope_per_nm: float
@@ -165,6 +166,7 @@ def analyze_cxrs_line(
         instrument_sigma_uncertainty_nm=float(instrument_sigma_uncertainty_nm),
         line_of_sight_velocity_m_s=float(velocity),
         velocity_uncertainty_m_s=float(velocity_unc),
+        viewing_angle_rad=float(viewing_angle_rad),
         amplitude=amp,
         background_intercept=intercept,
         background_slope_per_nm=slope,
