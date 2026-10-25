@@ -729,7 +729,7 @@
       "tokamak_analysis.ece_analysis.brightness_temperature_K",
       "tokamak_analysis.ece_analysis.brightness_temperature_eV"
     ],
-    "implementation_status": "Implemented numerical workflow with explicit calibration/equilibrium limitations; experimental calibration and device-specific validation remain required.",
+    "implementation_status": "Complete within declared software scope: validated cold-resonance field calculation, optional circular toroidal-field major-radius mapping, calibrated Rayleigh–Jeans brightness temperature, multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata. Dashboard provides numerical tables, plots, JSON exports, and configurable RMS-noise threshold. Device calibration, line-of-sight/equilibrium reconstruction, relativistic corrections, and independent experimental validation are not claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -880,7 +880,8 @@
       ],
       "raw_data_to_physics": true,
       "note": "Implemented callable analysis pipeline; do not imply instrument calibration or equilibrium-grade localization."
-    }
+    },
+    "note": "The built-in dashboard and Python API implement the declared ECE modes. The dashboard exposes brightness-temperature results, resonance mapping with explicit approximation warning, and fluctuation RMS/PSD with configurable noise threshold, visualizations, and JSON export. Completeness refers to software behavior within this declared scope, not experimental validation or a full ECE radiometer forward/inverse model."
   },
   {
     "family": "Plasma parameters",
