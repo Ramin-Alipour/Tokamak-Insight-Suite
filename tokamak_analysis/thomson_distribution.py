@@ -115,11 +115,16 @@ def analyze_thomson_spectral_distribution(
     fitted = _gaussian_background(x, *params)
     residual = y - fitted
     dof = max(1, x.size - len(params))
-    chi_square = None if uncertainty is None else float(np.sum((residual / uncertainty) ** 2))
-    reduced_chi_square = None if chi_square is None else chi_square / dof
+    chi_square_raw = None if uncertainty is None else float(np.sum((residual / uncertainty) ** 2))
+    chi_square = chi_square_raw if chi_square_raw is not None and np.isfinite(chi_square_raw) else None
+    reduced_chi_square_raw = None if chi_square is None else chi_square / dof
+    reduced_chi_square = reduced_chi_square_raw if reduced_chi_square_raw is not None and np.isfinite(reduced_chi_square_raw) else None
     ss_total = float(np.sum((y - np.mean(y))**2))
     r_squared = float(1.0 - np.sum(residual**2) / ss_total) if ss_total > 0 else None
-    parameter_uncertainties = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+    parameter_uncertainties = [
+        float(np.sqrt(max(float(value), 0.0))) if np.isfinite(value) else None
+        for value in np.diag(covariance)
+    ]
     return {
         "wavelength_nm": x.copy(),
         "signal": y.copy(),
@@ -144,11 +149,11 @@ def analyze_thomson_spectral_distribution(
             "background_slope_per_nm": float(params[4]),
         },
         "gaussian_fit_parameter_uncertainties": {
-            "amplitude": float(parameter_uncertainties[0]),
-            "center_nm": float(parameter_uncertainties[1]),
-            "sigma_nm": float(parameter_uncertainties[2]),
-            "background_intercept": float(parameter_uncertainties[3]),
-            "background_slope_per_nm": float(parameter_uncertainties[4]),
+            "amplitude": parameter_uncertainties[0],
+            "center_nm": parameter_uncertainties[1],
+            "sigma_nm": parameter_uncertainties[2],
+            "background_intercept": parameter_uncertainties[3],
+            "background_slope_per_nm": parameter_uncertainties[4],
         },
         "fitted_spectrum": fitted,
         "residual": residual,
