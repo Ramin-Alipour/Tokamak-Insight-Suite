@@ -156,6 +156,8 @@ def fit_custom_molecular_model(wavelength_nm, intensity, model, *, parameter_nam
         raise ValueError("model must be callable")
     if not names or len(set(names)) != len(names) or len(names) != p0.size:
         raise ValueError("Parameter names must be nonempty, unique, and match initial_values")
+    if p0.size >= x.size:
+        raise ValueError("The spectrum must contain more samples than fitted parameters")
     if not np.all(np.isfinite(p0)):
         raise ValueError("Initial parameter values must be finite")
     sigma = None
@@ -186,7 +188,7 @@ def fit_custom_molecular_model(wavelength_nm, intensity, model, *, parameter_nam
         popt, pcov = curve_fit(checked_model, x, y, p0=p0, bounds=(lower, upper),
                                sigma=sigma, absolute_sigma=sigma is not None, maxfev=50000)
         fitted = checked_model(x, *popt)
-    except (TypeError, ValueError, FloatingPointError) as exc:
+    except (TypeError, ValueError, FloatingPointError, RuntimeError, OverflowError) as exc:
         raise ValueError(f"Custom molecular model fitting failed: {exc}") from exc
     residual = y - fitted
     dof = int(y.size - len(popt))
