@@ -1249,7 +1249,7 @@
       "tokamak_analysis.molecular_spectroscopy.fit_custom_molecular_model",
       "tokamak_analysis.molecular_spectroscopy.fit_molecular_boltzmann_temperature"
     ],
-    "implementation_status": "Complete for exploratory calibrated-axis feature extraction, optional supplied-reference candidate matching, band integration, and caller-supplied model fitting. Does not claim molecular population inversion or device-independent physical inference.",
+    "implementation_status": "Complete within declared computational scope for calibrated-axis exploratory feature extraction, caller-supplied reference candidates, band integration, empirical/user-defined model fitting, and conditional Boltzmann excitation-temperature fitting from a supplied molecular transition table. It does not automatically identify species or infer electron/ion temperature; physical validity depends on user-supplied authoritative transition data and stated population/optical assumptions.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
