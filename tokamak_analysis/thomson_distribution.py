@@ -13,9 +13,12 @@ from scipy.optimize import curve_fit
 
 
 def _vector(values, name, *, minimum=9):
-    arr = np.asarray(values, dtype=float)
-    if arr.ndim != 1 or arr.size < minimum:
+    raw = np.asarray(values)
+    if raw.ndim != 1 or raw.size < minimum:
         raise ValueError(f"{name} must be a one-dimensional array with at least {minimum} samples")
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+    arr = raw.astype(float, copy=False)
     if not np.all(np.isfinite(arr)):
         raise ValueError(f"{name} must contain only finite values")
     return arr
@@ -47,10 +50,10 @@ def analyze_thomson_spectral_distribution(
         raise ValueError("wavelength_nm and signal must have equal lengths")
     if np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm must be strictly increasing")
-    if not np.isfinite(instrument_sigma_nm) or instrument_sigma_nm <= 0:
-        raise ValueError("instrument_sigma_nm must be positive and finite")
-    if not np.isfinite(background_fraction) or not (0.02 <= background_fraction <= 0.4):
-        raise ValueError("background_fraction must be finite and in [0.02, 0.4]")
+    if isinstance(instrument_sigma_nm, (bool, np.bool_)) or not isinstance(instrument_sigma_nm, (int, float, np.integer, np.floating)) or not np.isfinite(instrument_sigma_nm) or instrument_sigma_nm <= 0:
+        raise ValueError("instrument_sigma_nm must be a positive finite real number")
+    if isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.02 <= background_fraction <= 0.4):
+        raise ValueError("background_fraction must be a finite real number in [0.02, 0.4]")
 
     uncertainty = None
     if signal_uncertainty is not None:
