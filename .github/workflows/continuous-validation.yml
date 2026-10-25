@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: continuous-validation-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   tests-and-dashboard:
