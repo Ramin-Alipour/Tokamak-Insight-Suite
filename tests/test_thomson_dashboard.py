@@ -111,3 +111,36 @@ def test_thomson_calibrated_power_density_dashboard_executes_and_exports():
         item.label == "Export Thomson power-density estimate"
         for item in app.get("download_button")
     )
+
+
+def test_thomson_calibrated_spectrum_dashboard_estimates_temperature_and_density():
+    wavelength = np.linspace(530.8, 533.2, 241)
+    physical_sigma_nm = 532.0 * np.sqrt(4.0 * 0.01 / 510_998.95069) * np.sin(np.pi / 4.0)
+    fitted_sigma_nm = np.sqrt(physical_sigma_nm**2 + 0.05**2)
+    signal = (
+        1.0e-12 * np.exp(-0.5 * ((wavelength - 532.0) / fitted_sigma_nm) ** 2)
+        + 1.2e-14 + 8.0e-16 * (wavelength - 532.0)
+    )
+    app = _app_with_table(pd.DataFrame({"wavelength_nm": wavelength, "power_density_W_nm": signal}))
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
+        "Thomson raw-spectrum temperature fit"
+    ).run()
+
+    selectors = {item.label: item for item in app.selectbox}
+    selectors["Wavelength (nm)"].set_value("wavelength_nm")
+    selectors["Measured spectral signal"].set_value("power_density_W_nm")
+    next(
+        item for item in app.checkbox
+        if item.label == "Signal is calibrated spectral power density (W/nm); also estimate electron density"
+    ).check().run()
+    next(
+        item for item in app.button
+        if item.label == "Fit Thomson spectrum and estimate electron temperature"
+    ).click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("Thomson spectral fit completed." in str(item.value) for item in app.success)
+    assert any(item.label == "Electron temperature" for item in app.metric)
+    assert any(item.label == "Integrated collected scattered power" for item in app.metric)
+    assert any(item.label == "Electron density" for item in app.metric)
+    assert any(item.label == "Export Thomson fit summary" for item in app.get("download_button"))
