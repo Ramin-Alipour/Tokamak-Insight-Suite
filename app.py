@@ -1161,6 +1161,9 @@ elif page=='Plasma Parameters':
                     if ece_bandwidth_GHz>0:
                         ece_kwargs['channel_bandwidth_Hz']=ece_bandwidth_GHz*1e9
                     result=analyze_ece(ece_freq_Hz,harmonic=int(harm),spectral_radiance_W_m2_sr_Hz=ece_rad,mode='brightness_temperature',**ece_kwargs)
+                    st.success('ECE brightness-temperature analysis completed.')
+                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Brightness temperature (K)':result['brightness_temperature_K'],'Brightness temperature (eV)':result['brightness_temperature_eV']}),use_container_width=True,hide_index=True)
+                    st.line_chart(pd.DataFrame({'Brightness temperature (K)':np.asarray(result['brightness_temperature_K']).reshape(-1),'Brightness temperature (eV)':np.asarray(result['brightness_temperature_eV']).reshape(-1)},index=ece_freq_GHz))
                     st.json(result)
                     json_download('Export ECE brightness-temperature result',result,'tis_ece_brightness_temperature.json')
             elif ece_mode=='Channel fluctuations / PSD':
@@ -1169,22 +1172,39 @@ elif page=='Plasma Parameters':
                 else:
                     ece_time_col=col_select('ECE time column (s)',list(df.columns),'ece_time_col')
                     ece_signal_cols=st.multiselect('ECE channel signal columns (same order as frequencies)',[c for c in numeric if c!=ece_time_col],key='ece_signal_cols')
+                    ece_noise=st.number_input('Per-channel RMS noise estimate (signal units; 0 = omit)',min_value=0.0,value=0.0,key='ece_noise_std')
                     if st.button('Analyze ECE fluctuations / PSD',type='primary',key='ece_run_fluctuations'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
                             raise ValueError('Select exactly one signal column per channel frequency.')
                         ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce').dropna()
                         ece_t=ece_frame[ece_time_col].to_numpy(dtype=float)
                         ece_y=ece_frame[ece_signal_cols].to_numpy(dtype=float)
-                        ece_noise=st.number_input('Per-channel RMS noise estimate (signal units; 0 = omit)',min_value=0.0,value=0.0,key='ece_noise_std')
                         ece_kwargs={'noise_std':ece_noise} if ece_noise>0 else {}
                         result=analyze_ece(ece_freq_Hz,harmonic=int(harm),signal=ece_y,time_s=ece_t,mode='channel_fluctuations',**ece_kwargs)
-                        st.json(result)
+                        st.success('ECE fluctuation analysis completed.')
+                        st.metric('Sampling frequency',f"{result['sampling_frequency_Hz']:.6g} Hz")
+                        st.metric('Nyquist frequency',f"{result['nyquist_frequency_Hz']:.6g} Hz")
+                        rms_frame=pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Fluctuation RMS':result['fluctuation_rms']})
+                        st.markdown('**Per-channel fluctuation RMS**')
+                        st.dataframe(rms_frame,use_container_width=True,hide_index=True)
+                        st.bar_chart(rms_frame.set_index('Frequency (GHz)')['Fluctuation RMS'])
+                        psd_frame=pd.DataFrame(result['fluctuation_psd'],index=result['fluctuation_psd_frequency_Hz'],columns=[f'{v:g} GHz' for v in ece_freq_GHz])
+                        psd_frame.index.name='Frequency (Hz)'
+                        st.markdown('**One-sided fluctuation power spectral density**')
+                        st.line_chart(psd_frame)
+                        if 'above_noise_rms' in result:
+                            st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),use_container_width=True,hide_index=True)
+                        st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','time_s'}})
                         json_download('Export ECE fluctuation / PSD result',result,'tis_ece_fluctuations.json')
             else:
                 ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_r0')
                 ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_b0')
                 if st.button('Map ECE resonance radii',type='primary',key='ece_run_mapping'):
                     result=analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping')
+                    st.success('ECE resonance mapping completed using the declared circular toroidal-field approximation.')
+                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Approximate major radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
+                    st.line_chart(pd.DataFrame({'Approximate major radius (m)':result['resonance_radius_m']},index=ece_freq_GHz))
+                    st.warning('This is not EFIT mapping; plasma shaping, poloidal field, relativistic/Doppler shifts and line-of-sight geometry are not included.')
                     st.json(result)
                     json_download('Export ECE resonance mapping',result,'tis_ece_resonance_mapping.json')
         except Exception as e:
