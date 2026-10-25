@@ -7,7 +7,7 @@ from tis.probe_analysis import langmuir_iv_analysis, probe_iv_summary
 
 def synthetic_iv():
     voltage = np.linspace(-10.0, 10.0, 81)
-    current = -2.0e-3 + 1.5e-4 * np.exp((voltage + 10.0) / 4.0)
+    current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
     return voltage, current
 
 
