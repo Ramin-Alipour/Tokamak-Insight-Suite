@@ -98,3 +98,28 @@ def test_spectrum_workflow_rejects_flat_spectrum():
             x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
             instrumental_fwhm_nm=instrument,
         )
+
+
+def test_spectrum_workflow_reports_residual_and_weighted_fit_diagnostics():
+    x, y, rest, mass, instrument = _synthetic_spectrum()
+    uncertainty = np.full(y.shape, 0.15)
+    result = ion_temperature_from_doppler_spectrum(
+        x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
+        instrumental_fwhm_nm=instrument,
+        instrumental_fwhm_uncertainty_nm=0.0005,
+        intensity_uncertainty=uncertainty,
+    )
+    assert result["fit_residual_sum_squares"] == pytest.approx(
+        np.sum(result["fit_residuals"] ** 2)
+    )
+    assert result["fit_residual_rms"] == pytest.approx(
+        np.sqrt(np.mean(result["fit_residuals"] ** 2))
+    )
+    assert result["fit_degrees_of_freedom"] == len(x) - 5
+    assert result["fit_reduced_chi_square"] is not None
+    assert np.isfinite(result["fit_reduced_chi_square"])
+    unweighted = ion_temperature_from_doppler_spectrum(
+        x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
+        instrumental_fwhm_nm=instrument,
+    )
+    assert unweighted["fit_reduced_chi_square"] is None
