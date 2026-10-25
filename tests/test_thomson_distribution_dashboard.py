@@ -23,6 +23,9 @@ def test_thomson_spectral_distribution_dashboard_executes_and_exports():
     app.session_state["tis_sha"] = "synthetic-thomson-sha256"
     app.run()
     app.radio[0].set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "Thomson spectral distribution"
+    ).run()
 
     wavelength_column = next(
         item for item in app.selectbox
