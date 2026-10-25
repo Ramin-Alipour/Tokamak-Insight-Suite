@@ -1234,7 +1234,29 @@ elif page=='Probe Analysis':
     if st.button('Analyze probe I–V',type='primary'):
         try:
             result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,area or None,mass or None,ti,sheath,current_convention=cur_conv)
-            st.json(result); plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V'); json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
+            st.subheader('Langmuir analysis results')
+            r1,r2,r3=st.columns(3)
+            vf=result.get('floating_potential_V')
+            te_result=result.get('electron_temperature_eV')
+            density_result=result.get('ion_density_estimate_m-3')
+            with r1: st.metric('Floating potential Vf',f'{vf:.5g} V' if vf is not None else 'Not determined')
+            with r2: st.metric('Electron temperature Te',f'{te_result:.5g} eV' if te_result is not None else 'Not fitted')
+            with r3: st.metric('Ion density estimate',f'{density_result:.5g} m⁻³' if density_result is not None else 'Not estimated')
+            st.caption('Floating-potential status: '+str(result.get('floating_potential_status','not reported'))+
+                       ' · Current convention: '+str(result.get('current_convention',cur_conv)))
+            quality=result.get('input_quality',{})
+            if quality.get('discarded_nonfinite_pair_count',0):
+                st.warning(f"Discarded {quality['discarded_nonfinite_pair_count']} paired samples containing non-finite voltage/current values.")
+            if quality.get('duplicate_voltage_pair_count_aggregated',0):
+                st.info(f"Aggregated {quality['duplicate_voltage_pair_count_aggregated']} duplicate-voltage samples by averaging their currents.")
+            if efit is not None:
+                fit_r2=result.get('electron_retarding_fit_R2')
+                fit_rmse=result.get('electron_retarding_fit_normalized_rmse')
+                st.write({'Electron-fit R²':fit_r2,'Electron-fit normalized RMSE':fit_rmse,
+                          'Electron-fit status':result.get('electron_retarding_fit_status')})
+            st.json(result)
+            plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V')
+            json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
     st.warning('Default output is descriptive only. Te and density are calculated only when their fit windows are explicitly enabled; inspect fit quality and confirm calibration, sweep polarity, saturation regions, magnetic-field effects and the probe/sheath model before interpreting results.')
 
