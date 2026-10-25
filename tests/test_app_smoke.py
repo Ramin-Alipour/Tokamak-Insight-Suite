@@ -158,6 +158,8 @@ def test_ece_dashboard_channel_fluctuations_executes_and_exports_psd():
     app.radio[0].set_value("Plasma Parameters").run()
     mode = next(item for item in app.selectbox if item.label == "ECE workflow")
     mode.set_value("Channel fluctuations / PSD").run()
+    # The fixture supplies two signal channels; keep the ECE frequency count aligned.
+    next(item for item in app.text_input if item.label.startswith("Channel center frequencies")).set_value("80, 90").run()
     time_column = next(item for item in app.selectbox if item.label == "ECE time column (s)")
     time_column.set_value("time_s").run()
     channels = next(item for item in app.multiselect if item.label.startswith("ECE channel signal columns"))
