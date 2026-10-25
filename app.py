@@ -829,6 +829,16 @@ elif page=='Spectral Analysis':
         _saved_tsd=st.session_state.get('tis_thomson_distribution')
         if _saved_tsd and _saved_tsd.get('xcol')==xcol and _saved_tsd.get('ycol')==ycol and _saved_tsd.get('sigma_col')==sigma_col and _saved_tsd.get('instrument_sigma_nm')==float(inst_sigma) and _saved_tsd.get('background_fraction')==float(background_fraction) and _saved_tsd.get('data_sha')==sha:
             _r=_saved_tsd['result']
+            _m1,_m2,_m3,_m4=st.columns(4)
+            _m1.metric('Spectral centroid',f"{_r['spectral_centroid_nm']:.6g} nm")
+            _m2.metric('Observed RMS width',f"{_r['observed_sigma_nm']:.6g} nm")
+            _m3.metric('Instrument-corrected width',f"{_r['instrument_corrected_sigma_nm']:.6g} nm" if _r['instrument_width_resolved'] else "Unresolved")
+            _m4.metric('Positive integrated area',f"{_r['integrated_positive_spectral_signal']:.6g}")
+            if _r['instrument_width_resolved']:
+                st.success('Instrument-corrected spectral width is resolved under the stated Gaussian instrument-response assumption.')
+            else:
+                st.warning('The observed spectral variance does not exceed the calibrated instrument variance. Instrument-corrected width is unresolved and is intentionally not reported.')
+            st.caption('Descriptive spectral moments and Gaussian shape-fit diagnostics only. This workflow does not infer electron temperature, electron density, or a unique electron velocity distribution.')
             st.json({k:v for k,v in _r.items() if not isinstance(v,(np.ndarray,dict)) and k not in {'signal','wavelength_nm','background','background_subtracted_signal','positive_spectral_weights','fitted_spectrum','residual'}} | {'gaussian_fit_parameters':_r['gaussian_fit_parameters'],'gaussian_fit_parameter_uncertainties':_r['gaussian_fit_parameter_uncertainties']})
             st.line_chart(pd.DataFrame({'measured':_r['signal'],'background-subtracted':_r['background_subtracted_signal'],'Gaussian fit':_r['fitted_spectrum']} ,index=_r['wavelength_nm']))
             json_download('Export Thomson spectral-distribution results', {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in _r.items()}, 'thomson_spectral_distribution.json')
