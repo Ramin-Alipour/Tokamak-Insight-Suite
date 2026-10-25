@@ -128,14 +128,13 @@ def test_ece_dashboard_resonance_mapping_executes_and_exports_result():
     app = _loaded_app()
     app.run()
     app.radio[0].set_value("Plasma Parameters").run()
-    ece_tab = app.tabs[2]
     mode = next(item for item in app.selectbox if item.label == "ECE workflow")
     mode.set_value("Resonance mapping").run()
     button = next(item for item in app.button if item.label == "Map ECE resonance radii")
     button.click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("resonance_field_T" in str(item.value) for item in app.json)
-    assert any("tis_ece_resonance_mapping.json" in str(item.label) for item in app.download_button)
+    assert any("Export ECE resonance mapping" == str(item.label) for item in app.download_button)
 
 
 def test_ece_dashboard_brightness_temperature_executes_with_calibrated_radiance():
@@ -149,3 +148,20 @@ def test_ece_dashboard_brightness_temperature_executes_with_calibrated_radiance(
     next(item for item in app.button if item.label == "Analyze ECE brightness temperature").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("brightness_temperature_eV" in str(item.value) for item in app.json)
+
+
+
+def test_ece_dashboard_channel_fluctuations_executes_and_exports_psd():
+    app = _loaded_app()
+    app.run()
+    app.radio[0].set_value("Plasma Parameters").run()
+    mode = next(item for item in app.selectbox if item.label == "ECE workflow")
+    mode.set_value("Channel fluctuations / PSD").run()
+    time_column = next(item for item in app.selectbox if item.label == "ECE time column (s)")
+    time_column.set_value("time_s").run()
+    channels = next(item for item in app.multiselect if item.label.startswith("ECE channel signal columns"))
+    channels.set_value(["mirnov0", "mirnov1"]).run()
+    next(item for item in app.button if item.label == "Analyze ECE fluctuations / PSD").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("fluctuation_psd" in str(item.value) for item in app.json)
+    assert any(item.label == "Export ECE fluctuation / PSD result" for item in app.download_button)
