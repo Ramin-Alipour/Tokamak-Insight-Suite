@@ -123,3 +123,16 @@ def test_spectrum_workflow_reports_residual_and_weighted_fit_diagnostics():
         instrumental_fwhm_nm=instrument,
     )
     assert unweighted["fit_reduced_chi_square"] is None
+
+
+def test_fit_uncertainty_is_reported_when_instrument_width_is_treated_as_exact():
+    x, y, rest, mass, instrument = _synthetic_spectrum()
+    result = ion_temperature_from_doppler_spectrum(
+        x, y, rest_wavelength_nm=rest, ion_mass_amu=mass,
+        instrumental_fwhm_nm=instrument,
+    )
+    assert result["observed_fwhm_uncertainty_nm"] is not None
+    assert result["ion_temperature_uncertainty_eV"] is not None
+    assert np.isfinite(result["ion_temperature_uncertainty_eV"])
+    assert result["ion_temperature_uncertainty_eV"] > 0
+    assert any("treated as exact" in item for item in result["assumptions"])
