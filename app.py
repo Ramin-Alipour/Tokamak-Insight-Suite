@@ -1152,11 +1152,17 @@ elif page=='Plasma Parameters':
             ece_freq_Hz=ece_freq_GHz*1e9
             if ece_mode=='Brightness temperature':
                 ece_rad_text=st.text_input('Calibrated spectral radiance per channel (W m⁻² sr⁻¹ Hz⁻¹; comma-separated)',key='ece_radiance')
+                ece_bandwidth_GHz=st.number_input('Channel bandwidth (GHz; 0 = not supplied)',min_value=0.0,value=0.0,step=0.1,key='ece_bandwidth_ghz')
                 if st.button('Analyze ECE brightness temperature',type='primary',key='ece_run_brightness'):
                     ece_rad=np.asarray([float(v.strip()) for v in ece_rad_text.split(',') if v.strip()],dtype=float)
                     if ece_rad.shape!=ece_freq_Hz.shape:
                         raise ValueError('Radiance count must equal the number of channel frequencies.')
-                    st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),spectral_radiance_W_m2_sr_Hz=ece_rad,mode='brightness_temperature'))
+                    ece_kwargs={}
+                    if ece_bandwidth_GHz>0:
+                        ece_kwargs['channel_bandwidth_Hz']=ece_bandwidth_GHz*1e9
+                    result=analyze_ece(ece_freq_Hz,harmonic=int(harm),spectral_radiance_W_m2_sr_Hz=ece_rad,mode='brightness_temperature',**ece_kwargs)
+                    st.json(result)
+                    json_download('Export ECE brightness-temperature result',result,'tis_ece_brightness_temperature.json')
             elif ece_mode=='Channel fluctuations / PSD':
                 if df is None:
                     st.info('Upload a table containing a time column and one calibrated signal column per ECE channel.')
@@ -1169,12 +1175,18 @@ elif page=='Plasma Parameters':
                         ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce').dropna()
                         ece_t=ece_frame[ece_time_col].to_numpy(dtype=float)
                         ece_y=ece_frame[ece_signal_cols].to_numpy(dtype=float)
-                        st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),signal=ece_y,time_s=ece_t,mode='channel_fluctuations'))
+                        ece_noise=st.number_input('Per-channel RMS noise estimate (signal units; 0 = omit)',min_value=0.0,value=0.0,key='ece_noise_std')
+                        ece_kwargs={'noise_std':ece_noise} if ece_noise>0 else {}
+                        result=analyze_ece(ece_freq_Hz,harmonic=int(harm),signal=ece_y,time_s=ece_t,mode='channel_fluctuations',**ece_kwargs)
+                        st.json(result)
+                        json_download('Export ECE fluctuation / PSD result',result,'tis_ece_fluctuations.json')
             else:
                 ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_r0')
                 ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_b0')
                 if st.button('Map ECE resonance radii',type='primary',key='ece_run_mapping'):
-                    st.json(analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping'))
+                    result=analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping')
+                    st.json(result)
+                    json_download('Export ECE resonance mapping',result,'tis_ece_resonance_mapping.json')
         except Exception as e:
             st.error(str(e))
     with tabs[3]:
