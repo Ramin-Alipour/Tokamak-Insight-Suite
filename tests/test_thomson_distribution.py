@@ -51,6 +51,28 @@ def test_spectral_distribution_rejects_invalid_uncertainty_and_background_fracti
         analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06,
                                               background_fraction=0.9)
 
+@pytest.mark.parametrize("bad_values", [
+    [True] * 9,
+    ["1"] * 9,
+])
+def test_spectral_distribution_rejects_boolean_and_string_arrays(bad_values):
+    with pytest.raises(ValueError, match="real numeric values"):
+        analyze_thomson_spectral_distribution(
+            bad_values, np.ones(9), instrument_sigma_nm=0.1
+        )
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"instrument_sigma_nm": True},
+    {"instrument_sigma_nm": "0.1"},
+    {"instrument_sigma_nm": 0.1, "background_fraction": True},
+    {"instrument_sigma_nm": 0.1, "background_fraction": "0.1"},
+])
+def test_spectral_distribution_rejects_boolean_and_string_scalar_parameters(kwargs):
+    x, y = _spectrum()
+    with pytest.raises(ValueError):
+        analyze_thomson_spectral_distribution(x, y, **kwargs)
+
 
 def test_moments_are_correct_on_nonuniform_wavelength_grid():
     # A nonuniform grid must not bias moments toward densely sampled regions.
