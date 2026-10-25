@@ -1002,6 +1002,11 @@
           "description": "Local line-center covariance propagated uncertainty."
         },
         {
+          "name": "viewing_angle_rad",
+          "unit": "rad",
+          "description": "Input viewing-angle metadata preserved without velocity deprojection."
+        },
+        {
           "name": "fitted_signal",
           "unit": "signal units",
           "description": "Model evaluated on the input wavelength grid."
