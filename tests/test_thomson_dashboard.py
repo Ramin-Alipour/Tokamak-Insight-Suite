@@ -144,3 +144,9 @@ def test_thomson_calibrated_spectrum_dashboard_estimates_temperature_and_density
     assert any(item.label == "Integrated collected scattered power" for item in app.metric)
     assert any(item.label == "Electron density" for item in app.metric)
     assert any(item.label == "Export Thomson fit summary" for item in app.get("download_button"))
+    temperature_metric = next(item for item in app.metric if item.label == "Electron temperature")
+    density_metric = next(item for item in app.metric if item.label == "Electron density")
+    power_metric = next(item for item in app.metric if item.label == "Integrated collected scattered power")
+    assert float(temperature_metric.value.split()[0]) == pytest.approx(0.01, rel=0.05)
+    assert float(density_metric.value.split()[0]) > 0.0
+    assert float(power_metric.value.split()[0]) > 0.0
