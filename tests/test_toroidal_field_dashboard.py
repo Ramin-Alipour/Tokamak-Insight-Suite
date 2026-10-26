@@ -22,10 +22,18 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
         "baseline": 100.0,
         "signal_uncertainty": [1.0, 1.0, 1.0],
         "calibration_uncertainty_T_per_unit": 0.001,
+        "pickup_voltage_V": [4.0, 4.0, 4.0],
+        "pickup_sensitivity_V_per_T_per_s": 2.0,
+        "initial_field_T": 3.0,
+        "pickup_voltage_uncertainty_V": [0.1, 0.1, 0.1],
+        "pickup_sensitivity_uncertainty_V_per_T_per_s": 0.1,
+        "initial_field_uncertainty_T": 0.05,
     }
     app.text_area(label="Function arguments (JSON)").set_value(json.dumps(args)).run()
     app.button(label="Run registered analysis").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any(x.value == "Analysis executed." for x in app.success)
     assert any(x.label == "Export community contribution bundle (JSON)" for x in app.get("download_button"))
-    assert any("B_toroidal_T" in str(x.value) for x in app.get("json")) or any("B_toroidal_T" in str(x.value) for x in app.get("markdown"))
+    rendered = "\\n".join(str(x.value) for x in app.get("json") + app.get("markdown"))
+    assert "B_toroidal_T" in rendered
+    assert "B_toroidal_integrated_T" in rendered
