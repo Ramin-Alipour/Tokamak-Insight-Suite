@@ -940,6 +940,13 @@
           "minimum": 0
         },
         {
+          "name": "rest_wavelength_uncertainty_nm",
+          "unit": "nm",
+          "description": "Optional finite non-negative 1-sigma uncertainty of the laboratory rest wavelength; propagated into ion-temperature and line-of-sight velocity uncertainty.",
+          "required": false,
+          "minimum": 0
+        },
+        {
           "name": "viewing_angle_rad",
           "unit": "rad",
           "description": "Optional view geometry metadata in [0, pi]; no deprojection is performed.",
@@ -972,6 +979,16 @@
           "description": "Local covariance-based 1-sigma line-center uncertainty."
         },
         {
+          "name": "rest_wavelength_uncertainty_nm",
+          "unit": "nm",
+          "description": "Supplied 1-sigma laboratory rest-wavelength uncertainty used in propagated physics uncertainties."
+        },
+        {
+          "name": "instrument_sigma_uncertainty_nm",
+          "unit": "nm",
+          "description": "Supplied 1-sigma instrumental-width uncertainty used in ion-temperature uncertainty propagation."
+        },
+        {
           "name": "line_sigma_nm",
           "unit": "nm",
           "description": "Fitted observed Gaussian standard deviation."
@@ -989,7 +1006,7 @@
         {
           "name": "ion_temperature_uncertainty_eV",
           "unit": "eV",
-          "description": "Local fit-covariance propagated uncertainty; excludes systematic inputs."
+          "description": "First-order propagated uncertainty combining local width-fit covariance and optional independent instrumental-width and rest-wavelength uncertainties; excludes other systematics."
         },
         {
           "name": "line_of_sight_velocity_m_s",
@@ -999,7 +1016,7 @@
         {
           "name": "velocity_uncertainty_m_s",
           "unit": "m s^-1",
-          "description": "Local line-center covariance propagated uncertainty."
+          "description": "First-order propagated uncertainty combining local line-center covariance and optional rest-wavelength uncertainty; excludes wavelength-axis calibration systematics."
         },
         {
           "name": "viewing_angle_rad",
@@ -1046,11 +1063,12 @@
       ],
       "preprocessing": [
         "Validate dimensions, finite values, monotonic wavelength, positive physical parameters and optional uncertainties.",
-        "Estimate a local linear edge background and fit Gaussian amplitude, center, width, intercept and slope.",
-        "Reject unresolved line widths when observed width does not exceed instrumental width."
+        "Estimate a local linear edge background and fit Gaussian amplitude, center, width, intercept and slope using optional per-sample weighting.",
+        "Reject non-identifiable covariance, under-sampled line profiles, and unresolved widths where observed width does not exceed instrumental width.",
+        "Propagate fit covariance plus supplied independent instrumental-width and rest-wavelength uncertainties into reported ion-temperature and line-of-sight velocity uncertainties."
       ],
       "algorithm": "Fit Gaussian emission plus local linear background using nonlinear least squares. Compute intrinsic Doppler sigma from sqrt(sigma_observed^2 - sigma_instrument^2), Ti = m_i c^2/e * (sigma_D/lambda_0)^2, and v_los = c*(lambda_center-lambda_0)/lambda_0. Propagate local fit covariance to Ti and line-of-sight velocity uncertainties. The declared completion boundary is calibrated isolated-line inference only; no uncalibrated detector-to-physics claim is made.",
-      "uncertainty_model": "Local nonlinear least-squares covariance; optional per-sample standard deviations enable weighted fitting. Ti and velocity uncertainties are first-order covariance propagation. Excludes systematic uncertainty and covariance in wavelength calibration, rest wavelength, ion mass, and instrumental width.",
+      "uncertainty_model": "Local nonlinear least-squares covariance; optional per-sample standard deviations enable weighted fitting. First-order ion-temperature uncertainty includes observed-width fit covariance, optional independent instrumental-width uncertainty, and optional independent rest-wavelength uncertainty. Line-of-sight velocity uncertainty includes line-center covariance and optional rest-wavelength uncertainty. Assumes independent uncertainty contributions; excludes wavelength-axis calibration, ion-mass, covariance and model/systematic discrepancy.",
       "limitations": [
         "No atomic-rate or neutral-beam attenuation model and no impurity-density estimate.",
         "No toroidal/poloidal rotation inversion; reported velocity is line-of-sight only.",
