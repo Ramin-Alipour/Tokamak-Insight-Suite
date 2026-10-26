@@ -51,7 +51,7 @@ def test_molecular_spectrum_dashboard_runs_and_exports_features():
 
 def test_molecular_dashboard_hides_stale_result_when_analysis_settings_change():
     app = _app(_spectrum())
-    app.button(label="Analyze molecular spectrum").click().run()
+    next(button for button in app.button if button.label == "Analyze molecular spectrum").click().run()
     assert "tis_molecular_spectrum_result" in app.session_state
     app.slider(key="mol_prominence").set_value(0.2).run()
     assert not app.exception, [str(error.value) for error in app.exception]
@@ -61,13 +61,13 @@ def test_molecular_dashboard_hides_stale_result_when_analysis_settings_change():
 
 def test_molecular_dashboard_failed_rerun_clears_previous_result():
     app = _app(_spectrum())
-    app.button(label="Analyze molecular spectrum").click().run()
+    next(button for button in app.button if button.label == "Analyze molecular spectrum").click().run()
     assert "tis_molecular_spectrum_result" in app.session_state
     frame = app.session_state["tis_df"].copy()
     frame["intensity"] = 1.0
     app.session_state["tis_df"] = frame
     app.run()
-    app.button(label="Analyze molecular spectrum").click().run()
+    next(button for button in app.button if button.label == "Analyze molecular spectrum").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert "tis_molecular_spectrum_result" not in app.session_state
     assert any("no positive contrast" in str(item.value).lower() for item in app.error)
