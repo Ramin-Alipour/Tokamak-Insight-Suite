@@ -24,6 +24,6 @@ def test_equilibrium_workspace_exposes_grad_shafranov_solver_without_exceptions(
 def test_equilibrium_workspace_rejects_run_when_required_csv_inputs_are_missing():
     app = AppTest.from_file(APP_PATH, default_timeout=60).run()
     app.radio(key="workspace_page").set_value("Equilibrium & Reconstruction").run()
-    app.button(key="grad_shafranov_form-Solve Grad–Shafranov equilibrium").click().run()
+    next(item for item in app.button if item.label == "Solve Grad–Shafranov equilibrium").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Upload all six CSV inputs" in str(item.value) for item in app.error)
