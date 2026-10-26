@@ -915,7 +915,7 @@ elif page=='Spectral Analysis':
             inst_unc=st.number_input('Instrument sigma uncertainty (nm; 1σ)',min_value=0.0,value=0.0,format='%.9g',key='cxrs_inst_sigma_unc')
             viewing_angle=st.number_input('Viewing angle metadata (rad; no deprojection)',min_value=0.0,max_value=float(np.pi),value=0.0,format='%.8g',key='cxrs_viewing_angle')
             sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='cxrs_sigma')
-        if st.button('Analyze CXRS line'):
+        if st.button('Analyze CXRS line', key='cxrs_run'):
             # Never leave a previous successful result visible if a new attempt fails.
             st.session_state.pop('tis_cxrs_result', None)
             try:
