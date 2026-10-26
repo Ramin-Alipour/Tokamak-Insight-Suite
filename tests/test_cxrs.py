@@ -144,3 +144,29 @@ def test_rejects_under_resolved_line_profile():
             x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
             instrument_sigma_nm=0.008,
         )
+
+
+def test_rest_wavelength_uncertainty_is_propagated_to_temperature_and_velocity():
+    x, y, *_ = synthetic()
+    base = analyze_cxrs_line(
+        x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+        instrument_sigma_nm=0.008,
+    )
+    with_rest_uncertainty = analyze_cxrs_line(
+        x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+        instrument_sigma_nm=0.008, rest_wavelength_uncertainty_nm=1e-5,
+    )
+    assert with_rest_uncertainty.rest_wavelength_uncertainty_nm == pytest.approx(1e-5)
+    assert with_rest_uncertainty.ion_temperature_uncertainty_eV > base.ion_temperature_uncertainty_eV
+    assert with_rest_uncertainty.velocity_uncertainty_m_s > base.velocity_uncertainty_m_s
+
+
+def test_rejects_invalid_rest_wavelength_uncertainty():
+    x, y, *_ = synthetic()
+    for uncertainty in (-1e-5, np.nan, np.inf):
+        with pytest.raises(ValueError, match="rest_wavelength_uncertainty_nm"):
+            analyze_cxrs_line(
+                x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+                instrument_sigma_nm=0.008,
+                rest_wavelength_uncertainty_nm=uncertainty,
+            )
