@@ -170,3 +170,36 @@ def test_rejects_invalid_rest_wavelength_uncertainty():
                 instrument_sigma_nm=0.008,
                 rest_wavelength_uncertainty_nm=uncertainty,
             )
+
+
+
+def test_rejects_indefinite_fit_covariance(monkeypatch):
+    x, y, *_ = synthetic()
+    invalid_covariance = np.eye(5)
+    invalid_covariance[0, 1] = invalid_covariance[1, 0] = 2.0
+
+    def fake_curve_fit(*args, **kwargs):
+        return np.array([120.0, 530.0, 0.026, 4.0, 0.2]), invalid_covariance
+
+    monkeypatch.setattr(cxrs_module, "curve_fit", fake_curve_fit)
+    with pytest.raises(ValueError, match="not positive semidefinite"):
+        analyze_cxrs_line(
+            x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+            instrument_sigma_nm=0.008,
+        )
+
+
+def test_rejects_asymmetric_fit_covariance(monkeypatch):
+    x, y, *_ = synthetic()
+    invalid_covariance = np.eye(5)
+    invalid_covariance[0, 1] = 0.5
+
+    def fake_curve_fit(*args, **kwargs):
+        return np.array([120.0, 530.0, 0.026, 4.0, 0.2]), invalid_covariance
+
+    monkeypatch.setattr(cxrs_module, "curve_fit", fake_curve_fit)
+    with pytest.raises(ValueError, match="not symmetric"):
+        analyze_cxrs_line(
+            x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+            instrument_sigma_nm=0.008,
+        )
