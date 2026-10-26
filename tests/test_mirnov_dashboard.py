@@ -13,7 +13,8 @@ def _open_mirnov():
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Spectral Analysis").run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    app.radio[1].set_value("Mirnov / pickup coils").run()
+    workflow = next(radio for radio in app.radio if "Mirnov / pickup coils" in radio.options)
+    workflow.set_value("Mirnov / pickup coils").run()
     assert not app.exception, [str(x.value) for x in app.exception]
     return app
 
