@@ -2365,27 +2365,136 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)",
     "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
-    "status": "I",
-    "method": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
-    "caveat": "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "status": "D",
+    "method": "Solve the axisymmetric Grad–Shafranov equation on a uniform R-Z grid from prescribed boundary poloidal flux and supplied p'(psi) and F F'(psi) profiles; return poloidal flux, normalized flux, B_R, B_Z, B_p, convergence diagnostics, and a separate physical-equation residual evaluator.",
+    "caveat": "This is a finite-difference, prescribed-boundary/profile solver, not a full EFIT reconstruction: it does not infer boundary flux or profiles from magnetic measurements, locate a magnetic axis/separatrix, fit diagnostic constraints, or provide uncertainty estimates. Check convergence and residual before interpreting results.",
+    "implementation_functions": [
+      "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
+      "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation"
+    ],
+    "implementation_status": "Implemented numerical Grad–Shafranov solver within the declared prescribed-boundary/profile scope; automated numerical regression tests cover validation, boundary preservation, magnetic-field derivatives, physical-equation residual, and non-convergence reporting. Not a complete experimental EFIT replacement.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Solve constrained inverse problem using magnetic measurements, geometry and boundary constraints.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Requires machine geometry, coil calibration and validated equilibrium solver; no universal closed-form solution."
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "R_m",
+          "unit": "m",
+          "required": true,
+          "description": "Strictly increasing, positive, uniformly spaced major-radius grid; at least 3 points."
+        },
+        {
+          "name": "Z_m",
+          "unit": "m",
+          "required": true,
+          "description": "Strictly increasing, uniformly spaced vertical grid; at least 3 points."
+        },
+        {
+          "name": "boundary_flux_Wb_rad",
+          "unit": "Wb rad^-1",
+          "required": true,
+          "description": "Finite 2-D boundary-flux array of shape (len(Z_m), len(R_m)); perimeter values are fixed."
+        },
+        {
+          "name": "psi_profile",
+          "unit": "normalized flux",
+          "required": true,
+          "description": "Strictly increasing 1-D normalized-flux coordinates spanning a subset of [0,1], at least two points."
+        },
+        {
+          "name": "pressure_gradient_Pa_per_Wb",
+          "unit": "Pa Wb^-1",
+          "required": true,
+          "description": "p'(psi) values aligned with psi_profile."
+        },
+        {
+          "name": "ffprime_T2",
+          "unit": "T^2",
+          "required": true,
+          "description": "F F'(psi) values aligned with psi_profile."
+        },
+        {
+          "name": "max_iterations",
+          "unit": "count",
+          "required": false,
+          "description": "Positive integer iteration cap; default 10000."
+        },
+        {
+          "name": "tolerance",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Positive finite relative iteration-change tolerance; default 1e-8."
+        },
+        {
+          "name": "relaxation",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Finite over-relaxation factor in (0,2); default 1.2."
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "psi_Wb_rad",
+          "unit": "Wb rad^-1",
+          "description": "Reconstructed poloidal flux on the R-Z grid with fixed perimeter values."
+        },
+        {
+          "name": "psi_normalized",
+          "unit": "dimensionless",
+          "description": "Min-max normalized flux for inspection; not guaranteed to be a physical flux-surface coordinate."
+        },
+        {
+          "name": "B_R_T",
+          "unit": "T",
+          "description": "B_R = -(1/R) partial psi / partial Z."
+        },
+        {
+          "name": "B_Z_T",
+          "unit": "T",
+          "description": "B_Z = (1/R) partial psi / partial R."
+        },
+        {
+          "name": "B_poloidal_T",
+          "unit": "T",
+          "description": "Magnitude of poloidal magnetic field."
+        },
+        {
+          "name": "iterations",
+          "unit": "count",
+          "description": "Iterations executed."
+        },
+        {
+          "name": "relative_iteration_change",
+          "unit": "dimensionless",
+          "description": "Final relative maximum iterate change."
+        },
+        {
+          "name": "converged",
+          "unit": "boolean",
+          "description": "Whether iteration-change criterion was met; false results must not be treated as converged equilibria."
+        }
+      ],
+      "assumptions": [
+        "Axisymmetry and the supplied Grad–Shafranov sign/unit convention.",
+        "Boundary poloidal flux and profile functions are prescribed, not inferred from experimental measurements.",
+        "Uniform R-Z grid."
+      ],
+      "preprocessing": [
+        "Validate finite arrays, grid geometry, array shapes, profile monotonicity, and solver controls."
+      ],
+      "algorithm": "Finite-difference elliptic solve with successive over-relaxation; interpolate p'(psi_N) and F F'(psi_N), preserve perimeter flux, then calculate magnetic field from flux derivatives. A separate evaluator computes Δ*psi, source, and residual for supplied mapped profiles.",
+      "uncertainty_model": "No uncertainty propagation; measurement, calibration, boundary, and profile uncertainties are not estimated.",
+      "limitations": [
+        "Not a full EFIT implementation or experimental equilibrium inference.",
+        "No automatic magnetic-axis/separatrix identification, flux-loop/Mirnov fitting, profile reconstruction, or uncertainty estimation.",
+        "Iteration-change convergence alone is insufficient; inspect the physical-equation residual and validate against independent constraints."
+      ],
+      "function_links": [
+        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
+        "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation"
+      ],
+      "raw_data_to_physics": false
     }
   },
   {
