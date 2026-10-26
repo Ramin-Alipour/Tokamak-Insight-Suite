@@ -20,6 +20,7 @@ _U = 1.66053906660e-27
 class CXRSResult:
     wavelength_center_nm: float
     wavelength_center_uncertainty_nm: float
+    rest_wavelength_uncertainty_nm: float
     line_sigma_nm: float
     intrinsic_sigma_nm: float
     ion_temperature_eV: float
@@ -58,6 +59,7 @@ def analyze_cxrs_line(
     signal_uncertainty=None,
     initial_center_nm: float | None = None,
     instrument_sigma_uncertainty_nm: float = 0.0,
+    rest_wavelength_uncertainty_nm: float = 0.0,
 ) -> CXRSResult:
     """Fit one calibrated CXRS line and derive Ti and line-of-sight velocity.
 
@@ -83,6 +85,9 @@ def analyze_cxrs_line(
         Initial line-center estimate. Defaults to wavelength at maximum signal.
     instrument_sigma_uncertainty_nm : float, default 0
         1-sigma uncertainty of the independently measured instrumental sigma.
+    rest_wavelength_uncertainty_nm : float, default 0
+        1-sigma uncertainty of the laboratory rest wavelength; propagated into
+        both Doppler velocity and ion-temperature uncertainty.
 
     Notes
     -----
@@ -109,6 +114,8 @@ def analyze_cxrs_line(
         raise ValueError("viewing_angle_rad must be finite and within [0, pi]")
     if not np.isfinite(instrument_sigma_uncertainty_nm) or instrument_sigma_uncertainty_nm < 0:
         raise ValueError("instrument_sigma_uncertainty_nm must be finite and non-negative")
+    if not np.isfinite(rest_wavelength_uncertainty_nm) or rest_wavelength_uncertainty_nm < 0:
+        raise ValueError("rest_wavelength_uncertainty_nm must be finite and non-negative")
     sy = None
     if signal_uncertainty is not None:
         sy = np.asarray(signal_uncertainty, dtype=float)
@@ -173,9 +180,12 @@ def analyze_cxrs_line(
     sigma_unc = float(np.sqrt(max(0.0, pcov[2, 2]))) if np.isfinite(pcov[2, 2]) else float("nan")
     ti_unc_fit = 2 * ti * observed_sigma * sigma_unc / intrinsic_sigma**2
     ti_unc_instrument = 2 * ti * instrument_sigma_nm * instrument_sigma_uncertainty_nm / intrinsic_sigma**2
-    ti_unc = float(np.hypot(ti_unc_fit, ti_unc_instrument))
+    ti_unc_rest_wavelength = 2 * ti * rest_wavelength_uncertainty_nm / rest_wavelength_nm
+    ti_unc = float(np.sqrt(ti_unc_fit**2 + ti_unc_instrument**2 + ti_unc_rest_wavelength**2))
     velocity = _C * (center - rest_wavelength_nm) / rest_wavelength_nm
-    velocity_unc = _C * center_unc / rest_wavelength_nm
+    velocity_unc_center = _C * center_unc / rest_wavelength_nm
+    velocity_unc_rest = _C * center * rest_wavelength_uncertainty_nm / rest_wavelength_nm**2
+    velocity_unc = float(np.hypot(velocity_unc_center, velocity_unc_rest))
     fitted = _line_model(x, *popt)
     residual = y - fitted
     ss_res = float(np.sum(residual**2))
@@ -186,6 +196,7 @@ def analyze_cxrs_line(
     return CXRSResult(
         wavelength_center_nm=center,
         wavelength_center_uncertainty_nm=center_unc,
+        rest_wavelength_uncertainty_nm=float(rest_wavelength_uncertainty_nm),
         line_sigma_nm=observed_sigma,
         intrinsic_sigma_nm=intrinsic_sigma,
         ion_temperature_eV=float(ti),
@@ -206,7 +217,7 @@ def analyze_cxrs_line(
                      "Gaussian Doppler and instrumental line shapes", "known rest wavelength, ion mass and instrumental width"),
         limitations=("No atomic-rate or neutral-beam attenuation model; no impurity density estimate",
                      "Velocity is line-of-sight only; toroidal/poloidal inversion requires multiple calibrated views and geometry",
-                     "Fit covariance excludes wavelength, rest-wavelength, instrument-width and calibration systematics",
+                     "Fit covariance excludes wavelength-axis calibration and instrument-response systematics; supplied rest-wavelength and instrument-width uncertainties are propagated",
                      "Blends, opacity, non-Maxwellian distributions and non-Gaussian instrument response are not modelled",
                      "viewing_angle_rad is metadata only and does not imply a geometry inversion"),
     )
