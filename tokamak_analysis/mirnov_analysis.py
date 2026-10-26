@@ -51,6 +51,13 @@ def _dt(t: np.ndarray) -> float:
         d, dt, rtol=1e-3, atol=max(1e-15, dt * 1e-12)
     ):
         raise ValueError("Uniform sampling is required for spectral analysis")
+    # Finite, increasing timestamps can still imply an unrepresentable sampling
+    # frequency when the interval is subnormal. Reject it before passing inf to
+    # Welch/CSD so callers receive a deterministic input-validation error.
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        sampling_frequency = 1.0 / dt
+    if not np.isfinite(sampling_frequency):
+        raise ValueError("Sampling frequency must be finite and representable")
     return dt
 
 
