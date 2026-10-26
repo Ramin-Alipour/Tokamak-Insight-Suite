@@ -50,6 +50,10 @@ def test_electron_fit_reports_quality_for_exponential_retarding_branch():
     assert result["electron_temperature_estimate_eV"] == pytest.approx(2.0, rel=0.05)
     assert result["electron_fit_points"] >= 3
     assert result["electron_fit_r_squared"] > 0.99
+    assert result["electron_fit_residual_rms_A"] >= 0
+    assert result["electron_fit_quality"] == "strong_empirical_fit"
+    assert result["electron_temperature_standard_uncertainty_eV"] is not None
+    assert result["electron_temperature_standard_uncertainty_eV"] >= 0
 
 
 def test_electron_fit_does_not_silently_hide_insufficient_points():
@@ -74,3 +78,20 @@ def test_electron_retarding_current_validates_physical_domain():
     assert np.all(result["electron_current_A"] > 0)
     with pytest.raises(ValueError, match="electron-retarding"):
         electron_retarding_current([0, 1], 0, 1e-3, 2)
+
+
+def test_electron_fit_exposes_weak_fit_quality_without_overstating_physical_validity():
+    voltage = np.linspace(-4.0, 4.0, 17)
+    current = np.sin(voltage) + 0.03 * np.cos(7.0 * voltage)
+    result = analyze_probe_voltage_current(voltage, current, electron_fit_range=(-3.5, 3.5))
+    if result["electron_fit_status"] == "ok":
+        assert result["electron_fit_quality"] in {"strong_empirical_fit", "weak_empirical_fit"}
+        assert result["electron_fit_residual_rms_A"] >= 0
+        assert "electron_temperature_standard_uncertainty_eV" in result
+
+
+def test_electron_retarding_current_rejects_nonfinite_voltage_and_bad_parameters():
+    with pytest.raises(ValueError, match="finite"):
+        electron_retarding_current([0.0, np.nan], 1.0, 1e-3, 2.0)
+    with pytest.raises(ValueError, match="positive"):
+        electron_retarding_current([0.0], 1.0, 0.0, 2.0)
