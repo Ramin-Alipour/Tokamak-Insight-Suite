@@ -50,6 +50,10 @@ jobs:
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
         run: python -m pytest -q tests/test_ece_analysis.py tests/test_ece_dashboard.py
+      - name: Run CXRS physics and interactive dashboard acceptance suite
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+        run: python -m pytest -q tests/test_cxrs.py tests/test_cxrs_dashboard.py
       - name: Run Streamlit dashboard smoke test
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
