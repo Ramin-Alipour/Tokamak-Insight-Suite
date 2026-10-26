@@ -1818,6 +1818,7 @@ elif page=='Advanced Analysis':
     elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
+        st.caption(f"Selected analysis: {entry['name']}")
         fn=resolve_analysis(selected_id)
         import inspect
         st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
