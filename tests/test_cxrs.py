@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import tokamak_analysis.cxrs as cxrs_module
 from tokamak_analysis.cxrs import analyze_cxrs_line
 
 
@@ -103,3 +104,17 @@ def test_viewing_angle_is_preserved_as_metadata_without_velocity_deprojection():
     assert result.line_of_sight_velocity_m_s == pytest.approx(
         299792458.0 * (center - 530.0) / 530.0, abs=15
     )
+
+
+def test_rejects_optimizer_result_with_unidentifiable_covariance(monkeypatch):
+    x, y, *_ = synthetic()
+
+    def fake_curve_fit(*args, **kwargs):
+        return np.array([120.0, 530.0, 0.026, 4.0, 0.2]), np.full((5, 5), np.nan)
+
+    monkeypatch.setattr(cxrs_module, "curve_fit", fake_curve_fit)
+    with pytest.raises(ValueError, match="covariance is singular or non-finite"):
+        analyze_cxrs_line(
+            x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+            instrument_sigma_nm=0.008,
+        )
