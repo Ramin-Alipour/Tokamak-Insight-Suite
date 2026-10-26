@@ -38,7 +38,7 @@ def test_flux_loop_workflow_is_available_and_renders_without_data():
     app.radio(key="workspace_page").set_value("Advanced Analysis").run()
     assert not app.exception
 
-    app.selectbox(label="Select workflow").set_value(
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
         "Flux-loop magnetic-flux reconstruction"
     ).run()
     assert not app.exception
