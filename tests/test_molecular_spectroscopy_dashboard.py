@@ -83,7 +83,8 @@ def test_molecular_boltzmann_dashboard_fits_supplied_transition_table_and_export
     frame = pd.DataFrame({
         "upper_energy_eV": energy, "integrated_intensity": intensity,
         "einstein_A_s": einstein_a, "degeneracy": degeneracy,
-        "wavelength_nm": wavelength, "intensity_sigma": 0.02 * intensity,
+        "wavelength_nm": wavelength, "intensity": intensity,
+        "intensity_sigma": 0.02 * intensity,
     })
     app = _app(frame)
     next(item for item in app.radio if item.label == "Workflow").set_value("Molecular Boltzmann temperature").run()
