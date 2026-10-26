@@ -32,6 +32,8 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
         raise ValueError("Calibration coefficient must be finite and uncertainty non-negative")
     if signal_kind == "field" and not np.isclose(k, 1.0):
         raise ValueError("field input requires calibration_T_per_unit=1")
+    if signal_kind in {"current", "voltage"} and k == 0.0:
+        raise ValueError("current/voltage input requires a non-zero calibration_T_per_unit")
     if baseline is not None and not np.isfinite(float(baseline)):
         raise ValueError("baseline must be finite")
     corrected = x - (0.0 if baseline is None else float(baseline))
@@ -47,7 +49,7 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
         "physical_relation": "B_t(t) = k_cal * [signal(t) - baseline]",
         "limitations": ["Calibration must be valid over the signal range and bandwidth.",
         "No coil geometry, mutual inductance, plasma-current contribution, ferromagnetic response, or absolute calibration is inferred.",
-        "Pickup-coil voltage generally requires a validated transfer function or Faraday-law integration; this function does not integrate voltage."]}
+        "Pickup-coil voltage must use the separate validated integration path; it is not interchangeable with an instantaneous field signal."]}
     if signal_uncertainty is not None:
         sx = np.asarray(signal_uncertainty, dtype=float)
         if sx.shape != x.shape or not np.all(np.isfinite(sx)) or np.any(sx < 0):
