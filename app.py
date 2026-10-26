@@ -1209,7 +1209,14 @@ elif page=='Probe Analysis':
     st.divider()
     st.markdown('### Langmuir probe I–V analysis')
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
-    vmin=float(pd.to_numeric(df[vcol],errors='coerce').min()); vmax=float(pd.to_numeric(df[vcol],errors='coerce').max())
+    voltage_values=pd.to_numeric(df[vcol],errors='coerce').to_numpy(dtype=float)
+    current_values=pd.to_numeric(df[icol],errors='coerce').to_numpy(dtype=float)
+    finite_voltage=voltage_values[np.isfinite(voltage_values)]
+    finite_pairs=np.isfinite(voltage_values)&np.isfinite(current_values)
+    if finite_voltage.size == 0 or np.unique(finite_voltage).size < 8 or np.count_nonzero(finite_pairs) < 8:
+        st.error('The selected columns need at least eight finite paired samples and eight distinct finite voltage values before Langmuir analysis can run.')
+        st.stop()
+    vmin=float(np.min(finite_voltage)); vmax=float(np.max(finite_voltage))
     st.markdown('### Fit-window and probe geometry')
     st.caption('Fit windows are experiment-specific and are not inferred automatically. Enable each fit only after selecting a physically justified interval from the measured I–V curve. Default analysis reports descriptive quantities only.')
     efit=None
