@@ -1012,7 +1012,15 @@ elif page=='Spectral Analysis':
         baseline_q=st.slider('Constant baseline quantile',0.0,0.49,0.10,0.01,key='mol_baseline_quantile')
         refs_text=st.text_input('Optional user reference bandheads (nm:label; nm:label)',key='mol_refs')
         ranges_text=st.text_input('Optional integration windows (lower_nm:upper_nm; ...)',key='mol_ranges')
+        molecular_signature = {
+            'data_sha': sha, 'xcol': xcol, 'ycol': ycol,
+            'prominence_fraction': float(prominence),
+            'baseline_quantile': float(baseline_q),
+            'reference_text': refs_text.strip(),
+            'ranges_text': ranges_text.strip(),
+        }
         if st.button('Analyze molecular spectrum'):
+            st.session_state.pop('tis_molecular_spectrum_result', None)
             try:
                 refs=None
                 if refs_text.strip():
@@ -1044,12 +1052,13 @@ elif page=='Spectral Analysis':
                     band_ranges_nm=ranges,
                 )
                 st.session_state['tis_molecular_spectrum_result']={
-                    'data_sha':sha,'xcol':xcol,'ycol':ycol,'result':result
+                    **molecular_signature, 'result':result
                 }
+                st.success('Molecular spectrum feature analysis completed.')
             except Exception as e:
                 st.error(str(e))
         saved_molecular=st.session_state.get('tis_molecular_spectrum_result')
-        if saved_molecular and saved_molecular.get('data_sha')==sha and saved_molecular.get('xcol')==xcol and saved_molecular.get('ycol')==ycol:
+        if saved_molecular and all(saved_molecular.get(k)==v for k,v in molecular_signature.items()):
             st.json(saved_molecular['result'])
             json_download('Export molecular spectroscopy JSON',saved_molecular['result'],'tis_molecular_spectroscopy.json')
             st.caption('Reference matches are candidates only. Integrated signal is intensity·nm, not radiated power unless the input is absolutely calibrated.')
