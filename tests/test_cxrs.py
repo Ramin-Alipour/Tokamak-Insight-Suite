@@ -118,3 +118,16 @@ def test_rejects_optimizer_result_with_unidentifiable_covariance(monkeypatch):
             x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
             instrument_sigma_nm=0.008,
         )
+
+def test_rejects_finite_but_rank_deficient_covariance(monkeypatch):
+    x, y, *_ = synthetic()
+
+    def fake_curve_fit(*args, **kwargs):
+        return np.array([120.0, 530.0, 0.026, 4.0, 0.2]), np.zeros((5, 5))
+
+    monkeypatch.setattr(cxrs_module, "curve_fit", fake_curve_fit)
+    with pytest.raises(ValueError, match="covariance is rank-deficient"):
+        analyze_cxrs_line(
+            x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+            instrument_sigma_nm=0.008,
+        )
