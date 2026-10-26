@@ -43,7 +43,7 @@ def _cxrs_app():
 
 def test_cxrs_dashboard_fits_line_reports_physics_and_exports():
     app, expected_center = _cxrs_app()
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     result = app.session_state["tis_cxrs_result"]["result"]
     assert any("CXRS line-profile analysis completed" in str(item.value) for item in app.success)
@@ -61,7 +61,7 @@ def test_cxrs_dashboard_fits_line_reports_physics_and_exports():
 def test_cxrs_dashboard_withholds_unresolved_temperature_and_surfaces_error():
     app, _ = _cxrs_app()
     app.number_input(key="cxrs_inst_sigma").set_value(0.2)
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("unresolved" in str(item.value).lower() for item in app.error)
     assert "tis_cxrs_result" not in app.session_state
@@ -73,7 +73,7 @@ def test_cxrs_dashboard_rejects_nonpositive_sample_uncertainty():
     frame.loc[20, "signal_sigma"] = 0.0
     app.session_state["tis_df"] = frame
     app.run()
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("finite positive values" in str(item.value) for item in app.error)
     assert "tis_cxrs_result" not in app.session_state
@@ -81,14 +81,14 @@ def test_cxrs_dashboard_rejects_nonpositive_sample_uncertainty():
 
 def test_cxrs_dashboard_failed_rerun_clears_previous_successful_result():
     app, _ = _cxrs_app()
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert "tis_cxrs_result" in app.session_state
 
     # Keep the same selected columns and settings but make the next fit invalid.
     frame = app.session_state["tis_df"].copy()
     frame["cxrs_signal"] = 0.0
     app.session_state["tis_df"] = frame
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
 
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("positive emission feature" in str(item.value) for item in app.error)
@@ -97,7 +97,7 @@ def test_cxrs_dashboard_failed_rerun_clears_previous_successful_result():
 
 def test_cxrs_dashboard_hides_stale_result_when_analysis_parameters_change():
     app, _ = _cxrs_app()
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert "tis_cxrs_result" in app.session_state
     assert any("CXRS line-profile analysis completed" in str(item.value) for item in app.success)
 
@@ -111,7 +111,7 @@ def test_cxrs_dashboard_hides_stale_result_when_analysis_parameters_change():
 def test_cxrs_dashboard_propagates_instrument_width_uncertainty():
     app, _ = _cxrs_app()
     app.number_input(key="cxrs_inst_sigma_unc").set_value(0.001).run()
-    app.button(label="Analyze CXRS line").click().run()
+    app.button(key="cxrs_run").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     result = app.session_state["tis_cxrs_result"]["result"]
     assert result["instrument_sigma_uncertainty_nm"] == pytest.approx(0.001)
