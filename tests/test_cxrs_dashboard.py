@@ -116,3 +116,24 @@ def test_cxrs_dashboard_propagates_instrument_width_uncertainty():
     result = app.session_state["tis_cxrs_result"]["result"]
     assert result["instrument_sigma_uncertainty_nm"] == pytest.approx(0.001)
     assert result["ion_temperature_uncertainty_eV"] > 0
+
+
+def test_cxrs_dashboard_withholds_under_resolved_spectrum():
+    app, _ = _cxrs_app()
+    wavelength = np.linspace(529.8, 530.2, 15)
+    center = 530.0 * (1.0 + 2.5e4 / 299792458.0)
+    sigma_observed = np.hypot(0.025, 0.008)
+    frame = pd.DataFrame({
+        "wavelength_nm": wavelength,
+        "cxrs_signal": 120.0 * np.exp(-0.5 * ((wavelength-center) / sigma_observed) ** 2) + 4.0,
+        "signal_sigma": np.full(wavelength.size, 0.5),
+    })
+    app.session_state["tis_df"] = frame
+    app.session_state["tis_raw"] = frame.to_csv(index=False).encode("utf-8")
+    app.run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    app.button(key="cxrs_run").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("under-resolved by wavelength sampling" in str(item.value).lower()
+               for item in app.error)
+    assert "tis_cxrs_result" not in app.session_state
