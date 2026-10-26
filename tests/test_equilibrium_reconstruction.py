@@ -30,6 +30,19 @@ def test_solver_preserves_boundary_and_recovers_harmonic_flux():
     np.testing.assert_allclose(result["B_Z_T"], 2.0, atol=1e-5)
 
 
+
+def test_solver_residual_scaling_is_invariant_for_small_flux_magnitudes():
+    R, Z = grid()
+    boundary = 1e-12 * np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    result = reconstruct_equilibrium(
+        R, Z, boundary, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0],
+        tolerance=1e-9,
+    )
+    assert result["converged"] is True
+    assert result["equation_residual_relative_rms"] <= 1e-8
+    np.testing.assert_allclose(result["psi_Wb_rad"], boundary, atol=2e-18, rtol=1e-8)
+
+
 def test_physical_relation_returns_small_residual_for_exact_quadratic_solution():
     R, Z = grid()
     psi = R[None, :] ** 2 + Z[:, None] ** 2
