@@ -39,7 +39,7 @@ def test_molecular_spectrum_dashboard_runs_and_exports_features():
     app = _app(_spectrum())
     app.text_input(key="mol_refs").set_value("405.02:synthetic band")
     app.text_input(key="mol_ranges").set_value("404.5:405.5")
-    app.button(label="Analyze molecular spectrum").click().run()
+    next(button for button in app.button if button.label == "Analyze molecular spectrum").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Molecular spectrum feature analysis completed" in str(item.value) for item in app.success)
     result = app.session_state["tis_molecular_spectrum_result"]["result"]
