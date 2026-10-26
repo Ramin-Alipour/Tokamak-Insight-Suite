@@ -11,9 +11,14 @@ def _open_mirnov():
     app.session_state["tis_df"] = pd.DataFrame({"time_s": t, "mirnov_V": np.sin(2 * np.pi * 1250 * t)})
     app.run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    app.radio(key="workspace_page").set_value("Spectral Analysis").run()
+    app.session_state["workspace_page"] = "Spectral Analysis"
+    app.run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    workflow = next(radio for radio in app.radio if "Mirnov / pickup coils" in radio.options)
+    workflow = next(
+        (radio for radio in app.radio if "Mirnov / pickup coils" in radio.options),
+        None,
+    )
+    assert workflow is not None, "Mirnov workflow selector was not rendered."
     workflow.set_value("Mirnov / pickup coils").run()
     assert not app.exception, [str(x.value) for x in app.exception]
     return app
