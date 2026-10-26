@@ -4,7 +4,12 @@ import numpy as np
 
 def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float,
         signal_kind: str = "field", signal_uncertainty=None,
-        calibration_uncertainty_T_per_unit: float = 0.0, baseline=None):
+        calibration_uncertainty_T_per_unit: float = 0.0, baseline=None,
+        pickup_voltage_V=None, pickup_sensitivity_V_per_T_per_s=None,
+        initial_field_T=None, pickup_voltage_baseline_V: float = 0.0,
+        pickup_voltage_uncertainty_V=None,
+        pickup_sensitivity_uncertainty_V_per_T_per_s: float = 0.0,
+        initial_field_uncertainty_T: float = 0.0):
     """Convert calibrated coil signal samples to toroidal field and report quality metrics.
 
     Voltage input is converted only by the explicit T/V coefficient; no integration
@@ -48,6 +53,26 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
         out["B_toroidal_uncertainty_T"] = np.sqrt((k*sx)**2 + (corrected*sk)**2)
     elif sk > 0:
         out["B_toroidal_uncertainty_T"] = np.abs(corrected)*sk
+    if pickup_voltage_V is not None:
+        if pickup_sensitivity_V_per_T_per_s is None or initial_field_T is None:
+            raise ValueError(
+                "pickup_sensitivity_V_per_T_per_s and initial_field_T are required "
+                "when pickup_voltage_V is supplied"
+            )
+        integrated = integrate_pickup_coil_voltage(
+            t, pickup_voltage_V,
+            sensitivity_V_per_T_per_s=pickup_sensitivity_V_per_T_per_s,
+            initial_field_T=initial_field_T,
+            voltage_baseline_V=pickup_voltage_baseline_V,
+            voltage_uncertainty_V=pickup_voltage_uncertainty_V,
+            sensitivity_uncertainty_V_per_T_per_s=pickup_sensitivity_uncertainty_V_per_T_per_s,
+            initial_field_uncertainty_T=initial_field_uncertainty_T,
+        )
+        out["pickup_voltage_integration"] = integrated
+        out["B_toroidal_integrated_T"] = integrated["B_toroidal_T"]
+        out["delta_B_T"] = integrated["delta_B_T"]
+        out["dB_dt_T_s"] = integrated["dB_dt_T_s"]
+        out["B_toroidal_integrated_uncertainty_T"] = integrated.get("B_toroidal_uncertainty_T")
     return out
 
 
