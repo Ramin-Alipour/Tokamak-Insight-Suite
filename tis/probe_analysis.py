@@ -178,7 +178,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     if electron_fit_range is not None:
         if min(electron_fit_range) < min(v) or max(electron_fit_range) > max(v):
             raise ValueError(
-                f"electron_fit_range must lie inside the measured voltage range "
+                f"electron_fit_range must overlap and lie inside the measured voltage range "
                 f"[{min(v):g}, {max(v):g}] V."
             )
         m = (v >= min(electron_fit_range)) & (v <= max(electron_fit_range))
