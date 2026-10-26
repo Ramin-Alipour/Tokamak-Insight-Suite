@@ -1,8 +1,10 @@
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
 
 
 def test_flux_loop_workflow_is_available_and_renders_without_data():
-    app = AppTest.from_file("app.py", default_timeout=120).run()
+    app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"), default_timeout=120).run()
     assert not app.exception
 
     app.radio(key="workspace_page").set_value("Advanced Analysis").run()
