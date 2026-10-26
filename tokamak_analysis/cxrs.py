@@ -160,6 +160,18 @@ def analyze_cxrs_line(
     covariance_diagonal = np.diag(pcov)
     if np.any(covariance_diagonal < 0):
         raise ValueError("CXRS line fit covariance has negative parameter variances")
+    # A covariance matrix must be symmetric positive semidefinite. Finite,
+    # full-rank matrices with positive diagonal can still be physically invalid
+    # (for example, a malformed optimizer result with an indefinite matrix).
+    covariance_scale = max(1.0, float(np.max(np.abs(pcov))))
+    if not np.allclose(pcov, pcov.T, rtol=1e-10, atol=1e-12 * covariance_scale):
+        raise ValueError("CXRS line fit covariance is not symmetric")
+    try:
+        covariance_eigenvalues = np.linalg.eigvalsh((pcov + pcov.T) / 2.0)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("CXRS line fit covariance validity could not be determined") from exc
+    if np.min(covariance_eigenvalues) < -1e-10 * covariance_scale:
+        raise ValueError("CXRS line fit covariance is not positive semidefinite")
     amp, center, observed_sigma, intercept, slope = map(float, popt)
     # Do not report a quantitative Doppler width when the sampled line profile
     # is under-resolved. Three samples across the fitted FWHM is a conservative
