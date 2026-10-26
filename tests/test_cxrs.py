@@ -131,3 +131,16 @@ def test_rejects_finite_but_rank_deficient_covariance(monkeypatch):
             x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
             instrument_sigma_nm=0.008,
         )
+
+
+def test_rejects_under_resolved_line_profile():
+    # The intrinsic width is not meaningfully sampled on this coarse axis.
+    x = np.linspace(529.8, 530.2, 15)
+    center = 530.0 * (1 + 2.5e4 / 299792458.0)
+    sigma_observed = np.hypot(0.025, 0.008)
+    y = 120 * np.exp(-0.5 * ((x-center)/sigma_observed)**2) + 4
+    with pytest.raises(ValueError, match="under-resolved by wavelength sampling"):
+        analyze_cxrs_line(
+            x, y, rest_wavelength_nm=530.0, ion_mass_amu=12,
+            instrument_sigma_nm=0.008,
+        )
