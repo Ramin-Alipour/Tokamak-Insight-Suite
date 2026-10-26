@@ -1588,7 +1588,7 @@ elif page=='Plasma Parameters':
 
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
-    st.warning('This page analyzes a supplied equilibrium flux grid. It does not solve the Grad–Shafranov equation or replace EFIT / a validated equilibrium reconstruction code.')
+    st.warning('The supplied-grid tools derive magnetic fields from an existing flux grid. The optional Grad–Shafranov solver below solves only the prescribed-boundary/profile problem and is not a full EFIT replacement.')
     st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
     st.caption('This finite-difference solver does not replace EFIT. Upload R and Z coordinate vectors, a boundary-flux grid shaped (len(Z), len(R)), and three profile CSV vectors: normalized flux, p\'(ψ), and F F\'(ψ).')
     with st.form('grad_shafranov_form'):
