@@ -13,7 +13,7 @@ For a Maxwellian ion distribution and Gaussian broadening,
 `sigma_D^2 = sigma_obs^2 - sigma_inst^2` and
 `T_i[eV] = (m_i c^2/e) (sigma_D/lambda_0)^2`.
 
-All wavelengths and widths use nm consistently in the ratios. The ion mass is supplied in atomic mass units and converted to kg. The code rejects unresolved widths where observed sigma does not exceed the instrumental sigma.
+All wavelengths and widths use nm consistently in the ratios. The ion mass is supplied in atomic mass units and converted to kg. The code rejects unresolved widths where observed sigma does not exceed the instrumental sigma. It also withholds quantitative Ti/velocity results if the fitted line FWHM spans fewer than three median wavelength-sample intervals; this is a conservative sampling gate, not proof of instrument resolution or scientific validity.
 
 ## Inputs
 
