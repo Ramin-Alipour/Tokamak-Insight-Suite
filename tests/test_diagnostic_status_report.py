@@ -31,8 +31,8 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     }
     assert report["diagnostic_completeness_counts"] == {
         "complete": 7,
-        "complete_with_declared_scope": 4,
-        "incomplete": 69,
+        "complete_with_declared_scope": 5,
+        "incomplete": 68,
     }
     assert report["callable_analysis_entry_point_count"] == 81
     assert sum(report["callable_analysis_completeness_counts"].values()) == 81
