@@ -96,8 +96,10 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
         source = -MU0 * R[None, :]**2 * np.interp(psin, prof, pp, left=pp[0], right=pp[-1]) - np.interp(psin, prof, ff, left=ff[0], right=ff[-1])
         for j in range(1, Z.size - 1):
             for i in range(1, R.size - 1):
-                rp = ar + 1 / (2 * R[i] * dr)
-                rm = ar - 1 / (2 * R[i] * dr)
+                # Δ*ψ = ψ_RR - (1/R)ψ_R + ψ_ZZ; the first-derivative
+                # term therefore reduces the right-neighbour coefficient.
+                rp = ar - 1 / (2 * R[i] * dr)
+                rm = ar + 1 / (2 * R[i] * dr)
                 candidate = (source[j, i] - rp * psi[j, i+1] - rm * psi[j, i-1] - az * (psi[j+1, i] + psi[j-1, i])) / den
                 psi[j, i] = (1 - relaxation) * psi[j, i] + relaxation * candidate
         change = float(np.max(np.abs(psi - old))) / max(float(np.max(np.abs(psi))), np.finfo(float).tiny)
