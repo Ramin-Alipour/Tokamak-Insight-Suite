@@ -32,7 +32,7 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
         "initial_field_uncertainty_T": 0.05,
     }
     next(item for item in app.text_area if item.label == "Function arguments (JSON)").set_value(json.dumps(args)).run()
-    app.button(label="Run registered analysis").click().run()
+    next(item for item in app.button if item.label == "Run registered analysis").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any(x.value == "Analysis executed." for x in app.success)
     assert any(x.label == "Export community contribution bundle (JSON)" for x in app.get("download_button"))
