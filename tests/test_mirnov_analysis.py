@@ -220,3 +220,11 @@ def test_mirnov_rejects_unhashable_detrend_mode_cleanly():
     t = np.arange(16, dtype=float) * 1e-4
     with pytest.raises(ValueError, match="detrend"):
         analyze_mirnov_signal(t, np.sin(np.arange(16.0)), detrend=[])
+
+
+def test_mirnov_rejects_unrepresentable_sampling_frequency():
+    # Strictly increasing finite timestamps can have a subnormal interval
+    # whose reciprocal overflows to infinity; reject before scipy.signal.welch.
+    t = np.arange(8, dtype=float) * 1e-320
+    with pytest.raises(ValueError, match="Sampling frequency must be finite"):
+        analyze_mirnov_signal(t, np.sin(np.arange(8.0)))
