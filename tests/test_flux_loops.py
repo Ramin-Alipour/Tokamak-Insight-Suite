@@ -14,7 +14,7 @@ def test_constant_voltage_faraday_sign_and_turns():
 
 
 def test_polarity_and_offset_correction():
-    result = analyze_flux_loop([0, 1, 2], [4, 4, 4], voltage_offset_V=1, polarity=-1)
+    result = analyze_flux_loop([0, 1, 2], [4, 4, 4], voltage_offset_V=1, polarity=-1, turns=2)
     np.testing.assert_allclose(result.voltage_V, [-3, -3, -3])
     np.testing.assert_allclose(result.flux_change_Wb, [0, 1.5, 3])
 
