@@ -141,6 +141,15 @@ def analyze_cxrs_line(
     # is undefined. Never label such a result as a completed quantitative analysis.
     if pcov.shape != (5, 5) or not np.all(np.isfinite(pcov)):
         raise ValueError("CXRS line fit covariance is singular or non-finite; uncertainties are not identifiable")
+    # Finite covariance entries are not sufficient: optimizers can return a
+    # zero or rank-deficient matrix for non-identifiable parameters. Reject
+    # these fits rather than silently reporting zero/underestimated errors.
+    try:
+        covariance_rank = int(np.linalg.matrix_rank(pcov))
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("CXRS line fit covariance rank could not be determined") from exc
+    if covariance_rank < 5:
+        raise ValueError("CXRS line fit covariance is rank-deficient; uncertainties are not identifiable")
     covariance_diagonal = np.diag(pcov)
     if np.any(covariance_diagonal < 0):
         raise ValueError("CXRS line fit covariance has negative parameter variances")
