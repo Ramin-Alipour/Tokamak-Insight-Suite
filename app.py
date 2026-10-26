@@ -852,13 +852,16 @@ elif page=='Spectral Analysis':
             rest=st.number_input('Laboratory rest wavelength (nm)',min_value=1e-9,value=530.0,format='%.10g',key='ti_doppler_rest')
             mass=st.number_input('Emitting-ion mass (amu)',min_value=1e-9,value=12.0,format='%.8g',key='ti_doppler_mass')
             inst=st.number_input('Instrument Gaussian FWHM (nm; independent calibration)',min_value=0.0,value=0.01,format='%.9g',key='ti_doppler_inst')
+            assume_inst_negligible=st.checkbox('Assume instrumental broadening is negligible (independently justified)',value=False,key='ti_doppler_inst_negligible')
         with c2:
             inst_unc=st.number_input('Instrument FWHM uncertainty (nm; 1σ)',min_value=0.0,value=0.0,format='%.9g',key='ti_doppler_inst_unc')
             sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='ti_doppler_sigma')
-        _signature={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'sigma_col':sigma_col}
+        _signature={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'assume_inst_negligible':bool(assume_inst_negligible),'sigma_col':sigma_col}
         if st.button('Calculate ion temperature from Doppler width',type='primary',key='ti_doppler_run'):
             st.session_state.pop('tis_doppler_ti_result',None)
             try:
+                if inst == 0 and not assume_inst_negligible:
+                    raise ValueError('Enter the independently calibrated instrument FWHM, or explicitly justify the negligible-instrument-width assumption.')
                 _spec=pd.DataFrame({'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),'intensity':pd.to_numeric(df[ycol],errors='coerce')})
                 if sigma_col!='<none>':
                     _spec['uncertainty']=pd.to_numeric(df[sigma_col],errors='coerce')
