@@ -698,32 +698,47 @@ elif page=='Time Series & MHD':
         if st.button('Fit supplied phases',key='fit_manual_mode'):
             try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')],convention=mode_conv))
             except Exception as e: st.error(str(e))
-    st.markdown('### Calibrated signal integration')
-    st.caption('Useful for derivative-type diagnostics such as pickup coils or Rogowski signals only when the sensor scale, offset/baseline, bandwidth and initial condition are known. The software does not infer these calibrations.')
-    int_scale=st.number_input('Integration input scale',value=1.0,format='%.8g',key='int_scale')
-    int_initial=st.number_input('Integrated initial value',value=0.0,format='%.8g',key='int_initial')
-    use_baseline=st.checkbox('Subtract mean over a baseline interval',value=False,key='int_use_baseline')
-    if use_baseline:
-        tmin=float(np.min(t)); tmax=float(np.max(t))
-        b1,b2=st.columns(2)
-        with b1: baseline_start=st.number_input('Baseline start (s)',value=tmin, min_value=tmin, max_value=tmax, key='int_baseline_start')
-        with b2: baseline_end=st.number_input('Baseline end (s)',value=min(tmin+(tmax-tmin)*0.1,tmax), min_value=tmin, max_value=tmax, key='int_baseline_end')
-    else:
-        baseline_start=baseline_end=None
-    drift_start=drift_end=None
-    if use_baseline and st.checkbox('Also remove linear drift using a post-event quiet window',value=False,key='int_use_drift'):
-        d1,d2=st.columns(2)
-        with d1: drift_start=st.number_input('Post window start (s)',value=max(tmin,tmax-(tmax-tmin)*0.1),min_value=tmin,max_value=tmax,key='int_drift_start')
-        with d2: drift_end=st.number_input('Post window end (s)',value=tmax,min_value=tmin,max_value=tmax,key='int_drift_end')
-        st.caption('Assumes the true signal is ≈0 in both windows, so any difference of their means is instrument drift (linear in time).')
-    if st.button('Integrate calibrated signal'):
+    st.markdown('### Calibrated signal integration / Rogowski current')
+    st.caption('Choose the hardware-chain mode explicitly. The software cannot infer sensor calibration, transfer function, saturation or bandwidth.')
+    acquisition_mode=st.radio('Signal acquisition mode',['Derivative output (signal ∝ dIp/dt; integrate once)','External integrator output (signal ∝ Ip; do not integrate)'],key='rogowski_acquisition_mode')
+    int_scale=st.number_input('Calibration scale for selected mode',value=1.0,format='%.8g',key='int_scale')
+    int_initial=st.number_input('Initial plasma current (A; derivative-output mode only)',value=0.0,format='%.8g',key='int_initial')
+    use_baseline=False
+    baseline_start=baseline_end=drift_start=drift_end=None
+    if acquisition_mode.startswith('Derivative output'):
+        use_baseline=st.checkbox('Subtract mean over a pre-shot baseline interval',value=False,key='int_use_baseline')
+        if use_baseline:
+            tmin=float(np.min(t)); tmax=float(np.max(t))
+            b1,b2=st.columns(2)
+            with b1: baseline_start=st.number_input('Baseline start (s)',value=tmin,min_value=tmin,max_value=tmax,key='int_baseline_start')
+            with b2: baseline_end=st.number_input('Baseline end (s)',value=min(tmin+(tmax-tmin)*0.1,tmax),min_value=tmin,max_value=tmax,key='int_baseline_end')
+        if use_baseline and st.checkbox('Also remove linear drift using a post-event quiet window',value=False,key='int_use_drift'):
+            d1,d2=st.columns(2)
+            with d1: drift_start=st.number_input('Post window start (s)',value=max(tmin,tmax-(tmax-tmin)*0.1),min_value=tmin,max_value=tmax,key='int_drift_start')
+            with d2: drift_end=st.number_input('Post window end (s)',value=tmax,min_value=tmin,max_value=tmax,key='int_drift_end')
+            st.caption('Drift correction assumes the true signal is approximately zero in both selected windows.')
+    if st.button('Analyze Rogowski / calibrated current trace'):
         try:
-            integrated=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
-            st.json({k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}})
-            plot_line(t,integrated['integrated_signal'],'Time (s)','Integrated signal','Cumulative calibrated integral')
-            out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':integrated['calibrated_signal'],'integrated_signal':integrated['integrated_signal']})
-            download_df('Download integrated series',out,'tis_integrated_timeseries.csv')
-            json_download('Export integration manifest',{k:v for k,v in integrated.items() if k not in {'time_s','calibrated_signal','integrated_signal'}},'tis_integration_manifest.json')
+            if acquisition_mode.startswith('Derivative output'):
+                result=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
+                current=np.asarray(result['integrated_signal'],dtype=float)
+                corrected=np.asarray(result['calibrated_signal'],dtype=float)
+                metadata={k:v for k,v in result.items() if k not in {'time_s','calibrated_signal','integrated_signal'}}
+                metadata.update({'diagnostic':'Rogowski coil','acquisition_mode':'derivative_output','current_unit':'A','calibration_scale':float(int_scale),'initial_current_A':float(int_initial),'integration_method':'cumulative trapezoidal rule'})
+            else:
+                if not np.isfinite(int_scale) or int_scale == 0:
+                    raise ValueError('Calibration scale must be finite and nonzero.')
+                corrected=np.asarray(y,dtype=float)*float(int_scale)
+                current=corrected.copy()
+                metadata={'diagnostic':'Rogowski coil','acquisition_mode':'integrator_output','current_unit':'A','calibration_scale':float(int_scale),'integration_applied':False,'note':'Input is treated as an already-integrated, calibrated current signal; no second integration was applied.'}
+            if not np.all(np.isfinite(current)):
+                raise ValueError('Current reconstruction contains non-finite values.')
+            metadata.update({'n_samples':int(len(t)),'duration_s':float(t[-1]-t[0]),'median_dt_s':float(np.median(np.diff(t)))})
+            st.json(metadata)
+            plot_line(t,current,'Time (s)','Plasma current (A)','Rogowski-derived plasma current')
+            out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':corrected,'plasma_current_A':current})
+            download_df('Download Rogowski current series',out,'tis_rogowski_current.csv')
+            json_download('Export Rogowski analysis manifest',metadata,'tis_rogowski_manifest.json')
         except Exception as e: st.error(str(e))
 
 elif page=='Events & Transients':
