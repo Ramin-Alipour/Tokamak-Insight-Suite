@@ -41,6 +41,7 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
         payload = buffer.getvalue().encode("utf-8")
         return UploadedFile(
             record=UploadedFileRec(file_id=name, name=name, type="text/csv", data=payload),
+            file_urls=None,
         )
 
     R = np.linspace(1.0, 2.0, 5)
