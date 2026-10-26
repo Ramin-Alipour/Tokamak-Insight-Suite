@@ -34,6 +34,6 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any(x.value == "Analysis executed." for x in app.success)
     assert any(x.label == "Export community contribution bundle (JSON)" for x in app.get("download_button"))
-    rendered = "\\n".join(str(x.value) for x in app.get("json") + app.get("markdown"))
+    rendered = "\n".join(str(x.value) for x in app.get("json") + app.get("markdown"))
     assert "B_toroidal_T" in rendered
     assert "B_toroidal_integrated_T" in rendered
