@@ -5,7 +5,7 @@ from streamlit.testing.v1 import AppTest
 
 
 def _open_ece():
-    app = AppTest.from_file("app.py", default_timeout=120).run()
+    app = AppTest.from_file("../app.py", default_timeout=120).run()
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Advanced Analysis").run()
     assert not app.exception, [str(x.value) for x in app.exception]
