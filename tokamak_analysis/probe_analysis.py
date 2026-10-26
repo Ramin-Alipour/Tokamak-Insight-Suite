@@ -84,7 +84,7 @@ def analyze_probe_voltage_current(voltage_V, current_A, *, electron_fit_range=No
                 return baseline + amplitude * np.exp(slope * (voltage - lo))
 
             try:
-                params, _ = curve_fit(
+                params, covariance = curve_fit(
                     exponential_branch, x, current,
                     p0=(baseline0 - amplitude0 * 0.05, amplitude0, slope0),
                     bounds=([-np.inf, 0.0, np.finfo(float).eps],
@@ -97,12 +97,22 @@ def analyze_probe_voltage_current(voltage_V, current_A, *, electron_fit_range=No
                 ss_res = float(np.sum(residual ** 2))
                 ss_tot = float(np.sum((current - np.mean(current)) ** 2))
                 r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else (1.0 if ss_res == 0 else 0.0)
-                out["electron_temperature_estimate_eV"] = float(1.0 / slope)
+                temperature = 1.0 / slope
+                out["electron_temperature_estimate_eV"] = float(temperature)
                 out["electron_fit_status"] = "ok"
                 out["electron_fit_slope_per_V"] = slope
+                # Local covariance uncertainty is conditional on this empirical
+                # three-parameter model and selected voltage interval; it is not
+                # a complete experimental uncertainty budget.
+                slope_variance = float(covariance[2, 2])
+                slope_standard_error = (float(np.sqrt(slope_variance)) if np.isfinite(slope_variance) and slope_variance >= 0 else None)
+                out["electron_fit_slope_standard_error_per_V"] = slope_standard_error
+                out["electron_temperature_standard_uncertainty_eV"] = (float(slope_standard_error / (slope * slope)) if slope_standard_error is not None else None)
                 out["electron_fit_intercept"] = float(np.log(amplitude) - slope * lo)
                 out["electron_fit_baseline_A"] = baseline
                 out["electron_fit_r_squared"] = float(r_squared)
+                out["electron_fit_residual_rms_A"] = float(np.sqrt(np.mean(residual ** 2)))
+                out["electron_fit_quality"] = "strong_empirical_fit" if r_squared >= 0.95 else "weak_empirical_fit"
                 out["electron_current_used_A"] = current - baseline
                 out["electron_fit_note"] = (
                     "Nonlinear exponential fit with a free current offset over the selected interval. "
