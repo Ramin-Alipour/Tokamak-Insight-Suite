@@ -46,6 +46,7 @@ def test_cxrs_dashboard_fits_line_reports_physics_and_exports():
     app.button(label="Analyze CXRS line").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     result = app.session_state["tis_cxrs_result"]["result"]
+    assert any("CXRS line-profile analysis completed" in str(item.value) for item in app.success)
     assert result["wavelength_center_nm"] == pytest.approx(expected_center, abs=2e-5)
     assert result["line_of_sight_velocity_m_s"] == pytest.approx(2.5e4, abs=15)
     assert result["ion_temperature_eV"] > 0
