@@ -58,4 +58,4 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
     next(item for item in app.button if item.label == "Solve Grad–Shafranov equilibrium").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Converged" in str(item.value) for item in app.metric)
-    assert any("tis_grad_shafranov_equilibrium.csv" in str(item.value) for item in app.get("download_button"))
+    assert any(item.label == "Download Grad–Shafranov solution grid" for item in app.get("download_button"))
