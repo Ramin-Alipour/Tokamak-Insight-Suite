@@ -1863,7 +1863,7 @@ elif page=='Advanced Analysis':
                     return value
                 result=fn(**{k:resolve_value(v) for k,v in args.items()})
                 st.success('Analysis executed.')
-                st.write(result)
+                st.json(result)
                 if selected_id == 1 and isinstance(result, dict) and {'radius_m', 'density_m3', 'temperature_eV'} <= set(result):
                     profile_frame = pd.DataFrame({'Radius (m)': result['radius_m'], 'Electron density (m^-3)': result['density_m3'], 'Electron temperature (eV)': result['temperature_eV']})
                     st.markdown('**Electron-density profile**')
