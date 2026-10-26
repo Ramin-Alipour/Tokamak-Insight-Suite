@@ -916,6 +916,8 @@ elif page=='Spectral Analysis':
             viewing_angle=st.number_input('Viewing angle metadata (rad; no deprojection)',min_value=0.0,max_value=float(np.pi),value=0.0,format='%.8g',key='cxrs_viewing_angle')
             sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='cxrs_sigma')
         if st.button('Analyze CXRS line'):
+            # Never leave a previous successful result visible if a new attempt fails.
+            st.session_state.pop('tis_cxrs_result', None)
             try:
                 _spec=pd.DataFrame({'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),'signal':pd.to_numeric(df[ycol],errors='coerce')}).dropna()
                 if sigma_col!='<none>':
