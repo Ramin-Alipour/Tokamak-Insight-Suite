@@ -1342,7 +1342,9 @@ elif page=='Plasma Parameters':
                     if st.button('Analyze ECE fluctuations / PSD',type='primary',key='ece_run_fluctuations'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
                             raise ValueError('Select exactly one signal column per channel frequency.')
-                        ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce').dropna()
+                        ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce')
+                        if ece_frame.isna().any().any():
+                            raise ValueError('ECE time and selected channel columns must be numeric and complete. Missing/non-numeric samples are not dropped because doing so can corrupt the timebase and FFT spectrum; clean or explicitly resample the data first.')
                         ece_t=ece_frame[ece_time_col].to_numpy(dtype=float)
                         ece_y=ece_frame[ece_signal_cols].to_numpy(dtype=float)
                         ece_kwargs={'noise_std':ece_noise} if ece_noise>0 else {}
