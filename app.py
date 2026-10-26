@@ -1211,12 +1211,13 @@ elif page=='Probe Analysis':
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     voltage_values=pd.to_numeric(df[vcol],errors='coerce').to_numpy(dtype=float)
     current_values=pd.to_numeric(df[icol],errors='coerce').to_numpy(dtype=float)
-    finite_voltage=voltage_values[np.isfinite(voltage_values)]
     finite_pairs=np.isfinite(voltage_values)&np.isfinite(current_values)
-    if finite_voltage.size == 0 or np.unique(finite_voltage).size < 8 or np.count_nonzero(finite_pairs) < 8:
-        st.error('The selected columns need at least eight finite paired samples and eight distinct finite voltage values before Langmuir analysis can run.')
+    paired_voltage=voltage_values[finite_pairs]
+    distinct_paired_voltage=np.unique(paired_voltage)
+    if np.count_nonzero(finite_pairs) < 8 or distinct_paired_voltage.size < 8:
+        st.error('The selected columns need at least eight finite paired samples and eight distinct voltage values among those pairs before Langmuir analysis can run.')
         st.stop()
-    vmin=float(np.min(finite_voltage)); vmax=float(np.max(finite_voltage))
+    vmin=float(np.min(paired_voltage)); vmax=float(np.max(paired_voltage))
     st.markdown('### Fit-window and probe geometry')
     st.caption('Fit windows are experiment-specific and are not inferred automatically. Enable each fit only after selecting a physically justified interval from the measured I–V curve. Default analysis reports descriptive quantities only.')
     efit=None
