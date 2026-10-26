@@ -14,6 +14,7 @@ from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, 
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectrum
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
+from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
@@ -806,8 +807,54 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='Thomson spectral distribution':
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Mirnov / pickup coils','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='Mirnov / pickup coils':
+        st.caption('Analyze calibrated Mirnov voltage versus time: signal statistics, Welch PSD, in-band peak candidates, optional ideal Faraday-law dB/dt and relative perturbation integration. Instrument transfer functions and absolute-field calibration are not inferred.')
+        numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        if len(numeric_cols)<2:
+            st.warning('Upload a table with a numeric time column and at least one numeric Mirnov voltage column.')
+        else:
+            tc=col_select('Time column (s)',''+numeric_cols[0:1]+numeric_cols[1:], 'mirnov_time')
+            vc=st.selectbox('Mirnov voltage column (V)',[c for c in numeric_cols if c!=tc],key='mirnov_voltage')
+            c1,c2,c3=st.columns(3)
+            with c1: detrend_mode=st.selectbox('Detrending',['constant','linear','none'],key='mirnov_detrend')
+            with c2: seg=st.number_input('Welch segment length (samples)',min_value=8,max_value=max(8,int(len(df))),value=min(1024,max(8,int(len(df)))),step=1,key='mirnov_nperseg')
+            with c3: prominence=st.number_input('Peak threshold fraction',min_value=0.0,max_value=1.0,value=0.01,step=0.01,key='mirnov_prominence')
+            use_geometry=st.checkbox('Estimate ideal dB/dt using coil geometry',key='mirnov_geometry')
+            if use_geometry:
+                g1,g2=st.columns(2)
+                with g1: area=st.number_input('Effective coil area (m²)',min_value=1e-15,value=1e-4,format='%.8g',key='mirnov_area')
+                with g2: turns=st.number_input('Coil turns',min_value=1,value=10,step=1,key='mirnov_turns')
+            integrate=st.checkbox('Integrate voltage to relative magnetic perturbation',key='mirnov_integrate')
+            if integrate:
+                i1,i2,i3=st.columns(3)
+                with i1: baseline=st.number_input('Baseline voltage (V)',value=0.0,format='%.8g',key='mirnov_baseline')
+                with i2: initial_db=st.number_input('Initial relative δB (T)',value=0.0,format='%.8g',key='mirnov_initial_db')
+                with i3: polarity=st.selectbox('Polarity sign',[-1,1],index=0,key='mirnov_polarity')
+            if st.button('Analyze Mirnov signal',type='primary',key='mirnov_analyze'):
+                try:
+                    tt=pd.to_numeric(df[tc],errors='coerce').to_numpy(dtype=float)
+                    vv=pd.to_numeric(df[vc],errors='coerce').to_numpy(dtype=float)
+                    result=analyze_mirnov_signal(tt,vv,detrend=detrend_mode,nperseg=int(seg),peak_prominence_fraction=float(prominence),**({'coil_area_m2':float(area),'turns':int(turns)} if use_geometry else {}))
+                    st.success('Mirnov signal analysis completed within the declared numerical scope.')
+                    m1,m2,m3,m4=st.columns(4)
+                    m1.metric('Sampling frequency',f"{result['sampling_frequency_Hz']:.6g} Hz")
+                    m2.metric('Nyquist frequency',f"{result['nyquist_frequency_Hz']:.6g} Hz")
+                    m3.metric('AC RMS',f"{result['ac_rms_voltage_V']:.6g} V")
+                    m4.metric('Peak-to-peak',f"{result['peak_to_peak_voltage_V']:.6g} V")
+                    st.dataframe(pd.DataFrame({'Frequency (Hz)':result['frequency_Hz'],'PSD (V²/Hz)':result['power_spectral_density_V2_per_Hz']}),use_container_width=True)
+                    if len(result['dominant_peaks_Hz']): st.dataframe(pd.DataFrame({'Peak frequency (Hz)':result['dominant_peaks_Hz'],'Peak PSD (V²/Hz)':result['dominant_peak_psd_V2_per_Hz']}),use_container_width=True)
+                    else: st.info('No local spectral peaks passed the selected in-band threshold.')
+                    if integrate:
+                        result['relative_magnetic_perturbation']=magnetic_perturbation_from_mirnov_voltage(tt,vv,int(turns) if use_geometry else 1,float(area) if use_geometry else 1.0,initial_delta_B_T=float(initial_db),baseline_voltage_V=float(baseline),polarity_sign=int(polarity)) if use_geometry else {'error':'Integration requires the coil geometry option; select it and provide area and turns.'}
+                    st.json({k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in result.items() if k not in {'time_s','voltage_V','frequency_Hz','power_spectral_density','power_spectral_density_V2_per_Hz','dominant_peaks_Hz','dominant_peak_psd_V2_per_Hz','approx_Bdot_T_s','approx_Bdot_detrended_T_s'}})
+                    if integrate and use_geometry:
+                        br=result['relative_magnetic_perturbation']
+                        st.line_chart(pd.DataFrame({'δB (T)':br['delta_B_T']},index=br['time_s']))
+                    json_download('Export Mirnov analysis JSON',result,'tis_mirnov_analysis.json')
+                    add_report_section('Mirnov / pickup-coil analysis',result)
+                except Exception as e: st.error(f'Mirnov analysis failed: {e}')
+    elif mode=='Thomson spectral distribution':
         st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
         xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
         ycol=col_select('Thomson spectral signal',numeric,'tsd_y')
