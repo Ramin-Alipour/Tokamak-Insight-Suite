@@ -814,7 +814,7 @@ elif page=='Spectral Analysis':
         if len(numeric_cols)<2:
             st.warning('Upload a table with a numeric time column and at least one numeric Mirnov voltage column.')
         else:
-            tc=col_select('Time column (s)',''+numeric_cols[0:1]+numeric_cols[1:], 'mirnov_time')
+            tc=st.selectbox('Time column (s)',numeric_cols,key='mirnov_time')
             vc=st.selectbox('Mirnov voltage column (V)',[c for c in numeric_cols if c!=tc],key='mirnov_voltage')
             c1,c2,c3=st.columns(3)
             with c1: detrend_mode=st.selectbox('Detrending',['constant','linear','none'],key='mirnov_detrend')
@@ -825,8 +825,9 @@ elif page=='Spectral Analysis':
                 g1,g2=st.columns(2)
                 with g1: area=st.number_input('Effective coil area (m²)',min_value=1e-15,value=1e-4,format='%.8g',key='mirnov_area')
                 with g2: turns=st.number_input('Coil turns',min_value=1,value=10,step=1,key='mirnov_turns')
-            integrate=st.checkbox('Integrate voltage to relative magnetic perturbation',key='mirnov_integrate')
-            if integrate:
+            integrate=st.checkbox('Integrate voltage to relative magnetic perturbation (requires coil geometry)',key='mirnov_integrate')
+            if integrate and not use_geometry: st.warning('Select “Estimate ideal dB/dt using coil geometry” to enable physically scaled integration.')
+            if integrate and use_geometry:
                 i1,i2,i3=st.columns(3)
                 with i1: baseline=st.number_input('Baseline voltage (V)',value=0.0,format='%.8g',key='mirnov_baseline')
                 with i2: initial_db=st.number_input('Initial relative δB (T)',value=0.0,format='%.8g',key='mirnov_initial_db')
@@ -845,8 +846,8 @@ elif page=='Spectral Analysis':
                     st.dataframe(pd.DataFrame({'Frequency (Hz)':result['frequency_Hz'],'PSD (V²/Hz)':result['power_spectral_density_V2_per_Hz']}),use_container_width=True)
                     if len(result['dominant_peaks_Hz']): st.dataframe(pd.DataFrame({'Peak frequency (Hz)':result['dominant_peaks_Hz'],'Peak PSD (V²/Hz)':result['dominant_peak_psd_V2_per_Hz']}),use_container_width=True)
                     else: st.info('No local spectral peaks passed the selected in-band threshold.')
-                    if integrate:
-                        result['relative_magnetic_perturbation']=magnetic_perturbation_from_mirnov_voltage(tt,vv,int(turns) if use_geometry else 1,float(area) if use_geometry else 1.0,initial_delta_B_T=float(initial_db),baseline_voltage_V=float(baseline),polarity_sign=int(polarity)) if use_geometry else {'error':'Integration requires the coil geometry option; select it and provide area and turns.'}
+                    if integrate and use_geometry:
+                        result['relative_magnetic_perturbation']=magnetic_perturbation_from_mirnov_voltage(tt,vv,int(turns),float(area),initial_delta_B_T=float(initial_db),baseline_voltage_V=float(baseline),polarity_sign=int(polarity))
                     st.json({k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in result.items() if k not in {'time_s','voltage_V','frequency_Hz','power_spectral_density','power_spectral_density_V2_per_Hz','dominant_peaks_Hz','dominant_peak_psd_V2_per_Hz','approx_Bdot_T_s','approx_Bdot_detrended_T_s'}})
                     if integrate and use_geometry:
                         br=result['relative_magnetic_perturbation']
