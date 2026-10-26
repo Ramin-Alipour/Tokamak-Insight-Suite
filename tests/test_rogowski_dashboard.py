@@ -40,7 +40,7 @@ def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
     rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
     assert "derivative_output" in rendered
     assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
-    assert "plasma current" in rendered.lower()
+    assert "rogowski coil" in rendered.lower()
     assert any(item.label == "Download Rogowski current series" for item in app.get("download_button"))
     assert any(item.label == "Export Rogowski analysis manifest" for item in app.get("download_button"))
 
