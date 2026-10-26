@@ -57,8 +57,8 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
     app = AppTest.from_file(APP_PATH, default_timeout=90).run()
     app.radio(key="workspace_page").set_value("Equilibrium & Reconstruction").run()
     for key, value in files.items():
-        app.get("file_uploader").key(key).set_value(value)
-    app.button(key="grad_shafranov_form-Solve Grad–Shafranov equilibrium").click().run()
+        next(item for item in app.get("file_uploader") if item.key == key).set_value(value)
+    next(item for item in app.button if item.label == "Solve Grad–Shafranov equilibrium").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Converged" in str(item.value) for item in app.metric)
     assert any("tis_grad_shafranov_equilibrium.csv" in str(item.value) for item in app.get("download_button"))
