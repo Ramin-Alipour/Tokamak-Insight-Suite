@@ -77,3 +77,19 @@ def test_cxrs_dashboard_rejects_nonpositive_sample_uncertainty():
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("finite positive values" in str(item.value) for item in app.error)
     assert "tis_cxrs_result" not in app.session_state
+
+
+def test_cxrs_dashboard_failed_rerun_clears_previous_successful_result():
+    app, _ = _cxrs_app()
+    app.button(label="Analyze CXRS line").click().run()
+    assert "tis_cxrs_result" in app.session_state
+
+    # Keep the same selected columns and settings but make the next fit invalid.
+    frame = app.session_state["tis_df"].copy()
+    frame["cxrs_signal"] = 0.0
+    app.session_state["tis_df"] = frame
+    app.button(label="Analyze CXRS line").click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("positive emission feature" in str(item.value) for item in app.error)
+    assert "tis_cxrs_result" not in app.session_state
