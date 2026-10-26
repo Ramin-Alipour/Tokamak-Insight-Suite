@@ -33,14 +33,15 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
     import io
 
     import numpy as np
-    from streamlit.runtime.uploaded_file_manager import UploadedFile
+    from streamlit.runtime.uploaded_file_manager import UploadedFile, UploadedFileRec
 
     def upload(name, values):
         buffer = io.StringIO()
         np.savetxt(buffer, np.asarray(values, dtype=float), delimiter=",")
+        payload = buffer.getvalue().encode("utf-8")
         return UploadedFile(
-            record={"file_id": name, "name": name, "type": "text/csv", "size": len(buffer.getvalue())},
-            file=io.BytesIO(buffer.getvalue().encode("utf-8")),
+            record=UploadedFileRec(file_id=name, name=name, type="text/csv", size=len(payload)),
+            file=io.BytesIO(payload),
         )
 
     R = np.linspace(1.0, 2.0, 5)
