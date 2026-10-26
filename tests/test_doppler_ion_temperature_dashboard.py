@@ -86,3 +86,11 @@ def test_doppler_dashboard_hides_stale_result_after_parameter_change():
     app.number_input(key="ti_doppler_mass").set_value(16.0).run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert not any("Doppler ion-temperature analysis completed" in str(item.value) for item in app.success)
+
+def test_doppler_dashboard_requires_instrument_calibration_or_explicit_negligible_assumption():
+    app, _ = _app()
+    app.number_input(key="ti_doppler_inst").set_value(0.0)
+    app.button(key="ti_doppler_run").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("independently calibrated" in str(item.value) for item in app.error)
+    assert "tis_doppler_ti_result" not in app.session_state
