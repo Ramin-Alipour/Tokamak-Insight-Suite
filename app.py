@@ -1634,6 +1634,47 @@ elif page=='Equilibrium & Reconstruction':
             st.warning(gs_result['warning'])
         except Exception as exc:
             st.error(f'Grad–Shafranov reconstruction failed: {exc}')
+    st.divider()
+    st.markdown('### Inverse magnetic equilibrium fit (measured data)')
+    st.caption('Upload a machine-specific JSON bundle containing calibrated response matrices, measured probe/flux-loop signals and uncertainties. No example or synthetic measurement data are substituted.')
+    st.code('Required: R_m, Z_m, basis_psi_Wb_rad; magnetic_probe_response_T_per_coefficient + magnetic_probe_values_T + magnetic_probe_sigma_T and/or flux_loop_response_Wb_rad_per_coefficient + flux_loop_values_Wb_rad + flux_loop_sigma_Wb_rad. Optional coil response matrices must be paired with known coil currents.', language='text')
+    inverse_bundle_file = st.file_uploader('Machine-calibrated inverse reconstruction bundle (JSON)', type=['json'], key='eq_inverse_bundle')
+    inverse_regularization = st.number_input('Inverse-fit regularization', min_value=0.0, value=1e-8, format='%.3g', key='eq_inverse_regularization')
+    if st.button('Fit equilibrium to magnetic measurements', type='primary', key='eq_inverse_run'):
+        try:
+            if inverse_bundle_file is None:
+                raise ValueError('Upload a machine-specific calibrated JSON bundle before running the inverse fit.')
+            inverse_bundle = json.load(inverse_bundle_file)
+            from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+            inverse_result = reconstruct_equilibrium_inverse(
+                inverse_bundle.get('R_m'), inverse_bundle.get('Z_m'), inverse_bundle.get('basis_psi_Wb_rad'),
+                magnetic_probe_response_T_per_coefficient=inverse_bundle.get('magnetic_probe_response_T_per_coefficient'),
+                magnetic_probe_values_T=inverse_bundle.get('magnetic_probe_values_T'),
+                magnetic_probe_sigma_T=inverse_bundle.get('magnetic_probe_sigma_T'),
+                flux_loop_response_Wb_rad_per_coefficient=inverse_bundle.get('flux_loop_response_Wb_rad_per_coefficient'),
+                flux_loop_values_Wb_rad=inverse_bundle.get('flux_loop_values_Wb_rad'),
+                flux_loop_sigma_Wb_rad=inverse_bundle.get('flux_loop_sigma_Wb_rad'),
+                coil_probe_response_T_per_A=inverse_bundle.get('coil_probe_response_T_per_A'),
+                coil_probe_currents_A=inverse_bundle.get('coil_probe_currents_A'),
+                coil_flux_response_Wb_rad_per_A=inverse_bundle.get('coil_flux_response_Wb_rad_per_A'),
+                coil_flux_currents_A=inverse_bundle.get('coil_flux_currents_A'),
+                regularization=float(inverse_regularization),
+            )
+            st.metric('Magnetic measurement count', inverse_result['measurement_count'])
+            st.metric('Weighted residual RMS', f"{inverse_result['weighted_residual_rms']:.4g}")
+            st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask'}})
+            inverse_grid = pd.DataFrame({
+                'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
+                'R_m': np.tile(inverse_result['R_m'], inverse_result['Z_m'].size),
+                'psi_Wb_rad': inverse_result['psi_Wb_rad'].ravel(),
+                'psi_normalized': inverse_result['psi_normalized'].ravel(),
+                'boundary_mask': inverse_result['boundary_mask'].ravel(),
+            })
+            st.dataframe(inverse_grid.head(30), use_container_width=True)
+            download_df('Download inverse equilibrium grid', inverse_grid, 'tis_inverse_equilibrium_grid.csv')
+            st.warning(inverse_result['warning'])
+        except Exception as exc:
+            st.error(f'Inverse magnetic reconstruction failed: {exc}')
     if df is not None: st.info('For grid data, upload separate arrays as CSV files below. R and Z must be physical coordinates in metres.')
     Rfile=st.file_uploader('R coordinate array CSV',type=['csv'],key='eq_R'); Zfile=st.file_uploader('Z coordinate array CSV',type=['csv'],key='eq_Z'); Pfile=st.file_uploader('Poloidal-flux grid ψ(R,Z) CSV',type=['csv'],key='eq_P')
     bt=st.number_input('Toroidal field input Bφ (T)',value=1.0)
