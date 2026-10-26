@@ -93,3 +93,26 @@ def test_cxrs_dashboard_failed_rerun_clears_previous_successful_result():
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("positive emission feature" in str(item.value) for item in app.error)
     assert "tis_cxrs_result" not in app.session_state
+
+
+def test_cxrs_dashboard_hides_stale_result_when_analysis_parameters_change():
+    app, _ = _cxrs_app()
+    app.button(label="Analyze CXRS line").click().run()
+    assert "tis_cxrs_result" in app.session_state
+    assert any("CXRS line-profile analysis completed" in str(item.value) for item in app.success)
+
+    # Changing a physics-defining input must invalidate the displayed result
+    # before the user runs the fit again.
+    app.number_input(key="cxrs_inst_sigma").set_value(0.009).run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert not any("CXRS line-profile analysis completed" in str(item.value) for item in app.success)
+
+
+def test_cxrs_dashboard_propagates_instrument_width_uncertainty():
+    app, _ = _cxrs_app()
+    app.number_input(key="cxrs_inst_sigma_unc").set_value(0.001).run()
+    app.button(label="Analyze CXRS line").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    result = app.session_state["tis_cxrs_result"]["result"]
+    assert result["instrument_sigma_uncertainty_nm"] == pytest.approx(0.001)
+    assert result["ion_temperature_uncertainty_eV"] > 0
