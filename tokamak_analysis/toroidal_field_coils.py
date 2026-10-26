@@ -12,8 +12,10 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
         initial_field_uncertainty_T: float = 0.0):
     """Convert calibrated coil signal samples to toroidal field and report quality metrics.
 
-    Voltage input is converted only by the explicit T/V coefficient; no integration
-    or coil transfer function is assumed. Geometry and absolute calibration are external.
+    The primary signal is converted using its explicit calibration coefficient.
+    Optional pickup-coil voltage is integrated only when a validated sensitivity and
+    initial-field boundary condition are supplied. Geometry and absolute calibration
+    remain external.
     """
     t, x = np.asarray(time_s, dtype=float), np.asarray(signal, dtype=float)
     if t.ndim != 1 or x.ndim != 1 or t.size != x.size or t.size < 2:
