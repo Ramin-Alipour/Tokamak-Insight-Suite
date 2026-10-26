@@ -30,7 +30,7 @@ def _cxrs_app():
     assert not app.exception, [str(error.value) for error in app.exception]
     app.radio(key="workspace_page").set_value("Spectral Analysis").run()
     assert not app.exception, [str(error.value) for error in app.exception]
-    app.radio(label="Workflow").set_value("CXRS line profile").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value("CXRS line profile").run()
     assert not app.exception, [str(error.value) for error in app.exception]
     selectors = {item.label: item for item in app.selectbox}
     selectors["Calibrated wavelength (nm)"].set_value("wavelength_nm")
