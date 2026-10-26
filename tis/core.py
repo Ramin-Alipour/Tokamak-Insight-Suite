@@ -213,6 +213,8 @@ def integrate_time_series(
         raise ValueError('Time values must be strictly increasing with no duplicates.')
     if not _is_finite_real_scalar(scale) or not _is_finite_real_scalar(initial_value):
         raise ValueError('Scale and initial value must be finite real numeric scalars.')
+    if scale == 0:
+        raise ValueError('Calibration scale must be finite and nonzero.')
     if (baseline_start_s is None) != (baseline_end_s is None):
         raise ValueError('Specify both baseline start and end, or neither.')
     if (drift_start_s is None) != (drift_end_s is None):
