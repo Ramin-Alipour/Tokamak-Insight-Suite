@@ -40,7 +40,7 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
         np.savetxt(buffer, np.asarray(values, dtype=float), delimiter=",")
         payload = buffer.getvalue().encode("utf-8")
         return UploadedFile(
-            record=UploadedFileRec(file_id=name, name=name, type="text/csv"),
+            record=UploadedFileRec(file_id=name, name=name, type="text/csv", data=payload),
             file=io.BytesIO(payload),
         )
 
