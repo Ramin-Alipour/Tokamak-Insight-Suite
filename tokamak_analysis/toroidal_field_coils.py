@@ -73,6 +73,13 @@ def analyze_toroidal_field_coil(time_s, signal, *, calibration_T_per_unit: float
         out["delta_B_T"] = integrated["delta_B_T"]
         out["dB_dt_T_s"] = integrated["dB_dt_T_s"]
         out["B_toroidal_integrated_uncertainty_T"] = integrated.get("B_toroidal_uncertainty_T")
+        # Stable registry output names retained for reports and downstream consumers.
+        out["pickup_integration_B_toroidal_T"] = integrated["B_toroidal_T"]
+        out["pickup_integration_B_uncertainty_T"] = integrated.get("B_toroidal_uncertainty_T")
+        out["limitations"] = [
+            item for item in out["limitations"]
+            if "does not integrate voltage" not in item
+        ] + integrated["limitations"]
     return out
 
 
