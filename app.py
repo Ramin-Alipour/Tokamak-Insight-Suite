@@ -937,6 +937,12 @@ elif page=='Spectral Analysis':
         _saved_cxrs=st.session_state.get('tis_cxrs_result')
         if _saved_cxrs and all(_saved_cxrs.get(k)==v for k,v in {'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'viewing_angle':float(viewing_angle),'sigma_col':sigma_col}.items()):
             _rr=_saved_cxrs['result']
+            st.success('CXRS line-profile analysis completed within the declared single-line scope.')
+            _m1, _m2, _m3, _m4 = st.columns(4)
+            _m1.metric('Ion temperature', f"{_rr['ion_temperature_eV']:.6g} ± {_rr['ion_temperature_uncertainty_eV']:.3g} eV")
+            _m2.metric('Line-of-sight velocity', f"{_rr['line_of_sight_velocity_m_s']:.6g} ± {_rr['velocity_uncertainty_m_s']:.3g} m/s")
+            _m3.metric('Fit R²', f"{_rr['fit_r_squared']:.6f}")
+            _m4.metric('Reduced χ²', f"{_rr['reduced_chi_square']:.5g}" if _rr['reduced_chi_square'] is not None else "Not calculated (no σ)")
             st.json({k:v for k,v in _rr.items() if k not in {'fitted_signal','residual'}})
             st.line_chart(pd.DataFrame({'measured':_rr['measured_signal'],'fitted':_rr['fitted_signal'],'residual':_rr['residual']},index=_rr['wavelength_nm']))
             json_download('Export CXRS line-profile result',_rr,'tis_cxrs_line_profile.json')
