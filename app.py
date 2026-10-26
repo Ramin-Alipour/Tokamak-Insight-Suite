@@ -832,12 +832,67 @@ elif page=='Spectral Analysis':
                 with i1: baseline=st.number_input('Baseline voltage (V)',value=0.0,format='%.8g',key='mirnov_baseline')
                 with i2: initial_db=st.number_input('Initial relative δB (T)',value=0.0,format='%.8g',key='mirnov_initial_db')
                 with i3: polarity=st.selectbox('Polarity sign',[-1,1],index=0,key='mirnov_polarity')
+            use_array_mode = st.checkbox('Estimate toroidal mode number from a multi-channel Mirnov array', key='mirnov_array_mode')
+            if use_array_mode:
+                array_columns = st.multiselect(
+                    'Mirnov array voltage channels (select at least 3; same voltage units)',
+                    [c for c in numeric_cols if c != tc],
+                    key='mirnov_array_channels',
+                )
+                angle_text = st.text_input(
+                    'Toroidal sensor angles in radians, in the same order as selected channels',
+                    value='',
+                    key='mirnov_array_angles',
+                    help='Enter comma-separated measured angles, e.g. 0, 1.2, 2.4. Do not use equally spaced defaults unless they match the actual coil geometry.',
+                )
+                array_nperseg = st.number_input(
+                    'Array Welch segment length (samples)', min_value=8,
+                    max_value=max(8, int(len(df))),
+                    value=min(1024, max(8, int(len(df)))),
+                    step=1, key='mirnov_array_nperseg',
+                )
+                array_reference = st.number_input(
+                    'Reference channel index (zero-based)', min_value=0, value=0,
+                    step=1, key='mirnov_array_reference',
+                )
             if st.button('Analyze Mirnov signal',type='primary',key='mirnov_analyze'):
                 try:
                     tt=pd.to_numeric(df[tc],errors='coerce').to_numpy(dtype=float)
                     vv=pd.to_numeric(df[vc],errors='coerce').to_numpy(dtype=float)
                     result=analyze_mirnov_signal(tt,vv,detrend=detrend_mode,nperseg=int(seg),peak_prominence_fraction=float(prominence),**({'coil_area_m2':float(area),'turns':int(turns)} if use_geometry else {}))
+                    if use_array_mode:
+                        if len(array_columns) < 3:
+                            raise ValueError('Select at least three distinct Mirnov array voltage channels.')
+                        try:
+                            array_angles = np.asarray([float(part.strip()) for part in angle_text.split(',') if part.strip()], dtype=float)
+                        except ValueError as exc:
+                            raise ValueError('Toroidal angles must be comma-separated finite numbers in radians.') from exc
+                        if len(array_angles) != len(array_columns):
+                            raise ValueError('The number of toroidal angles must equal the number of selected array channels.')
+                        if int(array_reference) >= len(array_columns):
+                            raise ValueError('Reference channel index must be smaller than the selected channel count.')
+                        array_signals = np.vstack([
+                            pd.to_numeric(df[column], errors='coerce').to_numpy(dtype=float)
+                            for column in array_columns
+                        ])
+                        array_result = analyze_mirnov_array(
+                            tt, array_signals, array_angles,
+                            reference_channel=int(array_reference),
+                            nperseg=int(array_nperseg),
+                        )
+                        result['array_mode_analysis'] = {
+                            key: value for key, value in array_result.items()
+                            if key not in {'frequency_Hz', 'reference_psd_V2_per_Hz'}
+                        }
                     st.success('Mirnov signal analysis completed within the declared numerical scope.')
+                    if use_array_mode:
+                        mode_result = result['array_mode_analysis']
+                        st.subheader('Multi-channel phase / toroidal mode candidate')
+                        am1, am2, am3 = st.columns(3)
+                        am1.metric('Dominant array frequency', f"{mode_result['dominant_frequency_Hz']:.6g} Hz")
+                        am2.metric('Toroidal mode candidate', str(mode_result['estimated_toroidal_mode_number']))
+                        am3.metric('Phase-fit RMS', f"{mode_result['phase_fit_rms_rad']:.4g} rad")
+                        st.caption('The mode number is an alias-prone candidate based on measured coil angles and cross-spectral phase, not an automatic MHD-mode identification.')
                     m1,m2,m3,m4=st.columns(4)
                     m1.metric('Sampling frequency',f"{result['sampling_frequency_Hz']:.6g} Hz")
                     m2.metric('Nyquist frequency',f"{result['nyquist_frequency_Hz']:.6g} Hz")
