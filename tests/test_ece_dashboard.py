@@ -51,3 +51,24 @@ def test_ece_fluctuation_dashboard_with_loaded_data():
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("ECE fluctuation analysis completed" in x.value for x in app.success)
     assert any(x.label == "Export ECE fluctuation / PSD result" for x in app.get("download_button"))
+
+
+def test_ece_fluctuation_dashboard_rejects_missing_samples_without_compressing_timebase():
+    app = _open_ece()
+    t = np.arange(32, dtype=float) * 1e-6
+    frame = pd.DataFrame({
+        "time_s": t,
+        "ece_80": np.sin(2 * np.pi * 5e3 * t),
+        "ece_90": np.sin(2 * np.pi * 8e3 * t),
+        "ece_100": np.sin(2 * np.pi * 12e3 * t),
+    })
+    frame.loc[10, "ece_90"] = np.nan
+    app.session_state["tis_df"] = frame
+    app.run()
+    app.selectbox(key="ece_workflow_mode").set_value("Channel fluctuations / PSD").run()
+    app.selectbox(key="ece_time_col").set_value("time_s").run()
+    app.multiselect(key="ece_signal_cols").set_value(["ece_80", "ece_90", "ece_100"]).run()
+    app.button(key="ece_run_fluctuations").click().run()
+    assert not app.exception, [str(x.value) for x in app.exception]
+    assert any("Missing/non-numeric samples are not dropped" in x.value for x in app.error)
+    assert not any("ECE fluctuation analysis completed" in x.value for x in app.success)
