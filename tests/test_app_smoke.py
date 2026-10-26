@@ -275,3 +275,50 @@ def test_thomson_spectral_distribution_dashboard_executes_and_exports():
         item.label == "Export Thomson spectral-distribution results"
         for item in app.get("download_button")
     )
+
+
+
+def test_cxrs_dashboard_executes_line_fit_and_exports_result():
+    """Exercise the CXRS workflow through the real Streamlit dashboard."""
+    import numpy as np
+    import pandas as pd
+
+    wavelength = np.linspace(529.8, 530.2, 401)
+    rest_wavelength = 530.0
+    expected_velocity = 2.5e4
+    center = rest_wavelength * (1.0 + expected_velocity / 299792458.0)
+    intrinsic_sigma = 0.025
+    instrument_sigma = 0.008
+    observed_sigma = np.hypot(intrinsic_sigma, instrument_sigma)
+    intensity = (
+        120.0 * np.exp(-0.5 * ((wavelength - center) / observed_sigma) ** 2)
+        + 4.0 + 0.2 * (wavelength - center)
+    )
+    frame = pd.DataFrame({"wavelength_nm": wavelength, "intensity": intensity})
+    app = AppTest.from_file(APP_PATH, default_timeout=60)
+    app.session_state["tis_df"] = frame
+    app.session_state["tis_filename"] = "synthetic_cxrs_spectrum.csv"
+    app.session_state["tis_raw"] = b"synthetic CXRS spectrum"
+    app.session_state["tis_sha"] = "synthetic-cxrs-spectrum"
+    app.run()
+
+    app.radio[0].set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "CXRS line profile"
+    ).run()
+    next(item for item in app.selectbox if item.label == "Calibrated wavelength (nm)").set_value(
+        "wavelength_nm"
+    ).run()
+    next(item for item in app.selectbox if item.label == "Spectral intensity").set_value(
+        "intensity"
+    ).run()
+    next(item for item in app.button if item.label == "Analyze CXRS line").click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert not app.error, [str(item.value) for item in app.error]
+    assert any("ion_temperature_eV" in str(item.value) for item in app.json)
+    assert any("line_of_sight_velocity_m_s" in str(item.value) for item in app.json)
+    assert any(
+        item.label == "Export CXRS line-profile result"
+        for item in app.get("download_button")
+    )
