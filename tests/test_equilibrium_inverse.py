@@ -47,6 +47,8 @@ def test_inverse_fit_recovers_coefficients_axis_and_edge_flux_from_measurements(
     assert result["axis_Z_m"] == pytest.approx(0.0)
     assert np.isfinite(result["boundary_flux_Wb_rad"])
     assert result["boundary_mask"].shape == (case["Z_m"].size, case["R_m"].size)
+    assert result["boundary_contours_RZ_m"]
+    assert all(len(contour) >= 3 for contour in result["boundary_contours_RZ_m"])
     assert np.all(np.isfinite(result["psi_normalized"]))
     assert set(result["measurement_diagnostics"]) == {"magnetic probes", "flux loops"}
 
