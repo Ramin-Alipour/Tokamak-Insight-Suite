@@ -154,6 +154,16 @@ def analyze_cxrs_line(
     if np.any(covariance_diagonal < 0):
         raise ValueError("CXRS line fit covariance has negative parameter variances")
     amp, center, observed_sigma, intercept, slope = map(float, popt)
+    # Do not report a quantitative Doppler width when the sampled line profile
+    # is under-resolved. Three samples across the fitted FWHM is a conservative
+    # minimum for this workflow, not a substitute for instrument calibration.
+    fitted_fwhm = 2.0 * np.sqrt(2.0 * np.log(2.0)) * observed_sigma
+    if fitted_fwhm < 3.0 * spacing:
+        raise ValueError(
+            "CXRS line is under-resolved by wavelength sampling: fitted FWHM "
+            f"({fitted_fwhm:.6g} nm) spans fewer than 3 samples "
+            f"(median spacing {spacing:.6g} nm); ion temperature and velocity are withheld"
+        )
     if observed_sigma <= instrument_sigma_nm:
         raise ValueError("observed line width does not exceed instrumental width; ion temperature is unresolved")
     intrinsic_sigma = float(np.sqrt(observed_sigma**2 - instrument_sigma_nm**2))
