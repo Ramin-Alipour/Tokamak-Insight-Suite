@@ -1,4 +1,5 @@
 """Interactive Streamlit acceptance tests for Rogowski-current analysis."""
+import json
 from pathlib import Path
 
 import numpy as np
@@ -29,6 +30,20 @@ def _loaded_app():
     return app
 
 
+def _rogowski_metadata(app):
+    """Read st.json output regardless of Streamlit's AppTest value encoding."""
+    for item in app.get("json"):
+        value = item.value
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (TypeError, ValueError):
+                continue
+        if isinstance(value, dict) and value.get("diagnostic") == "Rogowski coil":
+            return value
+    pytest.fail("Rogowski JSON metadata was not rendered by the dashboard")
+
+
 def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
     app = _loaded_app()
     mode = next(item for item in app.radio if item.key == "rogowski_acquisition_mode")
@@ -42,7 +57,7 @@ def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
     assert "derivative_output" in rendered
     assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
     assert "rogowski coil" in rendered.lower()
-    metadata = next(item.value for item in app.get("json") if isinstance(item.value, dict) and item.value.get("diagnostic") == "Rogowski coil")
+    metadata = _rogowski_metadata(app)
     assert metadata["n_samples"] == 101
     assert metadata["current_final_A"] == pytest.approx(2.0)
     assert metadata["current_min_A"] == pytest.approx(0.0)
@@ -69,7 +84,7 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
     assert "integration_applied" in rendered
     assert "false" in rendered.lower()
-    metadata = next(item.value for item in app.get("json") if isinstance(item.value, dict) and item.value.get("diagnostic") == "Rogowski coil")
+    metadata = _rogowski_metadata(app)
     assert metadata["current_min_A"] == pytest.approx(5.0)
     assert metadata["current_final_A"] == pytest.approx(7.0)
     assert metadata["integration_applied"] is False
