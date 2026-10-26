@@ -1260,7 +1260,14 @@ elif page=='Probe Analysis':
             if efit is not None:
                 fit_r2=result.get('electron_retarding_fit_R2')
                 fit_rmse=result.get('electron_retarding_fit_normalized_rmse')
+                fit_residual_rms=result.get('electron_retarding_fit_residual_rms_A')
+                te_uncertainty=result.get('electron_temperature_standard_error_eV')
+                fit_quality=('strong empirical fit' if fit_r2 is not None and fit_r2 >= 0.95 else
+                             'weak empirical fit' if fit_r2 is not None else 'not available')
                 st.write({'Electron-fit R²':fit_r2,'Electron-fit normalized RMSE':fit_rmse,
+                          'Electron-fit residual RMS (A)':fit_residual_rms,
+                          'Te local standard uncertainty (eV)':te_uncertainty,
+                          'Fit quality screening':fit_quality,
                           'Electron-fit status':result.get('electron_retarding_fit_status')})
             st.json(result)
             plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V')
