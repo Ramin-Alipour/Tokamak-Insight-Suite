@@ -137,3 +137,14 @@ def test_cxrs_dashboard_withholds_under_resolved_spectrum():
     assert any("under-resolved by wavelength sampling" in str(item.value).lower()
                for item in app.error)
     assert "tis_cxrs_result" not in app.session_state
+
+
+def test_cxrs_dashboard_propagates_rest_wavelength_uncertainty():
+    app, _ = _cxrs_app()
+    app.number_input(key="cxrs_rest_unc").set_value(1e-5).run()
+    app.button(key="cxrs_run").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    result = app.session_state["tis_cxrs_result"]["result"]
+    assert result["rest_wavelength_uncertainty_nm"] == pytest.approx(1e-5)
+    assert result["ion_temperature_uncertainty_eV"] > 0
+    assert result["velocity_uncertainty_m_s"] > 0
