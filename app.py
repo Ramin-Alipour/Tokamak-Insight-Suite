@@ -903,7 +903,7 @@ elif page=='Spectral Analysis':
             plot_line(np.asarray(df[xcol],float),np.asarray(df[ycol],float),xcol,ycol,'Input spectrum')
             json_download('Export fit JSON',fit,'tis_spectral_fit.json')
     elif mode=='CXRS line profile':
-        st.caption('Fit one calibrated, isolated charge-exchange line. Requires independently known rest wavelength, emitting-ion mass and Gaussian instrumental sigma (not FWHM). Reports line-of-sight velocity and a single-Maxwellian Ti estimate; it does not infer impurity density or invert multiple views.')
+        st.caption('Fit one calibrated, isolated charge-exchange line. Requires independently known rest wavelength, emitting-ion mass and Gaussian instrumental sigma (not FWHM). Reports line-of-sight velocity and a single-Maxwellian Ti estimate only when the fitted FWHM spans at least three median wavelength intervals; it does not infer impurity density or invert multiple views.')
         xcol=col_select('Calibrated wavelength (nm)',numeric,'cxrs_x')
         ycol=col_select('Spectral intensity',numeric,'cxrs_y')
         c1,c2=st.columns(2)
