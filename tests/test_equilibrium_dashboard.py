@@ -19,6 +19,9 @@ def test_equilibrium_workspace_exposes_grad_shafranov_solver_without_exceptions(
     actual_inputs = {item.key for item in app.get("file_uploader")}
     assert expected_inputs <= actual_inputs
     assert any("not a full EFIT replacement" in str(item.value) for item in app.warning)
+    assert any(item.key == "eq_inverse_bundle" for item in app.get("file_uploader"))
+    assert any(item.label == "Fit equilibrium to magnetic measurements" for item in app.button)
+    assert any("machine-specific JSON bundle" in str(item.value) for item in app.caption)
 
 
 def test_equilibrium_workspace_rejects_run_when_required_csv_inputs_are_missing():
@@ -59,3 +62,12 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Converged" in str(item.value) for item in app.metric)
     assert any(item.label == "Download Grad–Shafranov solution grid" for item in app.get("download_button"))
+
+
+
+def test_inverse_dashboard_requires_machine_calibrated_bundle():
+    app = AppTest.from_file(APP_PATH, default_timeout=60).run()
+    app.radio(key="workspace_page").set_value("Equilibrium & Reconstruction").run()
+    next(item for item in app.button if item.label == "Fit equilibrium to magnetic measurements").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("machine-specific calibrated JSON bundle" in str(item.value) for item in app.error)
