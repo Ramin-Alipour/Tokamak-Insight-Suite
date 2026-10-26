@@ -154,3 +154,137 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
         "equation_residual_max_abs_Wb_rad_m-2": float(np.max(np.abs(interior))),
         "warning": "Prescribed-boundary/profile solve only; inspect PDE residual and validate against independent magnetic constraints. Not a full EFIT reconstruction.",
     }
+
+
+
+def reconstruct_equilibrium_inverse(
+    R_m, Z_m, basis_psi_Wb_rad, *,
+    magnetic_probe_response_T_per_coefficient=None,
+    magnetic_probe_values_T=None,
+    magnetic_probe_sigma_T=None,
+    flux_loop_response_Wb_rad_per_coefficient=None,
+    flux_loop_values_Wb_rad=None,
+    flux_loop_sigma_Wb_rad=None,
+    coil_probe_response_T_per_A=None,
+    coil_probe_currents_A=None,
+    coil_flux_response_Wb_rad_per_A=None,
+    coil_flux_currents_A=None,
+    regularization=1e-8,
+):
+    """Fit a linearized flux-basis equilibrium to *measured* magnetic data.
+
+    The caller must provide calibrated sensor response matrices generated for the
+    actual machine geometry. Basis coefficients are estimated by weighted,
+    Tikhonov-regularized least squares. Known coil-current responses are removed
+    from measurements before fitting. No synthetic measurements or machine
+    geometry are generated here.
+
+    This is an inverse magnetic fit framework, not a substitute for a machine-
+    specific nonlinear EFIT implementation: the basis, response matrices, sensor
+    calibration, and current constraints must be independently validated.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    basis = np.asarray(basis_psi_Wb_rad, dtype=float)
+    if basis.ndim != 3 or basis.shape[1:] != (Z.size, R.size) or basis.shape[0] < 1:
+        raise ValueError("basis_psi_Wb_rad must have shape (n_basis, len(Z), len(R))")
+    if not np.all(np.isfinite(basis)):
+        raise ValueError("Flux basis must be finite")
+    if not np.isfinite(regularization) or regularization < 0:
+        raise ValueError("regularization must be finite and non-negative")
+    n_basis = basis.shape[0]
+    blocks, targets, weights = [], [], []
+
+    def add_measurement_block(response, values, sigma, name, coil_response, coil_currents):
+        if response is None and values is None and sigma is None:
+            return
+        if response is None or values is None or sigma is None:
+            raise ValueError(f"{name}: response, measured values, and uncertainties are all required")
+        matrix = np.asarray(response, dtype=float)
+        observed = np.asarray(values, dtype=float)
+        uncertainty = np.asarray(sigma, dtype=float)
+        if matrix.ndim != 2 or matrix.shape[1] != n_basis or observed.shape != (matrix.shape[0],) or uncertainty.shape != observed.shape:
+            raise ValueError(f"{name}: incompatible response, value, or uncertainty dimensions")
+        if not np.all(np.isfinite(matrix)) or not np.all(np.isfinite(observed)) or not np.all(np.isfinite(uncertainty)) or np.any(uncertainty <= 0):
+            raise ValueError(f"{name}: all values must be finite and uncertainties positive")
+        corrected = observed.copy()
+        if coil_response is not None or coil_currents is not None:
+            if coil_response is None or coil_currents is None:
+                raise ValueError(f"{name}: coil response and coil currents must be supplied together")
+            cr = np.asarray(coil_response, dtype=float)
+            ci = np.asarray(coil_currents, dtype=float)
+            if cr.shape != (matrix.shape[0], ci.size) or ci.ndim != 1 or not np.all(np.isfinite(cr)) or not np.all(np.isfinite(ci)):
+                raise ValueError(f"{name}: invalid coil response/current dimensions or values")
+            corrected -= cr @ ci
+        blocks.append(matrix / uncertainty[:, None])
+        targets.append(corrected / uncertainty)
+        weights.append((name, matrix, observed, uncertainty, corrected))
+
+    add_measurement_block(
+        magnetic_probe_response_T_per_coefficient, magnetic_probe_values_T,
+        magnetic_probe_sigma_T, "magnetic probes",
+        coil_probe_response_T_per_A, coil_probe_currents_A)
+    add_measurement_block(
+        flux_loop_response_Wb_rad_per_coefficient, flux_loop_values_Wb_rad,
+        flux_loop_sigma_Wb_rad, "flux loops",
+        coil_flux_response_Wb_rad_per_A, coil_flux_currents_A)
+    if not blocks:
+        raise ValueError("At least one calibrated magnetic-probe or flux-loop measurement block is required")
+
+    design = np.vstack(blocks)
+    observed = np.concatenate(targets)
+    # Scale columns to avoid unit/conditioning differences between basis functions.
+    column_norm = np.linalg.norm(design, axis=0)
+    if np.any(column_norm <= np.finfo(float).tiny):
+        raise ValueError("At least one flux-basis coefficient is unobservable in the supplied measurements")
+    scaled = design / column_norm
+    augmented = np.vstack((scaled, np.sqrt(regularization) * np.eye(n_basis)))
+    rhs = np.concatenate((observed, np.zeros(n_basis)))
+    scaled_coefficients, *_ = np.linalg.lstsq(augmented, rhs, rcond=None)
+    coefficients = scaled_coefficients / column_norm
+    psi = np.einsum("k,kij->ij", coefficients, basis)
+    if not np.all(np.isfinite(psi)) or float(np.ptp(psi)) <= np.finfo(float).tiny:
+        raise ValueError("Inverse fit produced a degenerate flux field; check response matrices and data")
+
+    # Determine the magnetic axis from the strongest interior extremum relative
+    # to the computational-edge flux level, then infer a boundary flux level
+    # from the edge. This is a data-derived estimate, not a machine limiter model.
+    edge = np.concatenate((psi[0, :], psi[-1, :], psi[1:-1, 0], psi[1:-1, -1]))
+    edge_flux = float(np.median(edge))
+    interior = psi[1:-1, 1:-1]
+    if abs(float(np.min(interior)) - edge_flux) >= abs(float(np.max(interior)) - edge_flux):
+        local = np.unravel_index(np.argmin(interior), interior.shape)
+        axis_flux = float(np.min(interior))
+    else:
+        local = np.unravel_index(np.argmax(interior), interior.shape)
+        axis_flux = float(np.max(interior))
+    axis_j, axis_i = int(local[0] + 1), int(local[1] + 1)
+    denom = edge_flux - axis_flux
+    if abs(denom) <= np.finfo(float).tiny:
+        raise ValueError("Cannot infer a distinct plasma axis and edge flux from this reconstruction")
+    psi_norm = (psi - axis_flux) / denom
+    boundary_level = edge_flux
+    boundary_mask = np.isclose(psi_norm, 1.0, rtol=0.02, atol=0.02)
+    # Per-block residuals are reported in native units and uncertainty-normalized units.
+    diagnostics = {}
+    for name, matrix, measured, sigma, corrected in weights:
+        prediction = matrix @ coefficients
+        residual = measured - (prediction + (measured - corrected))
+        diagnostics[name] = {
+            "count": int(measured.size),
+            "residual_rms": float(np.sqrt(np.mean(residual**2))),
+            "normalized_residual_rms": float(np.sqrt(np.mean((residual / sigma)**2))),
+            "predicted_without_coils": prediction.tolist(),
+            "measured": measured.tolist(),
+        }
+    return {
+        "R_m": R.copy(), "Z_m": Z.copy(), "psi_Wb_rad": psi,
+        "psi_normalized": psi_norm, "basis_coefficients": coefficients,
+        "axis_R_m": float(R[axis_i]), "axis_Z_m": float(Z[axis_j]),
+        "axis_flux_Wb_rad": axis_flux, "boundary_flux_Wb_rad": boundary_level,
+        "boundary_mask": boundary_mask, "edge_flux_estimator": "median of reconstructed computational-edge flux",
+        "measurement_diagnostics": diagnostics,
+        "weighted_residual_rms": float(np.linalg.norm(design @ coefficients - observed) / np.sqrt(observed.size)),
+        "regularization": float(regularization),
+        "measurement_count": int(observed.size),
+        "warning": "Inverse magnetic fit using caller-supplied calibrated machine response. Validate basis, coil responses, inferred boundary, and Grad-Shafranov/profile consistency for the specific device; this generic linearized fit is not a complete machine-specific EFIT.",
+    }
