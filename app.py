@@ -1589,6 +1589,51 @@ elif page=='Plasma Parameters':
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
     st.warning('This page analyzes a supplied equilibrium flux grid. It does not solve the Grad–Shafranov equation or replace EFIT / a validated equilibrium reconstruction code.')
+    st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
+    st.caption('This finite-difference solver does not replace EFIT. Upload R and Z coordinate vectors, a boundary-flux grid shaped (len(Z), len(R)), and three profile CSV vectors: normalized flux, p\'(ψ), and F F\'(ψ).')
+    with st.form('grad_shafranov_form'):
+        eq_R_solver = st.file_uploader('Solver R coordinates (m; CSV vector)', type=['csv'], key='gs_R')
+        eq_Z_solver = st.file_uploader('Solver Z coordinates (m; CSV vector)', type=['csv'], key='gs_Z')
+        eq_boundary_solver = st.file_uploader('Boundary poloidal flux grid (Wb/rad; CSV matrix)', type=['csv'], key='gs_boundary')
+        eq_profile_solver = st.file_uploader('Normalized-flux profile coordinates (CSV vector)', type=['csv'], key='gs_profile')
+        eq_pprime_solver = st.file_uploader('Pressure derivative p\'(ψ) (Pa/Wb; CSV vector)', type=['csv'], key='gs_pprime')
+        eq_ffprime_solver = st.file_uploader('F F\'(ψ) (T²; CSV vector)', type=['csv'], key='gs_ffprime')
+        gs_tolerance = st.number_input('Relative iteration tolerance', min_value=1e-12, max_value=1e-2, value=1e-8, format='%.1e', key='gs_tolerance')
+        gs_max_iterations = st.number_input('Maximum iterations', min_value=1, max_value=100000, value=10000, step=100, key='gs_max_iterations')
+        gs_relaxation = st.number_input('Relaxation factor (0, 2)', min_value=0.01, max_value=1.99, value=1.2, step=0.05, key='gs_relaxation')
+        gs_run = st.form_submit_button('Solve Grad–Shafranov equilibrium', type='primary')
+    if gs_run:
+        try:
+            from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium
+            required_uploads = [eq_R_solver, eq_Z_solver, eq_boundary_solver, eq_profile_solver, eq_pprime_solver, eq_ffprime_solver]
+            if any(upload is None for upload in required_uploads):
+                raise ValueError('Upload all six CSV inputs before running the solver.')
+            gs_R = pd.read_csv(eq_R_solver, header=None).to_numpy(dtype=float).ravel()
+            gs_Z = pd.read_csv(eq_Z_solver, header=None).to_numpy(dtype=float).ravel()
+            gs_boundary = pd.read_csv(eq_boundary_solver, header=None).to_numpy(dtype=float)
+            gs_profile = pd.read_csv(eq_profile_solver, header=None).to_numpy(dtype=float).ravel()
+            gs_pprime = pd.read_csv(eq_pprime_solver, header=None).to_numpy(dtype=float).ravel()
+            gs_ffprime = pd.read_csv(eq_ffprime_solver, header=None).to_numpy(dtype=float).ravel()
+            gs_result = reconstruct_equilibrium(
+                gs_R, gs_Z, gs_boundary, gs_profile, gs_pprime, gs_ffprime,
+                max_iterations=int(gs_max_iterations), tolerance=float(gs_tolerance),
+                relaxation=float(gs_relaxation),
+            )
+            st.metric('Solver convergence', 'Converged' if gs_result['converged'] else 'Not converged')
+            st.json({key: value for key, value in gs_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'B_R_T', 'B_Z_T', 'B_poloidal_T'}})
+            gs_table = pd.DataFrame({'Z_m': np.repeat(gs_Z, gs_R.size), 'R_m': np.tile(gs_R, gs_Z.size),
+                                     'psi_Wb_rad': gs_result['psi_Wb_rad'].ravel(),
+                                     'psi_normalized': gs_result['psi_normalized'].ravel(),
+                                     'B_R_T': gs_result['B_R_T'].ravel(),
+                                     'B_Z_T': gs_result['B_Z_T'].ravel(),
+                                     'B_poloidal_T': gs_result['B_poloidal_T'].ravel()})
+            st.dataframe(gs_table.head(30), use_container_width=True)
+            download_df('Download Grad–Shafranov solution grid', gs_table, 'tis_grad_shafranov_equilibrium.csv')
+            if not gs_result['converged']:
+                st.error('Iteration limit reached before the requested tolerance. Do not treat this solution as converged.')
+            st.warning(gs_result['warning'])
+        except Exception as exc:
+            st.error(f'Grad–Shafranov reconstruction failed: {exc}')
     if df is not None: st.info('For grid data, upload separate arrays as CSV files below. R and Z must be physical coordinates in metres.')
     Rfile=st.file_uploader('R coordinate array CSV',type=['csv'],key='eq_R'); Zfile=st.file_uploader('Z coordinate array CSV',type=['csv'],key='eq_Z'); Pfile=st.file_uploader('Poloidal-flux grid ψ(R,Z) CSV',type=['csv'],key='eq_P')
     bt=st.number_input('Toroidal field input Bφ (T)',value=1.0)
