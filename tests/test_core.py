@@ -424,6 +424,11 @@ def test_axisymmetric_radiated_power_rejects_negative_emissivity():
     with pytest.raises(ValueError, match="nonnegative"):
         axisymmetric_radiated_power(R, Z, eps)
 
+def test_integrate_time_series_rejects_zero_calibration_scale():
+    with pytest.raises(ValueError, match="Calibration scale must be finite and nonzero"):
+        integrate_time_series([0.0, 1.0], [1.0, 1.0], scale=0.0)
+
+
 def test_integrate_time_series_recovers_linear_integral():
     t = np.linspace(0.0, 1.0, 101)
     y = np.full_like(t, 2.0)
