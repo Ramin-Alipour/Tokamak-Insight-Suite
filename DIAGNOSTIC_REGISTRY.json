@@ -2128,7 +2128,7 @@
     "implementation_status": "Implemented numerical workflow with explicit polarity, offset correction, turn count, initial flux, nonuniform-sampling integration, finite/monotonic input validation, optional sampling-gap guard, diagnostics, and JSON-friendly output.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "calibrated_signal_to_physics",
+      "execution_level": "limited_calculation",
       "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
