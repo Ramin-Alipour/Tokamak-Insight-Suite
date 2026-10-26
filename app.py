@@ -845,8 +845,8 @@ elif page=='Spectral Analysis':
             json_download('Export Thomson spectral-distribution results', {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in _r.items()}, 'thomson_spectral_distribution.json')
     elif mode=='Ion temperature from Doppler spectroscopy':
         st.caption('End-to-end Gaussian line fit and instrument-corrected ion temperature. Requires an independently calibrated wavelength axis, identified isolated transition, emitting-ion mass and measured instrument FWHM. This does not remove Stark/Zeeman broadening, blends, opacity or non-thermal broadening.')
-        xcol=col_select('Calibrated wavelength (nm)','numeric','ti_doppler_x')
-        ycol=col_select('Emission intensity','numeric','ti_doppler_y')
+        xcol=col_select('Calibrated wavelength (nm)',numeric,'ti_doppler_x')
+        ycol=col_select('Emission intensity',numeric,'ti_doppler_y')
         c1,c2=st.columns(2)
         with c1:
             rest=st.number_input('Laboratory rest wavelength (nm)',min_value=1e-9,value=530.0,format='%.10g',key='ti_doppler_rest')
