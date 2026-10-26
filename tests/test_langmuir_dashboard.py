@@ -46,6 +46,10 @@ def test_langmuir_dashboard_rejects_columns_without_finite_paired_samples():
     app.radio(key="workspace_page").set_value("Probe Analysis")
     app.run()
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+    app.selectbox(key="probe_v").set_value("voltage_V")
+    app.selectbox(key="probe_i").set_value("current_A")
+    app.run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
     assert any(
         "at least eight finite paired samples" in str(item.value)
         for item in app.error
