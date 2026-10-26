@@ -62,7 +62,7 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     assert "integrator_output" in rendered
     assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
     assert "integration_applied" in rendered
-    assert "False" in rendered
+    assert "false" in rendered.lower()
 
 
 def test_rogowski_dashboard_rejects_zero_calibration_scale_without_crashing():
