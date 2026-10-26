@@ -84,3 +84,23 @@ def test_langmuir_dashboard_normalizes_ion_positive_current_polarity():
     payloads = [str(item.value) for item in app.json]
     assert any("current_convention" in payload and "ion_positive" in payload for payload in payloads)
     assert any("single_zero_crossing" in payload for payload in payloads)
+
+
+def test_langmuir_dashboard_requires_eight_distinct_voltage_values_among_finite_pairs():
+    voltage = np.array([-4., -3., -2., -1., 0., 1., 2., 3., 3., 3.])
+    current = np.array([np.nan, -3., -2., -1., 0., 1., 2., 3., 4., 5.])
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+
+    app.session_state["tis_df"] = pd.DataFrame({"voltage_V": voltage, "current_A": current})
+    app.session_state["tis_filename"] = "duplicate_paired_voltage.csv"
+    app.session_state["tis_sha"] = "synthetic-duplicate-paired-voltage"
+    app.radio(key="workspace_page").set_value("Probe Analysis")
+    app.run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+    app.selectbox(key="probe_v").set_value("voltage_V")
+    app.selectbox(key="probe_i").set_value("current_A")
+    app.run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+    assert any("eight distinct voltage values among those pairs" in str(item.value) for item in app.error)
