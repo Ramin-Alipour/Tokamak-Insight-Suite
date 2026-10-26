@@ -48,6 +48,10 @@ def test_physical_relation_returns_small_residual_for_exact_quadratic_solution()
         ({"boundary_flux_Wb_rad": np.zeros((2, 3))}, "Boundary flux"),
         ({"psi_profile": [0.5, 0.5]}, "increase strictly"),
         ({"max_iterations": 0}, "Solver controls"),
+        ({"max_iterations": True}, "Solver controls"),
+        ({"tolerance": True}, "Solver controls"),
+        ({"relaxation": False}, "Solver controls"),
+        ({"tolerance": "1e-8"}, "Solver controls"),
     ],
 )
 def test_solver_rejects_invalid_inputs(kwargs, message):
