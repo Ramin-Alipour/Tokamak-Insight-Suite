@@ -81,3 +81,28 @@ def test_pickup_voltage_uncertainty_accounts_for_shared_trapezoid_samples():
         result["B_toroidal_uncertainty_T"], expected, rtol=1e-13, atol=0.0
     )
 
+
+
+def test_registered_analysis_integrates_pickup_voltage_and_propagates_uncertainty():
+    r = analyze_toroidal_field_coil(
+        [0.0, 0.5, 1.0], [0.0, 0.0, 0.0],
+        calibration_T_per_unit=1.0, signal_kind="field",
+        pickup_voltage_V=[4.0, 4.0, 4.0],
+        pickup_sensitivity_V_per_T_per_s=2.0,
+        initial_field_T=3.0,
+        pickup_voltage_uncertainty_V=[0.1, 0.1, 0.1],
+        pickup_sensitivity_uncertainty_V_per_T_per_s=0.1,
+        initial_field_uncertainty_T=0.05,
+    )
+    assert r["B_toroidal_integrated_T"].tolist() == pytest.approx([3.0, 4.0, 5.0])
+    assert r["delta_B_T"].tolist() == pytest.approx([0.0, 1.0, 2.0])
+    assert r["dB_dt_T_s"].tolist() == pytest.approx([2.0, 2.0, 2.0])
+    assert r["B_toroidal_integrated_uncertainty_T"][-1] > 0
+
+
+def test_registered_analysis_requires_pickup_integration_boundary_conditions():
+    with pytest.raises(ValueError, match="sensitivity.*initial_field"):
+        analyze_toroidal_field_coil(
+            [0.0, 1.0], [0.0, 0.0], calibration_T_per_unit=1.0,
+            pickup_voltage_V=[1.0, 1.0],
+        )
