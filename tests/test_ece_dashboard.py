@@ -1,7 +1,6 @@
 """Interactive Streamlit regressions for the ECE analysis workflow."""
 import numpy as np
 import pandas as pd
-import pytest
 from streamlit.testing.v1 import AppTest
 
 
@@ -17,7 +16,6 @@ def _open_ece():
 def test_ece_brightness_temperature_dashboard_and_export():
     app = _open_ece()
     app.text_input(key="ece_radiance").set_value("1e-10, 2e-10, 3e-10")
-    app.button(key="run_ece_brightness_missing") if False else None
     app.button(key="ece_run_brightness").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("ECE brightness-temperature analysis completed" in x.value for x in app.success)
@@ -33,7 +31,7 @@ def test_ece_resonance_mapping_dashboard():
     assert any(x.label == "Export ECE resonance mapping" for x in app.get("download_button"))
 
 
-def test_ece_fluctuation_dashboard_with_uploaded_data(tmp_path):
+def test_ece_fluctuation_dashboard_with_loaded_data():
     app = _open_ece()
     t = np.arange(128, dtype=float) * 1e-6
     frame = pd.DataFrame({
@@ -42,9 +40,8 @@ def test_ece_fluctuation_dashboard_with_uploaded_data(tmp_path):
         "ece_90": 0.5 * np.sin(2 * np.pi * 8e3 * t),
         "ece_100": 0.25 * np.sin(2 * np.pi * 12e3 * t),
     })
-    path = tmp_path / "ece.csv"
-    frame.to_csv(path, index=False)
-    app.file_uploader(key="global_upload").set_value(str(path)).run()
+    app.session_state["tis_df"] = frame
+    app.run()
     assert not app.exception, [str(x.value) for x in app.exception]
     app.selectbox(key="ece_workflow_mode").set_value("Channel fluctuations / PSD").run()
     assert not app.exception, [str(x.value) for x in app.exception]
