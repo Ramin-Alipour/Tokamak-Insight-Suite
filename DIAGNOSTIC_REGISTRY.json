@@ -2117,32 +2117,123 @@
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Flux loops",
-    "quantities": "Flux change, loop voltage constraints",
-    "status": "M→D",
-    "method": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
-    "caveat": "Integration constants, loop area/orientation and bandwidth matter.",
+    "quantities": "Loop voltage, integrated poloidal magnetic flux change, flux reconstruction",
+    "status": "D",
+    "method": "Integrate calibrated loop voltage using Faraday's law: ΔΦ(t)=−(1/N)∫ polarity·(V_loop−V_offset)dt; absolute flux additionally requires an initial-flux condition.",
+    "caveat": "Voltage calibration, polarity, turn count, baseline drift, integration constants, loop geometry/orientation, bandwidth, and sampling gaps affect results. Software integrates supplied calibrated voltage; it does not infer calibration or reconstruct equilibrium.",
     "implementation_functions": [
-      "integrate_time_series"
+      "tokamak_analysis.flux_loops.analyze_flux_loop",
+      "tokamak_analysis.flux_loops.flux_from_voltage"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Implemented numerical workflow with explicit polarity, offset correction, turn count, initial flux, nonuniform-sampling integration, finite/monotonic input validation, optional sampling-gap guard, diagnostics, and JSON-friendly output.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Faraday law V = −N dΦ/dt with explicit sign and calibration convention.",
-      "uncertainty_model": "not_specified",
+      "execution_level": "calibrated_signal_to_physics",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite one-dimensional strictly increasing sample times; at least two samples.",
+          "required": true
+        },
+        {
+          "name": "voltage_V",
+          "unit": "V",
+          "description": "Finite one-dimensional calibrated flux-loop voltage samples, same length as time_s.",
+          "required": true
+        },
+        {
+          "name": "turns",
+          "unit": "dimensionless",
+          "description": "Positive integer number of turns; default 1.",
+          "required": false,
+          "minimum": 1
+        },
+        {
+          "name": "initial_flux_Wb",
+          "unit": "Wb",
+          "description": "Flux integration constant at first sample; default 0 Wb.",
+          "required": false
+        },
+        {
+          "name": "voltage_offset_V",
+          "unit": "V",
+          "description": "Constant baseline subtracted before integration; default 0 V.",
+          "required": false
+        },
+        {
+          "name": "polarity",
+          "unit": "dimensionless",
+          "description": "Sensor polarity multiplier, +1 or -1; default +1.",
+          "required": false
+        },
+        {
+          "name": "max_gap_s",
+          "unit": "s",
+          "description": "Optional maximum permitted interval between adjacent samples.",
+          "required": false,
+          "minimum": 0
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Validated input time axis."
+        },
+        {
+          "name": "voltage_V",
+          "unit": "V",
+          "description": "Polarity-adjusted, offset-corrected loop voltage."
+        },
+        {
+          "name": "loop_voltage_integral_Vs",
+          "unit": "V s",
+          "description": "Cumulative trapezoidal integral of corrected voltage."
+        },
+        {
+          "name": "flux_change_Wb",
+          "unit": "Wb",
+          "description": "Flux change relative to first sample, −integral/N."
+        },
+        {
+          "name": "flux_Wb",
+          "unit": "Wb",
+          "description": "Flux reconstruction using the supplied initial-flux condition."
+        },
+        {
+          "name": "diagnostics",
+          "unit": "structured",
+          "description": "Sample count, duration, interval statistics, voltage statistics, and flux excursion."
+        }
+      ],
+      "assumptions": [
+        "Input voltage is already calibrated in volts.",
+        "Time is in seconds.",
+        "Faraday sign convention is V_loop=−N dΦ/dt, after applying the stated sensor polarity.",
+        "A constant voltage offset is adequate when baseline correction is requested.",
+        "Initial flux is an explicit integration constant and defaults to zero only as a reference."
+      ],
+      "preprocessing": [
+        "Validate array shape, matching length, finite samples, and strictly increasing time.",
+        "Apply polarity and subtract constant voltage offset.",
+        "Optionally reject sampling intervals exceeding max_gap_s."
+      ],
+      "algorithm": "Cumulative trapezoidal integration on the supplied nonuniform time grid; flux change equals negative integrated corrected voltage divided by turn count; absolute flux equals initial flux plus flux change.",
+      "uncertainty_model": "not_provided; calibration, offset, timing and voltage uncertainties are not propagated.",
       "limitations": [
-        "Integration constants, loop area/orientation and bandwidth matter."
+        "Does not estimate voltage calibration, loop area, orientation, bandwidth, or baseline drift automatically.",
+        "Absolute flux requires a known initial condition.",
+        "Does not perform Grad–Shafranov equilibrium reconstruction or infer plasma current.",
+        "No uncertainty propagation is provided."
       ],
       "function_links": [
-        "integrate_time_series"
+        "tokamak_analysis.flux_loops.analyze_flux_loop",
+        "tokamak_analysis.flux_loops.flux_from_voltage"
       ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Complete for calibrated voltage time series to flux-change reconstruction within declared scope; raw instrument data and device-specific calibration are outside the function boundary."
     }
   },
   {
