@@ -1,4 +1,5 @@
 name: TIS CI
+# CXRS acceptance is included in the full matrix below.
 run-name: TIS CI — ${{ github.event_name }} — ${{ github.sha }}
 
 on:
