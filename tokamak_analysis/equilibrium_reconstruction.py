@@ -122,7 +122,7 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
     residual_scale = max(
         float(np.sqrt(np.mean(operator[1:-1, 1:-1] ** 2))),
         float(np.sqrt(np.mean(final_source[1:-1, 1:-1] ** 2))),
-        np.finfo(float).tiny,
+        1e-6 * max(1.0, float(np.max(np.abs(psi))) / min(dr, dz) ** 2),
     )
     relative_residual_rms = residual_rms / residual_scale
     # A small update alone can indicate stagnation, not a solution of the PDE.
