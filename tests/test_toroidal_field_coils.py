@@ -106,3 +106,21 @@ def test_registered_analysis_requires_pickup_integration_boundary_conditions():
             [0.0, 1.0], [0.0, 0.0], calibration_T_per_unit=1.0,
             pickup_voltage_V=[1.0, 1.0],
         )
+
+
+@pytest.mark.parametrize("signal_kind", ["current", "voltage"])
+def test_current_or_voltage_requires_nonzero_calibration(signal_kind):
+    with pytest.raises(ValueError, match="non-zero calibration"):
+        analyze_toroidal_field_coil(
+            [0.0, 1.0], [1.0, 2.0], calibration_T_per_unit=0.0,
+            signal_kind=signal_kind,
+        )
+
+
+def test_pickup_voltage_integration_rejects_nonfinite_voltage_baseline():
+    with pytest.raises(ValueError, match="baseline"):
+        integrate_pickup_coil_voltage(
+            [0.0, 1.0], [1.0, 1.0],
+            sensitivity_V_per_T_per_s=1.0, initial_field_T=0.0,
+            voltage_baseline_V=float("nan"),
+        )
