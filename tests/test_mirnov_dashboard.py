@@ -7,6 +7,10 @@ from streamlit.testing.v1 import AppTest
 def _open_mirnov():
     app = AppTest.from_file("../app.py", default_timeout=120).run()
     assert not app.exception, [str(x.value) for x in app.exception]
+    t = np.arange(128, dtype=float) / 20000.0
+    app.session_state["tis_df"] = pd.DataFrame({"time_s": t, "mirnov_V": np.sin(2 * np.pi * 1250 * t)})
+    app.run()
+    assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Spectral Analysis").run()
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(label="Workflow").set_value("Mirnov / pickup coils").run()
