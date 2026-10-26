@@ -7,7 +7,7 @@ from streamlit.testing.v1 import AppTest
 def _open_ece():
     app = AppTest.from_file("../app.py", default_timeout=120).run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    app.radio(key="workspace_page").set_value("Advanced Analysis").run()
+    app.radio(key="workspace_page").set_value("Plasma Parameters").run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert app.selectbox(key="ece_workflow_mode")
     return app
