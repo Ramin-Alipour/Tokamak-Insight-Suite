@@ -32,3 +32,22 @@ def test_probe_analysis_dashboard_can_run_and_render_langmuir_results():
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
     assert len(app.json) >= 1
     assert any("electron_temperature_eV" in str(item.value) for item in app.json)
+
+def test_langmuir_dashboard_rejects_columns_without_finite_paired_samples():
+    voltage = np.linspace(-4.0, 4.0, 17)
+    current = np.full_like(voltage, np.nan)
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+
+    app.session_state["tis_df"] = pd.DataFrame({"voltage_V": voltage, "current_A": current})
+    app.session_state["tis_filename"] = "invalid_langmuir_iv.csv"
+    app.session_state["tis_sha"] = "synthetic-invalid-test"
+    app.radio(key="workspace_page").set_value("Probe Analysis")
+    app.run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+    assert any(
+        "at least eight finite paired samples" in str(item.value)
+        for item in app.error
+    )
+
