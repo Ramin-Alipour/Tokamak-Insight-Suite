@@ -848,7 +848,7 @@ elif page=='Spectral Analysis':
                     else: st.info('No local spectral peaks passed the selected in-band threshold.')
                     if integrate and use_geometry:
                         result['relative_magnetic_perturbation']=magnetic_perturbation_from_mirnov_voltage(tt,vv,int(turns),float(area),initial_delta_B_T=float(initial_db),baseline_voltage_V=float(baseline),polarity_sign=int(polarity))
-                    st.json({k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in result.items() if k not in {'time_s','voltage_V','frequency_Hz','power_spectral_density','power_spectral_density_V2_per_Hz','dominant_peaks_Hz','dominant_peak_psd_V2_per_Hz','approx_Bdot_T_s','approx_Bdot_detrended_T_s'}})
+                    st.json(_json_safe({k:v for k,v in result.items() if k not in {'time_s','voltage_V','frequency_Hz','power_spectral_density','power_spectral_density_V2_per_Hz','dominant_peaks_Hz','dominant_peak_psd_V2_per_Hz','approx_Bdot_T_s','approx_Bdot_detrended_T_s'}}))
                     if integrate and use_geometry:
                         br=result['relative_magnetic_perturbation']
                         st.line_chart(pd.DataFrame({'δB (T)':br['delta_B_T']},index=br['time_s']))
