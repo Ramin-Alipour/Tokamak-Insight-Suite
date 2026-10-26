@@ -22,6 +22,7 @@ def test_solver_preserves_boundary_and_recovers_harmonic_flux():
     np.testing.assert_allclose(result["psi_Wb_rad"][:, [0, -1]], boundary[:, [0, -1]])
     np.testing.assert_allclose(result["psi_Wb_rad"], boundary, atol=2e-6)
     assert result["converged"] is True
+    assert result["equation_residual_relative_rms"] <= 1e-8
     assert result["iterations"] > 0
     assert np.all(np.isfinite(result["B_R_T"]))
     assert np.all(np.isfinite(result["B_Z_T"]))
