@@ -1029,3 +1029,49 @@ def test_xray_spectrum_integrated_energy_weighted_signal_converts_ev_to_kev():
     assert result["integrated_signal_keV_weighted"] == pytest.approx(4000.0)
     assert result["integrated_counts_keV"] == pytest.approx(2000.0)
     assert result["integrated_signal"] == pytest.approx(2000.0)
+
+
+def test_rogowski_derivative_output_reconstructs_current_with_initial_condition():
+    # Constant dIp/dt = 2 A/s, sampled uniformly: Ip(t) = 5 + 2t.
+    t = np.linspace(0.0, 2.0, 21)
+    didt = np.full_like(t, 2.0)
+    result = integrate_time_series(t, didt, scale=1.0, initial_value=5.0)
+    np.testing.assert_allclose(result["integrated_signal"], 5.0 + 2.0 * t, rtol=1e-12, atol=1e-12)
+    assert result["initial_value"] == 5.0
+    assert result["n_samples"] == len(t)
+
+
+def test_rogowski_baseline_corrected_derivative_output_has_zero_integral_for_zero_trace():
+    t = np.linspace(0.0, 1.0, 101)
+    trace = np.full_like(t, 0.25)
+    result = integrate_time_series(
+        t, trace, scale=4.0, initial_value=0.0,
+        baseline_start_s=0.0, baseline_end_s=0.2,
+    )
+    np.testing.assert_allclose(result["calibrated_signal"], 0.0, atol=1e-14)
+    np.testing.assert_allclose(result["integrated_signal"], 0.0, atol=1e-14)
+
+
+def test_rogowski_integration_rejects_nonmonotonic_time_and_incomplete_baseline():
+    with pytest.raises(ValueError, match="strictly increasing"):
+        integrate_time_series([0.0, 1.0, 1.0], [0.0, 1.0, 2.0])
+    with pytest.raises(ValueError, match="both baseline"):
+        integrate_time_series([0.0, 1.0], [0.0, 1.0], baseline_start_s=0.0)
+
+
+def test_rogowski_registry_declares_bounded_end_to_end_contract():
+    import json
+    from pathlib import Path
+
+    registry = json.loads(Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    item = next(entry for entry in registry if entry.get("diagnostic") == "Rogowski coil")
+    contract = item["execution_contract"]
+    assert item["status"] == "D"
+    assert contract["completeness"] == "complete_with_declared_scope"
+    assert contract["raw_data_to_physics"] is True
+    assert {entry["name"] for entry in contract["input_specs"]} >= {
+        "acquisition_mode", "time_s", "signal", "scale"
+    }
+    assert {entry["name"] for entry in contract["output_specs"]} >= {
+        "plasma_current_A", "corrected_signal", "diagnostics"
+    }
