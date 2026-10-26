@@ -162,8 +162,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         raise ValueError("dI/dV is non-finite; voltage values must be distinct and well-conditioned.")
     out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
     if ion_fit_range is not None:
-        if max(ion_fit_range) < min(v) or min(ion_fit_range) > max(v):
-            raise ValueError("ion_fit_range must overlap the measured voltage sweep and contain at least 3 valid samples.")
+        if min(ion_fit_range) < min(v) or max(ion_fit_range) > max(v):
+            raise ValueError(
+                f"ion_fit_range must lie inside the measured voltage range "
+                f"[{min(v):g}, {max(v):g}] V."
+            )
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum()>=3:
             p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
@@ -171,8 +174,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
         else:
             raise ValueError("ion_fit_range must overlap the measured voltage sweep and contain at least 3 valid samples.")
     if electron_fit_range is not None:
-        if max(electron_fit_range) <= min(v) or min(electron_fit_range) >= max(v):
-            raise ValueError("electron_fit_range must overlap the measured voltage sweep.")
+        if min(electron_fit_range) < min(v) or max(electron_fit_range) > max(v):
+            raise ValueError(
+                f"electron_fit_range must lie inside the measured voltage range "
+                f"[{min(v):g}, {max(v):g}] V."
+            )
         m = (v >= min(electron_fit_range)) & (v <= max(electron_fit_range))
         if m.sum() < 4:
             raise ValueError("Electron-retarding fit range needs at least 4 points with positive current after ion-current baseline subtraction.")
