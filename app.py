@@ -20,6 +20,7 @@ from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distr
 from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
+from tokamak_analysis.flux_loops import analyze_flux_loop
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families, maturity_counts, maturity_label
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -1685,7 +1686,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Registered analysis modules'])
     if workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
@@ -1918,6 +1919,55 @@ elif page=='Advanced Analysis':
                 json_download('Export Thomson power-density estimate',summary,'tis_thomson_power_density.json')
             except Exception as e:
                 st.error(str(e))
+    elif workflow=='Flux-loop magnetic-flux reconstruction':
+        st.markdown('Reconstruct poloidal magnetic-flux change from a calibrated flux-loop voltage using Faraday’s law.')
+        st.caption('Time must be in seconds and voltage in volts. Correct calibration, loop polarity, turn count, and the initial-flux condition are experiment-specific inputs.')
+        st.warning('The absolute flux depends on the supplied initial flux. This workflow does not calibrate raw electronics or reconstruct Grad–Shafranov equilibrium.')
+        if df is None or len(numeric) < 2:
+            st.info('Load a table with time (s) and calibrated flux-loop voltage (V) columns.')
+        else:
+            time_col=col_select('Time (s)',numeric,'tis_flux_loop_time')
+            voltage_col=col_select('Calibrated flux-loop voltage (V)',numeric,'tis_flux_loop_voltage')
+            turns=int(st.number_input('Number of turns',min_value=1,value=1,step=1,key='tis_flux_loop_turns'))
+            polarity=st.selectbox('Sensor polarity',options=[1,-1],format_func=lambda value: '+1' if value==1 else '−1',key='tis_flux_loop_polarity')
+            offset=st.number_input('Voltage baseline offset to subtract (V)',value=0.0,format='%.8g',key='tis_flux_loop_offset')
+            initial_flux=st.number_input('Initial flux at first sample (Wb)',value=0.0,format='%.8g',key='tis_flux_loop_initial')
+            gap_guard=st.checkbox('Reject unexpectedly large sampling gaps',value=False,key='tis_flux_loop_gap_guard')
+            max_gap=None
+            if gap_guard:
+                max_gap=st.number_input('Maximum allowed sample interval (s)',min_value=1e-15,value=1e-3,format='%.8g',key='tis_flux_loop_max_gap')
+            if st.button('Reconstruct magnetic flux',type='primary',key='run_flux_loop_analysis'):
+                try:
+                    if time_col==voltage_col:
+                        raise ValueError('Time and voltage must use different columns.')
+                    time_values=pd.to_numeric(df[time_col],errors='raise').to_numpy(dtype=float)
+                    voltage_values=pd.to_numeric(df[voltage_col],errors='raise').to_numpy(dtype=float)
+                    result=analyze_flux_loop(time_values,voltage_values,turns=turns,polarity=int(polarity),
+                        voltage_offset_V=float(offset),initial_flux_Wb=float(initial_flux),max_gap_s=max_gap)
+                    st.success('Flux-loop analysis completed within the declared calibrated-input scope.')
+                    c1,c2,c3=st.columns(3)
+                    c1.metric('Flux change (final)',f"{result.flux_change_Wb[-1]:.6g} Wb")
+                    c2.metric('Reconstructed flux (final)',f"{result.flux_Wb[-1]:.6g} Wb")
+                    c3.metric('Samples',f"{result.diagnostics['sample_count']}")
+                    frame=pd.DataFrame({'Time (s)':result.time_s,'Corrected loop voltage (V)':result.voltage_V,
+                        'Integrated voltage (V s)':result.loop_voltage_integral_Vs,'Flux change (Wb)':result.flux_change_Wb,
+                        'Reconstructed flux (Wb)':result.flux_Wb})
+                    st.markdown('**Corrected voltage**')
+                    st.line_chart(frame.set_index('Time (s)')[['Corrected loop voltage (V)']])
+                    st.markdown('**Magnetic flux reconstruction**')
+                    st.line_chart(frame.set_index('Time (s)')[['Flux change (Wb)','Reconstructed flux (Wb)']])
+                    st.markdown('**Sampling and signal diagnostics**')
+                    st.json(result.diagnostics)
+                    download_df('Download flux-loop results (CSV)',frame,'tis_flux_loop_results.csv')
+                    json_download('Export flux-loop result and provenance (JSON)',result.to_dict(),'tis_flux_loop_results.json')
+                    with st.expander('Assumptions and limitations'):
+                        st.markdown('- Faraday convention: V_loop = −N dΦ/dt after applying the selected polarity.')
+                        st.markdown('- Input voltage must already be calibrated in volts; constant offset correction is optional.')
+                        st.markdown('- Flux change is relative to the first sample; absolute flux uses the explicit initial condition.')
+                        st.markdown('- Voltage, timing, calibration, baseline-drift and initial-condition uncertainties are not propagated.')
+                        st.markdown('- This is not an equilibrium solver and does not infer plasma current or loop geometry.')
+                except Exception as exc:
+                    st.error(f'Flux-loop analysis failed: {exc}')
     elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
