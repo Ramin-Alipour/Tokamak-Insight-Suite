@@ -1,0 +1,63 @@
+"""Interactive Streamlit acceptance tests for Rogowski-current analysis."""
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from streamlit.testing.v1 import AppTest
+
+
+def _loaded_app():
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    t = np.linspace(0.0, 1.0, 101)
+    app.session_state["tis_df"] = pd.DataFrame({
+        "time_s": t,
+        "derivative_V": np.full_like(t, 2.0),
+        "integrator_V": 5.0 + 2.0 * t,
+    })
+    app.session_state["tis_filename"] = "synthetic_rogowski.csv"
+    app.session_state["tis_sha"] = "synthetic-rogowski-test"
+    app.radio(key="workspace_page").set_value("Time Series & MHD")
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    app.selectbox(key="ts_t").set_value("time_s")
+    app.selectbox(key="ts_s").set_value("derivative_V")
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    return app
+
+
+def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
+    app = _loaded_app()
+    mode = next(item for item in app.radio if item.key == "rogowski_acquisition_mode")
+    mode.set_value("Derivative output (signal ∝ dIp/dt; integrate once)")
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    next(item for item in app.button if item.label == "Analyze Rogowski / calibrated current trace").click()
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
+    assert "derivative_output" in rendered
+    assert "plasma current" in rendered.lower()
+    assert any(item.label == "Download Rogowski current series" for item in app.get("download_button"))
+    assert any(item.label == "Export Rogowski analysis manifest" for item in app.get("download_button"))
+
+
+def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
+    app = _loaded_app()
+    app.selectbox(key="ts_s").set_value("integrator_V")
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    next(item for item in app.radio if item.key == "rogowski_acquisition_mode").set_value(
+        "External integrator output (signal ∝ Ip; do not integrate)"
+    )
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    next(item for item in app.button if item.label == "Analyze Rogowski / calibrated current trace").click()
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
+    assert "integrator_output" in rendered
+    assert "integration_applied" in rendered
+    assert "False" in rendered
