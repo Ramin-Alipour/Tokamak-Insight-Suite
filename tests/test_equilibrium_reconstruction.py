@@ -72,3 +72,55 @@ def test_iteration_cap_is_reported_without_false_convergence_claim():
     )
     assert result["iterations"] == 1
     assert result["converged"] is False
+
+
+
+@pytest.mark.parametrize(
+    "R, Z, message",
+    [
+        ([1.0, 1.4, 2.0], np.linspace(-0.5, 0.5, 3), "Uniform grids"),
+        ([1.0, np.nan, 2.0], np.linspace(-0.5, 0.5, 3), "finite"),
+        ([0.0, 0.5, 1.0], np.linspace(-0.5, 0.5, 3), "R must be positive"),
+    ],
+)
+def test_solver_rejects_nonphysical_or_nonuniform_coordinate_grids(R, Z, message):
+    boundary = np.zeros((len(Z), len(R)))
+    with pytest.raises(ValueError, match=message):
+        reconstruct_equilibrium(R, Z, boundary, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0])
+
+
+@pytest.mark.parametrize(
+    "dp, ff, message",
+    [
+        (np.zeros((3, 3)), np.zeros((4, 3)), "shape"),
+        (np.full((3, 3), np.nan), np.zeros((3, 3)), "finite"),
+        (np.zeros((3, 3)), np.full((3, 3), np.inf), "finite"),
+    ],
+)
+def test_physical_relation_rejects_mismatched_or_nonfinite_profiles(dp, ff, message):
+    R = np.linspace(1.0, 2.0, 3)
+    Z = np.linspace(-0.5, 0.5, 3)
+    psi = np.zeros((3, 3))
+    with pytest.raises(ValueError, match=message):
+        grad_shafranov_physical_relation(R, Z, psi, dp, ff)
+
+
+def test_solver_reports_finite_interior_equation_residual_and_fixed_perimeter():
+    R, Z = grid()
+    boundary = np.zeros((Z.size, R.size))
+    boundary[0, :] = np.linspace(0.0, 1.0, R.size)
+    boundary[-1, :] = np.linspace(0.0, 1.0, R.size)
+    boundary[:, 0] = 0.0
+    boundary[:, -1] = 1.0
+    result = reconstruct_equilibrium(
+        R, Z, boundary, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0],
+        max_iterations=20000, tolerance=1e-9,
+    )
+    np.testing.assert_array_equal(result["psi_Wb_rad"][[0, -1], :], boundary[[0, -1], :])
+    np.testing.assert_array_equal(result["psi_Wb_rad"][:, [0, -1]], boundary[:, [0, -1]])
+    assert np.isfinite(result["equation_residual_rms_Wb_rad_m-2"])
+    assert np.isfinite(result["equation_residual_max_abs_Wb_rad_m-2"])
+    assert result["equation_residual_rms_Wb_rad_m-2"] >= 0
+    assert result["equation_residual_max_abs_Wb_rad_m-2"] >= result["equation_residual_rms_Wb_rad_m-2"]
+    assert result["psi_Wb_rad"].shape == (Z.size, R.size)
+    assert result["B_poloidal_T"].shape == (Z.size, R.size)
