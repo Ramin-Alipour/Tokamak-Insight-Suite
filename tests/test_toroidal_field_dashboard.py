@@ -12,9 +12,9 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Advanced Analysis").run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    app.selectbox(label="Select workflow").set_value("Registered analysis modules").run()
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value("Registered analysis modules").run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    app.selectbox(label="Analysis").set_value(8).run()
+    next(item for item in app.selectbox if item.label == "Analysis").set_value(8).run()
     assert any("Toroidal-field coils / magnetic probes" in x.value for x in app.get("caption"))
     args = {
         "time_s": [0.0, 0.1, 0.2],
@@ -31,7 +31,7 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
         "pickup_sensitivity_uncertainty_V_per_T_per_s": 0.1,
         "initial_field_uncertainty_T": 0.05,
     }
-    app.text_area(label="Function arguments (JSON)").set_value(json.dumps(args)).run()
+    next(item for item in app.text_area if item.label == "Function arguments (JSON)").set_value(json.dumps(args)).run()
     app.button(label="Run registered analysis").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any(x.value == "Analysis executed." for x in app.success)
