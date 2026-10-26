@@ -25,14 +25,14 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     assert report["source_of_truth"] == "DIAGNOSTIC_REGISTRY.json"
     assert report["diagnostic_record_count"] == 80
     assert report["diagnostic_execution_level_counts"] == {
-        "analysis_pipeline": 11,
-        "limited_calculation": 17,
+        "analysis_pipeline": 12,
+        "limited_calculation": 16,
         "reference_only": 52,
     }
     assert report["diagnostic_completeness_counts"] == {
         "complete": 7,
-        "complete_with_declared_scope": 5,
-        "incomplete": 68,
+        "complete_with_declared_scope": 6,
+        "incomplete": 67,
     }
     assert report["callable_analysis_entry_point_count"] == 81
     assert sum(report["callable_analysis_completeness_counts"].values()) == 81
