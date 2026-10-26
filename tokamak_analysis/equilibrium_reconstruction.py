@@ -118,12 +118,24 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
     operator = physical["grad_shafranov_operator_Wb_rad_m-2"]
     residual = operator - final_source
     interior = residual[1:-1, 1:-1]
+    residual_rms = float(np.sqrt(np.mean(interior**2)))
+    residual_scale = max(
+        float(np.sqrt(np.mean(operator[1:-1, 1:-1] ** 2))),
+        float(np.sqrt(np.mean(final_source[1:-1, 1:-1] ** 2))),
+        np.finfo(float).tiny,
+    )
+    relative_residual_rms = residual_rms / residual_scale
+    # A small update alone can indicate stagnation, not a solution of the PDE.
+    # Only advertise convergence when both the iteration and equation residual
+    # satisfy their tolerances on the cells where the PDE is solved.
+    converged = bool(converged and relative_residual_rms <= max(10.0 * tolerance, 1e-10))
     return {
         "R_m": R.copy(), "Z_m": Z.copy(), "psi_Wb_rad": psi,
         "psi_normalized": psin, "B_R_T": br, "B_Z_T": bz,
         "B_poloidal_T": np.hypot(br, bz), "iterations": it,
         "relative_iteration_change": change, "converged": converged,
-        "equation_residual_rms_Wb_rad_m-2": float(np.sqrt(np.mean(interior**2))),
+        "equation_residual_rms_Wb_rad_m-2": residual_rms,
+        "equation_residual_relative_rms": relative_residual_rms,
         "equation_residual_max_abs_Wb_rad_m-2": float(np.max(np.abs(interior))),
         "warning": "Prescribed-boundary/profile solve only; inspect PDE residual and validate against independent magnetic constraints. Not a full EFIT reconstruction.",
     }
