@@ -9,12 +9,12 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     assert len(contracts) == 80
     assert len({item.name for item in contracts}) == 80
     assert sum(item.completeness == "complete" for item in contracts) == 7
-    assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 6
-    assert sum(item.completeness == "incomplete" for item in contracts) == 67
+    assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 7
+    assert sum(item.completeness == "incomplete" for item in contracts) == 66
     assert all(item.completeness in {"incomplete", "complete", "complete_with_declared_scope"} for item in contracts)
-    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 52
+    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 51
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 16
-    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 12
+    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 13
     assert any(item.supports_raw_data for item in contracts)
     assert all(
         not item.supports_raw_data
