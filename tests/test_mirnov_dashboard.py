@@ -83,7 +83,10 @@ def test_mirnov_dashboard_multichannel_mode_candidate():
     app.button(key="mirnov_analyze").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("Mirnov signal analysis completed" in x.value for x in app.success)
-    assert any("Toroidal mode candidate" in x.value for x in app.metric)
+    assert any(
+        "Multi-channel phase / toroidal mode candidate" in x.value
+        for x in app.subheader
+    )
     assert any(x.label == "Export Mirnov analysis JSON" for x in app.get("download_button"))
 
 
