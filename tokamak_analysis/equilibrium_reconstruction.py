@@ -263,7 +263,19 @@ def reconstruct_equilibrium_inverse(
         raise ValueError("Cannot infer a distinct plasma axis and edge flux from this reconstruction")
     psi_norm = (psi - axis_flux) / denom
     boundary_level = edge_flux
-    boundary_mask = np.isclose(psi_norm, 1.0, rtol=0.02, atol=0.02)
+    boundary_mask = np.isclose(psi, boundary_level, rtol=0.02, atol=0.02 * max(abs(denom), np.finfo(float).tiny))
+    # Extract actual level-set polylines from the fitted flux grid. This is a
+    # computational-edge-flux contour estimate, not a machine-defined LCFS.
+    from matplotlib.figure import Figure
+    contour_figure = Figure()
+    contour_axis = contour_figure.subplots()
+    contour_set = contour_axis.contour(R, Z, psi, levels=[boundary_level])
+    boundary_contours = [
+        np.asarray(segment, dtype=float).tolist()
+        for segment in contour_set.allsegs[0]
+        if len(segment) >= 3
+    ]
+    contour_figure.clear()
     # Per-block residuals are reported in native units and uncertainty-normalized units.
     diagnostics = {}
     for name, matrix, measured, sigma, corrected in weights:
@@ -281,7 +293,8 @@ def reconstruct_equilibrium_inverse(
         "psi_normalized": psi_norm, "basis_coefficients": coefficients,
         "axis_R_m": float(R[axis_i]), "axis_Z_m": float(Z[axis_j]),
         "axis_flux_Wb_rad": axis_flux, "boundary_flux_Wb_rad": boundary_level,
-        "boundary_mask": boundary_mask, "edge_flux_estimator": "median of reconstructed computational-edge flux",
+        "boundary_mask": boundary_mask, "boundary_contours_RZ_m": boundary_contours,
+        "edge_flux_estimator": "median of reconstructed computational-edge flux; not a machine-defined LCFS",
         "measurement_diagnostics": diagnostics,
         "weighted_residual_rms": float(np.linalg.norm(design @ coefficients - observed) / np.sqrt(observed.size)),
         "regularization": float(regularization),
