@@ -39,6 +39,7 @@ def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
     assert not app.exception, [str(item.value) for item in app.exception]
     rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
     assert "derivative_output" in rendered
+    assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
     assert "plasma current" in rendered.lower()
     assert any(item.label == "Download Rogowski current series" for item in app.get("download_button"))
     assert any(item.label == "Export Rogowski analysis manifest" for item in app.get("download_button"))
@@ -59,5 +60,18 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     assert not app.exception, [str(item.value) for item in app.exception]
     rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
     assert "integrator_output" in rendered
+    assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
     assert "integration_applied" in rendered
     assert "False" in rendered
+
+
+def test_rogowski_dashboard_rejects_zero_calibration_scale_without_crashing():
+    app = _loaded_app()
+    app.number_input(key="int_scale").set_value(0.0)
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    next(item for item in app.button if item.label == "Analyze Rogowski / calibrated current trace").click()
+    app.run()
+    assert not app.exception, [str(item.value) for item in app.exception]
+    assert any("Calibration scale must be finite and nonzero" in item.value for item in app.error)
+    assert not any("Rogowski-coil analysis completed" in item.value for item in app.success)
