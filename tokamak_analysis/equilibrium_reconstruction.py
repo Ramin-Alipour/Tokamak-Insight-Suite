@@ -75,9 +75,23 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
         raise ValueError("Profile arrays must be finite 1-D arrays of equal length")
     if np.any(np.diff(prof) <= 0) or prof[0] < 0 or prof[-1] > 1:
         raise ValueError("psi_profile must increase strictly within [0,1]")
-    if (not np.isfinite(max_iterations) or int(max_iterations) != max_iterations
-            or max_iterations < 1 or not np.isfinite(tolerance) or tolerance <= 0
-            or not np.isfinite(relaxation) or not 0 < relaxation < 2):
+    if ((
+            isinstance(max_iterations, (bool, np.bool_))
+            or not isinstance(max_iterations, (int, np.integer, float, np.floating))
+            or not np.isfinite(max_iterations)
+            or int(max_iterations) != max_iterations
+            or max_iterations < 1
+        ) or (
+            isinstance(tolerance, (bool, np.bool_))
+            or not isinstance(tolerance, (int, float, np.integer, np.floating))
+            or not np.isfinite(tolerance)
+            or tolerance <= 0
+        ) or (
+            isinstance(relaxation, (bool, np.bool_))
+            or not isinstance(relaxation, (int, float, np.integer, np.floating))
+            or not np.isfinite(relaxation)
+            or not 0 < relaxation < 2
+        )):
         raise ValueError("Solver controls require a positive integer iteration limit, finite positive tolerance, and finite relaxation in (0,2)")
     psi = np.zeros_like(bnd)
     psi[0, :] = bnd[0, :]
