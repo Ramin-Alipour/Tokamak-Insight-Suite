@@ -136,6 +136,14 @@ def analyze_cxrs_line(
                                bounds=(lower, upper), maxfev=30000)
     except (RuntimeError, ValueError, FloatingPointError) as exc:
         raise ValueError(f"CXRS line fit failed: {exc}") from exc
+    # A successful optimizer return is not sufficient: a rank-deficient fit can
+    # return parameters while its covariance (and therefore reported uncertainty)
+    # is undefined. Never label such a result as a completed quantitative analysis.
+    if pcov.shape != (5, 5) or not np.all(np.isfinite(pcov)):
+        raise ValueError("CXRS line fit covariance is singular or non-finite; uncertainties are not identifiable")
+    covariance_diagonal = np.diag(pcov)
+    if np.any(covariance_diagonal < 0):
+        raise ValueError("CXRS line fit covariance has negative parameter variances")
     amp, center, observed_sigma, intercept, slope = map(float, popt)
     if observed_sigma <= instrument_sigma_nm:
         raise ValueError("observed line width does not exceed instrumental width; ion temperature is unresolved")
