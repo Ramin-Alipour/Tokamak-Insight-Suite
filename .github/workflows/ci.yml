@@ -39,6 +39,10 @@ jobs:
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
         run: python -m pytest -q tests/test_toroidal_field_coils.py tests/test_toroidal_field_dashboard.py
+      - name: Run poloidal-field probe physics and interactive dashboard acceptance suite
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+        run: python -m pytest -q tests/test_poloidal_field_probes.py tests/test_poloidal_field_dashboard.py
 
       - name: Run interactive Langmuir dashboard regression
         env:
