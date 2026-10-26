@@ -1,12 +1,14 @@
 """Interactive Streamlit regression for registered toroidal-field analysis."""
 import json
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 
 def test_toroidal_field_registered_analysis_executes_and_exports():
-    app = AppTest.from_file("../app.py", default_timeout=120).run()
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Advanced Analysis").run()
     assert not app.exception, [str(x.value) for x in app.exception]
