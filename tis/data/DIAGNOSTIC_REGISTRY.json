@@ -2240,31 +2240,125 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Rogowski coil",
     "quantities": "Plasma current I_p",
-    "status": "M→D",
-    "method": "Integrate calibrated Rogowski output with documented integrator response.",
-    "caveat": "Offset drift, saturation, bandwidth and calibration are critical.",
+    "status": "D",
+    "method": "Analyze a calibrated Rogowski-coil trace in one of two explicitly declared acquisition modes: (1) derivative output proportional to dIp/dt, integrated numerically to reconstruct current; or (2) an external integrator output already proportional to Ip, analyzed without a second integration. Apply optional pre-shot baseline and linear pre/post-window drift correction only when the selected windows physically represent zero-current/zero-signal intervals. Preserve calibration, initial-condition and bandwidth assumptions in the result.",
+    "caveat": "This workflow cannot infer whether the input is raw coil voltage or integrator output, nor determine the transfer function, saturation, bandwidth, polarity, absolute calibration or initial current. The operator must explicitly select the acquisition mode and supply a calibrated scale. Integration is invalid as a current reconstruction when the signal is already proportional to current. Drift correction assumes the true signal is approximately zero in both selected windows.",
     "implementation_functions": [
       "integrate_time_series"
     ],
-    "implementation_status": "Implemented numerical workflow (see limits)",
+    "implementation_status": "Complete within the declared calibrated-trace software scope: explicit derivative-output integration and integrator-output pass-through modes, input validation, optional baseline/drift correction, diagnostics and uncertainty-free numerical results with calibration limitations declared. Device-specific calibration, transfer-function correction and independent experimental validation remain external.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Integrate calibrated Rogowski output with documented integrator response.",
-      "uncertainty_model": "not_specified",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "acquisition_mode",
+          "unit": "text",
+          "description": "Required explicit mode: derivative_output (signal proportional to dIp/dt; integrate once) or integrator_output (signal already proportional to Ip; do not integrate again).",
+          "required": true
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Finite, strictly increasing time coordinates with at least two samples.",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "V or calibrated signal units",
+          "description": "Measured Rogowski/integrator trace; finite and length-matched to time_s.",
+          "required": true
+        },
+        {
+          "name": "scale",
+          "unit": "mode-dependent calibration factor",
+          "description": "Finite calibrated factor converting signal to dIp/dt for derivative_output, or to Ip for integrator_output.",
+          "required": true
+        },
+        {
+          "name": "initial_current_A",
+          "unit": "A",
+          "description": "Initial current at the first time sample; used only for derivative_output integration.",
+          "required": false
+        },
+        {
+          "name": "baseline_start_s",
+          "unit": "s",
+          "description": "Optional start of a pre-shot baseline interval; must be supplied together with baseline_end_s.",
+          "required": false
+        },
+        {
+          "name": "baseline_end_s",
+          "unit": "s",
+          "description": "Optional end of a pre-shot baseline interval; must be supplied together with baseline_start_s.",
+          "required": false
+        },
+        {
+          "name": "drift_start_s",
+          "unit": "s",
+          "description": "Optional start of a post-event quiet interval for linear drift correction; requires both baseline bounds and drift_end_s.",
+          "required": false
+        },
+        {
+          "name": "drift_end_s",
+          "unit": "s",
+          "description": "Optional end of a post-event quiet interval for linear drift correction; requires drift_start_s and baseline bounds.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "plasma_current_A",
+          "unit": "A",
+          "description": "Reconstructed current in derivative_output mode, or calibrated current trace in integrator_output mode."
+        },
+        {
+          "name": "corrected_signal",
+          "unit": "mode-dependent calibrated units",
+          "description": "Input after requested baseline/drift correction and calibration scaling."
+        },
+        {
+          "name": "time_s",
+          "unit": "s",
+          "description": "Validated time coordinates."
+        },
+        {
+          "name": "acquisition_mode",
+          "unit": "text",
+          "description": "Mode used, preventing ambiguity about whether numerical integration was applied."
+        },
+        {
+          "name": "diagnostics",
+          "unit": "structured",
+          "description": "Sample count, duration, sampling-interval statistics, integration method and correction metadata."
+        }
+      ],
+      "assumptions": [
+        "The selected acquisition mode matches the physical hardware chain.",
+        "The supplied scale is calibrated for the selected mode and operating bandwidth.",
+        "Linear drift correction is used only when both baseline and post-event quiet windows have approximately zero true signal.",
+        "Initial current is known when integrating dIp/dt; otherwise the result has an unknown additive offset."
+      ],
+      "preprocessing": [
+        "Validate finite equal-length vectors, at least two samples, and strictly increasing unique time coordinates.",
+        "Validate mode-specific calibration and optional window bounds; reject incomplete or overlapping/invalid correction windows.",
+        "Apply baseline and optional linear drift correction only when requested."
+      ],
+      "algorithm": "For derivative_output, subtract any explicitly selected offset/drift correction and use cumulative trapezoidal integration with the supplied initial current. For integrator_output, apply the calibrated scale and report the resulting current trace without integrating a second time. Report time-grid and correction diagnostics.",
+      "uncertainty_model": "No uncertainty is inferred by this workflow. Input uncertainty, calibration uncertainty, integrator transfer-function response, drift-model uncertainty and initial-condition uncertainty are not propagated; users must quantify them externally.",
       "limitations": [
-        "Offset drift, saturation, bandwidth and calibration are critical."
+        "No automatic detection of raw coil voltage versus external-integrator output.",
+        "No sensor transfer-function, frequency-response, saturation or bandwidth correction.",
+        "Absolute current depends on the supplied calibration and initial condition.",
+        "Linear drift correction assumes the true signal is approximately zero in both correction windows.",
+        "No uncertainty propagation or independent experimental validation is claimed."
       ],
       "function_links": [
         "integrate_time_series"
       ],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "raw_data_to_physics": true,
+      "note": "The dashboard's calibrated-signal integration workflow is a numerical utility, not automatic instrument calibration. Select the derivative-output mode only for a signal proportional to dIp/dt; use integrator-output mode for a signal already proportional to plasma current. The registry contract declares the bounded supported scope and does not claim hardware-specific calibration."
     }
   },
   {
