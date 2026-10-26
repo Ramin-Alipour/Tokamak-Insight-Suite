@@ -27,3 +27,38 @@ def test_equilibrium_workspace_rejects_run_when_required_csv_inputs_are_missing(
     next(item for item in app.button if item.label == "Solve Grad–Shafranov equilibrium").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Upload all six CSV inputs" in str(item.value) for item in app.error)
+
+
+def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
+    import io
+
+    import numpy as np
+    from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+    def upload(name, values):
+        buffer = io.StringIO()
+        np.savetxt(buffer, np.asarray(values, dtype=float), delimiter=",")
+        return UploadedFile(
+            record={"file_id": name, "name": name, "type": "text/csv", "size": len(buffer.getvalue())},
+            file=io.BytesIO(buffer.getvalue().encode("utf-8")),
+        )
+
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    boundary = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    files = {
+        "gs_R": upload("R.csv", R),
+        "gs_Z": upload("Z.csv", Z),
+        "gs_boundary": upload("boundary.csv", boundary),
+        "gs_profile": upload("profile.csv", [0.0, 1.0]),
+        "gs_pprime": upload("pprime.csv", [0.0, 0.0]),
+        "gs_ffprime": upload("ffprime.csv", [0.0, 0.0]),
+    }
+    app = AppTest.from_file(APP_PATH, default_timeout=90).run()
+    app.radio(key="workspace_page").set_value("Equilibrium & Reconstruction").run()
+    for key, value in files.items():
+        app.get("file_uploader").key(key).set_value(value)
+    app.button(key="grad_shafranov_form-Solve Grad–Shafranov equilibrium").click().run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any("Converged" in str(item.value) for item in app.metric)
+    assert any("tis_grad_shafranov_equilibrium.csv" in str(item.value) for item in app.get("download_button"))
