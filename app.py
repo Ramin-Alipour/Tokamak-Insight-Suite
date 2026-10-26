@@ -717,8 +717,10 @@ elif page=='Time Series & MHD':
             with d1: drift_start=st.number_input('Post window start (s)',value=max(tmin,tmax-(tmax-tmin)*0.1),min_value=tmin,max_value=tmax,key='int_drift_start')
             with d2: drift_end=st.number_input('Post window end (s)',value=tmax,min_value=tmin,max_value=tmax,key='int_drift_end')
             st.caption('Drift correction assumes the true signal is approximately zero in both selected windows.')
-    if st.button('Analyze Rogowski / calibrated current trace'):
+    if st.button('Analyze Rogowski / calibrated current trace',key='run_rogowski_analysis'):
         try:
+            if not np.isfinite(int_scale) or int_scale == 0:
+                raise ValueError('Calibration scale must be finite and nonzero for the selected acquisition mode.')
             if acquisition_mode.startswith('Derivative output'):
                 result=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
                 current=np.asarray(result['integrated_signal'],dtype=float)
@@ -733,12 +735,14 @@ elif page=='Time Series & MHD':
                 metadata={'diagnostic':'Rogowski coil','acquisition_mode':'integrator_output','current_unit':'A','calibration_scale':float(int_scale),'integration_applied':False,'note':'Input is treated as an already-integrated, calibrated current signal; no second integration was applied.'}
             if not np.all(np.isfinite(current)):
                 raise ValueError('Current reconstruction contains non-finite values.')
-            metadata.update({'n_samples':int(len(t)),'duration_s':float(t[-1]-t[0]),'median_dt_s':float(np.median(np.diff(t)))})
+            metadata.update({'n_samples':int(len(t)),'duration_s':float(t[-1]-t[0]),'median_dt_s':float(np.median(np.diff(t))), 'current_min_A':float(np.min(current)), 'current_max_A':float(np.max(current)), 'current_final_A':float(current[-1])})
+            st.success('Rogowski-coil analysis completed within the declared calibrated-input scope.')
             st.json(metadata)
             plot_line(t,current,'Time (s)','Plasma current (A)','Rogowski-derived plasma current')
             out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':corrected,'plasma_current_A':current})
             download_df('Download Rogowski current series',out,'tis_rogowski_current.csv')
             json_download('Export Rogowski analysis manifest',metadata,'tis_rogowski_manifest.json')
+            add_report_section('Rogowski coil current reconstruction',metadata)
         except Exception as e: st.error(str(e))
 
 elif page=='Events & Transients':
