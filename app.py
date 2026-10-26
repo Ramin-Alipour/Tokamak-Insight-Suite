@@ -12,6 +12,7 @@ from tis.ui.project_page import render_project_page
 from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
+from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectrum
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
@@ -805,7 +806,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Thomson spectral distribution':
         st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
         xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
@@ -842,6 +843,56 @@ elif page=='Spectral Analysis':
             st.json({k:v for k,v in _r.items() if not isinstance(v,(np.ndarray,dict)) and k not in {'signal','wavelength_nm','background','background_subtracted_signal','positive_spectral_weights','fitted_spectrum','residual'}} | {'gaussian_fit_parameters':_r['gaussian_fit_parameters'],'gaussian_fit_parameter_uncertainties':_r['gaussian_fit_parameter_uncertainties']})
             st.line_chart(pd.DataFrame({'measured':_r['signal'],'background-subtracted':_r['background_subtracted_signal'],'Gaussian fit':_r['fitted_spectrum']} ,index=_r['wavelength_nm']))
             json_download('Export Thomson spectral-distribution results', {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in _r.items()}, 'thomson_spectral_distribution.json')
+    elif mode=='Ion temperature from Doppler spectroscopy':
+        st.caption('End-to-end Gaussian line fit and instrument-corrected ion temperature. Requires an independently calibrated wavelength axis, identified isolated transition, emitting-ion mass and measured instrument FWHM. This does not remove Stark/Zeeman broadening, blends, opacity or non-thermal broadening.')
+        xcol=col_select('Calibrated wavelength (nm)','numeric','ti_doppler_x')
+        ycol=col_select('Emission intensity','numeric','ti_doppler_y')
+        c1,c2=st.columns(2)
+        with c1:
+            rest=st.number_input('Laboratory rest wavelength (nm)',min_value=1e-9,value=530.0,format='%.10g',key='ti_doppler_rest')
+            mass=st.number_input('Emitting-ion mass (amu)',min_value=1e-9,value=12.0,format='%.8g',key='ti_doppler_mass')
+            inst=st.number_input('Instrument Gaussian FWHM (nm; independent calibration)',min_value=0.0,value=0.01,format='%.9g',key='ti_doppler_inst')
+        with c2:
+            inst_unc=st.number_input('Instrument FWHM uncertainty (nm; 1σ)',min_value=0.0,value=0.0,format='%.9g',key='ti_doppler_inst_unc')
+            sigma_col=st.selectbox('Per-sample intensity uncertainty σ (optional)',['<none>']+numeric,key='ti_doppler_sigma')
+        _signature={'data_sha':sha,'xcol':xcol,'ycol':ycol,'rest':float(rest),'mass':float(mass),'inst':float(inst),'inst_unc':float(inst_unc),'sigma_col':sigma_col}
+        if st.button('Calculate ion temperature from Doppler width',type='primary',key='ti_doppler_run'):
+            st.session_state.pop('tis_doppler_ti_result',None)
+            try:
+                _spec=pd.DataFrame({'wavelength_nm':pd.to_numeric(df[xcol],errors='coerce'),'intensity':pd.to_numeric(df[ycol],errors='coerce')})
+                if sigma_col!='<none>':
+                    _spec['uncertainty']=pd.to_numeric(df[sigma_col],errors='coerce')
+                    if not np.all(np.isfinite(_spec['uncertainty'])) or np.any(_spec['uncertainty']<=0):
+                        raise ValueError('Selected intensity uncertainty must be finite and positive for every sample.')
+                _spec=_spec.dropna(subset=['wavelength_nm','intensity']).sort_values('wavelength_nm',kind='stable')
+                _kwargs={}
+                if sigma_col!='<none>':
+                    _kwargs['intensity_uncertainty']=_spec['uncertainty'].to_numpy(dtype=float)
+                _result=ion_temperature_from_doppler_spectrum(
+                    _spec['wavelength_nm'].to_numpy(dtype=float),_spec['intensity'].to_numpy(dtype=float),
+                    rest_wavelength_nm=float(rest),ion_mass_amu=float(mass),
+                    instrumental_fwhm_nm=float(inst),
+                    instrumental_fwhm_uncertainty_nm=float(inst_unc),**_kwargs)
+                _result={k:(v.tolist() if isinstance(v,np.ndarray) else
+                            {kk:(vv.tolist() if isinstance(vv,np.ndarray) else vv) for kk,vv in v.items()} if isinstance(v,dict) else v)
+                         for k,v in _result.items()}
+                st.session_state['tis_doppler_ti_result']={**_signature,'result':_result,
+                    'wavelength_nm':_spec['wavelength_nm'].to_list(),'intensity':_spec['intensity'].to_list()}
+            except Exception as e:
+                st.error(f'Ion temperature withheld: {e}')
+        _saved=st.session_state.get('tis_doppler_ti_result')
+        if _saved and all(_saved.get(k)==v for k,v in _signature.items()):
+            _r=_saved['result']
+            m1,m2,m3,m4=st.columns(4)
+            m1.metric('Ion temperature',f"{_r['ion_temperature_eV']:.6g} eV")
+            m2.metric('1σ uncertainty',f"{_r['ion_temperature_uncertainty_eV']:.3g} eV" if _r['ion_temperature_uncertainty_eV'] is not None else 'Unavailable')
+            m3.metric('Observed FWHM',f"{_r['observed_fwhm_nm']:.6g} nm")
+            m4.metric('Fit R²',f"{_r['fit_r_squared']:.6g}")
+            st.success('Doppler ion-temperature analysis completed within the declared Gaussian isolated-line model.')
+            st.caption(_r['caveat'])
+            st.json({k:v for k,v in _r.items() if k not in {'fitted_intensity','fit_residuals','fit_covariance'}})
+            st.line_chart(pd.DataFrame({'measured':_saved['intensity'],'fitted':_r['fitted_intensity'],'residual':_r['fit_residuals']},index=_saved['wavelength_nm']))
+            json_download('Export Doppler ion-temperature result',_r,'tis_doppler_ion_temperature.json')
     elif mode=='Optical / emission line':
         xcol=col_select('Wavelength / spectral coordinate',numeric,'sp_x'); ycol=col_select('Intensity',numeric,'sp_y')
         model=st.selectbox('Line model',['Gaussian','Lorentzian','Voigt']); sigma_col=st.selectbox('Intensity uncertainty σ (optional)',['<none>']+numeric,key='sp_sigma'); xmin=st.number_input('Fit minimum',value=float(pd.to_numeric(df[xcol],errors='coerce').min())); xmax=st.number_input('Fit maximum',value=float(pd.to_numeric(df[xcol],errors='coerce').max()))
