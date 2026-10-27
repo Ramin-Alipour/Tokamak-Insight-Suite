@@ -66,8 +66,8 @@ jobs:
               assert main() == 0
               output = Path(tmp) / "ANALYSIS_REGISTRY.json"
               rows = json.loads(output.read_text(encoding="utf-8"))
-              assert len(rows) == 81
-              assert [row["id"] for row in rows] == list(range(1, 82))
+              assert len(rows) == 80
+              assert [row["id"] for row in rows] == list(range(1, 81))
           print("Installed wheel registries, contracts, version, and CLI smoke test passed.")
           PY
 
