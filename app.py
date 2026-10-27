@@ -1635,6 +1635,9 @@ elif page=='Equilibrium & Reconstruction':
                     n_profile_points=32, max_iterations=5000,
                     tolerance=1e-6, relaxation=1.1,
                     toroidal_field_boundary_Tm=(float(public_eq_f_edge) if float(public_eq_f_edge) != 0.0 else None),
+                    psi_profile=public_eq_profiles["psi_normalized_axis_to_edge"],
+                    pressure_gradient_Pa_per_Wb=public_eq_profiles["pressure_gradient_Pa_per_Wb"],
+                    ffprime_T2=public_eq_profiles["ffprime_T2"],
                 )
                 st.session_state['public_eq_result'] = public_eq_result
                 st.session_state['public_eq_profiles'] = public_eq_profiles
