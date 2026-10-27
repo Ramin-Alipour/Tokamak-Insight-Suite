@@ -254,6 +254,35 @@ def test_reference_flux_workflow_reconstructs_grad_shafranov_solution():
     assert "joint_pressure_ffprime_identifiable" in result["reference_comparison"]
 
 
+def test_reference_flux_workflow_uses_user_supplied_equilibrium_profiles():
+    R, Z = grid()
+    rr, zz = np.meshgrid(R, Z)
+    reference = rr**2 + zz**2
+    profile = np.linspace(0.0, 1.0, 8)
+    pprime = np.zeros_like(profile)
+    ffprime = np.full_like(profile, -2.0)
+    result = reconstruct_equilibrium_from_reference_flux(
+        R, Z, reference, psi_profile=profile,
+        pressure_gradient_Pa_per_Wb=pprime, ffprime_T2=ffprime,
+        tolerance=1e-9,
+    )
+    assert result["converged"] is True
+    assert "user-supplied" in result["reference_comparison"]["source_profile_model"]
+    np.testing.assert_allclose(result["psi_Wb_rad"], reference, atol=2e-6)
+    np.testing.assert_array_equal(result["inferred_profiles"]["psi_profile"], profile)
+    np.testing.assert_array_equal(result["inferred_profiles"]["pressure_gradient_Pa_per_Wb"], pprime)
+    np.testing.assert_array_equal(result["inferred_profiles"]["ffprime_T2"], ffprime)
+
+
+def test_reference_flux_workflow_rejects_partial_supplied_profile_bundle():
+    R, Z = grid()
+    rr, zz = np.meshgrid(R, Z)
+    with pytest.raises(ValueError, match="Supply psi_profile"):
+        reconstruct_equilibrium_from_reference_flux(
+            R, Z, rr**2 + zz**2, psi_profile=np.linspace(0.0, 1.0, 8)
+        )
+
+
 def test_reference_flux_workflow_rejects_bad_reference_map():
     R, Z = grid()
     with pytest.raises(ValueError, match="finite"):
