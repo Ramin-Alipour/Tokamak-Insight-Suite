@@ -501,6 +501,25 @@ def reconstruct_equilibrium_inverse(
     if not np.all(np.isfinite(psi)) or float(np.ptp(psi)) <= np.finfo(float).tiny:
         raise ValueError("Inverse fit produced a degenerate flux field; check response matrices and data")
 
+    # Propagate the caller-supplied 1-sigma measurement uncertainties through
+    # the weighted linear fit. This is the sampling covariance of the
+    # regularized estimator (not a Bayesian posterior and not a model-error
+    # estimate); calibration, basis, boundary, and profile uncertainties remain
+    # outside this conditional covariance.
+    normal_matrix = design.T @ design + float(regularization) * (penalty.T @ penalty)
+    try:
+        normal_inverse = np.linalg.solve(normal_matrix, np.eye(n_basis))
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("Inverse-fit coefficient covariance is numerically singular") from exc
+    coefficient_covariance = normal_inverse @ (design.T @ design) @ normal_inverse.T
+    coefficient_covariance = 0.5 * (coefficient_covariance + coefficient_covariance.T)
+    coefficient_variances = np.diag(coefficient_covariance)
+    if not np.all(np.isfinite(coefficient_covariance)) or np.any(coefficient_variances < -1e-12 * max(float(np.max(np.abs(coefficient_variances))), 1.0)):
+        raise ValueError("Inverse fit produced invalid coefficient uncertainty estimates")
+    coefficient_sigma = np.sqrt(np.maximum(coefficient_variances, 0.0))
+    flux_variance = np.einsum("kij,kl,lij->ij", basis, coefficient_covariance, basis, optimize=True)
+    flux_sigma = np.sqrt(np.maximum(flux_variance, 0.0))
+
     # Determine the magnetic axis from the strongest interior extremum relative
     # to the computational-edge flux level, then infer a boundary flux level
     # from the edge. This is a data-derived estimate, not a machine limiter model.
@@ -547,6 +566,14 @@ def reconstruct_equilibrium_inverse(
     return {
         "R_m": R.copy(), "Z_m": Z.copy(), "psi_Wb_rad": psi,
         "psi_normalized": psi_norm, "basis_coefficients": coefficients,
+        "basis_coefficient_covariance": coefficient_covariance,
+        "basis_coefficient_sigma": coefficient_sigma,
+        "psi_standard_uncertainty_Wb_rad": flux_sigma,
+        "uncertainty_interpretation": (
+            "Conditional 1-sigma propagation from supplied measurement uncertainties "
+            "through the regularized linear fit; excludes calibration, basis, boundary, "
+            "and Grad-Shafranov/profile-model uncertainties."
+        ),
         "axis_R_m": float(R[axis_i]), "axis_Z_m": float(Z[axis_j]),
         "axis_flux_Wb_rad": axis_flux, "boundary_flux_Wb_rad": boundary_level,
         "boundary_mask": boundary_mask, "boundary_contours_RZ_m": boundary_contours,
