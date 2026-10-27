@@ -207,27 +207,68 @@ def reconstruct_equilibrium_from_reference_flux(
     R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32,
     max_iterations=10000, tolerance=1e-8, relaxation=1.2,
     toroidal_field_boundary_Tm=None,
+    psi_profile=None, pressure_gradient_Pa_per_Wb=None, ffprime_T2=None,
 ):
-    """Run a data-backed Grad-Shafranov solve using a public/reference flux map.
+    """Reconstruct flux from a reference map using inferred or supplied GS profiles.
 
-    The reference supplies the fixed perimeter and a flux-binned source estimate.
-    Returned error metrics compare the computed interior against that reference;
-    because the source is estimated from the reference, this is a reconstruction
-    workflow demonstration, not blind validation or an independent EFIT result.
+    With no source-profile arguments, p'(psi) and F F'(psi) are estimated from
+    the reference flux map. If all three source-profile arrays are supplied,
+    they are used directly by the Grad-Shafranov solve and are not refitted.
+    The perimeter flux is prescribed in either mode, so this remains a
+    fixed-boundary reconstruction rather than a machine-specific free-boundary
+    EFIT. Reference comparison metrics are in-sample, not independent validation.
     """
     R, Z = _validated_grid(R_m, Z_m)
     reference = np.asarray(reference_psi_Wb_rad, dtype=float)
     if reference.shape != (Z.size, R.size) or not np.all(np.isfinite(reference)):
         raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
-    profiles = reconstruct_equilibrium_profiles_from_flux(
-        R, Z, reference, n_profile_points=n_profile_points,
-        toroidal_field_boundary_Tm=toroidal_field_boundary_Tm,
-    )
-    result = reconstruct_equilibrium(
-        R, Z, reference, profiles["psi_normalized_axis_to_edge"],
-        profiles["pressure_gradient_Pa_per_Wb"], profiles["ffprime_T2"],
-        max_iterations=max_iterations, tolerance=tolerance, relaxation=relaxation,
-    )
+
+    supplied = (psi_profile is not None, pressure_gradient_Pa_per_Wb is not None,
+                ffprime_T2 is not None)
+    if any(supplied) and not all(supplied):
+        raise ValueError(
+            "Supply psi_profile, pressure_gradient_Pa_per_Wb, and ffprime_T2 together, or omit all three"
+        )
+
+    if all(supplied):
+        profile = np.asarray(psi_profile, dtype=float)
+        pprime = np.asarray(pressure_gradient_Pa_per_Wb, dtype=float)
+        ffprime = np.asarray(ffprime_T2, dtype=float)
+        if (profile.ndim != 1 or profile.size < 4 or pprime.shape != profile.shape
+                or ffprime.shape != profile.shape or not np.all(np.isfinite(profile))
+                or not np.all(np.isfinite(pprime)) or not np.all(np.isfinite(ffprime))
+                or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1):
+            raise ValueError(
+                "Supplied source profiles must be finite, aligned, and strictly increasing within [0, 1]"
+            )
+        result = reconstruct_equilibrium(
+            R, Z, reference, profile, pprime, ffprime,
+            max_iterations=max_iterations, tolerance=tolerance, relaxation=relaxation,
+        )
+        derived = derive_equilibrium_profiles_from_sources(
+            R, Z, result["psi_Wb_rad"], profile, pprime, ffprime,
+            toroidal_field_boundary_Tm=toroidal_field_boundary_Tm,
+        )
+        source_model = "user-supplied p'(psi_N) and F F'(psi_N); no source refit"
+        bin_counts = np.array([], dtype=int)
+        design_rank = np.array([], dtype=int)
+        identifiable = None
+    else:
+        profiles = reconstruct_equilibrium_profiles_from_flux(
+            R, Z, reference, n_profile_points=n_profile_points,
+            toroidal_field_boundary_Tm=toroidal_field_boundary_Tm,
+        )
+        result = reconstruct_equilibrium(
+            R, Z, reference, profiles["psi_normalized_axis_to_edge"],
+            profiles["pressure_gradient_Pa_per_Wb"], profiles["ffprime_T2"],
+            max_iterations=max_iterations, tolerance=tolerance, relaxation=relaxation,
+        )
+        derived = profiles
+        source_model = profiles["profile_source_model"]
+        bin_counts = profiles["profile_bin_counts"]
+        design_rank = profiles["profile_bin_design_rank"]
+        identifiable = profiles["joint_pressure_ffprime_identifiable"]
+
     difference = result["psi_Wb_rad"][1:-1, 1:-1] - reference[1:-1, 1:-1]
     ref_interior = reference[1:-1, 1:-1]
     scale = max(float(np.ptp(ref_interior)), np.finfo(float).tiny)
@@ -237,23 +278,23 @@ def reconstruct_equilibrium_from_reference_flux(
             "interior_flux_nrmse_by_reference_range": float(np.sqrt(np.mean(difference**2)) / scale),
             "interior_flux_mae_Wb_rad": float(np.mean(np.abs(difference))),
             "reference_grid_shape": [int(Z.size), int(R.size)],
-            "source_profile_model": profiles["profile_source_model"],
-            "profile_bin_counts": profiles["profile_bin_counts"].tolist(),
-            "joint_pressure_ffprime_identifiable": profiles["joint_pressure_ffprime_identifiable"],
-            "profile_bin_design_rank": profiles["profile_bin_design_rank"].tolist(),
+            "source_profile_model": source_model,
+            "profile_bin_counts": np.asarray(bin_counts, dtype=int).tolist(),
+            "joint_pressure_ffprime_identifiable": identifiable,
+            "profile_bin_design_rank": np.asarray(design_rank, dtype=int).tolist(),
         },
         "inferred_profiles": {
-            "psi_profile": profiles["psi_normalized_axis_to_edge"].tolist(),
-            "pressure_gradient_Pa_per_Wb": profiles["pressure_gradient_Pa_per_Wb"].tolist(),
-            "ffprime_T2": profiles["ffprime_T2"].tolist(),
-            "pressure_Pa_relative_to_edge": profiles["pressure_Pa_relative_to_edge"].tolist(),
+            "psi_profile": np.asarray(derived["psi_normalized_axis_to_edge"], dtype=float).tolist(),
+            "pressure_gradient_Pa_per_Wb": np.asarray(derived["pressure_gradient_Pa_per_Wb"], dtype=float).tolist(),
+            "ffprime_T2": np.asarray(derived["ffprime_T2"], dtype=float).tolist(),
+            "pressure_Pa_relative_to_edge": np.asarray(derived["pressure_Pa_relative_to_edge"], dtype=float).tolist(),
         },
         "reference_psi_Wb_rad": reference.copy(),
         "warning": (
-            "Data-backed Grad-Shafranov reconstruction from a reference flux map. "
-            "The joint p'(psi)/F F'(psi) source profile was estimated from that same map; "
-            "comparison metrics are in-sample reconstruction errors, not independent validation. "
-            "Profile decomposition is underdetermined when the per-flux-bin R² design is rank deficient."
+            "Fixed-perimeter Grad-Shafranov reconstruction. Source profiles were "
+            + ("supplied by the user and used directly. " if all(supplied) else "estimated from the same reference flux map. ")
+            + "Comparison metrics are in-sample errors, not independent validation; "
+            "this is not a machine-specific free-boundary EFIT."
         ),
     })
     return result
