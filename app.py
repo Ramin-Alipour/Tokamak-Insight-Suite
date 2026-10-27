@@ -1718,8 +1718,29 @@ elif page=='Equilibrium & Reconstruction':
         st.pyplot(profile_fig)
         download_df('Download reconstructed equilibrium profiles', profile_table,
                     'tis_equilibrium_profiles.csv')
+        st.markdown('**Derived toroidal-current-density map**')
+        st.caption('jφ = R p′(ψ) + F F′(ψ)/(μ₀R); values outside the inferred axis-to-edge flux interval are masked.')
+        public_jtor_table = pd.DataFrame({
+            'Z_m': np.repeat(public_eq_Z, public_eq_R.size),
+            'R_m': np.tile(public_eq_R, public_eq_Z.size),
+            'j_tor_A_m2': public_eq_profiles['j_tor_A_m2'].ravel(),
+        })
+        public_jtor_fig = Figure(figsize=(8, 4.5))
+        public_jtor_ax = public_jtor_fig.subplots()
+        public_jtor_mesh = public_jtor_ax.pcolormesh(
+            public_eq_R, public_eq_Z, public_eq_profiles['j_tor_A_m2'],
+            shading='auto',
+        )
+        public_jtor_ax.set_xlabel('R (m)')
+        public_jtor_ax.set_ylabel('Z (m)')
+        public_jtor_ax.set_title('Inferred toroidal current density')
+        public_jtor_fig.colorbar(public_jtor_mesh, ax=public_jtor_ax, label='jφ (A/m²)')
+        public_jtor_fig.tight_layout()
+        st.pyplot(public_jtor_fig)
+        download_df('Download toroidal-current-density grid', public_jtor_table,
+                    'tis_equilibrium_toroidal_current_density.csv')
         st.json({key: value for key, value in public_eq_profiles.items()
-                 if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid'}})
+                 if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid', 'j_tor_A_m2'}})
         st.warning(public_eq_result['warning'])
     st.divider()
     st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
@@ -1851,8 +1872,15 @@ elif page=='Equilibrium & Reconstruction':
             st.metric('Joint p′ / FF′ fit', 'Identifiable' if inverse_profiles['joint_pressure_ffprime_identifiable'] else 'Underdetermined')
             st.dataframe(inv_profile_table, use_container_width=True)
             download_df('Download inverse-fit equilibrium profiles', inv_profile_table, 'tis_inverse_equilibrium_profiles.csv')
+            inv_jtor_table = pd.DataFrame({
+                'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
+                'R_m': np.tile(inverse_result['R_m'], inverse_result['Z_m'].size),
+                'j_tor_A_m2': inverse_profiles['j_tor_A_m2'].ravel(),
+            })
+            download_df('Download inverse-fit toroidal current-density grid', inv_jtor_table,
+                        'tis_inverse_toroidal_current_density.csv')
             st.json({key: value for key, value in inverse_profiles.items()
-                     if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid'}})
+                     if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid', 'j_tor_A_m2'}})
             st.warning(inverse_result['warning'])
         except Exception as exc:
             st.error(f'Inverse magnetic reconstruction failed: {exc}')
