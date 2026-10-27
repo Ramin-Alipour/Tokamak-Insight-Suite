@@ -1897,6 +1897,7 @@ elif page=='Equilibrium & Reconstruction':
             st.metric('Weighted residual RMS', f"{inverse_result['weighted_residual_rms']:.4g}")
             st.metric('Grad–Shafranov refinement', 'Converged' if inverse_gs_result['converged'] else 'Not converged')
             st.metric('GS-vs-fit flux NRMSE', f"{inverse_gs_result['reference_comparison']['interior_flux_nrmse_by_reference_range']:.4g}")
+            st.caption(f"Grad–Shafranov source profiles: {inverse_gs_result['reference_comparison']['source_profile_model']}")
             inverse_refined_grid = pd.DataFrame({
                 'Z_m': np.repeat(inverse_gs_result['Z_m'], inverse_gs_result['R_m'].size),
                 'R_m': np.tile(inverse_gs_result['R_m'], inverse_gs_result['Z_m'].size),
