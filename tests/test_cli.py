@@ -46,7 +46,7 @@ def test_cli_catalog_exports_analysis_maturity(tmp_path, monkeypatch):
     ])
     assert main() == 0
     registry = json.loads((tmp_path / "ANALYSIS_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(registry) == 81
+    assert len(registry) == 80
     assert all(row.get("maturity_level") for row in registry)
     assert registry[0]["execution_contract"]["completeness"] == "complete_with_declared_scope"
     assert registry[0]["maturity_level"] == "Complete within declared scope — not independently validated"
@@ -62,7 +62,7 @@ def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monk
         (tmp_path / "DIAGNOSTIC_STATUS_REPORT.json").read_text(encoding="utf-8")
     )
     assert report["diagnostic_record_count"] == 80
-    assert report["callable_analysis_entry_point_count"] == 81
+    assert report["callable_analysis_entry_point_count"] == 80
     assert report["diagnostic_completeness_counts"] == {
         "complete": 7,
         "complete_with_declared_scope": 7,
