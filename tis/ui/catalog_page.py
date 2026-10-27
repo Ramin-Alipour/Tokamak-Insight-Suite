@@ -28,7 +28,12 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
     if completeness_total != len(diagnostics):
         st.error("Diagnostic completeness counts do not reconcile with the loaded registry; do not trust this status summary.")
     if len(diagnostics) != 80:
-        st.warning(f"Expected 80 diagnostic records but loaded {len(diagnostics)}. This may be a stale or mismatched checkout.")
+        st.error(f"Expected exactly 80 diagnostic records but loaded {len(diagnostics)}.")
+    if len(analyses) != 80 or [item.get("id") for item in analyses] != list(range(1, 81)):
+        st.error("The analysis registry must contain IDs 1–80 in canonical order.")
+    if [item.get("name") for item in analyses] != [item.get("diagnostic") for item in diagnostics]:
+        st.error("Analysis titles/order do not match the canonical diagnostic registry.")
+    diagnostic_positions = {id(row): position for position, row in enumerate(diagnostics, start=1)}
     expected_completeness = {"complete": 7, "complete_with_declared_scope": 4, "incomplete": 69}
     expected_levels = {"analysis_pipeline": 11, "limited_calculation": 17, "reference_only": 52}
     if dict(diagnostic_status) != expected_completeness or dict(diagnostic_levels) != expected_levels:
@@ -69,7 +74,7 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                    and (not query or query in " ".join(str(v) for v in d.values()).lower())]
         st.write(f"{len(entries)} entries")
         for diagnostic in entries:
-            with st.expander(f"{diagnostic['diagnostic']} · {diagnostic['family']}"):
+            with st.expander(f"{diagnostic_positions[id(diagnostic)]:02d} · {diagnostic['diagnostic']} · {diagnostic['family']}"):
                 contract = diagnostic.get("execution_contract", {})
                 level = contract.get("execution_level", "reference_only")
                 completeness = contract.get("completeness", "incomplete")
