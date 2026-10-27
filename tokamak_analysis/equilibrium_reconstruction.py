@@ -364,7 +364,12 @@ def reconstruct_equilibrium_inverse(
             f"(response rank {effective_rank} < {n_basis} coefficients); add independent "
             f"magnetic measurements or reduce the basis"
         )
-    augmented = np.vstack((scaled, np.sqrt(regularization) * np.eye(n_basis)))
+    # Column scaling improves conditioning, but regularization is defined on the
+    # physical basis coefficients. Since beta = coefficients * column_norm, the
+    # Tikhonov rows must be diag(1 / column_norm), not the identity; otherwise
+    # changing a basis function's units silently changes the regularization prior.
+    penalty = np.diag(1.0 / column_norm)
+    augmented = np.vstack((scaled, np.sqrt(regularization) * penalty))
     rhs = np.concatenate((observed, np.zeros(n_basis)))
     scaled_coefficients, *_ = np.linalg.lstsq(augmented, rhs, rcond=None)
     coefficients = scaled_coefficients / column_norm
