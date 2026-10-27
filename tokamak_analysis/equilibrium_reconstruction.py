@@ -189,8 +189,13 @@ def reconstruct_equilibrium_inverse(
         raise ValueError("basis_psi_Wb_rad must have shape (n_basis, len(Z), len(R))")
     if not np.all(np.isfinite(basis)):
         raise ValueError("Flux basis must be finite")
-    if not np.isfinite(regularization) or regularization < 0:
-        raise ValueError("regularization must be finite and non-negative")
+    if (
+        isinstance(regularization, (bool, np.bool_))
+        or not isinstance(regularization, (int, float, np.integer, np.floating))
+        or not np.isfinite(regularization)
+        or regularization < 0
+    ):
+        raise ValueError("regularization must be a finite non-negative number")
     n_basis = basis.shape[0]
     blocks, targets, weights = [], [], []
 
