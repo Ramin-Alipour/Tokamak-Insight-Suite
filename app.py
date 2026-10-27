@@ -1822,6 +1822,11 @@ elif page=='Equilibrium & Reconstruction':
             })
             if 'F_Tm' in gs_profiles:
                 gs_profile_table['F_Tm'] = gs_profiles['F_Tm']
+                gs_profile_table['q_profile'] = gs_profiles['q_profile']
+                if gs_profiles['q95'] is not None:
+                    st.metric('Estimated q95', f"{gs_profiles['q95']:.5g}")
+                else:
+                    st.info('q95 unavailable: no sufficient closed interior flux contours around the inferred magnetic axis.')
             st.dataframe(gs_profile_table, use_container_width=True)
             download_df('Download Grad–Shafranov equilibrium profiles', gs_profile_table, 'tis_grad_shafranov_profiles.csv')
             gs_jtor_table = pd.DataFrame({
