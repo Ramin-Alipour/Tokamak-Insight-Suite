@@ -453,6 +453,7 @@ def test_q95_is_not_extrapolated_when_closed_contours_stop_before_095():
     q[2:8] = np.linspace(1.0, 2.0, 6)  # last closed contour is psi_N=0.7
     assert _q95_from_profile(profile, q) is None
 
-    q[9] = 3.0  # valid closed-contour data now bracket psi_N=0.95
-    assert _q95_from_profile(profile, q) == pytest.approx(2.75)
+    q[9] = 3.0
+    q[10] = 3.5  # valid closed-contour data now bracket psi_N=0.95
+    assert _q95_from_profile(profile, q) == pytest.approx(3.25)
 
