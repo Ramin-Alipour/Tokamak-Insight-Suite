@@ -25,3 +25,24 @@ def test_flux_rejects_bad_inputs():
         magnetic_flux_from_voltage([0, 1], [1, np.nan])
     with pytest.raises(ValueError):
         magnetic_flux_from_voltage([0, 0], [1, 2])
+
+
+@pytest.mark.parametrize("time, voltage", [
+    ([[0.0, 1.0]], [[1.0, 1.0]]),
+    ([0.0, 1.0], [[1.0], [1.0]]),
+])
+def test_flux_rejects_multidimensional_inputs_instead_of_flattening(time, voltage):
+    with pytest.raises(ValueError, match="one-dimensional"):
+        magnetic_flux_from_voltage(time, voltage)
+
+
+@pytest.mark.parametrize("initial_flux", [np.nan, np.inf, True, [0.0]])
+def test_flux_rejects_invalid_initial_flux(initial_flux):
+    with pytest.raises(ValueError, match="initial_flux_Wb"):
+        magnetic_flux_from_voltage([0.0, 1.0], [0.0, 0.0], initial_flux_Wb=initial_flux)
+
+
+@pytest.mark.parametrize("polarity", [True, 1.0, 0, 2, "1"])
+def test_flux_rejects_non_integer_or_invalid_polarity(polarity):
+    with pytest.raises(ValueError, match="polarity_sign"):
+        magnetic_flux_from_voltage([0.0, 1.0], [0.0, 0.0], polarity_sign=polarity)
