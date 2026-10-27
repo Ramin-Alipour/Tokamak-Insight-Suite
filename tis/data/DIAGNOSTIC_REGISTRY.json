@@ -2366,13 +2366,14 @@
     "diagnostic": "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)",
     "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
     "status": "D",
-    "method": "Solve the axisymmetric Grad–Shafranov equation on a uniform R-Z grid from prescribed boundary poloidal flux and supplied p'(psi) and F F'(psi) profiles; return poloidal flux, normalized flux, B_R, B_Z, B_p, convergence diagnostics, and a separate physical-equation residual evaluator.",
-    "caveat": "This is a finite-difference, prescribed-boundary/profile solver, not a full EFIT reconstruction: it does not infer boundary flux or profiles from magnetic measurements, locate a magnetic axis/separatrix, fit diagnostic constraints, or provide uncertainty estimates. Check convergence and residual before interpreting results.",
+    "method": "Two explicit computational paths: (1) finite-difference Grad–Shafranov solve with prescribed boundary poloidal flux and p'(psi), F F'(psi) profiles; (2) weighted inverse fit of a caller-supplied flux basis to calibrated magnetic-probe and/or flux-loop measurements, with optional known-coil-response subtraction. Returns flux grid, normalized flux, poloidal field, inferred axis/edge-contour estimates for the inverse fit, measurement residuals, and convergence diagnostics.",
+    "caveat": "This is a generic computational framework, not a machine-specific full EFIT. The prescribed-boundary solver does not infer the boundary or profiles. The inverse path requires independently generated machine-geometry response matrices, calibration, uncertainties, and coil responses; its axis and computational-edge contour are estimates, not a guaranteed magnetic axis or LCFS. It does not solve the nonlinear profile/measurement equilibrium inverse problem, reconstruct q(r), or propagate measurement/calibration uncertainty. Check solver convergence, PDE residual, identifiability, and measurement residuals.",
     "implementation_functions": [
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
-      "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation"
+      "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
+      "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse"
     ],
-    "implementation_status": "Implemented numerical Grad–Shafranov solver within the declared prescribed-boundary/profile scope; automated numerical regression tests cover validation, boundary preservation, magnetic-field derivatives, physical-equation residual, and non-convergence reporting. Not a complete experimental EFIT replacement.",
+    "implementation_status": "Implemented scoped Grad–Shafranov finite-difference solve plus weighted inverse flux-basis fit to supplied calibrated magnetic measurements. Automated numerical and Streamlit dashboard acceptance tests exercise both paths, invalid inputs, identifiability, residual reporting, and downloads. It remains a generic analysis framework rather than a complete machine-specific EFIT implementation.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -2431,6 +2432,60 @@
           "unit": "dimensionless",
           "required": false,
           "description": "Finite over-relaxation factor in (0,2); default 1.2."
+        },
+        {
+          "name": "basis_psi_Wb_rad",
+          "unit": "Wb rad^-1",
+          "required": false,
+          "description": "Inverse mode: finite flux basis with shape (n_basis, len(Z_m), len(R_m))."
+        },
+        {
+          "name": "magnetic_probe_response_T_per_coefficient",
+          "unit": "T per coefficient",
+          "required": false,
+          "description": "Inverse mode: calibrated magnetic-probe response matrix for the actual machine; supply together with measured values and positive 1-sigma uncertainties."
+        },
+        {
+          "name": "magnetic_probe_values_T",
+          "unit": "T",
+          "required": false,
+          "description": "Inverse mode: calibrated measured magnetic-probe values."
+        },
+        {
+          "name": "magnetic_probe_sigma_T",
+          "unit": "T",
+          "required": false,
+          "description": "Inverse mode: positive 1-sigma uncertainty for each magnetic-probe value."
+        },
+        {
+          "name": "flux_loop_response_Wb_rad_per_coefficient",
+          "unit": "Wb rad^-1 per coefficient",
+          "required": false,
+          "description": "Inverse mode: calibrated flux-loop response matrix for the actual machine; supply together with measured values and positive 1-sigma uncertainties."
+        },
+        {
+          "name": "flux_loop_values_Wb_rad",
+          "unit": "Wb rad^-1",
+          "required": false,
+          "description": "Inverse mode: calibrated measured flux-loop values."
+        },
+        {
+          "name": "flux_loop_sigma_Wb_rad",
+          "unit": "Wb rad^-1",
+          "required": false,
+          "description": "Inverse mode: positive 1-sigma uncertainty for each flux-loop value."
+        },
+        {
+          "name": "coil_response_and_currents",
+          "unit": "matrix and A",
+          "required": false,
+          "description": "Optional matched response matrix and measured coil-current vector for subtracting known coil contributions from each supplied diagnostic block."
+        },
+        {
+          "name": "regularization",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Inverse mode: finite non-negative Tikhonov regularization; rank-deficient/unidentifiable bases are rejected."
         }
       ],
       "output_specs": [
@@ -2473,26 +2528,65 @@
           "name": "converged",
           "unit": "boolean",
           "description": "Whether iteration-change criterion was met; false results must not be treated as converged equilibria."
+        },
+        {
+          "name": "basis_coefficients",
+          "unit": "coefficient",
+          "description": "Weighted regularized least-squares coefficients for the supplied flux basis."
+        },
+        {
+          "name": "axis_R_m",
+          "unit": "m",
+          "description": "Estimated location of the strongest interior flux extremum relative to the computational-edge flux level; not a guaranteed physical magnetic axis."
+        },
+        {
+          "name": "axis_Z_m",
+          "unit": "m",
+          "description": "Estimated vertical coordinate of the strongest interior flux extremum."
+        },
+        {
+          "name": "boundary_contours_RZ_m",
+          "unit": "m",
+          "description": "Extracted contours of the inferred computational-edge flux level; not a machine-defined last closed flux surface."
+        },
+        {
+          "name": "measurement_diagnostics",
+          "unit": "structured",
+          "description": "Per-diagnostic measured values, predictions, RMS residuals and uncertainty-normalized residuals."
+        },
+        {
+          "name": "equation_residual_relative_rms",
+          "unit": "dimensionless",
+          "description": "Prescribed-boundary solver's interior Grad–Shafranov residual normalized by a scale including flux and operator magnitudes."
+        },
+        {
+          "name": "measurement_count",
+          "unit": "count",
+          "description": "Number of magnetic measurement constraints used by inverse fit."
         }
       ],
       "assumptions": [
         "Axisymmetry and the supplied Grad–Shafranov sign/unit convention.",
         "Boundary poloidal flux and profile functions are prescribed, not inferred from experimental measurements.",
-        "Uniform R-Z grid."
+        "Uniform R-Z grid.",
+        "Inverse fitting is linear in caller-supplied flux-basis coefficients and depends on machine-specific calibrated response matrices."
       ],
       "preprocessing": [
-        "Validate finite arrays, grid geometry, array shapes, profile monotonicity, and solver controls."
+        "Validate finite arrays, grid geometry, array shapes, profile monotonicity, and solver controls.",
+        "Inverse path validates dimensions, finite values, positive measurement uncertainties, paired coil-response/current inputs, and full numerical rank of the weighted response matrix."
       ],
-      "algorithm": "Finite-difference elliptic solve with successive over-relaxation; interpolate p'(psi_N) and F F'(psi_N), preserve perimeter flux, then calculate magnetic field from flux derivatives. A separate evaluator computes Δ*psi, source, and residual for supplied mapped profiles.",
+      "algorithm": "Finite-difference elliptic solve with successive over-relaxation; interpolate p'(psi_N) and F F'(psi_N), preserve perimeter flux, then calculate magnetic field from flux derivatives. A separate evaluator computes Δ*psi, source, and residual for supplied mapped profiles. In inverse mode, solve a weighted Tikhonov least-squares problem after removing optional known coil responses; reject rank-deficient basis coefficients and report residuals by measurement block.",
       "uncertainty_model": "No uncertainty propagation; measurement, calibration, boundary, and profile uncertainties are not estimated.",
       "limitations": [
         "Not a full EFIT implementation or experimental equilibrium inference.",
         "No automatic magnetic-axis/separatrix identification, flux-loop/Mirnov fitting, profile reconstruction, or uncertainty estimation.",
-        "Iteration-change convergence alone is insufficient; inspect the physical-equation residual and validate against independent constraints."
+        "Iteration-change convergence alone is insufficient; inspect the physical-equation residual and validate against independent constraints.",
+        "Inverse basis fitting is linearized and cannot replace nonlinear machine-specific EFIT constraints or a Grad–Shafranov-consistent profile inversion."
       ],
       "function_links": [
         "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
-        "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation"
+        "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
+        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse"
       ],
       "raw_data_to_physics": false
     }
