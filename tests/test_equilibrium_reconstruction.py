@@ -284,3 +284,24 @@ def test_public_efit_loader_selects_real_flux_slice_and_records_provenance(monke
     assert manifest["dataset"] == "Sophelio/Fusion Equilibrium Challenge"
     assert manifest["selected_time_ms"] == 200.0
     assert manifest["license"] == "CC BY 4.0"
+
+
+
+def test_inverse_regularization_is_invariant_to_response_column_scaling():
+    """Tikhonov penalty acts on physical coefficients, not normalized columns."""
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    rr, zz = np.meshgrid(R, Z)
+    basis = np.stack((rr**2 + zz**2, rr + 2.0 * zz))
+    response = np.array([[100.0, 0.0], [0.0, 1.0]])
+    expected = np.array([10000.0 / 10001.0, 0.5])
+    result = reconstruct_equilibrium_inverse(
+        R, Z, basis,
+        magnetic_probe_response_T_per_coefficient=response,
+        magnetic_probe_values_T=[100.0, 1.0],
+        magnetic_probe_sigma_T=[1.0, 1.0],
+        regularization=1.0,
+    )
+    np.testing.assert_allclose(result["basis_coefficients"], expected, rtol=1e-10, atol=1e-10)
