@@ -1596,12 +1596,26 @@ elif page=='Equilibrium & Reconstruction':
         public_eq_sample = st.number_input('Public DIII-D sample index', min_value=0, value=0, step=1, key='public_eq_sample')
     with public_eq_col2:
         public_eq_time = st.number_input('EFIT time (s)', min_value=0.0, value=0.2, format='%.6f', key='public_eq_time')
+    public_eq_f_edge = st.number_input(
+        'Edge F = R Bφ (T·m; enter 0 to omit q)',
+        min_value=-1000.0, max_value=1000.0, value=0.0, format='%.6g',
+        help='Use the independently known EFIT edge value of F=R·B_toroidal in T·m. Do not enter a guessed value; q(ψ) is omitted when this is zero.',
+        key='public_eq_f_edge',
+    )
     if st.button('Fetch public EFIT map and reconstruct', type='primary', key='public_eq_reconstruct'):
         try:
             with st.spinner('Fetching public DIII-D EFIT map and solving Grad–Shafranov equation...'):
-                from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_from_reference_flux
+                from tokamak_analysis.equilibrium_reconstruction import (
+                    reconstruct_equilibrium_from_reference_flux,
+                    reconstruct_equilibrium_profiles_from_flux,
+                )
                 public_eq_R, public_eq_Z, public_eq_reference, public_eq_manifest = fetch_public_efit_flux_map(
                     int(public_eq_sample), float(public_eq_time)
+                )
+                public_eq_profiles = reconstruct_equilibrium_profiles_from_flux(
+                    public_eq_R, public_eq_Z, public_eq_reference,
+                    n_profile_points=32,
+                    toroidal_field_boundary_Tm=(float(public_eq_f_edge) if float(public_eq_f_edge) != 0.0 else None),
                 )
                 if (not np.allclose(np.diff(public_eq_R), np.diff(public_eq_R)[0])
                         or not np.allclose(np.diff(public_eq_Z), np.diff(public_eq_Z)[0])):
@@ -1612,6 +1626,7 @@ elif page=='Equilibrium & Reconstruction':
                     tolerance=1e-6, relaxation=1.1,
                 )
                 st.session_state['public_eq_result'] = public_eq_result
+                st.session_state['public_eq_profiles'] = public_eq_profiles
                 st.session_state['public_eq_manifest'] = public_eq_manifest
                 st.session_state['public_eq_R'] = public_eq_R
                 st.session_state['public_eq_Z'] = public_eq_Z
@@ -1624,6 +1639,7 @@ elif page=='Equilibrium & Reconstruction':
         public_eq_R = st.session_state['public_eq_R']
         public_eq_Z = st.session_state['public_eq_Z']
         public_eq_metrics = public_eq_result['reference_comparison']
+        public_eq_profiles = st.session_state['public_eq_profiles']
         st.markdown('**Public dataset provenance**')
         st.json(public_eq_manifest)
         public_eq_m1, public_eq_m2, public_eq_m3 = st.columns(3)
@@ -1661,6 +1677,49 @@ elif page=='Equilibrium & Reconstruction':
         })
         download_df('Download public-data reconstruction and comparison', public_eq_table,
                     'tis_public_efit_reconstruction.csv')
+        st.markdown('### Reconstructed equilibrium profiles')
+        st.caption(
+            'Pressure-gradient and F·F′ profiles are estimated jointly from the Grad–Shafranov operator and its R² dependence on each flux surface. '
+            'This is an inverse-source estimate, not a unique pressure/current reconstruction; the dataset provides ψ but withholds EFIT profile labels.'
+        )
+        prof1, prof2, prof3 = st.columns(3)
+        prof1.metric('Magnetic-axis R', f"{public_eq_profiles['axis_R_m']:.4g} m")
+        prof2.metric('Magnetic-axis Z', f"{public_eq_profiles['axis_Z_m']:.4g} m")
+        prof3.metric('Joint p′ / FF′ fit', 'Identifiable' if public_eq_profiles['joint_pressure_ffprime_identifiable'] else 'Underdetermined')
+        profile_table_data = {
+            'psi_normalized_axis_to_edge': public_eq_profiles['psi_normalized_axis_to_edge'],
+            'pressure_gradient_Pa_per_Wb': public_eq_profiles['pressure_gradient_Pa_per_Wb'],
+            'ffprime_T2': public_eq_profiles['ffprime_T2'],
+            'pressure_Pa_relative_to_edge': public_eq_profiles['pressure_Pa_relative_to_edge'],
+            'samples_in_flux_bin': public_eq_profiles['profile_bin_counts'],
+            'source_fit_rank': public_eq_profiles['profile_bin_design_rank'],
+        }
+        if 'F_Tm' in public_eq_profiles:
+            profile_table_data['F_Tm'] = public_eq_profiles['F_Tm']
+            profile_table_data['q_profile'] = public_eq_profiles['q_profile']
+            if public_eq_profiles['q95'] is not None:
+                st.metric('Estimated q95 (requires supplied edge F)', f"{public_eq_profiles['q95']:.5g}")
+            else:
+                st.warning('q95 could not be estimated because the flux map did not provide enough closed interior flux contours.')
+        else:
+            st.info('q(ψ) is not calculated: enter an independently known edge F = R·Bφ value to constrain the toroidal field function.')
+        profile_table = pd.DataFrame(profile_table_data)
+        st.dataframe(profile_table, use_container_width=True)
+        profile_fig = Figure(figsize=(9, 5))
+        profile_ax = profile_fig.subplots()
+        profile_ax.plot(profile_table_data['psi_normalized_axis_to_edge'],
+                        profile_table_data['pressure_gradient_Pa_per_Wb'], label="p′(ψ)")
+        profile_ax.plot(profile_table_data['psi_normalized_axis_to_edge'],
+                        profile_table_data['ffprime_T2'], label="F F′(ψ)")
+        profile_ax.set_xlabel('Normalized poloidal flux (axis 0 → edge 1)')
+        profile_ax.set_ylabel('Inferred Grad–Shafranov source profile')
+        profile_ax.legend()
+        profile_fig.tight_layout()
+        st.pyplot(profile_fig)
+        download_df('Download reconstructed equilibrium profiles', profile_table,
+                    'tis_equilibrium_profiles.csv')
+        st.json({key: value for key, value in public_eq_profiles.items()
+                 if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid'}})
         st.warning(public_eq_result['warning'])
     st.divider()
     st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
