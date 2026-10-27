@@ -263,8 +263,9 @@ def reconstruct_equilibrium_from_reference_flux(
         "reference_psi_Wb_rad": reference.copy(),
         "warning": (
             "Data-backed Grad-Shafranov reconstruction from a reference flux map. "
-            "The source profile was estimated from that same map with p'=0; comparison "
-            "metrics are in-sample reconstruction errors, not independent validation."
+            "The joint p'(psi)/F F'(psi) source profile was estimated from that same map; "
+            "comparison metrics are in-sample reconstruction errors, not independent validation. "
+            "Profile decomposition is underdetermined when the per-flux-bin R² design is rank deficient."
         ),
     })
     return result
