@@ -37,6 +37,18 @@ Each response matrix has one column per basis coefficient. Each uncertainty is a
 
 The weighted fit rejects a rank-deficient response matrix, since regularization cannot make unidentifiable coefficients identifiable. Outputs include basis coefficients, flux and normalized-flux grids, an interior-extremum axis estimate, a computational-edge flux contour estimate, per-diagnostic residuals, and the total weighted residual. The axis and edge contour are estimates from the supplied basis; they are not guaranteed to be the physical magnetic axis or last closed flux surface.
 
+## Flux-map-derived equilibrium profiles
+
+The public-data workflow now also estimates the Grad–Shafranov source profiles from the 2-D EFIT flux map. In each normalized-flux bin it fits
+
+`Δ*ψ = -μ0 R² p'(ψ) - F(ψ)F'(ψ)`
+
+jointly for `p'(ψ)` and `F F'(ψ)`, using the within-bin variation in `R²`. It integrates `p'` with the explicit boundary convention `p(edge)=0`. The output includes the magnetic-axis estimate, pressure-gradient profile, `F F'` profile, relative pressure profile, sample counts and design rank per flux bin.
+
+This is an **inverse-source estimate**, not a unique kinetic-pressure reconstruction. A single flux map does not uniquely determine pressure and current profiles unless the joint source fit is identifiable; the UI reports the fit rank/identifiability and never treats the estimated profile as an independently measured profile. The public challenge dataset provides EFIT flux maps but withholds most profile labels on its test split.
+
+The safety-factor profile `q(ψ)` is calculated only when the user supplies an independently known edge value `F(edge)=R Bφ` in T·m. The solver then integrates along closed flux contours that enclose the estimated axis. If the input is omitted, no `q` or `q95` is fabricated. The result remains sensitive to the flux-map sign convention, contour resolution, the supplied edge value, and the validity of the inferred source functions.
+
 ## Limitations and interpretation
 
 - Supply machine-specific geometry, basis functions, response matrices, calibration, coil-current measurements, and uncertainties. The software does not generate them.
