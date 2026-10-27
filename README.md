@@ -66,7 +66,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).
 
-**Implementation coverage audit:** [80 diagnostic records, 81 callable analysis entry points, and 37 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
+**Implementation coverage audit:** [80 diagnostic records, 80 ordered analysis entry points, and 37 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
 
 ## Workspace
 
@@ -84,7 +84,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Signal conditioning and detection limits:** explicit gap policies, Hampel despiking, drift-corrected integration, and background-only robust noise-floor/per-sample detection-threshold estimates. Every repair is reported; detection thresholds require bandwidth/temporal-correlation interpretation. See [Noise floor and detection limit](docs/analyses/noise_floor_detection_limit.md).
 - **Diagnostic Catalog:** `DIAGNOSTIC_REGISTRY.json` and `FORMULA_REGISTRY.json`, with supporting catalog modules.
 - **Molecular Spectroscopy (analysis 6/81):** [feature extraction, user-defined molecular-model fitting, input contract, and physical limitations](docs/analyses/molecular_spectroscopy.md).
-- **Thomson Scattering (analysis 1/81):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
+- **Thomson scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
 - **CXRS (analysis 4/81):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
 - **Poloidal-field probes:** [calibrated single-/multi-channel field analysis, uncertainty propagation, dashboard acceptance, and physical limitations](docs/analyses/poloidal_field_probes.md).
 - **Electron Cyclotron Emission (analysis 3/81):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
