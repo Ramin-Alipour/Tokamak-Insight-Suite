@@ -1664,7 +1664,7 @@ elif page=='Equilibrium & Reconstruction':
         st.warning(public_eq_result['warning'])
     st.divider()
     st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
-    st.caption('This finite-difference solver does not replace EFIT. Upload R and Z coordinate vectors, a boundary-flux grid shaped (len(Z), len(R)), and three profile CSV vectors: normalized flux, p\'(ψ), and F F\'(ψ).')
+    st.caption('Upload R and Z coordinate vectors, a boundary-flux grid shaped (len(Z), len(R)), and three profile CSV vectors: normalized flux, p\'(ψ), and F F\'(ψ).')
     with st.form('grad_shafranov_form'):
         eq_R_solver = st.file_uploader('Solver R coordinates (m; CSV vector)', type=['csv'], key='gs_R')
         eq_Z_solver = st.file_uploader('Solver Z coordinates (m; CSV vector)', type=['csv'], key='gs_Z')
