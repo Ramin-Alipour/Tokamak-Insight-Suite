@@ -32,6 +32,15 @@ def test_package_and_runtime_versions_are_consistent():
     assert version_line.split("=", 1)[1].strip().strip('"') == __version__
 
 
+def test_analysis_titles_numbers_and_order_match_canonical_80_diagnostic_catalog():
+    from tokamak_analysis.analysis_registry import ANALYSES
+
+    expected = [row["diagnostic"] for row in DIAGNOSTICS]
+    assert [row["id"] for row in ANALYSES] == list(range(1, 81))
+    assert [row["name"] for row in ANALYSES] == expected
+    assert [row["diagnostic"] for row in DIAGNOSTICS] == expected
+
+
 def test_all_analysis_entry_points_declare_conservative_contracts():
     import importlib
     from tokamak_analysis.analysis_registry import ANALYSES
