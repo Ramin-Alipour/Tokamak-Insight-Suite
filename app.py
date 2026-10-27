@@ -1841,7 +1841,7 @@ elif page=='Equilibrium & Reconstruction':
             st.error(f'Grad–Shafranov reconstruction failed: {exc}')
     st.divider()
     st.markdown('### Inverse magnetic equilibrium fit (measured data)')
-    st.caption('Upload a machine-specific JSON bundle containing calibrated response matrices, measured probe/flux-loop signals and uncertainties. No example or synthetic measurement data are substituted.')
+    st.caption('Upload a machine-specific JSON bundle containing calibrated response matrices, measured probe/flux-loop signals and uncertainties. The measured-data fit is followed by a separate fixed-boundary Grad–Shafranov consistency solve; this generic workflow is not a machine-specific free-boundary EFIT. No example or synthetic measurement data are substituted.')
     st.code('Required: R_m, Z_m, basis_psi_Wb_rad; magnetic_probe_response_T_per_coefficient + magnetic_probe_values_T + magnetic_probe_sigma_T and/or flux_loop_response_Wb_rad_per_coefficient + flux_loop_values_Wb_rad + flux_loop_sigma_Wb_rad. Optional coil response matrices must be paired with known coil currents.', language='text')
     inverse_bundle_file = st.file_uploader('Machine-calibrated inverse reconstruction bundle (JSON)', type=['json'], key='eq_inverse_bundle')
     inverse_regularization = st.number_input('Inverse-fit regularization', min_value=0.0, value=1e-8, format='%.3g', key='eq_inverse_regularization')
@@ -1852,7 +1852,7 @@ elif page=='Equilibrium & Reconstruction':
             inverse_bundle = json.load(inverse_bundle_file)
             from tokamak_analysis.equilibrium_reconstruction import (
                 reconstruct_equilibrium_inverse,
-                reconstruct_equilibrium_profiles_from_flux,
+                reconstruct_equilibrium_from_reference_flux,
             )
             inverse_result = reconstruct_equilibrium_inverse(
                 inverse_bundle.get('R_m'), inverse_bundle.get('Z_m'), inverse_bundle.get('basis_psi_Wb_rad'),
@@ -1868,13 +1868,29 @@ elif page=='Equilibrium & Reconstruction':
                 coil_flux_currents_A=inverse_bundle.get('coil_flux_currents_A'),
                 regularization=float(inverse_regularization),
             )
-            inverse_profiles = reconstruct_equilibrium_profiles_from_flux(
+            # Follow the calibrated magnetic fit with a fixed-boundary
+            # Grad–Shafranov consistency solve. This is deliberately reported
+            # separately from the sensor fit: it is not a free-boundary EFIT.
+            inverse_gs_result = reconstruct_equilibrium_from_reference_flux(
                 inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
-                n_profile_points=32,
+                n_profile_points=32, max_iterations=500, tolerance=1e-6,
+                relaxation=1.0,
                 toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
             )
+            inverse_profiles = inverse_gs_result['inferred_profiles']
             st.metric('Magnetic measurement count', inverse_result['measurement_count'])
             st.metric('Weighted residual RMS', f"{inverse_result['weighted_residual_rms']:.4g}")
+            st.metric('Grad–Shafranov refinement', 'Converged' if inverse_gs_result['converged'] else 'Not converged')
+            st.metric('GS-vs-fit flux NRMSE', f"{inverse_gs_result['reference_comparison']['interior_flux_nrmse_by_reference_range']:.4g}")
+            inverse_refined_grid = pd.DataFrame({
+                'Z_m': np.repeat(inverse_gs_result['Z_m'], inverse_gs_result['R_m'].size),
+                'R_m': np.tile(inverse_gs_result['R_m'], inverse_gs_result['Z_m'].size),
+                'magnetic_fit_psi_Wb_rad': inverse_gs_result['reference_psi_Wb_rad'].ravel(),
+                'gs_refined_psi_Wb_rad': inverse_gs_result['psi_Wb_rad'].ravel(),
+                'psi_difference_Wb_rad': (inverse_gs_result['psi_Wb_rad'] - inverse_gs_result['reference_psi_Wb_rad']).ravel(),
+            })
+            download_df('Download GS-refined inverse equilibrium', inverse_refined_grid,
+                        'tis_gs_refined_inverse_equilibrium.csv')
             st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask'}})
             inverse_grid = pd.DataFrame({
                 'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
