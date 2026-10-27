@@ -1841,7 +1841,7 @@ elif page=='Equilibrium & Reconstruction':
             st.error(f'Grad–Shafranov reconstruction failed: {exc}')
     st.divider()
     st.markdown('### Inverse magnetic equilibrium fit (measured data)')
-    st.caption('Upload a machine-specific JSON bundle containing calibrated response matrices, measured probe/flux-loop signals and uncertainties. The measured-data fit is followed by a separate fixed-boundary Grad–Shafranov consistency solve; this generic workflow is not a machine-specific free-boundary EFIT. No example or synthetic measurement data are substituted.')
+    st.caption('Upload a machine-specific JSON bundle containing calibrated response matrices, measured probe/flux-loop signals and uncertainties. Optional psi_profile, pressure_gradient_Pa_per_Wb, and ffprime_T2 arrays let the Grad–Shafranov solve use supplied equilibrium source profiles directly; omit all three to infer them from the fitted flux. The perimeter remains prescribed, so this generic workflow is not a machine-specific free-boundary EFIT. No example or synthetic measurement data are substituted.')
     st.code('Required: R_m, Z_m, basis_psi_Wb_rad; magnetic_probe_response_T_per_coefficient + magnetic_probe_values_T + magnetic_probe_sigma_T and/or flux_loop_response_Wb_rad_per_coefficient + flux_loop_values_Wb_rad + flux_loop_sigma_Wb_rad. Optional coil response matrices must be paired with known coil currents.', language='text')
     inverse_bundle_file = st.file_uploader('Machine-calibrated inverse reconstruction bundle (JSON)', type=['json'], key='eq_inverse_bundle')
     inverse_regularization = st.number_input('Inverse-fit regularization', min_value=0.0, value=1e-8, format='%.3g', key='eq_inverse_regularization')
@@ -1853,7 +1853,7 @@ elif page=='Equilibrium & Reconstruction':
             from tokamak_analysis.equilibrium_reconstruction import (
                 reconstruct_equilibrium_inverse,
                 reconstruct_equilibrium_from_reference_flux,
-                reconstruct_equilibrium_profiles_from_flux,
+                derive_equilibrium_profiles_from_sources,
             )
             inverse_result = reconstruct_equilibrium_inverse(
                 inverse_bundle.get('R_m'), inverse_bundle.get('Z_m'), inverse_bundle.get('basis_psi_Wb_rad'),
@@ -1876,10 +1876,21 @@ elif page=='Equilibrium & Reconstruction':
                 inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
                 n_profile_points=32, max_iterations=500, tolerance=1e-6,
                 relaxation=1.0,
+                toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
+                psi_profile=inverse_bundle.get('psi_profile'),
+                pressure_gradient_Pa_per_Wb=inverse_bundle.get('pressure_gradient_Pa_per_Wb'),
+                ffprime_T2=inverse_bundle.get('ffprime_T2'),
             )
-            inverse_profiles = reconstruct_equilibrium_profiles_from_flux(
-                inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
-                n_profile_points=32,
+            # Derive displayed profiles from the same source functions used by
+            # the GS solve, evaluated on its refined flux map. Do not silently
+            # replace supplied equilibrium profiles with a fresh inverse fit.
+            inverse_source_profiles = inverse_gs_result['inferred_profiles']
+            inverse_profiles = derive_equilibrium_profiles_from_sources(
+                inverse_gs_result['R_m'], inverse_gs_result['Z_m'],
+                inverse_gs_result['psi_Wb_rad'],
+                inverse_source_profiles['psi_profile'],
+                inverse_source_profiles['pressure_gradient_Pa_per_Wb'],
+                inverse_source_profiles['ffprime_T2'],
                 toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
             )
             st.metric('Magnetic measurement count', inverse_result['measurement_count'])
