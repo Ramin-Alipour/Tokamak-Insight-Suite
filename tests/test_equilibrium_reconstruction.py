@@ -63,6 +63,8 @@ def test_physical_relation_returns_small_residual_for_exact_quadratic_solution()
         ({"R_m": [1, 1, 2]}, "strictly increasing"),
         ({"boundary_flux_Wb_rad": np.zeros((2, 3))}, "Boundary flux"),
         ({"psi_profile": [0.5, 0.5]}, "increase strictly"),
+        ({"psi_profile": [0.1, 1.0]}, "full normalized-flux interval"),
+        ({"psi_profile": [0.0, 0.9]}, "full normalized-flux interval"),
         ({"max_iterations": 0}, "Solver controls"),
         ({"max_iterations": True}, "Solver controls"),
         ({"tolerance": True}, "Solver controls"),
