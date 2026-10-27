@@ -506,7 +506,9 @@ def reconstruct_equilibrium_inverse(
     # regularized estimator (not a Bayesian posterior and not a model-error
     # estimate); calibration, basis, boundary, and profile uncertainties remain
     # outside this conditional covariance.
-    normal_matrix = design.T @ design + float(regularization) * (penalty.T @ penalty)
+    # The augmented system regularizes the physical coefficients because
+    # beta = coefficients * column_norm and penalty @ beta == coefficients.
+    normal_matrix = design.T @ design + float(regularization) * np.eye(n_basis)
     try:
         normal_inverse = np.linalg.solve(normal_matrix, np.eye(n_basis))
     except np.linalg.LinAlgError as exc:
