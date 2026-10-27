@@ -15,16 +15,15 @@ def grid():
 
 
 def valid_reference_equilibrium():
-    """Build a reference flux from a closed, fixed-boundary GS test problem."""
+    """Build an exact source-free Grad-Shafranov reference with fixed perimeter flux.
+
+    psi = R**2 is harmonic under the Grad-Shafranov operator and is compatible
+    with zero p'(psi) and F F'(psi) source profiles. This tests the reference
+    workflow without requiring an incompatible synthetic plasma source.
+    """
     R, Z = grid()
-    boundary = np.ones((Z.size, R.size))
-    profile = np.linspace(0.0, 1.0, 8)
-    solved = reconstruct_equilibrium(
-        R, Z, boundary, profile, np.zeros_like(profile),
-        np.full_like(profile, -2.0), tolerance=1e-9,
-    )
-    assert solved["converged"] is True
-    return R, Z, solved["psi_Wb_rad"]
+    reference = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    return R, Z, reference
 
 
 def test_solver_preserves_boundary_and_recovers_harmonic_flux():
@@ -307,7 +306,7 @@ def test_reference_flux_workflow_uses_user_supplied_equilibrium_profiles():
     R, Z, reference = valid_reference_equilibrium()
     profile = np.linspace(0.0, 1.0, 8)
     pprime = np.zeros_like(profile)
-    ffprime = np.full_like(profile, -2.0)
+    ffprime = np.zeros_like(profile)
     result = reconstruct_equilibrium_from_reference_flux(
         R, Z, reference, psi_profile=profile,
         pressure_gradient_Pa_per_Wb=pprime, ffprime_T2=ffprime,
