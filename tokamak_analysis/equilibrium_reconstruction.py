@@ -486,7 +486,54 @@ def derive_equilibrium_profiles_from_sources(
         if np.any(f2 <= 0) or not np.all(np.isfinite(f2)):
             raise ValueError("Inferred F²(psi) is non-positive; check flux convention and edge F")
         result["F_squared_T2_m2"] = f2
-        result["F_Tm"] = np.sign(float(toroidal_field_boundary_Tm)) * np.sqrt(f2)
+        F = np.sign(float(toroidal_field_boundary_Tm)) * np.sqrt(f2)
+        result["F_Tm"] = F
+        # Safety factor from closed flux contours, only where a contour around
+        # the inferred axis exists and the supplied edge F makes F(psi) defined.
+        from matplotlib.figure import Figure
+        from matplotlib.path import Path as PolygonPath
+        from scipy.interpolate import RegularGridInterpolator
+
+        dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
+        grad_mag = np.hypot(dpsi_dr, dpsi_dz)
+        grad_interp = RegularGridInterpolator((Z, R), grad_mag, bounds_error=False, fill_value=np.nan)
+        fig = Figure()
+        ax = fig.subplots()
+        q_profile = np.full(profile.size, np.nan)
+        for k, level_n in enumerate(profile):
+            if level_n <= 0.02 or level_n >= 0.995:
+                continue
+            level = axis_flux + level_n * flux_span
+            contours = ax.contour(R, Z, psi, levels=[level])
+            segments = contours.allsegs[0]
+            chosen = None
+            for segment in segments:
+                if len(segment) < 8 or not np.allclose(segment[0], segment[-1], rtol=0, atol=1e-6):
+                    continue
+                if PolygonPath(segment).contains_point((R[axis_i], Z[axis_j])):
+                    if chosen is None or len(segment) > len(chosen):
+                        chosen = segment
+            for collection in getattr(contours, "collections", []):
+                collection.remove()
+            if chosen is None:
+                continue
+            points = np.asarray(chosen, dtype=float)
+            delta = np.diff(points, axis=0)
+            dl = np.hypot(delta[:, 0], delta[:, 1])
+            mid = 0.5 * (points[:-1] + points[1:])
+            grad_mid = grad_interp(mid[:, ::-1])
+            denominator = mid[:, 0] ** 2 * grad_mid
+            good = np.isfinite(denominator) & (denominator > np.finfo(float).tiny)
+            if np.count_nonzero(good) < 6:
+                continue
+            q_profile[k] = F[k] * float(np.sum(dl[good] / denominator[good])) / (2.0 * np.pi)
+        fig.clear()
+        result["q_profile"] = q_profile
+        result["q95"] = (
+            float(np.interp(0.95, profile[np.isfinite(q_profile)], q_profile[np.isfinite(q_profile)]))
+            if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
+        )
+        result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
     return result
 
 
