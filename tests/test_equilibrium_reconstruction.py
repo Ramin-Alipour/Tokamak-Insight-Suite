@@ -305,3 +305,40 @@ def test_inverse_regularization_is_invariant_to_response_column_scaling():
         regularization=1.0,
     )
     np.testing.assert_allclose(result["basis_coefficients"], expected, rtol=1e-10, atol=1e-10)
+
+
+def test_joint_equilibrium_profile_reconstruction_extracts_pressure_and_current_profiles():
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_profiles_from_flux
+
+    R = np.linspace(1.0, 2.0, 65)
+    Z = np.linspace(-0.5, 0.5, 65)
+    rr, zz = np.meshgrid(R, Z)
+    psi = -((rr - 1.5) ** 2 + zz**2)
+    result = reconstruct_equilibrium_profiles_from_flux(
+        R, Z, psi, n_profile_points=24, toroidal_field_boundary_Tm=3.0
+    )
+    assert result["joint_pressure_ffprime_identifiable"] is True
+    assert result["pressure_gradient_Pa_per_Wb"].shape == (24,)
+    assert result["ffprime_T2"].shape == (24,)
+    assert result["pressure_Pa_relative_to_edge"].shape == (24,)
+    assert result["F_Tm"].shape == (24,)
+    assert result["q_profile"].shape == (24,)
+    assert result["q95"] is None or np.isfinite(result["q95"])
+    assert result["axis_R_m"] == pytest.approx(1.5, abs=R[1] - R[0])
+    assert result["axis_Z_m"] == pytest.approx(0.0, abs=Z[1] - Z[0])
+    assert result["pressure_Pa_relative_to_edge"][-1] == pytest.approx(0.0)
+    assert np.all(np.isfinite(result["pressure_gradient_Pa_per_Wb"]))
+    assert np.all(np.isfinite(result["ffprime_T2"]))
+
+
+def test_joint_equilibrium_profile_reconstruction_does_not_guess_toroidal_field():
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_profiles_from_flux
+
+    R = np.linspace(1.0, 2.0, 65)
+    Z = np.linspace(-0.5, 0.5, 65)
+    rr, zz = np.meshgrid(R, Z)
+    psi = -((rr - 1.5) ** 2 + zz**2)
+    result = reconstruct_equilibrium_profiles_from_flux(R, Z, psi, n_profile_points=16)
+    assert "F_Tm" not in result
+    assert "q_profile" not in result
+    assert result["joint_pressure_ffprime_identifiable"] is True
