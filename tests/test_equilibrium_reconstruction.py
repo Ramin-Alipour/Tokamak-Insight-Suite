@@ -4,6 +4,8 @@ import pytest
 from tokamak_analysis.equilibrium_reconstruction import (
     grad_shafranov_physical_relation,
     reconstruct_equilibrium,
+    infer_grad_shafranov_profiles_from_flux,
+    reconstruct_equilibrium_from_reference_flux,
 )
 
 
@@ -220,3 +222,36 @@ def test_inverse_reconstruction_rejects_rank_deficient_basis_and_invalid_uncerta
             magnetic_probe_values_T=[1.0, 2.0],
             magnetic_probe_sigma_T=[0.1, 0.0],
         )
+
+
+
+def test_reference_flux_profile_inference_recovers_constant_source():
+    R, Z = grid()
+    rr, zz = np.meshgrid(R, Z)
+    reference = rr**2 + zz**2
+    profiles = infer_grad_shafranov_profiles_from_flux(R, Z, reference, n_profile_points=8)
+    np.testing.assert_allclose(profiles["pressure_gradient_Pa_per_Wb"], 0.0)
+    np.testing.assert_allclose(profiles["ffprime_T2"], -2.0, atol=1e-10)
+    assert profiles["reference_operator_Wb_rad_m-2"].shape == reference.shape
+    assert np.all(profiles["profile_bin_counts"] >= 0)
+
+
+def test_reference_flux_workflow_reconstructs_grad_shafranov_solution():
+    R, Z = grid()
+    rr, zz = np.meshgrid(R, Z)
+    reference = rr**2 + zz**2
+    result = reconstruct_equilibrium_from_reference_flux(
+        R, Z, reference, n_profile_points=8, tolerance=1e-9
+    )
+    assert result["converged"] is True
+    np.testing.assert_allclose(result["psi_Wb_rad"], reference, atol=2e-6)
+    assert result["reference_comparison"]["interior_flux_nrmse_by_reference_range"] < 1e-6
+    assert result["reference_psi_Wb_rad"].shape == reference.shape
+
+
+def test_reference_flux_workflow_rejects_bad_reference_map():
+    R, Z = grid()
+    with pytest.raises(ValueError, match="finite"):
+        infer_grad_shafranov_profiles_from_flux(R, Z, np.full((len(Z), len(R)), np.nan))
+    with pytest.raises(ValueError, match="nonzero finite range"):
+        reconstruct_equilibrium_from_reference_flux(R, Z, np.ones((len(Z), len(R))))
