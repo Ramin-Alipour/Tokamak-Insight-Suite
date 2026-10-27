@@ -1876,7 +1876,6 @@ elif page=='Equilibrium & Reconstruction':
                 inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
                 n_profile_points=32, max_iterations=500, tolerance=1e-6,
                 relaxation=1.0,
-                toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
                 psi_profile=inverse_bundle.get('psi_profile'),
                 pressure_gradient_Pa_per_Wb=inverse_bundle.get('pressure_gradient_Pa_per_Wb'),
                 ffprime_T2=inverse_bundle.get('ffprime_T2'),
