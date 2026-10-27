@@ -76,6 +76,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Probe Analysis:** Langmuir I–V analysis, probe summaries, triple-probe estimates and fluctuation/particle-flux utilities.
 - **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
 - **Equilibrium & Reconstruction:** derivatives of an input flux grid and profile analysis; Public Data Access can fetch and plot an existing FAIR-MAST EFIT `plasma_current_rz` grid without claiming to reconstruct equilibrium.
+- **Equilibrium reconstruction (analysis 13):** [prescribed-boundary Grad–Shafranov solve, weighted inverse magnetic fit, inputs, outputs, acceptance tests, and EFIT limitations](docs/analyses/equilibrium_reconstruction.md).
 - **Tomography & Bolometry:** uncertainty-weighted regularized tomography with optional L-curve λ selection, Abel reconstruction, axisymmetric radiated-power integration, and Eich-like or simple-exponential target heat-flux fitting.
 - **Advanced Analysis:** X-ray spectrum summaries, neutron-rate estimates, heat-flux fits and related routines.
 - **Events & Transients:** ELM detection and repetition statistics, sawtooth crash detection (period, amplitude), plasma-current-quench analysis (ITER 80 %→20 % convention). Statistical detectors; always confirm against the raw trace.
