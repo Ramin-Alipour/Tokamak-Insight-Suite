@@ -488,3 +488,22 @@ def test_q95_is_not_extrapolated_when_closed_contours_stop_before_095():
     q[10] = 3.5  # valid closed-contour data now bracket psi_N=0.95
     assert _q95_from_profile(profile, q) == pytest.approx(3.25)
 
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        np.linspace(0.1, 1.0, 8),
+        np.linspace(0.0, 0.9, 8),
+    ],
+)
+def test_reference_reconstruction_rejects_source_profiles_without_axis_or_edge(profile):
+    R, Z = grid()
+    reference = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    with pytest.raises(ValueError, match="strictly increasing within"):
+        reconstruct_equilibrium_from_reference_flux(
+            R, Z, reference,
+            psi_profile=profile,
+            pressure_gradient_Pa_per_Wb=np.zeros(profile.size),
+            ffprime_T2=np.zeros(profile.size),
+        )
