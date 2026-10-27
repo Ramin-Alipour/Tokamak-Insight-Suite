@@ -181,6 +181,24 @@ def test_inverse_reconstruction_recovers_coefficients_and_removes_known_coil_res
     assert result["boundary_contours_RZ_m"]
 
 
+@pytest.mark.parametrize("regularization", [True, False, "1e-8", np.nan, np.inf, -1.0])
+def test_inverse_reconstruction_rejects_invalid_regularization(regularization):
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    basis = np.stack((np.broadcast_to(R[None, :] ** 2, (len(Z), len(R))),
+                      np.broadcast_to(Z[:, None] ** 2, (len(Z), len(R)))))
+    with pytest.raises(ValueError, match="regularization must be a finite non-negative number"):
+        reconstruct_equilibrium_inverse(
+            R, Z, basis,
+            magnetic_probe_response_T_per_coefficient=[[1.0, 0.0], [0.0, 1.0]],
+            magnetic_probe_values_T=[1.0, 2.0],
+            magnetic_probe_sigma_T=[0.1, 0.1],
+            regularization=regularization,
+        )
+
+
 def test_inverse_reconstruction_rejects_rank_deficient_basis_and_invalid_uncertainty():
     from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
 
