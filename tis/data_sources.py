@@ -499,3 +499,83 @@ def list_fair_mast_signals(shot: int, group: str) -> tuple[pd.DataFrame, dict[st
         return table, manifest
     finally:
         ds.close()
+
+
+
+def fetch_public_efit_flux_map(
+    sample_index: int = 0,
+    time_s: float = 0.2,
+    *,
+    config: str = "diii_d_train",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
+    """Fetch a real EFIT poloidal-flux map from the open Fusion Equilibrium Challenge.
+
+    The dataset provides EFIT target maps, physical R/Z coordinates, and EFIT times.
+    Shot identifiers are intentionally anonymized; sample_index selects a row in
+    the public training split. Requested time is in seconds; the source clock is ms.
+    """
+    if isinstance(sample_index, (bool, np.bool_)) or not isinstance(sample_index, (int, np.integer)) or sample_index < 0:
+        raise ValueError("sample_index must be a non-negative integer")
+    if not _is_finite_real_scalar(time_s) or time_s < 0:
+        raise ValueError("time_s must be a finite non-negative number")
+    if config not in {"diii_d_train"}:
+        raise ValueError("Only the public DIII-D training split contains EFIT target maps.")
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError(
+            "Public EFIT dataset access needs the optional data dependencies. "
+            "Install with: python -m pip install -r requirements-data.txt"
+        ) from exc
+    from itertools import islice
+    dataset = load_dataset(
+        "Sophelio/fusion-equilibrium-challenge", config, split="train", streaming=True
+    )
+    row = next(islice(iter(dataset), int(sample_index), int(sample_index) + 1), None)
+    if row is None:
+        raise IndexError(f"Public EFIT sample index {sample_index} is outside the available split.")
+    required = {"efit_times", "efit_grid_R", "efit_grid_Z", "efit_psirz"}
+    missing = required.difference(row)
+    if missing:
+        raise KeyError(f"Public EFIT dataset sample is missing fields: {sorted(missing)}")
+    times_ms = np.asarray(row["efit_times"], dtype=float).ravel()
+    R = np.asarray(row["efit_grid_R"], dtype=float).ravel()
+    Z = np.asarray(row["efit_grid_Z"], dtype=float).ravel()
+    flux_stack = np.asarray(row["efit_psirz"], dtype=float)
+    if (times_ms.size == 0 or not np.all(np.isfinite(times_ms))
+            or not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z))
+            or np.any(np.diff(R) <= 0) or np.any(np.diff(Z) <= 0)):
+        raise ValueError("Public EFIT time and coordinate arrays must be finite and strictly increasing.")
+    if flux_stack.ndim != 3 or flux_stack.shape[0] != times_ms.size:
+        raise ValueError("Public EFIT flux must have shape (n_times, n_Z, n_R).")
+    if flux_stack.shape[1:] == (R.size, Z.size) and (R.size != Z.size):
+        flux_stack = np.transpose(flux_stack, (0, 2, 1))
+    if flux_stack.shape[1:] != (Z.size, R.size):
+        raise ValueError(
+            f"Public EFIT flux shape {flux_stack.shape[1:]} does not match (n_Z, n_R)={(Z.size, R.size)}."
+        )
+    selected = int(np.argmin(np.abs(times_ms - float(time_s) * 1000.0)))
+    psi = np.asarray(flux_stack[selected], dtype=float)
+    if not np.all(np.isfinite(psi)) or float(np.ptp(psi)) <= np.finfo(float).tiny:
+        raise ValueError("Selected public EFIT flux map is non-finite or degenerate.")
+    manifest = {
+        "dataset": "Sophelio/Fusion Equilibrium Challenge",
+        "source_url": "https://huggingface.co/datasets/Sophelio/fusion-equilibrium-challenge",
+        "license": "CC BY 4.0",
+        "config": config,
+        "sample_index": int(sample_index),
+        "requested_time_s": float(time_s),
+        "selected_time_ms": float(times_ms[selected]),
+        "time_index": selected,
+        "grid_shape_z_by_r": [int(Z.size), int(R.size)],
+        "R_range_m": [float(R[0]), float(R[-1])],
+        "Z_range_m": [float(Z[0]), float(Z[-1])],
+        "flux_min_Wb_rad": float(np.min(psi)),
+        "flux_max_Wb_rad": float(np.max(psi)),
+        "scientific_limit": (
+            "The reference is an existing EFIT reconstruction. The TIS profile-estimation "
+            "workflow derives a source profile from this same map and reports an in-sample "
+            "comparison, not an independent experimental validation."
+        ),
+    }
+    return R, Z, psi, manifest
