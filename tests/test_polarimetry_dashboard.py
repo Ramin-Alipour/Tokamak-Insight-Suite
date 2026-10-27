@@ -8,7 +8,7 @@ def test_polarimetry_dashboard_executes_and_exports_results():
     assert not app.exception, "\n".join(str(item.value) for item in app.exception)
     app.radio(key="workspace_page").set_value("Advanced Analysis")
     app.run()
-    app.selectbox(label="Select workflow").set_value("Faraday-rotation polarimetry")
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value("Faraday-rotation polarimetry")
     app.run()
     assert not app.exception, "\n".join(str(item.value) for item in app.exception)
     # Choose a wavelength/rotation pair with a finite, non-zero line integral.
