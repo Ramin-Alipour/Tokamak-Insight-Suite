@@ -55,6 +55,12 @@ This is an **inverse-source estimate**, not a unique kinetic-pressure reconstruc
 
 The safety-factor profile `q(ψ)` is calculated only when the user supplies an independently known edge value `F(edge)=R Bφ` in T·m. The solver then integrates along closed flux contours that enclose the estimated axis. If the input is omitted, no `q` or `q95` is fabricated. The result remains sensitive to the flux-map sign convention, contour resolution, the supplied edge value, and the validity of the inferred source functions.
 
+## Geometry and global equilibrium estimates
+
+The profile workflow also reports shaping on a resolved closed 95%-flux contour: major/minor radius, elongation and upper/lower triangularity. These are **95%-surface estimates**, not a separatrix measurement. A near-edge saddle is reported as an X-point candidate only when the grid resolves one; the separatrix flux is withheld if the candidate is not sufficiently close to the edge level.
+
+When a pressure grid and toroidal-current-density map are available, the dashboard estimates `beta_p`, plasma current, and internal inductance from axisymmetric `2πR` volume integrals. These estimates depend on the inferred pressure convention `p(edge)=0`, current-density map, the computational domain, and the axisymmetric-volume assumption. They do not substitute for machine-specific EFIT constraints or independent validation.
+
 ## Limitations and interpretation
 
 - Supply machine-specific geometry, basis functions, response matrices, calibration, coil-current measurements, and uncertainties. The software does not generate them.

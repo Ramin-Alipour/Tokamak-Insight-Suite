@@ -2595,6 +2595,61 @@
           "name": "q_profile",
           "unit": "dimensionless",
           "description": "Optional safety-factor profile from closed-contour integration, available only with edge F and sufficiently resolved closed flux surfaces."
+        },
+        {
+          "name": "major_radius_95_m",
+          "unit": "m",
+          "description": "Major radius of the closed 95%-normalized-flux contour."
+        },
+        {
+          "name": "minor_radius_95_m",
+          "unit": "m",
+          "description": "Minor radius of the closed 95%-normalized-flux contour."
+        },
+        {
+          "name": "elongation_95",
+          "unit": "dimensionless",
+          "description": "Vertical-to-horizontal half-span ratio of the closed 95%-flux contour."
+        },
+        {
+          "name": "triangularity_upper_95",
+          "unit": "dimensionless",
+          "description": "Upper triangularity estimate on the closed 95%-flux contour."
+        },
+        {
+          "name": "triangularity_lower_95",
+          "unit": "dimensionless",
+          "description": "Lower triangularity estimate on the closed 95%-flux contour."
+        },
+        {
+          "name": "xpoint_R_m",
+          "unit": "m",
+          "description": "X-point candidate coordinate, only if a near-edge saddle is resolved."
+        },
+        {
+          "name": "xpoint_Z_m",
+          "unit": "m",
+          "description": "X-point candidate coordinate, only if a near-edge saddle is resolved."
+        },
+        {
+          "name": "separatrix_flux_Wb_rad",
+          "unit": "Wb rad^-1",
+          "description": "Flux at a resolved near-edge X-point; withheld if no suitable saddle is found."
+        },
+        {
+          "name": "beta_p",
+          "unit": "dimensionless",
+          "description": "Poloidal beta estimate from pressure and poloidal-field volume integrals under axisymmetry."
+        },
+        {
+          "name": "plasma_current_A",
+          "unit": "A",
+          "description": "Plasma-current estimate by integrating the inferred toroidal current density over the poloidal cross-section."
+        },
+        {
+          "name": "li_internal",
+          "unit": "dimensionless",
+          "description": "Internal-inductance estimate from poloidal magnetic energy and the inferred plasma current."
         }
       ],
       "assumptions": [

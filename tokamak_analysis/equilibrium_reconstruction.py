@@ -534,6 +534,12 @@ def derive_equilibrium_profiles_from_sources(
             if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
         )
         result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
+    pressure_grid = np.interp(np.clip(psi_n_grid, 0.0, 1.0), profile, pressure)
+    pressure_grid[(psi_n_grid < 0.0) | (psi_n_grid > 1.0)] = np.nan
+    result.update(derive_equilibrium_geometry_from_flux(
+        R, Z, psi, psi_normalized_grid=psi_n_grid,
+        pressure_grid=pressure_grid, j_tor_A_m2=j_tor,
+    ))
     return result
 
 
@@ -731,4 +737,173 @@ def reconstruct_equilibrium_profiles_from_flux(
         result["q_profile"] = q_profile
         result["q95"] = float(np.interp(0.95, profile[np.isfinite(q_profile)], q_profile[np.isfinite(q_profile)])) if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
         result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
+    pressure_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, pressure)
+    pressure_grid[(psi_n < 0.0) | (psi_n > 1.0)] = np.nan
+    result.update(derive_equilibrium_geometry_from_flux(
+        R, Z, psi, psi_normalized_grid=psi_n,
+        pressure_grid=pressure_grid, j_tor_A_m2=j_tor,
+    ))
+    return result
+
+
+def derive_equilibrium_geometry_from_flux(
+    R_m, Z_m, psi_Wb_rad, *, psi_normalized_grid=None,
+    pressure_grid=None, j_tor_A_m2=None, shape_surface_psi_n=0.95,
+):
+    """Derive axis, closed-surface shaping, X-point and global estimates.
+
+    Shaping metrics are evaluated on the requested normalized-flux contour
+    (default 95%), not mislabeled as a measured separatrix. An X-point and
+    separatrix flux are reported only when a near-edge saddle is detected.
+    beta_p and li use axisymmetric 2πR volume weighting and the supplied
+    pressure/current maps; they remain estimates tied to those inputs.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    psi = np.asarray(psi_Wb_rad, dtype=float)
+    if psi.shape != (Z.size, R.size) or not np.all(np.isfinite(psi)):
+        raise ValueError("psi_Wb_rad must be a finite (len(Z), len(R)) grid")
+    if not np.isscalar(shape_surface_psi_n) or not np.isfinite(shape_surface_psi_n) or not 0.5 <= shape_surface_psi_n < 1.0:
+        raise ValueError("shape_surface_psi_n must be finite and in [0.5, 1)")
+
+    edge = np.concatenate((psi[0, :], psi[-1, :], psi[1:-1, 0], psi[1:-1, -1]))
+    edge_flux = float(np.median(edge))
+    interior = psi[1:-1, 1:-1]
+    min_offset = abs(float(np.min(interior)) - edge_flux)
+    max_offset = abs(float(np.max(interior)) - edge_flux)
+    if min_offset >= max_offset:
+        axis_flux = float(np.min(interior))
+        axis_local = np.unravel_index(np.argmin(interior), interior.shape)
+    else:
+        axis_flux = float(np.max(interior))
+        axis_local = np.unravel_index(np.argmax(interior), interior.shape)
+    axis_j, axis_i = int(axis_local[0] + 1), int(axis_local[1] + 1)
+    flux_span = edge_flux - axis_flux
+    if abs(flux_span) <= np.finfo(float).tiny:
+        raise ValueError("Flux map must have a nonzero finite axis-to-edge span")
+    if psi_normalized_grid is None:
+        psi_n = (psi - axis_flux) / flux_span
+    else:
+        psi_n = np.asarray(psi_normalized_grid, dtype=float)
+        if psi_n.shape != psi.shape or not np.all(np.isfinite(psi_n)):
+            raise ValueError("psi_normalized_grid must be finite and match psi_Wb_rad")
+
+    result = {
+        "axis_R_m": float(R[axis_i]),
+        "axis_Z_m": float(Z[axis_j]),
+        "psi_axis_Wb_rad": axis_flux,
+        "psi_edge_Wb_rad": edge_flux,
+        "shape_surface_psi_n": float(shape_surface_psi_n),
+        "shape_surface_found": False,
+        "major_radius_95_m": None,
+        "minor_radius_95_m": None,
+        "elongation_95": None,
+        "triangularity_upper_95": None,
+        "triangularity_lower_95": None,
+        "xpoint_found": False,
+        "xpoint_R_m": None,
+        "xpoint_Z_m": None,
+        "separatrix_found": False,
+        "separatrix_flux_Wb_rad": None,
+        "plasma_current_A": None,
+        "beta_p": None,
+        "li_internal": None,
+        "geometry_interpretation": (
+            "Shaping is measured on a closed 95%-flux contour. X-point/separatrix "
+            "are reported only when a near-edge saddle is resolved. beta_p and li "
+            "assume axisymmetry and the supplied pressure/current maps."
+        ),
+    }
+
+    # Geometric shaping on a closed interior surface around the inferred axis.
+    from matplotlib.figure import Figure
+    from matplotlib.path import Path as PolygonPath
+    from scipy.ndimage import minimum_filter
+
+    fig = Figure()
+    ax = fig.subplots()
+    shape_level = axis_flux + float(shape_surface_psi_n) * flux_span
+    contour_set = ax.contour(R, Z, psi, levels=[shape_level])
+    chosen = None
+    for segment in contour_set.allsegs[0]:
+        if len(segment) < 8 or not np.allclose(segment[0], segment[-1], rtol=0, atol=1e-6):
+            continue
+        if PolygonPath(segment).contains_point((R[axis_i], Z[axis_j])):
+            if chosen is None or len(segment) > len(chosen):
+                chosen = segment
+    for collection in getattr(contour_set, "collections", []):
+        collection.remove()
+    fig.clear()
+    if chosen is not None:
+        points = np.asarray(chosen, dtype=float)
+        r_min, r_max = float(np.min(points[:, 0])), float(np.max(points[:, 0]))
+        z_min, z_max = float(np.min(points[:, 1])), float(np.max(points[:, 1]))
+        a_minor = 0.5 * (r_max - r_min)
+        r_major = 0.5 * (r_max + r_min)
+        if a_minor > 0:
+            upper = points[int(np.argmax(points[:, 1]))]
+            lower = points[int(np.argmin(points[:, 1]))]
+            result.update({
+                "shape_surface_found": True,
+                "major_radius_95_m": r_major,
+                "minor_radius_95_m": a_minor,
+                "elongation_95": (z_max - z_min) / (2.0 * a_minor),
+                "triangularity_upper_95": (r_major - float(upper[0])) / a_minor,
+                "triangularity_lower_95": (r_major - float(lower[0])) / a_minor,
+            })
+
+    # A saddle near the edge is an X-point candidate. If the grid cannot
+    # resolve one, do not manufacture a separatrix location.
+    dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
+    d2r = np.gradient(dpsi_dr, R, axis=1, edge_order=2)
+    d2z = np.gradient(dpsi_dz, Z, axis=0, edge_order=2)
+    d2rz = np.gradient(dpsi_dr, Z, axis=0, edge_order=2)
+    hessian_det = d2r * d2z - d2rz**2
+    grad_mag = np.hypot(dpsi_dr, dpsi_dz)
+    local_min = grad_mag <= minimum_filter(grad_mag, size=3, mode="nearest") + np.finfo(float).eps
+    candidate_mask = np.zeros_like(psi, dtype=bool)
+    candidate_mask[2:-2, 2:-2] = True
+    candidate_mask &= (hessian_det < 0.0) & local_min & (psi_n >= 0.75) & (psi_n <= 1.25)
+    candidate_mask[axis_j-2:axis_j+3, axis_i-2:axis_i+3] = False
+    candidate_indices = np.argwhere(candidate_mask)
+    if candidate_indices.size:
+        jx, ix = min(candidate_indices, key=lambda ij: grad_mag[int(ij[0]), int(ij[1])])
+        result["xpoint_found"] = True
+        result["xpoint_R_m"] = float(R[ix])
+        result["xpoint_Z_m"] = float(Z[jx])
+        x_flux = float(psi[jx, ix])
+        if abs(float(psi_n[jx, ix]) - 1.0) <= 0.15:
+            result["separatrix_found"] = True
+            result["separatrix_flux_Wb_rad"] = x_flux
+
+    # Global equilibrium estimates from axisymmetric volume integrals.
+    if pressure_grid is not None or j_tor_A_m2 is not None:
+        inside = (psi_n >= 0.0) & (psi_n <= 1.0)
+        volume_weight = np.broadcast_to((2.0 * np.pi * R)[None, :], psi.shape)
+        bp2 = (dpsi_dz / R[None, :])**2 + (dpsi_dr / R[None, :])**2
+
+        def volume_integral(values):
+            arr = np.where(inside & np.isfinite(values), values * volume_weight, 0.0)
+            return float(np.trapz(np.trapz(arr, R, axis=1), Z))
+
+        bp_energy_integral = volume_integral(bp2)
+        if pressure_grid is not None:
+            pgrid = np.asarray(pressure_grid, dtype=float)
+            if pgrid.shape != psi.shape:
+                raise ValueError("pressure_grid must match psi_Wb_rad")
+            valid_p = inside & np.isfinite(pgrid)
+            pscale = max(float(np.max(np.abs(pgrid[valid_p]))) if np.any(valid_p) else 0.0, 1.0)
+            if np.any(valid_p) and np.all(pgrid[valid_p] >= -1e-10 * pscale) and bp_energy_integral > 0:
+                p_volume_integral = volume_integral(pgrid)
+                result["beta_p"] = max(0.0, 2.0 * MU0 * p_volume_integral / bp_energy_integral)
+
+        if j_tor_A_m2 is not None:
+            jgrid = np.asarray(j_tor_A_m2, dtype=float)
+            if jgrid.shape != psi.shape:
+                raise ValueError("j_tor_A_m2 must match psi_Wb_rad")
+            jcross = np.where(inside & np.isfinite(jgrid), jgrid, 0.0)
+            current = float(np.trapz(np.trapz(jcross, R, axis=1), Z))
+            result["plasma_current_A"] = current
+            if abs(current) > np.finfo(float).tiny and R[axis_i] > 0 and bp_energy_integral > 0:
+                poloidal_energy = bp_energy_integral / (2.0 * MU0)
+                result["li_internal"] = 4.0 * poloidal_energy / (MU0 * R[axis_i] * current**2)
     return result

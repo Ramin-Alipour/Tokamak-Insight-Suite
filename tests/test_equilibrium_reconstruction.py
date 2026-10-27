@@ -409,3 +409,37 @@ def test_known_source_profile_rejects_invalid_edge_toroidal_field():
             R, Z, psi, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0],
             toroidal_field_boundary_Tm=0.0,
         )
+
+
+def test_equilibrium_geometry_reports_closed_surface_shape_and_global_estimates():
+    from tokamak_analysis.equilibrium_reconstruction import derive_equilibrium_geometry_from_flux
+
+    R = np.linspace(1.1, 1.9, 81)
+    Z = np.linspace(-0.3, 0.3, 61)
+    rr, zz = np.meshgrid(R, Z)
+    psi = -((rr - 1.5) / 0.4) ** 2 - (zz / 0.3) ** 2
+    # Prescribe a constant perimeter flux so the 95% contour is closed.
+    psi[0, :] = -1.0
+    psi[-1, :] = -1.0
+    psi[:, 0] = -1.0
+    psi[:, -1] = -1.0
+    edge_flux = -1.0
+    psi_n = (psi - 0.0) / (edge_flux - 0.0)
+    inside = (psi_n >= 0.0) & (psi_n <= 1.0)
+    pressure = np.where(inside, 1.0e3, np.nan)
+    j_tor = np.where(inside, 1.0e5, np.nan)
+    result = derive_equilibrium_geometry_from_flux(
+        R, Z, psi, psi_normalized_grid=psi_n,
+        pressure_grid=pressure, j_tor_A_m2=j_tor,
+    )
+    assert result["shape_surface_found"] is True
+    assert result["major_radius_95_m"] == pytest.approx(1.5, abs=0.01)
+    assert result["minor_radius_95_m"] == pytest.approx(0.4 * np.sqrt(0.95), abs=0.02)
+    assert result["elongation_95"] == pytest.approx(0.75, abs=0.08)
+    assert result["triangularity_upper_95"] == pytest.approx(0.0, abs=0.08)
+    assert result["triangularity_lower_95"] == pytest.approx(0.0, abs=0.08)
+    assert result["xpoint_found"] is False
+    assert result["separatrix_found"] is False
+    assert result["beta_p"] is not None and result["beta_p"] > 0
+    assert result["plasma_current_A"] is not None and result["plasma_current_A"] > 0
+    assert result["li_internal"] is not None and result["li_internal"] > 0
