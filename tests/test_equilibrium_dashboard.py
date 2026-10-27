@@ -18,7 +18,7 @@ def test_equilibrium_workspace_exposes_grad_shafranov_solver_without_exceptions(
     }
     actual_inputs = {item.key for item in app.get("file_uploader")}
     assert expected_inputs <= actual_inputs
-    assert any("not a full EFIT replacement" in str(item.value) for item in app.warning)
+    assert any("public DIII-D EFIT flux map" in str(item.value) for item in app.caption)
     assert any(item.key == "eq_inverse_bundle" for item in app.get("file_uploader"))
     assert any(item.label == "Fit equilibrium to magnetic measurements" for item in app.button)
     assert any("machine-specific JSON bundle" in str(item.value) for item in app.caption)
