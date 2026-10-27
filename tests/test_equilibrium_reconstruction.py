@@ -227,6 +227,14 @@ def test_inverse_reconstruction_recovers_coefficients_and_removes_known_coil_res
         regularization=0.0,
     )
     np.testing.assert_allclose(result["basis_coefficients"], expected, rtol=1e-10, atol=1e-10)
+    assert result["basis_coefficient_covariance"].shape == (2, 2)
+    assert result["basis_coefficient_sigma"].shape == (2,)
+    assert np.all(np.isfinite(result["basis_coefficient_covariance"]))
+    assert np.all(result["basis_coefficient_sigma"] >= 0)
+    assert result["psi_standard_uncertainty_Wb_rad"].shape == (len(Z), len(R))
+    assert np.all(np.isfinite(result["psi_standard_uncertainty_Wb_rad"]))
+    assert np.all(result["psi_standard_uncertainty_Wb_rad"] >= 0)
+    assert "excludes calibration" in result["uncertainty_interpretation"]
     assert result["measurement_count"] == 5
     assert result["measurement_diagnostics"]["magnetic probes"]["normalized_residual_rms"] < 1e-9
     assert result["measurement_diagnostics"]["flux loops"]["normalized_residual_rms"] < 1e-9
