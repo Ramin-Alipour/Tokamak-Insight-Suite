@@ -87,6 +87,7 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 - **Thomson scattering (analysis 1/80):** [inputs, model, outputs, assumptions, limitations, and completion gate](docs/analyses/thomson_scattering.md).
 - **CXRS (analysis 4/81):** [calibrated line fitting, ion-temperature and line-of-sight velocity estimates, assumptions, tests, and scientific limitations](docs/analyses/charge_exchange_recombination_spectroscopy.md).
 - **Poloidal-field probes:** [calibrated single-/multi-channel field analysis, uncertainty propagation, dashboard acceptance, and physical limitations](docs/analyses/poloidal_field_probes.md).
+- **Polarimetry / Faraday rotation (analysis 14):** [Faraday line-integral calculation, optional chord-averaged parallel field, uncertainty propagation, dashboard workflow, and limitations](docs/analyses/polarimetry_faraday_rotation.md).
 - **Electron Cyclotron Emission (analysis 3/81):** [resonance mapping, calibrated brightness temperature, fluctuation PSD, tests, and scientific limitations](docs/analyses/electron_cyclotron_emission.md).
 - **Reports & Export:** data and analysis exports with provenance metadata.
 
