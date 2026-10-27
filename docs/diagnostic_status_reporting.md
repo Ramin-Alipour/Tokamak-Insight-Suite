@@ -1,6 +1,6 @@
 # Diagnostic status report
 
-Use the diagnostic registry for counts of the 80 diagnostic catalogue records. The callable analysis registry is a different layer and currently contains 81 callable entry points; it must not be counted as though it were a one-to-one list of the 80 diagnostics.
+The canonical diagnostic catalogue and analysis registry each contain 80 entries, with matching IDs, titles, and order. The analysis registry points to software entry points; that mapping alone does not imply full physical modeling or independent validation.
 
 Generate a reconciled JSON report from the same source used by the catalogue UI:
 
