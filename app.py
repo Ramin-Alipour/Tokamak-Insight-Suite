@@ -2098,7 +2098,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
@@ -2380,6 +2380,42 @@ elif page=='Advanced Analysis':
                         st.markdown('- This is not an equilibrium solver and does not infer plasma current or loop geometry.')
                 except Exception as exc:
                     st.error(f'Flux-loop analysis failed: {exc}')
+    elif workflow=='Faraday-rotation polarimetry':
+        from tokamak_analysis.polarimetry import analyze_polarimetry
+        st.markdown('Convert calibrated Faraday rotation to a line-integrated density-weighted parallel magnetic field.')
+        st.caption('Wavelength in metres; signed rotation in radians. Optional density and path length enable a chord-averaged field only under the uniform-density assumption.')
+        wavelength_text=st.text_input('Wavelength values (m; comma-separated)',value='1.06e-5',key='pol_wavelength')
+        rotation_text=st.text_input('Signed Faraday rotation values (rad; comma-separated)',value='0.001',key='pol_rotation')
+        density_text=st.text_input('Electron density (m⁻³; optional scalar)',value='',key='pol_density')
+        path_text=st.text_input('Chord length (m; optional scalar)',value='',key='pol_path')
+        rotation_unc_text=st.text_input('Rotation 1-sigma uncertainty (rad; optional scalar)',value='',key='pol_rotation_unc')
+        wavelength_unc_text=st.text_input('Wavelength 1-sigma uncertainty (m; optional scalar)',value='',key='pol_wavelength_unc')
+        density_unc_text=st.text_input('Density 1-sigma uncertainty (m⁻³; optional scalar)',value='',key='pol_density_unc')
+        path_unc_text=st.text_input('Path-length 1-sigma uncertainty (m; optional scalar)',value='',key='pol_path_unc')
+        if st.button('Analyze Faraday rotation',type='primary',key='run_polarimetry'):
+            try:
+                def parse_values(text):
+                    return np.asarray([float(part.strip()) for part in text.split(',') if part.strip()],dtype=float)
+                wavelength_values=parse_values(wavelength_text)
+                rotation_values=parse_values(rotation_text)
+                if wavelength_values.size!=rotation_values.size:
+                    raise ValueError('Wavelength and rotation arrays must contain the same number of values.')
+                optional={}
+                for text_value,key in [(density_text,'electron_density_m3'),(path_text,'path_length_m'),(rotation_unc_text,'rotation_uncertainty_rad'),(wavelength_unc_text,'wavelength_uncertainty_m'),(density_unc_text,'density_uncertainty_m3'),(path_unc_text,'path_length_uncertainty_m')]:
+                    if text_value.strip():
+                        parsed=parse_values(text_value)
+                        optional[key]=float(parsed[0]) if parsed.size==1 else parsed
+                result=analyze_polarimetry(wavelength_values,rotation_values,**optional)
+                st.success('Faraday-rotation polarimetry analysis completed within its declared scope.')
+                st.json(result)
+                frame=pd.DataFrame({'wavelength_m':result['wavelength_m'],'rotation_rad':result['rotation_rad'],'line_integrated_ne_B_parallel_m-2_T':result['line_integrated_ne_B_parallel_m-2_T']})
+                if 'average_B_parallel_T' in result:
+                    frame['average_B_parallel_T']=result['average_B_parallel_T']
+                st.line_chart(frame.set_index('wavelength_m'))
+                download_df('Export polarimetry results CSV',frame,'tis_polarimetry_results.csv')
+                json_download('Export polarimetry result and limitations JSON',result,'tis_polarimetry_results.json')
+            except Exception as exc:
+                st.error(f'Faraday-rotation analysis failed: {exc}')
     elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
