@@ -443,3 +443,16 @@ def test_equilibrium_geometry_reports_closed_surface_shape_and_global_estimates(
     assert result["beta_p"] is not None and result["beta_p"] > 0
     assert result["plasma_current_A"] is not None and result["plasma_current_A"] > 0
     assert result["li_internal"] is not None and result["li_internal"] > 0
+
+
+def test_q95_is_not_extrapolated_when_closed_contours_stop_before_095():
+    from tokamak_analysis.equilibrium_reconstruction import _q95_from_profile
+
+    profile = np.linspace(0.0, 1.0, 11)
+    q = np.full(profile.shape, np.nan)
+    q[2:8] = np.linspace(1.0, 2.0, 6)  # last closed contour is psi_N=0.7
+    assert _q95_from_profile(profile, q) is None
+
+    q[9] = 3.0  # valid closed-contour data now bracket psi_N=0.95
+    assert _q95_from_profile(profile, q) == pytest.approx(2.75)
+
