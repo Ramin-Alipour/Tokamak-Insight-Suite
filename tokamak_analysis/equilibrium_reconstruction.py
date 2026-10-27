@@ -161,61 +161,26 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
 def infer_grad_shafranov_profiles_from_flux(
     R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32
 ):
-    """Estimate flux-only source profiles from an existing EFIT flux map.
+    """Infer pressure-gradient and F F-prime source profiles from a flux map.
 
-    This creates a reproducible reconstruction benchmark from public EFIT maps:
-    p'(psi) is fixed to zero and FF'(psi) is estimated by binning the measured
-    Grad-Shafranov operator against normalized flux. It is an inverse-source
-    approximation, not an independent reconstruction of the reference shot.
+    This compatibility API now delegates to the joint R²-aware source fit.
+    When the pressure and FF-prime terms are not identifiable from the map,
+    the returned metadata explicitly marks the fallback source decomposition.
     """
-    R, Z = _validated_grid(R_m, Z_m)
-    psi = np.asarray(reference_psi_Wb_rad, dtype=float)
-    if psi.shape != (Z.size, R.size) or not np.all(np.isfinite(psi)):
-        raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
-    if (isinstance(n_profile_points, (bool, np.bool_))
-            or not isinstance(n_profile_points, (int, np.integer))
-            or n_profile_points < 2 or n_profile_points > 512):
-        raise ValueError("n_profile_points must be an integer from 2 to 512")
-    span = float(np.ptp(psi))
-    if not np.isfinite(span) or span <= np.finfo(float).tiny:
-        raise ValueError("Reference flux map must have a nonzero finite range")
-    psin = (psi - float(np.min(psi))) / span
-    dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
-    operator = (
-        np.gradient(dpsi_dr, R, axis=1, edge_order=2)
-        - dpsi_dr / R[None, :]
-        + np.gradient(dpsi_dz, Z, axis=0, edge_order=2)
+    profiles = reconstruct_equilibrium_profiles_from_flux(
+        R_m, Z_m, reference_psi_Wb_rad, n_profile_points=n_profile_points
     )
-    profile = np.linspace(0.0, 1.0, int(n_profile_points))
-    edges = np.linspace(0.0, 1.0, int(n_profile_points) + 1)
-    centers = 0.5 * (edges[:-1] + edges[1:])
-    binned = np.full(int(n_profile_points), np.nan, dtype=float)
-    counts = np.zeros(int(n_profile_points), dtype=int)
-    # Exclude the perimeter: it is a fixed boundary in the forward solve.
-    interior_flux = psin[1:-1, 1:-1].ravel()
-    interior_operator = operator[1:-1, 1:-1].ravel()
-    bin_id = np.clip(np.digitize(interior_flux, edges[1:-1]), 0, len(centers)-1)
-    for k in range(len(centers)):
-        values = interior_operator[bin_id == k]
-        counts[k] = values.size
-        if values.size:
-            binned[k] = float(np.median(values))
-    populated = np.flatnonzero(np.isfinite(binned))
-    if populated.size < 2:
-        raise ValueError("Reference flux map does not populate enough flux bins to infer a source profile")
-    binned = np.interp(np.arange(len(centers)), populated, binned[populated])
-    # Δ*ψ = -μ0 R² p'(ψ) - FF'(ψ); with p'=0, FF'=-Δ*ψ.
-    ffprime = -np.interp(profile, centers, binned, left=binned[0], right=binned[-1])
     return {
-        "psi_profile": profile,
-        "pressure_gradient_Pa_per_Wb": np.zeros_like(profile),
-        "ffprime_T2": ffprime,
-        "reference_operator_Wb_rad_m-2": operator,
-        "normalized_flux": psin,
-        "profile_bin_counts": counts,
-        "source_model": "p'(psi)=0; FF'(psi) inferred as negative median Δ*psi in normalized-flux bins",
+        "psi_profile": profiles["psi_normalized_axis_to_edge"],
+        "pressure_gradient_Pa_per_Wb": profiles["pressure_gradient_Pa_per_Wb"],
+        "ffprime_T2": profiles["ffprime_T2"],
+        "reference_operator_Wb_rad_m-2": profiles["operator_Wb_rad_m-2"],
+        "normalized_flux": profiles["psi_normalized_grid"],
+        "profile_bin_counts": profiles["profile_bin_counts"],
+        "source_model": profiles["profile_source_model"],
+        "joint_pressure_ffprime_identifiable": profiles["joint_pressure_ffprime_identifiable"],
+        "profile_bin_design_rank": profiles["profile_bin_design_rank"],
     }
-
 
 def reconstruct_equilibrium_from_reference_flux(
     R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32,
