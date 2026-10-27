@@ -487,10 +487,12 @@ def reconstruct_equilibrium_profiles_from_flux(
         local = np.unravel_index(np.argmax(interior), interior.shape)
         axis_flux = float(np.max(interior))
     axis_j, axis_i = int(local[0] + 1), int(local[1] + 1)
-    flux_span = axis_flux - edge_flux
+    # psi_N = 0 at the magnetic axis and 1 at the computational edge,
+    # irrespective of whether the machine's psi convention increases inward.
+    flux_span = edge_flux - axis_flux
     if abs(flux_span) <= np.finfo(float).tiny:
         raise ValueError("Flux map has no distinct interior magnetic-axis and edge flux")
-    psi_n = (psi - edge_flux) / flux_span
+    psi_n = (psi - axis_flux) / flux_span
 
     dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
     operator = (
@@ -602,7 +604,7 @@ def reconstruct_equilibrium_profiles_from_flux(
         for k, level_n in enumerate(profile):
             if level_n <= 0.02 or level_n >= 0.995:
                 continue
-            level = edge_flux + level_n * flux_span
+            level = axis_flux + level_n * flux_span
             contours = ax.contour(R, Z, psi, levels=[level])
             segments = contours.allsegs[0]
             chosen = None
