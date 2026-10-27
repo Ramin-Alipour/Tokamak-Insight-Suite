@@ -1608,22 +1608,33 @@ elif page=='Equilibrium & Reconstruction':
                 from tokamak_analysis.equilibrium_reconstruction import (
                     reconstruct_equilibrium_from_reference_flux,
                     reconstruct_equilibrium_profiles_from_flux,
+                    resample_flux_map_to_uniform_grid,
                 )
                 public_eq_R, public_eq_Z, public_eq_reference, public_eq_manifest = fetch_public_efit_flux_map(
                     int(public_eq_sample), float(public_eq_time)
                 )
+                was_nonuniform = (
+                    not np.allclose(np.diff(public_eq_R), np.diff(public_eq_R)[0])
+                    or not np.allclose(np.diff(public_eq_Z), np.diff(public_eq_Z)[0])
+                )
+                public_eq_R, public_eq_Z, public_eq_reference = resample_flux_map_to_uniform_grid(
+                    public_eq_R, public_eq_Z, public_eq_reference
+                )
+                public_eq_manifest = {
+                    **public_eq_manifest,
+                    'solver_grid_resampled_uniform': bool(was_nonuniform),
+                    'solver_grid_interpolation': 'separable linear interpolation in R then Z',
+                }
                 public_eq_profiles = reconstruct_equilibrium_profiles_from_flux(
                     public_eq_R, public_eq_Z, public_eq_reference,
                     n_profile_points=32,
                     toroidal_field_boundary_Tm=(float(public_eq_f_edge) if float(public_eq_f_edge) != 0.0 else None),
                 )
-                if (not np.allclose(np.diff(public_eq_R), np.diff(public_eq_R)[0])
-                        or not np.allclose(np.diff(public_eq_Z), np.diff(public_eq_Z)[0])):
-                    raise ValueError('Public EFIT coordinates are not uniform; resample the reference grid before solving.')
                 public_eq_result = reconstruct_equilibrium_from_reference_flux(
                     public_eq_R, public_eq_Z, public_eq_reference,
                     n_profile_points=32, max_iterations=5000,
                     tolerance=1e-6, relaxation=1.1,
+                    toroidal_field_boundary_Tm=(float(public_eq_f_edge) if float(public_eq_f_edge) != 0.0 else None),
                 )
                 st.session_state['public_eq_result'] = public_eq_result
                 st.session_state['public_eq_profiles'] = public_eq_profiles
