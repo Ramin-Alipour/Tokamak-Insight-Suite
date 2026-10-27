@@ -96,6 +96,14 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
         raise ValueError("Profile arrays must be finite 1-D arrays of equal length")
     if np.any(np.diff(prof) <= 0) or prof[0] < 0 or prof[-1] > 1:
         raise ValueError("psi_profile must increase strictly within [0,1]")
+    # This solver maps each iterate's min-max normalized flux onto psi_profile.
+    # Accepting a profile that covers only a sub-interval silently clamps the
+    # source terms outside that interval to endpoint values via np.interp.
+    # For an axis-to-edge equilibrium profile, require both physical endpoints.
+    if not np.isclose(prof[0], 0.0, rtol=0.0, atol=1e-12) or not np.isclose(
+        prof[-1], 1.0, rtol=0.0, atol=1e-12
+    ):
+        raise ValueError("psi_profile must cover the full normalized-flux interval [0,1]")
     if ((
             isinstance(max_iterations, (bool, np.bool_))
             or not isinstance(max_iterations, (int, np.integer, float, np.floating))
