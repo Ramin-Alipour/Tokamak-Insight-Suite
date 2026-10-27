@@ -245,7 +245,9 @@ def reconstruct_equilibrium_from_reference_flux(
         if (profile.ndim != 1 or profile.size < 4 or pprime.shape != profile.shape
                 or ffprime.shape != profile.shape or not np.all(np.isfinite(profile))
                 or not np.all(np.isfinite(pprime)) or not np.all(np.isfinite(ffprime))
-                or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1):
+                or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1
+                or not np.isclose(profile[0], 0.0, rtol=0.0, atol=1e-12)
+                or not np.isclose(profile[-1], 1.0, rtol=0.0, atol=1e-12)):
             raise ValueError(
                 "Supplied source profiles must be finite, aligned, and strictly increasing within [0, 1]"
             )
