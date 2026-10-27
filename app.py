@@ -1588,7 +1588,7 @@ elif page=='Plasma Parameters':
 
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
-    st.warning('The supplied-grid tools derive magnetic fields from an existing flux grid. The optional Grad–Shafranov solver below solves only the prescribed-boundary/profile problem and is not a full EFIT replacement.')
+    st.caption('Run a Grad–Shafranov reconstruction from a public FAIR-MAST EFIT reference map or solve from your own boundary and pressure/current profiles.')
     st.markdown('### Public-data equilibrium reconstruction')
     st.caption('Fetch an existing UKAEA FAIR-MAST EFIT flux map, infer a flux-dependent Grad–Shafranov source profile from that map, solve the equation with the measured map perimeter fixed, and compare the reconstructed interior against the source map.')
     public_eq_col1, public_eq_col2 = st.columns(2)
