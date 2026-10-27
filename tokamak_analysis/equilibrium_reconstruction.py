@@ -131,13 +131,13 @@ def _normalized_axis_to_edge_flux(psi):
 
 def _grad_shafranov_source_from_profiles(psi_normalized, R_m, psi_profile,
                                         pressure_gradient_Pa_per_Wb, ffprime_T2):
-    """Evaluate profile-based Grad-Shafranov sources on the full computational grid.
+    """Evaluate Grad-Shafranov source terms inside the normalized plasma region.
 
-    The supplied profile arrays cover normalized flux [0, 1]. Values outside
-    that interval are evaluated at the nearest endpoint, matching np.interp's
-    endpoint behavior. A separate separatrix/plasma mask is required before
-    vacuum regions can be assigned zero source; a rectangular grid and its
-    perimeter flux alone do not define that mask.
+    The profile arrays cover normalized flux [0, 1]. Grid cells with normalized
+    flux outside that interval are treated as vacuum and assigned zero source;
+    endpoint-clamping profiles into those cells would create artificial plasma
+    current outside the separatrix. This mask is only as reliable as the
+    supplied axis-to-edge flux normalization and is not a free-boundary EFIT.
     """
     psi_n = np.asarray(psi_normalized, dtype=float)
     R = np.asarray(R_m, dtype=float)
@@ -149,9 +149,13 @@ def _grad_shafranov_source_from_profiles(psi_normalized, R_m, psi_profile,
     if (profile.ndim != 1 or profile.size < 2 or pprime.shape != profile.shape
             or ffprime.shape != profile.shape):
         raise ValueError("Source profiles must be aligned 1-D arrays")
-    p_grid = np.interp(psi_n, profile, pprime)
-    ff_grid = np.interp(psi_n, profile, ffprime)
-    return -MU0 * R[None, :]**2 * p_grid - ff_grid
+    # Interpolate only the plasma profile coordinate. Outside [0, 1] is
+    # vacuum, not a request to extend the edge pressure/current source.
+    inside_plasma = (psi_n >= 0.0) & (psi_n <= 1.0)
+    p_grid = np.interp(np.clip(psi_n, profile[0], profile[-1]), profile, pprime)
+    ff_grid = np.interp(np.clip(psi_n, profile[0], profile[-1]), profile, ffprime)
+    source = -MU0 * R[None, :]**2 * p_grid - ff_grid
+    return np.where(inside_plasma, source, 0.0)
 
 
 def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
