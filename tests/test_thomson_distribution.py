@@ -154,19 +154,14 @@ def test_fit_uncertainties_and_goodness_metrics_remain_strict_json_safe():
     assert json.loads(encoded)["chi_square"] is not None
 
 
-def test_analysis_81_contract_matches_executable_thomson_distribution_inputs_and_outputs():
-    from tokamak_analysis.analysis_registry import get_analysis
+def test_thomson_distribution_is_not_a_separate_canonical_analysis_entry():
+    from tokamak_analysis.analysis_registry import ANALYSES, get_analysis
 
-    entry = get_analysis(81)
-    assert entry["name"] == "Thomson Spectral Distribution Analysis"
-    contract = entry["execution_contract"]
-    inputs = {item["name"]: item for item in contract["input_specs"]}
-    assert set(inputs) == {"wavelength_nm", "signal", "instrument_sigma_nm", "signal_uncertainty", "background_fraction"}
-    assert inputs["wavelength_nm"]["description"].find("nine") >= 0
-    outputs = {item["name"] for item in contract["output_specs"]}
-    assert {"spectral_centroid_nm", "observed_sigma_nm", "instrument_corrected_sigma_nm", "gaussian_fit_parameters", "residual", "reduced_chi_square"} <= outputs
-    assert contract["raw_data_to_physics"] is False
-    assert contract["completeness"] == "complete_with_declared_scope"
+    assert len(ANALYSES) == 80
+    with pytest.raises(KeyError, match="Unknown analysis ID: 81"):
+        get_analysis(81)
+    # The numerical function remains tested directly below; it is not counted
+    # as a separate diagnostic/analysis entry in the canonical 80-item registry.
 
 
 @pytest.mark.parametrize("scale", [1e-20, 1e-12, 1.0, 1e12])
