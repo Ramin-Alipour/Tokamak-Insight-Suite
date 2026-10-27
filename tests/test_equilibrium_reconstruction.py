@@ -142,3 +142,63 @@ def test_solver_reports_finite_interior_equation_residual_and_fixed_perimeter():
     assert result["equation_residual_max_abs_Wb_rad_m-2"] >= result["equation_residual_rms_Wb_rad_m-2"]
     assert result["psi_Wb_rad"].shape == (Z.size, R.size)
     assert result["B_poloidal_T"].shape == (Z.size, R.size)
+
+
+
+def test_inverse_reconstruction_recovers_coefficients_and_removes_known_coil_response():
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+
+    R = np.linspace(1.0, 2.0, 9)
+    Z = np.linspace(-0.5, 0.5, 9)
+    rr, zz = np.meshgrid(R, Z)
+    basis = np.stack((-(rr - 1.5) ** 2 - zz**2,
+                      0.2 * (rr - 1.5) ** 2 + 0.1 * zz**2))
+    expected = np.array([2.0, 0.5])
+    probe_response = np.array([[1.0, 0.2], [0.1, 1.2], [0.7, -0.4]])
+    probe_coil = np.array([[0.01], [0.02], [-0.01]])
+    currents = np.array([10.0])
+    loop_response = np.array([[0.4, 0.3], [-0.2, 0.8]])
+    loop_coil = np.array([[0.002], [0.004]])
+    result = reconstruct_equilibrium_inverse(
+        R, Z, basis,
+        magnetic_probe_response_T_per_coefficient=probe_response,
+        magnetic_probe_values_T=probe_response @ expected + probe_coil @ currents,
+        magnetic_probe_sigma_T=[0.01, 0.02, 0.01],
+        coil_probe_response_T_per_A=probe_coil,
+        coil_probe_currents_A=currents,
+        flux_loop_response_Wb_rad_per_coefficient=loop_response,
+        flux_loop_values_Wb_rad=loop_response @ expected + loop_coil @ currents,
+        flux_loop_sigma_Wb_rad=[0.001, 0.002],
+        coil_flux_response_Wb_rad_per_A=loop_coil,
+        coil_flux_currents_A=currents,
+        regularization=0.0,
+    )
+    np.testing.assert_allclose(result["basis_coefficients"], expected, rtol=1e-10, atol=1e-10)
+    assert result["measurement_count"] == 5
+    assert result["measurement_diagnostics"]["magnetic probes"]["normalized_residual_rms"] < 1e-9
+    assert result["measurement_diagnostics"]["flux loops"]["normalized_residual_rms"] < 1e-9
+    assert result["psi_Wb_rad"].shape == (len(Z), len(R))
+    assert result["boundary_contours_RZ_m"]
+
+
+def test_inverse_reconstruction_rejects_rank_deficient_basis_and_invalid_uncertainty():
+    from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+
+    R = np.linspace(1.0, 2.0, 5)
+    Z = np.linspace(-0.5, 0.5, 5)
+    basis = np.ones((2, len(Z), len(R)))
+    with pytest.raises(ValueError, match="not identifiable"):
+        reconstruct_equilibrium_inverse(
+            R, Z, basis,
+            magnetic_probe_response_T_per_coefficient=[[1.0, 1.0]],
+            magnetic_probe_values_T=[1.0],
+            magnetic_probe_sigma_T=[0.1],
+        )
+    basis = np.stack((np.ones((len(Z), len(R))), np.arange(len(Z) * len(R)).reshape(len(Z), len(R))))
+    with pytest.raises(ValueError, match="uncertainties positive"):
+        reconstruct_equilibrium_inverse(
+            R, Z, basis,
+            magnetic_probe_response_T_per_coefficient=[[1.0, 0.0], [0.0, 1.0]],
+            magnetic_probe_values_T=[1.0, 2.0],
+            magnetic_probe_sigma_T=[0.1, 0.0],
+        )
