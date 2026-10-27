@@ -1,15 +1,15 @@
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_81_unique_ordered_analysis_ids():
+def test_registry_contains_80_unique_ordered_analysis_ids():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 81
-    assert ids == list(range(1, 82))
+    assert len(ANALYSES) == 80
+    assert ids == list(range(1, 81))
 
 
-def test_registry_uses_distinct_entry_points_for_all_81_analyses():
+def test_registry_uses_distinct_entry_points_for_all_80_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 81
+    assert len(set(pairs)) == 80
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -114,3 +114,10 @@ def test_cxrs_is_analysis_four_with_explicit_physics_contract():
     ti_uncertainty = next(item for item in contract["output_specs"] if item["name"] == "ion_temperature_uncertainty_eV")
     assert "instrumental-width uncertainty" in ti_uncertainty["description"]
     assert callable(resolve_analysis(4))
+
+
+def test_analysis_id_81_is_not_part_of_the_canonical_80_analysis_registry():
+    import pytest
+
+    with pytest.raises(KeyError, match="Unknown analysis ID: 81"):
+        get_analysis(81)
