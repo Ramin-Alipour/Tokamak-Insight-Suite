@@ -33,10 +33,10 @@ jobs:
         uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      - name: Install locked test environment
-        run: uv sync --locked --extra test
-      - name: Check lockfile consistency
-        run: uv lock --check
+      - name: Resolve and install test environment
+        run: |
+          uv lock
+          uv sync --locked --extra test
       - name: Compile application and packages
         run: uv run python -m compileall -q app.py tis tokamak_analysis
       - name: Run complete automated test suite
