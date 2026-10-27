@@ -157,6 +157,115 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
 
 
 
+
+def infer_grad_shafranov_profiles_from_flux(
+    R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32
+):
+    """Estimate flux-only source profiles from an existing EFIT flux map.
+
+    This creates a reproducible reconstruction benchmark from public EFIT maps:
+    p'(psi) is fixed to zero and FF'(psi) is estimated by binning the measured
+    Grad-Shafranov operator against normalized flux. It is an inverse-source
+    approximation, not an independent reconstruction of the reference shot.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    psi = np.asarray(reference_psi_Wb_rad, dtype=float)
+    if psi.shape != (Z.size, R.size) or not np.all(np.isfinite(psi)):
+        raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
+    if (isinstance(n_profile_points, (bool, np.bool_))
+            or not isinstance(n_profile_points, (int, np.integer))
+            or n_profile_points < 2 or n_profile_points > 512):
+        raise ValueError("n_profile_points must be an integer from 2 to 512")
+    span = float(np.ptp(psi))
+    if not np.isfinite(span) or span <= np.finfo(float).tiny:
+        raise ValueError("Reference flux map must have a nonzero finite range")
+    psin = (psi - float(np.min(psi))) / span
+    dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
+    operator = (
+        np.gradient(dpsi_dr, R, axis=1, edge_order=2)
+        - dpsi_dr / R[None, :]
+        + np.gradient(dpsi_dz, Z, axis=0, edge_order=2)
+    )
+    profile = np.linspace(0.0, 1.0, int(n_profile_points))
+    edges = np.linspace(0.0, 1.0, int(n_profile_points) + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    binned = np.full(int(n_profile_points), np.nan, dtype=float)
+    counts = np.zeros(int(n_profile_points), dtype=int)
+    # Exclude the perimeter: it is a fixed boundary in the forward solve.
+    interior_flux = psin[1:-1, 1:-1].ravel()
+    interior_operator = operator[1:-1, 1:-1].ravel()
+    bin_id = np.clip(np.digitize(interior_flux, edges[1:-1]), 0, len(centers)-1)
+    for k in range(len(centers)):
+        values = interior_operator[bin_id == k]
+        counts[k] = values.size
+        if values.size:
+            binned[k] = float(np.median(values))
+    populated = np.flatnonzero(np.isfinite(binned))
+    if populated.size < 2:
+        raise ValueError("Reference flux map does not populate enough flux bins to infer a source profile")
+    binned = np.interp(np.arange(len(centers)), populated, binned[populated])
+    # Δ*ψ = -μ0 R² p'(ψ) - FF'(ψ); with p'=0, FF'=-Δ*ψ.
+    ffprime = -np.interp(profile, centers, binned, left=binned[0], right=binned[-1])
+    return {
+        "psi_profile": profile,
+        "pressure_gradient_Pa_per_Wb": np.zeros_like(profile),
+        "ffprime_T2": ffprime,
+        "reference_operator_Wb_rad_m-2": operator,
+        "normalized_flux": psin,
+        "profile_bin_counts": counts,
+        "source_model": "p'(psi)=0; FF'(psi) inferred as negative median Δ*psi in normalized-flux bins",
+    }
+
+
+def reconstruct_equilibrium_from_reference_flux(
+    R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32,
+    max_iterations=10000, tolerance=1e-8, relaxation=1.2,
+):
+    """Run a data-backed Grad-Shafranov solve using a public/reference flux map.
+
+    The reference supplies the fixed perimeter and a flux-binned source estimate.
+    Returned error metrics compare the computed interior against that reference;
+    because the source is estimated from the reference, this is a reconstruction
+    workflow demonstration, not blind validation or an independent EFIT result.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    reference = np.asarray(reference_psi_Wb_rad, dtype=float)
+    if reference.shape != (Z.size, R.size) or not np.all(np.isfinite(reference)):
+        raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
+    profiles = infer_grad_shafranov_profiles_from_flux(
+        R, Z, reference, n_profile_points=n_profile_points
+    )
+    result = reconstruct_equilibrium(
+        R, Z, reference, profiles["psi_profile"],
+        profiles["pressure_gradient_Pa_per_Wb"], profiles["ffprime_T2"],
+        max_iterations=max_iterations, tolerance=tolerance, relaxation=relaxation,
+    )
+    difference = result["psi_Wb_rad"][1:-1, 1:-1] - reference[1:-1, 1:-1]
+    ref_interior = reference[1:-1, 1:-1]
+    scale = max(float(np.ptp(ref_interior)), np.finfo(float).tiny)
+    result.update({
+        "reference_comparison": {
+            "interior_flux_rmse_Wb_rad": float(np.sqrt(np.mean(difference**2))),
+            "interior_flux_nrmse_by_reference_range": float(np.sqrt(np.mean(difference**2)) / scale),
+            "interior_flux_mae_Wb_rad": float(np.mean(np.abs(difference))),
+            "reference_grid_shape": [int(Z.size), int(R.size)],
+            "source_profile_model": profiles["source_model"],
+            "profile_bin_counts": profiles["profile_bin_counts"].tolist(),
+        },
+        "inferred_profiles": {
+            "psi_profile": profiles["psi_profile"].tolist(),
+            "pressure_gradient_Pa_per_Wb": profiles["pressure_gradient_Pa_per_Wb"].tolist(),
+            "ffprime_T2": profiles["ffprime_T2"].tolist(),
+        },
+        "reference_psi_Wb_rad": reference.copy(),
+        "warning": (
+            "Data-backed Grad-Shafranov reconstruction from a reference flux map. "
+            "The source profile was estimated from that same map with p'=0; comparison "
+            "metrics are in-sample reconstruction errors, not independent validation."
+        ),
+    })
+    return result
+
 def reconstruct_equilibrium_inverse(
     R_m, Z_m, basis_psi_Wb_rad, *,
     magnetic_probe_response_T_per_coefficient=None,
