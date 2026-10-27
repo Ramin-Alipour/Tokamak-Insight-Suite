@@ -206,6 +206,7 @@ def infer_grad_shafranov_profiles_from_flux(
 def reconstruct_equilibrium_from_reference_flux(
     R_m, Z_m, reference_psi_Wb_rad, *, n_profile_points=32,
     max_iterations=10000, tolerance=1e-8, relaxation=1.2,
+    toroidal_field_boundary_Tm=None,
 ):
     """Run a data-backed Grad-Shafranov solve using a public/reference flux map.
 
@@ -219,7 +220,8 @@ def reconstruct_equilibrium_from_reference_flux(
     if reference.shape != (Z.size, R.size) or not np.all(np.isfinite(reference)):
         raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
     profiles = reconstruct_equilibrium_profiles_from_flux(
-        R, Z, reference, n_profile_points=n_profile_points
+        R, Z, reference, n_profile_points=n_profile_points,
+        toroidal_field_boundary_Tm=toroidal_field_boundary_Tm,
     )
     result = reconstruct_equilibrium(
         R, Z, reference, profiles["psi_normalized_axis_to_edge"],
