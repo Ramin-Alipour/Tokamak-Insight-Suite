@@ -404,6 +404,92 @@ def reconstruct_equilibrium_inverse(
     }
 
 
+
+def derive_equilibrium_profiles_from_sources(
+    R_m, Z_m, psi_Wb_rad, psi_profile,
+    pressure_gradient_Pa_per_Wb, ffprime_T2, *,
+    toroidal_field_boundary_Tm=None,
+):
+    """Derive pressure/current profiles from the *supplied* GS source profiles.
+
+    Unlike reconstruct_equilibrium_profiles_from_flux, this routine does not
+    refit p' and FF' from the solved flux map. It preserves the user's supplied
+    source functions, integrates p(edge)=0, and computes j_phi. If an independent
+    edge F=R B_phi is supplied, it also integrates F^2. This is a profile
+    derivation for a prescribed-profile GS solution, not free-boundary EFIT.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    psi = np.asarray(psi_Wb_rad, dtype=float)
+    profile = np.asarray(psi_profile, dtype=float)
+    pprime_input = np.asarray(pressure_gradient_Pa_per_Wb, dtype=float)
+    ffprime_input = np.asarray(ffprime_T2, dtype=float)
+    if psi.shape != (Z.size, R.size) or not np.all(np.isfinite(psi)):
+        raise ValueError("psi_Wb_rad must be a finite (len(Z), len(R)) grid")
+    if (profile.ndim != 1 or profile.size < 2 or pprime_input.shape != profile.shape
+            or ffprime_input.shape != profile.shape or not np.all(np.isfinite(profile))
+            or not np.all(np.isfinite(pprime_input)) or not np.all(np.isfinite(ffprime_input))
+            or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1):
+        raise ValueError("Source profiles must be finite, aligned, and strictly increasing within [0, 1]")
+    if toroidal_field_boundary_Tm is not None and (
+        not np.isscalar(toroidal_field_boundary_Tm)
+        or not np.isfinite(toroidal_field_boundary_Tm)
+        or float(toroidal_field_boundary_Tm) == 0
+    ):
+        raise ValueError("toroidal_field_boundary_Tm must be finite and non-zero when supplied")
+    edge = np.concatenate((psi[0, :], psi[-1, :], psi[1:-1, 0], psi[1:-1, -1]))
+    edge_flux = float(np.median(edge))
+    interior = psi[1:-1, 1:-1]
+    if abs(float(np.max(psi) - np.min(psi))) <= np.finfo(float).tiny:
+        raise ValueError("Solved flux map has no finite flux span")
+    axis_offset_min = abs(float(np.min(interior)) - edge_flux)
+    axis_offset_max = abs(float(np.max(interior)) - edge_flux)
+    axis_flux = float(np.min(interior) if axis_offset_min >= axis_offset_max else np.max(interior))
+    axis_index = np.unravel_index(np.argmin(interior) if axis_offset_min >= axis_offset_max else np.argmax(interior), interior.shape)
+    axis_j, axis_i = int(axis_index[0] + 1), int(axis_index[1] + 1)
+    flux_span = edge_flux - axis_flux
+    if abs(flux_span) <= np.finfo(float).tiny:
+        raise ValueError("Solved flux has no distinct axis-to-edge flux span")
+    psi_n_grid = (psi - axis_flux) / flux_span
+    profile = np.asarray(profile, dtype=float)
+    pprime = np.interp(profile, np.asarray(psi_profile, dtype=float), pprime_input)
+    ffprime = np.interp(profile, np.asarray(psi_profile, dtype=float), ffprime_input)
+    pressure = np.zeros_like(profile)
+    for k in range(profile.size - 2, -1, -1):
+        pressure[k] = pressure[k + 1] - 0.5 * (
+            pprime[k + 1] + pprime[k]
+        ) * flux_span * (profile[k + 1] - profile[k])
+    rr = np.broadcast_to(R[None, :], psi.shape)
+    p_grid = np.interp(np.clip(psi_n_grid, 0.0, 1.0), profile, pprime)
+    ff_grid = np.interp(np.clip(psi_n_grid, 0.0, 1.0), profile, ffprime)
+    j_tor = rr * p_grid + ff_grid / (MU0 * rr)
+    j_tor[(psi_n_grid < 0.0) | (psi_n_grid > 1.0)] = np.nan
+    result = {
+        "psi_normalized_axis_to_edge": profile,
+        "pressure_gradient_Pa_per_Wb": pprime,
+        "ffprime_T2": ffprime,
+        "pressure_Pa_relative_to_edge": pressure,
+        "j_tor_A_m2": j_tor,
+        "psi_axis_Wb_rad": axis_flux,
+        "psi_edge_Wb_rad": edge_flux,
+        "axis_R_m": float(R[axis_i]),
+        "axis_Z_m": float(Z[axis_j]),
+        "psi_normalized_grid": psi_n_grid,
+        "profile_source_model": "directly supplied p'(psi_N) and F F'(psi_N); no inverse source refit",
+        "pressure_profile_is_relative": True,
+    }
+    if toroidal_field_boundary_Tm is not None:
+        f2 = np.empty_like(profile)
+        f2[-1] = float(toroidal_field_boundary_Tm) ** 2
+        integrand = 2.0 * ffprime * flux_span
+        for k in range(profile.size - 2, -1, -1):
+            f2[k] = f2[k + 1] - 0.5 * (integrand[k + 1] + integrand[k]) * (profile[k + 1] - profile[k])
+        if np.any(f2 <= 0) or not np.all(np.isfinite(f2)):
+            raise ValueError("Inferred F²(psi) is non-positive; check flux convention and edge F")
+        result["F_squared_T2_m2"] = f2
+        result["F_Tm"] = np.sign(float(toroidal_field_boundary_Tm)) * np.sqrt(f2)
+    return result
+
+
 def reconstruct_equilibrium_profiles_from_flux(
     R_m, Z_m, psi_Wb_rad, *, n_profile_points=32,
     toroidal_field_boundary_Tm=None,
