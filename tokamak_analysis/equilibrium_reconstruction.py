@@ -491,7 +491,7 @@ def reconstruct_equilibrium_profiles_from_flux(
     # irrespective of whether the machine's psi convention increases inward.
     flux_span = edge_flux - axis_flux
     if abs(flux_span) <= np.finfo(float).tiny:
-        raise ValueError("Flux map has no distinct interior magnetic-axis and edge flux")
+        raise ValueError("Flux map must have a nonzero finite range and distinct interior magnetic-axis and edge flux")
     psi_n = (psi - axis_flux) / flux_span
 
     dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
