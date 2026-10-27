@@ -21,6 +21,7 @@ from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_p
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
 from tokamak_analysis.flux_loops import analyze_flux_loop
+from tokamak_analysis.poloidal_flux import reconstruct_poloidal_flux
 from tis.catalog import DIAGNOSTICS, FORMULAS, diagnostic_families, maturity_counts, maturity_label
 from tis.signals import sampling_audit, hampel_despike, prepare_time_series_robust
 from tis.events import detect_elms, detect_sawteeth, current_quench_analysis
@@ -2098,7 +2099,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
@@ -2416,6 +2417,51 @@ elif page=='Advanced Analysis':
                 json_download('Export polarimetry result and limitations JSON',result,'tis_polarimetry_results.json')
             except Exception as exc:
                 st.error(f'Faraday-rotation analysis failed: {exc}')
+    elif workflow=='Poloidal magnetic-flux map reconstruction':
+        st.markdown('Reconstruct relative axisymmetric poloidal flux from calibrated B_R and B_Z grids.')
+        st.caption('Input table must be a long-form grid with one row per (R,Z) coordinate pair and calibrated B_R/B_Z in tesla. This is not EFIT or a Grad–Shafranov solver.')
+        if df is None or len(numeric) < 4:
+            st.info('Load a table containing major radius R (m), vertical coordinate Z (m), radial field B_R (T), and vertical field B_Z (T).')
+        else:
+            rcol=col_select('Major radius R (m)',numeric,'tis_psi_R')
+            zcol=col_select('Vertical coordinate Z (m)',numeric,'tis_psi_Z')
+            brcol=col_select('Radial field B_R (T)',numeric,'tis_psi_BR')
+            bzcol=col_select('Vertical field B_Z (T)',numeric,'tis_psi_BZ')
+            initial_flux=st.number_input('Reference poloidal flux (Wb)',value=0.0,format='%.8g',key='tis_psi_initial')
+            if st.button('Reconstruct poloidal flux map',type='primary',key='run_poloidal_flux'):
+                try:
+                    if len({rcol,zcol,brcol,bzcol}) != 4:
+                        raise ValueError('R, Z, B_R, and B_Z must use four distinct columns.')
+                    frame=df[[rcol,zcol,brcol,bzcol]].apply(pd.to_numeric,errors='raise').dropna()
+                    if frame.empty:
+                        raise ValueError('No complete numeric grid rows are available.')
+                    if frame.duplicated([rcol,zcol]).any():
+                        raise ValueError('Each (R,Z) coordinate pair must occur exactly once; duplicate grid points were found.')
+                    R=np.sort(frame[rcol].unique().astype(float))
+                    Z=np.sort(frame[zcol].unique().astype(float))
+                    expected=len(R)*len(Z)
+                    if len(frame)!=expected:
+                        raise ValueError(f'Grid is incomplete: found {len(frame)} unique coordinate pairs; expected {expected} ({len(Z)} × {len(R)}).')
+                    grid_br=frame.pivot(index=zcol,columns=rcol,values=brcol).reindex(index=Z,columns=R).to_numpy(dtype=float)
+                    grid_bz=frame.pivot(index=zcol,columns=rcol,values=bzcol).reindex(index=Z,columns=R).to_numpy(dtype=float)
+                    result=reconstruct_poloidal_flux(R,Z,grid_br,grid_bz,initial_flux_Wb=initial_flux)
+                    st.success('Poloidal-flux reconstruction completed within the declared calibrated-input scope.')
+                    for label,value in [('Flux minimum (Wb)',result['diagnostics']['flux_min_Wb']),('Flux maximum (Wb)',result['diagnostics']['flux_max_Wb']),('R-derivative RMS residual',result['diagnostics']['rms_derivative_residual_R_Wb_m']),('Z-derivative RMS residual',result['diagnostics']['rms_derivative_residual_Z_Wb_m'])]:
+                        st.metric(label,f'{value:.6g}')
+                    flux_frame=pd.DataFrame(result['poloidal_flux_Wb'],index=Z,columns=R)
+                    flux_frame.index.name='Z_m'
+                    flux_frame.columns.name='R_m'
+                    st.dataframe(flux_frame,use_container_width=True)
+                    st.line_chart(flux_frame.T)
+                    csv_frame=flux_frame.stack().rename('poloidal_flux_Wb').reset_index()
+                    download_df('Export poloidal flux map (CSV)',csv_frame,'tis_poloidal_flux.csv')
+                    json_safe_result={k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in result.items()}
+                    json_download('Export poloidal flux result and diagnostics (JSON)',json_safe_result,'tis_poloidal_flux.json')
+                    with st.expander('Assumptions and limitations'):
+                        for item in result['assumptions']:
+                            st.write('- '+item)
+                except Exception as exc:
+                    st.error(f'Poloidal-flux reconstruction failed: {exc}')
     elif workflow=='Registered analysis modules':
         selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
         entry=next(x for x in ANALYSES if x['id']==selected_id)
