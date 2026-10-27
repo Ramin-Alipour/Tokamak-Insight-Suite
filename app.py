@@ -1755,6 +1755,11 @@ elif page=='Equilibrium & Reconstruction':
         gs_tolerance = st.number_input('Relative iteration tolerance', min_value=1e-12, max_value=1e-2, value=1e-8, format='%.1e', key='gs_tolerance')
         gs_max_iterations = st.number_input('Maximum iterations', min_value=1, max_value=100000, value=10000, step=100, key='gs_max_iterations')
         gs_relaxation = st.number_input('Relaxation factor (0, 2)', min_value=0.01, max_value=1.99, value=1.2, step=0.05, key='gs_relaxation')
+        gs_f_edge = st.number_input(
+            'Edge F = R Bφ (T·m; 0 omits F and q)', min_value=-1000.0, max_value=1000.0,
+            value=0.0, format='%.6g', key='gs_f_edge',
+            help='Use an independently known edge value. Do not guess it.',
+        )
         gs_run = st.form_submit_button('Solve Grad–Shafranov equilibrium', type='primary')
     if gs_run:
         try:
@@ -1772,6 +1777,11 @@ elif page=='Equilibrium & Reconstruction':
                 gs_R, gs_Z, gs_boundary, gs_profile, gs_pprime, gs_ffprime,
                 max_iterations=int(gs_max_iterations), tolerance=float(gs_tolerance),
                 relaxation=float(gs_relaxation),
+            )
+            from tokamak_analysis.equilibrium_reconstruction import derive_equilibrium_profiles_from_sources
+            gs_profiles = derive_equilibrium_profiles_from_sources(
+                gs_R, gs_Z, gs_result['psi_Wb_rad'], gs_profile, gs_pprime, gs_ffprime,
+                toroidal_field_boundary_Tm=(float(gs_f_edge) if float(gs_f_edge) != 0.0 else None),
             )
             st.metric('Solver convergence', 'Converged' if gs_result['converged'] else 'Not converged')
             st.json({key: value for key, value in gs_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'B_R_T', 'B_Z_T', 'B_poloidal_T'}})
@@ -1802,6 +1812,23 @@ elif page=='Equilibrium & Reconstruction':
             gs_field_fig.tight_layout()
             st.pyplot(gs_field_fig)
             download_df('Download Grad–Shafranov solution grid', gs_table, 'tis_grad_shafranov_equilibrium.csv')
+            st.markdown('**Profiles derived from the source functions used by the solver**')
+            st.caption('These profiles use the supplied p′ and F·F′ directly; they are not refitted from the computed flux. Pressure is relative to p(edge)=0. F and q require an independently known edge F value.')
+            gs_profile_table = pd.DataFrame({
+                'psi_normalized_axis_to_edge': gs_profiles['psi_normalized_axis_to_edge'],
+                'pressure_gradient_Pa_per_Wb': gs_profiles['pressure_gradient_Pa_per_Wb'],
+                'ffprime_T2': gs_profiles['ffprime_T2'],
+                'pressure_Pa_relative_to_edge': gs_profiles['pressure_Pa_relative_to_edge'],
+            })
+            if 'F_Tm' in gs_profiles:
+                gs_profile_table['F_Tm'] = gs_profiles['F_Tm']
+            st.dataframe(gs_profile_table, use_container_width=True)
+            download_df('Download Grad–Shafranov equilibrium profiles', gs_profile_table, 'tis_grad_shafranov_profiles.csv')
+            gs_jtor_table = pd.DataFrame({
+                'Z_m': np.repeat(gs_Z, gs_R.size), 'R_m': np.tile(gs_R, gs_Z.size),
+                'j_tor_A_m2': gs_profiles['j_tor_A_m2'].ravel(),
+            })
+            download_df('Download Grad–Shafranov toroidal current density', gs_jtor_table, 'tis_grad_shafranov_jtor.csv')
             if not gs_result['converged']:
                 st.error('Iteration limit reached before the requested tolerance. Do not treat this solution as converged.')
             st.warning(gs_result['warning'])
