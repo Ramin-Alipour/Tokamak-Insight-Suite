@@ -249,7 +249,7 @@ def reconstruct_equilibrium_from_reference_flux(
                 or not np.isclose(profile[0], 0.0, rtol=0.0, atol=1e-12)
                 or not np.isclose(profile[-1], 1.0, rtol=0.0, atol=1e-12)):
             raise ValueError(
-                "Supplied source profiles must be finite, aligned, and strictly increasing within [0, 1]"
+                "Supplied source profiles must be finite, aligned, strictly increasing, and span the full normalized-flux interval [0, 1]"
             )
         result = reconstruct_equilibrium(
             R, Z, reference, profile, pprime, ffprime,
