@@ -2419,7 +2419,7 @@ elif page=='Advanced Analysis':
                 st.error(f'Faraday-rotation analysis failed: {exc}')
     elif workflow=='Poloidal magnetic-flux map reconstruction':
         st.markdown('Reconstruct relative axisymmetric poloidal flux from calibrated B_R and B_Z grids.')
-        st.caption('Input table must be a long-form grid with one row per (R,Z) coordinate pair and calibrated B_R/B_Z in tesla. This is not EFIT or a Grad–Shafranov solver.')
+        st.caption('Input table must provide calibrated B_R and B_Z grids in tesla as a long-form table with one row per (R,Z) coordinate pair. This is not EFIT or a Grad–Shafranov solver.')
         if df is None or len(numeric) < 4:
             st.info('Load a table containing major radius R (m), vertical coordinate Z (m), radial field B_R (T), and vertical field B_Z (T).')
         else:
