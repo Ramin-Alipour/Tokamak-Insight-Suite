@@ -25,8 +25,10 @@ def reconstruct_poloidal_flux(R_m, Z_m, B_R_T, B_Z_T, *, initial_flux_Wb=0.0,
     expected = (Z.size, R.size)
     if br.shape != expected or bz.shape != expected:
         raise ValueError(f"B_R_T and B_Z_T must both have shape (len(Z_m), len(R_m)) = {expected}.")
-    if isinstance(initial_flux_Wb, (bool, np.bool_)) or not np.isscalar(initial_flux_Wb) or not np.isfinite(initial_flux_Wb):
-        raise ValueError("initial_flux_Wb must be a finite scalar.")
+    if (isinstance(initial_flux_Wb, (bool, np.bool_))
+            or not isinstance(initial_flux_Wb, (int, float, np.integer, np.floating))
+            or not np.isfinite(initial_flux_Wb)):
+        raise ValueError("initial_flux_Wb must be a finite real numeric scalar.")
     if reference_index is None:
         iz0, ir0 = 0, 0
     else:
@@ -51,6 +53,15 @@ def reconstruct_poloidal_flux(R_m, Z_m, B_R_T, B_Z_T, *, initial_flux_Wb=0.0,
     dpsi_dZ_num = np.gradient(psi, Z, axis=0, edge_order=1)
     residual_R = dpsi_dR_num - R[None, :] * bz
     residual_Z = dpsi_dZ_num + R[None, :] * br
+    # A single-valued flux surface requires compatible field derivatives:
+    # d(R B_Z)/dZ = d(-R B_R)/dR. This is a field-consistency diagnostic,
+    # distinct from the reconstruction residuals and not an uncertainty estimate.
+    radial_flux_gradient = R[None, :] * bz
+    vertical_flux_gradient = -R[None, :] * br
+    integrability_residual = (
+        np.gradient(vertical_flux_gradient, R, axis=1, edge_order=1)
+        - np.gradient(radial_flux_gradient, Z, axis=0, edge_order=1)
+    )
     return {
         "R_m": R.copy(), "Z_m": Z.copy(), "poloidal_flux_Wb": psi,
         "poloidal_flux_change_Wb": psi - float(initial_flux_Wb),
@@ -59,12 +70,15 @@ def reconstruct_poloidal_flux(R_m, Z_m, B_R_T, B_Z_T, *, initial_flux_Wb=0.0,
         "dpsi_dR_Wb_m": dpsi_dR_num, "dpsi_dZ_Wb_m": dpsi_dZ_num,
         "consistency_residual_R_Wb_m": residual_R,
         "consistency_residual_Z_Wb_m": residual_Z,
+        "integrability_residual_Wb_m2": integrability_residual,
         "diagnostics": {
             "grid_shape": list(psi.shape), "sample_count": int(psi.size),
             "flux_min_Wb": float(np.min(psi)), "flux_max_Wb": float(np.max(psi)),
             "flux_peak_to_peak_Wb": float(np.ptp(psi)),
             "rms_derivative_residual_R_Wb_m": float(np.sqrt(np.mean(residual_R**2))),
             "rms_derivative_residual_Z_Wb_m": float(np.sqrt(np.mean(residual_Z**2))),
+            "rms_integrability_residual_Wb_m2": float(np.sqrt(np.mean(integrability_residual**2))),
+            "max_abs_integrability_residual_Wb_m2": float(np.max(np.abs(integrability_residual))),
             "absolute_flux_depends_on_initial_condition": True,
             "input_fields_assumed_calibrated_T": True,
         },
@@ -73,7 +87,8 @@ def reconstruct_poloidal_flux(R_m, Z_m, B_R_T, B_Z_T, *, initial_flux_Wb=0.0,
             "Flux is reconstructed by path integration on the supplied rectangular grid.",
             "The reference point sets the additive flux gauge; absolute flux needs an independent boundary/reference condition.",
             "This is not an EFIT/Grad-Shafranov equilibrium solver and does not infer plasma current or pressure profiles.",
-            "Field inconsistency and measurement noise can make the path-integrated map path-dependent; inspect derivative residuals.",
+            "Field inconsistency and measurement noise can make the path-integrated map path-dependent; inspect derivative and integrability residuals.",
+            "The integrability residual tests compatibility of the supplied field gradients; it is not a statistical uncertainty or a substitute for equilibrium reconstruction.",
         ],
     }
 
