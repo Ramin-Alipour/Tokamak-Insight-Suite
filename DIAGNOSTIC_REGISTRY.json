@@ -2371,7 +2371,9 @@
     "implementation_functions": [
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
       "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
-      "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse"
+      "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse",
+      "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux",
+      "tokamak_analysis.equilibrium_reconstruction.derive_equilibrium_profiles_from_sources"
     ],
     "implementation_status": "Implemented: prescribed-boundary Grad–Shafranov solve, weighted magnetic inverse flux fit, joint p'(psi)/F F'(psi) source-profile inference, relative pressure profile, toroidal-current-density map, and optional F/q profile when an independent edge F=R·Bphi constraint is supplied. Includes numerical and dashboard acceptance tests. Not a complete machine-specific free-boundary EFIT.",
     "execution_contract": {
@@ -2617,7 +2619,8 @@
         "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
         "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
         "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse",
-        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux"
+        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux",
+        "tokamak_analysis.equilibrium_reconstruction.derive_equilibrium_profiles_from_sources"
       ],
       "raw_data_to_physics": false
     }
