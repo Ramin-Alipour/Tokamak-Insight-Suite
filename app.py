@@ -1588,7 +1588,7 @@ elif page=='Plasma Parameters':
 
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
-    st.caption('Run a Grad–Shafranov reconstruction from a public FAIR-MAST EFIT reference map or solve from your own boundary and pressure/current profiles.')
+    st.caption('Run a Grad–Shafranov reconstruction from a public DIII-D EFIT flux map or solve from your own boundary and pressure/current profiles.')
     st.markdown('### Public-data equilibrium reconstruction')
     st.caption('Fetch a real EFIT poloidal-flux map from the open Fusion Equilibrium Challenge dataset, infer a flux-dependent Grad–Shafranov source profile, solve with the reference perimeter fixed, and compare the reconstructed interior against the reference.')
     public_eq_col1, public_eq_col2 = st.columns(2)
@@ -1598,7 +1598,7 @@ elif page=='Equilibrium & Reconstruction':
         public_eq_time = st.number_input('EFIT time (s)', min_value=0.0, value=0.2, format='%.6f', key='public_eq_time')
     if st.button('Fetch public EFIT map and reconstruct', type='primary', key='public_eq_reconstruct'):
         try:
-            with st.spinner('Fetching FAIR-MAST EFIT map and solving Grad–Shafranov equation...'):
+            with st.spinner('Fetching public DIII-D EFIT map and solving Grad–Shafranov equation...'):
                 from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_from_reference_flux
                 public_eq_R, public_eq_Z, public_eq_reference, public_eq_manifest = fetch_public_efit_flux_map(
                     int(public_eq_sample), float(public_eq_time)
