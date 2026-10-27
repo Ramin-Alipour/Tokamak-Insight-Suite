@@ -327,6 +327,8 @@ def test_joint_equilibrium_profile_reconstruction_extracts_pressure_and_current_
     assert result["pressure_Pa_relative_to_edge"].shape == (24,)
     assert result["F_Tm"].shape == (24,)
     assert result["q_profile"].shape == (24,)
+    assert result["j_tor_A_m2"].shape == psi.shape
+    assert np.isfinite(result["j_tor_A_m2"]).any()
     assert result["q95"] is None or np.isfinite(result["q95"])
     assert result["axis_R_m"] == pytest.approx(1.5, abs=R[1] - R[0])
     assert result["axis_Z_m"] == pytest.approx(0.0, abs=Z[1] - Z[0])
