@@ -101,11 +101,13 @@ def _normalized_axis_to_edge_flux(psi):
 
 def _grad_shafranov_source_from_profiles(psi_normalized, R_m, psi_profile,
                                         pressure_gradient_Pa_per_Wb, ffprime_T2):
-    """Evaluate the plasma source only inside the prescribed axis-to-edge flux domain.
+    """Evaluate profile-based Grad-Shafranov sources on the full computational grid.
 
-    The supplied profiles describe 0 <= psi_N <= 1. Outside that interval the
-    plasma source is zero; clamping to edge values would incorrectly extend
-    plasma pressure/current sources into the vacuum region.
+    The supplied profile arrays cover normalized flux [0, 1]. Values outside
+    that interval are evaluated at the nearest endpoint, matching np.interp's
+    endpoint behavior. A separate separatrix/plasma mask is required before
+    vacuum regions can be assigned zero source; a rectangular grid and its
+    perimeter flux alone do not define that mask.
     """
     psi_n = np.asarray(psi_normalized, dtype=float)
     R = np.asarray(R_m, dtype=float)
@@ -117,12 +119,9 @@ def _grad_shafranov_source_from_profiles(psi_normalized, R_m, psi_profile,
     if (profile.ndim != 1 or profile.size < 2 or pprime.shape != profile.shape
             or ffprime.shape != profile.shape):
         raise ValueError("Source profiles must be aligned 1-D arrays")
-    inside = np.isfinite(psi_n) & (psi_n >= 0.0) & (psi_n <= 1.0)
-    p_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, pprime)
-    ff_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, ffprime)
-    source = -MU0 * R[None, :]**2 * p_grid - ff_grid
-    return np.where(inside, source, 0.0)
-
+    p_grid = np.interp(psi_n, profile, pprime)
+    ff_grid = np.interp(psi_n, profile, ffprime)
+    return -MU0 * R[None, :]**2 * p_grid - ff_grid
 
 
 def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
