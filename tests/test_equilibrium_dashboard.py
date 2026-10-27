@@ -116,4 +116,7 @@ def test_inverse_dashboard_runs_with_explicit_synthetic_acceptance_fixture():
     next(item for item in app.button if item.label == "Fit equilibrium to magnetic measurements").click().run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any(item.label == "Download inverse equilibrium grid" for item in app.get("download_button"))
+    assert any(item.label == "Download GS-refined inverse equilibrium" for item in app.get("download_button"))
     assert any("Magnetic measurement count" in str(item.label) for item in app.metric)
+    assert any("Grad–Shafranov refinement" in str(item.label) for item in app.metric)
+    assert any("GS-vs-fit flux NRMSE" in str(item.label) for item in app.metric)
