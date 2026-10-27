@@ -1853,6 +1853,7 @@ elif page=='Equilibrium & Reconstruction':
             from tokamak_analysis.equilibrium_reconstruction import (
                 reconstruct_equilibrium_inverse,
                 reconstruct_equilibrium_from_reference_flux,
+                reconstruct_equilibrium_profiles_from_flux,
             )
             inverse_result = reconstruct_equilibrium_inverse(
                 inverse_bundle.get('R_m'), inverse_bundle.get('Z_m'), inverse_bundle.get('basis_psi_Wb_rad'),
@@ -1877,7 +1878,11 @@ elif page=='Equilibrium & Reconstruction':
                 relaxation=1.0,
                 toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
             )
-            inverse_profiles = inverse_gs_result['inferred_profiles']
+            inverse_profiles = reconstruct_equilibrium_profiles_from_flux(
+                inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
+                n_profile_points=32,
+                toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
+            )
             st.metric('Magnetic measurement count', inverse_result['measurement_count'])
             st.metric('Weighted residual RMS', f"{inverse_result['weighted_residual_rms']:.4g}")
             st.metric('Grad–Shafranov refinement', 'Converged' if inverse_gs_result['converged'] else 'Not converged')
