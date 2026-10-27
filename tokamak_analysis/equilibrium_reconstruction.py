@@ -883,7 +883,7 @@ def derive_equilibrium_geometry_from_flux(
 
         def volume_integral(values):
             arr = np.where(inside & np.isfinite(values), values * volume_weight, 0.0)
-            return float(np.trapz(np.trapz(arr, R, axis=1), Z))
+            return float(np.trapezoid(np.trapezoid(arr, R, axis=1), Z))
 
         bp_energy_integral = volume_integral(bp2)
         if pressure_grid is not None:
@@ -901,7 +901,7 @@ def derive_equilibrium_geometry_from_flux(
             if jgrid.shape != psi.shape:
                 raise ValueError("j_tor_A_m2 must match psi_Wb_rad")
             jcross = np.where(inside & np.isfinite(jgrid), jgrid, 0.0)
-            current = float(np.trapz(np.trapz(jcross, R, axis=1), Z))
+            current = float(np.trapezoid(np.trapezoid(jcross, R, axis=1), Z))
             result["plasma_current_A"] = current
             if abs(current) > np.finfo(float).tiny and R[axis_i] > 0 and bp_energy_integral > 0:
                 poloidal_energy = bp_energy_integral / (2.0 * MU0)
