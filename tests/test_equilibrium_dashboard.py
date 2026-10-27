@@ -106,6 +106,9 @@ def test_inverse_dashboard_runs_with_explicit_synthetic_acceptance_fixture():
         "flux_loop_sigma_Wb_rad": [0.001, 0.002],
         "coil_flux_response_Wb_rad_per_A": loop_coil_response.tolist(),
         "coil_flux_currents_A": probe_currents.tolist(),
+        "psi_profile": np.linspace(0.0, 1.0, 8).tolist(),
+        "pressure_gradient_Pa_per_Wb": np.zeros(8).tolist(),
+        "ffprime_T2": np.zeros(8).tolist(),
     }
     payload = json.dumps(bundle).encode("utf-8")
     app = AppTest.from_file(APP_PATH, default_timeout=90).run()
@@ -120,3 +123,4 @@ def test_inverse_dashboard_runs_with_explicit_synthetic_acceptance_fixture():
     assert any("Magnetic measurement count" in str(item.label) for item in app.metric)
     assert any("Grad–Shafranov refinement" in str(item.label) for item in app.metric)
     assert any("GS-vs-fit flux NRMSE" in str(item.label) for item in app.metric)
+    assert any("user-supplied p'(psi_N)" in str(item.value) for item in app.json)
