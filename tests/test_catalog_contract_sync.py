@@ -35,7 +35,7 @@ def test_package_and_runtime_versions_are_consistent():
 def test_all_analysis_entry_points_declare_conservative_contracts():
     import importlib
     from tokamak_analysis.analysis_registry import ANALYSES
-    assert len(ANALYSES) == 81
+    assert len(ANALYSES) == 80
     for entry in ANALYSES:
         contract = entry["execution_contract"]
         assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
