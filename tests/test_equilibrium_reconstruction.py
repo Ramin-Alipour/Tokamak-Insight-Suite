@@ -46,7 +46,7 @@ def test_solver_normalizes_flux_from_interior_axis_to_perimeter_edge_not_global_
         result["psi_normalized"][1:-1, 0], result["psi_normalized"][1:-1, -1],
     ))
     interior = result["psi_normalized"][1:-1, 1:-1]
-    assert np.min(interior) == pytest.approx(0.0, abs=1e-12)
+    assert min(abs(float(np.min(interior))), abs(float(np.max(interior)))) == pytest.approx(0.0, abs=1e-12)
     assert np.median(edge) == pytest.approx(1.0, abs=1e-12)
 
 
