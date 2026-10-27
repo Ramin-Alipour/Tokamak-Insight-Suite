@@ -2804,7 +2804,7 @@
       "raw_data_to_physics": true,
       "note": "Complete only for calibrated axisymmetric B_R/B_Z grid integration within the stated limitations."
     }
-  }
+  },
   {
     "family": "Electrostatic probes",
     "diagnostic": "Ball-pen probe",
