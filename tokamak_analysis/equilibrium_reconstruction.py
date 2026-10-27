@@ -6,6 +6,27 @@ import numpy as np
 MU0 = 4e-7 * np.pi
 
 
+def _q95_from_profile(profile, q_profile):
+    """Return q at normalized flux 0.95 only when supported by closed surfaces.
+
+    np.interp silently clamps out-of-range requests to an endpoint. That would
+    turn a last valid contour below 0.95 into a fabricated q95 estimate.
+    """
+    profile = np.asarray(profile, dtype=float)
+    q = np.asarray(q_profile, dtype=float)
+    if profile.ndim != 1 or q.shape != profile.shape:
+        return None
+    valid = np.isfinite(profile) & np.isfinite(q)
+    x, y = profile[valid], q[valid]
+    if x.size < 2 or not np.any(x <= 0.95) or not np.any(x >= 0.95):
+        return None
+    order = np.argsort(x)
+    x, y = x[order], y[order]
+    if np.any(np.diff(x) <= 0):
+        return None
+    return float(np.interp(0.95, x, y))
+
+
 def _validated_grid(R_m, Z_m):
     R = np.asarray(R_m, dtype=float)
     Z = np.asarray(Z_m, dtype=float)
@@ -529,10 +550,7 @@ def derive_equilibrium_profiles_from_sources(
             q_profile[k] = F[k] * float(np.sum(dl[good] / denominator[good])) / (2.0 * np.pi)
         fig.clear()
         result["q_profile"] = q_profile
-        result["q95"] = (
-            float(np.interp(0.95, profile[np.isfinite(q_profile)], q_profile[np.isfinite(q_profile)]))
-            if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
-        )
+        result["q95"] = _q95_from_profile(profile, q_profile)
         result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
     pressure_grid = np.interp(np.clip(psi_n_grid, 0.0, 1.0), profile, pressure)
     pressure_grid[(psi_n_grid < 0.0) | (psi_n_grid > 1.0)] = np.nan
@@ -735,7 +753,7 @@ def reconstruct_equilibrium_profiles_from_flux(
             q_profile[k] = F[k] * integral / (2.0 * np.pi)
         fig.clear()
         result["q_profile"] = q_profile
-        result["q95"] = float(np.interp(0.95, profile[np.isfinite(q_profile)], q_profile[np.isfinite(q_profile)])) if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
+        result["q95"] = _q95_from_profile(profile, q_profile)
         result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
     pressure_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, pressure)
     pressure_grid[(psi_n < 0.0) | (psi_n > 1.0)] = np.nan
