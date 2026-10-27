@@ -350,7 +350,7 @@ def test_joint_profile_fit_recovers_analytic_pressure_and_ffprime_source_terms()
     R = np.linspace(1.0, 2.0, 81)
     Z = np.linspace(-0.5, 0.5, 81)
     rr, zz = np.meshgrid(R, Z)
-    pprime_true = -1200.0
+    pprime_true = 1200.0
     ffprime_true = 1.5
     a = -MU0 * pprime_true / 8.0
     r_axis = 1.5
