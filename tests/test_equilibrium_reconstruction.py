@@ -395,6 +395,8 @@ def test_known_grad_shafranov_sources_are_used_directly_for_profiles():
     np.testing.assert_allclose(result["ffprime_T2"], ffprime)
     np.testing.assert_allclose(result["pressure_Pa_relative_to_edge"][-1], 0.0)
     np.testing.assert_allclose(result["F_Tm"][-1], 2.0)
+    assert result["q_profile"].shape == profile.shape
+    assert result["q95"] is None  # open contours must not yield a fabricated q95
     assert result["j_tor_A_m2"].shape == psi.shape
     assert "no inverse source refit" in result["profile_source_model"]
 
