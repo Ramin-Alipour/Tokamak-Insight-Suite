@@ -39,6 +39,7 @@ def test_dashboard_reconstructs_flux_and_exposes_exports():
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("completed within the declared calibrated-input scope" in x.value for x in app.success)
     assert any(x.label == "Flux minimum (Wb)" for x in app.metric)
+    assert any(x.label == "Field integrability RMS residual (Wb/m²)" for x in app.metric)
     assert any(x.label == "Export poloidal flux map (CSV)" for x in app.get("download_button"))
     assert any(x.label == "Export poloidal flux result and diagnostics (JSON)" for x in app.get("download_button"))
 
