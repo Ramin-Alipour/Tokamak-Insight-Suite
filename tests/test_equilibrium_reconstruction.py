@@ -332,6 +332,11 @@ def test_joint_equilibrium_profile_reconstruction_extracts_pressure_and_current_
     assert result["q95"] is None or np.isfinite(result["q95"])
     assert result["axis_R_m"] == pytest.approx(1.5, abs=R[1] - R[0])
     assert result["axis_Z_m"] == pytest.approx(0.0, abs=Z[1] - Z[0])
+    assert result["psi_normalized_grid"][32, 32] == pytest.approx(0.0, abs=1e-12)
+    assert np.nanmedian(np.concatenate((
+        result["psi_normalized_grid"][0, :], result["psi_normalized_grid"][-1, :],
+        result["psi_normalized_grid"][1:-1, 0], result["psi_normalized_grid"][1:-1, -1],
+    ))) == pytest.approx(1.0, abs=1e-12)
     assert result["pressure_Pa_relative_to_edge"][-1] == pytest.approx(0.0)
     assert np.all(np.isfinite(result["pressure_gradient_Pa_per_Wb"]))
     assert np.all(np.isfinite(result["ffprime_T2"]))
