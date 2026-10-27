@@ -14,6 +14,19 @@ def grid():
     return np.linspace(1.0, 2.0,  nine := 9), np.linspace(-0.5, 0.5, nine)
 
 
+def valid_reference_equilibrium():
+    """Build a reference flux from a closed, fixed-boundary GS test problem."""
+    R, Z = grid()
+    boundary = np.ones((Z.size, R.size))
+    profile = np.linspace(0.0, 1.0, 8)
+    solved = reconstruct_equilibrium(
+        R, Z, boundary, profile, np.zeros_like(profile),
+        np.full_like(profile, -2.0), tolerance=1e-9,
+    )
+    assert solved["converged"] is True
+    return R, Z, solved["psi_Wb_rad"]
+
+
 def test_solver_preserves_boundary_and_recovers_harmonic_flux():
     R, Z = grid()
     boundary = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
@@ -276,9 +289,7 @@ def test_reference_flux_profile_inference_recovers_constant_source():
 
 
 def test_reference_flux_workflow_reconstructs_grad_shafranov_solution():
-    R, Z = grid()
-    rr, zz = np.meshgrid(R, Z)
-    reference = rr**2 + zz**2
+    R, Z, reference = valid_reference_equilibrium()
     result = reconstruct_equilibrium_from_reference_flux(
         R, Z, reference, n_profile_points=8, tolerance=1e-9
     )
@@ -293,9 +304,7 @@ def test_reference_flux_workflow_reconstructs_grad_shafranov_solution():
 
 
 def test_reference_flux_workflow_uses_user_supplied_equilibrium_profiles():
-    R, Z = grid()
-    rr, zz = np.meshgrid(R, Z)
-    reference = rr**2 + zz**2
+    R, Z, reference = valid_reference_equilibrium()
     profile = np.linspace(0.0, 1.0, 8)
     pprime = np.zeros_like(profile)
     ffprime = np.full_like(profile, -2.0)
