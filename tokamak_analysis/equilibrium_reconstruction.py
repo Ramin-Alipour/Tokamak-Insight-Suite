@@ -103,8 +103,9 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
                             max_iterations=10000, tolerance=1e-8, relaxation=1.2):
     """Solve Δ*ψ = -μ0 R²p'(ψ)-FF'(ψ) with fixed perimeter flux.
 
-    The profiles are interpolated against min-max normalized flux of each iterate.
-    This prescribed-boundary numerical solve is not a full experimental EFIT.
+    The profiles are interpolated against each iterate's interior-axis to
+    perimeter-edge normalized flux. This prescribed-boundary numerical solve
+    is not a full experimental EFIT.
     """
     R, Z = _validated_grid(R_m, Z_m)
     bnd = np.asarray(boundary_flux_Wb_rad, dtype=float)
