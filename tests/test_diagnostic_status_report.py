@@ -42,7 +42,7 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     assert [row["catalog_position"] for row in first_ten] == list(range(1, 11))
     assert first_ten[0]["diagnostic"] == "Thomson scattering"
     assert first_ten[0]["completeness"] == "complete_with_declared_scope"
-    assert first_ten[1]["diagnostic"] == "Langmuir probe"
+    assert first_ten[1]["diagnostic"] == "Langmuir Probe"
     assert first_ten[1]["completeness"] == "complete_with_declared_scope"
     assert first_ten[9]["diagnostic"] == "Mirnov / pickup coils"
     assert first_ten[9]["completeness"] == "complete"
