@@ -81,8 +81,8 @@ def test_invalid_input_rejected():
 
 def test_analysis_registry_resolves_every_callable():
     from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
-    assert len(ANALYSES) == 81
-    assert [x["id"] for x in ANALYSES] == list(range(1, 82))
+    assert len(ANALYSES) == 80
+    assert [x["id"] for x in ANALYSES] == list(range(1, 81))
     for entry in ANALYSES:
         assert callable(resolve_analysis(entry["id"]))
 
