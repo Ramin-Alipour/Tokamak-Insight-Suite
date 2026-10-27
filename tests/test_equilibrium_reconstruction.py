@@ -500,7 +500,7 @@ def test_q95_is_not_extrapolated_when_closed_contours_stop_before_095():
 def test_reference_reconstruction_rejects_source_profiles_without_axis_or_edge(profile):
     R, Z = grid()
     reference = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
-    with pytest.raises(ValueError, match="strictly increasing within"):
+    with pytest.raises(ValueError, match="full normalized-flux interval"):
         reconstruct_equilibrium_from_reference_flux(
             R, Z, reference,
             psi_profile=profile,
