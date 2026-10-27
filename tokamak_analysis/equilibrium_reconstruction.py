@@ -437,7 +437,7 @@ def reconstruct_equilibrium_inverse(
 
 def reconstruct_equilibrium_profiles_from_flux(
     R_m, Z_m, psi_Wb_rad, *, n_profile_points=32,
-    toroidal_field_boundary_T= None,
+    toroidal_field_boundary_Tm=None,
 ):
     """Infer flux-surface p' and FF' source profiles from a 2-D flux map.
 
@@ -461,12 +461,12 @@ def reconstruct_equilibrium_profiles_from_flux(
             or not isinstance(n_profile_points, (int, np.integer))
             or n_profile_points < 4 or n_profile_points > 512):
         raise ValueError("n_profile_points must be an integer from 4 to 512")
-    if toroidal_field_boundary_T is not None and (
-        not np.isscalar(toroidal_field_boundary_T)
-        or not np.isfinite(toroidal_field_boundary_T)
-        or float(toroidal_field_boundary_T) == 0
+    if toroidal_field_boundary_Tm is not None and (
+        not np.isscalar(toroidal_field_boundary_Tm)
+        or not np.isfinite(toroidal_field_boundary_Tm)
+        or float(toroidal_field_boundary_Tm) == 0
     ):
-        raise ValueError("toroidal_field_boundary_T must be finite and non-zero when supplied")
+        raise ValueError("toroidal_field_boundary_Tm must be finite and non-zero when supplied")
 
     # The magnetic axis is the strongest interior extremum relative to the
     # median computational-edge flux; normalize axis-to-edge regardless of
@@ -563,9 +563,9 @@ def reconstruct_equilibrium_profiles_from_flux(
         "pressure_nonnegative_everywhere": bool(np.all(pressure >= -1e-10 * max(float(np.max(np.abs(pressure))), 1.0))),
     }
 
-    if toroidal_field_boundary_T is not None:
+    if toroidal_field_boundary_Tm is not None:
         f2 = np.empty_like(profile)
-        f2[-1] = float(toroidal_field_boundary_T) ** 2
+        f2[-1] = float(toroidal_field_boundary_Tm) ** 2
         integrand = 2.0 * ffprime * dpsi_dpsi_n
         for k in range(profile.size - 2, -1, -1):
             f2[k] = f2[k + 1] - 0.5 * (integrand[k + 1] + integrand[k]) * (profile[k + 1] - profile[k])
