@@ -433,3 +433,189 @@ def reconstruct_equilibrium_inverse(
         "measurement_count": int(observed.size),
         "warning": "Inverse magnetic fit using caller-supplied calibrated machine response. Validate basis, coil responses, inferred boundary, and Grad-Shafranov/profile consistency for the specific device; this generic linearized fit is not a complete machine-specific EFIT.",
     }
+
+
+def reconstruct_equilibrium_profiles_from_flux(
+    R_m, Z_m, psi_Wb_rad, *, n_profile_points=32,
+    toroidal_field_boundary_T= None,
+):
+    """Infer flux-surface p' and FF' source profiles from a 2-D flux map.
+
+    The Grad–Shafranov source is decomposed in each normalized-flux bin as
+    Δ*ψ = -μ0 R² p'(ψ) - F(ψ)F'(ψ). This is a constrained source fit, not a
+    unique pressure/current reconstruction: the two functions are not
+    identifiable from a single flux map unless the R² variation within a
+    surface bin provides enough independent leverage. If the joint fit is
+    poorly identified, this function reports that limitation rather than
+    silently presenting p'=0 as measured physics.
+
+    Pressure is integrated with p(edge)=0. F(ψ) and q(ψ) are calculated only
+    when the user supplies F(edge)=R B_t(edge) in T·m. The q integral uses
+    closed flux contours and the physical-flux gradient.
+    """
+    R, Z = _validated_grid(R_m, Z_m)
+    psi = np.asarray(psi_Wb_rad, dtype=float)
+    if psi.shape != (Z.size, R.size) or not np.all(np.isfinite(psi)):
+        raise ValueError("psi_Wb_rad must be a finite (len(Z), len(R)) grid")
+    if (isinstance(n_profile_points, (bool, np.bool_))
+            or not isinstance(n_profile_points, (int, np.integer))
+            or n_profile_points < 4 or n_profile_points > 512):
+        raise ValueError("n_profile_points must be an integer from 4 to 512")
+    if toroidal_field_boundary_T is not None and (
+        not np.isscalar(toroidal_field_boundary_T)
+        or not np.isfinite(toroidal_field_boundary_T)
+        or float(toroidal_field_boundary_T) == 0
+    ):
+        raise ValueError("toroidal_field_boundary_T must be finite and non-zero when supplied")
+
+    # The magnetic axis is the strongest interior extremum relative to the
+    # median computational-edge flux; normalize axis-to-edge regardless of
+    # whether the device uses increasing or decreasing psi.
+    edge = np.concatenate((psi[0, :], psi[-1, :], psi[1:-1, 0], psi[1:-1, -1]))
+    edge_flux = float(np.median(edge))
+    interior = psi[1:-1, 1:-1]
+    min_offset = abs(float(np.min(interior)) - edge_flux)
+    max_offset = abs(float(np.max(interior)) - edge_flux)
+    if min_offset >= max_offset:
+        local = np.unravel_index(np.argmin(interior), interior.shape)
+        axis_flux = float(np.min(interior))
+    else:
+        local = np.unravel_index(np.argmax(interior), interior.shape)
+        axis_flux = float(np.max(interior))
+    axis_j, axis_i = int(local[0] + 1), int(local[1] + 1)
+    flux_span = axis_flux - edge_flux
+    if abs(flux_span) <= np.finfo(float).tiny:
+        raise ValueError("Flux map has no distinct interior magnetic-axis and edge flux")
+    psi_n = (psi - edge_flux) / flux_span
+
+    dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
+    operator = (
+        np.gradient(dpsi_dr, R, axis=1, edge_order=2)
+        - dpsi_dr / R[None, :]
+        + np.gradient(dpsi_dz, Z, axis=0, edge_order=2)
+    )
+    profile = np.linspace(0.0, 1.0, int(n_profile_points))
+    edges = np.linspace(0.0, 1.0, int(n_profile_points) + 1)
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    pprime_bins = np.full(profile.size, np.nan)
+    ffprime_bins = np.full(profile.size, np.nan)
+    counts = np.zeros(profile.size, dtype=int)
+    ranks = np.zeros(profile.size, dtype=int)
+    rr = np.broadcast_to(R[None, :], psi.shape)
+    valid = (psi_n[1:-1, 1:-1] >= 0.0) & (psi_n[1:-1, 1:-1] <= 1.0)
+    svals = psi_n[1:-1, 1:-1][valid]
+    yvals = operator[1:-1, 1:-1][valid]
+    rvals = rr[1:-1, 1:-1][valid]
+    bin_ids = np.clip(np.digitize(svals, edges[1:-1]), 0, profile.size - 1)
+    for k in range(profile.size):
+        mask = bin_ids == k
+        counts[k] = int(np.count_nonzero(mask))
+        if counts[k] < 3:
+            continue
+        # Fit the actual Grad–Shafranov source, including its R² dependence.
+        design = np.column_stack((-MU0 * rvals[mask]**2, -np.ones(counts[k])))
+        ranks[k] = int(np.linalg.matrix_rank(design))
+        if ranks[k] == 2:
+            fitted, *_ = np.linalg.lstsq(design, yvals[mask], rcond=None)
+            pprime_bins[k], ffprime_bins[k] = fitted
+    populated = np.flatnonzero(np.isfinite(pprime_bins) & np.isfinite(ffprime_bins))
+    identifiable = populated.size >= 2
+    if identifiable:
+        pprime = np.interp(np.arange(profile.size), populated, pprime_bins[populated])
+        ffprime = np.interp(np.arange(profile.size), populated, ffprime_bins[populated])
+        model = "joint per-flux-bin fit of p'(psi) and F F'(psi) using R² variation"
+    else:
+        # Preserve a usable source estimate for tiny/degenerate grids, while
+        # explicitly marking that pressure and FF' could not be separated.
+        counts_by_bin = np.bincount(bin_ids, weights=yvals, minlength=profile.size)
+        sums_by_bin = np.bincount(bin_ids, weights=np.ones_like(yvals), minlength=profile.size)
+        source_mean = np.divide(counts_by_bin, sums_by_bin, out=np.full(profile.size, np.nan), where=sums_by_bin > 0)
+        good = np.flatnonzero(np.isfinite(source_mean))
+        if good.size < 2:
+            raise ValueError("Not enough interior flux-surface samples to estimate source profiles")
+        source_mean = np.interp(np.arange(profile.size), good, source_mean[good])
+        pprime = np.zeros_like(profile)
+        ffprime = -source_mean
+        model = "fallback FF'-only source estimate; joint p'/FF' fit not identifiable on this grid"
+
+    # psi = psi_edge + psi_N * (psi_axis - psi_edge); integrate from edge
+    # inward so p(edge)=0 and F(edge) is an explicit user-provided constraint.
+    dpsi_dpsi_n = flux_span
+    p_integrand = pprime * dpsi_dpsi_n
+    pressure = np.zeros_like(profile)
+    for k in range(profile.size - 2, -1, -1):
+        pressure[k] = pressure[k + 1] - 0.5 * (p_integrand[k + 1] + p_integrand[k]) * (profile[k + 1] - profile[k])
+    result = {
+        "psi_normalized_axis_to_edge": profile,
+        "pressure_gradient_Pa_per_Wb": pprime,
+        "ffprime_T2": ffprime,
+        "pressure_Pa_relative_to_edge": pressure,
+        "psi_axis_Wb_rad": axis_flux,
+        "psi_edge_Wb_rad": edge_flux,
+        "axis_R_m": float(R[axis_i]),
+        "axis_Z_m": float(Z[axis_j]),
+        "profile_bin_counts": counts,
+        "profile_bin_design_rank": ranks,
+        "joint_pressure_ffprime_identifiable": bool(identifiable),
+        "profile_source_model": model,
+        "operator_Wb_rad_m-2": operator,
+        "psi_normalized_grid": psi_n,
+        "pressure_nonnegative_everywhere": bool(np.all(pressure >= -1e-10 * max(float(np.max(np.abs(pressure))), 1.0))),
+    }
+
+    if toroidal_field_boundary_T is not None:
+        f2 = np.empty_like(profile)
+        f2[-1] = float(toroidal_field_boundary_T) ** 2
+        integrand = 2.0 * ffprime * dpsi_dpsi_n
+        for k in range(profile.size - 2, -1, -1):
+            f2[k] = f2[k + 1] - 0.5 * (integrand[k + 1] + integrand[k]) * (profile[k + 1] - profile[k])
+        if np.any(f2 <= 0) or not np.all(np.isfinite(f2)):
+            raise ValueError("Inferred F²(psi) is non-positive; check flux convention, source fit, and supplied edge toroidal field")
+        F = np.sqrt(f2)
+        result["F_Tm"] = F
+        result["F_squared_T2_m2"] = f2
+
+        # q(psi) = F/(2π) ∮ dl/(R² |∇psi|) on each closed flux surface.
+        from matplotlib.figure import Figure
+        from matplotlib.path import Path as PolygonPath
+        from scipy.interpolate import RegularGridInterpolator
+        from scipy.ndimage import map_coordinates
+
+        grad_mag = np.hypot(dpsi_dr, dpsi_dz)
+        grad_interp = RegularGridInterpolator((Z, R), grad_mag, bounds_error=False, fill_value=np.nan)
+        fig = Figure()
+        ax = fig.subplots()
+        q_profile = np.full(profile.size, np.nan)
+        for k, level_n in enumerate(profile):
+            if level_n <= 0.02 or level_n >= 0.995:
+                continue
+            level = edge_flux + level_n * flux_span
+            contours = ax.contour(R, Z, psi, levels=[level])
+            segments = contours.allsegs[0]
+            chosen = None
+            for segment in segments:
+                if len(segment) < 8 or not np.allclose(segment[0], segment[-1], rtol=0, atol=1e-6):
+                    continue
+                if PolygonPath(segment).contains_point((R[axis_i], Z[axis_j])):
+                    if chosen is None or len(segment) > len(chosen):
+                        chosen = segment
+            for collection in getattr(contours, "collections", []):
+                collection.remove()
+            if chosen is None:
+                continue
+            points = np.asarray(chosen, dtype=float)
+            delta = np.diff(points, axis=0)
+            dl = np.hypot(delta[:, 0], delta[:, 1])
+            mid = 0.5 * (points[:-1] + points[1:])
+            grad_mid = grad_interp(mid[:, ::-1])
+            denominator = mid[:, 0] ** 2 * grad_mid
+            good = np.isfinite(denominator) & (denominator > np.finfo(float).tiny)
+            if np.count_nonzero(good) < 6:
+                continue
+            integral = float(np.sum(dl[good] / denominator[good]))
+            q_profile[k] = F[k] * integral / (2.0 * np.pi)
+        fig.clear()
+        result["q_profile"] = q_profile
+        result["q95"] = float(np.interp(0.95, profile[np.isfinite(q_profile)], q_profile[np.isfinite(q_profile)])) if np.count_nonzero(np.isfinite(q_profile)) >= 2 else None
+        result["q_definition"] = "q(psi)=F(psi)/(2π) ∮ dl/[R² |∇psi|]; only closed contours containing the inferred magnetic axis are used"
+    return result
