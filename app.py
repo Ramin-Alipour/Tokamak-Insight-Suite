@@ -28,7 +28,7 @@ from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_sta
     larmor_radii_and_speeds, coulomb_logarithm_electron, shaping_surface_area, q95_iter_formula)
 from tis.report import build_html_report, figure_to_png_base64
 from tis.contributions import build_contribution_bundle, bundle_json
-from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, list_fair_mast_signals, fetch_public_table_bytes
+from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, fetch_public_efit_flux_map, list_fair_mast_signals, fetch_public_table_bytes
 from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
@@ -1590,34 +1590,22 @@ elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
     st.caption('Run a Grad–Shafranov reconstruction from a public FAIR-MAST EFIT reference map or solve from your own boundary and pressure/current profiles.')
     st.markdown('### Public-data equilibrium reconstruction')
-    st.caption('Fetch an existing UKAEA FAIR-MAST EFIT flux map, infer a flux-dependent Grad–Shafranov source profile from that map, solve the equation with the measured map perimeter fixed, and compare the reconstructed interior against the source map.')
+    st.caption('Fetch a real EFIT poloidal-flux map from the open Fusion Equilibrium Challenge dataset, infer a flux-dependent Grad–Shafranov source profile, solve with the reference perimeter fixed, and compare the reconstructed interior against the reference.')
     public_eq_col1, public_eq_col2 = st.columns(2)
     with public_eq_col1:
-        public_eq_shot = st.number_input('FAIR-MAST shot', min_value=1, value=30421, step=1, key='public_eq_shot')
+        public_eq_sample = st.number_input('Public DIII-D sample index', min_value=0, value=0, step=1, key='public_eq_sample')
     with public_eq_col2:
         public_eq_time = st.number_input('EFIT time (s)', min_value=0.0, value=0.2, format='%.6f', key='public_eq_time')
     if st.button('Fetch public EFIT map and reconstruct', type='primary', key='public_eq_reconstruct'):
         try:
             with st.spinner('Fetching FAIR-MAST EFIT map and solving Grad–Shafranov equation...'):
                 from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_from_reference_flux
-                public_eq_frame, public_eq_manifest = fetch_fair_mast_efit_snapshot(
-                    int(public_eq_shot), float(public_eq_time)
+                public_eq_R, public_eq_Z, public_eq_reference, public_eq_manifest = fetch_public_efit_flux_map(
+                    int(public_eq_sample), float(public_eq_time)
                 )
-                public_eq_Z = public_eq_frame['z_m'].to_numpy(dtype=float)
-                public_eq_R = np.asarray([
-                    float(str(name).split('=', 1)[1].removesuffix('_m'))
-                    for name in public_eq_frame.columns[1:]
-                ], dtype=float)
-                public_eq_reference = pd.DataFrame(
-                    public_eq_frame.iloc[:, 1:].to_numpy(dtype=float)
-                ).interpolate(axis=1, limit_direction='both').interpolate(
-                    axis=0, limit_direction='both'
-                ).to_numpy(dtype=float)
-                if not np.all(np.isfinite(public_eq_reference)):
-                    raise ValueError('Public EFIT grid contains missing values that cannot be interpolated.')
                 if (not np.allclose(np.diff(public_eq_R), np.diff(public_eq_R)[0])
                         or not np.allclose(np.diff(public_eq_Z), np.diff(public_eq_Z)[0])):
-                    raise ValueError('FAIR-MAST coordinates are not uniform; resample the reference grid before solving.')
+                    raise ValueError('Public EFIT coordinates are not uniform; resample the reference grid before solving.')
                 public_eq_result = reconstruct_equilibrium_from_reference_flux(
                     public_eq_R, public_eq_Z, public_eq_reference,
                     n_profile_points=32, max_iterations=5000,
@@ -1629,7 +1617,7 @@ elif page=='Equilibrium & Reconstruction':
                 st.session_state['public_eq_Z'] = public_eq_Z
         except Exception as exc:
             st.error(f'Public-data equilibrium reconstruction failed: {exc}')
-            st.info('The public FAIR-MAST archive must be reachable and the optional data dependencies must be installed.')
+            st.info('The public Hugging Face dataset must be reachable and the optional data dependencies must be installed.')
     if 'public_eq_result' in st.session_state:
         public_eq_result = st.session_state['public_eq_result']
         public_eq_manifest = st.session_state['public_eq_manifest']
