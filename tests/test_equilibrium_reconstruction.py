@@ -247,6 +247,10 @@ def test_reference_flux_workflow_reconstructs_grad_shafranov_solution():
     np.testing.assert_allclose(result["psi_Wb_rad"], reference, atol=2e-6)
     assert result["reference_comparison"]["interior_flux_nrmse_by_reference_range"] < 1e-6
     assert result["reference_psi_Wb_rad"].shape == reference.shape
+    assert "pressure_gradient_Pa_per_Wb" in result["inferred_profiles"]
+    assert "ffprime_T2" in result["inferred_profiles"]
+    assert "pressure_Pa_relative_to_edge" in result["inferred_profiles"]
+    assert "joint_pressure_ffprime_identifiable" in result["reference_comparison"]
 
 
 def test_reference_flux_workflow_rejects_bad_reference_map():
