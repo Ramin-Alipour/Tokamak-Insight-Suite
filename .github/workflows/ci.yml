@@ -104,6 +104,11 @@ jobs:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
         run: python -m pytest -q tests/test_flux_loops.py tests/test_flux_loop_dashboard.py
 
+      - name: Run Faraday-rotation polarimetry physics and interactive dashboard acceptance suite
+        env:
+          STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+        run: python -m pytest -q tests/test_polarimetry.py tests/test_polarimetry_dashboard.py
+
       - name: Run Rogowski-coil physics and interactive dashboard acceptance suite
         env:
           STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
