@@ -41,6 +41,36 @@ def _validated_grid(R_m, Z_m):
     return R, Z
 
 
+
+def resample_flux_map_to_uniform_grid(R_m, Z_m, psi_Wb_rad):
+    """Linearly resample a flux map onto uniform R/Z grids for the finite-difference solver.
+
+    The public EFIT archive can provide monotonic but nonuniform coordinates,
+    whereas the finite-difference Grad-Shafranov solver intentionally requires
+    uniform spacing. Preserve the domain and grid dimensions; interpolate first
+    along R and then along Z without extrapolating beyond the measured domain.
+    """
+    R = np.asarray(R_m, dtype=float)
+    Z = np.asarray(Z_m, dtype=float)
+    psi = np.asarray(psi_Wb_rad, dtype=float)
+    if (R.ndim != 1 or Z.ndim != 1 or R.size < 3 or Z.size < 3
+            or psi.shape != (Z.size, R.size)):
+        raise ValueError("R, Z, and psi must be 1-D coordinates and a matching (len(Z), len(R)) flux map")
+    if (not np.all(np.isfinite(R)) or not np.all(np.isfinite(Z))
+            or not np.all(np.isfinite(psi)) or np.any(R <= 0)
+            or np.any(np.diff(R) <= 0) or np.any(np.diff(Z) <= 0)):
+        raise ValueError("R and Z must be finite, strictly increasing coordinates; psi must be finite")
+    R_uniform = np.linspace(R[0], R[-1], R.size)
+    Z_uniform = np.linspace(Z[0], Z[-1], Z.size)
+    if np.allclose(np.diff(R), np.diff(R)[0]) and np.allclose(np.diff(Z), np.diff(Z)[0]):
+        return R.copy(), Z.copy(), psi.copy()
+    along_R = np.vstack([np.interp(R_uniform, R, row) for row in psi])
+    resampled = np.column_stack([
+        np.interp(Z_uniform, Z, along_R[:, i]) for i in range(R.size)
+    ])
+    return R_uniform, Z_uniform, resampled
+
+
 def grad_shafranov_physical_relation(R_m, Z_m, psi_Wb_rad,
                                      pressure_gradient_Pa_per_Wb, ffprime_T2):
     """Evaluate Δ*ψ and residual Δ*ψ - [-μ0 R² p'(ψ) - F F'(ψ)]."""
