@@ -6,6 +6,7 @@ from tokamak_analysis.equilibrium_reconstruction import (
     reconstruct_equilibrium,
     infer_grad_shafranov_profiles_from_flux,
     reconstruct_equilibrium_from_reference_flux,
+    derive_equilibrium_profiles_from_sources,
 )
 
 
@@ -378,3 +379,31 @@ def test_joint_profile_fit_recovers_analytic_pressure_and_ffprime_source_terms()
         np.median(result["ffprime_T2"][valid]),
         ffprime_true, rtol=0.03, atol=0.03,
     )
+
+
+
+def test_known_grad_shafranov_sources_are_used_directly_for_profiles():
+    R, Z = grid()
+    psi = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    profile = np.linspace(0.0, 1.0, 5)
+    pprime = np.full(profile.size, 2.0)
+    ffprime = np.full(profile.size, -0.1)
+    result = derive_equilibrium_profiles_from_sources(
+        R, Z, psi, profile, pprime, ffprime, toroidal_field_boundary_Tm=2.0
+    )
+    np.testing.assert_allclose(result["pressure_gradient_Pa_per_Wb"], pprime)
+    np.testing.assert_allclose(result["ffprime_T2"], ffprime)
+    np.testing.assert_allclose(result["pressure_Pa_relative_to_edge"][-1], 0.0)
+    np.testing.assert_allclose(result["F_Tm"][-1], 2.0)
+    assert result["j_tor_A_m2"].shape == psi.shape
+    assert "no inverse source refit" in result["profile_source_model"]
+
+
+def test_known_source_profile_rejects_invalid_edge_toroidal_field():
+    R, Z = grid()
+    psi = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    with pytest.raises(ValueError, match="finite and non-zero"):
+        derive_equilibrium_profiles_from_sources(
+            R, Z, psi, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0],
+            toroidal_field_boundary_Tm=0.0,
+        )
