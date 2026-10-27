@@ -425,7 +425,7 @@
   },
   {
     "family": "Plasma parameters",
-    "diagnostic": "Langmuir probe",
+    "diagnostic": "Langmuir Probe",
     "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
     "status": "D",
     "method": "Analyze a calibrated single-probe I–V sweep with explicit current polarity and user-selected electron-retarding and ion-branch fit intervals. Report floating-potential zero crossing, dI/dV plasma-potential proxy, optional log-linear electron-temperature fit, ion-branch fit and optional sheath-model ion-density estimate when geometry and ion mass are supplied.",
@@ -717,7 +717,7 @@
   },
   {
     "family": "Plasma parameters",
-    "diagnostic": "Electron cyclotron emission (ECE)",
+    "diagnostic": "Electron Cyclotron Emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness/electron-temperature estimate, channel fluctuations and spectra",
     "status": "D",
     "method": "Validated ECE workflow: non-relativistic harmonic resonance field; optional simplified circular-toroidal-field resonance mapping; calibrated spectral-radiance to Rayleigh–Jeans brightness temperature; multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata.",
@@ -1257,7 +1257,7 @@
   },
   {
     "family": "Plasma parameters",
-    "diagnostic": "Molecular spectroscopy",
+    "diagnostic": "Molecular Spectroscopy",
     "quantities": "Molecular-band features, band-integrated signal, candidate bandhead matches; user-model fit parameters",
     "status": "D",
     "method": "For calibrated wavelength-axis molecular emission spectra, estimate a documented constant quantile baseline, detect prominent local features, estimate approximate half-prominence widths, integrate baseline-subtracted signal globally and over user-selected windows, and optionally compare peaks to user-supplied reference bandheads. A separate Python API fits caller-supplied molecular spectral models and returns parameter covariance and residual diagnostics when identifiable. A separate line-list Boltzmann workflow fits excitation temperature from response-corrected integrated line intensities, upper-state energies, Einstein A coefficients, statistical weights and wavelengths supplied by the user.",
