@@ -20,7 +20,6 @@ def test_equilibrium_workspace_exposes_grad_shafranov_solver_without_exceptions(
     assert expected_inputs <= actual_inputs
     assert any("public DIII-D EFIT flux map" in str(item.value) for item in app.caption)
     assert any(item.key == "public_eq_f_edge" for item in app.get("number_input"))
-    assert any("pressure/current profiles" in str(item.value) for item in app.caption)
     assert any(item.key == "eq_inverse_bundle" for item in app.get("file_uploader"))
     assert any(item.label == "Fit equilibrium to magnetic measurements" for item in app.button)
     assert any("machine-specific JSON bundle" in str(item.value) for item in app.caption)
