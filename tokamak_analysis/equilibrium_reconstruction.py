@@ -549,10 +549,19 @@ def reconstruct_equilibrium_profiles_from_flux(
     pressure = np.zeros_like(profile)
     for k in range(profile.size - 2, -1, -1):
         pressure[k] = pressure[k + 1] - 0.5 * (p_integrand[k + 1] + p_integrand[k]) * (profile[k + 1] - profile[k])
+    # Reconstruct the local toroidal-current-density map from the fitted
+    # Grad–Shafranov source functions: j_phi = R p'(psi) + F F'(psi)/(mu0 R).
+    # Values outside the inferred axis-to-edge flux interval are deliberately NaN.
+    psi_n_clipped = np.clip(psi_n, 0.0, 1.0)
+    pprime_grid = np.interp(psi_n_clipped, profile, pprime)
+    ffprime_grid = np.interp(psi_n_clipped, profile, ffprime)
+    j_tor = rr * pprime_grid + ffprime_grid / (MU0 * rr)
+    j_tor[~((psi_n >= 0.0) & (psi_n <= 1.0))] = np.nan
     result = {
         "psi_normalized_axis_to_edge": profile,
         "pressure_gradient_Pa_per_Wb": pprime,
         "ffprime_T2": ffprime,
+        "j_tor_A_m2": j_tor,
         "pressure_Pa_relative_to_edge": pressure,
         "psi_axis_Wb_rad": axis_flux,
         "psi_edge_Wb_rad": edge_flux,
