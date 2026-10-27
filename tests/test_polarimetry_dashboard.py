@@ -33,7 +33,7 @@ def test_polarimetry_dashboard_rejects_mismatched_arrays():
     app = AppTest.from_file(Path(__file__).resolve().parents[1] / "app.py", default_timeout=120).run()
     app.radio(key="workspace_page").set_value("Advanced Analysis")
     app.run()
-    app.selectbox(label="Select workflow").set_value("Faraday-rotation polarimetry")
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value("Faraday-rotation polarimetry")
     app.run()
     app.text_input(key="pol_wavelength").set_value("1e-6,2e-6")
     app.text_input(key="pol_rotation").set_value("0.1")
