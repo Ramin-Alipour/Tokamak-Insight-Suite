@@ -5,7 +5,7 @@
 
 ## Diagnostic categories versus callable analysis entry points
 
-The canonical `DIAGNOSTIC_REGISTRY.json` contains 80 diagnostic records, while `tokamak_analysis.analysis_registry.ANALYSES` contains 81 callable entry points. These registries describe different layers and are not a one-to-one row mapping: one diagnostic may expose multiple callables, and a callable entry point is not itself a new diagnostic. The CI contract therefore verifies the two counts independently and resolves every callable by ID.
+The canonical `DIAGNOSTIC_REGISTRY.json` and `tokamak_analysis.analysis_registry.ANALYSES` each contain 80 entries. Their IDs, titles, and ordering are required to match exactly. An analysis entry point is an executable software route, not proof that the associated diagnostic is fully modeled or independently validated; consult each execution contract for scope and limitations. CI checks the cross-registry title/order contract and resolves registered callables.
 
 The 80 diagnostic contracts currently classify execution level as:
 
