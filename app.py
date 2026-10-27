@@ -1608,7 +1608,16 @@ elif page=='Equilibrium & Reconstruction':
                     float(str(name).split('=', 1)[1].removesuffix('_m'))
                     for name in public_eq_frame.columns[1:]
                 ], dtype=float)
-                public_eq_reference = public_eq_frame.iloc[:, 1:].to_numpy(dtype=float)
+                public_eq_reference = pd.DataFrame(
+                    public_eq_frame.iloc[:, 1:].to_numpy(dtype=float)
+                ).interpolate(axis=1, limit_direction='both').interpolate(
+                    axis=0, limit_direction='both'
+                ).to_numpy(dtype=float)
+                if not np.all(np.isfinite(public_eq_reference)):
+                    raise ValueError('Public EFIT grid contains missing values that cannot be interpolated.')
+                if (not np.allclose(np.diff(public_eq_R), np.diff(public_eq_R)[0])
+                        or not np.allclose(np.diff(public_eq_Z), np.diff(public_eq_Z)[0])):
+                    raise ValueError('FAIR-MAST coordinates are not uniform; resample the reference grid before solving.')
                 public_eq_result = reconstruct_equilibrium_from_reference_flux(
                     public_eq_R, public_eq_Z, public_eq_reference,
                     n_profile_points=32, max_iterations=5000,
