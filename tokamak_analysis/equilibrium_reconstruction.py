@@ -502,8 +502,12 @@ def derive_equilibrium_profiles_from_sources(
     if (profile.ndim != 1 or profile.size < 2 or pprime_input.shape != profile.shape
             or ffprime_input.shape != profile.shape or not np.all(np.isfinite(profile))
             or not np.all(np.isfinite(pprime_input)) or not np.all(np.isfinite(ffprime_input))
-            or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1):
-        raise ValueError("Source profiles must be finite, aligned, and strictly increasing within [0, 1]")
+            or np.any(np.diff(profile) <= 0) or profile[0] < 0 or profile[-1] > 1
+            or not np.isclose(profile[0], 0.0, rtol=0.0, atol=1e-12)
+            or not np.isclose(profile[-1], 1.0, rtol=0.0, atol=1e-12)):
+        raise ValueError(
+            "Source profiles must be finite, aligned, strictly increasing, and span the full normalized-flux interval [0, 1]"
+        )
     if toroidal_field_boundary_Tm is not None and (
         not np.isscalar(toroidal_field_boundary_Tm)
         or not np.isfinite(toroidal_field_boundary_Tm)
