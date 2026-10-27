@@ -35,7 +35,7 @@ def test_solver_preserves_boundary_and_recovers_harmonic_flux():
 
 
 
-def test_grad_shafranov_profile_source_uses_endpoint_values_without_plasma_mask():
+def test_grad_shafranov_profile_source_sets_vacuum_source_to_zero():
     from tokamak_analysis.equilibrium_reconstruction import (
         MU0,
         _grad_shafranov_source_from_profiles,
@@ -49,7 +49,9 @@ def test_grad_shafranov_profile_source_uses_endpoint_values_without_plasma_mask(
     pprime = np.array([2.0, 2.0, 3.0, 4.0, 4.0])
     ffprime = np.array([3.0, 3.0, 4.0, 5.0, 5.0])
     expected = -MU0 * R**2 * pprime - ffprime
-    np.testing.assert_allclose(source, np.tile(expected, (3, 1)))
+    np.testing.assert_allclose(source[:, 0], 0.0)
+    np.testing.assert_allclose(source[:, 1:4], np.tile(expected[1:4], (3, 1)))
+    np.testing.assert_allclose(source[:, 4], 0.0)
 
 
 def test_solver_normalizes_flux_from_interior_axis_to_perimeter_edge_not_global_extrema():
