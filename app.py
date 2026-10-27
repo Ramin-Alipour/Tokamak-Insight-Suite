@@ -1797,7 +1797,10 @@ elif page=='Equilibrium & Reconstruction':
             if inverse_bundle_file is None:
                 raise ValueError('Upload a machine-specific calibrated JSON bundle before running the inverse fit.')
             inverse_bundle = json.load(inverse_bundle_file)
-            from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_inverse
+            from tokamak_analysis.equilibrium_reconstruction import (
+                reconstruct_equilibrium_inverse,
+                reconstruct_equilibrium_profiles_from_flux,
+            )
             inverse_result = reconstruct_equilibrium_inverse(
                 inverse_bundle.get('R_m'), inverse_bundle.get('Z_m'), inverse_bundle.get('basis_psi_Wb_rad'),
                 magnetic_probe_response_T_per_coefficient=inverse_bundle.get('magnetic_probe_response_T_per_coefficient'),
@@ -1812,6 +1815,11 @@ elif page=='Equilibrium & Reconstruction':
                 coil_flux_currents_A=inverse_bundle.get('coil_flux_currents_A'),
                 regularization=float(inverse_regularization),
             )
+            inverse_profiles = reconstruct_equilibrium_profiles_from_flux(
+                inverse_result['R_m'], inverse_result['Z_m'], inverse_result['psi_Wb_rad'],
+                n_profile_points=32,
+                toroidal_field_boundary_Tm=inverse_bundle.get('toroidal_field_boundary_Tm'),
+            )
             st.metric('Magnetic measurement count', inverse_result['measurement_count'])
             st.metric('Weighted residual RMS', f"{inverse_result['weighted_residual_rms']:.4g}")
             st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask'}})
@@ -1824,6 +1832,27 @@ elif page=='Equilibrium & Reconstruction':
             })
             st.dataframe(inverse_grid.head(30), use_container_width=True)
             download_df('Download inverse equilibrium grid', inverse_grid, 'tis_inverse_equilibrium_grid.csv')
+            st.markdown('**Derived equilibrium profiles from fitted flux**')
+            st.caption(
+                'p′ and F·F′ are inferred from the Grad–Shafranov source and may be underdetermined. '
+                'For q(ψ), the JSON bundle may provide an independently known edge F=R·Bφ value in T·m as toroidal_field_boundary_Tm.'
+            )
+            inv_profile_table = pd.DataFrame({
+                'psi_normalized_axis_to_edge': inverse_profiles['psi_normalized_axis_to_edge'],
+                'pressure_gradient_Pa_per_Wb': inverse_profiles['pressure_gradient_Pa_per_Wb'],
+                'ffprime_T2': inverse_profiles['ffprime_T2'],
+                'pressure_Pa_relative_to_edge': inverse_profiles['pressure_Pa_relative_to_edge'],
+                'samples_in_flux_bin': inverse_profiles['profile_bin_counts'],
+                'source_fit_rank': inverse_profiles['profile_bin_design_rank'],
+            })
+            if 'F_Tm' in inverse_profiles:
+                inv_profile_table['F_Tm'] = inverse_profiles['F_Tm']
+                inv_profile_table['q_profile'] = inverse_profiles['q_profile']
+            st.metric('Joint p′ / FF′ fit', 'Identifiable' if inverse_profiles['joint_pressure_ffprime_identifiable'] else 'Underdetermined')
+            st.dataframe(inv_profile_table, use_container_width=True)
+            download_df('Download inverse-fit equilibrium profiles', inv_profile_table, 'tis_inverse_equilibrium_profiles.csv')
+            st.json({key: value for key, value in inverse_profiles.items()
+                     if key not in {'operator_Wb_rad_m-2', 'psi_normalized_grid'}})
             st.warning(inverse_result['warning'])
         except Exception as exc:
             st.error(f'Inverse magnetic reconstruction failed: {exc}')
