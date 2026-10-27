@@ -2770,30 +2770,41 @@
   {
     "family": "Magnetic and equilibrium",
     "diagnostic": "Magnetic flux / poloidal flux",
-    "quantities": "Φ_B, ψ",
-    "status": "M→D/I",
-    "method": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
-    "caveat": "Reference surfaces and sign conventions must be recorded.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "quantities": "ψ(R,Z), Δψ",
+    "status": "D/I",
+    "method": "Axisymmetric path integration of calibrated B_R and B_Z grids using dψ/dR=R B_Z and dψ/dZ=-R B_R.",
+    "caveat": "Requires calibrated field grids and a reference-flux gauge; not an EFIT/Grad-Shafranov equilibrium solver.",
+    "implementation_functions": ["tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"],
+    "implementation_status": "Complete within declared software scope: calibrated-field grid validation, relative flux reconstruction, gauge setting, and derivative-consistency diagnostics.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Integrate calibrated magnetic measurements or derive from equilibrium reconstruction.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Reference surfaces and sign conventions must be recorded."
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {"name":"R_m","unit":"m","description":"Positive, strictly increasing major-radius coordinate.","required":true},
+        {"name":"Z_m","unit":"m","description":"Strictly increasing vertical coordinate.","required":true},
+        {"name":"B_R_T","unit":"T","description":"Calibrated radial field grid, shape (len(Z_m),len(R_m)).","required":true},
+        {"name":"B_Z_T","unit":"T","description":"Calibrated vertical field grid, shape (len(Z_m),len(R_m)).","required":true},
+        {"name":"initial_flux_Wb","unit":"Wb","description":"Optional finite reference flux.","required":false},
+        {"name":"reference_index","unit":"index pair","description":"Optional (Z index,R index) gauge location.","required":false}
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {"name":"poloidal_flux_Wb","unit":"Wb","description":"Reconstructed poloidal flux map."},
+        {"name":"poloidal_flux_change_Wb","unit":"Wb","description":"Flux relative to the supplied gauge."},
+        {"name":"consistency_residual_R_Wb_m","unit":"Wb m^-1","description":"Residual for dψ/dR=R B_Z."},
+        {"name":"consistency_residual_Z_Wb_m","unit":"Wb m^-1","description":"Residual for dψ/dZ=-R B_R."},
+        {"name":"diagnostics","unit":"structured","description":"Flux range and derivative-residual summary."}
+      ],
+      "assumptions": ["Axisymmetric cylindrical (R,Z) coordinates.","Input magnetic fields are calibrated in tesla.","Absolute flux requires an independent reference condition."],
+      "preprocessing": ["Validate finite arrays, positive/increasing R, increasing Z, field-grid dimensions, and reference index."],
+      "algorithm": "Trapezoidal path integration of dψ/dR=R B_Z and dψ/dZ=-R B_R.",
+      "uncertainty_model": "No uncertainty propagation; measurement uncertainties are not input. Derivative residuals are diagnostics, not uncertainty estimates.",
+      "limitations": ["Not an EFIT/Grad-Shafranov solver.","Does not infer plasma current, pressure profiles, or separatrix.","No instrument calibration; path integration may be path-dependent for inconsistent fields."],
+      "function_links": ["tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"],
+      "raw_data_to_physics": true,
+      "note": "Complete only for calibrated axisymmetric B_R/B_Z grid integration within the stated limitations."
     }
-  },
+  }
   {
     "family": "Electrostatic probes",
     "diagnostic": "Ball-pen probe",
