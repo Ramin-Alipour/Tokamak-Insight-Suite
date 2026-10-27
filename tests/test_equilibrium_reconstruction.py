@@ -558,3 +558,30 @@ def test_profile_derivation_rejects_profiles_without_full_axis_to_edge_coverage(
             R, Z, psi, profile,
             np.zeros(profile.size), np.zeros(profile.size),
         )
+
+def test_public_flux_resampling_converts_nonuniform_grid_to_uniform_without_losing_domain():
+    from tokamak_analysis.equilibrium_reconstruction import resample_flux_map_to_uniform_grid
+
+    R = np.array([1.0, 1.1, 1.45, 2.0])
+    Z = np.array([-0.5, -0.2, 0.15, 0.5])
+    rr, zz = np.meshgrid(R, Z)
+    psi = rr**2 + zz**2
+    Ru, Zu, resampled = resample_flux_map_to_uniform_grid(R, Z, psi)
+    assert Ru.shape == R.shape
+    assert Zu.shape == Z.shape
+    np.testing.assert_allclose(Ru[[0, -1]], R[[0, -1]])
+    np.testing.assert_allclose(Zu[[0, -1]], Z[[0, -1]])
+    np.testing.assert_allclose(np.diff(Ru), np.diff(Ru)[0])
+    np.testing.assert_allclose(np.diff(Zu), np.diff(Zu)[0])
+    np.testing.assert_allclose(resampled[[0, -1], :][:, [0, -1]], psi[[0, -1], :][:, [0, -1]])
+    assert np.all(np.isfinite(resampled))
+
+
+def test_public_flux_resampling_rejects_bad_coordinates_and_shape():
+    from tokamak_analysis.equilibrium_reconstruction import resample_flux_map_to_uniform_grid
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        resample_flux_map_to_uniform_grid([1.0, 1.5, 1.4], [0.0, 0.5, 1.0], np.zeros((3, 3)))
+    with pytest.raises(ValueError, match="matching"):
+        resample_flux_map_to_uniform_grid([1.0, 1.5, 2.0], [0.0, 0.5, 1.0], np.zeros((2, 3)))
+
