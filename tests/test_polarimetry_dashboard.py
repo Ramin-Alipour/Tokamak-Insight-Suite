@@ -1,7 +1,5 @@
 """Interactive Streamlit acceptance tests for Faraday-rotation polarimetry."""
 from pathlib import Path
-
-import numpy as np
 from streamlit.testing.v1 import AppTest
 
 
