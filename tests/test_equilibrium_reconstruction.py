@@ -507,3 +507,20 @@ def test_reference_reconstruction_rejects_source_profiles_without_axis_or_edge(p
             pressure_gradient_Pa_per_Wb=np.zeros(profile.size),
             ffprime_T2=np.zeros(profile.size),
         )
+
+
+@pytest.mark.parametrize(
+    "profile",
+    [
+        np.linspace(0.1, 1.0, 8),
+        np.linspace(0.0, 0.9, 8),
+    ],
+)
+def test_profile_derivation_rejects_profiles_without_full_axis_to_edge_coverage(profile):
+    R, Z = grid()
+    psi = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    with pytest.raises(ValueError, match="full normalized-flux interval"):
+        derive_equilibrium_profiles_from_sources(
+            R, Z, psi, profile,
+            np.zeros(profile.size), np.zeros(profile.size),
+        )
