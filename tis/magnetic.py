@@ -10,18 +10,28 @@ def magnetic_flux_from_voltage(
     baseline_start_s: float | None = None, baseline_end_s: float | None = None,
     drift_start_s: float | None = None, drift_end_s: float | None = None,
 ) -> dict[str, Any]:
-    """Integrate calibrated loop voltage using V_loop = -d(Phi)/dt.
+    """Integrate calibrated loop voltage using Faraday's law.
 
-    Input voltage must already be calibrated in volts. The caller supplies the
-    loop orientation via polarity_sign; no geometry or sensor transfer function
-    is inferred. Baseline/drift windows must be known zero-voltage intervals.
+    Inputs are one-dimensional, equally sized samples: time in seconds and
+    calibrated loop voltage in volts. The convention is dPhi/dt = -V_loop;
+    polarity_sign applies the documented sensor orientation. Optional baseline
+    and drift windows must represent known zero-voltage intervals. This routine
+    reconstructs flux from a loop signal; it does not solve Grad-Shafranov or
+    infer a spatial poloidal-flux map from insufficient measurements.
     """
-    if isinstance(polarity_sign, (bool, np.bool_)) or polarity_sign not in (-1, 1):
-        raise ValueError("polarity_sign must be -1 or +1.")
-    if not np.isfinite(initial_flux_Wb):
-        raise ValueError("initial_flux_Wb must be finite.")
-    t = np.asarray(time_s, dtype=float).ravel()
-    v = np.asarray(coil_voltage_V, dtype=float).ravel()
+    if isinstance(polarity_sign, (bool, np.bool_)) or not isinstance(
+        polarity_sign, (int, np.integer)
+    ) or polarity_sign not in (-1, 1):
+        raise ValueError("polarity_sign must be integer -1 or +1.")
+    if isinstance(initial_flux_Wb, (bool, np.bool_)) or not np.isscalar(initial_flux_Wb) or not np.isfinite(initial_flux_Wb):
+        raise ValueError("initial_flux_Wb must be a finite real scalar.")
+    try:
+        t = np.asarray(time_s, dtype=float)
+        v = np.asarray(coil_voltage_V, dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Time and voltage must be numeric one-dimensional arrays.") from exc
+    if t.ndim != 1 or v.ndim != 1:
+        raise ValueError("Time and voltage must be one-dimensional arrays; multidimensional inputs are not flattened.")
     if len(t) != len(v) or len(t) < 2:
         raise ValueError("Time and voltage must have equal lengths and at least two samples.")
     if not np.all(np.isfinite(t)) or not np.all(np.isfinite(v)):
@@ -39,6 +49,6 @@ def magnetic_flux_from_voltage(
         "physical_quantity": "magnetic flux in Wb; flux change if initial flux is zero",
         "interpretation": (
             "Requires calibrated loop voltage and a documented sign convention. "
-            "Integration does not reconstruct a full tokamak equilibrium."
+            "Integration does not reconstruct a full tokamak equilibrium or a spatial poloidal-flux map."
         ),
     }
