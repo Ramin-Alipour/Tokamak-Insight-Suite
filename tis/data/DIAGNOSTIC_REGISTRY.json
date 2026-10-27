@@ -2699,27 +2699,72 @@
     "family": "Magnetic and equilibrium",
     "diagnostic": "Polarimetry / Faraday rotation",
     "quantities": "Line-integrated density-weighted B_parallel; rotation angle",
-    "status": "M→D/I",
-    "method": "Invert rotation with wavelength, density and line-of-sight geometry model.",
-    "caveat": "Sign conventions, birefringence, geometry and density-field degeneracy must be handled.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "status": "D",
+    "method": "From calibrated wavelength and signed Faraday rotation, compute the line integral of electron density times parallel magnetic field; optionally estimate chord-averaged B_parallel using supplied density and path length, with first-order uncertainty propagation.",
+    "caveat": "Requires calibrated rotation/wavelength and a consistent sign convention. Single-chord output is a line integral; average field assumes uniform supplied density. No raw instrument calibration, ray tracing or spatial inversion.",
+    "implementation_functions": [
+      "tokamak_analysis.polarimetry.analyze_polarimetry"
+    ],
+    "implementation_status": "Complete within declared software scope: Faraday line-integral calculation, optional chord-averaged parallel-field estimate, uncertainty propagation, validation and explicit limitations are implemented. Device-specific calibration and spatial inversion remain out of scope.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Invert rotation with wavelength, density and line-of-sight geometry model.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Sign conventions, birefringence, geometry and density-field degeneracy must be handled."
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "wavelength_m",
+          "unit": "m",
+          "required": true
+        },
+        {
+          "name": "rotation_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": false
+        },
+        {
+          "name": "path_length_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "rotation_uncertainty_rad",
+          "unit": "rad",
+          "required": false
+        },
+        {
+          "name": "wavelength_uncertainty_m",
+          "unit": "m",
+          "required": false
+        }
       ],
-      "function_links": [],
-      "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "output_specs": [
+        {
+          "name": "line_integrated_ne_B_parallel_m-2_T",
+          "unit": "m^-2 T"
+        },
+        {
+          "name": "average_B_parallel_T",
+          "unit": "T"
+        },
+        {
+          "name": "average_B_parallel_uncertainty_T",
+          "unit": "T"
+        }
+      ],
+      "assumptions": [
+        "Calibrated wavelength and signed rotation",
+        "Uniform supplied density for average field",
+        "Single-chord line integral is not a spatial inversion"
+      ],
+      "limitations": [
+        "Raw instrument calibration and device-specific calibration are out of scope",
+        "Refraction and additional birefringence are not modeled"
+      ]
     }
   },
   {
