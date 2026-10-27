@@ -1939,16 +1939,18 @@ elif page=='Equilibrium & Reconstruction':
                 inverse_refine_fig.colorbar(inverse_refine_mesh, ax=inverse_refine_ax)
             inverse_refine_fig.tight_layout()
             st.pyplot(inverse_refine_fig)
-            st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask'}})
+            st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask', 'psi_standard_uncertainty_Wb_rad'}})
+            st.caption(inverse_result['uncertainty_interpretation'])
             inverse_grid = pd.DataFrame({
                 'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
                 'R_m': np.tile(inverse_result['R_m'], inverse_result['Z_m'].size),
                 'psi_Wb_rad': inverse_result['psi_Wb_rad'].ravel(),
+                'psi_standard_uncertainty_Wb_rad': inverse_result['psi_standard_uncertainty_Wb_rad'].ravel(),
                 'psi_normalized': inverse_result['psi_normalized'].ravel(),
                 'boundary_mask': inverse_result['boundary_mask'].ravel(),
             })
             st.dataframe(inverse_grid.head(30), use_container_width=True)
-            download_df('Download inverse equilibrium grid', inverse_grid, 'tis_inverse_equilibrium_grid.csv')
+            download_df('Download inverse equilibrium grid and uncertainty', inverse_grid, 'tis_inverse_equilibrium_grid.csv')
             st.markdown('**Derived equilibrium profiles from fitted flux**')
             st.caption(
                 'p′ and F·F′ are inferred from the Grad–Shafranov source and may be underdetermined. '
