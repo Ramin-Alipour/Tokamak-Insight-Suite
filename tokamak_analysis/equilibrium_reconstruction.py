@@ -98,6 +98,33 @@ def _normalized_axis_to_edge_flux(psi):
     return (flux - axis_flux) / span
 
 
+
+def _grad_shafranov_source_from_profiles(psi_normalized, R_m, psi_profile,
+                                        pressure_gradient_Pa_per_Wb, ffprime_T2):
+    """Evaluate the plasma source only inside the prescribed axis-to-edge flux domain.
+
+    The supplied profiles describe 0 <= psi_N <= 1. Outside that interval the
+    plasma source is zero; clamping to edge values would incorrectly extend
+    plasma pressure/current sources into the vacuum region.
+    """
+    psi_n = np.asarray(psi_normalized, dtype=float)
+    R = np.asarray(R_m, dtype=float)
+    profile = np.asarray(psi_profile, dtype=float)
+    pprime = np.asarray(pressure_gradient_Pa_per_Wb, dtype=float)
+    ffprime = np.asarray(ffprime_T2, dtype=float)
+    if psi_n.ndim != 2 or R.ndim != 1 or psi_n.shape[1] != R.size:
+        raise ValueError("normalized flux must have shape (len(Z), len(R))")
+    if (profile.ndim != 1 or profile.size < 2 or pprime.shape != profile.shape
+            or ffprime.shape != profile.shape):
+        raise ValueError("Source profiles must be aligned 1-D arrays")
+    inside = np.isfinite(psi_n) & (psi_n >= 0.0) & (psi_n <= 1.0)
+    p_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, pprime)
+    ff_grid = np.interp(np.clip(psi_n, 0.0, 1.0), profile, ffprime)
+    source = -MU0 * R[None, :]**2 * p_grid - ff_grid
+    return np.where(inside, source, 0.0)
+
+
+
 def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
                             pressure_gradient_Pa_per_Wb, ffprime_T2, *,
                             max_iterations=10000, tolerance=1e-8, relaxation=1.2):
@@ -158,7 +185,7 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
     for it in range(1, int(max_iterations) + 1):
         old = psi.copy()
         psin = _normalized_axis_to_edge_flux(psi)
-        source = -MU0 * R[None, :]**2 * np.interp(psin, prof, pp, left=pp[0], right=pp[-1]) - np.interp(psin, prof, ff, left=ff[0], right=ff[-1])
+        source = _grad_shafranov_source_from_profiles(psin, R, prof, pp, ff)
         for j in range(1, Z.size - 1):
             for i in range(1, R.size - 1):
                 # Δ*ψ = ψ_RR - (1/R)ψ_R + ψ_ZZ; the first-derivative
@@ -176,7 +203,7 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
     psin = _normalized_axis_to_edge_flux(psi)
     # Re-evaluate source using the final normalized flux; report physical residual
     # only on interior cells, where the PDE is actually solved.
-    final_source = -MU0 * R[None, :]**2 * np.interp(psin, prof, pp, left=pp[0], right=pp[-1]) - np.interp(psin, prof, ff, left=ff[0], right=ff[-1])
+    final_source = _grad_shafranov_source_from_profiles(psin, R, prof, pp, ff)
     physical = grad_shafranov_physical_relation(R, Z, psi, -final_source / (MU0 * R[None, :]**2), np.zeros_like(psi))
     # Use direct operator/source residual with the actual mapped source.
     operator = physical["grad_shafranov_operator_Wb_rad_m-2"]
