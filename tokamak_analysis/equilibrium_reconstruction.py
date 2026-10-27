@@ -232,11 +232,11 @@ def reconstruct_equilibrium_from_reference_flux(
     reference = np.asarray(reference_psi_Wb_rad, dtype=float)
     if reference.shape != (Z.size, R.size) or not np.all(np.isfinite(reference)):
         raise ValueError("reference_psi_Wb_rad must be a finite (len(Z), len(R)) grid")
-    profiles = infer_grad_shafranov_profiles_from_flux(
+    profiles = reconstruct_equilibrium_profiles_from_flux(
         R, Z, reference, n_profile_points=n_profile_points
     )
     result = reconstruct_equilibrium(
-        R, Z, reference, profiles["psi_profile"],
+        R, Z, reference, profiles["psi_normalized_axis_to_edge"],
         profiles["pressure_gradient_Pa_per_Wb"], profiles["ffprime_T2"],
         max_iterations=max_iterations, tolerance=tolerance, relaxation=relaxation,
     )
@@ -249,13 +249,16 @@ def reconstruct_equilibrium_from_reference_flux(
             "interior_flux_nrmse_by_reference_range": float(np.sqrt(np.mean(difference**2)) / scale),
             "interior_flux_mae_Wb_rad": float(np.mean(np.abs(difference))),
             "reference_grid_shape": [int(Z.size), int(R.size)],
-            "source_profile_model": profiles["source_model"],
+            "source_profile_model": profiles["profile_source_model"],
             "profile_bin_counts": profiles["profile_bin_counts"].tolist(),
+            "joint_pressure_ffprime_identifiable": profiles["joint_pressure_ffprime_identifiable"],
+            "profile_bin_design_rank": profiles["profile_bin_design_rank"].tolist(),
         },
         "inferred_profiles": {
-            "psi_profile": profiles["psi_profile"].tolist(),
+            "psi_profile": profiles["psi_normalized_axis_to_edge"].tolist(),
             "pressure_gradient_Pa_per_Wb": profiles["pressure_gradient_Pa_per_Wb"].tolist(),
             "ffprime_T2": profiles["ffprime_T2"].tolist(),
+            "pressure_Pa_relative_to_edge": profiles["pressure_Pa_relative_to_edge"].tolist(),
         },
         "reference_psi_Wb_rad": reference.copy(),
         "warning": (
