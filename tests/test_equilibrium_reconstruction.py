@@ -34,6 +34,22 @@ def test_solver_preserves_boundary_and_recovers_harmonic_flux():
 
 
 
+def test_solver_normalizes_flux_from_interior_axis_to_perimeter_edge_not_global_extrema():
+    R, Z = grid()
+    boundary = np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
+    result = reconstruct_equilibrium(
+        R, Z, boundary, [0.0, 1.0], [0.0, 0.0], [0.0, 0.0],
+        tolerance=1e-9,
+    )
+    edge = np.concatenate((
+        result["psi_normalized"][0, :], result["psi_normalized"][-1, :],
+        result["psi_normalized"][1:-1, 0], result["psi_normalized"][1:-1, -1],
+    ))
+    interior = result["psi_normalized"][1:-1, 1:-1]
+    assert np.min(interior) == pytest.approx(0.0, abs=1e-12)
+    assert np.median(edge) == pytest.approx(1.0, abs=1e-12)
+
+
 def test_solver_residual_scaling_is_invariant_for_small_flux_magnitudes():
     R, Z = grid()
     boundary = 1e-12 * np.broadcast_to(R[None, :] ** 2, (Z.size, R.size)).copy()
