@@ -63,6 +63,8 @@ def test_equilibrium_workspace_runs_solver_and_renders_downloadable_solution():
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any("Converged" in str(item.value) for item in app.metric)
     assert any(item.label == "Download Grad–Shafranov solution grid" for item in app.get("download_button"))
+    assert any(item.label == "Download Grad–Shafranov equilibrium profiles" for item in app.get("download_button"))
+    assert any(item.label == "Download Grad–Shafranov toroidal current density" for item in app.get("download_button"))
 
 
 
