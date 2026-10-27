@@ -1891,6 +1891,25 @@ elif page=='Equilibrium & Reconstruction':
             })
             download_df('Download GS-refined inverse equilibrium', inverse_refined_grid,
                         'tis_gs_refined_inverse_equilibrium.csv')
+            st.markdown('**Magnetic-fit flux versus Grad–Shafranov-refined flux**')
+            inverse_refine_fig = Figure(figsize=(12, 4))
+            inverse_refine_axes = inverse_refine_fig.subplots(1, 3)
+            inverse_refine_fields = [
+                (inverse_gs_result['reference_psi_Wb_rad'], 'Magnetic-measurement fit'),
+                (inverse_gs_result['psi_Wb_rad'], 'GS-refined flux'),
+                (inverse_gs_result['psi_Wb_rad'] - inverse_gs_result['reference_psi_Wb_rad'], 'GS refinement − fit'),
+            ]
+            for inverse_refine_ax, (inverse_refine_field, inverse_refine_title) in zip(inverse_refine_axes, inverse_refine_fields):
+                inverse_refine_mesh = inverse_refine_ax.pcolormesh(
+                    inverse_gs_result['R_m'], inverse_gs_result['Z_m'],
+                    inverse_refine_field, shading='auto',
+                )
+                inverse_refine_ax.set_xlabel('R (m)')
+                inverse_refine_ax.set_ylabel('Z (m)')
+                inverse_refine_ax.set_title(inverse_refine_title)
+                inverse_refine_fig.colorbar(inverse_refine_mesh, ax=inverse_refine_ax)
+            inverse_refine_fig.tight_layout()
+            st.pyplot(inverse_refine_fig)
             st.json({key: value for key, value in inverse_result.items() if key not in {'psi_Wb_rad', 'psi_normalized', 'boundary_mask'}})
             inverse_grid = pd.DataFrame({
                 'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
