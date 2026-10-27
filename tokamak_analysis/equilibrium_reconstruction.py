@@ -75,6 +75,29 @@ def grad_shafranov_physical_relation(R_m, Z_m, psi_Wb_rad,
     }
 
 
+def _normalized_axis_to_edge_flux(psi):
+    """Normalize a flux grid using its interior magnetic-axis candidate and perimeter edge.
+
+    The global min/max can be set by a nonuniform boundary or an isolated grid
+    corner, so it is not a reliable axis-to-edge flux coordinate.
+    """
+    flux = np.asarray(psi, dtype=float)
+    if flux.ndim != 2 or min(flux.shape) < 3 or not np.all(np.isfinite(flux)):
+        raise ValueError("psi must be a finite 2-D flux grid with an interior")
+    edge = np.concatenate((flux[0, :], flux[-1, :], flux[1:-1, 0], flux[1:-1, -1]))
+    edge_flux = float(np.median(edge))
+    interior = flux[1:-1, 1:-1]
+    min_flux, max_flux = float(np.min(interior)), float(np.max(interior))
+    if abs(min_flux - edge_flux) >= abs(max_flux - edge_flux):
+        axis_flux = min_flux
+    else:
+        axis_flux = max_flux
+    span = edge_flux - axis_flux
+    if abs(span) <= np.finfo(float).tiny:
+        return np.zeros_like(flux)
+    return (flux - axis_flux) / span
+
+
 def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
                             pressure_gradient_Pa_per_Wb, ffprime_T2, *,
                             max_iterations=10000, tolerance=1e-8, relaxation=1.2):
@@ -133,9 +156,7 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
     converged, change = False, np.inf
     for it in range(1, int(max_iterations) + 1):
         old = psi.copy()
-        lo, hi = float(np.min(psi)), float(np.max(psi))
-        span = hi - lo
-        psin = np.zeros_like(psi) if span <= np.finfo(float).tiny else (psi - lo) / span
+        psin = _normalized_axis_to_edge_flux(psi)
         source = -MU0 * R[None, :]**2 * np.interp(psin, prof, pp, left=pp[0], right=pp[-1]) - np.interp(psin, prof, ff, left=ff[0], right=ff[-1])
         for j in range(1, Z.size - 1):
             for i in range(1, R.size - 1):
@@ -151,8 +172,7 @@ def reconstruct_equilibrium(R_m, Z_m, boundary_flux_Wb_rad, psi_profile,
             break
     dpsi_dz, dpsi_dr = np.gradient(psi, Z, R, edge_order=2)
     br, bz = -dpsi_dz / R[None, :], dpsi_dr / R[None, :]
-    span = float(np.max(psi) - np.min(psi))
-    psin = np.zeros_like(psi) if span == 0 else (psi - np.min(psi)) / span
+    psin = _normalized_axis_to_edge_flux(psi)
     # Re-evaluate source using the final normalized flux; report physical residual
     # only on interior cells, where the PDE is actually solved.
     final_source = -MU0 * R[None, :]**2 * np.interp(psin, prof, pp, left=pp[0], right=pp[-1]) - np.interp(psin, prof, ff, left=ff[0], right=ff[-1])
