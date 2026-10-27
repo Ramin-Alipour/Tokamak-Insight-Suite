@@ -342,3 +342,28 @@ def test_joint_equilibrium_profile_reconstruction_does_not_guess_toroidal_field(
     assert "F_Tm" not in result
     assert "q_profile" not in result
     assert result["joint_pressure_ffprime_identifiable"] is True
+
+
+def test_joint_profile_fit_recovers_analytic_pressure_and_ffprime_source_terms():
+    from tokamak_analysis.equilibrium_reconstruction import MU0, reconstruct_equilibrium_profiles_from_flux
+
+    R = np.linspace(1.0, 2.0, 81)
+    Z = np.linspace(-0.5, 0.5, 81)
+    rr, zz = np.meshgrid(R, Z)
+    pprime_true = -1200.0
+    ffprime_true = 1.5
+    a = -MU0 * pprime_true / 8.0
+    r_axis = 1.5
+    psi = a * rr**4 - 2.0 * a * r_axis**2 * rr**2 - 0.5 * ffprime_true * zz**2
+    result = reconstruct_equilibrium_profiles_from_flux(R, Z, psi, n_profile_points=16)
+    assert result["joint_pressure_ffprime_identifiable"] is True
+    valid = (result["profile_bin_counts"] >= 3) & (result["profile_bin_design_rank"] == 2)
+    assert np.count_nonzero(valid) >= 2
+    np.testing.assert_allclose(
+        np.median(result["pressure_gradient_Pa_per_Wb"][valid]),
+        pprime_true, rtol=0.03, atol=2.0,
+    )
+    np.testing.assert_allclose(
+        np.median(result["ffprime_T2"][valid]),
+        ffprime_true, rtol=0.03, atol=0.03,
+    )
