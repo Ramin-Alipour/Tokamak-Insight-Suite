@@ -2407,7 +2407,7 @@ elif page=='Advanced Analysis':
                         optional[key]=float(parsed[0]) if parsed.size==1 else parsed
                 result=analyze_polarimetry(wavelength_values,rotation_values,**optional)
                 st.success('Faraday-rotation polarimetry analysis completed within its declared scope.')
-                st.json(result)
+                st.json(_json_safe(result))
                 frame=pd.DataFrame({'wavelength_m':result['wavelength_m'],'rotation_rad':result['rotation_rad'],'line_integrated_ne_B_parallel_m-2_T':result['line_integrated_ne_B_parallel_m-2_T']})
                 if 'average_B_parallel_T' in result:
                     frame['average_B_parallel_T']=result['average_B_parallel_T']
