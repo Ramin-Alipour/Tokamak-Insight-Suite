@@ -30,3 +30,38 @@ def test_analysis_14_registry_contract_resolves_to_polarimetry():
     assert entry["execution_contract"]["completeness"] == "complete_with_declared_scope"
     assert entry["execution_contract"]["raw_data_to_physics"] is True
     assert resolve_analysis(14) is analyze_polarimetry
+
+
+def test_density_and_path_arrays_must_match_measurement_shape():
+    with pytest.raises(ValueError, match="must be scalar or match"):
+        analyze_polarimetry(
+            [1e-6, 2e-6],
+            [0.01, -0.02],
+            electron_density_m3=[1e19, 2e19, 3e19],
+            path_length_m=1.0,
+        )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"density_uncertainty_m3": -1.0},
+        {"path_length_uncertainty_m": [0.01, 0.02]},
+        {"density_uncertainty_m3": [1e17, 2e17, 3e17]},
+        {"path_length_uncertainty_m": float("nan")},
+    ],
+)
+def test_density_or_path_uncertainty_requires_valid_matching_physics_inputs(kwargs):
+    with pytest.raises(ValueError):
+        analyze_polarimetry([1e-6, 2e-6], [0.01, -0.02], **kwargs)
+
+
+def test_density_and_path_uncertainties_reject_wrong_array_shape():
+    with pytest.raises(ValueError, match="scalar or match the input"):
+        analyze_polarimetry(
+            [1e-6, 2e-6],
+            [0.01, -0.02],
+            electron_density_m3=1e19,
+            path_length_m=1.0,
+            density_uncertainty_m3=[1e17, 2e17, 3e17],
+        )
