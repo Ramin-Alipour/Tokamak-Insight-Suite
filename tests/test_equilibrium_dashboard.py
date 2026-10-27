@@ -123,4 +123,4 @@ def test_inverse_dashboard_runs_with_explicit_synthetic_acceptance_fixture():
     assert any("Magnetic measurement count" in str(item.label) for item in app.metric)
     assert any("Grad–Shafranov refinement" in str(item.label) for item in app.metric)
     assert any("GS-vs-fit flux NRMSE" in str(item.label) for item in app.metric)
-    assert any("user-supplied p'(psi_N)" in str(item.value) for item in app.json)
+    assert any("user-supplied p'(psi_N)" in str(item.value) for item in app.caption)
