@@ -237,6 +237,19 @@ def reconstruct_equilibrium_inverse(
     if np.any(column_norm <= np.finfo(float).tiny):
         raise ValueError("At least one flux-basis coefficient is unobservable in the supplied measurements")
     scaled = design / column_norm
+    # Regularization can make a singular system numerically solvable without making
+    # its coefficients identifiable. Reject unobservable linear combinations before
+    # regularization instead of returning an arbitrary-looking equilibrium.
+    singular_values = np.linalg.svd(scaled, compute_uv=False)
+    rank_tolerance = (singular_values[0] * max(scaled.shape) * np.finfo(float).eps
+                      if singular_values.size else 0.0)
+    effective_rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    if effective_rank < n_basis:
+        raise ValueError(
+            f"Flux-basis coefficients are not identifiable from these measurements "
+            f"(response rank {effective_rank} < {n_basis} coefficients); add independent "
+            f"magnetic measurements or reduce the basis"
+        )
     augmented = np.vstack((scaled, np.sqrt(regularization) * np.eye(n_basis)))
     rhs = np.concatenate((observed, np.zeros(n_basis)))
     scaled_coefficients, *_ = np.linalg.lstsq(augmented, rhs, rcond=None)
