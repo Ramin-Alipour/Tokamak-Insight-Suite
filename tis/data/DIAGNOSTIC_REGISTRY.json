@@ -2375,7 +2375,7 @@
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux",
       "tokamak_analysis.equilibrium_reconstruction.derive_equilibrium_profiles_from_sources"
     ],
-    "implementation_status": "Implemented scoped prescribed-boundary Grad–Shafranov solve, direct derivation/export of pressure and toroidal-current profiles from the exact supplied p'(psi_N) and F F'(psi_N) source functions, optional F(psi) integration from an independently supplied edge F, and weighted inverse flux-basis fit to calibrated magnetic measurements. Numerical and Streamlit dashboard acceptance tests cover both paths, profile downloads, invalid inputs, identifiability, residual reporting, and downloads. This remains a generic constrained reconstruction workflow, not a complete machine-specific free-boundary EFIT; q and topology-dependent quantities are only reported where independently constrained and numerically supported.",
+    "implementation_status": "Implemented scoped prescribed-boundary Grad–Shafranov solve, direct derivation/export of pressure and toroidal-current profiles from the exact supplied p'(psi_N) and F F'(psi_N) source functions, optional F(psi) integration from an independently supplied edge F, and weighted inverse flux-basis fit to calibrated magnetic measurements. Numerical and Streamlit dashboard acceptance tests cover both paths, profile downloads, invalid inputs, identifiability, residual reporting, and downloads. This remains a generic constrained reconstruction workflow, not a complete machine-specific free-boundary EFIT; q and topology-dependent quantities are only reported where independently constrained and numerically supported. The inverse-fit path now propagates supplied measurement uncertainties to coefficient covariance and pointwise flux uncertainty and exports the uncertainty grid; this is conditional uncertainty only, not a full systematic/model uncertainty budget.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -2403,7 +2403,7 @@
           "name": "psi_profile",
           "unit": "normalized flux",
           "required": true,
-          "description": "Strictly increasing 1-D normalized-flux coordinates spanning a subset of [0,1], at least two points."
+          "description": "Strictly increasing 1-D normalized-flux coordinates covering the full axis-to-edge interval [0,1]; partial profiles are rejected."
         },
         {
           "name": "pressure_gradient_Pa_per_Wb",
@@ -2529,7 +2529,7 @@
         {
           "name": "converged",
           "unit": "boolean",
-          "description": "Whether iteration-change criterion was met; false results must not be treated as converged equilibria."
+          "description": "True only when both relative iteration change and the interior Grad-Shafranov equation residual satisfy the configured tolerance."
         },
         {
           "name": "basis_coefficients",
@@ -2650,6 +2650,21 @@
           "name": "li_internal",
           "unit": "dimensionless",
           "description": "Internal-inductance estimate from poloidal magnetic energy and the inferred plasma current."
+        },
+        {
+          "name": "basis_coefficient_covariance",
+          "unit": "coefficient²",
+          "description": "Conditional sampling covariance propagated from supplied 1-sigma measurement uncertainties through the regularized weighted linear fit; excludes model and calibration uncertainty."
+        },
+        {
+          "name": "basis_coefficient_sigma",
+          "unit": "coefficient",
+          "description": "Square root of the diagonal of basis_coefficient_covariance."
+        },
+        {
+          "name": "psi_standard_uncertainty_Wb_rad",
+          "unit": "Wb rad^-1",
+          "description": "Pointwise 1-sigma flux uncertainty propagated through the fitted basis and coefficient covariance; excludes basis, calibration, boundary and model uncertainty."
         }
       ],
       "assumptions": [
@@ -2663,12 +2678,12 @@
         "Inverse path validates dimensions, finite values, positive measurement uncertainties, paired coil-response/current inputs, and full numerical rank of the weighted response matrix."
       ],
       "algorithm": "Finite-difference Grad–Shafranov solve with SOR and residual-based convergence checks; weighted Tikhonov inverse fit of caller-supplied flux basis to calibrated measurements; joint per-normalized-flux-bin least-squares fit of p'(psi) and F F'(psi) from Δ*psi=-mu0 R²p'-FF' using R² variation; integrate pressure with p(edge)=0, derive j_phi=R p'+FF'/(mu0 R), and optionally integrate F² and calculate q along closed flux contours from supplied F(edge).",
-      "uncertainty_model": "No uncertainty propagation; measurement, calibration, boundary, and profile uncertainties are not estimated.",
+      "uncertainty_model": "Inverse magnetic-fit coefficients and flux map include conditional sampling uncertainty propagated from supplied 1-sigma measurement uncertainties through the regularized linear estimator. Calibration, response-matrix, flux-basis, boundary, profile, and Grad-Shafranov model uncertainties are not propagated. The prescribed-profile solver itself does not infer uncertainty in p'(psi) or FF'(psi).",
       "limitations": [
         "Not a full EFIT implementation or experimental equilibrium inference.",
-        "No automatic magnetic-axis/separatrix identification, flux-loop/Mirnov fitting, profile reconstruction, or uncertainty estimation.",
         "Iteration-change convergence alone is insufficient; inspect the physical-equation residual and validate against independent constraints.",
-        "Inverse basis fitting is linearized and cannot replace nonlinear machine-specific EFIT constraints or a Grad–Shafranov-consistent profile inversion."
+        "Inverse basis fitting is linearized and cannot replace nonlinear machine-specific EFIT constraints or a Grad–Shafranov-consistent profile inversion.",
+        "Inverse-fit uncertainty is conditional on supplied 1-sigma measurement errors and exact response/basis matrices; it is not a total equilibrium uncertainty budget."
       ],
       "function_links": [
         "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
