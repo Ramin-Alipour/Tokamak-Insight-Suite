@@ -2446,7 +2446,7 @@ elif page=='Advanced Analysis':
                     grid_bz=frame.pivot(index=zcol,columns=rcol,values=bzcol).reindex(index=Z,columns=R).to_numpy(dtype=float)
                     result=reconstruct_poloidal_flux(R,Z,grid_br,grid_bz,initial_flux_Wb=initial_flux)
                     st.success('Poloidal-flux reconstruction completed within the declared calibrated-input scope.')
-                    for label,value in [('Flux minimum (Wb)',result['diagnostics']['flux_min_Wb']),('Flux maximum (Wb)',result['diagnostics']['flux_max_Wb']),('R-derivative RMS residual',result['diagnostics']['rms_derivative_residual_R_Wb_m']),('Z-derivative RMS residual',result['diagnostics']['rms_derivative_residual_Z_Wb_m'])]:
+                    for label,value in [('Flux minimum (Wb)',result['diagnostics']['flux_min_Wb']),('Flux maximum (Wb)',result['diagnostics']['flux_max_Wb']),('R-derivative RMS residual',result['diagnostics']['rms_derivative_residual_R_Wb_m']),('Z-derivative RMS residual',result['diagnostics']['rms_derivative_residual_Z_Wb_m']),('Field integrability RMS residual (Wb/m²)',result['diagnostics']['rms_integrability_residual_Wb_m2'])]:
                         st.metric(label,f'{value:.6g}')
                     flux_frame=pd.DataFrame(result['poloidal_flux_Wb'],index=Z,columns=R)
                     flux_frame.index.name='Z_m'
