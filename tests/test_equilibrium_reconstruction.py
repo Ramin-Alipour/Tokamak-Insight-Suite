@@ -228,6 +228,15 @@ def test_inverse_reconstruction_recovers_coefficients_and_removes_known_coil_res
     )
     np.testing.assert_allclose(result["basis_coefficients"], expected, rtol=1e-10, atol=1e-10)
     assert result["basis_coefficient_covariance"].shape == (2, 2)
+    weighted_design = np.vstack((
+        probe_response / np.asarray([0.01, 0.02, 0.01])[:, None],
+        loop_response / np.asarray([0.001, 0.002])[:, None],
+    ))
+    expected_covariance = np.linalg.inv(weighted_design.T @ weighted_design)
+    np.testing.assert_allclose(
+        result["basis_coefficient_covariance"], expected_covariance,
+        rtol=1e-10, atol=1e-12,
+    )
     assert result["basis_coefficient_sigma"].shape == (2,)
     assert np.all(np.isfinite(result["basis_coefficient_covariance"]))
     assert np.all(result["basis_coefficient_sigma"] >= 0)
