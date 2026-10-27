@@ -45,3 +45,37 @@ def test_reference_index_and_shape_validation():
         reconstruct_poloidal_flux(R,Z,np.zeros((2,2)),np.ones((2,2)),reference_index=(2,0))
     with pytest.raises(ValueError, match="shape"):
         reconstruct_poloidal_flux(R,Z,np.zeros((3,2)),np.ones((2,2)))
+
+
+
+def test_integrability_diagnostic_for_analytic_flux_field():
+    # Analytic psi=R^2 Z gives B_Z=(1/R)dpsi/dR=2Z and
+    # B_R=-(1/R)dpsi/dZ=-R. The derivative constraints are compatible.
+    R = np.linspace(1.0, 2.0, 7)
+    Z = np.linspace(-1.0, 1.0, 9)
+    br = -np.broadcast_to(R[None, :], (Z.size, R.size))
+    bz = np.broadcast_to((2.0 * Z)[:, None], (Z.size, R.size))
+    out = reconstruct_poloidal_flux(R, Z, br, bz)
+    residual = out["integrability_residual_Wb_m2"]
+    assert residual.shape == (Z.size, R.size)
+    assert np.isfinite(residual).all()
+    assert out["diagnostics"]["rms_integrability_residual_Wb_m2"] < 1e-12
+
+
+def test_inconsistent_field_is_flagged_by_integrability_diagnostic():
+    R = np.linspace(1.0, 2.0, 7)
+    Z = np.linspace(0.0, 1.0, 9)
+    br = np.zeros((Z.size, R.size))
+    bz = np.broadcast_to(Z[:, None], (Z.size, R.size))
+    out = reconstruct_poloidal_flux(R, Z, br, bz)
+    assert out["diagnostics"]["rms_integrability_residual_Wb_m2"] > 0.1
+    assert "integrability residuals" in " ".join(out["assumptions"])
+
+
+@pytest.mark.parametrize("bad_flux", [True, "1.0", None, np.nan, np.inf])
+def test_invalid_initial_flux_gauge_is_rejected(bad_flux):
+    R = np.array([1.0, 2.0])
+    Z = np.array([0.0, 1.0])
+    with pytest.raises(ValueError, match="initial_flux_Wb"):
+        reconstruct_poloidal_flux(R, Z, np.zeros((2, 2)), np.zeros((2, 2)),
+                                  initial_flux_Wb=bad_flux)
