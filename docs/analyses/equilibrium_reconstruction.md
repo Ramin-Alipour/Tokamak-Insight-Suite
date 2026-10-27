@@ -26,6 +26,12 @@ The Grad–Shafranov convention used here is
 
 with `Delta* psi = d2psi/dR2 - (1/R) dpsi/dR + d2psi/dZ2`. The poloidal field convention is `B_R = -(1/R) dpsi/dZ`, `B_Z = (1/R) dpsi/dR`.
 
+## Profiles from the prescribed-profile solver
+
+The prescribed-boundary Grad–Shafranov dashboard now exports the profiles derived from the *same supplied source functions used by the solver*: p'(psi_N), F F'(psi_N), pressure relative to the explicit convention p(edge)=0, and the toroidal-current-density map j_phi = R p' + F F'/(mu0 R). It does not refit p' and F F' from the computed flux map, so the displayed source profiles remain traceable to the actual solver inputs. An optional independently known edge value F(edge)=R B_phi allows F(psi) to be integrated from F F'; the software rejects non-positive inferred F². The prescribed-profile path does not report q unless a valid closed-surface safety-factor calculation is available; it never substitutes a guessed edge field.
+
+This makes profile use explicit, but it does not turn the prescribed-boundary solver into full EFIT. A machine-specific free-boundary reconstruction still requires the relevant magnetic measurements, calibrated sensor/coil response, plasma-current and boundary constraints, and a well-posed profile/force-balance model. A flux map alone cannot uniquely determine all pressure and current profiles.
+
 ## Inverse-fit JSON bundle
 
 The dashboard's inverse-fit uploader expects a JSON object with R_m, Z_m, basis_psi_Wb_rad (shape n_basis × n_Z × n_R), and at least one complete measurement block:
