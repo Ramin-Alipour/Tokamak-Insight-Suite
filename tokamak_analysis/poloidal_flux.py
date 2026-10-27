@@ -58,9 +58,11 @@ def reconstruct_poloidal_flux(R_m, Z_m, B_R_T, B_Z_T, *, initial_flux_Wb=0.0,
     # distinct from the reconstruction residuals and not an uncertainty estimate.
     radial_flux_gradient = R[None, :] * bz
     vertical_flux_gradient = -R[None, :] * br
+    r_edge_order = 2 if R.size >= 3 else 1
+    z_edge_order = 2 if Z.size >= 3 else 1
     integrability_residual = (
-        np.gradient(vertical_flux_gradient, R, axis=1, edge_order=1)
-        - np.gradient(radial_flux_gradient, Z, axis=0, edge_order=1)
+        np.gradient(vertical_flux_gradient, R, axis=1, edge_order=r_edge_order)
+        - np.gradient(radial_flux_gradient, Z, axis=0, edge_order=z_edge_order)
     )
     return {
         "R_m": R.copy(), "Z_m": Z.copy(), "poloidal_flux_Wb": psi,
