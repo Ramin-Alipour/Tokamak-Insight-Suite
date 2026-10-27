@@ -19,3 +19,14 @@ def test_invalid_inputs_fail_explicitly(kwargs):
 
 def test_zero_rotation_returns_zero_integral():
     out = analyze_polarimetry([1e-6], [0.0]); assert out["line_integrated_ne_B_parallel_m-2_T"][0] == 0.0
+
+def test_analysis_14_registry_contract_resolves_to_polarimetry():
+    from tokamak_analysis.analysis_registry import get_analysis, resolve_analysis
+
+    entry = get_analysis(14)
+    assert entry["name"] == "Polarimetry / Faraday rotation"
+    assert entry["module"] == "polarimetry"
+    assert entry["function"] == "analyze_polarimetry"
+    assert entry["execution_contract"]["completeness"] == "complete_with_declared_scope"
+    assert entry["execution_contract"]["raw_data_to_physics"] is True
+    assert resolve_analysis(14) is analyze_polarimetry
