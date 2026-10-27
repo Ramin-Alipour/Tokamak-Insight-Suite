@@ -2366,7 +2366,7 @@
     "diagnostic": "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)",
     "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
     "status": "D",
-    "method": "Prescribed-boundary Grad–Shafranov solve; weighted inverse flux-basis fit to calibrated magnetic probes and/or flux loops; joint flux-bin source decomposition of p'(psi) and F F'(psi) using R² variation; integrated pressure relative to zero edge pressure; derived toroidal current-density map; optional F(psi) and q(psi) using supplied edge F=R Bphi.",
+    "method": "Prescribed-boundary Grad–Shafranov solve; weighted inverse flux-basis fit to calibrated magnetic probes and/or flux loops; joint flux-bin source decomposition of p'(psi) and F F'(psi) using R² variation; integrated pressure relative to zero edge pressure; derived toroidal current-density map; optional F(psi) and q(psi) using supplied edge F=R Bphi. The prescribed-profile solver now exports pressure-relative-to-edge, source profiles, and toroidal-current density derived directly from the same supplied source functions; an independent edge F constraint may be supplied to integrate F(psi).",
     "caveat": "Generic EFIT-like toolkit, not a complete machine-specific free-boundary EFIT. Pressure/current source decomposition from psi alone is not unique when the per-flux-bin R² design is rank-deficient; the result reports identifiability. Absolute pressure assumes p(edge)=0. q(r) requires an independently supplied edge F=R Bphi value and valid closed flux contours. Geometry, calibration, coil responses, uncertainties, and diagnostic constraints must be supplied and validated.",
     "implementation_functions": [
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
@@ -2375,7 +2375,7 @@
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux",
       "tokamak_analysis.equilibrium_reconstruction.derive_equilibrium_profiles_from_sources"
     ],
-    "implementation_status": "Implemented: prescribed-boundary Grad–Shafranov solve, weighted magnetic inverse flux fit, joint p'(psi)/F F'(psi) source-profile inference, relative pressure profile, toroidal-current-density map, and optional F/q profile when an independent edge F=R·Bphi constraint is supplied. Includes numerical and dashboard acceptance tests. Not a complete machine-specific free-boundary EFIT.",
+    "implementation_status": "Implemented scoped prescribed-boundary Grad–Shafranov solve, direct derivation/export of pressure and toroidal-current profiles from the exact supplied p'(psi_N) and F F'(psi_N) source functions, optional F(psi) integration from an independently supplied edge F, and weighted inverse flux-basis fit to calibrated magnetic measurements. Numerical and Streamlit dashboard acceptance tests cover both paths, profile downloads, invalid inputs, identifiability, residual reporting, and downloads. This remains a generic constrained reconstruction workflow, not a complete machine-specific free-boundary EFIT; q and topology-dependent quantities are only reported where independently constrained and numerically supported.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
