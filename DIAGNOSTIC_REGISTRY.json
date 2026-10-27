@@ -2366,14 +2366,14 @@
     "diagnostic": "Equilibrium reconstruction (Grad–Shafranov / EFIT-like)",
     "quantities": "ψ(R,Z), magnetic axis, separatrix, X-point, q(r), κ, δ, β_p, l_i",
     "status": "D",
-    "method": "Two explicit computational paths: (1) finite-difference Grad–Shafranov solve with prescribed boundary poloidal flux and p'(psi), F F'(psi) profiles; (2) weighted inverse fit of a caller-supplied flux basis to calibrated magnetic-probe and/or flux-loop measurements, with optional known-coil-response subtraction. Returns flux grid, normalized flux, poloidal field, inferred axis/edge-contour estimates for the inverse fit, measurement residuals, and convergence diagnostics.",
-    "caveat": "This is a generic computational framework, not a machine-specific full EFIT. The prescribed-boundary solver does not infer the boundary or profiles. The inverse path requires independently generated machine-geometry response matrices, calibration, uncertainties, and coil responses; its axis and computational-edge contour are estimates, not a guaranteed magnetic axis or LCFS. It does not solve the nonlinear profile/measurement equilibrium inverse problem, reconstruct q(r), or propagate measurement/calibration uncertainty. Check solver convergence, PDE residual, identifiability, and measurement residuals.",
+    "method": "Prescribed-boundary Grad–Shafranov solve; weighted inverse flux-basis fit to calibrated magnetic probes and/or flux loops; joint flux-bin source decomposition of p'(psi) and F F'(psi) using R² variation; integrated pressure relative to zero edge pressure; derived toroidal current-density map; optional F(psi) and q(psi) using supplied edge F=R Bphi.",
+    "caveat": "Generic EFIT-like toolkit, not a complete machine-specific free-boundary EFIT. Pressure/current source decomposition from psi alone is not unique when the per-flux-bin R² design is rank-deficient; the result reports identifiability. Absolute pressure assumes p(edge)=0. q(r) requires an independently supplied edge F=R Bphi value and valid closed flux contours. Geometry, calibration, coil responses, uncertainties, and diagnostic constraints must be supplied and validated.",
     "implementation_functions": [
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
       "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
       "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse"
     ],
-    "implementation_status": "Implemented scoped Grad–Shafranov finite-difference solve plus weighted inverse flux-basis fit to supplied calibrated magnetic measurements. Automated numerical and Streamlit dashboard acceptance tests exercise both paths, invalid inputs, identifiability, residual reporting, and downloads. It remains a generic analysis framework rather than a complete machine-specific EFIT implementation.",
+    "implementation_status": "Implemented: prescribed-boundary Grad–Shafranov solve, weighted magnetic inverse flux fit, joint p'(psi)/F F'(psi) source-profile inference, relative pressure profile, toroidal-current-density map, and optional F/q profile when an independent edge F=R·Bphi constraint is supplied. Includes numerical and dashboard acceptance tests. Not a complete machine-specific free-boundary EFIT.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -2563,6 +2563,36 @@
           "name": "measurement_count",
           "unit": "count",
           "description": "Number of magnetic measurement constraints used by inverse fit."
+        },
+        {
+          "name": "pressure_gradient_Pa_per_Wb",
+          "unit": "Pa Wb^-1",
+          "description": "Jointly inferred p'(psi) profile; decomposition identifiability is reported per flux bin."
+        },
+        {
+          "name": "ffprime_T2",
+          "unit": "T^2",
+          "description": "Jointly inferred F(psi)F'(psi) source profile."
+        },
+        {
+          "name": "pressure_Pa_relative_to_edge",
+          "unit": "Pa",
+          "description": "Pressure profile integrated with the explicit boundary condition p(edge)=0; it is not an independent kinetic measurement."
+        },
+        {
+          "name": "j_tor_A_m2",
+          "unit": "A m^-2",
+          "description": "Toroidal current-density map from j_phi=R p'(psi)+F F'(psi)/(mu0 R), masked outside the inferred axis-to-edge flux interval."
+        },
+        {
+          "name": "F_Tm",
+          "unit": "T m",
+          "description": "Optional toroidal-field function F(psi), available only when the independently known edge F=R Bphi is supplied."
+        },
+        {
+          "name": "q_profile",
+          "unit": "dimensionless",
+          "description": "Optional safety-factor profile from closed-contour integration, available only with edge F and sufficiently resolved closed flux surfaces."
         }
       ],
       "assumptions": [
@@ -2575,7 +2605,7 @@
         "Validate finite arrays, grid geometry, array shapes, profile monotonicity, and solver controls.",
         "Inverse path validates dimensions, finite values, positive measurement uncertainties, paired coil-response/current inputs, and full numerical rank of the weighted response matrix."
       ],
-      "algorithm": "Finite-difference elliptic solve with successive over-relaxation; interpolate p'(psi_N) and F F'(psi_N), preserve perimeter flux, then calculate magnetic field from flux derivatives. A separate evaluator computes Δ*psi, source, and residual for supplied mapped profiles. In inverse mode, solve a weighted Tikhonov least-squares problem after removing optional known coil responses; reject rank-deficient basis coefficients and report residuals by measurement block.",
+      "algorithm": "Finite-difference Grad–Shafranov solve with SOR and residual-based convergence checks; weighted Tikhonov inverse fit of caller-supplied flux basis to calibrated measurements; joint per-normalized-flux-bin least-squares fit of p'(psi) and F F'(psi) from Δ*psi=-mu0 R²p'-FF' using R² variation; integrate pressure with p(edge)=0, derive j_phi=R p'+FF'/(mu0 R), and optionally integrate F² and calculate q along closed flux contours from supplied F(edge).",
       "uncertainty_model": "No uncertainty propagation; measurement, calibration, boundary, and profile uncertainties are not estimated.",
       "limitations": [
         "Not a full EFIT implementation or experimental equilibrium inference.",
@@ -2586,7 +2616,8 @@
       "function_links": [
         "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium",
         "tokamak_analysis.equilibrium_reconstruction.grad_shafranov_physical_relation",
-        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse"
+        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_inverse",
+        "tokamak_analysis.equilibrium_reconstruction.reconstruct_equilibrium_profiles_from_flux"
       ],
       "raw_data_to_physics": false
     }
