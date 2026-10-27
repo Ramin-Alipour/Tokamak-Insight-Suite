@@ -571,7 +571,7 @@ def reconstruct_equilibrium_profiles_from_flux(
             f2[k] = f2[k + 1] - 0.5 * (integrand[k + 1] + integrand[k]) * (profile[k + 1] - profile[k])
         if np.any(f2 <= 0) or not np.all(np.isfinite(f2)):
             raise ValueError("Inferred F²(psi) is non-positive; check flux convention, source fit, and supplied edge toroidal field")
-        F = np.sqrt(f2)
+        F = np.sign(float(toroidal_field_boundary_Tm)) * np.sqrt(f2)
         result["F_Tm"] = F
         result["F_squared_T2_m2"] = f2
 
