@@ -1589,6 +1589,83 @@ elif page=='Plasma Parameters':
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
     st.warning('The supplied-grid tools derive magnetic fields from an existing flux grid. The optional Grad–Shafranov solver below solves only the prescribed-boundary/profile problem and is not a full EFIT replacement.')
+    st.markdown('### Public-data equilibrium reconstruction')
+    st.caption('Fetch an existing UKAEA FAIR-MAST EFIT flux map, infer a flux-dependent Grad–Shafranov source profile from that map, solve the equation with the measured map perimeter fixed, and compare the reconstructed interior against the source map.')
+    public_eq_col1, public_eq_col2 = st.columns(2)
+    with public_eq_col1:
+        public_eq_shot = st.number_input('FAIR-MAST shot', min_value=1, value=30421, step=1, key='public_eq_shot')
+    with public_eq_col2:
+        public_eq_time = st.number_input('EFIT time (s)', min_value=0.0, value=0.2, format='%.6f', key='public_eq_time')
+    if st.button('Fetch public EFIT map and reconstruct', type='primary', key='public_eq_reconstruct'):
+        try:
+            with st.spinner('Fetching FAIR-MAST EFIT map and solving Grad–Shafranov equation...'):
+                from tokamak_analysis.equilibrium_reconstruction import reconstruct_equilibrium_from_reference_flux
+                public_eq_frame, public_eq_manifest = fetch_fair_mast_efit_snapshot(
+                    int(public_eq_shot), float(public_eq_time)
+                )
+                public_eq_Z = public_eq_frame['z_m'].to_numpy(dtype=float)
+                public_eq_R = np.asarray([
+                    float(str(name).split('=', 1)[1].removesuffix('_m'))
+                    for name in public_eq_frame.columns[1:]
+                ], dtype=float)
+                public_eq_reference = public_eq_frame.iloc[:, 1:].to_numpy(dtype=float)
+                public_eq_result = reconstruct_equilibrium_from_reference_flux(
+                    public_eq_R, public_eq_Z, public_eq_reference,
+                    n_profile_points=32, max_iterations=5000,
+                    tolerance=1e-6, relaxation=1.1,
+                )
+                st.session_state['public_eq_result'] = public_eq_result
+                st.session_state['public_eq_manifest'] = public_eq_manifest
+                st.session_state['public_eq_R'] = public_eq_R
+                st.session_state['public_eq_Z'] = public_eq_Z
+        except Exception as exc:
+            st.error(f'Public-data equilibrium reconstruction failed: {exc}')
+            st.info('The public FAIR-MAST archive must be reachable and the optional data dependencies must be installed.')
+    if 'public_eq_result' in st.session_state:
+        public_eq_result = st.session_state['public_eq_result']
+        public_eq_manifest = st.session_state['public_eq_manifest']
+        public_eq_R = st.session_state['public_eq_R']
+        public_eq_Z = st.session_state['public_eq_Z']
+        public_eq_metrics = public_eq_result['reference_comparison']
+        st.markdown('**Public dataset provenance**')
+        st.json(public_eq_manifest)
+        public_eq_m1, public_eq_m2, public_eq_m3 = st.columns(3)
+        public_eq_m1.metric('Interior flux NRMSE', f"{public_eq_metrics['interior_flux_nrmse_by_reference_range']:.4g}")
+        public_eq_m2.metric('Interior flux RMSE', f"{public_eq_metrics['interior_flux_rmse_Wb_rad']:.4g} Wb/rad")
+        public_eq_m3.metric('Solver iterations', str(public_eq_result['iterations']))
+        st.metric('Grad–Shafranov solve', 'Converged' if public_eq_result['converged'] else 'Not converged')
+        public_eq_fig = Figure(figsize=(12, 4.5))
+        public_eq_axes = public_eq_fig.subplots(1, 3)
+        public_eq_fields = [
+            (public_eq_result['reference_psi_Wb_rad'], 'Public EFIT reference flux'),
+            (public_eq_result['psi_Wb_rad'], 'Reconstructed flux'),
+            (public_eq_result['psi_Wb_rad'] - public_eq_result['reference_psi_Wb_rad'], 'Reconstruction − reference'),
+        ]
+        for public_eq_ax, (public_eq_field, public_eq_title) in zip(public_eq_axes, public_eq_fields):
+            public_eq_mesh = public_eq_ax.pcolormesh(public_eq_R, public_eq_Z, public_eq_field, shading='auto')
+            public_eq_ax.set_xlabel('R (m)')
+            public_eq_ax.set_ylabel('Z (m)')
+            public_eq_ax.set_title(public_eq_title)
+            public_eq_fig.colorbar(public_eq_mesh, ax=public_eq_ax)
+        public_eq_fig.tight_layout()
+        st.pyplot(public_eq_fig)
+        st.json({key: value for key, value in public_eq_result.items()
+                 if key not in {'psi_Wb_rad', 'psi_normalized', 'B_R_T', 'B_Z_T',
+                                'B_poloidal_T', 'reference_psi_Wb_rad'}})
+        public_eq_table = pd.DataFrame({
+            'Z_m': np.repeat(public_eq_Z, public_eq_R.size),
+            'R_m': np.tile(public_eq_R, public_eq_Z.size),
+            'reference_psi_Wb_rad': public_eq_result['reference_psi_Wb_rad'].ravel(),
+            'reconstructed_psi_Wb_rad': public_eq_result['psi_Wb_rad'].ravel(),
+            'psi_difference_Wb_rad': (public_eq_result['psi_Wb_rad'] - public_eq_result['reference_psi_Wb_rad']).ravel(),
+            'B_R_T': public_eq_result['B_R_T'].ravel(),
+            'B_Z_T': public_eq_result['B_Z_T'].ravel(),
+            'B_poloidal_T': public_eq_result['B_poloidal_T'].ravel(),
+        })
+        download_df('Download public-data reconstruction and comparison', public_eq_table,
+                    'tis_public_efit_reconstruction.csv')
+        st.warning(public_eq_result['warning'])
+    st.divider()
     st.markdown('### Grad–Shafranov solver (prescribed boundary and profiles)')
     st.caption('This finite-difference solver does not replace EFIT. Upload R and Z coordinate vectors, a boundary-flux grid shaped (len(Z), len(R)), and three profile CSV vectors: normalized flux, p\'(ψ), and F F\'(ψ).')
     with st.form('grad_shafranov_form'):
