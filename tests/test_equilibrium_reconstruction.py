@@ -255,3 +255,32 @@ def test_reference_flux_workflow_rejects_bad_reference_map():
         infer_grad_shafranov_profiles_from_flux(R, Z, np.full((len(Z), len(R)), np.nan))
     with pytest.raises(ValueError, match="nonzero finite range"):
         reconstruct_equilibrium_from_reference_flux(R, Z, np.ones((len(Z), len(R))))
+
+
+
+def test_public_efit_loader_selects_real_flux_slice_and_records_provenance(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    from tis.data_sources import fetch_public_efit_flux_map
+
+    R = np.linspace(1.0, 2.0, 4)
+    Z = np.linspace(-0.5, 0.5, 3)
+    first = np.zeros((3, 4))
+    second = np.arange(12, dtype=float).reshape(3, 4)
+    row = {
+        "efit_times": [100.0, 200.0],
+        "efit_grid_R": R.tolist(),
+        "efit_grid_Z": Z.tolist(),
+        "efit_psirz": np.stack((first, second)).tolist(),
+    }
+    fake_datasets = SimpleNamespace(
+        load_dataset=lambda *args, **kwargs: [row]
+    )
+    monkeypatch.setitem(sys.modules, "datasets", fake_datasets)
+    r_out, z_out, psi, manifest = fetch_public_efit_flux_map(0, 0.19)
+    np.testing.assert_array_equal(r_out, R)
+    np.testing.assert_array_equal(z_out, Z)
+    np.testing.assert_array_equal(psi, second)
+    assert manifest["dataset"] == "Sophelio/Fusion Equilibrium Challenge"
+    assert manifest["selected_time_ms"] == 200.0
+    assert manifest["license"] == "CC BY 4.0"
