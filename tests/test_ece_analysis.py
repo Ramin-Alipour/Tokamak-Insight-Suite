@@ -161,3 +161,55 @@ def test_resonance_mapping_requires_paired_field_geometry():
     with pytest.raises(ValueError, match="provided together"):
         analyze_ece([80e9, 90e9], major_radius_m=1.0,
                     mode="resonance_mapping")
+
+def test_ece_profile_reconstruction_from_user_converted_raw_multichannel_data():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    f = np.array([80e9, 90e9, 100e9])
+    t = np.arange(16, dtype=float) * 1e-6
+    raw = np.tile([10.0, 20.0, 30.0], (t.size, 1))
+    result = reconstruct_ece_temperature_profile(
+        f, raw, t, [2.0, 2.0, 2.0], [5.0, 5.0, 5.0],
+        major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
+        assume_optically_thick=True,
+    )
+    np.testing.assert_allclose(result["brightness_temperature_eV"], [25, 45, 65])
+    np.testing.assert_allclose(result["electron_temperature_channel_eV"], [25, 45, 65])
+    assert result["profile_radius_m"].size == 100
+    assert result["electron_temperature_profile_eV"].shape == (100,)
+    assert result["profile_radius_m"][0] < result["profile_radius_m"][-1]
+    assert "no extrapolation" in result["profile_method"]
+
+
+def test_ece_profile_optical_depth_inversion_uses_single_slab_relation():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    f = np.array([80e9, 90e9, 100e9])
+    t = np.arange(8, dtype=float) * 1e-6
+    tau = np.array([1.0, 1.0, 1.0])
+    te = np.array([100.0, 200.0, 300.0])
+    tb = te * (1 - np.exp(-tau))
+    result = reconstruct_ece_temperature_profile(
+        f, np.tile(tb / 2.0, (t.size, 1)), t, 2.0, 0.0,
+        major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
+        optical_depth=tau,
+    )
+    np.testing.assert_allclose(result["electron_temperature_channel_eV"], te)
+
+
+def test_ece_profile_requires_calibration_conversion_and_temperature_basis():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    f = np.array([80e9, 90e9, 100e9])
+    t = np.arange(8, dtype=float) * 1e-6
+    raw = np.ones((t.size, f.size))
+    with pytest.raises(ValueError, match="optical_depth"):
+        reconstruct_ece_temperature_profile(
+            f, raw, t, 1.0, 0.0, major_radius_m=1.0, B_axis_T=2.0
+        )
+    with pytest.raises(ValueError, match="gain"):
+        reconstruct_ece_temperature_profile(
+            f, raw, t, [1.0, -1.0, 1.0], 0.0,
+            major_radius_m=1.0, B_axis_T=2.0, assume_optically_thick=True
+        )
+
