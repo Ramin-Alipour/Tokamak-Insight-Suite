@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ece-dashboard-${{ github.workflow }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
