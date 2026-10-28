@@ -650,7 +650,14 @@ def reconstruct_ece_temperature_profile(
                 perturbed_profile = np.interp(r_profile, r_sorted, perturbed)
             jacobian[:, channel] = (perturbed_profile - profile_te) / step
         profile_covariance_variance = np.einsum("ij,jk,ik->i", jacobian, te_cov_sorted, jacobian)
-        profile_te_sigma = np.sqrt(np.maximum(0.0, profile_covariance_variance))
+        diagonal_covariance_variance = np.einsum(
+            "ij,j,ij->i", jacobian, np.diag(te_cov_sorted), jacobian
+        )
+        residual_independent_variance = (
+            np.zeros(r_profile.size) if profile_te_sigma is None else
+            np.maximum(0.0, profile_te_sigma**2 - diagonal_covariance_variance)
+        )
+        profile_te_sigma = np.sqrt(np.maximum(0.0, profile_covariance_variance + residual_independent_variance))
     profile_radius_sigma = np.interp(r_profile, r_sorted, radius_sigma_sorted)
     local_gradient = np.gradient(profile_te, r_profile, edge_order=2)
     profile_te_sigma_from_radius = np.abs(local_gradient) * profile_radius_sigma
