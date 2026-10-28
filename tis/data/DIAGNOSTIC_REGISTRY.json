@@ -1008,7 +1008,7 @@
         "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
       ],
       "raw_data_to_physics": true,
-      "note": "Implemented analysis pipeline, not merely formula reference. Dashboard executes numerical calculations, profile reconstruction, plots, and JSON exports within the declared scope. Do not imply instrument calibration or equilibrium-grade localization."
+      "note": "Implemented ECE analysis pipeline, not merely formula reference. The dashboard executes brightness-temperature calculations, resonance mapping, channel fluctuation/PSD analysis, time-windowed profile reconstruction, plots, and JSON exports within the declared scope. Input spectral radiance and profile brightness-temperature data must already be calibrated; TIS performs no detector calibration. Do not imply EFIT-grade localization or experimental validation."
     },
     "note": "The built-in dashboard and Python API execute ECE brightness-temperature, resonance-mapping, fluctuation/PSD, and temperature-profile workflows. Input radiance and profile brightness-temperature data must already be calibrated. Completeness is limited to this declared software scope and is not experimental validation."
   },
