@@ -30,10 +30,10 @@ from tis.plasma import (confinement_summary, beta_metrics, collisionality_nu_sta
 from tis.report import build_html_report, figure_to_png_base64
 from tis.contributions import build_contribution_bundle, bundle_json
 from tis.data_sources import fetch_fair_mast_signal, fetch_fair_mast_efit_snapshot, fetch_public_efit_flux_map, list_fair_mast_signals, fetch_public_table_bytes
-from tis.core import (load_table, signal_quality, sha256_bytes, linear_calibration, polynomial_calibration,
+from tis.core import (load_table, signal_quality, sha256_bytes,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
-    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, spectral_calibration, doppler_temperature_from_fwhm_eV, probe_iv_summary,
+    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, doppler_temperature_from_fwhm_eV, probe_iv_summary,
     linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
@@ -699,15 +699,14 @@ elif page=='Time Series & MHD':
         if st.button('Fit supplied phases',key='fit_manual_mode'):
             try: st.json(mode_number_from_phase([float(z) for z in ang.split(',')],[float(z) for z in phs.split(',')],convention=mode_conv))
             except Exception as e: st.error(str(e))
-    st.markdown('### Calibrated signal integration / Rogowski current')
-    st.caption('Choose the hardware-chain mode explicitly. The software cannot infer sensor calibration, transfer function, saturation or bandwidth.')
-    acquisition_mode=st.radio('Signal acquisition mode',['Derivative output (signal ∝ dIp/dt; integrate once)','External integrator output (signal ∝ Ip; do not integrate)'],key='rogowski_acquisition_mode')
-    int_scale=st.number_input('Calibration scale for selected mode',value=1.0,format='%.8g',key='int_scale')
-    int_initial=st.number_input('Initial plasma current (A; derivative-output mode only)',value=0.0,format='%.8g',key='int_initial')
+    st.markdown('### Rogowski coil: calibrated current reconstruction')
+    st.caption('Input must already be calibrated to dIp/dt in A/s or plasma current in A. TIS does not apply calibration gains or offsets.')
+    acquisition_mode=st.radio('Input signal representation',['Calibrated dIp/dt (A/s; integrate once)','Calibrated plasma current (A; no integration)'],key='rogowski_acquisition_mode')
+    int_initial=st.number_input('Initial plasma current for dIp/dt integration (A)',value=0.0,format='%.8g',key='int_initial')
     use_baseline=False
     baseline_start=baseline_end=drift_start=drift_end=None
-    if acquisition_mode.startswith('Derivative output'):
-        use_baseline=st.checkbox('Subtract mean over a pre-shot baseline interval',value=False,key='int_use_baseline')
+    if acquisition_mode.startswith('Calibrated dIp/dt'):
+        use_baseline=st.checkbox('Subtract mean pre-shot baseline from dIp/dt',value=False,key='int_use_baseline')
         if use_baseline:
             tmin=float(np.min(t)); tmax=float(np.max(t))
             b1,b2=st.columns(2)
@@ -717,30 +716,26 @@ elif page=='Time Series & MHD':
             d1,d2=st.columns(2)
             with d1: drift_start=st.number_input('Post window start (s)',value=max(tmin,tmax-(tmax-tmin)*0.1),min_value=tmin,max_value=tmax,key='int_drift_start')
             with d2: drift_end=st.number_input('Post window end (s)',value=tmax,min_value=tmin,max_value=tmax,key='int_drift_end')
-            st.caption('Drift correction assumes the true signal is approximately zero in both selected windows.')
+            st.caption('Drift correction assumes the true derivative is approximately zero in both selected windows.')
     if st.button('Analyze Rogowski / calibrated current trace',key='run_rogowski_analysis'):
         try:
-            if not np.isfinite(int_scale) or int_scale == 0:
-                raise ValueError('Calibration scale must be finite and nonzero for the selected acquisition mode.')
-            if acquisition_mode.startswith('Derivative output'):
-                result=integrate_time_series(t,y,scale=int_scale,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
+            if acquisition_mode.startswith('Calibrated dIp/dt'):
+                result=integrate_time_series(t,y,scale=1.0,initial_value=int_initial,baseline_start_s=baseline_start,baseline_end_s=baseline_end,drift_start_s=drift_start,drift_end_s=drift_end)
                 current=np.asarray(result['integrated_signal'],dtype=float)
                 corrected=np.asarray(result['calibrated_signal'],dtype=float)
                 metadata={k:v for k,v in result.items() if k not in {'time_s','calibrated_signal','integrated_signal'}}
-                metadata.update({'diagnostic':'Rogowski coil','acquisition_mode':'derivative_output','current_unit':'A','calibration_scale':float(int_scale),'initial_current_A':float(int_initial),'integration_method':'cumulative trapezoidal rule'})
+                metadata.update({'diagnostic':'Rogowski coil','input_representation':'calibrated_dIp_dt_A_s','current_unit':'A','integration_method':'cumulative trapezoidal rule'})
             else:
-                if not np.isfinite(int_scale) or int_scale == 0:
-                    raise ValueError('Calibration scale must be finite and nonzero.')
-                corrected=np.asarray(y,dtype=float)*float(int_scale)
-                current=corrected.copy()
-                metadata={'diagnostic':'Rogowski coil','acquisition_mode':'integrator_output','current_unit':'A','calibration_scale':float(int_scale),'integration_applied':False,'note':'Input is treated as an already-integrated, calibrated current signal; no second integration was applied.'}
+                current=np.asarray(y,dtype=float).copy()
+                corrected=current.copy()
+                metadata={'diagnostic':'Rogowski coil','input_representation':'calibrated_current_A','current_unit':'A','integration_applied':False,'note':'Input is already calibrated plasma current; no scaling or second integration was applied.'}
             if not np.all(np.isfinite(current)):
-                raise ValueError('Current reconstruction contains non-finite values.')
+                raise ValueError('Current trace contains non-finite values.')
             metadata.update({'n_samples':int(len(t)),'duration_s':float(t[-1]-t[0]),'median_dt_s':float(np.median(np.diff(t))), 'current_min_A':float(np.min(current)), 'current_max_A':float(np.max(current)), 'current_final_A':float(current[-1])})
-            st.success('Rogowski-coil analysis completed within the declared calibrated-input scope.')
+            st.success('Rogowski-coil analysis completed from calibrated input.')
             st.json(metadata)
             plot_line(t,current,'Time (s)','Plasma current (A)','Rogowski-derived plasma current')
-            out=pd.DataFrame({'time_s':t,'input_signal':y,'calibrated_signal':corrected,'plasma_current_A':current})
+            out=pd.DataFrame({'time_s':t,'input_signal':y,'analysis_signal':corrected,'plasma_current_A':current})
             download_df('Download Rogowski current series',out,'tis_rogowski_current.csv')
             json_download('Export Rogowski analysis manifest',metadata,'tis_rogowski_manifest.json')
             add_report_section('Rogowski coil current reconstruction',metadata)
@@ -1342,60 +1337,46 @@ elif page=='Spectral Analysis':
 
 elif page=='Probe Analysis':
     st.title('Langmuir, Ball-Pen & Magnetic Probe Analysis'); need_data()
-    with st.expander('Poloidal-field coils / magnetic probes', expanded=True):
-        st.caption('Calibrated signal analysis only. Supply gain/offset from the documented probe and acquisition-chain calibration; this workflow does not reconstruct poloidal flux or equilibrium.')
-        time_col=col_select('Time column (s)',numeric,'pf_probe_time')
-        pf_channels=st.multiselect('Poloidal-field probe signal channel(s)',[c for c in numeric if c != time_col],default=[],key='pf_probe_channels')
-        st.caption('Enter one comma-separated value for all channels, or one value per selected channel, in the same order.')
-        c1,c2,c3=st.columns(3)
-        with c1: pf_gain_text=st.text_input('Calibration gain (T / digitizer unit)','1.0',key='pf_gain')
-        with c2: pf_offset_text=st.text_input('Calibration offset (T)','0.0',key='pf_offset')
-        with c3: pf_unc_text=st.text_input('Signal uncertainty 1σ (digitizer units; optional)','',key='pf_uncertainty')
-        use_baseline=st.checkbox('Subtract mean baseline over a time interval',value=False,key='pf_use_baseline')
-        baseline_interval=None
-        if use_baseline:
-            tmin=float(pd.to_numeric(df[time_col],errors='coerce').min())
-            tmax=float(pd.to_numeric(df[time_col],errors='coerce').max())
-            if not np.isfinite(tmin) or not np.isfinite(tmax) or tmin >= tmax:
-                st.warning('The selected time column must have a finite, nonzero range.')
-            else:
-                baseline_interval=st.slider('Baseline interval (s)',min_value=tmin,max_value=tmax,value=(tmin,tmin+(tmax-tmin)*0.1),key='pf_baseline_interval')
-        if st.button('Analyze poloidal-field probes',type='primary',key='analyze_pf_probes'):
-            try:
-                if not pf_channels:
-                    raise ValueError('Select at least one magnetic-probe signal channel.')
-                def _parse_pf_values(raw, label, count):
-                    values=[float(part.strip()) for part in raw.split(',') if part.strip()]
-                    if len(values)==1: values=values*count
-                    if len(values)!=count or not np.all(np.isfinite(values)):
-                        raise ValueError(f'{label} must be one finite value or exactly {count} comma-separated finite values.')
-                    return values[0] if count==1 else values
-                gain_value=_parse_pf_values(pf_gain_text,'Calibration gain',len(pf_channels))
-                offset_value=_parse_pf_values(pf_offset_text,'Calibration offset',len(pf_channels))
-                uncertainty_value=None
-                if pf_unc_text.strip():
-                    uncertainty_value=_parse_pf_values(pf_unc_text,'Signal uncertainty',len(pf_channels))
-                time_values=pd.to_numeric(df[time_col],errors='coerce').to_numpy(dtype=float)
-                signal_values=df[pf_channels].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
-                result=analyze_poloidal_field_probes(
-                    time_values,signal_values,
-                    calibration_gain_T_per_unit=gain_value,
-                    calibration_offset_T=offset_value,
-                    signal_uncertainty=uncertainty_value,
-                    baseline_interval_s=baseline_interval,
-                    probe_names=pf_channels,
-                )
-                st.success('Poloidal-field probe analysis completed for the selected calibrated-signal scope.')
-                st.json(result)
-                for channel_index,channel_name in enumerate(pf_channels):
-                    st.markdown(f'**{channel_name}**')
-                    plot_line(result['time_s'],result['B_poloidal_T'][:,channel_index],time_col,'Bp (T)',f'{channel_name}: calibrated poloidal field')
-                    plot_line(result['time_s'],result['dB_poloidal_dt_T_s'][:,channel_index],time_col,'dBp/dt (T/s)',f'{channel_name}: time derivative')
-                json_download('Export poloidal-field analysis JSON',result,'tis_poloidal_field_probe_analysis.json')
-            except Exception as e:
-                st.error(f'Poloidal-field probe analysis failed: {e}')
-        st.info('Interpretation limits: gain/offset calibration uncertainty, probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
-    st.divider()
+     with st.expander('Poloidal-field coils / magnetic probes', expanded=True):
+         st.caption('Input must already be calibrated poloidal magnetic field in tesla. TIS performs no gain/offset calibration.')
+         time_col=col_select('Time column (s)',numeric,'pf_probe_time')
+         pf_channels=st.multiselect('Poloidal-field probe Bp channel(s) (T)',[c for c in numeric if c != time_col],default=[],key='pf_probe_channels')
+         st.caption('Optional uncertainty is a 1-sigma uncertainty in tesla, one value or one value per channel.')
+         pf_unc_text=st.text_input('Field uncertainty 1σ (T; optional)','',key='pf_uncertainty')
+         use_baseline=st.checkbox('Subtract mean baseline over a time interval',value=False,key='pf_use_baseline')
+         baseline_interval=None
+         if use_baseline:
+             tmin=float(pd.to_numeric(df[time_col],errors='coerce').min())
+             tmax=float(pd.to_numeric(df[time_col],errors='coerce').max())
+             if not np.isfinite(tmin) or not np.isfinite(tmax) or tmin >= tmax:
+                 st.warning('The selected time column must have a finite, nonzero range.')
+             else:
+                 baseline_interval=st.slider('Baseline interval (s)',min_value=tmin,max_value=tmax,value=(tmin,tmin+(tmax-tmin)*0.1),key='pf_baseline_interval')
+         if st.button('Analyze poloidal-field probes',type='primary',key='analyze_pf_probes'):
+             try:
+                 if not pf_channels:
+                     raise ValueError('Select at least one magnetic-probe signal channel.')
+                 uncertainty_value=None
+                 if pf_unc_text.strip():
+                     values=[float(part.strip()) for part in pf_unc_text.split(',') if part.strip()]
+                     if len(values)==1: values=values*len(pf_channels)
+                     if len(values)!=len(pf_channels) or not np.all(np.isfinite(values)) or np.any(np.asarray(values)<0):
+                         raise ValueError(f'Field uncertainty must be one non-negative finite value or exactly {len(pf_channels)} values.')
+                     uncertainty_value=values[0] if len(pf_channels)==1 else values
+                 time_values=pd.to_numeric(df[time_col],errors='coerce').to_numpy(dtype=float)
+                 signal_values=df[pf_channels].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
+                 result=analyze_poloidal_field_probes(time_values,signal_values,signal_uncertainty=uncertainty_value,baseline_interval_s=baseline_interval,probe_names=pf_channels)
+                 st.success('Poloidal-field probe analysis completed from calibrated input.')
+                 st.json(result)
+                 for channel_index,channel_name in enumerate(pf_channels):
+                     st.markdown(f'**{channel_name}**')
+                     plot_line(result['time_s'],result['B_poloidal_T'][:,channel_index],time_col,'Bp (T)',f'{channel_name}: poloidal field')
+                     plot_line(result['time_s'],result['dB_poloidal_dt_T_s'][:,channel_index],time_col,'dBp/dt (T/s)',f'{channel_name}: time derivative')
+                 json_download('Export poloidal-field analysis JSON',result,'tis_poloidal_field_probe_analysis.json')
+             except Exception as e:
+                 st.error(f'Poloidal-field probe analysis failed: {e}')
+         st.info('Interpretation limits: probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
+st.divider()
     st.markdown('### Langmuir probe I–V analysis')
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     voltage_values=pd.to_numeric(df[vcol],errors='coerce').to_numpy(dtype=float)
@@ -1575,10 +1556,11 @@ elif page=='Plasma Parameters':
                 except Exception as e: st.error(str(e))
         else: st.info('Load aligned density and velocity columns to calculate fluxes.')
     with tabs[4]:
-        counts=st.number_input('Measured count rate (s⁻¹)',min_value=0.0,value=1000.0); eff=st.number_input('Detection efficiency (0–1]',min_value=.000001,max_value=1.0,value=.1); geom=st.number_input('Geometric / solid-angle factor',min_value=.000001,value=1.0); cal=st.number_input('Additional calibration factor',min_value=.000001,value=1.0)
-        if st.button('Estimate neutron source rate'):
-            try: result=neutron_rate_from_counts(counts,eff,geom,cal); st.json(result); json_download('Export neutron estimate',result,'tis_neutron_rate.json')
-            except Exception as e: st.error(str(e))
+        st.caption('Enter a neutron source rate already calibrated and corrected for detector efficiency and geometry. TIS applies no calibration factors.')
+        source_rate=st.number_input('Calibrated neutron source rate (s⁻¹)',min_value=0.0,value=1000.0,key='calibrated_neutron_source_rate')
+        if st.button('Report calibrated neutron source rate'):
+            result={'diagnostic':'Neutron source rate','neutron_source_rate_s-1':float(source_rate),'input_status':'user-supplied calibrated value','calibration_performed':False}
+            st.json(result); json_download('Export calibrated neutron source rate',result,'tis_neutron_rate.json')
 
 elif page=='Equilibrium & Reconstruction':
     st.title('Equilibrium & Magnetic Reconstruction Tools')
