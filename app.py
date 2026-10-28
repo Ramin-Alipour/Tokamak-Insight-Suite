@@ -1443,7 +1443,7 @@ elif page=='Probe Analysis':
             plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V')
             json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
-    st.warning('Default output is descriptive only. Te and density are calculated only when their fit windows are explicitly enabled; inspect fit quality and confirm calibration, sweep polarity, saturation regions, magnetic-field effects and the probe/sheath model before interpreting results.')
+    st.warning('All supplied voltage/current inputs are treated as already calibrated; this workflow performs no calibration. Default output is descriptive. Te requires an explicitly selected electron-retarding fit window; density additionally requires a selected ion branch, collection area, ion mass, and valid Te. Review fit residuals, sweep polarity, saturation regions, magnetic-field effects, and probe/sheath assumptions before interpreting estimates.')
 
 elif page=='Plasma Parameters':
     st.title('Plasma Parameters & Diagnostic Conversions')
