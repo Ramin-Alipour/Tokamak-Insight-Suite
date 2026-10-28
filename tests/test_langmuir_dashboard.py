@@ -190,3 +190,29 @@ def test_langmuir_fit_window_suggestions_normalize_current_polarity_and_reject_b
         suggest_langmuir_fit_windows(voltage, current, current_convention="automatic")
     with pytest.raises(ValueError, match="equal-length"):
         suggest_langmuir_fit_windows(voltage, current[:-1])
+
+
+def test_langmuir_dashboard_suggests_and_populates_fit_windows():
+    voltage = np.linspace(-10.0, 10.0, 101)
+    current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
+    app_path = Path(__file__).resolve().parents[1] / "app.py"
+    app = AppTest.from_file(app_path, default_timeout=120).run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+
+    app.session_state["tis_df"] = pd.DataFrame({"voltage_V": voltage, "current_A": current})
+    app.session_state["tis_filename"] = "synthetic_langmuir_iv.csv"
+    app.session_state["tis_sha"] = "synthetic-suggestion-test"
+    app.radio(key="workspace_page").set_value("Probe Analysis")
+    app.run()
+    app.selectbox(key="probe_v").set_value("voltage_V")
+    app.selectbox(key="probe_i").set_value("current_A")
+    app.run()
+    next(button for button in app.button if button.label == "Suggest I–V fit windows").click()
+    app.run()
+    assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
+    suggestion = app.session_state["probe_fit_window_suggestions"]
+    assert suggestion["electron_fit_range_V"] is not None
+    assert app.session_state["probe_enable_electron_fit"] is True
+    assert app.session_state["probe_enable_ion_fit"] is True
+    assert tuple(app.session_state["probe_electron_fit_range"]) == tuple(suggestion["electron_fit_range_V"])
+    assert any("not_verified_ion_saturation" in str(item.value) for item in app.info)
