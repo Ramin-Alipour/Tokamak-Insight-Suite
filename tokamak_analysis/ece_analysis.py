@@ -12,6 +12,7 @@ import numpy as np
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
 from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence
 from scipy.interpolate import PchipInterpolator
+from scipy.integrate import trapezoid
 from scipy.stats import chi2
 
 
@@ -121,16 +122,15 @@ def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
         raise ValueError("response_weight must be a finite non-negative (channel, response-frequency) matrix.")
     if rf[0] < f[0] or rf[-1] > f[-1]:
         raise ValueError("Receiver response frequencies must lie within the measured radiance spectrum; extrapolation is forbidden.")
-    integrals = np.trapezoid(weights, rf, axis=1)
+    integrals = trapezoid(weights, rf, axis=1)
     if np.any(~np.isfinite(integrals)) or np.any(integrals <= 0):
         raise ValueError("Every receiver-response channel must have positive finite integrated weight.")
     normalized = weights / integrals[:, None]
     sampled = np.asarray([np.interp(rf, f, row) for row in radiance.reshape(-1, f.size)])
     sampled = sampled.reshape(*radiance.shape[:-1], rf.size)
-    effective = np.einsum("...k,ck,k->...c", sampled, normalized, np.gradient(rf))
-    # Use trapezoidal quadrature rather than gradient weights for irregular grids.
+    # Use trapezoidal quadrature, including for irregular response grids.
     effective = np.stack([
-        np.trapezoid(sampled * normalized[channel], rf, axis=-1)
+        trapezoid(sampled * normalized[channel], rf, axis=-1)
         for channel in range(weights.shape[0])
     ], axis=-1)
     if np.any(~np.isfinite(effective)) or np.any(effective < 0):
