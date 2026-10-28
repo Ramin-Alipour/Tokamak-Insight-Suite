@@ -404,6 +404,19 @@ def reconstruct_thomson_profile(
     temperature_fit, temperature_gradient = fit_channel(
         profile.temperature_ev, profile.temperature_uncertainty_ev, "temperature"
     )
+
+    # Unconstrained cubic smoothing splines can overshoot below zero even when
+    # every measured value is physical. Project the reconstructed profiles onto
+    # the physical non-negative domain and make the derivative consistent with
+    # the projected (flat) segment. PCHIP is shape-preserving, but this guard
+    # also protects the smoothing-spline path from returning negative ne or Te.
+    density_negative = density_fit < 0.0
+    temperature_negative = temperature_fit < 0.0
+    density_fit = np.maximum(density_fit, 0.0)
+    temperature_fit = np.maximum(temperature_fit, 0.0)
+    density_gradient = np.where(density_negative, 0.0, density_gradient)
+    temperature_gradient = np.where(temperature_negative, 0.0, temperature_gradient)
+
     return {
         "radius_m": grid,
         "density_m3": density_fit,
@@ -425,6 +438,7 @@ def reconstruct_thomson_profile(
             "Only calibrated spatial measurements are accepted; no detector or wavelength calibration is performed.",
             "No extrapolation beyond the measured radial interval is performed.",
             "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
-            "Smoothing splines are unconstrained and may overshoot below zero between measurements; inspect the reconstructed curve before physical interpretation.",
+            "Negative spline overshoot is projected to zero; derivatives are set to zero on clipped segments. This enforces non-negativity but is not a substitute for a physically constrained fit.",
+            "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
         ],
     }
