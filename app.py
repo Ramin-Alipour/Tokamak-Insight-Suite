@@ -1567,14 +1567,12 @@ elif page=='Plasma Parameters':
                     json_download('Export ECE resonance mapping',result,'tis_ece_resonance_mapping.json')
             else:
                 st.markdown('**Radial electron-temperature profile from multi-channel ECE data**')
-                st.warning('Provide your own channel signal-to-brightness-temperature conversion. TIS does not calibrate detector counts or voltage.')
+                st.caption('Inputs are already calibrated brightness temperatures in eV. TIS performs no detector calibration or signal-to-temperature conversion.')
                 if df is None:
-                    st.info('Upload a table with a time column and one raw signal column per ECE channel.')
+                    st.info('Upload a table with a time column and one already-calibrated brightness-temperature (eV) column per ECE channel.')
                 else:
                     ece_time_col=col_select('Profile time column (s)',list(df.columns),'ece_profile_time_col')
-                    ece_signal_cols=st.multiselect('Profile channel signal columns (same order as frequencies)',[col for col in numeric if col!=ece_time_col],key='ece_profile_signal_cols')
-                    ece_gain_text=st.text_input('User-supplied gain to Tb (eV per signal unit; one per channel)',key='ece_profile_gain')
-                    ece_offset_text=st.text_input('User-supplied offset to Tb (eV; one per channel)',value='0, 0, 0',key='ece_profile_offset')
+                    ece_signal_cols=st.multiselect('Calibrated brightness-temperature columns (eV; same order as frequencies)',[col for col in numeric if col!=ece_time_col],key='ece_profile_signal_cols')
                     ece_tau_text=st.text_input('Optical depth per channel (comma-separated; blank if assuming optically thick)',key='ece_profile_tau')
                     ece_thick=st.checkbox('I confirm the channels are optically thick; use Te ≈ Tb',value=False,key='ece_profile_thick')
                     ece_bg=st.number_input('Background brightness temperature (eV)',min_value=0.0,value=0.0,key='ece_profile_background')
@@ -1590,11 +1588,7 @@ elif page=='Plasma Parameters':
                     ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_profile_b0')
                     if st.button('Reconstruct ECE electron-temperature profile',type='primary',key='ece_run_profile'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
-                            raise ValueError('Select exactly one raw signal column per channel frequency.')
-                        ece_gain=np.asarray([float(v.strip()) for v in ece_gain_text.split(',') if v.strip()],dtype=float)
-                        ece_offset=np.asarray([float(v.strip()) for v in ece_offset_text.split(',') if v.strip()],dtype=float)
-                        if ece_gain.shape!=ece_freq_Hz.shape or ece_offset.shape!=ece_freq_Hz.shape:
-                            raise ValueError('Gain and offset must each contain one value per ECE channel.')
+                            raise ValueError('Select exactly one calibrated brightness-temperature column per channel frequency.')
                         ece_tau=None if not ece_tau_text.strip() else np.asarray([float(v.strip()) for v in ece_tau_text.split(',') if v.strip()],dtype=float)
                         if ece_tau is None and not ece_thick:
                             raise ValueError('Supply optical depth per channel or explicitly confirm the optically thick assumption.')
@@ -1603,14 +1597,14 @@ elif page=='Plasma Parameters':
                             raise ValueError('Profile time and channel signals must be numeric and complete; missing samples are not silently dropped.')
                         result=reconstruct_ece_temperature_profile(
                             ece_freq_Hz,ece_frame[ece_signal_cols].to_numpy(dtype=float),
-                            ece_frame[ece_time_col].to_numpy(dtype=float),ece_gain,ece_offset,
+                            ece_frame[ece_time_col].to_numpy(dtype=float),np.ones(len(ece_freq_Hz)),np.zeros(len(ece_freq_Hz)),
                             major_radius_m=ece_r0,B_axis_T=ece_b0,harmonic=int(harm),
                             optical_depth=ece_tau,background_temperature_eV=ece_bg,
                             assume_optically_thick=ece_thick,
                             time_window_s=(ece_window_start,ece_window_end),
                         )
                         st.success(f'ECE time-window-averaged electron-temperature profile completed ({result["selected_sample_count"]} samples; {ece_window_start:g}–{ece_window_end:g} s) within the declared model.')
-                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean raw signal':result['mean_raw_signal'],'Brightness temperature (eV)':result['brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
+                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
                         st.warning('Profile is interpolated only between approximate resonance locations. This is not EFIT mapping, ray tracing, a full radiative-transfer inversion, or uncertainty-validated device inference.')
                         st.json(result)
