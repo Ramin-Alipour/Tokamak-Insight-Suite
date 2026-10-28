@@ -28,7 +28,7 @@ def test_radial_field_gives_vertical_flux_gradient():
     ([1], [0,1], np.zeros((2,1)), np.zeros((2,1))),
     ([1,1], [0,1], np.zeros((2,2)), np.zeros((2,2))),
     ([0,1], [0,1], np.zeros((2,2)), np.zeros((2,2))),
-    ([1,2], [0,1], np.zeros((2,2)), np.zeros((2,2))),
+    ([1,2], [0,1], np.zeros((3,2)), np.zeros((2,2))),
     ([1,2], [0,1], np.zeros((2,2)), np.full((2,2), np.nan)),
 ])
 def test_invalid_inputs_rejected(R,Z,br,bz):
