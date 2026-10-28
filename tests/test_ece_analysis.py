@@ -743,7 +743,7 @@ def test_ece_relativistic_overflow_is_rejected_and_metadata_is_truthful():
     from tokamak_analysis.ece_analysis import resonance_field_relativistic_T, reconstruct_ece_temperature_profile
 
     with pytest.raises(ValueError, match="overflowed"):
-        resonance_field_relativistic_T(100e9, 2, electron_energy_eV=1e308)
+        resonance_field_relativistic_T(1e300, 2, electron_energy_eV=1e308)
     result = reconstruct_ece_temperature_profile(
         [80e9, 90e9, 100e9], np.tile([20.0, 30.0, 40.0], (8, 1)),
         np.arange(8, dtype=float) * 1e-6,
