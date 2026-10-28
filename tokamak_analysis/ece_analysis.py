@@ -176,9 +176,7 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
     if major_radius_m is not None or B_axis_T is not None:
         if major_radius_m is None or B_axis_T is None:
             raise ValueError("major_radius_m and B_axis_T must be provided together.")
-        out["resonance_radius_m"] = resonance_radius_m(
-            f, major_radius_m, B_axis_T, harmonic=harmonic
-        )
+        out["resonance_radius_m"] = np.asarray(major_radius_m, dtype=float) * np.asarray(B_axis_T, dtype=float) / np.asarray(out["resonance_field_T"], dtype=float)
         out["equilibrium_model"] = "circular toroidal field B(R)=B_axis*R_axis/R"
         out["limitations"] = ["not EFIT mapping; ignores shaping, poloidal field, relativistic and Doppler shifts"]
     if mode == "brightness_temperature":
@@ -581,8 +579,24 @@ def reconstruct_ece_temperature_profile(
     )
     bandwidth_radius_lower = bandwidth_radius_upper = None
     if bandwidth is not None:
-        bandwidth_radius_lower = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f + bandwidth / 2.0, harmonic)
-        bandwidth_radius_upper = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f - bandwidth / 2.0, harmonic)
+        if electron_energy_eV is None:
+            b_low_frequency = resonance_field_T(f - bandwidth / 2.0, harmonic)
+            b_high_frequency = resonance_field_T(f + bandwidth / 2.0, harmonic)
+        else:
+            b_low_frequency = resonance_field_relativistic_T(f - bandwidth / 2.0, harmonic, electron_energy_eV=electron_energy_eV, parallel_beta=parallel_beta)
+            b_high_frequency = resonance_field_relativistic_T(f + bandwidth / 2.0, harmonic, electron_energy_eV=electron_energy_eV, parallel_beta=parallel_beta)
+        if eq_r is None:
+            bandwidth_radius_lower = float(major_radius_m) * float(B_axis_T) / b_high_frequency
+            bandwidth_radius_upper = float(major_radius_m) * float(B_axis_T) / b_low_frequency
+        else:
+            if np.any(b_low_frequency < np.min(eq_b)) or np.any(b_high_frequency > np.max(eq_b)):
+                raise ValueError("Channel bandwidth extends outside the supplied equilibrium B_phi(R) table.")
+            b_sorted = eq_b if eq_b[0] < eq_b[-1] else eq_b[::-1]
+            r_sorted_eq = eq_r if eq_b[0] < eq_b[-1] else eq_r[::-1]
+            radius_at_low_f = np.interp(b_low_frequency, b_sorted, r_sorted_eq)
+            radius_at_high_f = np.interp(b_high_frequency, b_sorted, r_sorted_eq)
+            bandwidth_radius_lower = np.minimum(radius_at_low_f, radius_at_high_f)
+            bandwidth_radius_upper = np.maximum(radius_at_low_f, radius_at_high_f)
     if radius_mapping_uncertainty_input is not None:
         radius_sigma = np.sqrt(radius_sigma**2 + np.broadcast_to(radius_mapping_uncertainty_input, f.shape)**2)
     order = np.argsort(radius)
