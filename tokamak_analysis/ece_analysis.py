@@ -450,11 +450,13 @@ def reconstruct_ece_temperature_profile(
     If optical_depth is supplied, Te is inferred from the single-slab LTE
     relation Tb = Te*(1-exp(-tau)) + Tbg*exp(-tau). Otherwise the user must
     explicitly assert optically thick emission, in which case Te ~= Tb.
-    The radial profile is linearly interpolated between channel locations;
-    there is no extrapolation, EFIT mapping, ray tracing or receiver-response
-    convolution. Optional independent uncertainties are propagated to first
-    order, finite bandwidth is represented by a radial localization envelope,
-    and time-resolved profiles can be returned on request.
+    The radial profile uses linear or shape-preserving PCHIP interpolation
+    between channel locations; there is no extrapolation. A supplied monotonic
+    B_phi(R) table or explicit channel resonance positions can replace the
+    circular-field approximation, but neither is itself a full ray trace.
+    Optional covariance, temporal-correlation, radial-gradient and model-floor
+    uncertainty terms are propagated approximately; finite bandwidth remains
+    a localization envelope, not a receiver-response convolution.
     """
 
     f = np.asarray(frequency_Hz, dtype=float)
@@ -847,7 +849,7 @@ def reconstruct_ece_temperature_profile(
             "not EFIT equilibrium or ray tracing",
             "no relativistic or Doppler correction",
             "bandwidth is represented as a radial localization envelope, not a full receiver-response convolution",
-            "uncertainties are first-order independent-input estimates and exclude model discrepancy/correlations",
+            "uncertainties are approximate first-order estimates; include covariance only when supplied and model discrepancy only through the optional user-specified floor",
             "temperature inference depends on user-supplied optical depth or optically thick assertion",
             "time-resolved profiles are optional and are not a substitute for a radiative-transfer inversion",
         ],
