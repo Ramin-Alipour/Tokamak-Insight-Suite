@@ -294,6 +294,12 @@ def test_ece_contract_matches_precalibrated_profile_pipeline():
     assert any(item["name"] == "calibrated_brightness_temperature_eV" for item in contract["input_specs"])
     assert "must already be calibrated" in diagnostic["execution_contract"]["note"]
     assert diagnostic["implementation_status"].startswith("Complete within declared software scope")
+    assert any(item["name"] == "response_frequency_Hz" for item in diagnostic["execution_contract"]["input_specs"])
+    assert any(item["name"] == "response_weight" for item in diagnostic["execution_contract"]["input_specs"])
+    time_spec = next(item for item in contract["input_specs"] if item["name"] == "time_s")
+    assert "At least eight" in time_spec["description"]
+    packaged_registry = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    assert diagnostic == next(row for row in packaged_registry if row["diagnostic"].casefold() == "electron cyclotron emission (ece)")
 
 
 
