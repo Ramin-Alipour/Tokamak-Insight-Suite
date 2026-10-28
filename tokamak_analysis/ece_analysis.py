@@ -356,6 +356,8 @@ def reconstruct_ece_temperature_profile(
             raise ValueError("optical_depth_uncertainty requires optical_depth to be supplied.")
     if tau is None and tau_sigma is not None:
         raise ValueError("optical_depth_uncertainty requires optical_depth to be supplied.")
+    if tau is None and background_temperature_uncertainty_eV > 0:
+        raise ValueError("background_temperature_uncertainty_eV is only used when optical_depth is supplied.")
 
     dt = np.diff(t)
     if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
