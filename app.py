@@ -34,7 +34,7 @@ from tis.core import (load_table, signal_quality, sha256_bytes,
     prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
     fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
     uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, doppler_temperature_from_fwhm_eV, probe_iv_summary,
-    linear_phase_density, langmuir_iv_analysis, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
+    linear_phase_density, langmuir_iv_analysis, suggest_langmuir_fit_windows, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
@@ -1389,7 +1389,27 @@ elif page=='Probe Analysis':
         st.stop()
     vmin=float(np.min(paired_voltage)); vmax=float(np.max(paired_voltage))
     st.markdown('### Fit-window and probe geometry')
-    st.caption('Fit windows are experiment-specific and are not inferred automatically. Enable each fit only after selecting a physically justified interval from the measured I–V curve. Default analysis reports descriptive quantities only.')
+    st.caption('Fit-window suggestions scan the measured I–V curve for candidate electron-exponential and low-voltage ion-tail intervals. They do not validate physical regimes; inspect the curve, saturation regions and residuals.')
+    if st.button('Suggest I–V fit windows', key='probe_suggest_fit_windows'):
+        try:
+            suggestions=suggest_langmuir_fit_windows(df[vcol],df[icol],current_convention=st.session_state.get('probe_current_convention','electron_positive'))
+            st.session_state['probe_fit_window_suggestions']=suggestions
+            electron_candidate=suggestions.get('electron_fit_range_V')
+            ion_candidate=suggestions.get('ion_fit_range_candidate_V')
+            if electron_candidate is not None:
+                st.session_state['probe_electron_fit_range']=electron_candidate
+                st.session_state['probe_enable_electron_fit']=True
+            if ion_candidate is not None:
+                st.session_state['probe_ion_fit_range']=ion_candidate
+                st.session_state['probe_enable_ion_fit']=True
+        except Exception as exc:
+            st.session_state['probe_fit_window_suggestions']={'error':str(exc)}
+    suggestions=st.session_state.get('probe_fit_window_suggestions')
+    if suggestions:
+        if suggestions.get('error'):
+            st.warning('Fit-window suggestion failed: '+str(suggestions['error']))
+        else:
+            st.info('Suggested electron window: '+str(suggestions.get('electron_fit_range_V'))+' V; log-fit R²: '+str(suggestions.get('electron_candidate_log_R2'))+'; '+str(suggestions.get('electron_candidate_status'))+'. Ion window: '+str(suggestions.get('ion_fit_range_candidate_V'))+' V ('+str(suggestions.get('ion_candidate_status'))+'). Review both intervals against the measured curve before accepting them.')
     efit=None
     if st.checkbox('Enable electron-retarding exponential fit (Te)',value=False,key='probe_enable_electron_fit'):
         if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin>=vmax:
@@ -1443,7 +1463,7 @@ elif page=='Probe Analysis':
             plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V')
             json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
-    st.warning('All supplied voltage/current inputs are treated as already calibrated; this workflow performs no calibration. Default output is descriptive. Te requires an explicitly selected electron-retarding fit window; density additionally requires a selected ion branch, collection area, ion mass, and valid Te. Review fit residuals, sweep polarity, saturation regions, magnetic-field effects, and probe/sheath assumptions before interpreting estimates.')
+    st.warning('All supplied voltage/current inputs are treated as already calibrated; this workflow performs no calibration. Default output is descriptive. Suggested intervals are not physical validation. Te is fitted only after a candidate/selected electron branch is reviewed; density additionally requires a physically justified ion branch, collection area, ion mass, and valid Te. Review fit residuals, sweep polarity, saturation regions, magnetic-field effects, and probe/sheath assumptions before interpreting estimates.')
 
 elif page=='Plasma Parameters':
     st.title('Plasma Parameters & Diagnostic Conversions')
