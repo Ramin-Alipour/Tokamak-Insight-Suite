@@ -348,7 +348,8 @@ def reconstruct_ece_temperature_profile(
     major_radius_uncertainty_m=0.0, B_axis_uncertainty_T=0.0,
     include_time_resolved_profile=False, profile_method="pchip",
     equilibrium_radius_m=None, equilibrium_toroidal_field_T=None,
-    radius_mapping_uncertainty_m=None, channel_covariance_eV2=None,
+    channel_resonance_radius_m=None, radius_mapping_uncertainty_m=None,
+    channel_covariance_eV2=None,
     temporal_correlation_adjustment=True, electron_energy_eV=None,
     parallel_beta=0.0, model_discrepancy_fraction=0.0,
 ):
@@ -407,6 +408,12 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("temporal_correlation_adjustment must be boolean.")
     if (equilibrium_radius_m is None) != (equilibrium_toroidal_field_T is None):
         raise ValueError("equilibrium_radius_m and equilibrium_toroidal_field_T must be supplied together.")
+    if channel_resonance_radius_m is not None:
+        explicit_radius = np.asarray(channel_resonance_radius_m, dtype=float)
+        if explicit_radius.shape != f.shape or np.any(~np.isfinite(explicit_radius)) or np.any(explicit_radius <= 0):
+            raise ValueError("channel_resonance_radius_m must contain one finite positive radius per frequency channel.")
+    else:
+        explicit_radius = None
     if equilibrium_radius_m is not None:
         eq_r = np.asarray(equilibrium_radius_m, dtype=float)
         eq_b = np.asarray(equilibrium_toroidal_field_T, dtype=float)
@@ -561,7 +568,10 @@ def reconstruct_ece_temperature_profile(
     b_res = (resonance_field_T(f, harmonic) if electron_energy_eV is None else
              resonance_field_relativistic_T(f, harmonic, electron_energy_eV=electron_energy_eV,
                                             parallel_beta=parallel_beta))
-    if eq_r is None:
+    if explicit_radius is not None:
+        radius = explicit_radius.copy()
+        mapping_model = "user-supplied channel resonance locations; use only if derived from a validated equilibrium/line-of-sight model"
+    elif eq_r is None:
         radius = float(major_radius_m) * float(B_axis_T) / b_res
         mapping_model = "simplified circular toroidal field B(R)=B_axis*R_axis/R"
     else:
@@ -572,7 +582,9 @@ def reconstruct_ece_temperature_profile(
         radius = np.interp(b_res, eq_b if eq_b[0] < eq_b[-1] else eq_b[::-1],
                            eq_r if eq_b[0] < eq_b[-1] else eq_r[::-1])
         mapping_model = "user-supplied monotonic equilibrium B_phi(R) table; not a full ray-tracing/flux-coordinate solution"
-    if eq_r is None:
+    if explicit_radius is not None:
+        radius_sigma = np.zeros_like(radius)
+    elif eq_r is None:
         radius_sigma = np.abs(radius) * np.sqrt(
             (float(major_radius_uncertainty_m) / float(major_radius_m))**2
             + (float(B_axis_uncertainty_T) / float(B_axis_T))**2
@@ -586,7 +598,7 @@ def reconstruct_ece_temperature_profile(
         sigma_b_from_frequency = b_res * ((np.zeros_like(f) if frequency_sigma is None else frequency_sigma) / f)
         radius_sigma = np.abs(local_dr_db * sigma_b_from_frequency)
     bandwidth_radius_lower = bandwidth_radius_upper = None
-    if bandwidth is not None:
+    if bandwidth is not None and explicit_radius is None:
         if electron_energy_eV is None:
             b_low_frequency = resonance_field_T(f - bandwidth / 2.0, harmonic)
             b_high_frequency = resonance_field_T(f + bandwidth / 2.0, harmonic)
