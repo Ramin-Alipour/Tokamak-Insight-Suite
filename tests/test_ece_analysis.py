@@ -213,3 +213,45 @@ def test_ece_profile_requires_calibration_conversion_and_temperature_basis():
             major_radius_m=1.0, B_axis_T=2.0, assume_optically_thick=True
         )
 
+
+
+
+def test_ece_profile_uses_explicit_time_window_instead_of_whole_shot_average():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    early = np.tile([1.0, 2.0, 3.0], (4, 1))
+    late = np.tile([100.0, 200.0, 300.0], (4, 1))
+    signal = np.vstack([early, late])
+    result = reconstruct_ece_temperature_profile(
+        frequencies, signal, time_s, 1.0, 0.0,
+        major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
+        assume_optically_thick=True, time_window_s=(0.0, 3.0),
+    )
+    np.testing.assert_allclose(result["mean_raw_signal"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(result["electron_temperature_channel_eV"], [1.0, 2.0, 3.0])
+    assert result["selected_sample_count"] == 4
+    assert result["selected_time_window_s"] == [0.0, 3.0]
+
+
+def test_ece_profile_rejects_invalid_or_out_of_range_time_window():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    signal = np.ones((8, 3))
+    kwargs = dict(
+        major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
+        assume_optically_thick=True,
+    )
+    with pytest.raises(ValueError, match="time_window_s"):
+        reconstruct_ece_temperature_profile(
+            frequencies, signal, time_s, 1.0, 0.0,
+            time_window_s=(5.0, 2.0), **kwargs,
+        )
+    with pytest.raises(ValueError, match="within the supplied time_s range"):
+        reconstruct_ece_temperature_profile(
+            frequencies, signal, time_s, 1.0, 0.0,
+            time_window_s=(-1.0, 2.0), **kwargs,
+        )
