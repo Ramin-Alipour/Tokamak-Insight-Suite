@@ -150,3 +150,33 @@ def test_thomson_calibrated_spectrum_dashboard_estimates_temperature_and_density
     assert float(temperature_metric.value.split()[0]) == pytest.approx(0.01, rel=0.05)
     assert float(density_metric.value.split()[0]) > 0.0
     assert float(power_metric.value.split()[0]) > 0.0
+
+
+
+def test_thomson_spatial_profile_reconstruction_dashboard_executes_and_exports():
+    radius = np.linspace(0.0, 0.4, 9)
+    frame = pd.DataFrame({
+        "radius_m": radius,
+        "density_m3": 2.0e19 * (1.0 - 0.5 * radius),
+        "temperature_eV": 120.0 * (1.0 - 0.25 * radius),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
+        "Thomson spatial profile reconstruction"
+    ).run()
+
+    selectors = {item.label: item for item in app.selectbox}
+    selectors["Measurement radius (m)"].set_value("radius_m")
+    selectors["Calibrated electron density (m⁻³)"].set_value("density_m3")
+    selectors["Calibrated electron temperature (eV)"].set_value("temperature_eV")
+    selectors["Reconstruction method"].set_value("Shape-preserving PCHIP")
+    app.run()
+    next(item for item in app.button if item.label == "Reconstruct Thomson profiles").click().run()
+
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any(
+        "Spatial Thomson profile reconstruction completed" in str(item.value)
+        for item in app.success
+    )
+    assert any(item.label == "Download reconstructed Thomson profiles (CSV)" for item in app.get("download_button"))
+    assert any(item.label == "Export reconstruction, method and limitations (JSON)" for item in app.get("download_button"))
