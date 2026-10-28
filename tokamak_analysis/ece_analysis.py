@@ -433,7 +433,7 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                         "coherence": coh,
                         "cross_phase_rad": phase,
                         "estimated_relative_delay_s": delay_s,
-                        "delay_estimation_note": "Phase-slope estimate over bins with coherence >= 0.5; not a hardware synchronization calibration.",
+                        "delay_estimation_note": "Phase-slope estimate over the longest contiguous frequency run with coherence >= 0.5; approximate only, not hardware synchronization calibration.",
                     })
             out["cross_channel_spectra"] = pair_rows
             out["cross_channel_spectra_note"] = "Cross-spectra/coherence are signal statistics, not automatic MHD-mode identification; channel timing/phase response must be independently known."
