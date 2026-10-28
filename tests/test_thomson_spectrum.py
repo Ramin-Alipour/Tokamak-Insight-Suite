@@ -201,3 +201,24 @@ def test_raw_thomson_spectrum_requires_boolean_power_calibration_flag():
             instrument_sigma_nm=0.05,
             spectral_power_density_calibrated="yes",
         )
+
+def test_thomson_density_propagates_scattering_angle_uncertainty():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    angle = np.pi / 3.0
+    angle_sigma = 2.0e-3
+    result = density_from_thomson_scattered_power(
+        scattered_power_W=1.0e-10,
+        incident_power_W=2.0,
+        interaction_length_m=0.15,
+        scattering_angle_rad=angle,
+        collection_solid_angle_sr=1.0e-3,
+        optical_efficiency=0.7,
+        scattering_angle_uncertainty_rad=angle_sigma,
+    )
+    density = float(np.asarray(result["electron_density_m3"]).item())
+    actual_sigma = float(np.asarray(result["electron_density_uncertainty_m3"]).item())
+    relative_sensitivity = 2.0 * np.cos(angle) * np.sin(angle) / (1.0 + np.cos(angle) ** 2)
+    expected_sigma = density * abs(relative_sensitivity) * angle_sigma
+    assert actual_sigma == pytest.approx(expected_sigma, rel=1e-12)
+    assert actual_sigma > 0
