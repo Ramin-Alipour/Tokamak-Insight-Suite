@@ -4,16 +4,17 @@
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "D",
-    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature. User-defined spectral models can be registered in Python for experiment-specific fitting without modifying the built-in model.",
+    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature. User-defined spectral models can be registered in Python for experiment-specific fitting without modifying the built-in model. Spatially resolved calibrated measurements can also be reconstructed onto a denser radial grid using PCHIP or smoothing splines; negative spline overshoot is clipped to zero and no extrapolation is performed.",
     "caveat": "Raw-spectrum fitting is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. Density is never inferred from uncalibrated spectral amplitude; calibrated profile, calibrated single-band power-density, and combined spectrum-to-temperature/density workflows are separate explicit modes. A generic custom-model registry supports user-provided fitting functions, but physical interpretation and validation remain the model author's responsibility.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power",
       "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
-      "tokamak_analysis.thomson_models.fit_custom_spectral_model"
+      "tokamak_analysis.thomson_models.fit_custom_spectral_model",
+      "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Complete within the declared software scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, combined spectrum-to-temperature/density workflow, and user-defined spectral-model fitting are implemented. Independent experimental validation and device-specific calibration are important user responsibilities but are not software-completion gates; unsupported physics models remain explicitly out of scope.",
+    "implementation_status": "Complete within the declared software scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, combined spectrum-to-temperature/density workflow, user-defined spectral-model fitting, and spatial profile reconstruction are implemented. Independent experimental validation and device-specific calibration remain user responsibilities; unsupported physics models remain explicitly out of scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -387,6 +388,24 @@
             "custom_model_fit_quality"
           ],
           "scope": "Fits a user-registered callable model; parameter meanings and physical validity remain the model author's responsibility."
+        },
+        {
+          "name": "spatial_profile_reconstruction",
+          "function": "thomson_scattering.reconstruct_thomson_profile",
+          "inputs": [
+            "radius_m (m)",
+            "density_m3 (m^-3; calibrated)",
+            "temperature_ev (eV; calibrated)",
+            "optional pointwise 1-sigma uncertainties",
+            "method: smoothing_spline or pchip",
+            "smoothing_factor and output grid size"
+          ],
+          "outputs": [
+            "reconstructed density and temperature profiles within measured radius range",
+            "radial gradients",
+            "method metadata and limitations"
+          ],
+          "scope": "Fits already-calibrated spatial measurements only. No extrapolation, raw-data calibration, fit confidence intervals, equilibrium reconstruction or transport inversion. Negative spline overshoot is clipped to zero; zero uncertainties are not accepted as spline weights but are accepted by PCHIP."
         }
       ],
       "test_links": [
@@ -2774,33 +2793,97 @@
     "status": "D/I",
     "method": "Axisymmetric path integration of calibrated B_R and B_Z grids using dψ/dR=R B_Z and dψ/dZ=-R B_R.",
     "caveat": "Requires calibrated field grids and a reference-flux gauge; not an EFIT/Grad-Shafranov equilibrium solver.",
-    "implementation_functions": ["tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"],
+    "implementation_functions": [
+      "tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"
+    ],
     "implementation_status": "Complete within declared software scope: calibrated-field grid validation, relative flux reconstruction, gauge setting, and derivative-consistency diagnostics.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
       "completeness": "complete_with_declared_scope",
       "input_specs": [
-        {"name":"R_m","unit":"m","description":"Positive, strictly increasing major-radius coordinate.","required":true},
-        {"name":"Z_m","unit":"m","description":"Strictly increasing vertical coordinate.","required":true},
-        {"name":"B_R_T","unit":"T","description":"Calibrated radial field grid, shape (len(Z_m),len(R_m)).","required":true},
-        {"name":"B_Z_T","unit":"T","description":"Calibrated vertical field grid, shape (len(Z_m),len(R_m)).","required":true},
-        {"name":"initial_flux_Wb","unit":"Wb","description":"Optional finite reference flux.","required":false},
-        {"name":"reference_index","unit":"index pair","description":"Optional (Z index,R index) gauge location.","required":false}
+        {
+          "name": "R_m",
+          "unit": "m",
+          "description": "Positive, strictly increasing major-radius coordinate.",
+          "required": true
+        },
+        {
+          "name": "Z_m",
+          "unit": "m",
+          "description": "Strictly increasing vertical coordinate.",
+          "required": true
+        },
+        {
+          "name": "B_R_T",
+          "unit": "T",
+          "description": "Calibrated radial field grid, shape (len(Z_m),len(R_m)).",
+          "required": true
+        },
+        {
+          "name": "B_Z_T",
+          "unit": "T",
+          "description": "Calibrated vertical field grid, shape (len(Z_m),len(R_m)).",
+          "required": true
+        },
+        {
+          "name": "initial_flux_Wb",
+          "unit": "Wb",
+          "description": "Optional finite reference flux.",
+          "required": false
+        },
+        {
+          "name": "reference_index",
+          "unit": "index pair",
+          "description": "Optional (Z index,R index) gauge location.",
+          "required": false
+        }
       ],
       "output_specs": [
-        {"name":"poloidal_flux_Wb","unit":"Wb","description":"Reconstructed poloidal flux map."},
-        {"name":"poloidal_flux_change_Wb","unit":"Wb","description":"Flux relative to the supplied gauge."},
-        {"name":"consistency_residual_R_Wb_m","unit":"Wb m^-1","description":"Residual for dψ/dR=R B_Z."},
-        {"name":"consistency_residual_Z_Wb_m","unit":"Wb m^-1","description":"Residual for dψ/dZ=-R B_R."},
-        {"name":"diagnostics","unit":"structured","description":"Flux range and derivative-residual summary."}
+        {
+          "name": "poloidal_flux_Wb",
+          "unit": "Wb",
+          "description": "Reconstructed poloidal flux map."
+        },
+        {
+          "name": "poloidal_flux_change_Wb",
+          "unit": "Wb",
+          "description": "Flux relative to the supplied gauge."
+        },
+        {
+          "name": "consistency_residual_R_Wb_m",
+          "unit": "Wb m^-1",
+          "description": "Residual for dψ/dR=R B_Z."
+        },
+        {
+          "name": "consistency_residual_Z_Wb_m",
+          "unit": "Wb m^-1",
+          "description": "Residual for dψ/dZ=-R B_R."
+        },
+        {
+          "name": "diagnostics",
+          "unit": "structured",
+          "description": "Flux range and derivative-residual summary."
+        }
       ],
-      "assumptions": ["Axisymmetric cylindrical (R,Z) coordinates.","Input magnetic fields are calibrated in tesla.","Absolute flux requires an independent reference condition."],
-      "preprocessing": ["Validate finite arrays, positive/increasing R, increasing Z, field-grid dimensions, and reference index."],
+      "assumptions": [
+        "Axisymmetric cylindrical (R,Z) coordinates.",
+        "Input magnetic fields are calibrated in tesla.",
+        "Absolute flux requires an independent reference condition."
+      ],
+      "preprocessing": [
+        "Validate finite arrays, positive/increasing R, increasing Z, field-grid dimensions, and reference index."
+      ],
       "algorithm": "Trapezoidal path integration of dψ/dR=R B_Z and dψ/dZ=-R B_R.",
       "uncertainty_model": "No uncertainty propagation; measurement uncertainties are not input. Derivative residuals are diagnostics, not uncertainty estimates.",
-      "limitations": ["Not an EFIT/Grad-Shafranov solver.","Does not infer plasma current, pressure profiles, or separatrix.","No instrument calibration; path integration may be path-dependent for inconsistent fields."],
-      "function_links": ["tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"],
+      "limitations": [
+        "Not an EFIT/Grad-Shafranov solver.",
+        "Does not infer plasma current, pressure profiles, or separatrix.",
+        "No instrument calibration; path integration may be path-dependent for inconsistent fields."
+      ],
+      "function_links": [
+        "tokamak_analysis.poloidal_flux.reconstruct_poloidal_flux"
+      ],
       "raw_data_to_physics": true,
       "note": "Complete only for calibrated axisymmetric B_R/B_Z grid integration within the stated limitations."
     }
