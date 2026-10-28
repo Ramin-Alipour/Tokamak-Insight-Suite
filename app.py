@@ -1908,7 +1908,7 @@ elif page=='Plasma Parameters':
                     ece_bg_sigma=st.number_input('Background-temperature 1-sigma uncertainty (eV)',min_value=0.0,value=0.0,key='ece_profile_bg_sigma')
                     ece_r0_sigma=st.number_input('Reference-radius 1-sigma uncertainty (m)',min_value=0.0,value=0.0,key='ece_profile_r0_sigma')
                     ece_b0_sigma=st.number_input('Reference-field 1-sigma uncertainty (T)',min_value=0.0,value=0.0,key='ece_profile_b0_sigma')
-                    ece_covariance_text=st.text_area('Optional Tb channel covariance matrix (eV²; rows separated by semicolons)',key='ece_profile_covariance')
+                    ece_covariance_text=st.text_area('Optional covariance matrix of time-window-mean Tb channels (eV²; rows separated by semicolons)',key='ece_profile_covariance')
                     ece_time_resolved=st.checkbox('Also return time-resolved Te(R,t) and uncertainty estimates',value=False,key='ece_profile_time_resolved')
                     ece_time_values=pd.to_numeric(df[ece_time_col],errors='coerce').dropna()
                     if ece_time_values.empty:
