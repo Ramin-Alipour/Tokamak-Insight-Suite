@@ -1845,6 +1845,11 @@ elif page=='Plasma Parameters':
                             cross_frame.index.name='Frequency (Hz)'
                             st.line_chart(cross_frame)
                             st.caption(result['cross_channel_spectra_note'])
+                            st.caption(f"Estimated relative delay: {pair['estimated_relative_delay_s']} s. This phase-slope estimate is not hardware synchronization calibration.")
+                        if result.get('spectral_peak_candidates'):
+                            st.markdown('**Candidate spectral peaks (not automatic MHD-mode identification)**')
+                            st.dataframe(pd.DataFrame(result['spectral_peak_candidates']),use_container_width=True,hide_index=True)
+                            st.caption(result['spectral_peak_note'])
                         if 'above_noise_rms' in result:
                             st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),use_container_width=True,hide_index=True)
                         st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','welch_psd','welch_psd_frequency_Hz','time_s'}})
