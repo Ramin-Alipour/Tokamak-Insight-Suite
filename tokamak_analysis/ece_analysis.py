@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
-from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence, find_peaks
+from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence, find_peaks, fftconvolve
 from scipy.interpolate import PchipInterpolator
 from scipy.integrate import trapezoid
 from scipy.stats import chi2
@@ -610,7 +610,7 @@ def reconstruct_ece_temperature_profile(
             energy = float(np.dot(centered, centered))
             if energy <= np.finfo(float).tiny:
                 continue
-            acf = np.correlate(centered, centered, mode="full")[centered.size - 1:] / energy
+            acf = fftconvolve(centered, centered[::-1], mode="full")[centered.size - 1:] / energy
             positive = acf[1:]
             cutoff = np.flatnonzero(positive <= 0)
             stop = int(cutoff[0]) if cutoff.size else positive.size
