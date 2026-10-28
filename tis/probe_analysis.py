@@ -302,6 +302,14 @@ def suggest_langmuir_fit_windows(
     if len(unique_v) != len(v):
         sums, counts = np.bincount(inverse, weights=i), np.bincount(inverse)
         v, i = unique_v, sums / counts
+    # Bound the quadratic window scan for long acquisitions. Suggestions are
+    # based on an evenly spaced subset; the final nonlinear fit still uses the
+    # complete user-selected interval and all available samples.
+    original_unique_count = int(len(v))
+    suggestion_sampled = original_unique_count > 250
+    if suggestion_sampled:
+        sample_indices = np.linspace(0, original_unique_count - 1, 250, dtype=int)
+        v, i = v[sample_indices], i[sample_indices]
     n = len(v)
     tail_n = max(3, int(math.ceil(0.1 * n)))
     ion_tail = float(np.median(i[:tail_n]))
@@ -347,6 +355,9 @@ def suggest_langmuir_fit_windows(
         "ion_candidate_status": "low_voltage_tail_candidate_only_not_verified_ion_saturation",
         "ion_baseline_tail_median_A": ion_tail,
         "current_convention_normalized": "electron_positive",
+        "suggestion_sampled": suggestion_sampled,
+        "suggestion_input_unique_voltage_count": original_unique_count,
+        "suggestion_points_scanned": int(n),
         "warning": "Automated ranges are suggestions, not proof of a physical regime. Inspect the I-V curve and fit residuals; density remains a model-dependent estimate.",
     }
 
