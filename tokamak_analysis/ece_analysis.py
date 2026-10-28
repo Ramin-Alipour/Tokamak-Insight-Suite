@@ -183,3 +183,126 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             out["noise_std"] = n
             out["above_noise_rms"] = out["fluctuation_rms"] > n
     return out
+
+def reconstruct_ece_temperature_profile(
+    frequency_Hz, signal, time_s,
+    signal_to_brightness_temperature_eV_gain,
+    signal_to_brightness_temperature_eV_offset, *,
+    major_radius_m, B_axis_T, harmonic=2, optical_depth=None,
+    background_temperature_eV=0.0, assume_optically_thick=False,
+    profile_radius_m=None,
+):
+    """Estimate a radial Te profile using user-supplied signal conversion.
+
+    No detector calibration is performed here. The user supplies the linear
+    conversion Tb[eV] = gain * signal + offset for every channel.
+    Resonance radii use only the simplified B_phi(R)=B_axis*R_axis/R model.
+
+    If optical_depth is supplied, Te is inferred from the single-slab LTE
+    relation Tb = Te*(1-exp(-tau)) + Tbg*exp(-tau). Otherwise the user must
+    explicitly assert optically thick emission, in which case Te ~= Tb.
+    The radial profile is linearly interpolated between channel locations;
+    there is no extrapolation, EFIT mapping, ray tracing or bandwidth inversion.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    t = np.asarray(time_s, dtype=float)
+    y = np.asarray(signal, dtype=float)
+    gain = np.asarray(signal_to_brightness_temperature_eV_gain, dtype=float)
+    offset = np.asarray(signal_to_brightness_temperature_eV_offset, dtype=float)
+
+    if f.ndim != 1 or f.size < 3 or np.any(~np.isfinite(f)) or np.any(f <= 0) or np.any(np.diff(f) <= 0):
+        raise ValueError("frequency_Hz must contain at least 3 finite, positive, strictly increasing channels.")
+    if t.ndim != 1 or t.size < 3 or np.any(~np.isfinite(t)) or np.any(np.diff(t) <= 0):
+        raise ValueError("time_s must contain at least 3 finite, strictly increasing samples.")
+    if y.shape != (t.size, f.size) or np.any(~np.isfinite(y)):
+        raise ValueError("signal must be a finite (time samples, channels) matrix matching time_s and frequency_Hz.")
+    if gain.ndim == 0:
+        gain = np.full(f.shape, float(gain))
+    if offset.ndim == 0:
+        offset = np.full(f.shape, float(offset))
+    if gain.shape != f.shape or np.any(~np.isfinite(gain)) or np.any(gain <= 0):
+        raise ValueError("signal-to-brightness-temperature gain must be finite, positive, and scalar or one per channel.")
+    if offset.shape != f.shape or np.any(~np.isfinite(offset)):
+        raise ValueError("signal-to-brightness-temperature offset must be finite and scalar or one per channel.")
+    if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
+        raise ValueError("harmonic must be a positive integer.")
+    if not np.isfinite(major_radius_m) or major_radius_m <= 0 or not np.isfinite(B_axis_T) or B_axis_T <= 0:
+        raise ValueError("major_radius_m and B_axis_T must be finite and positive.")
+    if not np.isfinite(background_temperature_eV) or background_temperature_eV < 0:
+        raise ValueError("background_temperature_eV must be finite and non-negative.")
+
+    if optical_depth is None:
+        if not assume_optically_thick:
+            raise ValueError("Supply optical_depth per channel or explicitly assert assume_optically_thick=True.")
+        tau = None
+    else:
+        tau = np.asarray(optical_depth, dtype=float)
+        if tau.ndim == 0:
+            tau = np.full(f.shape, float(tau))
+        if tau.shape != f.shape or np.any(~np.isfinite(tau)) or np.any(tau <= 0):
+            raise ValueError("optical_depth must be finite, positive, and scalar or one value per channel.")
+
+    dt = np.diff(t)
+    if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
+        raise ValueError("time_s must be approximately uniformly sampled; inspect or explicitly resample acquisition data.")
+
+    mean_signal = np.mean(y, axis=0)
+    tb_eV = gain * mean_signal + offset
+    if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
+        raise ValueError("Supplied signal conversion produced negative or non-finite brightness temperature.")
+    if tau is None:
+        te_eV = tb_eV.copy()
+        inference = "Tb approximates Te under the user-declared optically thick assumption."
+    else:
+        emissivity = -np.expm1(-tau)
+        te_eV = (tb_eV - background_temperature_eV * np.exp(-tau)) / emissivity
+        if np.any(~np.isfinite(te_eV)) or np.any(te_eV < 0):
+            raise ValueError("Optical-depth inversion produced non-physical Te; check calibration, background and optical depth.")
+        inference = "Single-slab LTE inversion using user-supplied optical depth and background temperature."
+
+    b_res = resonance_field_T(f, harmonic)
+    radius = float(major_radius_m) * float(B_axis_T) / b_res
+    order = np.argsort(radius)
+    r_sorted = radius[order]
+    te_sorted = te_eV[order]
+    if np.any(np.diff(r_sorted) <= 0):
+        raise ValueError("Resonance radii must be distinct to reconstruct a profile.")
+    if profile_radius_m is None:
+        r_profile = np.linspace(float(r_sorted[0]), float(r_sorted[-1]), 100)
+    else:
+        r_profile = np.asarray(profile_radius_m, dtype=float)
+        if r_profile.ndim != 1 or r_profile.size < 2 or np.any(~np.isfinite(r_profile)):
+            raise ValueError("profile_radius_m must be a finite 1-D grid with at least 2 points.")
+        if np.any(np.diff(r_profile) <= 0) or r_profile[0] < r_sorted[0] or r_profile[-1] > r_sorted[-1]:
+            raise ValueError("profile_radius_m must be strictly increasing and remain within the measured resonance-radius range.")
+
+    return {
+        "frequency_Hz": f,
+        "harmonic": int(harmonic),
+        "mean_raw_signal": mean_signal,
+        "signal_to_brightness_temperature_eV_gain": gain,
+        "signal_to_brightness_temperature_eV_offset": offset,
+        "brightness_temperature_eV": tb_eV,
+        "electron_temperature_channel_eV": te_eV,
+        "resonance_field_T": b_res,
+        "resonance_radius_m": radius,
+        "profile_radius_m": r_profile,
+        "electron_temperature_profile_eV": np.interp(r_profile, r_sorted, te_sorted),
+        "inference_basis": inference,
+        "profile_method": "linear interpolation between channel resonance locations; no extrapolation",
+        "equilibrium_model": "simplified circular toroidal field B(R)=B_axis*R_axis/R",
+        "assumptions": [
+            "user-supplied linear signal-to-brightness-temperature conversion is valid",
+            "non-relativistic cold resonance mapping",
+            "channel center frequencies represent channel response",
+            "profile is inferred only between measured channel resonance locations",
+        ],
+        "limitations": [
+            "not EFIT equilibrium or ray tracing",
+            "no relativistic or Doppler correction",
+            "no finite-bandwidth convolution or regularized inverse problem",
+            "no uncertainty propagation",
+            "temperature inference depends on user-supplied optical depth or optically thick assertion",
+        ],
+    }
+
