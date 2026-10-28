@@ -48,3 +48,15 @@ jobs:
               raise SystemExit(f"ECE dashboard integration missing: {missing}")
           print("ECE dashboard integration and calibrated-input policy are present.")
           PY
+
+      - name: Smoke-test live Streamlit dashboard startup
+        run: |
+          python - <<'PY'
+          from streamlit.testing.v1 import AppTest
+
+          app = AppTest.from_file("app.py", default_timeout=30).run()
+          if app.exception:
+              details = "\\n".join(str(item.message) for item in app.exception)
+              raise SystemExit(f"Dashboard raised an exception: {details}")
+          print(f"Dashboard started without uncaught exceptions; rendered {len(app.get('button'))} buttons.")
+          PY
