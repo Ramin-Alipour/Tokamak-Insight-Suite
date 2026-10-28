@@ -85,7 +85,11 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
     signal may be a (time, channel) fluctuation matrix. Temperature inference
     requires calibrated spectral radiance and is reported as brightness
     temperature; interpreting it as Te requires optical thickness/thermalization.
+    Fluctuation mode returns a full-record periodogram and Welch PSD with
+    approximate confidence bounds; a supplied noise RMS yields a white-noise
+    PSD reference only, never automatic noise subtraction.
     """
+
     f = np.asarray(frequency_Hz, dtype=float)
     if f.ndim != 1 or f.size == 0 or np.any(~np.isfinite(f)) or np.any(f <= 0):
         raise ValueError("frequency_Hz must be a non-empty finite positive 1-D array.")
@@ -148,7 +152,9 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 raise ValueError("optical_depth must be a scalar or one value per frequency channel.")
             out["optical_depth"] = tau
             out["optical_depth_warning"] = "Tau alone does not establish thermalization or calibration validity."
-            out["optical_depth_inversion_sensitivity_dTe_dTb"] = 1.0 / (-np.expm1(-tau))
+            out["optical_depth_inversion_sensitivity_dTe_dTb"] = (
+                None if np.any(tau <= 0) else 1.0 / (-np.expm1(-tau))
+            )
             out["optical_depth_condition_warning"] = bool(np.any(tau < 1e-3))
             if out["optical_depth_condition_warning"]:
                 out["optical_depth_condition_message"] = (
@@ -268,8 +274,12 @@ def reconstruct_ece_temperature_profile(
     relation Tb = Te*(1-exp(-tau)) + Tbg*exp(-tau). Otherwise the user must
     explicitly assert optically thick emission, in which case Te ~= Tb.
     The radial profile is linearly interpolated between channel locations;
-    there is no extrapolation, EFIT mapping, ray tracing or bandwidth inversion.
+    there is no extrapolation, EFIT mapping, ray tracing or receiver-response
+    convolution. Optional independent uncertainties are propagated to first
+    order, finite bandwidth is represented by a radial localization envelope,
+    and time-resolved profiles can be returned on request.
     """
+
     f = np.asarray(frequency_Hz, dtype=float)
     t = np.asarray(time_s, dtype=float)
     y = np.asarray(calibrated_brightness_temperature_eV, dtype=float)
