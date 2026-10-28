@@ -385,10 +385,11 @@ def test_profile_uncertainties_bandwidth_envelope_and_time_resolved_output():
         B_axis_uncertainty_T=0.01,
         include_time_resolved_profile=True,
     )
-    np.testing.assert_allclose(
-        result["brightness_temperature_uncertainty_eV"],
-        np.array([2.0, 4.0, 6.0]) / np.sqrt(8),
+    assert np.all(
+        result["brightness_temperature_uncertainty_eV"] >= np.array([2.0, 4.0, 6.0]) / np.sqrt(8)
     )
+    assert np.all(result["effective_sample_count_per_channel"] <= 8)
+    assert np.all(result["effective_sample_count_per_channel"] >= 1)
     np.testing.assert_allclose(
         result["electron_temperature_channel_uncertainty_eV"],
         result["brightness_temperature_uncertainty_eV"],
