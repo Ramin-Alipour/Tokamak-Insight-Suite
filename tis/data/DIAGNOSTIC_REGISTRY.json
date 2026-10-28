@@ -810,7 +810,7 @@
     "diagnostic": "Electron Cyclotron Emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness temperature, inferred radial electron-temperature profile under declared assumptions, channel fluctuations and spectra",
     "status": "D",
-    "method": "Validated ECE workflow: non-relativistic harmonic resonance field; optional simplified circular-toroidal-field resonance mapping; calibrated spectral-radiance to Rayleigh–Jeans brightness temperature; multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata. Added radial Te estimate from user-supplied per-channel signal-to-brightness-temperature coefficients, optical-depth inversion or explicit optically-thick assumption, and interpolation between approximate resonance locations.",
+    "method": "ECE analysis pipeline: non-relativistic harmonic resonance mapping, optional approximate circular-field radius mapping, Rayleigh–Jeans brightness temperature from already-calibrated spectral radiance, multichannel fluctuation RMS and one-sided FFT PSD, and separate radial Te profile reconstruction from already-calibrated brightness-temperature samples under explicit optical-depth assumptions.",
     "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Accurate channel-to-flux-surface mapping requires equilibrium reconstruction and ray tracing; account for relativistic/Doppler shifts, harmonics, polarization/mode, optical depth, calibration, bandwidth, IF response, and nonthermal populations. Simplified circular B(R) mapping is explicitly approximate.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
@@ -820,7 +820,7 @@
       "tokamak_analysis.ece_analysis.brightness_temperature_eV",
       "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within declared software scope: validated cold-resonance field calculation, optional simplified circular toroidal-field major-radius mapping, calibrated Rayleigh–Jeans brightness temperature, multichannel fluctuation RMS/one-sided FFT PSD, and a radial Te profile estimate using user-supplied signal conversion and explicit optical-depth/optically-thick assumptions. Dashboard provides numerical tables, plots, JSON exports, and input validation. The profile uses approximate resonance radii and interpolation only; no detector calibration, EFIT/ray tracing, full radiative-transfer inversion, uncertainty propagation, or independent experimental validation is claimed.",
+    "implementation_status": "Complete within declared software scope: callable analysis and dashboard workflows for resonance field, approximate radius mapping, brightness temperature from calibrated radiance, channel fluctuation RMS/PSD with sampling metadata, and time-windowed radial Te profile reconstruction from already-calibrated brightness temperature. No detector calibration is performed. Profile localization is approximate and interpolation-only; no EFIT/ray tracing, relativistic/Doppler correction, full radiative-transfer inversion, or profile uncertainty propagation is claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -843,7 +843,7 @@
         {
           "name": "mode",
           "unit": "text",
-          "description": "brightness_temperature, channel_fluctuations, resonance_mapping, or temperature_profile_reconstruction.",
+          "description": "brightness_temperature, channel_fluctuations, or resonance_mapping. Temperature-profile reconstruction is a separate workflow using reconstruct_ece_temperature_profile.",
           "required": true
         },
         {
@@ -862,7 +862,7 @@
         {
           "name": "signal",
           "unit": "calibrated channel units",
-          "description": "Finite matrix shaped (time samples, frequency channels); required for fluctuation mode.",
+          "description": "Finite matrix shaped (time samples, frequency channels); used for calibrated channel fluctuation analysis. The separate profile function consumes already-calibrated brightness-temperature samples.",
           "required": false
         },
         {
@@ -916,7 +916,7 @@
         {
           "name": "calibrated_brightness_temperature_eV",
           "unit": "eV",
-          "description": "Already-calibrated brightness-temperature samples in eV, arranged as time by channel; required only for temperature-profile reconstruction.",
+          "description": "Already-calibrated brightness-temperature samples in eV, shaped (time samples, channels); required by the separate temperature-profile reconstruction workflow.",
           "required": false
         }
       ],
@@ -969,7 +969,7 @@
         {
           "name": "electron_temperature_profile_eV",
           "unit": "eV",
-          "description": "Linearly interpolated radial Te estimate between measured channel resonance locations."
+          "description": "Linearly interpolated radial Te estimate from already-calibrated brightness-temperature samples and the declared optical-depth/optically-thick assumption."
         },
         {
           "name": "profile_radius_m",
@@ -978,38 +978,39 @@
         }
       ],
       "assumptions": [
-        "Resonance formula assumes non-relativistic electrons and specified harmonic.",
-        "Temperature interpretation requires optically thick, thermalized emission.",
+        "Resonance formula assumes non-relativistic electrons and the specified harmonic.",
+        "Supplied spectral radiance and brightness-temperature data are already calibrated; TIS performs no detector calibration.",
+        "Temperature interpretation requires optical-depth/thermalization assumptions; brightness temperature is not automatically electron temperature.",
         "FFT mode requires finite, approximately uniformly sampled channels.",
-        "Profile reconstruction consumes already-calibrated brightness temperature directly; no signal conversion or detector calibration is performed.",
-        "All supplied ECE channel data are already calibrated; the software does not perform detector calibration."
+        "Profile reconstruction uses a simplified circular toroidal-field model and interpolates only within measured resonance locations."
       ],
       "preprocessing": [
-        "Treat input values as already calibrated; inspect provenance, channel ordering, bandwidth, saturation, missing samples, and noise floor.",
-        "Check channel ordering, bandwidth, saturation, missing samples, and noise floor.",
-        "For fluctuations, subtract per-channel mean and report Nyquist frequency.",
-        "For profile mode, validate calibrated brightness-temperature values, timebase, optical-depth basis, and frequency-to-radius model."
+        "Check channel frequency ordering, units, saturation, missing samples, bandwidth, noise floor, and calibration provenance; no calibration is performed by TIS.",
+        "For fluctuations, subtract per-channel mean and report sampling and Nyquist frequencies.",
+        "For profile reconstruction, use already-calibrated brightness-temperature samples, select a time window, and supply optical depth or explicitly assert the optically thick approximation."
       ],
-      "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. For calibrated radiance compute T_b=c^2 I_nu/(2 k_B f^2), then express k_B*T_b in eV. For fluctuation mode compute per-channel RMS and one-sided FFT PSD. For temperature_profile_reconstruction, average the finite time series per channel, consume already-calibrated brightness temperature directly, infer Te using the single-slab LTE optical-depth relation or explicit optically thick assumption, map channel frequency to approximate radius, and linearly interpolate only within the measured radius interval.",
-      "uncertainty_model": "No universal uncertainty is inferred. Propagate supplied calibration, radiance, frequency, bandwidth, equilibrium, and noise uncertainties externally; outputs are deterministic conditional on inputs. Profile mode does not currently propagate input, optical-depth, frequency, or equilibrium uncertainties.",
+      "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. Convert already-calibrated spectral radiance to Rayleigh–Jeans brightness temperature. For fluctuations, compute per-channel RMS and one-sided FFT PSD. In the separate profile workflow, average already-calibrated brightness-temperature samples over the selected time window, infer Te using the declared single-slab LTE optical-depth relation or explicit optically thick assumption, map channel frequencies to approximate resonance radii, and interpolate only within the measured radius interval.",
+      "uncertainty_model": "No universal uncertainty is inferred. ECE profile reconstruction does not currently propagate brightness-temperature, optical-depth, frequency, or equilibrium uncertainties; uncertainty analysis must be performed externally.",
       "limitations": [
-        "No automatic EFIT equilibrium, ray tracing, polarization, relativistic/Doppler correction, or optical-depth solver.",
-        "Circular-field radius is a simplified estimate, not a flux-surface coordinate.",
+        "No detector/receiver calibration, instrument-response deconvolution, automatic EFIT equilibrium, ray tracing, polarization correction, relativistic/Doppler correction, or optical-depth solver.",
+        "Circular-field radius is a simplified major-radius estimate, not a flux-surface coordinate.",
         "Brightness temperature is not automatically electron temperature.",
         "FFT PSD is a basic periodogram, not Welch-averaged or confidence-bounded.",
-        "Radial profile is interpolation, not a regularized full radiative-transfer inversion; no uncertainty propagation.",
-        "Profile reconstruction accepts already-calibrated brightness temperature in eV; it does not convert detector counts or voltage."
+        "Radial profile is time-window-averaged linear interpolation, not a regularized radiative-transfer inversion; no profile uncertainty propagation.",
+        "All radiance and brightness-temperature inputs must already be calibrated before import."
       ],
       "function_links": [
         "tokamak_analysis.ece_analysis.analyze_ece",
         "tokamak_analysis.ece_analysis.resonance_field_T",
         "tokamak_analysis.ece_analysis.resonance_radius_m",
+        "tokamak_analysis.ece_analysis.brightness_temperature_K",
+        "tokamak_analysis.ece_analysis.brightness_temperature_eV",
         "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
       ],
       "raw_data_to_physics": true,
-      "note": "Implemented callable analysis pipeline; do not imply instrument calibration or equilibrium-grade localization."
+      "note": "Implemented analysis pipeline, not merely formula reference. Dashboard executes numerical calculations, profile reconstruction, plots, and JSON exports within the declared scope. Do not imply instrument calibration or equilibrium-grade localization."
     },
-    "note": "The built-in dashboard and Python API implement the declared ECE modes. The dashboard exposes brightness-temperature results, resonance mapping with explicit approximation warning, and fluctuation RMS/PSD with configurable noise threshold, visualizations, and JSON export. Completeness refers to software behavior within this declared scope, not experimental validation or a full ECE radiometer forward/inverse model."
+    "note": "The built-in dashboard and Python API execute ECE brightness-temperature, resonance-mapping, fluctuation/PSD, and temperature-profile workflows. Input radiance and profile brightness-temperature data must already be calibrated. Completeness is limited to this declared software scope and is not experimental validation."
   },
   {
     "family": "Plasma parameters",
