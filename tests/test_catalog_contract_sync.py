@@ -136,3 +136,21 @@ def test_maturity_labels_distinguish_reference_calculation_and_unvalidated_pipel
     assert maturity_label(limited) == "Limited calculation"
     assert "Complete within declared scope" in maturity_label(thomson)
     assert "not independently validated" in maturity_label(scoped)
+
+
+def test_thomson_spatial_reconstruction_is_in_analysis_contract():
+    from tokamak_analysis.analysis_registry import ANALYSES
+    import importlib
+
+    entry = ANALYSES[0]
+    contract = entry["execution_contract"]
+    assert entry["name"] == "Thomson scattering"
+    assert contract["completeness"] == "complete_with_declared_scope"
+    reconstruction = next(
+        mode for mode in contract["workflow_modes"]
+        if mode["name"] == "spatial_profile_reconstruction"
+    )
+    assert reconstruction["function"] == "thomson_scattering.reconstruct_thomson_profile"
+    assert "No extrapolation" in reconstruction["scope"]
+    module = importlib.import_module("tokamak_analysis.thomson_scattering")
+    assert callable(module.reconstruct_thomson_profile)
