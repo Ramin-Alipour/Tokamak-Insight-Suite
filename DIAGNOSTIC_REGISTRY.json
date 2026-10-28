@@ -836,6 +836,18 @@
           "minimum": 1e-15
         },
         {
+          "name": "response_frequency_Hz",
+          "unit": "Hz",
+          "description": "Strictly increasing positive frequency grid for the supplied receiver-response kernel, fully inside the measured spectrum range.",
+          "required": false
+        },
+        {
+          "name": "response_weight",
+          "unit": "dimensionless",
+          "description": "Finite non-negative channel-by-response-frequency receiver kernel; each channel must have positive integrated weight.",
+          "required": false
+        },
+        {
           "name": "harmonic",
           "unit": "dimensionless",
           "description": "Positive integer cyclotron harmonic.",
