@@ -337,7 +337,7 @@ def cached_welch(values, fs, nperseg, noverlap, window):
 if page=='Home':
     st.markdown('# Tokamak Insight Suite')
     st.markdown('**Integrated Analysis Platform for Tokamak Diagnostics**')
-    st.markdown('From raw diagnostic data to physical insight — import, inspect, analyze, calibrate, reconstruct and export results in one Python-based workspace.')
+    st.markdown('From supplied diagnostic data to physical insight — import, inspect, analyze, reconstruct and export results in one Python-based workspace.')
     a,b,c=st.columns([1.2,1,1])
     with a:
         st.markdown('### Project workspace')
@@ -828,7 +828,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Mirnov / pickup coils','Wavelength calibration','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Mirnov / pickup coils':
         st.caption('Analyze calibrated Mirnov voltage versus time: signal statistics, Welch PSD, in-band peak candidates, optional ideal Faraday-law dB/dt and relative perturbation integration. Instrument transfer functions and absolute-field calibration are not inferred.')
         numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
@@ -1311,13 +1311,6 @@ elif page=='Spectral Analysis':
         with c2: i2=st.number_input('Line 2 intensity',min_value=0.000001,value=500.0); r2=st.number_input('Relative response at line 2',min_value=0.000001,value=1.0)
         if st.button('Calculate corrected line ratio'):
             try: result=corrected_line_ratio(i1,i2,r1,r2); st.json(result); json_download('Export line-ratio result',result,'tis_line_ratio.json')
-            except Exception as e: st.error(str(e))
-    elif mode=='Wavelength calibration':
-        rawcol=col_select('Raw pixel / coordinate',numeric,'cal_raw'); pix=st.text_input('Reference pixel coordinates','100,500,900'); wav=st.text_input('Reference wavelengths','500,550,600'); deg=st.slider('Polynomial degree',1,5,1)
-        if st.button('Calculate calibration'):
-            try:
-                r=spectral_calibration([float(x) for x in pix.split(',')],[float(x) for x in wav.split(',')],deg); st.json(r)
-                calibrated=polynomial_calibration(df[rawcol],[float(v) for v in r['coefficients_high_to_low']]); out=pd.DataFrame({'raw_coordinate':df[rawcol],'calibrated_wavelength':calibrated}); st.dataframe(out.head(20)); download_df('Download calibrated spectrum coordinates',out,'tis_calibrated_wavelength.csv'); json_download('Export calibration fit JSON',r,'tis_wavelength_calibration.json')
             except Exception as e: st.error(str(e))
     else:
         energy_unit=st.radio("Energy-axis unit",["keV","eV"],horizontal=True,key="xray_energy_unit")
@@ -2099,7 +2092,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Calibration & uncertainty','Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
@@ -2549,15 +2542,6 @@ elif page=='Advanced Analysis':
                 st.session_state.pop("tis_project_export_bytes", None)
                 st.session_state.pop("tis_project_export_signature", None)
             except Exception as e: st.error(f'Analysis failed: {e}')
-    elif workflow=='Calibration & uncertainty':
-        st.write('Apply y_cal = a y_raw + b with user-supplied calibration coefficients and uncertainty terms.')
-        if df is None: st.info('Load a data file to calibrate a numeric channel.')
-        else:
-            x=col_select('Raw channel',numeric,'adv_cal_x'); a=st.number_input('Slope a',value=1.0); b=st.number_input('Intercept b',value=0.0); sy=st.number_input('Input standard uncertainty',min_value=0.0,value=0.0); sa=st.number_input('Slope uncertainty',min_value=0.0,value=0.0); sb=st.number_input('Intercept uncertainty',min_value=0.0,value=0.0)
-            if st.button('Apply calibration'):
-                try:
-                    val,u=uncertainty_linear(pd.to_numeric(df[x],errors='coerce'),a,b,sy,sa,sb); out=pd.DataFrame({'raw':df[x],'calibrated':val,'standard_uncertainty':u}); st.dataframe(out.head(30)); download_df('Download calibrated channel',out,'tis_calibrated_channel.csv')
-                except Exception as e: st.error(str(e))
     elif workflow=='Profile integration & gradients':
         need_data(); x=col_select('Coordinate',numeric,'adv_int_x'); y=col_select('Profile',numeric,'adv_int_y')
         if st.button('Analyze profile'):
