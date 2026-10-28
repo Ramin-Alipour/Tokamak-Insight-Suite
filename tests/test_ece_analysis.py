@@ -319,3 +319,156 @@ def test_ece_fluctuation_analysis_exposes_welch_psd_and_resolves_tone():
     peak1 = result["welch_psd_frequency_Hz"][np.argmax(result["welch_psd"][:, 1])]
     assert peak0 == pytest.approx(tone_hz, abs=sample_rate / 256)
     assert peak1 == pytest.approx(2_000.0, abs=sample_rate / 256)
+
+
+
+def test_welch_psd_has_finite_approximate_confidence_bounds_and_sampling_audit():
+    sample_rate = 20_000.0
+    time_s = np.arange(2048, dtype=float) / sample_rate
+    signal = np.column_stack([
+        np.sin(2 * np.pi * 1_250.0 * time_s),
+        0.3 * np.sin(2 * np.pi * 2_000.0 * time_s),
+    ])
+    result = analyze_ece(
+        [80e9, 90e9], signal=signal, time_s=time_s,
+        mode="channel_fluctuations", psd_confidence_level=0.90,
+    )
+    assert result["welch_psd_confidence_level"] == pytest.approx(0.90)
+    assert result["welch_psd_degrees_of_freedom_approx"] > 2
+    assert result["welch_psd_segment_count"] > 1
+    assert result["welch_psd_confidence_lower"].shape == result["welch_psd"].shape
+    assert result["welch_psd_confidence_upper"].shape == result["welch_psd"].shape
+    assert np.all(np.isfinite(result["welch_psd_confidence_lower"]))
+    assert np.all(result["welch_psd_confidence_lower"] <= result["welch_psd"])
+    assert np.all(result["welch_psd"] <= result["welch_psd_confidence_upper"])
+    assert result["sampling_interval_max_deviation_fraction"] < 1e-12
+    assert result["sampling_uniformity_tolerance"] == pytest.approx(1e-3)
+
+
+def test_welch_psd_reports_expected_white_noise_reference_without_subtraction():
+    sample_rate = 10_000.0
+    time_s = np.arange(1024, dtype=float) / sample_rate
+    rng = np.random.default_rng(1234)
+    signal = rng.normal(size=(time_s.size, 2))
+    result = analyze_ece(
+        [80e9, 90e9], signal=signal, time_s=time_s, noise_std=0.5,
+        mode="channel_fluctuations",
+    )
+    assert result["white_noise_psd_expected"].shape == result["welch_psd"].shape
+    assert np.all(result["white_noise_psd_expected"] >= 0)
+    assert result["welch_psd_above_expected_white_noise"].shape == result["welch_psd"].shape
+    # The observed PSD remains untouched; the expected noise PSD is diagnostic only.
+    assert np.any(result["welch_psd"] != result["white_noise_psd_expected"])
+
+
+def test_invalid_psd_confidence_level_is_rejected():
+    with pytest.raises(ValueError, match="psd_confidence_level"):
+        analyze_ece([80e9, 90e9], signal=np.ones((16, 2)),
+                    time_s=np.arange(16), mode="channel_fluctuations",
+                    psd_confidence_level=1.0)
+
+
+def test_profile_uncertainties_bandwidth_envelope_and_time_resolved_output():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float) * 1e-6
+    tb = np.tile([20.0, 40.0, 60.0], (8, 1))
+    tb[4:, :] += np.array([10.0, 20.0, 30.0])
+    result = reconstruct_ece_temperature_profile(
+        frequency, tb, time_s, major_radius_m=1.0, B_axis_T=2.0,
+        assume_optically_thick=True,
+        channel_bandwidth_Hz=[1e9, 1e9, 1e9],
+        brightness_temperature_uncertainty_eV=[2.0, 4.0, 6.0],
+        frequency_uncertainty_Hz=[1e6, 1e6, 1e6],
+        major_radius_uncertainty_m=0.001,
+        B_axis_uncertainty_T=0.01,
+        include_time_resolved_profile=True,
+    )
+    np.testing.assert_allclose(
+        result["brightness_temperature_uncertainty_eV"],
+        np.array([2.0, 4.0, 6.0]) / np.sqrt(8),
+    )
+    np.testing.assert_allclose(
+        result["electron_temperature_channel_uncertainty_eV"],
+        result["brightness_temperature_uncertainty_eV"],
+    )
+    assert np.all(result["resonance_radius_uncertainty_m"] > 0)
+    assert np.all(result["resonance_radius_bandwidth_lower_m"] < result["resonance_radius_m"])
+    assert np.all(result["resonance_radius_bandwidth_upper_m"] > result["resonance_radius_m"])
+    assert result["electron_temperature_profile_uncertainty_eV"].shape == result["profile_radius_m"].shape
+    assert result["electron_temperature_profile_time_eV"].shape == (8, 100)
+    assert not np.allclose(result["electron_temperature_profile_time_eV"][0],
+                           result["electron_temperature_profile_time_eV"][-1])
+
+
+def test_profile_propagates_optical_depth_and_background_uncertainty():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tau = np.array([0.8, 1.0, 1.2])
+    te = np.array([100.0, 200.0, 300.0])
+    tb = te * (1.0 - np.exp(-tau))
+    result = reconstruct_ece_temperature_profile(
+        frequency, np.tile(tb, (8, 1)), time_s,
+        major_radius_m=1.0, B_axis_T=2.0, optical_depth=tau,
+        brightness_temperature_uncertainty_eV=1.0,
+        optical_depth_uncertainty=0.02,
+        background_temperature_eV=1.0,
+        background_temperature_uncertainty_eV=0.1,
+    )
+    assert np.all(np.isfinite(result["electron_temperature_channel_uncertainty_eV"]))
+    assert np.all(result["electron_temperature_channel_uncertainty_eV"] > 0)
+    assert np.all(np.isfinite(result["electron_temperature_profile_uncertainty_eV"]))
+
+
+def test_low_optical_depth_inversion_exposes_conditioning_warning():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tau = np.array([1e-5, 1.0, 1.2])
+    te = np.array([100.0, 200.0, 300.0])
+    tb = te * (1.0 - np.exp(-tau))
+    result = reconstruct_ece_temperature_profile(
+        frequency, np.tile(tb, (8, 1)), time_s,
+        major_radius_m=1.0, B_axis_T=2.0, optical_depth=tau,
+    )
+    assert result["optical_depth_condition_warning"] is True
+    assert result["optical_depth_inversion_sensitivity_dTe_dTb"][0] > 1e4
+
+
+def test_profile_rejects_invalid_bandwidth_and_uncertainty_inputs():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.ones((8, 3))
+    kwargs = dict(major_radius_m=1.0, B_axis_T=2.0, assume_optically_thick=True)
+    with pytest.raises(ValueError, match="channel_bandwidth_Hz"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s, channel_bandwidth_Hz=[1e9, np.nan, 1e9], **kwargs
+        )
+    with pytest.raises(ValueError, match="frequency_uncertainty_Hz"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s, frequency_uncertainty_Hz=[1e9, 1e9, 1e11], **kwargs
+        )
+    with pytest.raises(ValueError, match="optical_depth_uncertainty requires"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s, optical_depth_uncertainty=0.1, **kwargs
+        )
+
+
+def test_ece_dashboard_wires_all_four_workflows_and_new_diagnostics():
+    from pathlib import Path
+
+    app_source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    for expected in (
+        "Brightness temperature", "Resonance mapping", "Channel fluctuations / PSD",
+        "Te profile reconstruction", "welch_psd_confidence_lower",
+        "welch_psd_confidence_upper", "electron_temperature_profile_time_eV",
+        "Channel bandwidths in Hz", "Data-quality audit",
+    ):
+        assert expected in app_source
+    assert "st.radio('Temperature inference basis'" in app_source
