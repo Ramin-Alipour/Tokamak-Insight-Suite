@@ -150,7 +150,7 @@ def test_thomson_spatial_reconstruction_is_in_analysis_contract():
         mode for mode in contract["workflow_modes"]
         if mode["name"] == "spatial_profile_reconstruction"
     )
-    assert reconstruction["function"] == "thomson_scattering.reconstruct_thomson_profile"
+    assert reconstruction["function"] == "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     assert "No extrapolation" in reconstruction["scope"]
     module = importlib.import_module("tokamak_analysis.thomson_scattering")
     assert callable(module.reconstruct_thomson_profile)
