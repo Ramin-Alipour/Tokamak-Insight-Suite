@@ -783,7 +783,7 @@ def test_ece_covariance_psd_validation_is_scale_aware():
         )
 
 
-def test_ece_time_resolved_profile_uses_off_diagonal_channel_covariance():
+def test_mean_profile_uses_channel_covariance_but_time_resolved_uncertainty_does_not():
     from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
 
     frequencies = np.array([80e9, 90e9, 100e9])
@@ -803,6 +803,11 @@ def test_ece_time_resolved_profile_uses_off_diagonal_channel_covariance():
         **kwargs, channel_covariance_eV2=correlated
     )
     assert not np.allclose(
+        independent["electron_temperature_profile_uncertainty_eV"],
+        correlated_result["electron_temperature_profile_uncertainty_eV"],
+    )
+    np.testing.assert_allclose(
         independent["electron_temperature_profile_time_uncertainty_eV"],
         correlated_result["electron_temperature_profile_time_uncertainty_eV"],
     )
+    assert "covariance of the time-window mean" in correlated_result["time_resolved_uncertainty_note"]
