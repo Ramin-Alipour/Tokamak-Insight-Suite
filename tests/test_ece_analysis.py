@@ -812,3 +812,11 @@ def test_mean_profile_uses_channel_covariance_but_time_resolved_uncertainty_does
         correlated_result["electron_temperature_profile_time_uncertainty_eV"],
     )
     assert "covariance of the time-window mean" in correlated_result["time_resolved_uncertainty_note"]
+
+
+def test_ece_fluctuation_psd_rejects_too_short_uniform_records():
+    with pytest.raises(ValueError, match="at least 8 samples"):
+        analyze_ece(
+            [80e9], signal=np.ones((7, 1)), time_s=np.arange(7, dtype=float),
+            mode="channel_fluctuations",
+        )
