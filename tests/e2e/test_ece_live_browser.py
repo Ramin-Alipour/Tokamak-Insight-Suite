@@ -57,9 +57,9 @@ def test_live_streamlit_ece_response_workflow_upload_and_download(tmp_path):
             expect(page.get_by_text("ece_live_smoke.csv", exact=False)).to_be_visible(timeout=30_000)
 
             page.get_by_text("Plasma Parameters", exact=True).first.click()
-            workflow = page.get_by_text("Brightness temperature", exact=True).first
+            workflow = page.get_by_role("combobox", name="ECE workflow")
             workflow.click()
-            page.get_by_text("Receiver response convolution", exact=True).click()
+            page.get_by_role("option", name="Receiver response convolution").click()
 
             page.get_by_label("Spectral frequency grid (Hz; comma-separated, increasing)").fill(
                 "80000000000,85000000000,90000000000,95000000000,100000000000"
