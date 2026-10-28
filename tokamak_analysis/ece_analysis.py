@@ -734,6 +734,8 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("One or more resonance radii fall outside the user-supplied plasma major-radius bounds.")
     order = np.argsort(radius)
     r_sorted = radius[order]
+    if np.any(np.diff(r_sorted) <= 0):
+        raise ValueError("Channel resonance radii must be distinct to reconstruct a single-valued radial profile.")
     te_sorted = te_eV[order]
     radius_sigma_sorted = radius_sigma[order]
     te_sigma_sorted = None if te_sigma is None else te_sigma[order]
