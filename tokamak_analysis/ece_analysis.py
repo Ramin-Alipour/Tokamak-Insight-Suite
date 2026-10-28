@@ -48,8 +48,11 @@ def resonance_field_relativistic_T(frequency_Hz, harmonic: int = 1, *,
         raise ValueError("electron_energy_eV must be finite and non-negative.")
     if np.any(~np.isfinite(beta)) or np.any(np.abs(beta) >= 1):
         raise ValueError("parallel_beta must be finite and strictly between -1 and 1.")
-    gamma = 1.0 + energy * E_CHARGE / (M_E * C_LIGHT**2)
-    result = resonance_field_T(f, harmonic) * gamma * (1.0 - beta)
+    with np.errstate(over="ignore", invalid="ignore"):
+        gamma = 1.0 + energy * E_CHARGE / (M_E * C_LIGHT**2)
+        result = resonance_field_T(f, harmonic) * gamma * (1.0 - beta)
+    if np.any(~np.isfinite(gamma)) or np.any(gamma < 1.0) or np.any(~np.isfinite(result)) or np.any(result <= 0):
+        raise ValueError("Relativistic resonance calculation overflowed or left the representable physical range.")
     return float(result) if np.ndim(result) == 0 else result
 
 
@@ -114,8 +117,9 @@ def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
     weights = np.asarray(response_weight, dtype=float)
     if f.ndim != 1 or f.size < 2 or np.any(~np.isfinite(f)) or np.any(f <= 0) or np.any(np.diff(f) <= 0):
         raise ValueError("frequency_Hz must be finite, positive, strictly increasing, and contain at least two points.")
-    if radiance.shape[-1:] != f.shape or np.any(~np.isfinite(radiance)) or np.any(radiance < 0):
-        raise ValueError("spectral_radiance_W_m2_sr_Hz must be finite, non-negative and match the frequency axis.")
+    if (radiance.ndim < 1 or any(size == 0 for size in radiance.shape)
+            or radiance.shape[-1:] != f.shape or np.any(~np.isfinite(radiance)) or np.any(radiance < 0)):
+        raise ValueError("spectral_radiance_W_m2_sr_Hz must be a non-empty finite, non-negative array whose final axis matches frequency_Hz.")
     if rf.ndim != 1 or rf.size < 2 or np.any(~np.isfinite(rf)) or np.any(rf <= 0) or np.any(np.diff(rf) <= 0):
         raise ValueError("response_frequency_Hz must be finite, positive, strictly increasing, and contain at least two points.")
     if weights.ndim != 2 or weights.shape[1] != rf.size or weights.shape[0] < 1 or np.any(~np.isfinite(weights)) or np.any(weights < 0):
@@ -233,14 +237,30 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             bw = np.full(f.shape, float(bw))
         if bw.shape != f.shape or np.any(~np.isfinite(bw)) or np.any(bw <= 0):
             raise ValueError("channel_bandwidth_Hz must be positive and scalar or match frequency_Hz.")
+        if np.any(bw >= 2.0 * f):
+            raise ValueError("Each channel bandwidth must be smaller than twice its center frequency.")
         out["channel_bandwidth_Hz"] = bw
         out["fractional_bandwidth"] = bw / f
     if major_radius_m is not None or B_axis_T is not None:
         if major_radius_m is None or B_axis_T is None:
             raise ValueError("major_radius_m and B_axis_T must be provided together.")
-        out["resonance_radius_m"] = np.asarray(major_radius_m, dtype=float) * np.asarray(B_axis_T, dtype=float) / np.asarray(out["resonance_field_T"], dtype=float)
+        r0 = np.asarray(major_radius_m, dtype=float)
+        b0 = np.asarray(B_axis_T, dtype=float)
+        if r0.ndim != 0 or not np.isfinite(r0) or r0 <= 0:
+            raise ValueError("major_radius_m must be a finite positive scalar.")
+        if b0.ndim != 0 or not np.isfinite(b0) or b0 <= 0:
+            raise ValueError("B_axis_T must be a finite positive scalar.")
+        with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+            radius = float(r0) * float(b0) / np.asarray(out["resonance_field_T"], dtype=float)
+        if np.any(~np.isfinite(radius)) or np.any(radius <= 0):
+            raise ValueError("Resonance-radius mapping produced non-finite or non-positive radii.")
+        out["resonance_radius_m"] = float(radius) if radius.ndim == 0 else radius
         out["equilibrium_model"] = "circular toroidal field B(R)=B_axis*R_axis/R"
-        out["limitations"] = ["not EFIT mapping; ignores shaping, poloidal field, relativistic and Doppler shifts"]
+        out["limitations"] = ["not EFIT mapping; ignores shaping and poloidal field"]
+        if electron_energy_eV is None:
+            out["limitations"].append("relativistic and Doppler shifts are not included")
+        else:
+            out["limitations"].append("relativistic/Doppler term is monoenergetic and approximate; distribution effects and line-of-sight geometry are not modeled")
     if mode == "brightness_temperature":
         if spectral_radiance_W_m2_sr_Hz is None:
             raise ValueError("Calibrated spectral_radiance_W_m2_sr_Hz is required for temperature mode.")
@@ -259,8 +279,10 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             tau = np.asarray(optical_depth, dtype=float)
             if np.any(~np.isfinite(tau)) or np.any(tau < 0):
                 raise ValueError("optical_depth must be finite and non-negative.")
-            if tau.ndim > 1 or (tau.ndim == 1 and tau.shape != f.shape):
-                raise ValueError("optical_depth must be a scalar or one value per frequency channel.")
+            if tau.ndim > 1 or (tau.ndim == 1 and tau.shape not in {(1,), f.shape}):
+                raise ValueError("optical_depth must be a scalar, one value, or one value per frequency channel.")
+            if tau.shape == (1,):
+                tau = np.full(f.shape, float(tau[0]))
             out["optical_depth"] = tau
             out["optical_depth_warning"] = "Tau alone does not establish thermalization or calibration validity."
             out["optical_depth_inversion_sensitivity_dTe_dTb"] = (
@@ -475,28 +497,44 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("Calibrated brightness temperature samples must be non-negative.")
     if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
         raise ValueError("harmonic must be a positive integer.")
-    if not np.isfinite(major_radius_m) or major_radius_m <= 0 or not np.isfinite(B_axis_T) or B_axis_T <= 0:
-        raise ValueError("major_radius_m and B_axis_T must be finite and positive.")
-    if not np.isfinite(background_temperature_eV) or background_temperature_eV < 0:
-        raise ValueError("background_temperature_eV must be finite and non-negative.")
-    if not np.isfinite(model_discrepancy_fraction) or model_discrepancy_fraction < 0:
-        raise ValueError("model_discrepancy_fraction must be finite and non-negative.")
+    for name, value, lower, strict in (
+        ("major_radius_m", major_radius_m, 0.0, True),
+        ("B_axis_T", B_axis_T, 0.0, True),
+        ("background_temperature_eV", background_temperature_eV, 0.0, False),
+        ("model_discrepancy_fraction", model_discrepancy_fraction, 0.0, False),
+    ):
+        scalar = np.asarray(value, dtype=float)
+        if scalar.ndim != 0 or not np.isfinite(scalar) or (scalar <= lower if strict else scalar < lower):
+            qualifier = "positive" if strict else "non-negative"
+            raise ValueError(f"{name} must be a finite {qualifier} scalar.")
+    major_radius_m = float(major_radius_m)
+    B_axis_T = float(B_axis_T)
+    background_temperature_eV = float(background_temperature_eV)
+    model_discrepancy_fraction = float(model_discrepancy_fraction)
     if electron_energy_eV is not None:
-        if not np.isfinite(electron_energy_eV) or electron_energy_eV < 0:
-            raise ValueError("electron_energy_eV must be finite and non-negative.")
-        if not np.isfinite(parallel_beta) or abs(parallel_beta) >= 1:
-            raise ValueError("parallel_beta must be finite and strictly between -1 and 1.")
+        energy_scalar = np.asarray(electron_energy_eV, dtype=float)
+        if energy_scalar.ndim != 0 or not np.isfinite(energy_scalar) or energy_scalar < 0:
+            raise ValueError("electron_energy_eV must be a finite non-negative scalar.")
+        beta_scalar = np.asarray(parallel_beta, dtype=float)
+        if beta_scalar.ndim != 0 or not np.isfinite(beta_scalar) or abs(beta_scalar) >= 1:
+            raise ValueError("parallel_beta must be a finite scalar strictly between -1 and 1.")
+        electron_energy_eV = float(energy_scalar)
+        parallel_beta = float(beta_scalar)
     for uncertainty_name, uncertainty_value in (
         ("background_temperature_uncertainty_eV", background_temperature_uncertainty_eV),
         ("major_radius_uncertainty_m", major_radius_uncertainty_m),
         ("B_axis_uncertainty_T", B_axis_uncertainty_T),
     ):
-        if not np.isfinite(uncertainty_value) or uncertainty_value < 0:
-            raise ValueError(f"{uncertainty_name} must be finite and non-negative.")
+        uncertainty_scalar = np.asarray(uncertainty_value, dtype=float)
+        if uncertainty_scalar.ndim != 0 or not np.isfinite(uncertainty_scalar) or uncertainty_scalar < 0:
+            raise ValueError(f"{uncertainty_name} must be a finite non-negative scalar.")
+    background_temperature_uncertainty_eV = float(background_temperature_uncertainty_eV)
+    major_radius_uncertainty_m = float(major_radius_uncertainty_m)
+    B_axis_uncertainty_T = float(B_axis_uncertainty_T)
     if not isinstance(include_time_resolved_profile, (bool, np.bool_)):
         raise ValueError("include_time_resolved_profile must be boolean.")
-    if profile_method not in {"linear", "pchip"}:
-        raise ValueError("profile_method must be 'linear' or 'pchip'.")
+    if not isinstance(profile_method, str) or profile_method not in {"linear", "pchip"}:
+        raise ValueError("profile_method must be the string 'linear' or 'pchip'.")
     if not isinstance(temporal_correlation_adjustment, (bool, np.bool_)):
         raise ValueError("temporal_correlation_adjustment must be boolean.")
     if plasma_radius_bounds_m is not None:
@@ -848,13 +886,15 @@ def reconstruct_ece_temperature_profile(
         "uncertainty_method": "first-order propagation with optional channel covariance, temporal autocorrelation estimate, local radial-gradient contribution, and user-specified fractional model-discrepancy floor",
         "assumptions": [
             "input channels are already calibrated brightness temperatures in eV; no calibration or conversion is performed",
-            "cold resonance mapping unless the optional monoenergetic relativistic/Doppler correction is supplied",
+            ("cold non-relativistic resonance mapping" if electron_energy_eV is None else
+             "monoenergetic relativistic/Doppler resonance correction; not distribution averaged"),
             "channel center frequencies represent channel response",
             "profile is inferred only between measured channel resonance locations",
         ],
         "limitations": [
             "not EFIT equilibrium or ray tracing",
-            "no relativistic or Doppler correction",
+            ("no relativistic or Doppler correction" if electron_energy_eV is None else
+             "monoenergetic relativistic/Doppler correction is approximate; distribution effects and full ray tracing are not modeled"),
             "bandwidth is represented as a radial localization envelope, not a full receiver-response convolution",
             "uncertainties are approximate first-order estimates; include covariance only when supplied and model discrepancy only through the optional user-specified floor",
             "temperature inference depends on user-supplied optical depth or optically thick assertion",
