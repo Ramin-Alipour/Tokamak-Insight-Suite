@@ -414,9 +414,14 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                     phase = np.unwrap(np.angle(cross_p))
                     coherent = (coh >= 0.5) & (cross_f > 0) & np.isfinite(phase)
                     delay_s = None
-                    if np.count_nonzero(coherent) >= 3:
-                        slope, intercept = np.polyfit(2.0 * np.pi * cross_f[coherent], phase[coherent], 1)
-                        delay_s = float(-slope)
+                    coherent_indices = np.flatnonzero(coherent)
+                    if coherent_indices.size >= 3:
+                        split_at = np.flatnonzero(np.diff(coherent_indices) > 1) + 1
+                        runs = np.split(coherent_indices, split_at)
+                        longest_run = max(runs, key=len)
+                        if longest_run.size >= 3:
+                            slope, intercept = np.polyfit(2.0 * np.pi * cross_f[longest_run], phase[longest_run], 1)
+                            delay_s = float(-slope)
                     pair_rows.append({
                         "channel_i": int(i), "channel_j": int(j),
                         "frequency_Hz": cross_f,
