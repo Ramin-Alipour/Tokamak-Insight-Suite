@@ -1091,6 +1091,61 @@
           "name": "optical_depth_condition_warning",
           "unit": "boolean",
           "description": "True when any supplied optical depth is below 1e-3 and the inversion is strongly ill-conditioned."
+        },
+        {
+          "name": "selected_time_s",
+          "unit": "s",
+          "description": "Selected acquired sample times in the requested profile window."
+        },
+        {
+          "name": "brightness_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional first-order uncertainty of the time-window mean brightness temperature."
+        },
+        {
+          "name": "profile_radius_uncertainty_m",
+          "unit": "m",
+          "description": "Optional interpolated uncertainty of the approximate radial coordinate."
+        },
+        {
+          "name": "welch_psd_confidence_level",
+          "unit": "dimensionless",
+          "description": "Requested confidence level for approximate Welch PSD bounds."
+        },
+        {
+          "name": "welch_psd_segment_count",
+          "unit": "count",
+          "description": "Number of segments contributing to Welch PSD."
+        },
+        {
+          "name": "sampling_interval_median_s",
+          "unit": "s",
+          "description": "Median acquired sample interval."
+        },
+        {
+          "name": "sampling_uniformity_tolerance",
+          "unit": "dimensionless",
+          "description": "Relative tolerance used to validate sample interval uniformity."
+        },
+        {
+          "name": "above_noise_rms",
+          "unit": "boolean",
+          "description": "Per-channel indicator that fluctuation RMS exceeds the supplied RMS noise estimate."
+        },
+        {
+          "name": "welch_psd_above_expected_white_noise",
+          "unit": "boolean",
+          "description": "Per-frequency and per-channel comparison against expected white-noise PSD reference."
+        },
+        {
+          "name": "optical_depth_inversion_sensitivity_dTe_dTb",
+          "unit": "dimensionless",
+          "description": "Sensitivity of the single-slab Te inversion to brightness-temperature input."
+        },
+        {
+          "name": "optical_depth_condition_message",
+          "unit": "text",
+          "description": "Warning explanation when low optical depth makes inversion ill-conditioned."
         }
       ],
       "assumptions": [
