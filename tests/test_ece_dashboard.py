@@ -1,11 +1,13 @@
 """Interactive Streamlit regressions for the ECE analysis workflow."""
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from streamlit.testing.v1 import AppTest
 
 
 def _open_ece():
-    app = AppTest.from_file("../app.py", default_timeout=120).run()
+    app = AppTest.from_file(Path(__file__).resolve().parents[1] / "app.py", default_timeout=120).run()
     assert not app.exception, [str(x.value) for x in app.exception]
     app.radio(key="workspace_page").set_value("Plasma Parameters").run()
     assert not app.exception, [str(x.value) for x in app.exception]
