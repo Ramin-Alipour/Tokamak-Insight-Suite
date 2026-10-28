@@ -47,15 +47,15 @@ def _rogowski_metadata(app):
 def test_rogowski_dashboard_runs_derivative_mode_and_exports_current():
     app = _loaded_app()
     mode = next(item for item in app.radio if item.key == "rogowski_acquisition_mode")
-    mode.set_value("Derivative output (signal ∝ dIp/dt; integrate once)")
+    mode.set_value("Calibrated dIp/dt (A/s; integrate once)")
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
     next(item for item in app.button if item.label == "Analyze Rogowski / calibrated current trace").click()
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
     rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
-    assert "derivative_output" in rendered
-    assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
+    assert "calibrated_dIp_dt_A_s" in rendered
+    assert any("Rogowski-coil analysis completed from calibrated input." in item.value for item in app.success)
     assert "rogowski coil" in rendered.lower()
     metadata = _rogowski_metadata(app)
     assert metadata["n_samples"] == 101
@@ -72,7 +72,7 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
     next(item for item in app.radio if item.key == "rogowski_acquisition_mode").set_value(
-        "External integrator output (signal ∝ Ip; do not integrate)"
+        "Calibrated plasma current (A; no integration)"
     )
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
@@ -80,8 +80,8 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
     rendered = "\\n".join(str(item.value) for item in app.get("json") + app.get("markdown"))
-    assert "integrator_output" in rendered
-    assert any("Rogowski-coil analysis completed within the declared calibrated-input scope." in item.value for item in app.success)
+    assert "calibrated_current_A" in rendered
+    assert any("Rogowski-coil analysis completed from calibrated input." in item.value for item in app.success)
     assert "integration_applied" in rendered
     assert "false" in rendered.lower()
     metadata = _rogowski_metadata(app)
@@ -90,13 +90,13 @@ def test_rogowski_dashboard_integrator_output_does_not_integrate_twice():
     assert metadata["integration_applied"] is False
 
 
-def test_rogowski_dashboard_rejects_zero_calibration_scale_without_crashing():
+def test_rogowski_dashboard_uses_calibrated_input_without_scale_control():
     app = _loaded_app()
-    app.number_input(key="int_scale").set_value(0.0)
-    app.run()
-    assert not app.exception, [str(item.value) for item in app.exception]
+    assert not any(item.key == "int_scale" for item in app.number_input)
     next(item for item in app.button if item.label == "Analyze Rogowski / calibrated current trace").click()
     app.run()
     assert not app.exception, [str(item.value) for item in app.exception]
-    assert any("Calibration scale must be finite and nonzero" in item.value for item in app.error)
-    assert not any("Rogowski-coil analysis completed" in item.value for item in app.success)
+    metadata = _rogowski_metadata(app)
+    assert metadata["input_representation"] == "calibrated_dIp_dt_A_s"
+    assert metadata["current_final_A"] == pytest.approx(2.0)
+    assert any("Rogowski-coil analysis completed from calibrated input." in item.value for item in app.success)
