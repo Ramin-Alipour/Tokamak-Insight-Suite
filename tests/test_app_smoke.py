@@ -78,6 +78,7 @@ def test_catalog_displays_analysis_contracts_separately_from_reference_entries()
     "workflow",
     [
         "Thomson calibrated profile analysis",
+        "Thomson spatial profile reconstruction",
         "Thomson raw-spectrum temperature fit",
         "Thomson calibrated scattered-power density",
     ],
