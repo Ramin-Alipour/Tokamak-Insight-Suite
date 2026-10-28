@@ -823,7 +823,7 @@
       "tokamak_analysis.ece_analysis.brightness_temperature_eV",
       "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within the declared software scope: calibrated-input ECE calculations, optional 1-D supplied Bphi(R) inversion, optional monoenergetic resonance sensitivity correction, channel cross-spectral statistics, stationarity heuristics, PCHIP/linear profile reconstruction, covariance/autocorrelation/radial-gradient uncertainty propagation, and user-selected model-discrepancy floor. Inputs are already calibrated; no detector calibration is performed. Full EFIT/ray tracing, distribution-averaged relativistic emissivity, radiative-transfer inversion and receiver-response convolution remain outside scope.",
+    "implementation_status": "Complete within declared software scope: calibrated-input ECE calculations, optional 1-D supplied Bphi(R) inversion, optional monoenergetic resonance sensitivity correction, channel cross-spectral statistics, stationarity heuristics, PCHIP/linear profile reconstruction, covariance/autocorrelation/radial-gradient uncertainty propagation, and user-selected model-discrepancy floor. Inputs are already calibrated; no detector calibration is performed. Full EFIT/ray tracing, distribution-averaged relativistic emissivity, radiative-transfer inversion and receiver-response convolution remain outside scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
