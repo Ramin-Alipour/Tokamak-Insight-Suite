@@ -92,8 +92,10 @@ def test_ece_temperature_profile_dashboard_from_uploaded_multichannel_data():
     app.multiselect(key="ece_profile_signal_cols").set_value(["ece_80", "ece_90", "ece_100"]).run()
     app.text_input(key="ece_profile_gain").set_value("2, 2, 2").run()
     app.checkbox(key="ece_profile_thick").check().run()
+    app.number_input(key="ece_profile_window_start").set_value(0.0).run()
+    app.number_input(key="ece_profile_window_end").set_value(10e-6).run()
     app.button(key="ece_run_profile").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    assert any("ECE electron-temperature profile reconstruction completed" in x.value for x in app.success)
+    assert any("11 samples" in x.value for x in app.success)
     assert any(x.label == "Export ECE electron-temperature profile" for x in app.get("download_button"))
 
