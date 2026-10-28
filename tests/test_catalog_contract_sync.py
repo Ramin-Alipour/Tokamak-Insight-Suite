@@ -81,8 +81,8 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
     levels = Counter(row["execution_contract"]["execution_level"] for row in DIAGNOSTICS)
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
     assert len(DIAGNOSTICS) == 80
-    assert levels == {"reference_only": 50, "limited_calculation": 16, "analysis_pipeline": 14}
-    assert completeness == {"incomplete": 65, "complete": 7, "complete_with_declared_scope": 8}
+    assert levels == {"reference_only": 49, "limited_calculation": 16, "analysis_pipeline": 15}
+    assert completeness == {"incomplete": 64, "complete": 7, "complete_with_declared_scope": 9}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.
