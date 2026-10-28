@@ -329,3 +329,102 @@ def density_from_thomson_scattered_power(
         result["electron_density_uncertainty_m3"] = np.sqrt(variance)
         result["uncertainty_model"] = "First-order propagation of supplied independent 1-sigma input uncertainties; correlations and model/calibration discrepancy are not included."
     return result
+
+
+def reconstruct_thomson_profile(
+    radius_m,
+    density_m3,
+    temperature_ev,
+    *,
+    density_uncertainty_m3=None,
+    temperature_uncertainty_ev=None,
+    method="smoothing_spline",
+    smoothing_factor=1.0,
+    points=200,
+):
+    """Reconstruct smooth radial ne/Te curves from spatially resolved measurements.
+
+    Inputs must already be calibrated. The reconstruction is restricted to the
+    measured radial interval (no extrapolation). smoothing_factor controls the
+    weighted residual target for smoothing_spline: s = factor * N. If
+    uncertainties are provided, they are treated as independent 1-sigma errors
+    and used as inverse-uncertainty weights. Without uncertainties, each profile
+    is scaled before fitting and the residual target is relative to that scale.
+
+    Returns sampled reconstructed profiles and first derivatives. This is a
+    one-dimensional profile fit, not an equilibrium or transport reconstruction;
+    it does not estimate fit confidence intervals or systematic uncertainties.
+    """
+    from scipy.interpolate import PchipInterpolator, UnivariateSpline
+
+    profile = build_profile(
+        radius_m,
+        density_m3,
+        temperature_ev,
+        density_uncertainty_m3,
+        temperature_uncertainty_ev,
+    )
+    if method not in {"smoothing_spline", "pchip"}:
+        raise ValueError("method must be 'smoothing_spline' or 'pchip'")
+    if not _is_finite_real_scalar(smoothing_factor) or smoothing_factor < 0:
+        raise ValueError("smoothing_factor must be finite and non-negative")
+    if isinstance(points, (bool, np.bool_)) or not isinstance(points, (int, np.integer)) or not 20 <= points <= 5000:
+        raise ValueError("points must be an integer between 20 and 5000")
+
+    r = profile.radius_m
+    grid = np.linspace(float(r[0]), float(r[-1]), int(points))
+
+    def fit_channel(y, uncertainty, label):
+        if method == "pchip":
+            spline = PchipInterpolator(r, y, extrapolate=False)
+            return np.asarray(spline(grid), dtype=float), np.asarray(spline.derivative()(grid), dtype=float)
+
+        if uncertainty is not None:
+            if np.any(uncertainty <= 0):
+                raise ValueError(f"{label} uncertainties must be strictly positive for weighted spline fitting")
+            weights = 1.0 / uncertainty
+            fitted = UnivariateSpline(r, y, w=weights, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1))
+            return np.asarray(fitted(grid), dtype=float), np.asarray(fitted.derivative()(grid), dtype=float)
+
+        scale = float(np.max(np.abs(y)))
+        if scale == 0:
+            return np.zeros_like(grid), np.zeros_like(grid)
+        normalized = y / scale
+        fitted = UnivariateSpline(
+            r, normalized, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1)
+        )
+        return (
+            np.asarray(fitted(grid), dtype=float) * scale,
+            np.asarray(fitted.derivative()(grid), dtype=float) * scale,
+        )
+
+    density_fit, density_gradient = fit_channel(
+        profile.density_m3, profile.density_uncertainty_m3, "density"
+    )
+    temperature_fit, temperature_gradient = fit_channel(
+        profile.temperature_ev, profile.temperature_uncertainty_ev, "temperature"
+    )
+    return {
+        "radius_m": grid,
+        "density_m3": density_fit,
+        "temperature_eV": temperature_fit,
+        "density_gradient_m-4": density_gradient,
+        "temperature_gradient_eV_m-1": temperature_gradient,
+        "method": method,
+        "smoothing_factor": float(smoothing_factor) if method == "smoothing_spline" else None,
+        "input_point_count": int(r.size),
+        "reconstruction_point_count": int(grid.size),
+        "radial_domain_m": (float(r[0]), float(r[-1])),
+        "uncertainty_model": (
+            "Supplied pointwise uncertainties used as independent inverse-sigma fit weights; "
+            "fit confidence intervals and systematic/model uncertainties are not estimated."
+            if profile.density_uncertainty_m3 is not None or profile.temperature_uncertainty_ev is not None
+            else "No measurement uncertainties supplied; fit confidence intervals are not estimated."
+        ),
+        "limitations": [
+            "Only calibrated spatial measurements are accepted; no detector or wavelength calibration is performed.",
+            "No extrapolation beyond the measured radial interval is performed.",
+            "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
+            "Smoothing splines are unconstrained and may overshoot below zero between measurements; inspect the reconstructed curve before physical interpretation.",
+        ],
+    }
