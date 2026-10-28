@@ -412,6 +412,8 @@ def reconstruct_ece_temperature_profile(
         explicit_radius = np.asarray(channel_resonance_radius_m, dtype=float)
         if explicit_radius.shape != f.shape or np.any(~np.isfinite(explicit_radius)) or np.any(explicit_radius <= 0):
             raise ValueError("channel_resonance_radius_m must contain one finite positive radius per frequency channel.")
+        if equilibrium_radius_m is not None:
+            raise ValueError("Use either explicit channel_resonance_radius_m or an equilibrium B_phi(R) table, not both.")
     else:
         explicit_radius = None
     if equilibrium_radius_m is not None:
