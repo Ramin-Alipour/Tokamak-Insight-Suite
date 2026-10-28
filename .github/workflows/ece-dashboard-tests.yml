@@ -69,3 +69,24 @@ jobs:
               raise SystemExit(f"Dashboard raised an exception: {details}")
           print(f"Dashboard started without uncaught exceptions; rendered {len(app.get('button'))} buttons.")
           PY
+
+  live-browser-e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out main commit
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install package and browser-test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]" playwright
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run real-browser ECE dashboard test
+        env:
+          TIS_RUN_LIVE_BROWSER_E2E: "1"
+        run: python -m pytest -q tests/e2e/test_ece_live_browser.py
