@@ -843,7 +843,7 @@
         {
           "name": "mode",
           "unit": "text",
-          "description": "brightness_temperature, channel_fluctuations, or resonance_mapping.",
+          "description": "brightness_temperature, channel_fluctuations, resonance_mapping, or temperature_profile_reconstruction.",
           "required": true
         },
         {
@@ -989,15 +989,17 @@
         "Resonance formula assumes non-relativistic electrons and specified harmonic.",
         "Rayleigh–Jeans brightness temperature requires calibrated spectral radiance.",
         "Temperature interpretation requires optically thick, thermalized emission.",
-        "FFT mode requires finite, approximately uniformly sampled channels."
+        "FFT mode requires finite, approximately uniformly sampled channels.",
+        "Temperature-profile reconstruction uses user-supplied linear signal conversion and explicit optical-depth or optically-thick assumptions."
       ],
       "preprocessing": [
         "Verify frequency/time units and calibration provenance.",
         "Check channel ordering, bandwidth, saturation, missing samples, and noise floor.",
-        "For fluctuations, subtract per-channel mean and report Nyquist frequency."
+        "For fluctuations, subtract per-channel mean and report Nyquist frequency.",
+        "For profile mode, validate user-provided signal conversion, timebase, optical-depth basis, and frequency-to-radius model."
       ],
       "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. For calibrated radiance compute T_b=c^2 I_nu/(2 k_B f^2), then express k_B*T_b in eV. For fluctuation mode compute per-channel RMS and one-sided FFT PSD. For temperature_profile_reconstruction, average the finite time series per channel, apply user-supplied linear signal-to-Tb conversion, infer Te using the single-slab LTE optical-depth relation or explicit optically thick assumption, map channel frequency to approximate radius, and linearly interpolate only within the measured radius interval.",
-      "uncertainty_model": "No universal uncertainty is inferred. Propagate supplied calibration, radiance, frequency, bandwidth, equilibrium, and noise uncertainties externally; outputs are deterministic conditional on inputs.",
+      "uncertainty_model": "No universal uncertainty is inferred. Propagate supplied calibration, radiance, frequency, bandwidth, equilibrium, and noise uncertainties externally; outputs are deterministic conditional on inputs. Profile mode does not currently propagate calibration, optical-depth, frequency, or equilibrium uncertainties.",
       "limitations": [
         "No raw receiver/IF calibration or instrument response deconvolution.",
         "No automatic EFIT equilibrium, ray tracing, polarization, relativistic/Doppler correction, or optical-depth solver.",
@@ -1009,7 +1011,8 @@
       "function_links": [
         "tokamak_analysis.ece_analysis.analyze_ece",
         "tokamak_analysis.ece_analysis.resonance_field_T",
-        "tokamak_analysis.ece_analysis.resonance_radius_m"
+        "tokamak_analysis.ece_analysis.resonance_radius_m",
+        "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
       ],
       "raw_data_to_physics": true,
       "note": "Implemented callable analysis pipeline; do not imply instrument calibration or equilibrium-grade localization."
