@@ -569,3 +569,44 @@ def test_profile_rejects_nonmonotonic_equilibrium_and_bad_covariance():
             channel_covariance_eV2=[[1.0, 2.0, 0.0], [2.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             **common,
         )
+
+
+
+def test_explicit_geometry_derived_channel_radii_override_circular_mapping():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float) * 1e-6
+    tb = np.tile([10.0, 20.0, 15.0], (time_s.size, 1))
+    result = reconstruct_ece_temperature_profile(
+        frequency, tb, time_s, major_radius_m=1.5, B_axis_T=2.0,
+        assume_optically_thick=True,
+        channel_resonance_radius_m=[1.2, 1.6, 1.9],
+        radius_mapping_uncertainty_m=[0.01, 0.02, 0.03],
+    )
+    np.testing.assert_allclose(result["resonance_radius_m"], [1.2, 1.6, 1.9])
+    np.testing.assert_allclose(result["resonance_radius_uncertainty_m"], [0.01, 0.02, 0.03])
+    assert "user-supplied channel resonance locations" in result["equilibrium_model"]
+    assert result["resonance_radius_bandwidth_lower_m"] is None
+    assert result["resonance_radius_bandwidth_upper_m"] is None
+
+
+def test_explicit_geometry_mapping_rejects_conflicting_or_malformed_inputs():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.ones((8, 3))
+    common = dict(major_radius_m=1.5, B_axis_T=2.0, assume_optically_thick=True)
+    with pytest.raises(ValueError, match="one finite positive radius per frequency"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s, channel_resonance_radius_m=[1.0, np.nan, 2.0], **common
+        )
+    with pytest.raises(ValueError, match="not both"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s,
+            channel_resonance_radius_m=[1.0, 1.5, 2.0],
+            equilibrium_radius_m=[1.0, 1.5, 2.0],
+            equilibrium_toroidal_field_T=[2.0, 1.5, 1.0],
+            **common,
+        )
