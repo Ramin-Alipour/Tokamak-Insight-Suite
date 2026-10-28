@@ -10,7 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
-from scipy.signal import welch as welch_psd, get_window
+from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence
+from scipy.interpolate import PchipInterpolator
 from scipy.stats import chi2
 
 
@@ -79,7 +80,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 spectral_radiance_W_m2_sr_Hz=None, major_radius_m=None,
                 B_axis_T=None, harmonic=2, channel_bandwidth_Hz=None,
                 noise_std=None, optical_depth=None, psd_confidence_level=0.95,
-                mode="brightness_temperature"):
+                mode="brightness_temperature", welch_nperseg=None,
+                compute_cross_channel_spectra=True, stationarity_segments=4):
     """Analyze calibrated ECE channels and return validated derived quantities.
 
     signal may be a (time, channel) fluctuation matrix. Temperature inference
@@ -109,12 +111,22 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("optical_depth is only consumed in brightness_temperature mode.")
     if mode != "channel_fluctuations" and noise_std is not None:
         raise ValueError("noise_std is only consumed in channel_fluctuations mode.")
-    try:
-        psd_confidence_level = float(psd_confidence_level)
-    except (TypeError, ValueError) as exc:
-        raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.") from exc
-    if not np.isfinite(psd_confidence_level) or not 0.0 < psd_confidence_level < 1.0:
-        raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.")
+    if mode == "channel_fluctuations":
+        try:
+            psd_confidence_level = float(psd_confidence_level)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.") from exc
+        if not np.isfinite(psd_confidence_level) or not 0.0 < psd_confidence_level < 1.0:
+            raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.")
+        if welch_nperseg is not None and (
+            isinstance(welch_nperseg, (bool, np.bool_)) or
+            not isinstance(welch_nperseg, (int, np.integer)) or welch_nperseg < 8
+        ):
+            raise ValueError("welch_nperseg must be an integer >= 8.")
+        if isinstance(stationarity_segments, (bool, np.bool_)) or not isinstance(stationarity_segments, (int, np.integer)) or stationarity_segments < 2:
+            raise ValueError("stationarity_segments must be an integer >= 2.")
+        if not isinstance(compute_cross_channel_spectra, (bool, np.bool_)):
+            raise ValueError("compute_cross_channel_spectra must be boolean.")
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
            "resonance_field_T": resonance_field_T(f, harmonic),
            "assumptions": ["non-relativistic resonance", "cold-plasma frequency mapping"]}
@@ -195,7 +207,7 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         fs = 1.0 / float(np.median(dt))
         # Welch averaging provides a lower-variance PSD estimate alongside the
         # full-record periodogram retained for backward compatibility.
-        welch_nperseg = min(256, t.size)
+        welch_nperseg = min(256 if welch_nperseg is None else int(welch_nperseg), t.size)
         welch_noverlap = welch_nperseg // 2
         welch_step = welch_nperseg - welch_noverlap
         welch_frequency, welch_density = welch_psd(
@@ -237,7 +249,41 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                     "nyquist_frequency_Hz": 0.5 * fs,
                     "sampling_interval_median_s": float(np.median(dt)),
                     "sampling_interval_max_deviation_fraction": float(np.max(np.abs(dt - np.median(dt))) / np.median(dt)),
-                    "sampling_uniformity_tolerance": 1e-3})
+                    "sampling_uniformity_tolerance": 1e-3,
+                    "aliasing_assessment": "Not determined from samples alone; verify analogue anti-alias filtering and receiver bandwidth externally.",
+                    "stationarity_assessment": "Diagnostic only: split-record mean/RMS consistency; does not prove plasma stationarity."})
+        chunks = np.array_split(y0, min(int(stationarity_segments), t.size))
+        chunk_rms = np.asarray([np.sqrt(np.mean(chunk**2, axis=0)) for chunk in chunks])
+        chunk_means = np.asarray([np.mean(chunk, axis=0) for chunk in chunks])
+        rms_floor = np.maximum(np.sqrt(np.mean(y0**2, axis=0)), np.finfo(float).tiny)
+        out["stationarity_chunk_rms_relative_range"] = np.ptp(chunk_rms, axis=0) / rms_floor
+        out["stationarity_chunk_mean_relative_range"] = np.ptp(chunk_means, axis=0) / rms_floor
+        out["stationarity_flag"] = bool(np.any(out["stationarity_chunk_rms_relative_range"] > 0.5) or np.any(out["stationarity_chunk_mean_relative_range"] > 0.5))
+        if compute_cross_channel_spectra and f.size > 1:
+            pair_rows = []
+            for i in range(f.size):
+                for j in range(i + 1, f.size):
+                    cross_f, cross_p = cross_spectral_density(
+                        y0[:, i], y0[:, j], fs=fs, window="hann",
+                        nperseg=welch_nperseg, noverlap=welch_noverlap,
+                        detrend=False, scaling="density", return_onesided=True,
+                    )
+                    coh_f, coh = signal_coherence(
+                        y0[:, i], y0[:, j], fs=fs, window="hann",
+                        nperseg=welch_nperseg, noverlap=welch_noverlap,
+                        detrend=False,
+                    )
+                    pair_rows.append({
+                        "channel_i": int(i), "channel_j": int(j),
+                        "frequency_Hz": cross_f,
+                        "cross_spectrum_real": np.real(cross_p),
+                        "cross_spectrum_imag": np.imag(cross_p),
+                        "coherence_frequency_Hz": coh_f,
+                        "coherence": coh,
+                        "cross_phase_rad": np.angle(cross_p),
+                    })
+            out["cross_channel_spectra"] = pair_rows
+            out["cross_channel_spectra_note"] = "Cross-spectra/coherence are signal statistics, not automatic MHD-mode identification; channel timing/phase response must be independently known."
         if noise_std is not None:
             n = np.asarray(noise_std, dtype=float)
             if np.any(~np.isfinite(n)) or np.any(n < 0):
@@ -267,7 +313,10 @@ def reconstruct_ece_temperature_profile(
     brightness_temperature_uncertainty_eV=None, frequency_uncertainty_Hz=None,
     optical_depth_uncertainty=None, background_temperature_uncertainty_eV=0.0,
     major_radius_uncertainty_m=0.0, B_axis_uncertainty_T=0.0,
-    include_time_resolved_profile=False,
+    include_time_resolved_profile=False, profile_method="pchip",
+    equilibrium_radius_m=None, equilibrium_toroidal_field_T=None,
+    radius_mapping_uncertainty_m=None, channel_covariance_eV2=None,
+    temporal_correlation_adjustment=True,
 ):
     """Reconstruct a radial Te profile from already-calibrated ECE Tb [eV].
 
@@ -311,6 +360,31 @@ def reconstruct_ece_temperature_profile(
             raise ValueError(f"{uncertainty_name} must be finite and non-negative.")
     if not isinstance(include_time_resolved_profile, (bool, np.bool_)):
         raise ValueError("include_time_resolved_profile must be boolean.")
+    if profile_method not in {"linear", "pchip"}:
+        raise ValueError("profile_method must be 'linear' or 'pchip'.")
+    if not isinstance(temporal_correlation_adjustment, (bool, np.bool_)):
+        raise ValueError("temporal_correlation_adjustment must be boolean.")
+    if (equilibrium_radius_m is None) != (equilibrium_toroidal_field_T is None):
+        raise ValueError("equilibrium_radius_m and equilibrium_toroidal_field_T must be supplied together.")
+    if equilibrium_radius_m is not None:
+        eq_r = np.asarray(equilibrium_radius_m, dtype=float)
+        eq_b = np.asarray(equilibrium_toroidal_field_T, dtype=float)
+        if eq_r.ndim != 1 or eq_b.shape != eq_r.shape or eq_r.size < 3 or np.any(~np.isfinite(eq_r)) or np.any(~np.isfinite(eq_b)) or np.any(eq_r <= 0) or np.any(eq_b <= 0) or np.any(np.diff(eq_r) <= 0):
+            raise ValueError("Equilibrium radius/field arrays must be finite, positive, strictly increasing and have matching length >= 3.")
+    else:
+        eq_r = eq_b = None
+    if radius_mapping_uncertainty_m is not None:
+        radius_mapping_uncertainty_input = np.asarray(radius_mapping_uncertainty_m, dtype=float)
+        if radius_mapping_uncertainty_input.ndim > 1 or np.any(~np.isfinite(radius_mapping_uncertainty_input)) or np.any(radius_mapping_uncertainty_input < 0):
+            raise ValueError("radius_mapping_uncertainty_m must be finite and non-negative, scalar or per-channel.")
+    else:
+        radius_mapping_uncertainty_input = None
+    if channel_covariance_eV2 is not None:
+        covariance = np.asarray(channel_covariance_eV2, dtype=float)
+        if covariance.shape != (f.size, f.size) or np.any(~np.isfinite(covariance)) or not np.allclose(covariance, covariance.T, rtol=1e-8, atol=1e-12):
+            raise ValueError("channel_covariance_eV2 must be a finite symmetric channel-by-channel covariance matrix.")
+        if np.min(np.linalg.eigvalsh(covariance)) < -1e-10 * max(1.0, float(np.max(np.abs(covariance)))):
+            raise ValueError("channel_covariance_eV2 must be positive semidefinite.")
 
     def _channel_array(value, name, *, allow_time_matrix=False, strictly_positive=False):
         arr = np.asarray(value, dtype=float)
@@ -387,6 +461,21 @@ def reconstruct_ece_temperature_profile(
     if tb_sigma_input is not None:
         sigma_selected = tb_sigma_input[selected, :] if tb_sigma_input.shape == y.shape else np.broadcast_to(tb_sigma_input, selected_signal.shape)
         tb_mean_sigma = np.sqrt(np.sum(sigma_selected**2, axis=0)) / selected_signal.shape[0]
+        if temporal_correlation_adjustment and selected_signal.shape[0] > 2:
+            for channel in range(f.size):
+                centered = selected_signal[:, channel] - np.mean(selected_signal[:, channel])
+                energy = float(np.dot(centered, centered))
+                if energy <= np.finfo(float).tiny:
+                    continue
+                acf = np.correlate(centered, centered, mode="full")[centered.size - 1:] / energy
+                positive = acf[1:]
+                cutoff = np.flatnonzero(positive <= 0)
+                stop = int(cutoff[0]) if cutoff.size else positive.size
+                tau_int = max(1.0, 1.0 + 2.0 * float(np.sum(positive[:stop])))
+                n_eff = max(1.0, min(float(centered.size), centered.size / tau_int))
+                tb_mean_sigma[channel] *= np.sqrt(centered.size / n_eff)
+        if channel_covariance_eV2 is not None:
+            tb_mean_sigma = np.sqrt(np.maximum(0.0, tb_mean_sigma**2 + np.diag(covariance)))
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
     te_sigma = None
@@ -421,7 +510,17 @@ def reconstruct_ece_temperature_profile(
         inference = "Single-slab LTE inversion using user-supplied optical depth and background temperature."
 
     b_res = resonance_field_T(f, harmonic)
-    radius = float(major_radius_m) * float(B_axis_T) / b_res
+    if eq_r is None:
+        radius = float(major_radius_m) * float(B_axis_T) / b_res
+        mapping_model = "simplified circular toroidal field B(R)=B_axis*R_axis/R"
+    else:
+        if np.any(b_res < np.min(eq_b)) or np.any(b_res > np.max(eq_b)):
+            raise ValueError("Resonance field falls outside the supplied equilibrium B_phi(R) table; extrapolation is forbidden.")
+        if not (np.all(np.diff(eq_b) > 0) or np.all(np.diff(eq_b) < 0)):
+            raise ValueError("Supplied equilibrium B_phi(R) must be strictly monotonic for single-valued inversion.")
+        radius = np.interp(b_res, eq_b if eq_b[0] < eq_b[-1] else eq_b[::-1],
+                           eq_r if eq_b[0] < eq_b[-1] else eq_r[::-1])
+        mapping_model = "user-supplied monotonic equilibrium B_phi(R) table; not a full ray-tracing/flux-coordinate solution"
     radius_sigma = np.abs(radius) * np.sqrt(
         (float(major_radius_uncertainty_m) / float(major_radius_m))**2
         + (float(B_axis_uncertainty_T) / float(B_axis_T))**2
@@ -431,6 +530,8 @@ def reconstruct_ece_temperature_profile(
     if bandwidth is not None:
         bandwidth_radius_lower = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f + bandwidth / 2.0, harmonic)
         bandwidth_radius_upper = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f - bandwidth / 2.0, harmonic)
+    if radius_mapping_uncertainty_input is not None:
+        radius_sigma = np.sqrt(radius_sigma**2 + np.broadcast_to(radius_mapping_uncertainty_input, f.shape)**2)
     order = np.argsort(radius)
     r_sorted = radius[order]
     te_sorted = te_eV[order]
@@ -447,7 +548,7 @@ def reconstruct_ece_temperature_profile(
         if np.any(np.diff(r_profile) <= 0) or r_profile[0] < r_sorted[0] or r_profile[-1] > r_sorted[-1]:
             raise ValueError("profile_radius_m must be strictly increasing and remain within the measured resonance-radius range.")
 
-    profile_te = np.interp(r_profile, r_sorted, te_sorted)
+    profile_te = PchipInterpolator(r_sorted, te_sorted, extrapolate=False)(r_profile) if profile_method == "pchip" else np.interp(r_profile, r_sorted, te_sorted)
     profile_te_sigma = None
     if te_sigma_sorted is not None:
         right = np.clip(np.searchsorted(r_sorted, r_profile, side="right"), 1, r_sorted.size - 1)
@@ -455,6 +556,10 @@ def reconstruct_ece_temperature_profile(
         fraction = (r_profile - r_sorted[left]) / (r_sorted[right] - r_sorted[left])
         profile_te_sigma = np.sqrt(((1.0 - fraction) * te_sigma_sorted[left])**2 + (fraction * te_sigma_sorted[right])**2)
     profile_radius_sigma = np.interp(r_profile, r_sorted, radius_sigma_sorted)
+    local_gradient = np.gradient(profile_te, r_profile, edge_order=2)
+    profile_te_sigma_from_radius = np.abs(local_gradient) * profile_radius_sigma
+    if profile_te_sigma is not None:
+        profile_te_sigma = np.sqrt(profile_te_sigma**2 + profile_te_sigma_from_radius**2)
     output = {
         "frequency_Hz": f,
         "harmonic": int(harmonic),
@@ -480,9 +585,23 @@ def reconstruct_ece_temperature_profile(
         "optical_depth_condition_warning": optical_depth_condition_warning,
         "optical_depth_condition_message": optical_depth_condition_message,
         "optical_depth_inversion_sensitivity_dTe_dTb": None if tau is None else 1.0 / (-np.expm1(-tau)),
-        "profile_method": "linear interpolation between channel resonance locations; no extrapolation",
-        "equilibrium_model": "simplified circular toroidal field B(R)=B_axis*R_axis/R",
-        "uncertainty_method": "first-order independent-input propagation; excludes model discrepancy and correlations",
+        "profile_method": f"{profile_method} interpolation between channel resonance locations; no extrapolation; grid points are not independent measurements",
+        "profile_gradient_eV_per_m": local_gradient,
+        "profile_spatial_quality": {
+            "measured_channel_count": int(f.size),
+            "output_grid_point_count": int(r_profile.size),
+            "minimum_channel_spacing_m": float(np.min(np.diff(r_sorted))),
+            "maximum_channel_spacing_m": float(np.max(np.diff(r_sorted))),
+            "output_grid_is_not_measurement_resolution": True,
+            "feature_detection_status": "gradient-based flat-region candidates only; not transport-barrier identification",
+        },
+        "profile_uncertainty_from_radius_eV": profile_te_sigma_from_radius,
+        "profile_interpolation_method_sensitivity": (
+            float(np.max(np.abs(np.interp(r_profile, r_sorted, te_sorted) - profile_te)))
+            if profile_method == "pchip" else None
+        ),
+        "equilibrium_model": mapping_model,
+        "uncertainty_method": "first-order propagation with optional channel covariance, temporal autocorrelation estimate, and local radial-gradient contribution; model discrepancy remains unquantified",
         "assumptions": [
             "input channels are already calibrated brightness temperatures in eV; no calibration or conversion is performed",
             "non-relativistic cold resonance mapping",
@@ -498,6 +617,10 @@ def reconstruct_ece_temperature_profile(
             "time-resolved profiles are optional and are not a substitute for a radiative-transfer inversion",
         ],
     }
+    grad_abs = np.abs(local_gradient)
+    flat_threshold = max(float(np.nanpercentile(grad_abs, 25)), np.finfo(float).eps)
+    output["flat_region_candidate_mask"] = grad_abs <= flat_threshold
+    output["flat_region_candidate_note"] = "Gradient-based candidate mask only; does not identify a transport barrier without equilibrium, uncertainty and transport evidence."
     if include_time_resolved_profile:
         if tau is None:
             te_time = selected_signal.copy()
