@@ -1,24 +1,56 @@
-name: TCV L-H threshold scaling validation
+name: TCV L-H threshold discovery and validation
+
 on:
   push:
     paths:
+      - "tools/discover_tcv_lh_threshold_data.py"
       - "tools/validate_tcv_lh_threshold.py"
+      - ".github/workflows/tcv-lh-threshold-discovery.yml"
       - ".github/workflows/tcv-lh-threshold-validation.yml"
   workflow_dispatch:
+
 permissions:
   contents: read
+
 jobs:
-  validate:
+  discover:
+    name: Discover public TCV transition data
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - run: python -m pip install numpy pandas h5py
-      - run: python tools/validate_tcv_lh_threshold.py
-      - uses: actions/upload-artifact@v6
+      - name: Install discovery dependency
+        run: python -m pip install --disable-pip-version-check h5py
+      - name: Inspect public transition data sources
+        run: python tools/discover_tcv_lh_threshold_data.py
+      - name: Upload discovery provenance
         if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: tcv-lh-threshold-source
+          path: artifacts/tcv-lh-transition-source/
+          if-no-files-found: warn
+
+  validate:
+    name: Validate TCV L-H threshold scaling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install validation dependencies
+        run: python -m pip install --disable-pip-version-check numpy pandas h5py
+      - name: Run threshold scaling validation
+        run: python tools/validate_tcv_lh_threshold.py
+      - name: Upload validation outputs
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
           name: tcv-lh-threshold-validation
           path: artifacts/tcv-lh-threshold-validation/
+          if-no-files-found: warn
