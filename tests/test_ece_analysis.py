@@ -663,7 +663,7 @@ def test_extreme_frequencies_fail_cleanly_instead_of_returning_infinite_fields()
     with pytest.raises(ValueError, match="finite positive"):
         resonance_field_T(np.inf, 1)
     with pytest.raises(ValueError, match="overflowed"):
-        brightness_temperature_K(1e9, 1e308)
+        brightness_temperature_K(1e308, 1e9)
 
 
 
