@@ -952,14 +952,8 @@ def reconstruct_ece_temperature_profile(
                     dte_dtbg_time = -exp_tau / emissivity
                     te_time_variance += (dte_dtbg_time[None, :] * background_temperature_uncertainty_eV)**2
                 te_time_sigma = np.sqrt(te_time_variance)
-        if channel_covariance_eV2 is not None:
-            covariance_variance = np.diag(covariance)[None, :]
-            if tau is not None:
-                covariance_variance = covariance_variance / emissivity[None, :]**2
-            if te_time_sigma is None:
-                te_time_sigma = np.sqrt(np.broadcast_to(covariance_variance, te_time.shape))
-            else:
-                te_time_sigma = np.sqrt(te_time_sigma**2 + covariance_variance)
+        # channel_covariance_eV2 describes covariance of the time-window mean,
+        # not instantaneous samples, so it is intentionally excluded from Te(R,t).
         if te_time_sigma is not None and model_discrepancy_fraction > 0:
             te_time_sigma = np.sqrt(te_time_sigma**2 + (model_discrepancy_fraction * np.abs(te_time))**2)
         output["electron_temperature_channel_time_eV"] = te_time
@@ -977,36 +971,6 @@ def reconstruct_ece_temperature_profile(
             profile_time_sigma = np.vstack([
                 np.interp(r_profile, r_sorted, row[order]) for row in te_time_sigma
             ])
-            if channel_covariance_eV2 is not None:
-                # Preserve cross-channel covariance in each time-resolved profile.
-                # Remove the diagonal covariance contribution already represented
-                # by interpolated channel uncertainties before adding the full matrix.
-                covariance_diagonal = np.diag(te_cov_sorted)
-                for row_index, channel_te in enumerate(sorted_te_time):
-                    jacobian_time = np.empty((r_profile.size, f.size), dtype=float)
-                    for channel in range(f.size):
-                        step = np.sqrt(np.finfo(float).eps) * max(1.0, abs(channel_te[channel]))
-                        perturbed = channel_te.copy()
-                        perturbed[channel] += step
-                        if profile_method == "pchip":
-                            perturbed_profile = PchipInterpolator(
-                                r_sorted, perturbed, extrapolate=False
-                            )(r_profile)
-                        else:
-                            perturbed_profile = np.interp(r_profile, r_sorted, perturbed)
-                        jacobian_time[:, channel] = (perturbed_profile - profile_time[row_index]) / step
-                    full_variance = np.einsum(
-                        "ij,jk,ik->i", jacobian_time, te_cov_sorted, jacobian_time
-                    )
-                    diagonal_variance = np.einsum(
-                        "ij,j,ij->i", jacobian_time, covariance_diagonal, jacobian_time
-                    )
-                    independent_variance = np.maximum(
-                        0.0, profile_time_sigma[row_index]**2 - diagonal_variance
-                    )
-                    profile_time_sigma[row_index] = np.sqrt(
-                        np.maximum(0.0, full_variance + independent_variance)
-                    )
             # Add the radial-location contribution using each time slice's local gradient.
             for row_index, row in enumerate(profile_time):
                 profile_time_sigma[row_index] = np.sqrt(
@@ -1015,5 +979,6 @@ def reconstruct_ece_temperature_profile(
                 )
             output["electron_temperature_channel_time_uncertainty_eV"] = te_time_sigma
             output["electron_temperature_profile_time_uncertainty_eV"] = profile_time_sigma
+            output["time_resolved_uncertainty_note"] = "Time-resolved uncertainty excludes channel_covariance_eV2 because that matrix describes covariance of the time-window mean; use per-sample brightness_temperature_uncertainty_eV for time-resolved measurement uncertainty."
     return output
 
