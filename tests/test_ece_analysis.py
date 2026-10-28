@@ -294,3 +294,28 @@ def test_ece_contract_matches_precalibrated_profile_pipeline():
     assert any(item["name"] == "calibrated_brightness_temperature_eV" for item in contract["input_specs"])
     assert "must already be calibrated" in diagnostic["execution_contract"]["note"]
     assert diagnostic["implementation_status"].startswith("Complete within declared software scope")
+
+
+
+def test_ece_fluctuation_analysis_exposes_welch_psd_and_resolves_tone():
+    sample_rate = 20_000.0
+    time_s = np.arange(2048, dtype=float) / sample_rate
+    tone_hz = 1_250.0
+    signal = np.column_stack([
+        np.sin(2 * np.pi * tone_hz * time_s),
+        0.5 * np.sin(2 * np.pi * 2_000.0 * time_s),
+    ])
+    result = analyze_ece(
+        [80e9, 90e9], signal=signal, time_s=time_s,
+        mode="channel_fluctuations",
+    )
+
+    assert result["welch_psd"].shape == (
+        result["welch_psd_frequency_Hz"].size, 2
+    )
+    assert result["welch_psd_nperseg"] == 256
+    assert result["welch_psd_overlap_samples"] == 128
+    peak0 = result["welch_psd_frequency_Hz"][np.argmax(result["welch_psd"][:, 0])]
+    peak1 = result["welch_psd_frequency_Hz"][np.argmax(result["welch_psd"][:, 1])]
+    assert peak0 == pytest.approx(tone_hz, abs=sample_rate / 256)
+    assert peak1 == pytest.approx(2_000.0, abs=sample_rate / 256)
