@@ -23,6 +23,8 @@ def resonance_field_T(frequency_Hz, harmonic: int = 1):
     if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
         raise ValueError("harmonic must be a positive integer.")
     result = 2.0 * np.pi * M_E * f / (harmonic * E_CHARGE)
+    if np.any(~np.isfinite(result)) or np.any(result <= 0):
+        raise ValueError("Resonance-field calculation overflowed or left the representable physical range.")
     return float(result) if result.ndim == 0 else result
 
 
@@ -88,8 +90,60 @@ def brightness_temperature_K(spectral_radiance_W_m2_sr_Hz, frequency_Hz):
         raise ValueError("spectral radiance must be finite and non-negative.")
     if np.any(~np.isfinite(freq)) or np.any(freq <= 0):
         raise ValueError("frequency_Hz must be finite and positive.")
-    tb = C_LIGHT**2 * radiance / (2.0 * K_B * freq**2)
+    with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
+        tb = C_LIGHT**2 * radiance / (2.0 * K_B * freq**2)
+    if np.any(~np.isfinite(tb)) or np.any(tb < 0):
+        raise ValueError("Brightness-temperature calculation overflowed; check physical units and numeric range.")
     return float(tb) if tb.ndim == 0 else tb
+
+
+
+def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
+                                   response_frequency_Hz, response_weight):
+    """Apply a user-supplied receiver spectral response to calibrated radiance.
+
+    response_weight has shape (channel, response_frequency) and is integrated
+    against the supplied spectrum by linear interpolation. Each response row
+    is normalized by its trapezoidal integral; no detector calibration or
+    response-function inference is performed.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    radiance = np.asarray(spectral_radiance_W_m2_sr_Hz, dtype=float)
+    rf = np.asarray(response_frequency_Hz, dtype=float)
+    weights = np.asarray(response_weight, dtype=float)
+    if f.ndim != 1 or f.size < 2 or np.any(~np.isfinite(f)) or np.any(f <= 0) or np.any(np.diff(f) <= 0):
+        raise ValueError("frequency_Hz must be finite, positive, strictly increasing, and contain at least two points.")
+    if radiance.shape[-1:] != f.shape or np.any(~np.isfinite(radiance)) or np.any(radiance < 0):
+        raise ValueError("spectral_radiance_W_m2_sr_Hz must be finite, non-negative and match the frequency axis.")
+    if rf.ndim != 1 or rf.size < 2 or np.any(~np.isfinite(rf)) or np.any(rf <= 0) or np.any(np.diff(rf) <= 0):
+        raise ValueError("response_frequency_Hz must be finite, positive, strictly increasing, and contain at least two points.")
+    if weights.ndim != 2 or weights.shape[1] != rf.size or weights.shape[0] < 1 or np.any(~np.isfinite(weights)) or np.any(weights < 0):
+        raise ValueError("response_weight must be a finite non-negative (channel, response-frequency) matrix.")
+    if rf[0] < f[0] or rf[-1] > f[-1]:
+        raise ValueError("Receiver response frequencies must lie within the measured radiance spectrum; extrapolation is forbidden.")
+    integrals = np.trapezoid(weights, rf, axis=1)
+    if np.any(~np.isfinite(integrals)) or np.any(integrals <= 0):
+        raise ValueError("Every receiver-response channel must have positive finite integrated weight.")
+    normalized = weights / integrals[:, None]
+    sampled = np.asarray([np.interp(rf, f, row) for row in radiance.reshape(-1, f.size)])
+    sampled = sampled.reshape(*radiance.shape[:-1], rf.size)
+    effective = np.einsum("...k,ck,k->...c", sampled, normalized, np.gradient(rf))
+    # Use trapezoidal quadrature rather than gradient weights for irregular grids.
+    effective = np.stack([
+        np.trapezoid(sampled * normalized[channel], rf, axis=-1)
+        for channel in range(weights.shape[0])
+    ], axis=-1)
+    if np.any(~np.isfinite(effective)) or np.any(effective < 0):
+        raise ValueError("Receiver-response convolution produced non-finite or negative radiance.")
+    return {
+        "channel_spectral_radiance_W_m2_sr_Hz": effective,
+        "response_frequency_Hz": rf,
+        "normalized_response_weight": normalized,
+        "response_channel_count": int(weights.shape[0]),
+        "response_convolution_performed": True,
+        "calibration_performed": False,
+        "limitations": ["Uses the user-supplied response kernel and linear interpolation of the supplied calibrated spectrum.", "Does not perform radiative-transfer inversion or infer missing spectral coverage."],
+    }
 
 
 def brightness_temperature_eV(spectral_radiance_W_m2_sr_Hz, frequency_Hz):
