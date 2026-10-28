@@ -190,7 +190,7 @@ def reconstruct_ece_temperature_profile(
     signal_to_brightness_temperature_eV_offset, *,
     major_radius_m, B_axis_T, harmonic=2, optical_depth=None,
     background_temperature_eV=0.0, assume_optically_thick=False,
-    profile_radius_m=None,
+    profile_radius_m=None, time_window_s=None,
 ):
     """Estimate a radial Te profile using user-supplied signal conversion.
 
@@ -246,7 +246,21 @@ def reconstruct_ece_temperature_profile(
     if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
         raise ValueError("time_s must be approximately uniformly sampled; inspect or explicitly resample acquisition data.")
 
-    mean_signal = np.mean(y, axis=0)
+    if time_window_s is None:
+        window_start, window_end = float(t[0]), float(t[-1])
+    else:
+        window = np.asarray(time_window_s, dtype=float)
+        if window.shape != (2,) or np.any(~np.isfinite(window)) or window[0] > window[1]:
+            raise ValueError("time_window_s must contain finite (start_s, end_s) with start <= end.")
+        window_start, window_end = map(float, window)
+        if window_start < t[0] or window_end > t[-1]:
+            raise ValueError("time_window_s must lie within the supplied time_s range.")
+    selected = (t >= window_start) & (t <= window_end)
+    if np.count_nonzero(selected) < 1:
+        raise ValueError("time_window_s contains no acquired samples.")
+    selected_time = t[selected]
+    selected_signal = y[selected, :]
+    mean_signal = np.mean(selected_signal, axis=0)
     tb_eV = gain * mean_signal + offset
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Supplied signal conversion produced negative or non-finite brightness temperature.")
@@ -280,6 +294,8 @@ def reconstruct_ece_temperature_profile(
         "frequency_Hz": f,
         "harmonic": int(harmonic),
         "mean_raw_signal": mean_signal,
+        "selected_time_window_s": [window_start, window_end],
+        "selected_sample_count": int(selected_time.size),
         "signal_to_brightness_temperature_eV_gain": gain,
         "signal_to_brightness_temperature_eV_offset": offset,
         "brightness_temperature_eV": tb_eV,
@@ -303,6 +319,7 @@ def reconstruct_ece_temperature_profile(
             "no finite-bandwidth convolution or regularized inverse problem",
             "no uncertainty propagation",
             "temperature inference depends on user-supplied optical depth or optically thick assertion",
+            "channel values are averaged over the selected time window; time evolution is not reconstructed",
         ],
     }
 
