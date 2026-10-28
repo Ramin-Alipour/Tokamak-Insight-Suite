@@ -129,3 +129,20 @@ Before interpreting results, document and verify:
 - comparison with an independent diagnostic or a trusted synthetic diagnostic before claiming device-level validation.
 
 The workflow intentionally reports the model and its limitations rather than silently upgrading a simplified estimate into a device-validated physical inference.
+
+## Radial electron-temperature profile reconstruction
+
+The dashboard also offers a **Temperature profile reconstruction** workflow for a time-by-channel table. It calculates the temporal mean per channel, converts each channel using user-supplied linear coefficients
+
+`Tb[eV] = gain[eV / signal_unit] × mean(signal) + offset[eV]`
+
+and maps channel frequencies to approximate resonance radii using the same simplified toroidal-field model. These coefficients must come from the user's own instrument calibration; the software does not calibrate detector counts or voltage.
+
+For temperature inference, the user must either supply optical depth per channel and a background brightness temperature, using the single-slab LTE relation
+
+`Tb = Te (1 - exp(-tau)) + Tbg exp(-tau)`
+
+or explicitly declare the optically thick approximation `Te ≈ Tb`. The app does not silently assume that brightness temperature is electron temperature.
+
+The profile is a linear interpolation between distinct channel resonance locations and is restricted to the measured radial interval. It is a profile estimate, not a regularized inversion of a full radiative-transfer forward model. It currently does not propagate uncertainties, model finite channel bandwidth, perform ray tracing, or use EFIT equilibrium. Results must therefore report these assumptions and must not be described as device-validated without independent validation.
+
