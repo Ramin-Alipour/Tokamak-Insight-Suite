@@ -639,6 +639,9 @@ def test_receiver_response_convolution_preserves_flat_spectrum_and_no_calibratio
     )
     assert result["response_convolution_performed"] is True
     assert result["calibration_performed"] is False
+    assert result["effective_center_frequency_Hz"].shape == (2,)
+    assert np.all(result["effective_center_frequency_Hz"] > 85e9)
+    assert np.all(result["effective_center_frequency_Hz"] < 95e9)
 
 
 def test_receiver_response_rejects_uncovered_or_invalid_response():
