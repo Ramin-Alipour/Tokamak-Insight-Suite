@@ -90,6 +90,7 @@ def test_ece_temperature_profile_dashboard_from_uploaded_multichannel_data():
     assert not app.exception, [str(x.value) for x in app.exception]
     app.selectbox(key="ece_profile_time_col").set_value("time_s").run()
     app.multiselect(key="ece_profile_signal_cols").set_value(["ece_80", "ece_90", "ece_100"]).run()
+    assert not any("gain to Tb" in x.label or "offset to Tb" in x.label for x in app.text_input)
     app.checkbox(key="ece_profile_thick").check().run()
     app.number_input(key="ece_profile_window_start").set_value(0.0).run()
     app.number_input(key="ece_profile_window_end").set_value(10e-6).run()
