@@ -896,6 +896,14 @@ def reconstruct_ece_temperature_profile(
                     dte_dtbg_time = -exp_tau / emissivity
                     te_time_variance += (dte_dtbg_time[None, :] * background_temperature_uncertainty_eV)**2
                 te_time_sigma = np.sqrt(te_time_variance)
+        if channel_covariance_eV2 is not None:
+            covariance_variance = np.diag(covariance)[None, :]
+            if tau is not None:
+                covariance_variance = covariance_variance / emissivity[None, :]**2
+            if te_time_sigma is None:
+                te_time_sigma = np.sqrt(np.broadcast_to(covariance_variance, te_time.shape))
+            else:
+                te_time_sigma = np.sqrt(te_time_sigma**2 + covariance_variance)
         output["electron_temperature_channel_time_eV"] = te_time
         profile_time = np.vstack([
             PchipInterpolator(r_sorted, row[order], extrapolate=False)(r_profile)
