@@ -808,18 +808,19 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Electron Cyclotron Emission (ECE)",
-    "quantities": "ECE resonance mapping, calibrated brightness/electron-temperature estimate, channel fluctuations and spectra",
+    "quantities": "ECE resonance mapping, calibrated brightness temperature, inferred radial electron-temperature profile under declared assumptions, channel fluctuations and spectra",
     "status": "D",
-    "method": "Validated ECE workflow: non-relativistic harmonic resonance field; optional simplified circular-toroidal-field resonance mapping; calibrated spectral-radiance to Rayleigh–Jeans brightness temperature; multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata.",
+    "method": "Validated ECE workflow: non-relativistic harmonic resonance field; optional simplified circular-toroidal-field resonance mapping; calibrated spectral-radiance to Rayleigh–Jeans brightness temperature; multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata. Added radial Te estimate from user-supplied per-channel signal-to-brightness-temperature coefficients, optical-depth inversion or explicit optically-thick assumption, and interpolation between approximate resonance locations.",
     "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Accurate channel-to-flux-surface mapping requires equilibrium reconstruction and ray tracing; account for relativistic/Doppler shifts, harmonics, polarization/mode, optical depth, calibration, bandwidth, IF response, and nonthermal populations. Simplified circular B(R) mapping is explicitly approximate.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
       "tokamak_analysis.ece_analysis.resonance_field_T",
       "tokamak_analysis.ece_analysis.resonance_radius_m",
       "tokamak_analysis.ece_analysis.brightness_temperature_K",
-      "tokamak_analysis.ece_analysis.brightness_temperature_eV"
+      "tokamak_analysis.ece_analysis.brightness_temperature_eV",
+      "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within declared software scope: validated cold-resonance field calculation, optional circular toroidal-field major-radius mapping, calibrated Rayleigh–Jeans brightness temperature, multichannel fluctuation RMS and one-sided FFT PSD with sampling/Nyquist metadata. Dashboard provides numerical tables, plots, JSON exports, and configurable RMS-noise threshold. Device calibration, line-of-sight/equilibrium reconstruction, relativistic corrections, and independent experimental validation are not claimed.",
+    "implementation_status": "Complete within declared software scope: validated cold-resonance field calculation, optional simplified circular toroidal-field major-radius mapping, calibrated Rayleigh–Jeans brightness temperature, multichannel fluctuation RMS/one-sided FFT PSD, and a radial Te profile estimate using user-supplied signal conversion and explicit optical-depth/optically-thick assumptions. Dashboard provides numerical tables, plots, JSON exports, and input validation. The profile uses approximate resonance radii and interpolation only; no detector calibration, EFIT/ray tracing, full radiative-transfer inversion, uncertainty propagation, or independent experimental validation is claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -898,6 +899,32 @@
           "description": "Optional nonnegative optical depth metadata; not sufficient alone to validate Te inference.",
           "required": false,
           "minimum": 0
+        },
+        {
+          "name": "signal_to_brightness_temperature_eV_gain",
+          "unit": "eV per signal unit",
+          "description": "User-supplied positive linear conversion gain, scalar or one per channel; no software calibration.",
+          "required": false,
+          "minimum": 1e-15
+        },
+        {
+          "name": "signal_to_brightness_temperature_eV_offset",
+          "unit": "eV",
+          "description": "User-supplied finite conversion offset, scalar or one per channel.",
+          "required": false
+        },
+        {
+          "name": "background_temperature_eV",
+          "unit": "eV",
+          "description": "Background brightness temperature for single-slab LTE optical-depth inversion.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "assume_optically_thick",
+          "unit": "boolean",
+          "description": "Explicit user assertion to use Te approximately equal to Tb if optical depth is not supplied.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -940,6 +967,21 @@
           "name": "nyquist_frequency_Hz",
           "unit": "Hz",
           "description": "Nyquist frequency for the sampled signal."
+        },
+        {
+          "name": "electron_temperature_channel_eV",
+          "unit": "eV",
+          "description": "Per-channel Te estimate based on user-supplied conversion and declared temperature-inference assumptions."
+        },
+        {
+          "name": "electron_temperature_profile_eV",
+          "unit": "eV",
+          "description": "Linearly interpolated radial Te estimate between measured channel resonance locations."
+        },
+        {
+          "name": "profile_radius_m",
+          "unit": "m",
+          "description": "Radial grid within the approximate measured resonance-radius range."
         }
       ],
       "assumptions": [
@@ -954,14 +996,15 @@
         "Check channel ordering, bandwidth, saturation, missing samples, and noise floor.",
         "For fluctuations, subtract per-channel mean and report Nyquist frequency."
       ],
-      "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. For calibrated radiance compute T_b=c^2 I_nu/(2 k_B f^2), then express k_B*T_b in eV. For fluctuation mode compute per-channel RMS and one-sided FFT PSD.",
+      "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. For calibrated radiance compute T_b=c^2 I_nu/(2 k_B f^2), then express k_B*T_b in eV. For fluctuation mode compute per-channel RMS and one-sided FFT PSD. For temperature_profile_reconstruction, average the finite time series per channel, apply user-supplied linear signal-to-Tb conversion, infer Te using the single-slab LTE optical-depth relation or explicit optically thick assumption, map channel frequency to approximate radius, and linearly interpolate only within the measured radius interval.",
       "uncertainty_model": "No universal uncertainty is inferred. Propagate supplied calibration, radiance, frequency, bandwidth, equilibrium, and noise uncertainties externally; outputs are deterministic conditional on inputs.",
       "limitations": [
         "No raw receiver/IF calibration or instrument response deconvolution.",
         "No automatic EFIT equilibrium, ray tracing, polarization, relativistic/Doppler correction, or optical-depth solver.",
         "Circular-field radius is a simplified estimate, not a flux-surface coordinate.",
         "Brightness temperature is not automatically electron temperature.",
-        "FFT PSD is a basic periodogram, not Welch-averaged or confidence-bounded."
+        "FFT PSD is a basic periodogram, not Welch-averaged or confidence-bounded.",
+        "Radial profile is interpolation, not a regularized full radiative-transfer inversion; no uncertainty propagation."
       ],
       "function_links": [
         "tokamak_analysis.ece_analysis.analyze_ece",
