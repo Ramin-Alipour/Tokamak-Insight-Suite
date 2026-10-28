@@ -911,11 +911,15 @@ def reconstruct_ece_temperature_profile(
         if te_time_sigma is not None and model_discrepancy_fraction > 0:
             te_time_sigma = np.sqrt(te_time_sigma**2 + (model_discrepancy_fraction * np.abs(te_time))**2)
         output["electron_temperature_channel_time_eV"] = te_time
-        profile_time = np.vstack([
-            PchipInterpolator(r_sorted, row[order], extrapolate=False)(r_profile)
-            if profile_method == "pchip" else np.interp(r_profile, r_sorted, row[order])
-            for row in te_time
-        ])
+        sorted_te_time = te_time[:, order]
+        if profile_method == "pchip":
+            profile_time = PchipInterpolator(
+                r_sorted, sorted_te_time, axis=1, extrapolate=False
+            )(r_profile)
+        else:
+            profile_time = np.vstack([
+                np.interp(r_profile, r_sorted, row) for row in sorted_te_time
+            ])
         output["electron_temperature_profile_time_eV"] = profile_time
         if te_time_sigma is not None:
             profile_time_sigma = np.vstack([
