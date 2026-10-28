@@ -810,8 +810,8 @@
     "diagnostic": "Electron Cyclotron Emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness temperature, inferred radial electron-temperature profile under declared assumptions, channel fluctuations and spectra",
     "status": "D",
-    "method": "ECE analysis pipeline: non-relativistic harmonic resonance mapping, optional approximate circular-field radius mapping, Rayleigh–Jeans brightness temperature from already-calibrated spectral radiance, multichannel fluctuation RMS and one-sided FFT PSD, and separate radial Te profile reconstruction from already-calibrated brightness-temperature samples under explicit optical-depth assumptions.",
-    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Accurate channel-to-flux-surface mapping requires equilibrium reconstruction and ray tracing; account for relativistic/Doppler shifts, harmonics, polarization/mode, optical depth, calibration, bandwidth, IF response, and nonthermal populations. Simplified circular B(R) mapping is explicitly approximate.",
+    "method": "ECE analysis with four dashboard workflows: Rayleigh–Jeans brightness temperature from calibrated radiance; cold resonance field and optional circular-field radius mapping; multi-channel RMS, full-record periodogram and Welch PSD with approximate confidence intervals and optional white-noise PSD reference; and radial/time-resolved Te profile estimates from already-calibrated brightness-temperature inputs.",
+    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Circular-field mapping is approximate, not EFIT or ray tracing. Profile uncertainty is first-order for supplied independent uncertainties and excludes model discrepancy/covariance. Finite channel bandwidth is shown as a radial localization envelope, not a full receiver-response convolution. Low optical depth can make LTE inversion ill-conditioned. No experimental validation is implied.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
       "tokamak_analysis.ece_analysis.resonance_field_T",
@@ -820,7 +820,7 @@
       "tokamak_analysis.ece_analysis.brightness_temperature_eV",
       "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within declared software scope: callable analysis and dashboard workflows for resonance field, approximate radius mapping, brightness temperature from calibrated radiance, channel fluctuation RMS/PSD with sampling metadata, and time-windowed radial Te profile reconstruction from already-calibrated brightness temperature. No detector calibration is performed. Profile localization is approximate and interpolation-only; no EFIT/ray tracing, relativistic/Doppler correction, full radiative-transfer inversion, or profile uncertainty propagation is claimed.",
+    "implementation_status": "Complete within declared software scope: the dashboard exposes brightness-temperature calculation, resonance mapping, channel fluctuation/periodogram/Welch PSD with approximate confidence bounds, and time-windowed profile reconstruction with optional first-order uncertainty propagation, bandwidth-derived radial localization envelope, and time-resolved Te(R,t). Inputs are already calibrated; no detector calibration is performed. Localization uses a simplified circular toroidal-field model and interpolation, not EFIT/ray tracing or a radiative-transfer inversion.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -918,6 +918,62 @@
           "unit": "eV",
           "description": "Already-calibrated brightness-temperature samples in eV, shaped (time samples, channels); required by the separate temperature-profile reconstruction workflow.",
           "required": false
+        },
+        {
+          "name": "psd_confidence_level",
+          "unit": "dimensionless",
+          "description": "Confidence level between 0 and 1 for approximate Welch PSD confidence bounds.",
+          "required": false,
+          "minimum": 0,
+          "maximum": 1
+        },
+        {
+          "name": "brightness_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional independent 1-sigma uncertainty: scalar, per channel, or time-by-channel matrix for calibrated brightness temperature.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "frequency_uncertainty_Hz",
+          "unit": "Hz",
+          "description": "Optional non-negative 1-sigma center-frequency uncertainty, scalar or per channel.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "optical_depth_uncertainty",
+          "unit": "dimensionless",
+          "description": "Optional non-negative 1-sigma uncertainty for supplied per-channel optical depth.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "background_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional non-negative 1-sigma background-temperature uncertainty.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "major_radius_uncertainty_m",
+          "unit": "m",
+          "description": "Optional non-negative 1-sigma uncertainty in reference major radius for approximate mapping.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "B_axis_uncertainty_T",
+          "unit": "T",
+          "description": "Optional non-negative 1-sigma uncertainty in reference toroidal field for approximate mapping.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "include_time_resolved_profile",
+          "unit": "boolean",
+          "description": "Optional flag to return per-sample channel and radial Te estimates within the selected time window.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -975,28 +1031,156 @@
           "name": "profile_radius_m",
           "unit": "m",
           "description": "Radial grid within the approximate measured resonance-radius range."
+        },
+        {
+          "name": "welch_psd_confidence_lower",
+          "unit": "signal units^2/Hz",
+          "description": "Approximate lower confidence bound for Welch PSD using effective degrees of freedom for overlapping segments."
+        },
+        {
+          "name": "welch_psd_confidence_upper",
+          "unit": "signal units^2/Hz",
+          "description": "Approximate upper confidence bound for Welch PSD."
+        },
+        {
+          "name": "welch_psd_degrees_of_freedom_approx",
+          "unit": "dimensionless",
+          "description": "Approximate effective degrees of freedom accounting for overlap correlation."
+        },
+        {
+          "name": "white_noise_psd_expected",
+          "unit": "signal units^2/Hz",
+          "description": "Expected one-sided PSD reference for supplied time-domain RMS white-noise estimate; not subtracted."
+        },
+        {
+          "name": "sampling_interval_max_deviation_fraction",
+          "unit": "dimensionless",
+          "description": "Maximum relative deviation of sample intervals from their median."
+        },
+        {
+          "name": "electron_temperature_channel_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional first-order uncertainty from supplied brightness-temperature, optical-depth and background uncertainties."
+        },
+        {
+          "name": "electron_temperature_profile_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional linearly propagated profile uncertainty under independent channel-error assumptions."
+        },
+        {
+          "name": "resonance_radius_uncertainty_m",
+          "unit": "m",
+          "description": "Optional first-order uncertainty in approximate resonance radius from supplied R0, B0 and frequency uncertainties."
+        },
+        {
+          "name": "resonance_radius_bandwidth_lower_m",
+          "unit": "m",
+          "description": "Lower radial localization envelope edge implied by finite channel bandwidth."
+        },
+        {
+          "name": "resonance_radius_bandwidth_upper_m",
+          "unit": "m",
+          "description": "Upper radial localization envelope edge implied by finite channel bandwidth."
+        },
+        {
+          "name": "electron_temperature_profile_time_eV",
+          "unit": "eV",
+          "description": "Optional time-resolved Te profile array within the selected window."
+        },
+        {
+          "name": "optical_depth_condition_warning",
+          "unit": "boolean",
+          "description": "True when any supplied optical depth is below 1e-3 and the inversion is strongly ill-conditioned."
+        },
+        {
+          "name": "selected_time_s",
+          "unit": "s",
+          "description": "Selected acquired sample times in the requested profile window."
+        },
+        {
+          "name": "brightness_temperature_uncertainty_eV",
+          "unit": "eV",
+          "description": "Optional first-order uncertainty of the time-window mean brightness temperature."
+        },
+        {
+          "name": "profile_radius_uncertainty_m",
+          "unit": "m",
+          "description": "Optional interpolated uncertainty of the approximate radial coordinate."
+        },
+        {
+          "name": "welch_psd_confidence_level",
+          "unit": "dimensionless",
+          "description": "Requested confidence level for approximate Welch PSD bounds."
+        },
+        {
+          "name": "welch_psd_segment_count",
+          "unit": "count",
+          "description": "Number of segments contributing to Welch PSD."
+        },
+        {
+          "name": "sampling_interval_median_s",
+          "unit": "s",
+          "description": "Median acquired sample interval."
+        },
+        {
+          "name": "sampling_uniformity_tolerance",
+          "unit": "dimensionless",
+          "description": "Relative tolerance used to validate sample interval uniformity."
+        },
+        {
+          "name": "above_noise_rms",
+          "unit": "boolean",
+          "description": "Per-channel indicator that fluctuation RMS exceeds the supplied RMS noise estimate."
+        },
+        {
+          "name": "welch_psd_above_expected_white_noise",
+          "unit": "boolean",
+          "description": "Per-frequency and per-channel comparison against expected white-noise PSD reference."
+        },
+        {
+          "name": "optical_depth_inversion_sensitivity_dTe_dTb",
+          "unit": "dimensionless",
+          "description": "Sensitivity of the single-slab Te inversion to brightness-temperature input."
+        },
+        {
+          "name": "optical_depth_condition_message",
+          "unit": "text",
+          "description": "Warning explanation when low optical depth makes inversion ill-conditioned."
+        },
+        {
+          "name": "electron_temperature_channel_time_eV",
+          "unit": "eV",
+          "description": "Optional time-resolved per-channel electron-temperature estimates within the selected window."
+        },
+        {
+          "name": "channel_bandwidth_Hz",
+          "unit": "Hz",
+          "description": "Optional supplied channel bandwidth used to calculate a radial localization envelope."
         }
       ],
       "assumptions": [
         "Resonance formula assumes non-relativistic electrons and the specified harmonic.",
         "Supplied spectral radiance and brightness-temperature data are already calibrated; TIS performs no detector calibration.",
         "Temperature interpretation requires optical-depth/thermalization assumptions; brightness temperature is not automatically electron temperature.",
-        "FFT mode requires finite, approximately uniformly sampled channels.",
-        "Profile reconstruction uses a simplified circular toroidal-field model and interpolates only within measured resonance locations."
+        "Fluctuation analysis requires finite, approximately uniformly sampled, synchronized channels; anti-aliasing and acquisition quality remain user responsibilities.",
+        "Profile reconstruction uses a simplified circular toroidal-field model and interpolates only within measured resonance locations.",
+        "Optional uncertainty propagation assumes independent input uncertainties and first-order linearization; model discrepancy and correlations are excluded."
       ],
       "preprocessing": [
-        "Check channel frequency ordering, units, saturation, missing samples, bandwidth, noise floor, and calibration provenance; no calibration is performed by TIS.",
-        "For fluctuations, subtract per-channel mean and report sampling and Nyquist frequencies.",
-        "For profile reconstruction, use already-calibrated brightness-temperature samples, select a time window, and supply optical depth or explicitly assert the optically thick approximation."
+        "Validate positive channel frequencies, paired channel selection, finite synchronized samples, monotonic time, sampling uniformity and optional uncertainty shapes; do not silently discard invalid rows.",
+        "For fluctuations, subtract per-channel mean, report sampling and Nyquist frequencies, full-record periodogram, Welch PSD confidence bounds and optional white-noise PSD reference.",
+        "For profile reconstruction, use already-calibrated brightness-temperature samples, select a valid time window, and supply optical depth or explicitly assert the optically thick approximation.",
+        "Sort channel frequencies and their associated measurements/uncertainties together. Report bandwidth-derived radial localization envelopes where bandwidth is supplied."
       ],
-      "algorithm": "Compute f_ce=s*e*B/(2*pi*m_e); optionally invert B(R)=B_axis*R_axis/R. Convert already-calibrated spectral radiance to Rayleigh–Jeans brightness temperature. For fluctuations, compute per-channel RMS and one-sided FFT PSD. In the separate profile workflow, average already-calibrated brightness-temperature samples over the selected time window, infer Te using the declared single-slab LTE optical-depth relation or explicit optically thick assumption, map channel frequencies to approximate resonance radii, and interpolate only within the measured radius interval.",
-      "uncertainty_model": "No universal uncertainty is inferred. ECE profile reconstruction does not currently propagate brightness-temperature, optical-depth, frequency, or equilibrium uncertainties; uncertainty analysis must be performed externally.",
+      "algorithm": "Compute cold non-relativistic harmonic resonance field and optional circular toroidal-field radius estimate. Convert already-calibrated spectral radiance to Rayleigh–Jeans brightness temperature. For fluctuations compute per-channel RMS, full-record one-sided periodogram, Hann-window Welch PSD with 50% overlap, approximate chi-square confidence bounds based on overlap-adjusted effective degrees of freedom, sampling audit, and optional expected white-noise PSD reference. In the separate profile workflow, average already-calibrated brightness-temperature samples over the selected window, infer Te using the supplied single-slab LTE optical-depth relation or explicit optically thick assumption, propagate optional independent input uncertainties to channel/profile estimates, report bandwidth-derived radial localization envelope, optionally retain time-resolved Te(R,t), and interpolate only within measured approximate resonance radii.",
+      "uncertainty_model": "Welch PSD confidence intervals use approximate effective degrees of freedom for correlated overlapping segments. Optional profile uncertainties use first-order independent-input propagation for supplied brightness-temperature, optical-depth, background-temperature, frequency, major-radius and toroidal-field uncertainties; covariance and model discrepancy are excluded. Bandwidth-derived radius envelopes are localization bounds, not statistical confidence intervals.",
       "limitations": [
         "No detector/receiver calibration, instrument-response deconvolution, automatic EFIT equilibrium, ray tracing, polarization correction, relativistic/Doppler correction, or optical-depth solver.",
         "Circular-field radius is a simplified major-radius estimate, not a flux-surface coordinate.",
         "Brightness temperature is not automatically electron temperature.",
-        "FFT PSD is a basic periodogram, not Welch-averaged or confidence-bounded.",
-        "Radial profile is time-window-averaged linear interpolation, not a regularized radiative-transfer inversion; no profile uncertainty propagation.",
+        "Welch confidence bounds are approximate and assume the stationarity/segment model; supplied white-noise PSD is a reference and is not subtracted.",
+        "Radial profile remains interpolation-based, not a regularized radiative-transfer inversion. Finite bandwidth is represented by a localization envelope rather than receiver-response convolution.",
+        "Profile uncertainties exclude correlated inputs and model discrepancy; very low optical depth (<1e-3) is ill-conditioned.",
         "All radiance and brightness-temperature inputs must already be calibrated before import."
       ],
       "function_links": [
@@ -1008,9 +1192,9 @@
         "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
       ],
       "raw_data_to_physics": true,
-      "note": "Implemented ECE analysis pipeline, not merely formula reference. The dashboard executes brightness-temperature calculations, resonance mapping, channel fluctuation/PSD analysis, time-windowed profile reconstruction, plots, and JSON exports within the declared scope. Input spectral radiance and profile brightness-temperature data must already be calibrated; TIS performs no detector calibration. Do not imply EFIT-grade localization or experimental validation."
+      "note": "The dashboard and Python API execute four ECE workflows: calibrated-radiance brightness temperature, resonance mapping, multi-channel fluctuation/periodogram/Welch PSD, and time-windowed profile reconstruction with optional uncertainty, bandwidth-envelope and time-resolved outputs. Inputs must already be calibrated; no detector calibration is performed. Approximate model outputs are not experimental validation."
     },
-    "note": "The built-in dashboard and Python API execute ECE brightness-temperature, resonance-mapping, fluctuation/PSD, and temperature-profile workflows. Input radiance and profile brightness-temperature data must already be calibrated. Completeness is limited to this declared software scope and is not experimental validation."
+    "note": "The built-in dashboard and Python API expose brightness-temperature, resonance-mapping, fluctuation/PSD, and profile-reconstruction workflows. Welch PSD includes approximate confidence bounds; profile reconstruction optionally reports first-order uncertainty, bandwidth localization envelope, and time-resolved Te(R,t). Inputs must already be calibrated. No detector calibration or EFIT-grade localization is claimed."
   },
   {
     "family": "Plasma parameters",
