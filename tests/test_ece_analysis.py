@@ -273,3 +273,24 @@ def test_ece_profile_rejects_invalid_or_out_of_range_time_window():
             frequencies, signal, time_s,
             time_window_s=(-1.0, 2.0), **kwargs,
         )
+
+
+def test_ece_contract_matches_precalibrated_profile_pipeline():
+    import json
+    from pathlib import Path
+    from tokamak_analysis.analysis_registry import ANALYSES
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    root = Path(__file__).resolve().parents[1]
+    diagnostic_rows = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    diagnostic = next(row for row in diagnostic_rows if row["diagnostic"].casefold() == "electron cyclotron emission (ece)")
+    analysis = next(row for row in ANALYSES if row["id"] == 3)
+    contract = analysis["execution_contract"]
+
+    assert callable(reconstruct_ece_temperature_profile)
+    assert contract["completeness"] == "complete_with_declared_scope"
+    assert "signal_to_brightness_temperature_eV_gain" not in {item["name"] for item in contract["input_specs"]}
+    assert "signal_to_brightness_temperature_eV_offset" not in {item["name"] for item in contract["input_specs"]}
+    assert any(item["name"] == "calibrated_brightness_temperature_eV" for item in contract["input_specs"])
+    assert "already-calibrated" in diagnostic["execution_contract"]["note"]
+    assert diagnostic["implementation_status"].startswith("Complete within declared software scope")
