@@ -5,11 +5,11 @@
 The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and exposed in the Streamlit workspace. It supports four explicitly scoped workflows:
 
 1. **Brightness temperature** from absolutely calibrated spectral radiance.
-2. **Channel fluctuations and one-sided periodogram PSD** from aligned multi-channel time series.
+2. **Channel fluctuations, full-record one-sided periodogram, and Hann-window Welch PSD** from aligned multi-channel time series, with approximate PSD confidence intervals and an optional white-noise reference.
 3. **Cold resonance mapping** from channel frequency to resonance field, with an optional simplified circular toroidal-field major-radius estimate.
 4. **Time-windowed radial electron-temperature profile reconstruction** from already-calibrated brightness-temperature samples, using supplied optical depth with a single-slab LTE inversion or an explicit optically-thick assumption.
 
-The implementation is complete within this scope. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not constitute experimental validation for a particular tokamak.
+The dashboard exposes all four workflows. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not establish experimental validation. Numerical/software verification does not constitute experimental validation for a particular tokamak.
 
 ## Physics relations
 
@@ -34,7 +34,7 @@ B_\phi(R)=B_0\frac{R_0}{R},\qquad
 R_{res}=R_0\frac{B_0}{B_{res}}.
 \]
 
-The implementation is `resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T)`. This is a rough coordinate estimate, not an EFIT-equilibrium ray trace. Frequency alone cannot identify which side of the plasma a line of sight intersects; a mirrored high-field-side radius is deliberately not fabricated. Shaping, poloidal field, finite channel bandwidth, refraction, relativistic/Doppler shifts, and viewing geometry may materially affect localization.
+The implementation is `resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T)`. This is a rough coordinate estimate, not an EFIT-equilibrium ray trace. Frequency alone cannot identify which side of the plasma a line of sight intersects; a mirrored high-field-side radius is deliberately not fabricated. Shaping, poloidal field, finite channel bandwidth, refraction, relativistic/Doppler shifts, and viewing geometry may materially affect localization. The profile workflow reports a channel-bandwidth-derived radial localization envelope; it does not convolve a full receiver response into a radiative-transfer forward model.
 
 ### Rayleigh–Jeans brightness temperature
 
@@ -53,7 +53,7 @@ The implementation is `brightness_temperature_K` and `brightness_temperature_eV`
 
 For a sampled channel signal \(x_j(t)\), the workflow subtracts each channel's temporal mean and computes an FFT-based one-sided periodogram. It reports per-channel fluctuation RMS, PSD, sample frequency, and Nyquist frequency. The periodogram normalization is checked against Parseval's relation for odd and even sample counts. DC and (for even sample counts) Nyquist bins are not doubled.
 
-Input time samples must be finite, strictly increasing, and approximately uniformly spaced (relative tolerance 1e-3 against the median step); all signal samples must be finite. This is not an automatic anti-aliasing filter or a substitute for checking acquisition electronics, timing jitter, channel synchronization, gaps, calibration, and noise. The optional `noise_std` is a supplied per-channel RMS noise estimate; the code only reports whether observed RMS exceeds that estimate and does not perform a frequency-dependent noise-floor subtraction.
+Input time samples must be finite, strictly increasing, and approximately uniformly spaced (relative tolerance 1e-3 against the median step); all signal samples must be finite. The maximum relative sample-interval deviation is reported, but this cannot identify timing jitter below timebase resolution, repair acquisition gaps, validate synchronization, or provide anti-alias filtering. This is not an automatic anti-aliasing filter or a substitute for checking acquisition electronics, timing jitter, channel synchronization, gaps, calibration, and noise. The optional `noise_std` is a supplied per-channel time-domain RMS noise estimate. It reports RMS comparison and an expected one-sided PSD reference for white noise; this is not a measured noise floor and is not subtracted from the signal PSD.
 
 ## API
 
@@ -98,7 +98,7 @@ fluctuations = analyze_ece(
 | Mode | Required inputs | Principal outputs |
 |---|---|---|
 | `brightness_temperature` | `frequency_Hz`, `spectral_radiance_W_m2_sr_Hz` | `resonance_field_T`, `brightness_temperature_K`, `brightness_temperature_eV` |
-| `channel_fluctuations` | `frequency_Hz`, `time_s`, `signal` with shape (time samples, channels) | `fluctuation_rms`, `fluctuation_psd_frequency_Hz`, `fluctuation_psd`, sample and Nyquist frequencies |
+| `channel_fluctuations` | `frequency_Hz`, `time_s`, `signal` with shape (time samples, channels); optional `noise_std`, `psd_confidence_level` | `fluctuation_rms`, full-record periodogram, Welch PSD, approximate Welch confidence bounds, expected white-noise PSD reference when noise RMS is supplied, sample and Nyquist frequencies, sampling-interval audit |
 | `resonance_mapping` | `frequency_Hz`; optional paired `major_radius_m` and `B_axis_T` | `resonance_field_T`, optional `resonance_radius_m` |
 | `reconstruct_ece_temperature_profile` (separate workflow) | `frequency_Hz`, already-calibrated `calibrated_brightness_temperature_eV` matrix, `time_s`, `major_radius_m`, `B_axis_T`, and either per-channel `optical_depth` or explicit `assume_optically_thick=True`; optional background and time window | Time-window-averaged per-channel brightness temperature and inferred Te, approximate resonance radii, and interpolated radial Te profile; no extrapolation |
 
@@ -116,7 +116,7 @@ Automated tests are in `tests/test_ece_analysis.py`. They cover:
 - rejection of invalid frequencies, harmonics, radiance, sampling intervals, mode-conflicting inputs, and malformed noise/optical-depth arrays;
 - refusal to fabricate a high-field-side radius without viewing geometry.
 
-These tests establish analytic/software behavior for the stated model. They do **not** establish calibration traceability, instrument response, optical depth, equilibrium accuracy, or agreement with independent experimental reference data.
+The test suite also checks Welch confidence-bound ordering, the expected white-noise PSD reference, profile uncertainty propagation, bandwidth-derived radial envelopes, low-optical-depth conditioning warnings, optional time-resolved profiles, and dashboard wiring. These tests establish analytic/software behavior for the stated model. They do **not** establish calibration traceability, instrument response, optical depth, equilibrium accuracy, or agreement with independent experimental reference data.
 
 ## Scientific acceptance checklist for a real discharge
 
@@ -130,7 +130,7 @@ Before interpreting results, document and verify:
 - noise-floor estimate, channel-to-channel calibration, and reproducibility across independent analysis settings;
 - comparison with an independent diagnostic or a trusted synthetic diagnostic before claiming device-level validation.
 
-The workflow intentionally reports the model and its limitations rather than silently upgrading a simplified estimate into a device-validated physical inference.
+Uncertainty estimates assume independent input errors and first-order propagation; they exclude correlated errors and model discrepancy. Low optical depth can make the single-slab inversion ill-conditioned. The workflow intentionally reports the model and its limitations rather than silently upgrading a simplified estimate into a device-validated physical inference.
 
 ## Radial electron-temperature profile reconstruction
 
@@ -140,7 +140,7 @@ For temperature inference, the user must either supply optical depth per channel
 
 `Tb = Te (1 - exp(-tau)) + Tbg exp(-tau)`
 
-or explicitly declare the optically thick approximation `Te ≈ Tb`. The app does not silently assume that brightness temperature is electron temperature.
+or explicitly declare the optically thick approximation `Te ≈ Tb`. The app does not silently assume that brightness temperature is electron temperature. Optical depths below 1e-3 trigger a conditioning warning because inversion amplifies input errors approximately as 1/(1 − exp(−τ)).
 
-The profile is a linear interpolation between distinct channel resonance locations and is restricted to the measured radial interval. It is a profile estimate, not a regularized inversion of a full radiative-transfer forward model. It currently does not propagate uncertainties, model finite channel bandwidth, perform ray tracing, or use EFIT equilibrium. Results must therefore report these assumptions and must not be described as device-validated without independent validation.
+The profile is a linear interpolation between distinct channel resonance locations and is restricted to the measured radial interval. An optional output retains inferred channel and radial profiles at each sample in the selected time window, rather than only the time-window mean. It is a profile estimate, not a regularized inversion of a full radiative-transfer forward model. Optional first-order uncertainty propagation is available when independent measurement/model-input uncertainties are supplied; it excludes covariance and model discrepancy. Finite channel bandwidth is represented as a radial localization envelope, not a receiver-response convolution. The workflow does not perform ray tracing or use EFIT equilibrium. Results must therefore report these assumptions and must not be described as device-validated without independent validation.
 
