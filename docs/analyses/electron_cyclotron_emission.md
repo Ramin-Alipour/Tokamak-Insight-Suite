@@ -9,7 +9,7 @@ The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and expose
 3. **Cold resonance mapping** from channel frequency to resonance field, with an optional simplified circular toroidal-field major-radius estimate.
 4. **Receiver-response convolution** of an already-calibrated spectrum with a user-supplied, validated channel response kernel, using in-range interpolation and trapezoidal integration.\n5. **Time-windowed radial electron-temperature profile reconstruction** from already-calibrated brightness-temperature samples, using supplied optical depth with a single-slab LTE inversion or an explicit optically-thick assumption. Optional profile mapping supports a supplied monotonic toroidal-field table or externally derived channel resonance locations.
 
-The dashboard exposes all four workflows. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not establish experimental validation. Numerical/software verification does not constitute experimental validation for a particular tokamak.
+The dashboard exposes all five workflows. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not establish experimental validation. Numerical/software verification does not constitute experimental validation for a particular tokamak.
 
 ## Physics relations
 
