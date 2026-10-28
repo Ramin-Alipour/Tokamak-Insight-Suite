@@ -472,3 +472,100 @@ def test_ece_dashboard_wires_all_four_workflows_and_new_diagnostics():
     ):
         assert expected in app_source
     assert "st.radio('Temperature inference basis'" in app_source
+
+
+
+def test_relativistic_resonance_correction_reduces_to_cold_limit():
+    from tokamak_analysis.ece_analysis import resonance_field_relativistic_T
+
+    cold = resonance_field_T(100e9, 2)
+    corrected_zero = resonance_field_relativistic_T(
+        100e9, 2, electron_energy_eV=0.0, parallel_beta=0.0
+    )
+    assert corrected_zero == pytest.approx(cold)
+    assert resonance_field_relativistic_T(
+        100e9, 2, electron_energy_eV=10000.0, parallel_beta=0.0
+    ) > cold
+    assert resonance_field_relativistic_T(
+        100e9, 2, electron_energy_eV=0.0, parallel_beta=0.2
+    ) < cold
+    with pytest.raises(ValueError, match="parallel_beta"):
+        resonance_field_relativistic_T(100e9, 2, parallel_beta=1.0)
+
+
+def test_psd_confidence_is_validated_only_when_psd_is_requested():
+    result = analyze_ece(
+        [80e9, 90e9],
+        spectral_radiance_W_m2_sr_Hz=[1e-10, 2e-10],
+        mode="brightness_temperature",
+        psd_confidence_level=None,
+    )
+    assert result["brightness_temperature_eV"].shape == (2,)
+    with pytest.raises(ValueError, match="psd_confidence_level"):
+        analyze_ece(
+            [80e9, 90e9], signal=np.ones((32, 2)), time_s=np.arange(32),
+            mode="channel_fluctuations", psd_confidence_level=1.0,
+        )
+
+
+def test_cross_channel_coherence_and_stationarity_audit_are_returned():
+    fs = 10_000.0
+    t = np.arange(1024) / fs
+    a = np.sin(2 * np.pi * 1000 * t)
+    y = np.column_stack([a, 0.7 * a, np.sin(2 * np.pi * 1800 * t)])
+    result = analyze_ece(
+        [80e9, 90e9, 100e9], signal=y, time_s=t,
+        mode="channel_fluctuations", welch_nperseg=128,
+    )
+    assert len(result["cross_channel_spectra"]) == 3
+    pair = next(p for p in result["cross_channel_spectra"]
+                if p["channel_i"] == 0 and p["channel_j"] == 1)
+    assert np.nanmax(pair["coherence"]) > 0.95
+    assert result["welch_psd_nperseg"] == 128
+    assert result["stationarity_chunk_rms_relative_range"].shape == (3,)
+    assert "anti-alias" in result["aliasing_assessment"]
+
+
+def test_profile_uses_user_equilibrium_table_pchip_and_model_discrepancy_floor():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(16) * 1e-6
+    tb = np.tile([20.0, 35.0, 60.0], (time_s.size, 1))
+    result = reconstruct_ece_temperature_profile(
+        frequency, tb, time_s, major_radius_m=1.5, B_axis_T=2.0,
+        assume_optically_thick=True,
+        equilibrium_radius_m=[1.0, 1.5, 2.0, 2.5],
+        equilibrium_toroidal_field_T=[2.1, 1.8, 1.5, 1.2],
+        profile_method="pchip",
+        brightness_temperature_uncertainty_eV=1.0,
+        model_discrepancy_fraction=0.1,
+    )
+    assert result["equilibrium_model"].startswith("user-supplied monotonic")
+    assert result["profile_method"].startswith("pchip")
+    assert result["profile_gradient_eV_per_m"].shape == result["profile_radius_m"].shape
+    assert result["profile_spatial_quality"]["output_grid_is_not_measurement_resolution"]
+    assert result["electron_temperature_profile_uncertainty_eV"] is not None
+    assert result["model_discrepancy_fraction_user_supplied"] == pytest.approx(0.1)
+
+
+def test_profile_rejects_nonmonotonic_equilibrium_and_bad_covariance():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 30.0], (8, 1))
+    common = dict(major_radius_m=1.5, B_axis_T=2.0, assume_optically_thick=True)
+    with pytest.raises(ValueError, match="strictly monotonic"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s,
+            equilibrium_radius_m=[1.0, 1.5, 2.0],
+            equilibrium_toroidal_field_T=[1.0, 2.0, 1.5],
+            **common,
+        )
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s,
+            channel_covariance_eV2=[[1.0, 2.0, 0.0], [2.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            **common,
+        )
