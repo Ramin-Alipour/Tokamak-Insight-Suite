@@ -218,6 +218,22 @@ def test_ece_profile_requires_temperature_basis_and_rejects_negative_calibrated_
 
 
 
+def test_ece_profile_rejects_negative_sample_even_when_channel_mean_is_positive():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    calibrated_tb = np.ones((8, 3), dtype=float)
+    calibrated_tb[0, 1] = -2.0  # Mean remains positive, but an input sample is invalid.
+    with pytest.raises(ValueError, match="samples must be non-negative"):
+        reconstruct_ece_temperature_profile(
+            frequencies, calibrated_tb, time_s,
+            major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
+            assume_optically_thick=True,
+        )
+
+
+
 def test_ece_profile_uses_explicit_time_window_instead_of_whole_shot_average():
     from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
 
