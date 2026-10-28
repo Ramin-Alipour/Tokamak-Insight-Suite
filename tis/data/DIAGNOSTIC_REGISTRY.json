@@ -4,7 +4,7 @@
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "D",
-    "method": "For calibrated profiles, compute profile summaries and gradients. For calibrated raw spectra, fit a non-relativistic Gaussian Doppler profile with linear background and Gaussian instrument-width deconvolution to estimate electron temperature. User-defined spectral models can be registered in Python for experiment-specific fitting without modifying the built-in model. Spatially resolved calibrated measurements can also be reconstructed onto a denser radial grid using PCHIP or smoothing splines; negative spline overshoot is clipped to zero and no extrapolation is performed.",
+    "method": "Six scoped paths: calibrated profile summaries and gradients; non-collective non-relativistic Gaussian raw-spectrum temperature fitting with known Gaussian instrument-width deconvolution; calibrated single-band scattered-power density; combined spectrum-to-temperature/density; Python-registered custom spectral-model fitting; and spatial reconstruction from multiple calibrated radial measurements using PCHIP or smoothing splines. Spatial reconstruction is limited to the measured radial interval, clips negative spline overshoot to zero, and does not extrapolate.",
     "caveat": "Raw-spectrum fitting is scoped to non-collective, non-relativistic Maxwellian scattering and a Gaussian instrument response. Density is never inferred from uncalibrated spectral amplitude; calibrated profile, calibrated single-band power-density, and combined spectrum-to-temperature/density workflows are separate explicit modes. A generic custom-model registry supports user-provided fitting functions, but physical interpretation and validation remain the model author's responsibility.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
@@ -14,7 +14,7 @@
       "tokamak_analysis.thomson_models.fit_custom_spectral_model",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Complete within the declared software scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, combined spectrum-to-temperature/density workflow, user-defined spectral-model fitting, and spatial profile reconstruction are implemented. Independent experimental validation and device-specific calibration remain user responsibilities; unsupported physics models remain explicitly out of scope.",
+    "implementation_status": "Complete within the declared software scope: calibrated profile analysis, scoped raw-spectrum electron-temperature fitting, calibrated single-band density estimation, combined spectrum-to-temperature/density workflow, user-defined spectral-model fitting, and spatial profile reconstruction are implemented and covered by software tests. All data and instrument parameters are assumed calibrated by the user; TIS performs no calibration. Independent experimental validation and unsupported physics models remain outside this software-completeness claim.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -268,9 +268,10 @@
       "preprocessing": [
         "Validate finite values, matching lengths, unique radii, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
       ],
-      "algorithm": "Two explicitly separated paths: calibrated profile summaries/gradients; and raw-spectrum Gaussian Doppler fitting with instrumental-width deconvolution to estimate electron temperature. The separate single-band scattered-power helper estimates density only when optical power and geometry are calibrated. A combined calibrated-spectrum entry point now orchestrates spectral fitting and the calibrated-power density relation.",
+      "algorithm": "Six declared workflow modes: calibrated profile summaries/gradients; non-collective non-relativistic Gaussian raw-spectrum temperature fitting with known Gaussian instrument-width deconvolution; calibrated single-band scattered-power density estimation; combined calibrated spectrum-to-temperature/density; user-defined spectral-model fitting through a Python API; and spatial profile reconstruction from multiple calibrated radial measurements using PCHIP or smoothing splines. Reconstruction is confined to the measured radial interval and does not extrapolate, infer equilibrium, or perform transport inversion.",
       "uncertainty_model": "Raw-spectrum temperature uncertainty is local covariance-based and excludes uncertainty in laser wavelength, scattering angle, and instrumental width. Optional independent uncertainties for calibrated scattered-power density are propagated to first order. Profile pointwise uncertainties are propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples; peak-location uncertainty is not estimated.",
       "limitations": [
+        "All input data and instrument parameters must already be calibrated by the user; TIS does not perform calibration.",
         "Power-based density helper requires calibrated collected power, laser power, interaction length, scattering geometry, collection solid angle and optical efficiency.",
         "Single-band power relation neglects spectral-response integration, stray-light subtraction and relativistic spectral-shape effects.",
         "Numerical gradients can amplify measurement noise; use appropriate smoothing only with a justified noise model.",
@@ -287,7 +288,7 @@
         "tokamak_analysis.thomson_models.fit_custom_spectral_model"
       ],
       "raw_data_to_physics": true,
-      "note": "The supported built-in profile, raw-spectrum temperature-fit, calibrated-power density, and combined spectrum-to-temperature/density workflows have dashboard entry points and focused tests. The user-defined spectral-model extension is a Python API, not a dashboard workflow. Overall status remains conservative because independent experimental validation and broader physics models are not claimed. The custom-model registry is process-local and shared by code in the same Python process; it is not per-user isolation for multi-user web deployments.",
+      "note": "The calibrated profile, raw-spectrum temperature-fit, calibrated-power density, combined spectrum-to-temperature/density, and spatial-profile reconstruction workflows have dashboard entry points and focused tests. The user-defined spectral-model extension is a Python API, not a dashboard workflow. Software completeness is scoped to these implemented paths and does not claim independent experimental validation or broader physics models. All data and instrument parameters are assumed calibrated by the user; TIS performs no calibration. The custom-model registry is process-local and shared by code in the same Python process; it is not per-user isolation for multi-user web deployments.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
@@ -434,7 +435,7 @@
         "tests/test_thomson_models.py::test_fit_requires_more_samples_than_parameters",
         "tests/test_thomson_models.py::test_unregister_returns_false_for_missing_model"
       ],
-      "completion_scope": "The five declared workflow modes are implemented, exposed through documented APIs/dashboard paths where applicable, and covered by automated numerical and input-validation tests. This status does not claim collective/relativistic inversion, arbitrary non-Maxwellian reconstruction, or independent experimental validation."
+      "completion_scope": "The six declared workflow modes are implemented, exposed through documented APIs/dashboard paths where applicable, and covered by automated numerical and input-validation tests. All input data and instrument parameters are assumed calibrated by the user; no calibration is performed. This status does not claim collective/relativistic inversion, arbitrary non-Maxwellian reconstruction, or independent experimental validation."
     },
     "extension_functions": [
       "tokamak_analysis.thomson_models.register_spectral_model",
