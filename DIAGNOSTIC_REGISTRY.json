@@ -810,12 +810,11 @@
     "diagnostic": "Electron Cyclotron Emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness temperature, inferred radial electron-temperature profile under declared assumptions, channel fluctuations and spectra",
     "status": "D",
-    "method": "ECE analysis with brightness temperature, cold or optional monoenergetic relativistic/Doppler resonance estimates, circular-field or user-supplied monotonic Bphi(R) mapping, multi-channel RMS/periodogram/Welch PSD with approximate confidence bounds, pairwise cross-spectra/coherence/phase, heuristic stationarity audit, and time-windowed PCHIP/linear Te profile reconstruction with optional covariance and model-discrepancy inputs.",
-    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Radius mapping supports a supplied monotonic Bphi(R) table but remains 1-D, not full EFIT flux-coordinate mapping or line-of-sight ray tracing. Optional monoenergetic relativistic/Doppler correction is a sensitivity estimate, not a distribution-averaged emissivity solver. Profile uncertainty can include channel covariance, temporal autocorrelation adjustment, radial-gradient effects, and a user-specified model-discrepancy floor; unspecified model discrepancy remains unquantified. Finite bandwidth remains a localization envelope, not receiver-response convolution. Cross spectra/coherence do not identify modes automatically. No experimental validation is implied.",
+    "method": "Five ECE workflows: calibrated radiance to Rayleigh–Jeans brightness temperature; cold or optional monoenergetic relativistic/Doppler resonance sensitivity; simplified circular-field, supplied monotonic Bphi(R), or explicit channel-radius mapping; receiver-response convolution with a supplied kernel; multi-channel RMS/periodogram/Welch PSD, cross-spectra/coherence and stationarity diagnostics; time-windowed PCHIP/linear Te profile reconstruction with optional uncertainty propagation.",
+    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Radius mapping remains one-dimensional and is not full EFIT flux-coordinate mapping or line-of-sight ray tracing. The monoenergetic relativistic/Doppler correction is a sensitivity estimate, not distribution-averaged emissivity. Receiver convolution uses the supplied response kernel and measured spectral coverage; it does not infer calibration or perform radiative-transfer inversion. Profile uncertainties are approximate first-order estimates; covariance and temporal autocorrelation are included only when supplied/selected, and unknown model discrepancy remains unquantified. Cross spectra/coherence do not identify modes automatically. No experimental validation is implied.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
       "tokamak_analysis.ece_analysis.convolve_ece_receiver_response",
-      "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_field_T",
       "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_radius_m",
@@ -823,7 +822,7 @@
       "tokamak_analysis.ece_analysis.brightness_temperature_eV",
       "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within declared software scope: calibrated-input ECE calculations, optional 1-D supplied Bphi(R) inversion, optional monoenergetic resonance sensitivity correction, channel cross-spectral statistics, stationarity heuristics, PCHIP/linear profile reconstruction, covariance/autocorrelation/radial-gradient uncertainty propagation, and user-selected model-discrepancy floor. Inputs are already calibrated; no detector calibration is performed. Full EFIT/ray tracing, distribution-averaged relativistic emissivity, radiative-transfer inversion and receiver-response convolution remain outside scope.",
+    "implementation_status": "Complete within declared software scope: calibrated-input brightness-temperature calculations, optional monoenergetic resonance sensitivity correction, 1-D simplified or supplied Bphi(R)/explicit-radius mapping, supplied receiver-response convolution, channel cross-spectral statistics, stationarity heuristics, PCHIP/linear profile reconstruction, first-order uncertainty propagation with optional channel covariance/autocorrelation/radial-gradient terms, and optional user-selected model-discrepancy floor. Inputs are already calibrated; no detector calibration is performed. Full EFIT/ray tracing, distribution-averaged relativistic emissivity, radiative-transfer inversion and inference of missing receiver response remain outside scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -1159,15 +1158,30 @@
           "name": "channel_bandwidth_Hz",
           "unit": "Hz",
           "description": "Optional supplied channel bandwidth used to calculate a radial localization envelope."
+        },
+        {
+          "name": "channel_spectral_radiance_W_m2_sr_Hz",
+          "unit": "W m^-2 sr^-1 Hz^-1",
+          "description": "Spectral radiance integrated against each supplied normalized receiver-response kernel."
+        },
+        {
+          "name": "effective_center_frequency_Hz",
+          "unit": "Hz",
+          "description": "Response-weighted center frequency for each supplied receiver channel."
+        },
+        {
+          "name": "response_convolution_performed",
+          "unit": "boolean",
+          "description": "True when the user-supplied receiver kernel was applied to the calibrated spectrum."
         }
       ],
       "assumptions": [
-        "Resonance formula assumes non-relativistic electrons and the specified harmonic.",
-        "Supplied spectral radiance and brightness-temperature data are already calibrated; TIS performs no detector calibration.",
-        "Temperature interpretation requires optical-depth/thermalization assumptions; brightness temperature is not automatically electron temperature.",
-        "Fluctuation analysis requires finite, approximately uniformly sampled, synchronized channels; anti-aliasing and acquisition quality remain user responsibilities.",
-        "Profile reconstruction uses a simplified circular toroidal-field model and interpolates only within measured resonance locations.",
-        "Optional uncertainty propagation assumes independent input uncertainties and first-order linearization; model discrepancy and correlations are excluded."
+        "Frequencies and calibrated radiance/brightness-temperature values are supplied in the documented SI/eV units; TIS performs no detector calibration.",
+        "Brightness temperature approximates Te only under appropriate optical-depth, thermalization and propagation assumptions.",
+        "Cold resonance mapping is the default; the optional monoenergetic relativistic/Doppler term is only a sensitivity estimate.",
+        "Radial localization is approximate unless the user supplies validated channel resonance positions; a monotonic Bphi(R) table is still not full ray tracing.",
+        "Fluctuation analysis requires finite approximately uniformly sampled signals; acquisition synchronization and anti-aliasing remain user responsibilities.",
+        "Profile and PSD uncertainty estimates are approximate; optional covariance/autocorrelation/model-discrepancy terms are included only when supplied, and unknown discrepancy remains unquantified."
       ],
       "preprocessing": [
         "Validate positive channel frequencies, paired channel selection, finite synchronized samples, monotonic time, sampling uniformity and optional uncertainty shapes; do not silently discard invalid rows.",
@@ -1175,20 +1189,23 @@
         "For profile reconstruction, use already-calibrated brightness-temperature samples, select a valid time window, and supply optical depth or explicitly assert the optically thick approximation.",
         "Sort channel frequencies and their associated measurements/uncertainties together. Report bandwidth-derived radial localization envelopes where bandwidth is supplied."
       ],
-      "algorithm": "Compute cold non-relativistic harmonic resonance field and optional circular toroidal-field radius estimate. Convert already-calibrated spectral radiance to Rayleigh–Jeans brightness temperature. For fluctuations compute per-channel RMS, full-record one-sided periodogram, Hann-window Welch PSD with 50% overlap, approximate chi-square confidence bounds based on overlap-adjusted effective degrees of freedom, sampling audit, and optional expected white-noise PSD reference. In the separate profile workflow, average already-calibrated brightness-temperature samples over the selected window, infer Te using the supplied single-slab LTE optical-depth relation or explicit optically thick assumption, propagate optional independent input uncertainties to channel/profile estimates, report bandwidth-derived radial localization envelope, optionally retain time-resolved Te(R,t), and interpolate only within measured approximate resonance radii.",
-      "uncertainty_model": "Welch PSD confidence intervals use approximate effective degrees of freedom for correlated overlapping segments. Optional profile uncertainties use first-order independent-input propagation for supplied brightness-temperature, optical-depth, background-temperature, frequency, major-radius and toroidal-field uncertainties; covariance and model discrepancy are excluded. Bandwidth-derived radius envelopes are localization bounds, not statistical confidence intervals.",
+      "algorithm": "Compute cold or optional monoenergetic relativistic/Doppler-sensitivity harmonic resonance fields and optional simplified circular-field, supplied monotonic Bphi(R), or explicit channel-radius mapping. Convert already-calibrated spectral radiance to Rayleigh–Jeans brightness temperature. Convolve a supplied calibrated spectrum with a user-supplied receiver response kernel using in-range linear interpolation and trapezoidal integration. For fluctuations compute RMS, a full-record one-sided periodogram, Hann-window Welch PSD with 50% overlap, approximate chi-square confidence bounds, sampling audit, spectral candidates, pairwise cross-spectra/coherence/phase and optional white-noise reference. For profiles, average already-calibrated brightness-temperature samples over a selected time window, infer Te using supplied single-slab optical depth or explicit optically-thick assumption, propagate optional measurement uncertainty/covariance/autocorrelation/radial-gradient terms, report bandwidth-derived radial localization envelope, and interpolate only within measured approximate resonance radii.",
+      "uncertainty_model": "Welch PSD confidence intervals use approximate effective degrees of freedom for overlapping segments. Profile uncertainty uses first-order propagation for supplied brightness-temperature, optical-depth, background, frequency, reference-radius and field uncertainties; optional channel covariance and temporal-autocorrelation adjustment are included when supplied/selected. A user-specified model-discrepancy floor is optional and does not quantify unknown discrepancy. Bandwidth-derived radial envelopes are localization bounds, not statistical confidence intervals.",
       "limitations": [
-        "No detector/receiver calibration, instrument-response deconvolution, automatic EFIT equilibrium, ray tracing, polarization correction, relativistic/Doppler correction, or optical-depth solver.",
-        "Circular-field radius is a simplified major-radius estimate, not a flux-surface coordinate.",
-        "Brightness temperature is not automatically electron temperature.",
-        "Welch confidence bounds are approximate and assume the stationarity/segment model; supplied white-noise PSD is a reference and is not subtracted.",
-        "Radial profile remains interpolation-based, not a regularized radiative-transfer inversion. Finite bandwidth is represented by a localization envelope rather than receiver-response convolution.",
-        "Profile uncertainties exclude correlated inputs and model discrepancy; very low optical depth (<1e-3) is ill-conditioned.",
+        "No detector calibration, inferred receiver response, full radiative-transfer inversion, automatic EFIT equilibrium, full line-of-sight ray tracing, polarization/cutoff solver, or distribution-averaged relativistic/Doppler emissivity.",
+        "Circular-field radius and monotonic Bphi(R) inversion are one-dimensional estimates, not flux-surface coordinates or a substitute for validated viewing geometry.",
+        "Brightness temperature is not automatically electron temperature; optical depth alone does not prove thermalization.",
+        "Receiver-response convolution requires a user-supplied validated kernel and complete spectral coverage; reported channel brightness temperature uses the response-weighted center frequency and is approximate for broad channels.",
+        "Welch confidence bounds are approximate and rely on the stated segment model; the stationarity check is heuristic. Supplied white-noise PSD is a reference and is not subtracted.",
+        "Radial profiles are interpolation-based, not a regularized radiative-transfer inversion. Finite bandwidth is a localization envelope, not a full response convolution.",
+        "Uncertainty estimates are first-order. Missing covariance, calibration uncertainty and unknown model discrepancy remain unquantified; low optical depth can make inversion ill-conditioned.",
         "All radiance and brightness-temperature inputs must already be calibrated before import."
       ],
       "function_links": [
         "tokamak_analysis.ece_analysis.analyze_ece",
+        "tokamak_analysis.ece_analysis.convolve_ece_receiver_response",
         "tokamak_analysis.ece_analysis.resonance_field_T",
+        "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
         "tokamak_analysis.ece_analysis.resonance_radius_m",
         "tokamak_analysis.ece_analysis.brightness_temperature_K",
         "tokamak_analysis.ece_analysis.brightness_temperature_eV",
@@ -1197,7 +1214,7 @@
       "raw_data_to_physics": true,
       "note": "The dashboard and Python API execute four ECE workflows: calibrated-radiance brightness temperature, resonance mapping, multi-channel fluctuation/periodogram/Welch PSD, and time-windowed profile reconstruction with optional uncertainty, bandwidth-envelope and time-resolved outputs. Inputs must already be calibrated; no detector calibration is performed. Approximate model outputs are not experimental validation."
     },
-    "note": "The built-in dashboard and Python API expose brightness-temperature, resonance-mapping, fluctuation/PSD, and profile-reconstruction workflows. Welch PSD includes approximate confidence bounds; profile reconstruction optionally reports first-order uncertainty, bandwidth localization envelope, and time-resolved Te(R,t). Inputs must already be calibrated. No detector calibration or EFIT-grade localization is claimed."
+    "note": "The dashboard and Python API expose brightness-temperature, resonance-mapping, receiver-response convolution, fluctuation/PSD, and time-windowed profile reconstruction. Welch PSD includes approximate confidence bounds; profiles can include first-order uncertainty, supplied channel covariance, temporal autocorrelation adjustment, bandwidth localization envelopes, time-resolved Te(R,t), and a user-selected model-discrepancy floor. Inputs must already be calibrated. No detector calibration, EFIT-grade localization, or experimental validation is claimed."
   },
   {
     "family": "Plasma parameters",
