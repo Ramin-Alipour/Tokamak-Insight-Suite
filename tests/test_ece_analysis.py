@@ -659,3 +659,44 @@ def test_extreme_frequencies_fail_cleanly_instead_of_returning_infinite_fields()
         resonance_field_T(1e308, 1)
     with pytest.raises(ValueError, match="overflowed"):
         brightness_temperature_K(1e308, 1e9)
+
+
+
+def test_profile_checks_user_supplied_physical_plasma_radius_bounds():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 30.0], (8, 1))
+    with pytest.raises(ValueError, match="outside the user-supplied plasma"):
+        reconstruct_ece_temperature_profile(
+            frequency, tb, time_s, major_radius_m=1.5, B_axis_T=2.0,
+            assume_optically_thick=True,
+            channel_resonance_radius_m=[1.1, 1.5, 2.1],
+            plasma_radius_bounds_m=[1.2, 2.0],
+        )
+
+
+def test_full_channel_covariance_changes_profile_uncertainty():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequency = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 40.0], (8, 1))
+    common = dict(
+        frequency_Hz=frequency, calibrated_brightness_temperature_eV=tb,
+        time_s=time_s, major_radius_m=1.5, B_axis_T=2.0,
+        assume_optically_thick=True,
+    )
+    diagonal = np.diag([1.0, 1.0, 1.0])
+    correlated = np.full((3, 3), 0.8)
+    np.fill_diagonal(correlated, 1.0)
+    independent_result = reconstruct_ece_temperature_profile(
+        **common, channel_covariance_eV2=diagonal,
+    )
+    correlated_result = reconstruct_ece_temperature_profile(
+        **common, channel_covariance_eV2=correlated,
+    )
+    assert np.max(correlated_result["electron_temperature_profile_uncertainty_eV"]) > np.max(
+        independent_result["electron_temperature_profile_uncertainty_eV"]
+    )
