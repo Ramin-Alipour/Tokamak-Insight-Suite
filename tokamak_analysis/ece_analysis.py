@@ -434,8 +434,10 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             n = np.asarray(noise_std, dtype=float)
             if np.any(~np.isfinite(n)) or np.any(n < 0):
                 raise ValueError("noise_std must be finite and non-negative.")
+            if n.ndim == 1 and n.shape == (1,):
+                n = np.asarray(float(n[0]))
             if n.ndim > 1 or (n.ndim == 1 and n.shape != (f.size,)):
-                raise ValueError("noise_std must be a scalar or one value per frequency channel.")
+                raise ValueError("noise_std must be a scalar, one value, or one value per frequency channel.")
             out["noise_std"] = n
             out["above_noise_rms"] = out["fluctuation_rms"] > n
             noise_per_channel = np.broadcast_to(n, (f.size,))
