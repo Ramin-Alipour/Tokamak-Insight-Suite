@@ -74,3 +74,26 @@ def test_ece_fluctuation_dashboard_rejects_missing_samples_without_compressing_t
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("Missing/non-numeric samples are not dropped" in x.value for x in app.error)
     assert not any("ECE fluctuation analysis completed" in x.value for x in app.success)
+
+def test_ece_temperature_profile_dashboard_from_uploaded_multichannel_data():
+    app = _open_ece()
+    t = np.arange(32, dtype=float) * 1e-6
+    frame = pd.DataFrame({
+        "time_s": t,
+        "ece_80": np.full(t.size, 10.0),
+        "ece_90": np.full(t.size, 20.0),
+        "ece_100": np.full(t.size, 30.0),
+    })
+    app.session_state["tis_df"] = frame
+    app.run()
+    app.selectbox(key="ece_workflow_mode").set_value("Temperature profile reconstruction").run()
+    assert not app.exception, [str(x.value) for x in app.exception]
+    app.selectbox(key="ece_profile_time_col").set_value("time_s").run()
+    app.multiselect(key="ece_profile_signal_cols").set_value(["ece_80", "ece_90", "ece_100"]).run()
+    app.text_input(key="ece_profile_gain").set_value("2, 2, 2").run()
+    app.checkbox(key="ece_profile_thick").check().run()
+    app.button(key="ece_run_profile").click().run()
+    assert not app.exception, [str(x.value) for x in app.exception]
+    assert any("ECE electron-temperature profile reconstruction completed" in x.value for x in app.success)
+    assert any(x.label == "Export ECE electron-temperature profile" for x in app.get("download_button"))
+
