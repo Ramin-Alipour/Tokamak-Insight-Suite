@@ -19,6 +19,10 @@ def _open_workflow():
     next(x for x in app.selectbox if x.label == "Select workflow").set_value(
         "Poloidal magnetic-flux map reconstruction"
     ).run()
+    for key, value in (("tis_psi_R", "R_m"), ("tis_psi_Z", "Z_m"),
+                       ("tis_psi_BR", "B_R_T"), ("tis_psi_BZ", "B_Z_T")):
+        app.selectbox(key=key).set_value(value)
+    app.run()
     return app
 
 
