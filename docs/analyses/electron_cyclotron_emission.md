@@ -50,7 +50,11 @@ The implementation is `brightness_temperature_K` and `brightness_temperature_eV`
 
 **Brightness temperature is not automatically electron temperature.** Interpreting \(T_b\) as \(T_e\) requires optically thick emission and a thermalized electron distribution, in addition to valid calibration and appropriate propagation assumptions. In `analyze_ece`, optional `optical_depth` is metadata/conditioning information only; it does not certify thermalization. The separate profile workflow uses optical depth in an explicitly declared single-slab LTE inversion, or requires the user to affirm the optically thick approximation.
 
-### Receiver-response convolution\n\n`convolve_ece_receiver_response` integrates calibrated spectral radiance against user-supplied non-negative channel response weights. The spectrum and response grids must be finite, positive, strictly increasing, and fully covered by the measured spectrum; extrapolation is rejected. Response rows are normalized by their trapezoidal integral. This operation is not detector calibration, response-function inference, or radiative-transfer inversion. If channel brightness temperature is reported using the response-weighted center frequency, treat it as an approximation for broad channels.\n\n## Channel fluctuation spectra
+### Receiver-response convolution
+
+`convolve_ece_receiver_response` integrates calibrated spectral radiance against user-supplied non-negative channel response weights. The spectrum and response grids must be finite, positive, strictly increasing, and fully covered by the measured spectrum; extrapolation is rejected. Response rows are normalized by their trapezoidal integral. This operation is not detector calibration, response-function inference, or radiative-transfer inversion. If channel brightness temperature is reported using the response-weighted center frequency, treat it as an approximation for broad channels.
+
+## Channel fluctuation spectra
 
 For a sampled channel signal \(x_j(t)\), the workflow subtracts each channel's temporal mean and computes an FFT-based one-sided periodogram. It reports per-channel fluctuation RMS, PSD, sample frequency, and Nyquist frequency. The periodogram normalization is checked against Parseval's relation for odd and even sample counts. DC and (for even sample counts) Nyquist bins are not doubled.
 
