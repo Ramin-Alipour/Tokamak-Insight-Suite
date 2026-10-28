@@ -562,27 +562,29 @@ def reconstruct_ece_temperature_profile(
     mean_signal = np.mean(selected_signal, axis=0)
     tb_eV = mean_signal
     tb_mean_sigma = None
+    effective_sample_count = np.full(f.size, float(selected_signal.shape[0]))
+    if temporal_correlation_adjustment and selected_signal.shape[0] > 2:
+        for channel in range(f.size):
+            centered = selected_signal[:, channel] - np.mean(selected_signal[:, channel])
+            energy = float(np.dot(centered, centered))
+            if energy <= np.finfo(float).tiny:
+                continue
+            acf = np.correlate(centered, centered, mode="full")[centered.size - 1:] / energy
+            positive = acf[1:]
+            cutoff = np.flatnonzero(positive <= 0)
+            stop = int(cutoff[0]) if cutoff.size else positive.size
+            tau_int = max(1.0, 1.0 + 2.0 * float(np.sum(positive[:stop])))
+            effective_sample_count[channel] = max(1.0, min(float(centered.size), centered.size / tau_int))
     if tb_sigma_input is not None:
         sigma_selected = tb_sigma_input[selected, :] if tb_sigma_input.shape == y.shape else np.broadcast_to(tb_sigma_input, selected_signal.shape)
         tb_mean_sigma = np.sqrt(np.sum(sigma_selected**2, axis=0)) / selected_signal.shape[0]
-        if temporal_correlation_adjustment and selected_signal.shape[0] > 2:
-            for channel in range(f.size):
-                centered = selected_signal[:, channel] - np.mean(selected_signal[:, channel])
-                energy = float(np.dot(centered, centered))
-                if energy <= np.finfo(float).tiny:
-                    continue
-                acf = np.correlate(centered, centered, mode="full")[centered.size - 1:] / energy
-                positive = acf[1:]
-                cutoff = np.flatnonzero(positive <= 0)
-                stop = int(cutoff[0]) if cutoff.size else positive.size
-                tau_int = max(1.0, 1.0 + 2.0 * float(np.sum(positive[:stop])))
-                n_eff = max(1.0, min(float(centered.size), centered.size / tau_int))
-                tb_mean_sigma[channel] *= np.sqrt(centered.size / n_eff)
-        if channel_covariance_eV2 is not None:
-            if tb_mean_sigma is None:
-                tb_mean_sigma = np.sqrt(np.maximum(0.0, np.diag(covariance)))
-            else:
-                tb_mean_sigma = np.sqrt(np.maximum(0.0, tb_mean_sigma**2 + np.diag(covariance)))
+        if temporal_correlation_adjustment:
+            tb_mean_sigma *= np.sqrt(selected_signal.shape[0] / effective_sample_count)
+    if channel_covariance_eV2 is not None:
+        if tb_mean_sigma is None:
+            tb_mean_sigma = np.sqrt(np.maximum(0.0, np.diag(covariance)))
+        else:
+            tb_mean_sigma = np.sqrt(np.maximum(0.0, tb_mean_sigma**2 + np.diag(covariance)))
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
     te_sigma = None
@@ -735,6 +737,8 @@ def reconstruct_ece_temperature_profile(
             profile_te_sigma = np.sqrt(profile_te_sigma**2 + (model_discrepancy_fraction * np.abs(profile_te))**2)
     elif model_discrepancy_fraction > 0:
         profile_te_sigma = np.sqrt((model_discrepancy_fraction * np.abs(profile_te))**2 + profile_te_sigma_from_radius**2)
+    elif np.any(profile_radius_sigma > 0):
+        profile_te_sigma = profile_te_sigma_from_radius.copy()
     output = {
         "frequency_Hz": f,
         "harmonic": int(harmonic),
@@ -744,6 +748,8 @@ def reconstruct_ece_temperature_profile(
         "selected_time_s": selected_time,
         "brightness_temperature_eV": tb_eV,
         "brightness_temperature_uncertainty_eV": tb_mean_sigma,
+        "effective_sample_count_per_channel": effective_sample_count,
+        "temporal_correlation_adjustment_applied": bool(temporal_correlation_adjustment),
         "electron_temperature_channel_eV": te_eV,
         "electron_temperature_channel_uncertainty_eV": te_sigma,
         "resonance_field_T": b_res,
