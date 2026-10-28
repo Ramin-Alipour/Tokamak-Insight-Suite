@@ -1901,6 +1901,15 @@ elif page=='Plasma Parameters':
                     ece_tau_text=st.text_input('Optical depth per channel (comma-separated; blank if assuming optically thick)',key='ece_profile_tau')
                     ece_thick=st.checkbox('I confirm the channels are optically thick; use Te ≈ Tb',value=False,key='ece_profile_thick')
                     ece_bg=st.number_input('Background brightness temperature (eV)',min_value=0.0,value=0.0,key='ece_profile_background')
+                    ece_bandwidth_profile_text=st.text_input('Optional channel bandwidths (Hz; one value or one per channel)',key='ece_profile_bandwidth')
+                    ece_tb_sigma_text=st.text_input('Optional brightness-temperature 1-sigma uncertainty (eV; one value or one per channel)',key='ece_profile_tb_sigma')
+                    ece_freq_sigma_text=st.text_input('Optional center-frequency 1-sigma uncertainty (Hz; one value or one per channel)',key='ece_profile_freq_sigma')
+                    ece_tau_sigma_text=st.text_input('Optional optical-depth 1-sigma uncertainty (one value or one per channel)',key='ece_profile_tau_sigma')
+                    ece_bg_sigma=st.number_input('Background-temperature 1-sigma uncertainty (eV)',min_value=0.0,value=0.0,key='ece_profile_bg_sigma')
+                    ece_r0_sigma=st.number_input('Reference-radius 1-sigma uncertainty (m)',min_value=0.0,value=0.0,key='ece_profile_r0_sigma')
+                    ece_b0_sigma=st.number_input('Reference-field 1-sigma uncertainty (T)',min_value=0.0,value=0.0,key='ece_profile_b0_sigma')
+                    ece_covariance_text=st.text_area('Optional Tb channel covariance matrix (eV²; rows separated by semicolons)',key='ece_profile_covariance')
+                    ece_time_resolved=st.checkbox('Also return time-resolved Te(R,t) and uncertainty estimates',value=False,key='ece_profile_time_resolved')
                     ece_time_values=pd.to_numeric(df[ece_time_col],errors='coerce').dropna()
                     if ece_time_values.empty:
                         raise ValueError('The selected profile time column has no numeric samples.')
@@ -1945,6 +1954,11 @@ elif page=='Plasma Parameters':
                             raise ValueError('Enter exactly R_min,R_max for physical plasma major-radius bounds.')
                         if explicit_r is not None and eq_r is not None:
                             raise ValueError('Use either explicit channel resonance radii or an equilibrium R/Bφ table, not both.')
+                        bandwidth=None if not ece_bandwidth_profile_text.strip() else np.asarray([float(v.strip()) for v in ece_bandwidth_profile_text.split(',') if v.strip()],dtype=float)
+                        tb_sigma=None if not ece_tb_sigma_text.strip() else np.asarray([float(v.strip()) for v in ece_tb_sigma_text.split(',') if v.strip()],dtype=float)
+                        freq_sigma=None if not ece_freq_sigma_text.strip() else np.asarray([float(v.strip()) for v in ece_freq_sigma_text.split(',') if v.strip()],dtype=float)
+                        tau_sigma=None if not ece_tau_sigma_text.strip() else np.asarray([float(v.strip()) for v in ece_tau_sigma_text.split(',') if v.strip()],dtype=float)
+                        covariance=None if not ece_covariance_text.strip() else np.asarray([[float(v.strip()) for v in row.split(',') if v.strip()] for row in ece_covariance_text.split(';') if row.strip()],dtype=float)
                         result=reconstruct_ece_temperature_profile(
                             ece_freq_Hz,ece_frame[ece_signal_cols].to_numpy(dtype=float),
                             ece_frame[ece_time_col].to_numpy(dtype=float),
@@ -1957,6 +1971,15 @@ elif page=='Plasma Parameters':
                             channel_resonance_radius_m=explicit_r,
                             radius_mapping_uncertainty_m=radius_unc,
                             plasma_radius_bounds_m=plasma_bounds,
+                            channel_bandwidth_Hz=bandwidth,
+                            brightness_temperature_uncertainty_eV=tb_sigma,
+                            frequency_uncertainty_Hz=freq_sigma,
+                            optical_depth_uncertainty=tau_sigma,
+                            background_temperature_uncertainty_eV=float(ece_bg_sigma),
+                            major_radius_uncertainty_m=float(ece_r0_sigma),
+                            B_axis_uncertainty_T=float(ece_b0_sigma),
+                            channel_covariance_eV2=covariance,
+                            include_time_resolved_profile=ece_time_resolved,
                             electron_energy_eV=(ece_energy_eV if ece_relativistic else None),
                             parallel_beta=ece_beta_parallel,
                             model_discrepancy_fraction=float(ece_model_floor),
@@ -1965,6 +1988,13 @@ elif page=='Plasma Parameters':
                         st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['mean_calibrated_brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
                         st.line_chart(pd.DataFrame({'dTe/dR (eV/m)':result['profile_gradient_eV_per_m']},index=result['profile_radius_m']))
+                        if result['electron_temperature_profile_uncertainty_eV'] is not None:
+                            st.line_chart(pd.DataFrame({'Te (eV)':result['electron_temperature_profile_eV'],'Approximate 1-sigma uncertainty (eV)':result['electron_temperature_profile_uncertainty_eV']},index=result['profile_radius_m']))
+                        if 'electron_temperature_profile_time_eV' in result:
+                            st.markdown('**Time-resolved radial Te**')
+                            st.line_chart(pd.DataFrame(result['electron_temperature_profile_time_eV'].T,index=result['profile_radius_m']))
+                            if 'electron_temperature_profile_time_uncertainty_eV' in result:
+                                st.caption('Time-resolved uncertainty includes supplied measurement/model-input errors and radial-position sensitivity; it is still first-order.')
                         st.caption(f"Measured channels: {result['profile_spatial_quality']['measured_channel_count']} · Output grid points (not independent measurements): {result['profile_spatial_quality']['output_grid_point_count']} · Max PCHIP-vs-linear difference: {result['profile_interpolation_method_sensitivity']}")
                         st.warning('Brightness temperature is not automatically electron temperature. The inversion depends on optical-depth/thermalization assumptions. Uncertainty bands omit unquantified physics unless a model-discrepancy floor is supplied.')
                         st.warning('Radius mapping is one-dimensional. A supplied Bφ(R) table is not full EFIT flux-coordinate mapping or line-of-sight ray tracing; verify device bounds and viewing geometry independently.')
