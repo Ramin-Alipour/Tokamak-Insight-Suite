@@ -161,3 +161,30 @@ def test_langmuir_dashboard_rejects_invalid_fit_windows_and_partial_geometry():
         langmuir_iv_analysis(voltage, current, area_m2=1e-5)
     with pytest.raises(ValueError, match="current_convention"):
         langmuir_iv_analysis(voltage, current, current_convention="automatic")
+
+
+def test_langmuir_fit_window_suggestions_find_exponential_candidate_and_labels_ion_tail_as_candidate():
+    from tis.probe_analysis import suggest_langmuir_fit_windows
+
+    voltage = np.linspace(-10.0, 10.0, 101)
+    current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
+    result = suggest_langmuir_fit_windows(voltage, current)
+    assert result["electron_fit_range_V"] is not None
+    assert result["electron_candidate_log_R2"] >= 0.98
+    assert result["electron_candidate_points"] >= 6
+    assert result["ion_fit_range_candidate_V"][0] == pytest.approx(-10.0)
+    assert "not_verified_ion_saturation" in result["ion_candidate_status"]
+    assert "not proof" in result["warning"]
+
+
+def test_langmuir_fit_window_suggestions_normalize_current_polarity_and_reject_bad_inputs():
+    from tis.probe_analysis import suggest_langmuir_fit_windows
+
+    voltage = np.linspace(-10.0, 10.0, 101)
+    current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
+    result = suggest_langmuir_fit_windows(voltage, -current, current_convention="ion_positive")
+    assert result["current_convention_normalized"] == "electron_positive"
+    with pytest.raises(ValueError, match="current_convention"):
+        suggest_langmuir_fit_windows(voltage, current, current_convention="automatic")
+    with pytest.raises(ValueError, match="equal-length"):
+        suggest_langmuir_fit_windows(voltage, current[:-1])
