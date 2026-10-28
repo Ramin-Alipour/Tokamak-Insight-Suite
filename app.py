@@ -1864,6 +1864,17 @@ elif page=='Plasma Parameters':
                     ece_window_end=st.number_input('Profile window end (s)',min_value=ece_t_min,max_value=ece_t_max,value=ece_t_max,key='ece_profile_window_end')
                     ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_profile_r0')
                     ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_profile_b0')
+                    ece_profile_method=st.selectbox('Profile interpolation method',['Shape-preserving PCHIP','Linear'],key='ece_profile_method')
+                    ece_model_floor=st.number_input('Optional fractional model-discrepancy floor (0 = not quantified)',min_value=0.0,max_value=1.0,value=0.0,step=0.01,format='%.3f',key='ece_model_discrepancy')
+                    ece_relativistic=st.checkbox('Apply monoenergetic relativistic/Doppler resonance correction (approximate)',value=False,key='ece_relativistic')
+                    ece_energy_eV=0.0
+                    ece_beta_parallel=0.0
+                    if ece_relativistic:
+                        ece_energy_eV=st.number_input('Representative electron kinetic energy (eV)',min_value=0.0,value=1000.0,format='%.6g',key='ece_relativistic_energy')
+                        ece_beta_parallel=st.number_input('Signed line-of-sight beta (v_parallel/c; -1 < beta < 1)',min_value=-0.99,max_value=0.99,value=0.0,step=0.01,format='%.4f',key='ece_relativistic_beta')
+                        st.warning('Monoenergetic correction only; it is not a distribution-averaged emissivity, ray-tracing or relativistic radiative-transfer model.')
+                    ece_eq_radius_text=st.text_input('Optional equilibrium R grid (m; comma-separated; blank uses circular-field approximation)',key='ece_profile_eq_radius')
+                    ece_eq_bphi_text=st.text_input('Matching equilibrium toroidal Bφ grid (T; strictly monotonic; blank uses circular-field approximation)',key='ece_profile_eq_bphi')
                     if st.button('Reconstruct ECE electron-temperature profile',type='primary',key='ece_run_profile'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
                             raise ValueError('Select exactly one calibrated brightness-temperature column per channel frequency.')
@@ -1873,6 +1884,10 @@ elif page=='Plasma Parameters':
                         ece_frame=df[[ece_time_col]+ece_signal_cols].apply(pd.to_numeric,errors='coerce')
                         if ece_frame.isna().any().any():
                             raise ValueError('Profile time and channel signals must be numeric and complete; missing samples are not silently dropped.')
+                        eq_r=None if not ece_eq_radius_text.strip() else np.asarray([float(v.strip()) for v in ece_eq_radius_text.split(',') if v.strip()],dtype=float)
+                        eq_b=None if not ece_eq_bphi_text.strip() else np.asarray([float(v.strip()) for v in ece_eq_bphi_text.split(',') if v.strip()],dtype=float)
+                        if (eq_r is None)!=(eq_b is None):
+                            raise ValueError('Supply both equilibrium R and Bφ arrays, or leave both blank.')
                         result=reconstruct_ece_temperature_profile(
                             ece_freq_Hz,ece_frame[ece_signal_cols].to_numpy(dtype=float),
                             ece_frame[ece_time_col].to_numpy(dtype=float),
@@ -1880,11 +1895,19 @@ elif page=='Plasma Parameters':
                             optical_depth=ece_tau,background_temperature_eV=ece_bg,
                             assume_optically_thick=ece_thick,
                             time_window_s=(ece_window_start,ece_window_end),
+                            profile_method='pchip' if ece_profile_method=='Shape-preserving PCHIP' else 'linear',
+                            equilibrium_radius_m=eq_r,equilibrium_toroidal_field_T=eq_b,
+                            electron_energy_eV=(ece_energy_eV if ece_relativistic else None),
+                            parallel_beta=ece_beta_parallel,
+                            model_discrepancy_fraction=float(ece_model_floor),
                         )
                         st.success(f'ECE time-window-averaged electron-temperature profile completed ({result["selected_sample_count"]} samples; {ece_window_start:g}–{ece_window_end:g} s) within the declared model.')
                         st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['mean_calibrated_brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
-                        st.warning('Profile is interpolated only between approximate resonance locations. This is not EFIT mapping, ray tracing, a full radiative-transfer inversion, or uncertainty-validated device inference.')
+                        st.line_chart(pd.DataFrame({'dTe/dR (eV/m)':result['profile_gradient_eV_per_m']},index=result['profile_radius_m']))
+                        st.caption(f"Measured channels: {result['profile_spatial_quality']['measured_channel_count']} · Output grid points (not independent measurements): {result['profile_spatial_quality']['output_grid_point_count']} · Max PCHIP-vs-linear difference: {result['profile_interpolation_method_sensitivity']}")
+                        st.warning('Brightness temperature is not automatically electron temperature. The inversion depends on optical-depth/thermalization assumptions. Uncertainty bands omit unquantified physics unless a model-discrepancy floor is supplied.')
+                        st.warning('Radius mapping is one-dimensional. A supplied Bφ(R) table is not full EFIT flux-coordinate mapping or line-of-sight ray tracing; verify device bounds and viewing geometry independently.')
                         st.json(result)
                         json_download('Export ECE electron-temperature profile',result,'tis_ece_temperature_profile.json')
         except Exception as e:
