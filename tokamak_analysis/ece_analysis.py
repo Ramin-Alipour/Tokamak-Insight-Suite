@@ -124,7 +124,7 @@ def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
         raise ValueError("Receiver response frequencies must lie within the measured radiance spectrum; extrapolation is forbidden.")
     integrals = trapezoid(weights, rf, axis=1)
     if np.any(~np.isfinite(integrals)) or np.any(integrals <= 0):
-        raise ValueError("Every receiver-response channel must have positive finite integrated weight.")
+        raise ValueError("Every receiver-response channel must have positive integrated weight (finite).")
     normalized = weights / integrals[:, None]
     effective_center_frequency = trapezoid(weights * rf[None, :], rf, axis=1) / integrals
     sampled = np.asarray([np.interp(rf, f, row) for row in radiance.reshape(-1, f.size)])
@@ -599,7 +599,10 @@ def reconstruct_ece_temperature_profile(
         window_start, window_end = map(float, window)
         if window_start < t[0] or window_end > t[-1]:
             raise ValueError("time_window_s must lie within the supplied time_s range.")
-    selected = (t >= window_start) & (t <= window_end)
+    time_tolerance = 8.0 * np.finfo(float).eps * max(
+        abs(window_start), abs(window_end), float(np.median(np.diff(t))), np.finfo(float).tiny
+    )
+    selected = (t >= window_start - time_tolerance) & (t <= window_end + time_tolerance)
     if np.count_nonzero(selected) < 1:
         raise ValueError("time_window_s contains no acquired samples.")
     selected_time = t[selected]
