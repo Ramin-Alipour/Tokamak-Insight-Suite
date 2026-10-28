@@ -610,3 +610,47 @@ def test_explicit_geometry_mapping_rejects_conflicting_or_malformed_inputs():
             equilibrium_toroidal_field_T=[2.0, 1.5, 1.0],
             **common,
         )
+
+
+
+def test_receiver_response_convolution_preserves_flat_spectrum_and_no_calibration():
+    from tokamak_analysis.ece_analysis import convolve_ece_receiver_response
+
+    frequency = np.linspace(80e9, 100e9, 101)
+    radiance = np.full(frequency.size, 2.5e-10)
+    response_frequency = np.linspace(85e9, 95e9, 21)
+    response = np.vstack([
+        np.exp(-0.5 * ((response_frequency - center) / 1e9) ** 2)
+        for center in [88e9, 92e9]
+    ])
+    result = convolve_ece_receiver_response(
+        frequency, radiance, response_frequency, response,
+    )
+    np.testing.assert_allclose(
+        result["channel_spectral_radiance_W_m2_sr_Hz"], [2.5e-10, 2.5e-10],
+        rtol=1e-12,
+    )
+    assert result["response_convolution_performed"] is True
+    assert result["calibration_performed"] is False
+
+
+def test_receiver_response_rejects_uncovered_or_invalid_response():
+    from tokamak_analysis.ece_analysis import convolve_ece_receiver_response
+
+    frequency = np.linspace(80e9, 100e9, 10)
+    radiance = np.ones(10)
+    with pytest.raises(ValueError, match="within the measured radiance spectrum"):
+        convolve_ece_receiver_response(
+            frequency, radiance, [79e9, 90e9, 95e9], [[1.0, 1.0, 1.0]],
+        )
+    with pytest.raises(ValueError, match="positive integrated weight"):
+        convolve_ece_receiver_response(
+            frequency, radiance, [85e9, 90e9, 95e9], [[0.0, 0.0, 0.0]],
+        )
+
+
+def test_extreme_frequencies_fail_cleanly_instead_of_returning_infinite_fields():
+    with pytest.raises(ValueError, match="overflowed"):
+        resonance_field_T(1e308, 1)
+    with pytest.raises(ValueError, match="overflowed"):
+        brightness_temperature_K(1e308, 1e9)
