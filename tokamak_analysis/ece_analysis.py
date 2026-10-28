@@ -541,10 +541,10 @@ def reconstruct_ece_temperature_profile(
             if np.any(~np.isfinite(arr)) or np.any(arr < 0):
                 raise ValueError(f"{name} must be finite and non-negative.")
             return arr
-        if arr.ndim == 0:
-            arr = np.full(f.shape, float(arr))
+        if arr.ndim == 0 or arr.shape == (1,):
+            arr = np.full(f.shape, float(arr.reshape(-1)[0]))
         elif arr.shape != f.shape:
-            expected = "scalar, per-channel, or time-by-channel" if allow_time_matrix else "scalar or per-channel"
+            expected = "scalar, one value, per-channel, or time-by-channel" if allow_time_matrix else "scalar, one value, or per-channel"
             raise ValueError(f"{name} must be {expected}.")
         if np.any(~np.isfinite(arr)) or np.any(arr < 0) or (strictly_positive and np.any(arr <= 0)):
             bound = "finite and strictly positive" if strictly_positive else "finite and non-negative"
@@ -730,8 +730,8 @@ def reconstruct_ece_temperature_profile(
             bandwidth_radius_lower = np.minimum(radius_at_low_f, radius_at_high_f)
             bandwidth_radius_upper = np.maximum(radius_at_low_f, radius_at_high_f)
     if radius_mapping_uncertainty_input is not None:
-        if radius_mapping_uncertainty_input.ndim == 1 and radius_mapping_uncertainty_input.shape != f.shape:
-            raise ValueError("radius_mapping_uncertainty_m must be scalar or contain one value per frequency channel.")
+        if radius_mapping_uncertainty_input.ndim == 1 and radius_mapping_uncertainty_input.size not in {1, f.size}:
+            raise ValueError("radius_mapping_uncertainty_m must be scalar, one value, or contain one value per frequency channel.")
         radius_sigma = np.sqrt(radius_sigma**2 + np.broadcast_to(radius_mapping_uncertainty_input, f.shape)**2)
     if plasma_bounds is not None and np.any((radius < plasma_bounds[0]) | (radius > plasma_bounds[1])):
         raise ValueError("One or more resonance radii fall outside the user-supplied plasma major-radius bounds.")
