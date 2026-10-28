@@ -44,7 +44,7 @@ def test_invalid_calibration_baseline_or_channel_metadata_is_rejected(kwargs):
         analyze_poloidal_field_probes(t, signal, **kwargs)
 
 
-def test_probe_dashboard_runs_multichannel_analysis_and_renders_export():
+def test_probe_dashboard_runs_precalibrated_multichannel_analysis_and_renders_export():
     app_path = Path(__file__).resolve().parents[1] / "app.py"
     app = AppTest.from_file(app_path, default_timeout=120).run()
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
@@ -60,8 +60,6 @@ def test_probe_dashboard_runs_multichannel_analysis_and_renders_export():
     app.selectbox(key="pf_probe_time").set_value("time_s")
     app.run()
     app.multiselect(key="pf_probe_channels").set_value(["probe_inner", "probe_outer"])
-    app.text_input(key="pf_gain").set_value("0.5,0.25")
-    app.text_input(key="pf_offset").set_value("0.1,-0.2")
     app.text_input(key="pf_uncertainty").set_value("0.02")
     app.run()
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
