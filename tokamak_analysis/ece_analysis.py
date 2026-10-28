@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
+from scipy.signal import welch as welch_psd
 
 
 def resonance_field_T(frequency_Hz, harmonic: int = 1):
@@ -170,10 +171,24 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             psd[1:-1] *= 2.0
         else:
             psd[1:] *= 2.0
+        fs = 1.0 / float(np.median(dt))
+        # Welch averaging provides a lower-variance PSD estimate alongside the
+        # full-record periodogram retained for backward compatibility.
+        welch_nperseg = min(256, t.size)
+        welch_frequency, welch_density = welch_psd(
+            y0, fs=fs, window="hann", nperseg=welch_nperseg,
+            noverlap=welch_nperseg // 2, detrend=False, scaling="density",
+            axis=0, return_onesided=True,
+        )
         out.update({"time_s": t, "fluctuation_rms": np.sqrt(np.mean(y0**2, axis=0)),
                     "fluctuation_psd_frequency_Hz": freq, "fluctuation_psd": psd,
-                    "sampling_frequency_Hz": 1.0 / float(np.median(dt)),
-                    "nyquist_frequency_Hz": 0.5 / float(np.median(dt))})
+                    "welch_psd_frequency_Hz": welch_frequency,
+                    "welch_psd": welch_density,
+                    "welch_psd_nperseg": welch_nperseg,
+                    "welch_psd_window": "hann",
+                    "welch_psd_overlap_samples": welch_nperseg // 2,
+                    "sampling_frequency_Hz": fs,
+                    "nyquist_frequency_Hz": 0.5 * fs})
         if noise_std is not None:
             n = np.asarray(noise_std, dtype=float)
             if np.any(~np.isfinite(n)) or np.any(n < 0):
