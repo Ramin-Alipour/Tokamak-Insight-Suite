@@ -1,12 +1,13 @@
-# Electron Cyclotron Emission (ECE) — analysis 3/81
+# Electron Cyclotron Emission (ECE) — analysis 3/80
 
 ## Scope and status
 
-The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and exposed in the Streamlit workspace. It supports three explicitly scoped workflows:
+The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and exposed in the Streamlit workspace. It supports four explicitly scoped workflows:
 
 1. **Brightness temperature** from absolutely calibrated spectral radiance.
 2. **Channel fluctuations and one-sided periodogram PSD** from aligned multi-channel time series.
 3. **Cold resonance mapping** from channel frequency to resonance field, with an optional simplified circular toroidal-field major-radius estimate.
+4. **Time-windowed radial electron-temperature profile reconstruction** from already-calibrated brightness-temperature samples, using supplied optical depth with a single-slab LTE inversion or an explicit optically-thick assumption.
 
 The implementation is complete within this scope. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not constitute experimental validation for a particular tokamak.
 
@@ -99,6 +100,7 @@ fluctuations = analyze_ece(
 | `brightness_temperature` | `frequency_Hz`, `spectral_radiance_W_m2_sr_Hz` | `resonance_field_T`, `brightness_temperature_K`, `brightness_temperature_eV` |
 | `channel_fluctuations` | `frequency_Hz`, `time_s`, `signal` with shape (time samples, channels) | `fluctuation_rms`, `fluctuation_psd_frequency_Hz`, `fluctuation_psd`, sample and Nyquist frequencies |
 | `resonance_mapping` | `frequency_Hz`; optional paired `major_radius_m` and `B_axis_T` | `resonance_field_T`, optional `resonance_radius_m` |
+| `reconstruct_ece_temperature_profile` (separate workflow) | `frequency_Hz`, already-calibrated `calibrated_brightness_temperature_eV` matrix, `time_s`, `major_radius_m`, `B_axis_T`, and either per-channel `optical_depth` or explicit `assume_optically_thick=True`; optional background and time window | Time-window-averaged per-channel brightness temperature and inferred Te, approximate resonance radii, and interpolated radial Te profile; no extrapolation |
 
 All channel center frequencies must be a non-empty, finite, positive, strictly increasing one-dimensional array. `harmonic` must be a positive integer. Mode-specific conflicting inputs are rejected. Optional `channel_bandwidth_Hz` must be positive and scalar or one value per channel; its fractional value is reported but no finite-bandwidth convolution is performed.
 
@@ -132,11 +134,7 @@ The workflow intentionally reports the model and its limitations rather than sil
 
 ## Radial electron-temperature profile reconstruction
 
-The dashboard also offers a **Temperature profile reconstruction** workflow for a time-by-channel table. It calculates the temporal mean per channel, converts each channel using user-supplied linear coefficients
-
-`Tb[eV] = gain[eV / signal_unit] × mean(signal) + offset[eV]`
-
-and maps channel frequencies to approximate resonance radii using the same simplified toroidal-field model. These coefficients must come from the user's own instrument calibration; the software does not calibrate detector counts or voltage.
+The dashboard also offers a **Temperature profile reconstruction** workflow for a time-by-channel table whose columns already contain calibrated brightness temperature in eV. It computes the time-window mean per channel and maps channel frequencies to approximate resonance radii using the same simplified toroidal-field model. The input values must already be calibrated before import; TIS does not apply gain/offset coefficients or perform detector calibration.
 
 For temperature inference, the user must either supply optical depth per channel and a background brightness temperature, using the single-slab LTE relation
 
