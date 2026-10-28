@@ -39,7 +39,8 @@ def test_ece_dashboard_runs_fluctuation_and_profile_interactions():
 
     app.selectbox(key="ece_time_col").set_value("time_s")
     app.multiselect(key="ece_channel_cols").set_value(["tb_a", "tb_b", "tb_c"])
-    app.text_input(key="ece_frequency_text").set_value("80e9,90e9,100e9")
+    app.text_input(key="ece_frequency_text").set_value("100e9,80e9,90e9")
     app.button(key="ece_analyze").click().run()
     assert not app.exception
     assert any("ECE profile reconstructed within the declared approximate model." in item.value for item in app.success)
+    assert any("reordered together into ascending frequency order" in item.value for item in app.info)
