@@ -908,6 +908,8 @@ def reconstruct_ece_temperature_profile(
                 te_time_sigma = np.sqrt(np.broadcast_to(covariance_variance, te_time.shape))
             else:
                 te_time_sigma = np.sqrt(te_time_sigma**2 + covariance_variance)
+        if te_time_sigma is not None and model_discrepancy_fraction > 0:
+            te_time_sigma = np.sqrt(te_time_sigma**2 + (model_discrepancy_fraction * np.abs(te_time))**2)
         output["electron_temperature_channel_time_eV"] = te_time
         profile_time = np.vstack([
             PchipInterpolator(r_sorted, row[order], extrapolate=False)(r_profile)
