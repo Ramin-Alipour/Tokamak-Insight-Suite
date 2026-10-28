@@ -114,3 +114,17 @@ def test_ece_resonance_dashboard_relativistic_sensitivity_option():
     app.button(key="ece_run_mapping").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("ECE resonance mapping completed" in x.value for x in app.success)
+
+
+
+def test_ece_receiver_response_convolution_dashboard():
+    app = _open_ece()
+    app.selectbox(key="ece_workflow_mode").set_value("Receiver response convolution").run()
+    app.text_area(key="ece_response_spectrum_frequency").set_value("80000000000,85000000000,90000000000,95000000000,100000000000").run()
+    app.text_area(key="ece_response_spectrum_radiance").set_value("1e-10,1e-10,1e-10,1e-10,1e-10").run()
+    app.text_area(key="ece_response_frequency").set_value("85000000000,90000000000,95000000000").run()
+    app.text_area(key="ece_response_weights").set_value("0,1,0;0,0.5,0.5").run()
+    app.button(key="ece_response_run").click().run()
+    assert not app.exception, [str(x.value) for x in app.exception]
+    assert any("receiver-response convolution completed" in x.value for x in app.success)
+    assert any(x.label == "Export ECE receiver-response convolution" for x in app.get("download_button"))
