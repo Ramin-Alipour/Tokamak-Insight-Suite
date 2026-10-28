@@ -438,7 +438,7 @@ def reconstruct_ece_temperature_profile(
     include_time_resolved_profile=False, profile_method="pchip",
     equilibrium_radius_m=None, equilibrium_toroidal_field_T=None,
     channel_resonance_radius_m=None, radius_mapping_uncertainty_m=None,
-    channel_covariance_eV2=None,
+    plasma_radius_bounds_m=None, channel_covariance_eV2=None,
     temporal_correlation_adjustment=True, electron_energy_eV=None,
     parallel_beta=0.0, model_discrepancy_fraction=0.0,
 ):
@@ -495,6 +495,12 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("profile_method must be 'linear' or 'pchip'.")
     if not isinstance(temporal_correlation_adjustment, (bool, np.bool_)):
         raise ValueError("temporal_correlation_adjustment must be boolean.")
+    if plasma_radius_bounds_m is not None:
+        plasma_bounds = np.asarray(plasma_radius_bounds_m, dtype=float)
+        if plasma_bounds.shape != (2,) or np.any(~np.isfinite(plasma_bounds)) or plasma_bounds[0] <= 0 or plasma_bounds[0] >= plasma_bounds[1]:
+            raise ValueError("plasma_radius_bounds_m must be finite (R_min, R_max) with 0 < R_min < R_max.")
+    else:
+        plasma_bounds = None
     if (equilibrium_radius_m is None) != (equilibrium_toroidal_field_T is None):
         raise ValueError("equilibrium_radius_m and equilibrium_toroidal_field_T must be supplied together.")
     if channel_resonance_radius_m is not None:
@@ -657,6 +663,12 @@ def reconstruct_ece_temperature_profile(
         if tb_mean_sigma is not None or tau_sigma is not None or background_temperature_uncertainty_eV:
             te_sigma = np.sqrt(variance)
         inference = "Single-slab LTE inversion using user-supplied optical depth and background temperature."
+    if tau is not None and te_sigma is not None:
+        relative_te_uncertainty = te_sigma / np.maximum(np.abs(te_eV), np.finfo(float).tiny)
+        if np.any(relative_te_uncertainty > 0.5):
+            optical_depth_condition_warning = True
+    if optical_depth_condition_warning and optical_depth_condition_message is None:
+        optical_depth_condition_message = "The supplied uncertainties imply strongly amplified uncertainty in the optical-depth inversion; the 1e-3 threshold is only a heuristic, not a universal validity boundary."
 
     b_res = (resonance_field_T(f, harmonic) if electron_energy_eV is None else
              resonance_field_relativistic_T(f, harmonic, electron_energy_eV=electron_energy_eV,
@@ -711,7 +723,11 @@ def reconstruct_ece_temperature_profile(
             bandwidth_radius_lower = np.minimum(radius_at_low_f, radius_at_high_f)
             bandwidth_radius_upper = np.maximum(radius_at_low_f, radius_at_high_f)
     if radius_mapping_uncertainty_input is not None:
+        if radius_mapping_uncertainty_input.ndim == 1 and radius_mapping_uncertainty_input.shape != f.shape:
+            raise ValueError("radius_mapping_uncertainty_m must be scalar or contain one value per frequency channel.")
         radius_sigma = np.sqrt(radius_sigma**2 + np.broadcast_to(radius_mapping_uncertainty_input, f.shape)**2)
+    if plasma_bounds is not None and np.any((radius < plasma_bounds[0]) | (radius > plasma_bounds[1])):
+        raise ValueError("One or more resonance radii fall outside the user-supplied plasma major-radius bounds.")
     order = np.argsort(radius)
     r_sorted = radius[order]
     te_sorted = te_eV[order]
@@ -803,6 +819,7 @@ def reconstruct_ece_temperature_profile(
         "optical_depth_inversion_sensitivity_dTe_dTb": None if tau is None else 1.0 / (-np.expm1(-tau)),
         "profile_method": f"{profile_method} interpolation between channel resonance locations; no extrapolation; grid points are not independent measurements",
         "profile_gradient_eV_per_m": local_gradient,
+        "plasma_radius_bounds_m": None if plasma_bounds is None else plasma_bounds.tolist(),
         "profile_spatial_quality": {
             "measured_channel_count": int(f.size),
             "output_grid_point_count": int(r_profile.size),
