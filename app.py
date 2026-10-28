@@ -879,7 +879,9 @@ elif page=='Spectral Analysis':
                         rad_freq,rad_cols=_ece_order_channels(rad_freq,rad_cols)
                         radiance=df[rad_cols].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
                         bad_rows=np.flatnonzero(~np.all(np.isfinite(radiance),axis=1))
-                        if bad_rows.size: raise ValueError(f'Radiance contains missing/non-finite values in {bad_rows.size} rows (first row indices: {bad_rows[:10].tolist()}). Correct the source data; TIS will not silently drop rows.')
+                        if bad_rows.size:
+                            bad_by_channel={str(col):int(np.count_nonzero(~np.isfinite(pd.to_numeric(df[col],errors='coerce').to_numpy(dtype=float)))) for col in rad_cols}
+                            raise ValueError(f'Radiance contains missing/non-finite values in {bad_rows.size} rows; per-channel invalid counts: {bad_by_channel}; first row indices: {bad_rows[:10].tolist()}. Correct the source data; TIS will not silently drop rows.')
                         if np.any(radiance<0): raise ValueError('Calibrated spectral radiance cannot be negative.')
                         result=analyze_ece(rad_freq,harmonic=int(rad_harmonic),spectral_radiance_W_m2_sr_Hz=radiance,mode='brightness_temperature',**({'major_radius_m':float(rad_r0),'B_axis_T':float(rad_b0)} if rad_map else {}))
                         st.success('Brightness temperature calculated from the supplied calibrated radiance.')
@@ -935,7 +937,8 @@ elif page=='Spectral Analysis':
                         bad_time=np.flatnonzero(~np.isfinite(time_values))
                         bad_signal=np.flatnonzero(~np.all(np.isfinite(signals),axis=1))
                         if bad_time.size or bad_signal.size:
-                            raise ValueError(f'Invalid input rows: {bad_time.size} rows with invalid time and {bad_signal.size} rows with one or more invalid channel samples. First invalid time rows: {bad_time[:10].tolist()}; signal rows: {bad_signal[:10].tolist()}. Correct the source data; rows are not silently dropped.')
+                            bad_by_channel={str(col):int(np.count_nonzero(~np.isfinite(pd.to_numeric(df[col],errors='coerce').to_numpy(dtype=float)))) for col in fluct_cols}
+                            raise ValueError(f'Invalid input rows: {bad_time.size} rows with invalid time and {bad_signal.size} rows with one or more invalid channel samples. Per-channel invalid counts: {bad_by_channel}. First invalid time rows: {bad_time[:10].tolist()}; signal rows: {bad_signal[:10].tolist()}. Correct the source data; rows are not silently dropped.')
                         if np.any(np.diff(time_values)<=0): raise ValueError('Time must be strictly increasing; sort/fix the source table without breaking channel synchronization.')
                         noise=None
                         if use_noise:
@@ -1030,9 +1033,11 @@ elif page=='Spectral Analysis':
                         bad_time=np.flatnonzero(~np.isfinite(ece_time))
                         bad_channel=np.flatnonzero(~np.all(np.isfinite(ece_tb),axis=1))
                         negative_channel=np.flatnonzero(np.any(ece_tb<0,axis=1))
+                        bad_by_channel={str(col):int(np.count_nonzero(~np.isfinite(pd.to_numeric(df[col],errors='coerce').to_numpy(dtype=float)))) for col in ece_channel_cols}
+                        negative_by_channel={str(col):int(np.count_nonzero(pd.to_numeric(df[col],errors='coerce').to_numpy(dtype=float)<0)) for col in ece_channel_cols}
                         st.caption(f'Data-quality audit: {bad_time.size} invalid time rows; {bad_channel.size} rows with missing/non-finite channel values; {negative_channel.size} rows with negative brightness-temperature samples.')
-                        if bad_time.size or bad_channel.size: raise ValueError(f'Invalid input rows (time: {bad_time[:10].tolist()}, channels: {bad_channel[:10].tolist()}). Correct the source data; TIS will not silently discard rows.')
-                        if negative_channel.size: raise ValueError(f'Negative brightness-temperature samples at rows {negative_channel[:10].tolist()}; correct the calibrated input.')
+                        if bad_time.size or bad_channel.size: raise ValueError(f'Invalid input rows (time: {bad_time[:10].tolist()}, channels: {bad_channel[:10].tolist()}); per-channel invalid counts: {bad_by_channel}. Correct the source data; TIS will not silently discard rows.')
+                        if negative_channel.size: raise ValueError(f'Negative brightness-temperature samples at rows {negative_channel[:10].tolist()}; per-channel negative counts: {negative_by_channel}. Correct the calibrated input.')
                         if np.any(np.diff(ece_time)<=0): raise ValueError('Time must be strictly increasing; sort/fix the source data while preserving channel alignment.')
                         ece_tau=None
                         if inference_basis=='Use supplied optical depth (single-slab LTE)':
@@ -1086,6 +1091,8 @@ elif page=='Spectral Analysis':
                             time_profile=pd.DataFrame(result['electron_temperature_profile_time_eV'],index=result['selected_time_s'],columns=result['profile_radius_m'])
                             time_profile.index.name='time_s'
                             st.line_chart(time_profile)
+                        if result['optical_depth_condition_warning']:
+                            st.warning(result['optical_depth_condition_message'])
                         st.caption('Approximate circular-field mapping. Channel bandwidth is reported as a radial localization envelope, not a receiver-response convolution. Uncertainties are first-order and exclude model discrepancy/correlations. No EFIT/ray tracing or relativistic/Doppler correction.')
                         json_download('Export ECE profile analysis JSON',result,'tis_ece_profile_analysis.json')
                         add_report_section('ECE profile reconstruction',result)
