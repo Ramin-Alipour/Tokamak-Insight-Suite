@@ -32,6 +32,8 @@ def test_probe_analysis_dashboard_can_run_and_render_langmuir_results():
     assert not app.exception, "\\n".join(str(item.value) for item in app.exception)
     assert len(app.json) >= 1
     assert any("electron_temperature_eV" in str(item.value) for item in app.json)
+    assert any("treated as already calibrated" in str(item.value) for item in app.warning)
+    assert not any("confirm calibration" in str(item.value).lower() for item in app.warning)
 
 def test_langmuir_dashboard_rejects_columns_without_finite_paired_samples():
     voltage = np.linspace(-4.0, 4.0, 17)
