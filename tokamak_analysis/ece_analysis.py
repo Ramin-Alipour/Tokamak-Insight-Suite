@@ -185,17 +185,14 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
     return out
 
 def reconstruct_ece_temperature_profile(
-    frequency_Hz, signal, time_s,
-    signal_to_brightness_temperature_eV_gain,
-    signal_to_brightness_temperature_eV_offset, *,
+    frequency_Hz, calibrated_brightness_temperature_eV, time_s, *,
     major_radius_m, B_axis_T, harmonic=2, optical_depth=None,
     background_temperature_eV=0.0, assume_optically_thick=False,
     profile_radius_m=None, time_window_s=None,
 ):
-    """Estimate a radial Te profile using user-supplied signal conversion.
+    """Reconstruct a radial Te profile from already-calibrated ECE Tb [eV].
 
-    No detector calibration is performed here. The user supplies the linear
-    conversion Tb[eV] = gain * signal + offset for every channel.
+    No detector calibration or signal-to-temperature conversion is performed.
     Resonance radii use only the simplified B_phi(R)=B_axis*R_axis/R model.
 
     If optical_depth is supplied, Te is inferred from the single-slab LTE
@@ -206,9 +203,7 @@ def reconstruct_ece_temperature_profile(
     """
     f = np.asarray(frequency_Hz, dtype=float)
     t = np.asarray(time_s, dtype=float)
-    y = np.asarray(signal, dtype=float)
-    gain = np.asarray(signal_to_brightness_temperature_eV_gain, dtype=float)
-    offset = np.asarray(signal_to_brightness_temperature_eV_offset, dtype=float)
+    y = np.asarray(calibrated_brightness_temperature_eV, dtype=float)
 
     if f.ndim != 1 or f.size < 3 or np.any(~np.isfinite(f)) or np.any(f <= 0) or np.any(np.diff(f) <= 0):
         raise ValueError("frequency_Hz must contain at least 3 finite, positive, strictly increasing channels.")
@@ -216,14 +211,6 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("time_s must contain at least 3 finite, strictly increasing samples.")
     if y.shape != (t.size, f.size) or np.any(~np.isfinite(y)):
         raise ValueError("signal must be a finite (time samples, channels) matrix matching time_s and frequency_Hz.")
-    if gain.ndim == 0:
-        gain = np.full(f.shape, float(gain))
-    if offset.ndim == 0:
-        offset = np.full(f.shape, float(offset))
-    if gain.shape != f.shape or np.any(~np.isfinite(gain)) or np.any(gain <= 0):
-        raise ValueError("signal-to-brightness-temperature gain must be finite, positive, and scalar or one per channel.")
-    if offset.shape != f.shape or np.any(~np.isfinite(offset)):
-        raise ValueError("signal-to-brightness-temperature offset must be finite and scalar or one per channel.")
     if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
         raise ValueError("harmonic must be a positive integer.")
     if not np.isfinite(major_radius_m) or major_radius_m <= 0 or not np.isfinite(B_axis_T) or B_axis_T <= 0:
@@ -261,9 +248,9 @@ def reconstruct_ece_temperature_profile(
     selected_time = t[selected]
     selected_signal = y[selected, :]
     mean_signal = np.mean(selected_signal, axis=0)
-    tb_eV = gain * mean_signal + offset
+    tb_eV = mean_signal
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
-        raise ValueError("Supplied signal conversion produced negative or non-finite brightness temperature.")
+        raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
     if tau is None:
         te_eV = tb_eV.copy()
         inference = "Tb approximates Te under the user-declared optically thick assumption."
@@ -293,11 +280,9 @@ def reconstruct_ece_temperature_profile(
     return {
         "frequency_Hz": f,
         "harmonic": int(harmonic),
-        "mean_raw_signal": mean_signal,
+        "mean_calibrated_brightness_temperature_eV": mean_signal,
         "selected_time_window_s": [window_start, window_end],
         "selected_sample_count": int(selected_time.size),
-        "signal_to_brightness_temperature_eV_gain": gain,
-        "signal_to_brightness_temperature_eV_offset": offset,
         "brightness_temperature_eV": tb_eV,
         "electron_temperature_channel_eV": te_eV,
         "resonance_field_T": b_res,
