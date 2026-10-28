@@ -38,6 +38,7 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
         "calibrated_power_density",
         "calibrated_spectrum_temperature_density",
         "user_defined_spectral_model",
+        "spatial_profile_reconstruction",
     }
     assert callable(resolve_analysis(1))
 
