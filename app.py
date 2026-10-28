@@ -1578,6 +1578,14 @@ elif page=='Plasma Parameters':
                     ece_tau_text=st.text_input('Optical depth per channel (comma-separated; blank if assuming optically thick)',key='ece_profile_tau')
                     ece_thick=st.checkbox('I confirm the channels are optically thick; use Te ≈ Tb',value=False,key='ece_profile_thick')
                     ece_bg=st.number_input('Background brightness temperature (eV)',min_value=0.0,value=0.0,key='ece_profile_background')
+                    ece_time_values=pd.to_numeric(df[ece_time_col],errors='coerce').dropna()
+                    if ece_time_values.empty:
+                        raise ValueError('The selected profile time column has no numeric samples.')
+                    ece_t_min=float(ece_time_values.min())
+                    ece_t_max=float(ece_time_values.max())
+                    st.caption('The profile is time-averaged only over this explicit acquisition window; it is not a time-resolved Te profile.')
+                    ece_window_start=st.number_input('Profile window start (s)',min_value=ece_t_min,max_value=ece_t_max,value=ece_t_min,key='ece_profile_window_start')
+                    ece_window_end=st.number_input('Profile window end (s)',min_value=ece_t_min,max_value=ece_t_max,value=ece_t_max,key='ece_profile_window_end')
                     ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_profile_r0')
                     ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_profile_b0')
                     if st.button('Reconstruct ECE electron-temperature profile',type='primary',key='ece_run_profile'):
@@ -1599,8 +1607,9 @@ elif page=='Plasma Parameters':
                             major_radius_m=ece_r0,B_axis_T=ece_b0,harmonic=int(harm),
                             optical_depth=ece_tau,background_temperature_eV=ece_bg,
                             assume_optically_thick=ece_thick,
+                            time_window_s=(ece_window_start,ece_window_end),
                         )
-                        st.success('ECE electron-temperature profile reconstruction completed within the declared model.')
+                        st.success(f'ECE time-window-averaged electron-temperature profile completed ({result["selected_sample_count"]} samples; {ece_window_start:g}–{ece_window_end:g} s) within the declared model.')
                         st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean raw signal':result['mean_raw_signal'],'Brightness temperature (eV)':result['brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
                         st.warning('Profile is interpolated only between approximate resonance locations. This is not EFIT mapping, ray tracing, a full radiative-transfer inversion, or uncertainty-validated device inference.')
