@@ -630,6 +630,27 @@ def reconstruct_ece_temperature_profile(
         left = right - 1
         fraction = (r_profile - r_sorted[left]) / (r_sorted[right] - r_sorted[left])
         profile_te_sigma = np.sqrt(((1.0 - fraction) * te_sigma_sorted[left])**2 + (fraction * te_sigma_sorted[right])**2)
+    if channel_covariance_eV2 is not None:
+        # Propagate the full covariance through the selected interpolation by a
+        # numerical Jacobian. This retains common-mode and cross-channel terms.
+        cov_sorted = covariance[np.ix_(order, order)]
+        if tau is None:
+            dte_dtb_sorted = np.ones(f.size)
+        else:
+            dte_dtb_sorted = (1.0 / (-np.expm1(-tau)))[order]
+        te_cov_sorted = cov_sorted * np.outer(dte_dtb_sorted, dte_dtb_sorted)
+        jacobian = np.empty((r_profile.size, f.size), dtype=float)
+        for channel in range(f.size):
+            step = np.sqrt(np.finfo(float).eps) * max(1.0, abs(te_sorted[channel]))
+            perturbed = te_sorted.copy()
+            perturbed[channel] += step
+            if profile_method == "pchip":
+                perturbed_profile = PchipInterpolator(r_sorted, perturbed, extrapolate=False)(r_profile)
+            else:
+                perturbed_profile = np.interp(r_profile, r_sorted, perturbed)
+            jacobian[:, channel] = (perturbed_profile - profile_te) / step
+        profile_covariance_variance = np.einsum("ij,jk,ik->i", jacobian, te_cov_sorted, jacobian)
+        profile_te_sigma = np.sqrt(np.maximum(0.0, profile_covariance_variance))
     profile_radius_sigma = np.interp(r_profile, r_sorted, radius_sigma_sorted)
     local_gradient = np.gradient(profile_te, r_profile, edge_order=2)
     profile_te_sigma_from_radius = np.abs(local_gradient) * profile_radius_sigma
