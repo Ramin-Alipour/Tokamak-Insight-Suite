@@ -1802,6 +1802,7 @@ elif page=='Plasma Parameters':
                     ece_time_col=col_select('ECE time column (s)',list(df.columns),'ece_time_col')
                     ece_signal_cols=st.multiselect('ECE channel signal columns (same order as frequencies)',[c for c in numeric if c!=ece_time_col],key='ece_signal_cols')
                     ece_noise=st.number_input('Per-channel RMS noise estimate (signal units; 0 = omit)',min_value=0.0,value=0.0,key='ece_noise_std')
+                    ece_welch_nperseg=st.number_input('Welch segment length (samples; 0 = automatic)',min_value=0,max_value=1000000,value=0,step=16,key='ece_welch_nperseg')
                     if st.button('Analyze ECE fluctuations / PSD',type='primary',key='ece_run_fluctuations'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
                             raise ValueError('Select exactly one signal column per channel frequency.')
@@ -1811,6 +1812,8 @@ elif page=='Plasma Parameters':
                         ece_t=ece_frame[ece_time_col].to_numpy(dtype=float)
                         ece_y=ece_frame[ece_signal_cols].to_numpy(dtype=float)
                         ece_kwargs={'noise_std':ece_noise} if ece_noise>0 else {}
+                        if ece_welch_nperseg>0:
+                            ece_kwargs['welch_nperseg']=int(ece_welch_nperseg)
                         result=analyze_ece(ece_freq_Hz,harmonic=int(harm),signal=ece_y,time_s=ece_t,mode='channel_fluctuations',**ece_kwargs)
                         st.success('ECE fluctuation analysis completed.')
                         st.metric('Sampling frequency',f"{result['sampling_frequency_Hz']:.6g} Hz")
@@ -1828,6 +1831,20 @@ elif page=='Plasma Parameters':
                         st.markdown('**Welch-averaged PSD (Hann window; 50% overlap)**')
                         st.caption(f"Welch settings: {result['welch_psd_nperseg']} samples per segment; {result['welch_psd_overlap_samples']} samples overlap. The periodogram is retained for comparison.")
                         st.line_chart(welch_frame)
+                        st.caption(result['aliasing_assessment'])
+                        if result['stationarity_flag']:
+                            st.warning('Split-record stationarity audit flagged material changes in mean/RMS. Welch confidence intervals assume more stationarity than this audit can establish; inspect time-resolved windows before interpreting peaks.')
+                        else:
+                            st.info('The split-record audit did not flag large mean/RMS changes; this is not proof of stationarity.')
+                        if 'cross_channel_spectra' in result:
+                            st.markdown('**Cross-channel coherence and phase (diagnostic statistics, not mode identification)**')
+                            pair_choices=[f"{p['channel_i']}–{p['channel_j']}" for p in result['cross_channel_spectra']]
+                            pair_index=st.selectbox('Channel pair (indices in selected-channel order)',range(len(pair_choices)),format_func=lambda idx:pair_choices[idx],key='ece_cross_pair')
+                            pair=result['cross_channel_spectra'][pair_index]
+                            cross_frame=pd.DataFrame({'Coherence':pair['coherence'],'Cross phase (rad)':pair['cross_phase_rad']},index=pair['coherence_frequency_Hz'])
+                            cross_frame.index.name='Frequency (Hz)'
+                            st.line_chart(cross_frame)
+                            st.caption(result['cross_channel_spectra_note'])
                         if 'above_noise_rms' in result:
                             st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),use_container_width=True,hide_index=True)
                         st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','welch_psd','welch_psd_frequency_Hz','time_s'}})
@@ -1835,12 +1852,15 @@ elif page=='Plasma Parameters':
             elif ece_mode=='Resonance mapping':
                 ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_r0')
                 ece_b0=st.number_input('Toroidal field at R₀ (T)',min_value=1e-6,value=2.0,key='ece_b0')
+                ece_map_rel=st.checkbox('Use monoenergetic relativistic/Doppler correction (approximate)',value=False,key='ece_map_rel')
+                ece_map_energy=st.number_input('Representative electron kinetic energy (eV)',min_value=0.0,value=1000.0,key='ece_map_energy') if ece_map_rel else None
+                ece_map_beta=st.number_input('Signed line-of-sight beta',min_value=-0.99,max_value=0.99,value=0.0,key='ece_map_beta') if ece_map_rel else 0.0
                 if st.button('Map ECE resonance radii',type='primary',key='ece_run_mapping'):
-                    result=analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping')
+                    result=analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping',electron_energy_eV=ece_map_energy,parallel_beta=ece_map_beta)
                     st.success('ECE resonance mapping completed using the declared circular toroidal-field approximation.')
                     st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Approximate major radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                     st.line_chart(pd.DataFrame({'Approximate major radius (m)':result['resonance_radius_m']},index=ece_freq_GHz))
-                    st.warning('This is not EFIT mapping; plasma shaping, poloidal field, relativistic/Doppler shifts and line-of-sight geometry are not included.')
+                    st.warning('This is a 1-D circular-field estimate, not EFIT/ray tracing. A monoenergetic relativistic/Doppler correction is only a sensitivity estimate; distribution effects, line-of-sight geometry and instrument response remain unmodeled.')
                     st.json(result)
                     json_download('Export ECE resonance mapping',result,'tis_ece_resonance_mapping.json')
             else:
