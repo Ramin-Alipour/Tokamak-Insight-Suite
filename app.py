@@ -1597,14 +1597,14 @@ elif page=='Plasma Parameters':
                             raise ValueError('Profile time and channel signals must be numeric and complete; missing samples are not silently dropped.')
                         result=reconstruct_ece_temperature_profile(
                             ece_freq_Hz,ece_frame[ece_signal_cols].to_numpy(dtype=float),
-                            ece_frame[ece_time_col].to_numpy(dtype=float),np.ones(len(ece_freq_Hz)),np.zeros(len(ece_freq_Hz)),
+                            ece_frame[ece_time_col].to_numpy(dtype=float),
                             major_radius_m=ece_r0,B_axis_T=ece_b0,harmonic=int(harm),
                             optical_depth=ece_tau,background_temperature_eV=ece_bg,
                             assume_optically_thick=ece_thick,
                             time_window_s=(ece_window_start,ece_window_end),
                         )
                         st.success(f'ECE time-window-averaged electron-temperature profile completed ({result["selected_sample_count"]} samples; {ece_window_start:g}–{ece_window_end:g} s) within the declared model.')
-                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
+                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['mean_calibrated_brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
                         st.warning('Profile is interpolated only between approximate resonance locations. This is not EFIT mapping, ray tracing, a full radiative-transfer inversion, or uncertainty-validated device inference.')
                         st.json(result)
