@@ -1772,7 +1772,7 @@ elif page=='Plasma Parameters':
         st.divider()
         st.markdown('#### ECE channel analysis')
         st.caption('Use calibrated spectral radiance for brightness temperature. Temperature is not automatically electron temperature: optical thickness and thermalization must be justified independently.')
-        ece_mode=st.selectbox('ECE workflow',['Brightness temperature','Channel fluctuations / PSD','Resonance mapping','Temperature profile reconstruction'],key='ece_workflow_mode')
+        ece_mode=st.selectbox('ECE workflow',['Brightness temperature','Channel fluctuations / PSD','Resonance mapping','Temperature profile reconstruction','Receiver response convolution'],key='ece_workflow_mode')
         ece_freq_text=st.text_input('Channel center frequencies (GHz, comma-separated, ascending)',value='80, 90, 100',key='ece_channel_freqs')
         try:
             ece_freq_GHz=np.asarray([float(v.strip()) for v in ece_freq_text.split(',') if v.strip()],dtype=float)
@@ -1863,6 +1863,28 @@ elif page=='Plasma Parameters':
                     st.warning('This is a 1-D circular-field estimate, not EFIT/ray tracing. A monoenergetic relativistic/Doppler correction is only a sensitivity estimate; distribution effects, line-of-sight geometry and instrument response remain unmodeled.')
                     st.json(result)
                     json_download('Export ECE resonance mapping',result,'tis_ece_resonance_mapping.json')
+            elif ece_mode=='Receiver response convolution':
+                st.markdown('**Convolve calibrated spectral radiance with a supplied receiver response**')
+                st.caption('Supply an already-calibrated spectrum and the measured/validated response kernel. TIS does not infer the response function or perform detector calibration.')
+                ece_spectrum_frequency_text=st.text_area('Spectral frequency grid (Hz; comma-separated, increasing)',key='ece_response_spectrum_frequency')
+                ece_spectrum_radiance_text=st.text_area('Calibrated spectral radiance values (same length; W m⁻² sr⁻¹ Hz⁻¹)',key='ece_response_spectrum_radiance')
+                ece_response_frequency_text=st.text_area('Response frequency grid (Hz; comma-separated, increasing)',key='ece_response_frequency')
+                ece_response_weights_text=st.text_area('Response weights: one comma-separated row per channel, rows separated by semicolons',key='ece_response_weights')
+                if st.button('Convolve spectrum with receiver response',type='primary',key='ece_response_run'):
+                    try:
+                        spec_f=np.asarray([float(v.strip()) for v in ece_spectrum_frequency_text.split(',') if v.strip()],dtype=float)
+                        spec_rad=np.asarray([float(v.strip()) for v in ece_spectrum_radiance_text.split(',') if v.strip()],dtype=float)
+                        response_f=np.asarray([float(v.strip()) for v in ece_response_frequency_text.split(',') if v.strip()],dtype=float)
+                        response_rows=[[float(v.strip()) for v in row.split(',') if v.strip()] for row in ece_response_weights_text.split(';') if row.strip()]
+                        response_w=np.asarray(response_rows,dtype=float)
+                        result=convolve_ece_receiver_response(spec_f,spec_rad,response_f,response_w)
+                        result['channel_brightness_temperature_K']=brightness_temperature_K(result['channel_spectral_radiance_W_m2_sr_Hz'],np.asarray([np.average(response_f,weights=row) for row in response_w]))
+                        st.success('ECE receiver-response convolution completed using the supplied kernel.')
+                        st.dataframe(pd.DataFrame({'Channel':np.arange(response_w.shape[0]),'Effective spectral radiance (W m⁻² sr⁻¹ Hz⁻¹)':result['channel_spectral_radiance_W_m2_sr_Hz'],'Brightness temperature (K)':result['channel_brightness_temperature_K']}),use_container_width=True,hide_index=True)
+                        st.json(result)
+                        json_download('Export ECE receiver-response convolution',result,'tis_ece_receiver_response.json')
+                    except Exception as e:
+                        st.error(f'ECE receiver-response convolution failed: {e}')
             else:
                 st.markdown('**Radial electron-temperature profile from multi-channel ECE data**')
                 st.caption('Inputs are already calibrated brightness temperatures in eV. TIS performs no detector calibration or signal-to-temperature conversion.')
