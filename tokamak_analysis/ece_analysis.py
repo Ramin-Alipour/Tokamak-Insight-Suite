@@ -148,6 +148,13 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 raise ValueError("optical_depth must be a scalar or one value per frequency channel.")
             out["optical_depth"] = tau
             out["optical_depth_warning"] = "Tau alone does not establish thermalization or calibration validity."
+            out["optical_depth_inversion_sensitivity_dTe_dTb"] = 1.0 / (-np.expm1(-tau))
+            out["optical_depth_condition_warning"] = bool(np.any(tau < 1e-3))
+            if out["optical_depth_condition_warning"]:
+                out["optical_depth_condition_message"] = (
+                    "At least one optical depth is below 1e-3; the single-slab Te inversion is strongly "
+                    "ill-conditioned and highly sensitive to Tb, background and tau uncertainty."
+                )
     if mode == "channel_fluctuations":
         if signal is None or time_s is None:
             raise ValueError("signal and time_s are required for channel_fluctuations mode.")
@@ -367,6 +374,12 @@ def reconstruct_ece_temperature_profile(
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
     te_sigma = None
+    optical_depth_condition_warning = bool(tau is not None and np.any(tau < 1e-3))
+    optical_depth_condition_message = (
+        "At least one optical depth is below 1e-3; the single-slab Te inversion is strongly "
+        "ill-conditioned and highly sensitive to Tb, background and tau uncertainty."
+        if optical_depth_condition_warning else None
+    )
     if tau is None:
         te_eV = tb_eV.copy()
         if tb_mean_sigma is not None:
@@ -448,6 +461,9 @@ def reconstruct_ece_temperature_profile(
         "resonance_radius_bandwidth_lower_m": bandwidth_radius_lower,
         "resonance_radius_bandwidth_upper_m": bandwidth_radius_upper,
         "inference_basis": inference,
+        "optical_depth_condition_warning": optical_depth_condition_warning,
+        "optical_depth_condition_message": optical_depth_condition_message,
+        "optical_depth_inversion_sensitivity_dTe_dTb": None if tau is None else 1.0 / (-np.expm1(-tau)),
         "profile_method": "linear interpolation between channel resonance locations; no extrapolation",
         "equilibrium_model": "simplified circular toroidal field B(R)=B_axis*R_axis/R",
         "uncertainty_method": "first-order independent-input propagation; excludes model discrepancy and correlations",
