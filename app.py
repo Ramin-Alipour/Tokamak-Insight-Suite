@@ -1623,11 +1623,16 @@ elif page=='Plasma Parameters':
                         st.bar_chart(rms_frame.set_index('Frequency (GHz)')['Fluctuation RMS'])
                         psd_frame=pd.DataFrame(result['fluctuation_psd'],index=result['fluctuation_psd_frequency_Hz'],columns=[f'{v:g} GHz' for v in ece_freq_GHz])
                         psd_frame.index.name='Frequency (Hz)'
-                        st.markdown('**One-sided fluctuation power spectral density**')
+                        st.markdown('**Full-record one-sided periodogram**')
                         st.line_chart(psd_frame)
+                        welch_frame=pd.DataFrame(result['welch_psd'],index=result['welch_psd_frequency_Hz'],columns=[f'{v:g} GHz' for v in ece_freq_GHz])
+                        welch_frame.index.name='Frequency (Hz)'
+                        st.markdown('**Welch-averaged PSD (Hann window; 50% overlap)**')
+                        st.caption(f"Welch settings: {result['welch_psd_nperseg']} samples per segment; {result['welch_psd_overlap_samples']} samples overlap. The periodogram is retained for comparison.")
+                        st.line_chart(welch_frame)
                         if 'above_noise_rms' in result:
                             st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),use_container_width=True,hide_index=True)
-                        st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','time_s'}})
+                        st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','welch_psd','welch_psd_frequency_Hz','time_s'}})
                         json_download('Export ECE fluctuation / PSD result',result,'tis_ece_fluctuations.json')
             elif ece_mode=='Resonance mapping':
                 ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=1e-6,value=1.0,key='ece_r0')
