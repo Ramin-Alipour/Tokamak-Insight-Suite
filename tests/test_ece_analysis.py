@@ -292,5 +292,5 @@ def test_ece_contract_matches_precalibrated_profile_pipeline():
     assert "signal_to_brightness_temperature_eV_gain" not in {item["name"] for item in contract["input_specs"]}
     assert "signal_to_brightness_temperature_eV_offset" not in {item["name"] for item in contract["input_specs"]}
     assert any(item["name"] == "calibrated_brightness_temperature_eV" for item in contract["input_specs"])
-    assert "already-calibrated" in diagnostic["execution_contract"]["note"]
+    assert "must already be calibrated" in diagnostic["execution_contract"]["note"]
     assert diagnostic["implementation_status"].startswith("Complete within declared software scope")
