@@ -310,6 +310,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         dt = np.diff(t)
         if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
             raise ValueError("Sampling must be approximately uniform for FFT-based spectra.")
+        if t.size < 8:
+            raise ValueError("channel_fluctuations requires at least 8 samples for a minimally meaningful Welch PSD.")
         y0 = y - np.mean(y, axis=0, keepdims=True)
         freq = np.fft.rfftfreq(t.size, d=float(np.median(dt)))
         fft = np.fft.rfft(y0, axis=0)
