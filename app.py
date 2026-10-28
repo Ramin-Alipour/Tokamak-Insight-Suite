@@ -1883,7 +1883,7 @@ elif page=='Plasma Parameters':
                         response_rows=[[float(v.strip()) for v in row.split(',') if v.strip()] for row in ece_response_weights_text.split(';') if row.strip()]
                         response_w=np.asarray(response_rows,dtype=float)
                         result=convolve_ece_receiver_response(spec_f,spec_rad,response_f,response_w)
-                        result['channel_brightness_temperature_K']=brightness_temperature_K(result['channel_spectral_radiance_W_m2_sr_Hz'],np.asarray([np.average(response_f,weights=row) for row in response_w]))
+                        result['channel_brightness_temperature_K']=brightness_temperature_K(result['channel_spectral_radiance_W_m2_sr_Hz'],result['effective_center_frequency_Hz'])
                         st.success('ECE receiver-response convolution completed using the supplied kernel.')
                         st.dataframe(pd.DataFrame({'Channel':np.arange(response_w.shape[0]),'Effective spectral radiance (W m⁻² sr⁻¹ Hz⁻¹)':result['channel_spectral_radiance_W_m2_sr_Hz'],'Brightness temperature (K)':result['channel_brightness_temperature_K']}),use_container_width=True,hide_index=True)
                         st.json(result)
