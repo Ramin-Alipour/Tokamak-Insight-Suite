@@ -858,7 +858,7 @@
         {
           "name": "time_s",
           "unit": "s",
-          "description": "Strictly increasing, approximately uniformly sampled timebase; required for fluctuation mode.",
+          "description": "At least eight finite, strictly increasing, approximately uniformly sampled timestamps; required for fluctuation mode because Welch PSD and confidence bounds are always computed.",
           "required": false
         },
         {
