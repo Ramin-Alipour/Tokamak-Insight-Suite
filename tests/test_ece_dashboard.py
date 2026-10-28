@@ -52,7 +52,8 @@ def test_ece_fluctuation_dashboard_with_loaded_data():
     app.button(key="ece_run_fluctuations").click().run()
     assert not app.exception, [str(x.value) for x in app.exception]
     assert any("ECE fluctuation analysis completed" in x.value for x in app.success)
-    assert any(x.label == "Export ECE fluctuation / PSD result" for x in app.get("download_button"))
+    assert app.selectbox(key="ece_cross_pair")
+    assert any("Export ECE fluctuation / PSD result" == x.label for x in app.get("download_button"))
 
 
 def test_ece_fluctuation_dashboard_rejects_missing_samples_without_compressing_timebase():
@@ -92,6 +93,8 @@ def test_ece_temperature_profile_dashboard_from_uploaded_multichannel_data():
     app.multiselect(key="ece_profile_signal_cols").set_value(["ece_80", "ece_90", "ece_100"]).run()
     assert not any("gain to Tb" in x.label or "offset to Tb" in x.label for x in app.text_input)
     app.checkbox(key="ece_profile_thick").check().run()
+    app.selectbox(key="ece_profile_method").set_value("Shape-preserving PCHIP").run()
+    app.number_input(key="ece_model_discrepancy").set_value(0.05).run()
     app.number_input(key="ece_profile_window_start").set_value(0.0).run()
     app.number_input(key="ece_profile_window_end").set_value(10e-6).run()
     app.button(key="ece_run_profile").click().run()
@@ -99,3 +102,15 @@ def test_ece_temperature_profile_dashboard_from_uploaded_multichannel_data():
     assert any("11 samples" in x.value for x in app.success)
     assert any(x.label == "Export ECE electron-temperature profile" for x in app.get("download_button"))
 
+
+
+
+def test_ece_resonance_dashboard_relativistic_sensitivity_option():
+    app = _open_ece()
+    app.selectbox(key="ece_workflow_mode").set_value("Resonance mapping").run()
+    app.checkbox(key="ece_map_rel").check().run()
+    app.number_input(key="ece_map_energy").set_value(10000.0).run()
+    app.number_input(key="ece_map_beta").set_value(0.1).run()
+    app.button(key="ece_run_mapping").click().run()
+    assert not app.exception, [str(x.value) for x in app.exception]
+    assert any("ECE resonance mapping completed" in x.value for x in app.success)
