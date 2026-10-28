@@ -38,8 +38,13 @@ jobs:
           ast.parse(source, filename="app.py")
           required = (
               "ECE channel/profile analysis",
-              "Analyze ECE channels and reconstruct Te profile",
-              "reconstruct_ece_temperature_profile(",
+              "Brightness temperature",
+              "Resonance mapping",
+              "Channel fluctuations / PSD",
+              "Te profile reconstruction",
+              "Reconstruct ECE Te profile",
+              "welch_psd_confidence_lower",
+              "electron_temperature_profile_time_eV",
               "tis_ece_profile_analysis.json",
               "TIS performs no detector calibration",
           )
