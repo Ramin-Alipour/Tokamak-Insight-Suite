@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
-from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence
+from scipy.signal import welch as welch_psd, get_window, csd as cross_spectral_density, coherence as signal_coherence, find_peaks
 from scipy.interpolate import PchipInterpolator
 from scipy.integrate import trapezoid
 from scipy.stats import chi2
@@ -160,7 +160,7 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 noise_std=None, optical_depth=None, psd_confidence_level=0.95,
                 mode="brightness_temperature", welch_nperseg=None,
                 compute_cross_channel_spectra=True, stationarity_segments=4,
-                electron_energy_eV=None, parallel_beta=0.0):
+                peak_prominence_fraction=0.1, electron_energy_eV=None, parallel_beta=0.0):
     """Analyze calibrated ECE channels and return validated derived quantities.
 
     signal may be a (time, channel) fluctuation matrix. Temperature inference
@@ -206,6 +206,12 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             raise ValueError("stationarity_segments must be an integer >= 2.")
         if not isinstance(compute_cross_channel_spectra, (bool, np.bool_)):
             raise ValueError("compute_cross_channel_spectra must be boolean.")
+        try:
+            peak_prominence_fraction = float(peak_prominence_fraction)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("peak_prominence_fraction must be finite and between 0 and 1.") from exc
+        if not np.isfinite(peak_prominence_fraction) or not 0 <= peak_prominence_fraction < 1:
+            raise ValueError("peak_prominence_fraction must be finite and between 0 and 1.")
     if electron_energy_eV is None:
         resonance_fields = resonance_field_T(f, harmonic)
         resonance_model = "cold non-relativistic resonance"
@@ -346,6 +352,26 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         out["stationarity_chunk_rms_relative_range"] = np.ptp(chunk_rms, axis=0) / rms_floor
         out["stationarity_chunk_mean_relative_range"] = np.ptp(chunk_means, axis=0) / rms_floor
         out["stationarity_flag"] = bool(np.any(out["stationarity_chunk_rms_relative_range"] > 0.5) or np.any(out["stationarity_chunk_mean_relative_range"] > 0.5))
+        peak_rows = []
+        for channel in range(f.size):
+            density = welch_density[:, channel]
+            if density.size < 3 or not np.any(density[1:] > 0):
+                continue
+            peaks, properties = find_peaks(
+                density, prominence=max(float(np.max(density)) * peak_prominence_fraction, np.finfo(float).tiny)
+            )
+            peaks = peaks[peaks > 0]
+            for peak in peaks:
+                peak_rows.append({
+                    "channel_index": int(channel),
+                    "frequency_Hz": float(welch_frequency[peak]),
+                    "psd": float(density[peak]),
+                    "prominence": float(properties["prominences"][np.flatnonzero(properties["peak_indices"] == peak)[0]]) if "peak_indices" in properties else float("nan"),
+                    "interpretation": "spectral candidate only; not an automatically identified MHD mode",
+                })
+        out["spectral_peak_candidates"] = peak_rows
+        out["spectral_peak_prominence_fraction"] = float(peak_prominence_fraction)
+        out["spectral_peak_note"] = "Peak finding is statistical signal processing. Physical mode identity requires equilibrium, diagnostic geometry, channel timing and corroborating diagnostics."
         if compute_cross_channel_spectra and f.size > 1:
             pair_rows = []
             for i in range(f.size):
@@ -360,6 +386,12 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                         nperseg=welch_nperseg, noverlap=welch_noverlap,
                         detrend=False,
                     )
+                    phase = np.unwrap(np.angle(cross_p))
+                    coherent = (coh >= 0.5) & (cross_f > 0) & np.isfinite(phase)
+                    delay_s = None
+                    if np.count_nonzero(coherent) >= 3:
+                        slope, intercept = np.polyfit(2.0 * np.pi * cross_f[coherent], phase[coherent], 1)
+                        delay_s = float(-slope)
                     pair_rows.append({
                         "channel_i": int(i), "channel_j": int(j),
                         "frequency_Hz": cross_f,
@@ -367,7 +399,9 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                         "cross_spectrum_imag": np.imag(cross_p),
                         "coherence_frequency_Hz": coh_f,
                         "coherence": coh,
-                        "cross_phase_rad": np.angle(cross_p),
+                        "cross_phase_rad": phase,
+                        "estimated_relative_delay_s": delay_s,
+                        "delay_estimation_note": "Phase-slope estimate over bins with coherence >= 0.5; not a hardware synchronization calibration.",
                     })
             out["cross_channel_spectra"] = pair_rows
             out["cross_channel_spectra_note"] = "Cross-spectra/coherence are signal statistics, not automatic MHD-mode identification; channel timing/phase response must be independently known."
