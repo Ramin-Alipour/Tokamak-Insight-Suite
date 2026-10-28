@@ -705,3 +705,16 @@ def test_full_channel_covariance_changes_profile_uncertainty():
     assert np.max(correlated_result["electron_temperature_profile_uncertainty_eV"]) > np.max(
         independent_result["electron_temperature_profile_uncertainty_eV"]
     )
+
+
+
+def test_profile_rejects_duplicate_channel_resonance_radii():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    with pytest.raises(ValueError, match="must be distinct"):
+        reconstruct_ece_temperature_profile(
+            [80e9, 90e9, 100e9], np.tile([10.0, 20.0, 30.0], (8, 1)),
+            np.arange(8, dtype=float), major_radius_m=1.5, B_axis_T=2.0,
+            assume_optically_thick=True,
+            channel_resonance_radius_m=[1.2, 1.5, 1.5],
+        )
