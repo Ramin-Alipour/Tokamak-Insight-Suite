@@ -17,7 +17,7 @@ from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
-from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power, reconstruct_thomson_profile
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece
 from tokamak_analysis.flux_loops import analyze_flux_loop
@@ -2092,7 +2092,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson spatial profile reconstruction','Thomson raw-spectrum temperature fit','Thomson calibrated scattered-power density','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
@@ -2167,6 +2167,65 @@ elif page=='Advanced Analysis':
                     st.caption('Independent pointwise uncertainties are propagated through gradients, normalized gradients, scale lengths, and averages. Peak-location uncertainty is not estimated; model and calibration uncertainties are separate.')
                 except Exception as e:
                     st.error(str(e))
+    elif workflow=='Thomson spatial profile reconstruction':
+        st.markdown('Reconstruct smooth radial electron-density and electron-temperature profiles from multiple spatially resolved Thomson measurements.')
+        st.caption('Use already-calibrated measurements. This fit reconstructs profiles only within the measured radial interval; it does not calibrate raw data, infer equilibrium, or extrapolate beyond measured points.')
+        if df is None or len(numeric) < 3:
+            st.info('Load a table with radius (m), electron density (m⁻³), and electron temperature (eV) columns.')
+        else:
+            radius_col=col_select('Measurement radius (m)',numeric,'tis_thomson_recon_radius')
+            density_col=col_select('Calibrated electron density (m⁻³)',numeric,'tis_thomson_recon_density')
+            temperature_col=col_select('Calibrated electron temperature (eV)',numeric,'tis_thomson_recon_temperature')
+            uncertainty_options=['(none)']+list(numeric)
+            density_unc_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_recon_density_unc')
+            temperature_unc_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_recon_temperature_unc')
+            method=st.selectbox('Reconstruction method',['Smoothing spline','Shape-preserving PCHIP'],key='tis_thomson_recon_method')
+            smoothing_factor=1.0
+            if method=='Smoothing spline':
+                smoothing_factor=st.number_input('Smoothing factor (0 = exact interpolation; larger = smoother fit)',min_value=0.0,value=1.0,step=0.25,format='%.3f',key='tis_thomson_recon_smoothing')
+            points=int(st.number_input('Output radial grid points',min_value=20,max_value=5000,value=200,step=10,key='tis_thomson_recon_points'))
+            if st.button('Reconstruct Thomson profiles',type='primary',key='run_thomson_profile_reconstruction'):
+                try:
+                    required=[radius_col,density_col,temperature_col]
+                    if len(set(required))!=3:
+                        raise ValueError('Radius, density and temperature must use different columns.')
+                    for optional_col in (density_unc_col,temperature_unc_col):
+                        if optional_col!='(none)' and optional_col in required:
+                            raise ValueError('Uncertainty columns must differ from radius, density and temperature columns.')
+                    radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
+                    density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
+                    temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)
+                    density_unc=None if density_unc_col=='(none)' else pd.to_numeric(df[density_unc_col],errors='raise').to_numpy(dtype=float)
+                    temperature_unc=None if temperature_unc_col=='(none)' else pd.to_numeric(df[temperature_unc_col],errors='raise').to_numpy(dtype=float)
+                    result=reconstruct_thomson_profile(
+                        radius_values,density_values,temperature_values,
+                        density_uncertainty_m3=density_unc,
+                        temperature_uncertainty_ev=temperature_unc,
+                        method='pchip' if method=='Shape-preserving PCHIP' else 'smoothing_spline',
+                        smoothing_factor=smoothing_factor,
+                        points=points,
+                    )
+                    frame=pd.DataFrame({
+                        'Radius (m)':result['radius_m'],
+                        'Reconstructed electron density (m⁻³)':result['density_m3'],
+                        'Reconstructed electron temperature (eV)':result['temperature_eV'],
+                        'Density gradient (m⁻⁴)':result['density_gradient_m-4'],
+                        'Temperature gradient (eV/m)':result['temperature_gradient_eV_m-1'],
+                    })
+                    st.success('Spatial Thomson profile reconstruction completed within the measured radial interval.')
+                    st.caption(f"Method: {result['method']} · Input points: {result['input_point_count']} · Output points: {result['reconstruction_point_count']} · Radius range: {result['radial_domain_m'][0]:.6g}–{result['radial_domain_m'][1]:.6g} m")
+                    st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron density (m⁻³)']])
+                    st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron temperature (eV)']])
+                    st.markdown('**Reconstructed profiles and derivatives**')
+                    st.dataframe(frame,use_container_width=True,hide_index=True)
+                    download_df('Download reconstructed Thomson profiles (CSV)',frame,'tis_thomson_reconstructed_profiles.csv')
+                    json_download('Export reconstruction, method and limitations (JSON)',result,'tis_thomson_profile_reconstruction.json')
+                    with st.expander('Assumptions and limitations'):
+                        for item in result['limitations']:
+                            st.warning(item)
+                        st.write(result['uncertainty_model'])
+                except Exception as e:
+                    st.error(f'Thomson profile reconstruction failed: {e}')
     elif workflow=='Thomson raw-spectrum temperature fit':
         st.markdown('Fit a calibrated Thomson-scattering spectrum with a non-relativistic Gaussian Doppler model and a linear local background.')
         st.warning('Requires a calibrated wavelength axis and known Gaussian instrument sigma. Density can be estimated only if the signal is calibrated as spectral power density in W/nm and the optical geometry is supplied.')
