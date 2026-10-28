@@ -360,13 +360,14 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             peaks, properties = find_peaks(
                 density, prominence=max(float(np.max(density)) * peak_prominence_fraction, np.finfo(float).tiny)
             )
-            peaks = peaks[peaks > 0]
-            for peak in peaks:
+            for peak, prominence in zip(peaks, properties.get("prominences", [])):
+                if peak <= 0:
+                    continue
                 peak_rows.append({
                     "channel_index": int(channel),
                     "frequency_Hz": float(welch_frequency[peak]),
                     "psd": float(density[peak]),
-                    "prominence": float(properties["prominences"][np.flatnonzero(properties["peak_indices"] == peak)[0]]) if "peak_indices" in properties else float("nan"),
+                    "prominence": float(prominence),
                     "interpretation": "spectral candidate only; not an automatically identified MHD mode",
                 })
         out["spectral_peak_candidates"] = peak_rows
