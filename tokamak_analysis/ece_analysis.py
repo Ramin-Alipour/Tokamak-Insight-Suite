@@ -26,6 +26,30 @@ def resonance_field_T(frequency_Hz, harmonic: int = 1):
     return float(result) if result.ndim == 0 else result
 
 
+
+def resonance_field_relativistic_T(frequency_Hz, harmonic: int = 1, *,
+                                   electron_energy_eV=0.0, parallel_beta=0.0):
+    """Monoenergetic relativistic/Doppler resonance estimate, not a full ECE solver.
+
+    Uses f = n*f_ce/[gamma*(1-beta_parallel)]; beta_parallel is signed under
+    this convention. Distribution-averaged emissivity and ray tracing are not included.
+    """
+    f = np.asarray(frequency_Hz, dtype=float)
+    energy = np.asarray(electron_energy_eV, dtype=float)
+    beta = np.asarray(parallel_beta, dtype=float)
+    if np.any(~np.isfinite(f)) or np.any(f <= 0):
+        raise ValueError("frequency_Hz must contain finite positive values.")
+    if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
+        raise ValueError("harmonic must be a positive integer.")
+    if np.any(~np.isfinite(energy)) or np.any(energy < 0):
+        raise ValueError("electron_energy_eV must be finite and non-negative.")
+    if np.any(~np.isfinite(beta)) or np.any(np.abs(beta) >= 1):
+        raise ValueError("parallel_beta must be finite and strictly between -1 and 1.")
+    gamma = 1.0 + energy * E_CHARGE / (M_E * C_LIGHT**2)
+    result = resonance_field_T(f, harmonic) * gamma * (1.0 - beta)
+    return float(result) if np.ndim(result) == 0 else result
+
+
 def resonance_radius_m(frequency_Hz, major_radius_m, B_axis_T, *,
                        harmonic: int = 1, sign: int = 1):
     """Invert a circular toroidal-field model B(R)=B_axis*R_axis/R.
@@ -81,7 +105,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 B_axis_T=None, harmonic=2, channel_bandwidth_Hz=None,
                 noise_std=None, optical_depth=None, psd_confidence_level=0.95,
                 mode="brightness_temperature", welch_nperseg=None,
-                compute_cross_channel_spectra=True, stationarity_segments=4):
+                compute_cross_channel_spectra=True, stationarity_segments=4,
+                electron_energy_eV=None, parallel_beta=0.0):
     """Analyze calibrated ECE channels and return validated derived quantities.
 
     signal may be a (time, channel) fluctuation matrix. Temperature inference
@@ -127,9 +152,19 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             raise ValueError("stationarity_segments must be an integer >= 2.")
         if not isinstance(compute_cross_channel_spectra, (bool, np.bool_)):
             raise ValueError("compute_cross_channel_spectra must be boolean.")
+    if electron_energy_eV is None:
+        resonance_fields = resonance_field_T(f, harmonic)
+        resonance_model = "cold non-relativistic resonance"
+    else:
+        resonance_fields = resonance_field_relativistic_T(
+            f, harmonic, electron_energy_eV=electron_energy_eV,
+            parallel_beta=parallel_beta,
+        )
+        resonance_model = "monoenergetic relativistic/Doppler correction; not distribution averaged"
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
-           "resonance_field_T": resonance_field_T(f, harmonic),
-           "assumptions": ["non-relativistic resonance", "cold-plasma frequency mapping"]}
+           "resonance_field_T": resonance_fields,
+           "resonance_model": resonance_model,
+           "assumptions": [resonance_model, "frequency values must be in Hz; calibrated input units remain the user's responsibility"]}
     if channel_bandwidth_Hz is not None:
         bw = np.asarray(channel_bandwidth_Hz, dtype=float)
         if bw.ndim == 0:
@@ -316,7 +351,8 @@ def reconstruct_ece_temperature_profile(
     include_time_resolved_profile=False, profile_method="pchip",
     equilibrium_radius_m=None, equilibrium_toroidal_field_T=None,
     radius_mapping_uncertainty_m=None, channel_covariance_eV2=None,
-    temporal_correlation_adjustment=True,
+    temporal_correlation_adjustment=True, electron_energy_eV=None,
+    parallel_beta=0.0, model_discrepancy_fraction=0.0,
 ):
     """Reconstruct a radial Te profile from already-calibrated ECE Tb [eV].
 
@@ -351,6 +387,13 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("major_radius_m and B_axis_T must be finite and positive.")
     if not np.isfinite(background_temperature_eV) or background_temperature_eV < 0:
         raise ValueError("background_temperature_eV must be finite and non-negative.")
+    if not np.isfinite(model_discrepancy_fraction) or model_discrepancy_fraction < 0:
+        raise ValueError("model_discrepancy_fraction must be finite and non-negative.")
+    if electron_energy_eV is not None:
+        if not np.isfinite(electron_energy_eV) or electron_energy_eV < 0:
+            raise ValueError("electron_energy_eV must be finite and non-negative.")
+        if not np.isfinite(parallel_beta) or abs(parallel_beta) >= 1:
+            raise ValueError("parallel_beta must be finite and strictly between -1 and 1.")
     for uncertainty_name, uncertainty_value in (
         ("background_temperature_uncertainty_eV", background_temperature_uncertainty_eV),
         ("major_radius_uncertainty_m", major_radius_uncertainty_m),
@@ -475,11 +518,19 @@ def reconstruct_ece_temperature_profile(
                 n_eff = max(1.0, min(float(centered.size), centered.size / tau_int))
                 tb_mean_sigma[channel] *= np.sqrt(centered.size / n_eff)
         if channel_covariance_eV2 is not None:
-            tb_mean_sigma = np.sqrt(np.maximum(0.0, tb_mean_sigma**2 + np.diag(covariance)))
+            if tb_mean_sigma is None:
+                tb_mean_sigma = np.sqrt(np.maximum(0.0, np.diag(covariance)))
+            else:
+                tb_mean_sigma = np.sqrt(np.maximum(0.0, tb_mean_sigma**2 + np.diag(covariance)))
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
     te_sigma = None
     optical_depth_condition_warning = bool(tau is not None and np.any(tau < 1e-3))
+    if tau is not None and tb_mean_sigma is not None:
+        sensitivity = 1.0 / (-np.expm1(-tau))
+        relative_tb_sigma = tb_mean_sigma / np.maximum(np.abs(tb_eV), np.finfo(float).tiny)
+        if np.any(sensitivity * relative_tb_sigma > 0.5):
+            optical_depth_condition_warning = True
     optical_depth_condition_message = (
         "At least one optical depth is below 1e-3; the single-slab Te inversion is strongly "
         "ill-conditioned and highly sensitive to Tb, background and tau uncertainty."
@@ -509,7 +560,9 @@ def reconstruct_ece_temperature_profile(
             te_sigma = np.sqrt(variance)
         inference = "Single-slab LTE inversion using user-supplied optical depth and background temperature."
 
-    b_res = resonance_field_T(f, harmonic)
+    b_res = (resonance_field_T(f, harmonic) if electron_energy_eV is None else
+             resonance_field_relativistic_T(f, harmonic, electron_energy_eV=electron_energy_eV,
+                                            parallel_beta=parallel_beta))
     if eq_r is None:
         radius = float(major_radius_m) * float(B_axis_T) / b_res
         mapping_model = "simplified circular toroidal field B(R)=B_axis*R_axis/R"
@@ -560,6 +613,10 @@ def reconstruct_ece_temperature_profile(
     profile_te_sigma_from_radius = np.abs(local_gradient) * profile_radius_sigma
     if profile_te_sigma is not None:
         profile_te_sigma = np.sqrt(profile_te_sigma**2 + profile_te_sigma_from_radius**2)
+        if model_discrepancy_fraction > 0:
+            profile_te_sigma = np.sqrt(profile_te_sigma**2 + (model_discrepancy_fraction * np.abs(profile_te))**2)
+    elif model_discrepancy_fraction > 0:
+        profile_te_sigma = np.sqrt((model_discrepancy_fraction * np.abs(profile_te))**2 + profile_te_sigma_from_radius**2)
     output = {
         "frequency_Hz": f,
         "harmonic": int(harmonic),
@@ -601,10 +658,12 @@ def reconstruct_ece_temperature_profile(
             if profile_method == "pchip" else None
         ),
         "equilibrium_model": mapping_model,
-        "uncertainty_method": "first-order propagation with optional channel covariance, temporal autocorrelation estimate, and local radial-gradient contribution; model discrepancy remains unquantified",
+        "model_discrepancy_fraction_user_supplied": float(model_discrepancy_fraction),
+        "resonance_model": ("cold non-relativistic resonance" if electron_energy_eV is None else "monoenergetic relativistic/Doppler correction; not distribution averaged"),
+        "uncertainty_method": "first-order propagation with optional channel covariance, temporal autocorrelation estimate, local radial-gradient contribution, and user-specified fractional model-discrepancy floor",
         "assumptions": [
             "input channels are already calibrated brightness temperatures in eV; no calibration or conversion is performed",
-            "non-relativistic cold resonance mapping",
+            "cold resonance mapping unless the optional monoenergetic relativistic/Doppler correction is supplied",
             "channel center frequencies represent channel response",
             "profile is inferred only between measured channel resonance locations",
         ],
