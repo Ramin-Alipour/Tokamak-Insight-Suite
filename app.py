@@ -1337,46 +1337,46 @@ elif page=='Spectral Analysis':
 
 elif page=='Probe Analysis':
     st.title('Langmuir, Ball-Pen & Magnetic Probe Analysis'); need_data()
-     with st.expander('Poloidal-field coils / magnetic probes', expanded=True):
-         st.caption('Input must already be calibrated poloidal magnetic field in tesla. TIS performs no gain/offset calibration.')
-         time_col=col_select('Time column (s)',numeric,'pf_probe_time')
-         pf_channels=st.multiselect('Poloidal-field probe Bp channel(s) (T)',[c for c in numeric if c != time_col],default=[],key='pf_probe_channels')
-         st.caption('Optional uncertainty is a 1-sigma uncertainty in tesla, one value or one value per channel.')
-         pf_unc_text=st.text_input('Field uncertainty 1σ (T; optional)','',key='pf_uncertainty')
-         use_baseline=st.checkbox('Subtract mean baseline over a time interval',value=False,key='pf_use_baseline')
-         baseline_interval=None
-         if use_baseline:
-             tmin=float(pd.to_numeric(df[time_col],errors='coerce').min())
-             tmax=float(pd.to_numeric(df[time_col],errors='coerce').max())
-             if not np.isfinite(tmin) or not np.isfinite(tmax) or tmin >= tmax:
-                 st.warning('The selected time column must have a finite, nonzero range.')
-             else:
-                 baseline_interval=st.slider('Baseline interval (s)',min_value=tmin,max_value=tmax,value=(tmin,tmin+(tmax-tmin)*0.1),key='pf_baseline_interval')
-         if st.button('Analyze poloidal-field probes',type='primary',key='analyze_pf_probes'):
-             try:
-                 if not pf_channels:
-                     raise ValueError('Select at least one magnetic-probe signal channel.')
-                 uncertainty_value=None
-                 if pf_unc_text.strip():
-                     values=[float(part.strip()) for part in pf_unc_text.split(',') if part.strip()]
-                     if len(values)==1: values=values*len(pf_channels)
-                     if len(values)!=len(pf_channels) or not np.all(np.isfinite(values)) or np.any(np.asarray(values)<0):
-                         raise ValueError(f'Field uncertainty must be one non-negative finite value or exactly {len(pf_channels)} values.')
-                     uncertainty_value=values[0] if len(pf_channels)==1 else values
-                 time_values=pd.to_numeric(df[time_col],errors='coerce').to_numpy(dtype=float)
-                 signal_values=df[pf_channels].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
-                 result=analyze_poloidal_field_probes(time_values,signal_values,signal_uncertainty=uncertainty_value,baseline_interval_s=baseline_interval,probe_names=pf_channels)
-                 st.success('Poloidal-field probe analysis completed from calibrated input.')
-                 st.json(result)
-                 for channel_index,channel_name in enumerate(pf_channels):
-                     st.markdown(f'**{channel_name}**')
-                     plot_line(result['time_s'],result['B_poloidal_T'][:,channel_index],time_col,'Bp (T)',f'{channel_name}: poloidal field')
-                     plot_line(result['time_s'],result['dB_poloidal_dt_T_s'][:,channel_index],time_col,'dBp/dt (T/s)',f'{channel_name}: time derivative')
-                 json_download('Export poloidal-field analysis JSON',result,'tis_poloidal_field_probe_analysis.json')
-             except Exception as e:
-                 st.error(f'Poloidal-field probe analysis failed: {e}')
-         st.info('Interpretation limits: probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
-st.divider()
+    with st.expander('Poloidal-field coils / magnetic probes', expanded=True):
+        st.caption('Input must already be calibrated poloidal magnetic field in tesla. TIS performs no gain/offset calibration.')
+        time_col=col_select('Time column (s)',numeric,'pf_probe_time')
+        pf_channels=st.multiselect('Poloidal-field probe Bp channel(s) (T)',[c for c in numeric if c != time_col],default=[],key='pf_probe_channels')
+        st.caption('Optional uncertainty is a 1-sigma uncertainty in tesla, one value or one value per channel.')
+        pf_unc_text=st.text_input('Field uncertainty 1σ (T; optional)','',key='pf_uncertainty')
+        use_baseline=st.checkbox('Subtract mean baseline over a time interval',value=False,key='pf_use_baseline')
+        baseline_interval=None
+        if use_baseline:
+            tmin=float(pd.to_numeric(df[time_col],errors='coerce').min())
+            tmax=float(pd.to_numeric(df[time_col],errors='coerce').max())
+            if not np.isfinite(tmin) or not np.isfinite(tmax) or tmin >= tmax:
+                st.warning('The selected time column must have a finite, nonzero range.')
+            else:
+                baseline_interval=st.slider('Baseline interval (s)',min_value=tmin,max_value=tmax,value=(tmin,tmin+(tmax-tmin)*0.1),key='pf_baseline_interval')
+        if st.button('Analyze poloidal-field probes',type='primary',key='analyze_pf_probes'):
+            try:
+                if not pf_channels:
+                    raise ValueError('Select at least one magnetic-probe signal channel.')
+                uncertainty_value=None
+                if pf_unc_text.strip():
+                    values=[float(part.strip()) for part in pf_unc_text.split(',') if part.strip()]
+                    if len(values)==1: values=values*len(pf_channels)
+                    if len(values)!=len(pf_channels) or not np.all(np.isfinite(values)) or np.any(np.asarray(values)<0):
+                        raise ValueError(f'Field uncertainty must be one non-negative finite value or exactly {len(pf_channels)} values.')
+                    uncertainty_value=values[0] if len(pf_channels)==1 else values
+                time_values=pd.to_numeric(df[time_col],errors='coerce').to_numpy(dtype=float)
+                signal_values=df[pf_channels].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
+                result=analyze_poloidal_field_probes(time_values,signal_values,signal_uncertainty=uncertainty_value,baseline_interval_s=baseline_interval,probe_names=pf_channels)
+                st.success('Poloidal-field probe analysis completed from calibrated input.')
+                st.json(result)
+                for channel_index,channel_name in enumerate(pf_channels):
+                    st.markdown(f'**{channel_name}**')
+                    plot_line(result['time_s'],result['B_poloidal_T'][:,channel_index],time_col,'Bp (T)',f'{channel_name}: poloidal field')
+                    plot_line(result['time_s'],result['dB_poloidal_dt_T_s'][:,channel_index],time_col,'dBp/dt (T/s)',f'{channel_name}: time derivative')
+                json_download('Export poloidal-field analysis JSON',result,'tis_poloidal_field_probe_analysis.json')
+            except Exception as e:
+                st.error(f'Poloidal-field probe analysis failed: {e}')
+        st.info('Interpretation limits: probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
+    st.divider()
     st.markdown('### Langmuir probe I–V analysis')
     vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
     voltage_values=pd.to_numeric(df[vcol],errors='coerce').to_numpy(dtype=float)
