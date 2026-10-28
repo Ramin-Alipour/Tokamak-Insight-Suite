@@ -266,6 +266,90 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
     out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
     return out
 
+
+def suggest_langmuir_fit_windows(
+    voltage: Any, current: Any, current_convention: str = "electron_positive",
+    *, min_points: int = 6, min_voltage_fraction: float = 0.12,
+) -> dict[str, Any]:
+    """Suggest reviewable I-V fit windows; suggestions do not validate physical regimes.
+
+    Electron candidates are ranked using log(I - low-voltage-tail median) linearity.
+    The low-voltage interval is only a candidate, not proof of ion saturation.
+    """
+    if current_convention not in {"electron_positive", "ion_positive"}:
+        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
+    if isinstance(min_points, bool) or not isinstance(min_points, (int, np.integer)) or min_points < 6:
+        raise ValueError("min_points must be an integer of at least 6.")
+    if not _is_finite_real_scalar(min_voltage_fraction) or not 0 < min_voltage_fraction <= 1:
+        raise ValueError("min_voltage_fraction must be finite and in (0, 1].")
+    raw_v, raw_i = np.asarray(voltage), np.asarray(current)
+    if raw_v.ndim != 1 or raw_i.ndim != 1 or raw_v.shape != raw_i.shape:
+        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
+    if raw_v.dtype.kind not in "iuf" or raw_i.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must contain real numeric values.")
+    v, i = raw_v.astype(float, copy=True), raw_i.astype(float, copy=True)
+    if current_convention == "ion_positive":
+        i = -i
+    finite = np.isfinite(v) & np.isfinite(i)
+    v, i = v[finite], i[finite]
+    if len(v) < min_points:
+        raise ValueError(f"At least {min_points} finite paired samples are required to suggest fit windows.")
+    order = np.argsort(v)
+    v, i = v[order], i[order]
+    unique_v, inverse = np.unique(v, return_inverse=True)
+    if len(unique_v) < min_points:
+        raise ValueError(f"At least {min_points} distinct voltage values are required to suggest fit windows.")
+    if len(unique_v) != len(v):
+        sums, counts = np.bincount(inverse, weights=i), np.bincount(inverse)
+        v, i = unique_v, sums / counts
+    n = len(v)
+    tail_n = max(3, int(math.ceil(0.1 * n)))
+    ion_tail = float(np.median(i[:tail_n]))
+    ion_count = max(3, min(n, int(math.ceil(0.12 * n))))
+    ion_range = (float(v[0]), float(v[ion_count - 1]))
+    min_span = float(v[-1] - v[0]) * float(min_voltage_fraction)
+    candidates = []
+    for start in range(n - min_points + 1):
+        for stop in range(start + min_points, n + 1):
+            x, y = v[start:stop], i[start:stop]
+            if x[-1] - x[0] < min_span:
+                continue
+            excess = y - ion_tail
+            valid = excess > 0
+            if np.count_nonzero(valid) < min_points:
+                continue
+            lx, ly = x[valid], np.log(excess[valid])
+            slope, intercept = np.polyfit(lx, ly, 1)
+            if not np.isfinite(slope) or slope <= 0:
+                continue
+            predicted = intercept + slope * lx
+            ss_res = float(np.sum((ly - predicted) ** 2))
+            ss_tot = float(np.sum((ly - np.mean(ly)) ** 2))
+            r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else float("-inf")
+            if np.isfinite(r2):
+                candidates.append({"start": start, "stop": stop, "r2": r2,
+                                   "points": int(np.count_nonzero(valid)), "span": float(x[-1] - x[0])})
+    selected = None
+    if candidates:
+        good = [c for c in candidates if c["r2"] >= 0.98]
+        pool = good if good else candidates
+        selected = max(pool, key=lambda c: (c["span"], c["r2"], c["points"]))
+    return {
+        "electron_fit_range_V": ((float(v[selected["start"]]), float(v[selected["stop"] - 1]))
+                                  if selected is not None else None),
+        "electron_candidate_log_R2": float(selected["r2"]) if selected is not None else None,
+        "electron_candidate_points": selected["points"] if selected is not None else 0,
+        "electron_candidate_status": (
+            "candidate_found_review_curve_and_final_fit" if selected is not None and selected["r2"] >= 0.98
+            else "low_quality_candidate_review_manually" if selected is not None
+            else "no_defensible_candidate_found_select_window_manually"),
+        "ion_fit_range_candidate_V": ion_range,
+        "ion_candidate_status": "low_voltage_tail_candidate_only_not_verified_ion_saturation",
+        "ion_baseline_tail_median_A": ion_tail,
+        "current_convention_normalized": "electron_positive",
+        "warning": "Automated ranges are suggestions, not proof of a physical regime. Inspect the I-V curve and fit residuals; density remains a model-dependent estimate.",
+    }
+
 def floating_potential(voltage: Any, current: Any) -> float | None:
     v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
     if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
