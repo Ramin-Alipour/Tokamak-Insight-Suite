@@ -823,8 +823,83 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='Mirnov / pickup coils':
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='ECE channel/profile analysis':
+        st.caption('ECE analysis accepts already-calibrated brightness temperature (eV) per channel. TIS performs no detector calibration. Frequency-to-radius mapping uses a simplified circular toroidal-field model, not EFIT.')
+        numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        if len(numeric_cols)<4:
+            st.warning('Upload a table with a time column and at least three calibrated ECE brightness-temperature channels.')
+        else:
+            ece_time_col=st.selectbox('Time column (s)',numeric_cols,key='ece_time_col')
+            ece_channel_cols=st.multiselect('Calibrated ECE brightness-temperature channels (eV; select at least 3)',[c for c in numeric_cols if c!=ece_time_col],key='ece_channel_cols')
+            ece_frequency_text=st.text_input('Channel center frequencies (Hz), same order as selected channels',placeholder='e.g. 80000000000, 90000000000, 100000000000',key='ece_frequency_text')
+            e1,e2,e3=st.columns(3)
+            with e1: ece_r0=st.number_input('Reference major radius R_axis (m)',min_value=0.001,value=1.0,format='%.6g',key='ece_r0')
+            with e2: ece_b0=st.number_input('Toroidal field B_axis (T)',min_value=0.001,value=2.0,format='%.6g',key='ece_b0')
+            with e3: ece_harmonic=st.number_input('ECE harmonic',min_value=1,value=2,step=1,key='ece_harmonic')
+            ece_optically_thick=st.checkbox('Assume emission is optically thick (Tb ≈ Te)',value=False,key='ece_optically_thick')
+            ece_use_tau=st.checkbox('Provide optical depth per channel',value=False,key='ece_use_tau')
+            ece_tau_text=''
+            ece_background=0.0
+            if ece_use_tau:
+                ece_tau_text=st.text_input('Optical depth τ (one value or one per channel)',placeholder='e.g. 1.0 or 1.0, 1.2, 1.4',key='ece_tau_text')
+                ece_background=st.number_input('Background brightness temperature (eV)',min_value=0.0,value=0.0,format='%.6g',key='ece_background')
+            ece_window=st.checkbox('Restrict analysis to a time window',value=False,key='ece_window_enabled')
+            ece_window_s=None
+            if ece_window:
+                ece_t=pd.to_numeric(df[ece_time_col],errors='coerce').to_numpy(dtype=float)
+                ece_finite_t=ece_t[np.isfinite(ece_t)]
+                if ece_finite_t.size<2 or np.min(ece_finite_t)>=np.max(ece_finite_t):
+                    st.warning('Selected time column needs at least two distinct finite times.')
+                else:
+                    ece_w1,ece_w2=st.columns(2)
+                    with ece_w1: ece_t_start=st.number_input('Window start (s)',value=float(np.min(ece_finite_t)),key='ece_t_start')
+                    with ece_w2: ece_t_end=st.number_input('Window end (s)',value=float(np.max(ece_finite_t)),key='ece_t_end')
+                    ece_window_s=(ece_t_start,ece_t_end)
+            if st.button('Analyze ECE channels and reconstruct Te profile',type='primary',key='ece_analyze'):
+                try:
+                    if len(ece_channel_cols)<3:
+                        raise ValueError('Select at least three ECE channels.')
+                    try:
+                        ece_frequencies=np.asarray([float(part.strip()) for part in ece_frequency_text.split(',') if part.strip()],dtype=float)
+                    except ValueError as exc:
+                        raise ValueError('Channel frequencies must be comma-separated finite values in Hz.') from exc
+                    if ece_frequencies.size!=len(ece_channel_cols):
+                        raise ValueError('Enter exactly one channel frequency for each selected ECE channel, in matching order.')
+                    ece_time=pd.to_numeric(df[ece_time_col],errors='coerce').to_numpy(dtype=float)
+                    ece_tb=df[ece_channel_cols].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
+                    ece_tau=None
+                    if ece_use_tau:
+                        try:
+                            tau_values=np.asarray([float(part.strip()) for part in ece_tau_text.split(',') if part.strip()],dtype=float)
+                        except ValueError as exc:
+                            raise ValueError('Optical depth must be a comma-separated numeric value or values.') from exc
+                        if tau_values.size==1:
+                            ece_tau=float(tau_values[0])
+                        elif tau_values.size==len(ece_channel_cols):
+                            ece_tau=tau_values
+                        else:
+                            raise ValueError('Optical depth must be one scalar or one value per selected ECE channel.')
+                    if ece_tau is None and not ece_optically_thick:
+                        raise ValueError('Select the optically thick assumption or provide optical depth before inferring Te.')
+                    result=reconstruct_ece_temperature_profile(
+                        ece_frequencies,ece_tb,ece_time,
+                        major_radius_m=float(ece_r0),B_axis_T=float(ece_b0),
+                        harmonic=int(ece_harmonic),optical_depth=ece_tau,
+                        background_temperature_eV=float(ece_background),
+                        assume_optically_thick=bool(ece_optically_thick),
+                        time_window_s=ece_window_s,
+                    )
+                    st.success('ECE channel analysis and scoped Te-profile reconstruction completed from calibrated inputs.')
+                    st.json(result)
+                    plot_line(result['resonance_radius_m'],result['electron_temperature_channel_eV'],'Resonance major radius (m)','Te (eV)','ECE channel electron-temperature estimate')
+                    plot_line(result['profile_radius_m'],result['electron_temperature_profile_eV'],'Major radius R (m)','Te (eV)','ECE reconstructed radial Te profile')
+                    json_download('Export ECE profile analysis JSON',result,'tis_ece_profile_analysis.json')
+                    add_report_section('ECE channel/profile analysis',result)
+                    st.info('Scope: simplified circular Bφ(R) mapping and linear interpolation only; no EFIT equilibrium mapping, ray tracing, finite-bandwidth inversion, relativistic correction, or uncertainty propagation.')
+                except Exception as e:
+                    st.error(f'ECE analysis failed: {e}')
+    elif mode=='Mirnov / pickup coils':
         st.caption('Analyze calibrated Mirnov voltage versus time: signal statistics, Welch PSD, in-band peak candidates, optional ideal Faraday-law dB/dt and relative perturbation integration. Instrument transfer functions and absolute-field calibration are not inferred.')
         numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
         if len(numeric_cols)<2:
