@@ -109,7 +109,11 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("optical_depth is only consumed in brightness_temperature mode.")
     if mode != "channel_fluctuations" and noise_std is not None:
         raise ValueError("noise_std is only consumed in channel_fluctuations mode.")
-    if not np.isfinite(psd_confidence_level) or not 0.0 < float(psd_confidence_level) < 1.0:
+    try:
+        psd_confidence_level = float(psd_confidence_level)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.") from exc
+    if not np.isfinite(psd_confidence_level) or not 0.0 < psd_confidence_level < 1.0:
         raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.")
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
            "resonance_field_T": resonance_field_T(f, harmonic),
