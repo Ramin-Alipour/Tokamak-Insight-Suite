@@ -660,10 +660,10 @@ def test_receiver_response_rejects_uncovered_or_invalid_response():
 
 
 def test_extreme_frequencies_fail_cleanly_instead_of_returning_infinite_fields():
+    with pytest.raises(ValueError, match="finite positive"):
+        resonance_field_T(np.inf, 1)
     with pytest.raises(ValueError, match="overflowed"):
-        resonance_field_T(1e308, 1)
-    with pytest.raises(ValueError, match="overflowed"):
-        brightness_temperature_K(1e308, 1e9)
+        brightness_temperature_K(1e9, 1e308)
 
 
 
@@ -691,7 +691,7 @@ def test_full_channel_covariance_changes_profile_uncertainty():
     common = dict(
         frequency_Hz=frequency, calibrated_brightness_temperature_eV=tb,
         time_s=time_s, major_radius_m=1.5, B_axis_T=2.0,
-        assume_optically_thick=True,
+        assume_optically_thick=True, profile_method="linear",
     )
     diagonal = np.diag([1.0, 1.0, 1.0])
     correlated = np.full((3, 3), 0.8)
