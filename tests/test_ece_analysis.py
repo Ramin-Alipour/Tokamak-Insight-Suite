@@ -702,8 +702,8 @@ def test_full_channel_covariance_changes_profile_uncertainty():
     correlated_result = reconstruct_ece_temperature_profile(
         **common, channel_covariance_eV2=correlated,
     )
-    assert np.max(correlated_result["electron_temperature_profile_uncertainty_eV"]) > np.max(
-        independent_result["electron_temperature_profile_uncertainty_eV"]
+    assert np.sum(correlated_result["electron_temperature_profile_uncertainty_eV"]**2) > np.sum(
+        independent_result["electron_temperature_profile_uncertainty_eV"]**2
     )
 
 
