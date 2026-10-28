@@ -399,6 +399,8 @@ def test_profile_uncertainties_bandwidth_envelope_and_time_resolved_output():
     assert np.all(result["resonance_radius_bandwidth_upper_m"] > result["resonance_radius_m"])
     assert result["electron_temperature_profile_uncertainty_eV"].shape == result["profile_radius_m"].shape
     assert result["electron_temperature_profile_time_eV"].shape == (8, 100)
+    assert result["electron_temperature_profile_time_uncertainty_eV"].shape == (8, 100)
+    assert result["electron_temperature_channel_time_uncertainty_eV"].shape == (8, 3)
     assert not np.allclose(result["electron_temperature_profile_time_eV"][0],
                            result["electron_temperature_profile_time_eV"][-1])
 
