@@ -233,8 +233,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
            "assumptions": [resonance_model, "frequency values must be in Hz; calibrated input units remain the user's responsibility"]}
     if channel_bandwidth_Hz is not None:
         bw = np.asarray(channel_bandwidth_Hz, dtype=float)
-        if bw.ndim == 0:
-            bw = np.full(f.shape, float(bw))
+        if bw.ndim == 0 or bw.shape == (1,):
+            bw = np.full(f.shape, float(bw.reshape(-1)[0]))
         if bw.shape != f.shape or np.any(~np.isfinite(bw)) or np.any(bw <= 0):
             raise ValueError("channel_bandwidth_Hz must be positive and scalar or match frequency_Hz.")
         if np.any(bw >= 2.0 * f):
@@ -613,8 +613,8 @@ def reconstruct_ece_temperature_profile(
         tau = None
     else:
         tau = np.asarray(optical_depth, dtype=float)
-        if tau.ndim == 0:
-            tau = np.full(f.shape, float(tau))
+        if tau.ndim == 0 or tau.shape == (1,):
+            tau = np.full(f.shape, float(tau.reshape(-1)[0]))
         if tau.shape != f.shape or np.any(~np.isfinite(tau)) or np.any(tau <= 0):
             raise ValueError("optical_depth must be finite, positive, and scalar or one value per channel.")
         if tau_sigma is not None and tau_sigma.shape != f.shape:
@@ -968,6 +968,36 @@ def reconstruct_ece_temperature_profile(
             profile_time_sigma = np.vstack([
                 np.interp(r_profile, r_sorted, row[order]) for row in te_time_sigma
             ])
+            if channel_covariance_eV2 is not None:
+                # Preserve cross-channel covariance in each time-resolved profile.
+                # Remove the diagonal covariance contribution already represented
+                # by interpolated channel uncertainties before adding the full matrix.
+                covariance_diagonal = np.diag(te_cov_sorted)
+                for row_index, channel_te in enumerate(sorted_te_time):
+                    jacobian_time = np.empty((r_profile.size, f.size), dtype=float)
+                    for channel in range(f.size):
+                        step = np.sqrt(np.finfo(float).eps) * max(1.0, abs(channel_te[channel]))
+                        perturbed = channel_te.copy()
+                        perturbed[channel] += step
+                        if profile_method == "pchip":
+                            perturbed_profile = PchipInterpolator(
+                                r_sorted, perturbed, extrapolate=False
+                            )(r_profile)
+                        else:
+                            perturbed_profile = np.interp(r_profile, r_sorted, perturbed)
+                        jacobian_time[:, channel] = (perturbed_profile - profile_time[row_index]) / step
+                    full_variance = np.einsum(
+                        "ij,jk,ik->i", jacobian_time, te_cov_sorted, jacobian_time
+                    )
+                    diagonal_variance = np.einsum(
+                        "ij,j,ij->i", jacobian_time, covariance_diagonal, jacobian_time
+                    )
+                    independent_variance = np.maximum(
+                        0.0, profile_time_sigma[row_index]**2 - diagonal_variance
+                    )
+                    profile_time_sigma[row_index] = np.sqrt(
+                        np.maximum(0.0, full_variance + independent_variance)
+                    )
             # Add the radial-location contribution using each time slice's local gradient.
             for row_index, row in enumerate(profile_time):
                 profile_time_sigma[row_index] = np.sqrt(
