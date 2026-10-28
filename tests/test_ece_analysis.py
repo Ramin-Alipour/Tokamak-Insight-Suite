@@ -718,3 +718,91 @@ def test_profile_rejects_duplicate_channel_resonance_radii():
             assume_optically_thick=True,
             channel_resonance_radius_m=[1.2, 1.5, 1.5],
         )
+
+
+
+def test_ece_mapping_rejects_invalid_geometry_and_bandwidth():
+    with pytest.raises(ValueError, match="major_radius_m"):
+        analyze_ece([80e9, 90e9], major_radius_m=-1.0, B_axis_T=2.0,
+                    mode="resonance_mapping")
+    with pytest.raises(ValueError, match="B_axis_T"):
+        analyze_ece([80e9, 90e9], major_radius_m=1.0, B_axis_T=np.inf,
+                    mode="resonance_mapping")
+    with pytest.raises(ValueError, match="bandwidth"):
+        analyze_ece([80e9, 90e9], channel_bandwidth_Hz=[200e9, 1e9],
+                    spectral_radiance_W_m2_sr_Hz=[1e-10, 1e-10])
+
+
+def test_ece_relativistic_overflow_is_rejected_and_metadata_is_truthful():
+    from tokamak_analysis.ece_analysis import resonance_field_relativistic_T, reconstruct_ece_temperature_profile
+
+    with pytest.raises(ValueError, match="overflowed"):
+        resonance_field_relativistic_T(100e9, 2, electron_energy_eV=1e308)
+    result = reconstruct_ece_temperature_profile(
+        [80e9, 90e9, 100e9], np.tile([20.0, 30.0, 40.0], (8, 1)),
+        np.arange(8, dtype=float) * 1e-6,
+        major_radius_m=1.0, B_axis_T=2.0, assume_optically_thick=True,
+        electron_energy_eV=1000.0, parallel_beta=0.1,
+    )
+    assert "monoenergetic relativistic/Doppler" in result["resonance_model"]
+    assert not any(item == "no relativistic or Doppler correction" for item in result["limitations"])
+
+
+def test_ece_profile_accepts_singleton_optical_depth_and_rejects_array_scalars():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 30.0], (8, 1))
+    result = reconstruct_ece_temperature_profile(
+        frequencies, tb, time_s, major_radius_m=1.0, B_axis_T=2.0,
+        optical_depth=[1.0],
+    )
+    np.testing.assert_allclose(
+        result["electron_temperature_channel_eV"],
+        np.array([10.0, 20.0, 30.0]) / (1.0 - np.exp(-1.0)),
+    )
+    with pytest.raises(ValueError, match="major_radius_m"):
+        reconstruct_ece_temperature_profile(
+            frequencies, tb, time_s, major_radius_m=[1.0, 1.1], B_axis_T=2.0,
+            assume_optically_thick=True,
+        )
+
+
+def test_ece_covariance_psd_validation_is_scale_aware():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 30.0], (8, 1))
+    covariance = np.diag([1e-20, 1e-20, -1e-14])
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_ece_temperature_profile(
+            frequencies, tb, time_s, major_radius_m=1.0, B_axis_T=2.0,
+            assume_optically_thick=True, channel_covariance_eV2=covariance,
+        )
+
+
+def test_ece_time_resolved_profile_uses_off_diagonal_channel_covariance():
+    from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
+
+    frequencies = np.array([80e9, 90e9, 100e9])
+    time_s = np.arange(8, dtype=float)
+    tb = np.tile([10.0, 20.0, 30.0], (8, 1))
+    diagonal = np.diag([1.0, 1.0, 1.0])
+    correlated = np.array([[1.0, 0.8, 0.0], [0.8, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    kwargs = dict(
+        frequency_Hz=frequencies, calibrated_brightness_temperature_eV=tb,
+        time_s=time_s, major_radius_m=1.0, B_axis_T=2.0,
+        assume_optically_thick=True, include_time_resolved_profile=True,
+    )
+    independent = reconstruct_ece_temperature_profile(
+        **kwargs, channel_covariance_eV2=diagonal
+    )
+    correlated_result = reconstruct_ece_temperature_profile(
+        **kwargs, channel_covariance_eV2=correlated
+    )
+    assert not np.allclose(
+        independent["electron_temperature_profile_time_uncertainty_eV"],
+        correlated_result["electron_temperature_profile_time_uncertainty_eV"],
+    )
