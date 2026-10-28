@@ -903,11 +903,6 @@ def reconstruct_ece_temperature_profile(
         output["electron_temperature_profile_time_eV"] = profile_time
         if te_time_sigma is not None:
             profile_time_sigma = np.vstack([
-                np.sqrt(
-                    (((1.0 - np.clip(np.searchsorted(r_sorted, r_profile, side="right"), 1, r_sorted.size - 1) * 0.0))**2)
-                ) for _ in []
-            ]) if False else None
-            profile_time_sigma = np.vstack([
                 np.interp(r_profile, r_sorted, row[order]) for row in te_time_sigma
             ])
             # Add the radial-location contribution using each time slice's local gradient.
