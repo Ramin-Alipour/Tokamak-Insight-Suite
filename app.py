@@ -849,6 +849,18 @@ elif page=='Spectral Analysis':
                     st.info('Channels and their frequencies were reordered together into ascending frequency order; data pairing is preserved.')
                 return frequencies[order],[columns[i] for i in order]
 
+            def _ece_parse_optional_channel_values(raw_text, channel_count, label, *, strictly_positive=False):
+                try:
+                    values=np.asarray([float(part.strip()) for part in raw_text.split(',') if part.strip()],dtype=float)
+                except ValueError as exc:
+                    raise ValueError(f'{label} must be numeric and comma-separated.') from exc
+                if values.size not in (1,channel_count):
+                    raise ValueError(f'{label} must contain one value or exactly {channel_count} channel values.')
+                if np.any(~np.isfinite(values)) or np.any(values<0) or (strictly_positive and np.any(values<=0)):
+                    rule='finite and strictly positive' if strictly_positive else 'finite and non-negative'
+                    raise ValueError(f'{label} values must be {rule}.')
+                return float(values[0]) if values.size==1 else values
+
             with ece_tabs[0]:
                 st.markdown('**Rayleigh–Jeans brightness temperature**')
                 st.caption('Select columns containing absolutely calibrated spectral radiance in W m⁻² sr⁻¹ Hz⁻¹. Raw detector counts or arbitrary voltage are not accepted as calibrated radiance.')
@@ -909,6 +921,7 @@ elif page=='Spectral Analysis':
                 fluct_cols=st.multiselect('Signal columns (at least 2)',[c for c in numeric_cols if c!=ece_time_col],key='ece_fluct_cols')
                 fluct_freq_text=st.text_input('Center frequencies in Hz, same order as signal columns',placeholder='80000000000, 90000000000',key='ece_fluct_frequencies')
                 fluct_harmonic=st.number_input('Resonance harmonic',min_value=1,value=2,step=1,key='ece_fluct_harmonic')
+                psd_confidence=st.number_input('Welch PSD confidence level (0–1)',min_value=0.50,max_value=0.99,value=0.95,step=0.01,format='%.2f',key='ece_psd_confidence')
                 use_noise=st.checkbox('Compare RMS with supplied per-channel RMS noise estimate',value=False,key='ece_use_noise')
                 noise_text=''
                 if use_noise: noise_text=st.text_input('Noise RMS (one value or one per selected channel; signal units)',key='ece_noise_text')
@@ -931,7 +944,7 @@ elif page=='Spectral Analysis':
                             if noise_values.size==1: noise=float(noise_values[0])
                             elif noise_values.size==len(fluct_cols): noise=noise_values
                             else: raise ValueError('Enter one noise RMS value or one per channel.')
-                        result=analyze_ece(fluct_freq,harmonic=int(fluct_harmonic),signal=signals,time_s=time_values,noise_std=noise,mode='channel_fluctuations')
+                        result=analyze_ece(fluct_freq,harmonic=int(fluct_harmonic),signal=signals,time_s=time_values,noise_std=noise,psd_confidence_level=float(psd_confidence),mode='channel_fluctuations')
                         st.success('ECE fluctuation and spectral analysis completed.')
                         st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'fluctuation_rms':result['fluctuation_rms']}),use_container_width=True)
                         psd_frame=pd.DataFrame(result['fluctuation_psd'],index=result['fluctuation_psd_frequency_Hz'],columns=[str(c) for c in fluct_cols])
@@ -942,7 +955,21 @@ elif page=='Spectral Analysis':
                         welch_frame.index.name='frequency_Hz'
                         st.markdown('**Welch-averaged PSD (Hann window, 50% overlap)**')
                         st.line_chart(welch_frame)
-                        st.caption(f"Sampling frequency: {result['sampling_frequency_Hz']:.6g} Hz · Nyquist: {result['nyquist_frequency_Hz']:.6g} Hz · Welch segment: {result['welch_psd_nperseg']} samples.")
+                        ci_frame=pd.DataFrame(index=result['welch_psd_frequency_Hz'])
+                        for channel_index, channel_name in enumerate(fluct_cols):
+                            ci_frame[f'{channel_name} lower CI']=result['welch_psd_confidence_lower'][:,channel_index]
+                            ci_frame[f'{channel_name} upper CI']=result['welch_psd_confidence_upper'][:,channel_index]
+                        ci_frame.index.name='frequency_Hz'
+                        with st.expander('Welch PSD confidence limits and diagnostics'):
+                            st.caption(f"Approximate {100*result['welch_psd_confidence_level']:.0f}% confidence interval; effective degrees of freedom ≈ {result['welch_psd_degrees_of_freedom_approx']:.3g}, segments = {result['welch_psd_segment_count']}. Bounds account approximately for overlap correlation; interpret cautiously for short or non-stationary records.")
+                            st.line_chart(ci_frame)
+                            st.dataframe(pd.DataFrame({'frequency_Hz':result['welch_psd_frequency_Hz'],**{f'{c} PSD':result['welch_psd'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} lower CI':result['welch_psd_confidence_lower'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} upper CI':result['welch_psd_confidence_upper'][:,i] for i,c in enumerate(fluct_cols)}}),use_container_width=True)
+                            if 'white_noise_psd_expected' in result:
+                                noise_frame=pd.DataFrame(result['white_noise_psd_expected'],index=result['welch_psd_frequency_Hz'],columns=[str(c) for c in fluct_cols])
+                                noise_frame.index.name='frequency_Hz'
+                                st.caption('Expected one-sided PSD for a white-noise process using the supplied time-domain RMS estimate; this is a comparison reference, not noise subtraction.')
+                                st.line_chart(noise_frame)
+                        st.caption(f"Sampling frequency: {result['sampling_frequency_Hz']:.6g} Hz · Nyquist: {result['nyquist_frequency_Hz']:.6g} Hz · Welch segment: {result['welch_psd_nperseg']} samples · maximum relative sample-interval deviation: {result['sampling_interval_max_deviation_fraction']:.3g}.")
                         json_download('Export ECE fluctuation/PSD JSON',result,'tis_ece_fluctuation_psd.json')
                         add_report_section('ECE fluctuations and PSD',result)
                     except Exception as e: st.error(f'ECE fluctuation analysis failed: {e}')
@@ -953,6 +980,21 @@ elif page=='Spectral Analysis':
                 ece_time_col=st.selectbox('Time column (s)',numeric_cols,key='ece_time_col')
                 ece_channel_cols=st.multiselect('Calibrated brightness-temperature channels in eV (at least 3)',[c for c in numeric_cols if c!=ece_time_col],key='ece_channel_cols')
                 ece_frequency_text=st.text_input('Channel center frequencies in Hz, in the same order as selected channels',placeholder='80000000000, 90000000000, 100000000000',key='ece_frequency_text')
+                use_bandwidth=st.checkbox('Include finite channel bandwidth in the radial localization envelope',value=False,key='ece_use_bandwidth')
+                bandwidth_text=''
+                if use_bandwidth:
+                    bandwidth_text=st.text_input('Channel bandwidths in Hz (one value or one per selected channel)',placeholder='1000000000 or 1000000000, 1000000000, 1000000000',key='ece_bandwidth_text')
+                with st.expander('Optional measurement and model-input uncertainties'):
+                    use_tb_uncertainty=st.checkbox('Provide brightness-temperature uncertainty (eV)',key='ece_use_tb_uncertainty')
+                    tb_uncertainty_text=st.text_input('Tb uncertainty (one value or one per selected channel; eV)',key='ece_tb_uncertainty_text') if use_tb_uncertainty else ''
+                    use_frequency_uncertainty=st.checkbox('Provide center-frequency uncertainty (Hz)',key='ece_use_frequency_uncertainty')
+                    frequency_uncertainty_text=st.text_input('Frequency uncertainty (one value or one per selected channel; Hz)',key='ece_frequency_uncertainty_text') if use_frequency_uncertainty else ''
+                    use_tau_uncertainty=st.checkbox('Provide optical-depth uncertainty',key='ece_use_tau_uncertainty')
+                    tau_uncertainty_text=st.text_input('Optical-depth uncertainty (one value or one per selected channel)',key='ece_tau_uncertainty_text') if use_tau_uncertainty else ''
+                    bg_uncertainty=st.number_input('Background-temperature uncertainty (eV)',min_value=0.0,value=0.0,format='%.6g',key='ece_bg_uncertainty')
+                    r0_uncertainty=st.number_input('Reference-radius uncertainty (m)',min_value=0.0,value=0.0,format='%.6g',key='ece_r0_uncertainty')
+                    b0_uncertainty=st.number_input('Toroidal-field uncertainty (T)',min_value=0.0,value=0.0,format='%.6g',key='ece_b0_uncertainty')
+                include_time_resolved=st.checkbox('Also reconstruct time-resolved Te(R,t) within the selected window',value=False,key='ece_time_resolved')
                 e1,e2,e3=st.columns(3)
                 with e1: ece_r0=st.number_input('Reference major radius R₀ (m)',min_value=0.001,value=1.0,format='%.6g',key='ece_r0')
                 with e2: ece_b0=st.number_input('Toroidal field B₀ at R₀ (T)',min_value=0.001,value=2.0,format='%.6g',key='ece_b0')
@@ -981,6 +1023,7 @@ elif page=='Spectral Analysis':
                     try:
                         if len(ece_channel_cols)<3: raise ValueError('Select at least three ECE channels.')
                         ece_frequencies=_ece_parse_frequencies(ece_frequency_text,len(ece_channel_cols))
+                        ece_frequency_order=np.argsort(ece_frequencies)
                         ece_frequencies,ece_channel_cols=_ece_order_channels(ece_frequencies,ece_channel_cols)
                         ece_time=pd.to_numeric(df[ece_time_col],errors='coerce').to_numpy(dtype=float)
                         ece_tb=df[ece_channel_cols].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float)
@@ -996,16 +1039,54 @@ elif page=='Spectral Analysis':
                             try: tau_values=np.asarray([float(part.strip()) for part in ece_tau_text.split(',') if part.strip()],dtype=float)
                             except ValueError as exc: raise ValueError('Optical depth must be numeric and comma-separated.') from exc
                             if tau_values.size==1: ece_tau=float(tau_values[0])
-                            elif tau_values.size==len(ece_channel_cols): ece_tau=tau_values
+                            elif tau_values.size==len(ece_channel_cols): ece_tau=tau_values[ece_frequency_order]
                             else: raise ValueError('Optical depth must be one scalar or one value per selected channel.')
                             if np.any(~np.isfinite(tau_values)) or np.any(tau_values<=0): raise ValueError('Optical depth must be finite and strictly positive.')
                         if ece_window and ece_window_s is None: raise ValueError('Fix the invalid time window before running the profile reconstruction.')
-                        result=reconstruct_ece_temperature_profile(ece_frequencies,ece_tb,ece_time,major_radius_m=float(ece_r0),B_axis_T=float(ece_b0),harmonic=int(ece_harmonic),optical_depth=ece_tau,background_temperature_eV=float(ece_background),assume_optically_thick=inference_basis=='Assume optically thick (Tb ≈ Te)',time_window_s=ece_window_s)
+                        bandwidth=None
+                        if use_bandwidth:
+                            bandwidth=_ece_parse_optional_channel_values(bandwidth_text,len(ece_channel_cols),'Channel bandwidth',strictly_positive=True)
+                            if isinstance(bandwidth,np.ndarray): bandwidth=bandwidth[ece_frequency_order]
+                        tb_uncertainty=None
+                        if use_tb_uncertainty:
+                            tb_uncertainty=_ece_parse_optional_channel_values(tb_uncertainty_text,len(ece_channel_cols),'Brightness-temperature uncertainty')
+                            if isinstance(tb_uncertainty,np.ndarray): tb_uncertainty=tb_uncertainty[ece_frequency_order]
+                        frequency_uncertainty=None
+                        if use_frequency_uncertainty:
+                            frequency_uncertainty=_ece_parse_optional_channel_values(frequency_uncertainty_text,len(ece_channel_cols),'Frequency uncertainty')
+                            if isinstance(frequency_uncertainty,np.ndarray): frequency_uncertainty=frequency_uncertainty[ece_frequency_order]
+                        tau_uncertainty=None
+                        if use_tau_uncertainty:
+                            if ece_tau is None: raise ValueError('Optical-depth uncertainty requires the single-slab optical-depth inference basis.')
+                            tau_uncertainty=_ece_parse_optional_channel_values(tau_uncertainty_text,len(ece_channel_cols),'Optical-depth uncertainty')
+                            if isinstance(tau_uncertainty,np.ndarray): tau_uncertainty=tau_uncertainty[ece_frequency_order]
+                        result=reconstruct_ece_temperature_profile(
+                            ece_frequencies,ece_tb,ece_time,major_radius_m=float(ece_r0),B_axis_T=float(ece_b0),
+                            harmonic=int(ece_harmonic),optical_depth=ece_tau,background_temperature_eV=float(ece_background),
+                            assume_optically_thick=inference_basis=='Assume optically thick (Tb ≈ Te)',time_window_s=ece_window_s,
+                            channel_bandwidth_Hz=bandwidth,brightness_temperature_uncertainty_eV=tb_uncertainty,
+                            frequency_uncertainty_Hz=frequency_uncertainty,optical_depth_uncertainty=tau_uncertainty,
+                            background_temperature_uncertainty_eV=float(bg_uncertainty),
+                            major_radius_uncertainty_m=float(r0_uncertainty),B_axis_uncertainty_T=float(b0_uncertainty),
+                            include_time_resolved_profile=bool(include_time_resolved))
                         st.success('ECE profile reconstructed within the declared approximate model.')
-                        st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'resonance_radius_m':result['resonance_radius_m'],'brightness_temperature_eV':result['brightness_temperature_eV'],'electron_temperature_channel_eV':result['electron_temperature_channel_eV']}),use_container_width=True)
+                        profile_frame={'frequency_Hz':result['frequency_Hz'],'resonance_radius_m':result['resonance_radius_m'],'brightness_temperature_eV':result['brightness_temperature_eV'],'electron_temperature_channel_eV':result['electron_temperature_channel_eV']}
+                        if result['electron_temperature_channel_uncertainty_eV'] is not None: profile_frame['electron_temperature_channel_uncertainty_eV']=result['electron_temperature_channel_uncertainty_eV']
+                        if result['resonance_radius_uncertainty_m'] is not None: profile_frame['resonance_radius_uncertainty_m']=result['resonance_radius_uncertainty_m']
+                        if result['resonance_radius_bandwidth_lower_m'] is not None:
+                            profile_frame['bandwidth_radius_lower_m']=result['resonance_radius_bandwidth_lower_m']
+                            profile_frame['bandwidth_radius_upper_m']=result['resonance_radius_bandwidth_upper_m']
+                        st.dataframe(pd.DataFrame(profile_frame),use_container_width=True)
                         plot_line(result['resonance_radius_m'],result['electron_temperature_channel_eV'],'Resonance major radius (m)','Te (eV)','ECE channel electron-temperature estimate')
                         plot_line(result['profile_radius_m'],result['electron_temperature_profile_eV'],'Major radius R (m)','Te (eV)','ECE reconstructed radial Te profile')
-                        st.caption('Approximate circular-field mapping; channel-center localization; linear interpolation only. No EFIT/ray tracing, relativistic/Doppler correction, finite-bandwidth inversion, or uncertainty propagation unless explicitly supplied in a future supported model.')
+                        if result['electron_temperature_profile_uncertainty_eV'] is not None:
+                            st.line_chart(pd.DataFrame({'Te profile (eV)':result['electron_temperature_profile_eV'],'lower 1-sigma':result['electron_temperature_profile_eV']-result['electron_temperature_profile_uncertainty_eV'],'upper 1-sigma':result['electron_temperature_profile_eV']+result['electron_temperature_profile_uncertainty_eV']},index=result['profile_radius_m']))
+                        if include_time_resolved:
+                            st.markdown('**Time-resolved Te(R,t) estimate**')
+                            time_profile=pd.DataFrame(result['electron_temperature_profile_time_eV'],index=result['selected_time_s'],columns=result['profile_radius_m'])
+                            time_profile.index.name='time_s'
+                            st.line_chart(time_profile)
+                        st.caption('Approximate circular-field mapping. Channel bandwidth is reported as a radial localization envelope, not a receiver-response convolution. Uncertainties are first-order and exclude model discrepancy/correlations. No EFIT/ray tracing or relativistic/Doppler correction.')
                         json_download('Export ECE profile analysis JSON',result,'tis_ece_profile_analysis.json')
                         add_report_section('ECE profile reconstruction',result)
                     except Exception as e: st.error(f'ECE profile analysis failed: {e}')
