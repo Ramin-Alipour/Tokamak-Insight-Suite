@@ -572,11 +572,19 @@ def reconstruct_ece_temperature_profile(
         radius = np.interp(b_res, eq_b if eq_b[0] < eq_b[-1] else eq_b[::-1],
                            eq_r if eq_b[0] < eq_b[-1] else eq_r[::-1])
         mapping_model = "user-supplied monotonic equilibrium B_phi(R) table; not a full ray-tracing/flux-coordinate solution"
-    radius_sigma = np.abs(radius) * np.sqrt(
-        (float(major_radius_uncertainty_m) / float(major_radius_m))**2
-        + (float(B_axis_uncertainty_T) / float(B_axis_T))**2
-        + ((np.zeros_like(f) if frequency_sigma is None else frequency_sigma) / f)**2
-    )
+    if eq_r is None:
+        radius_sigma = np.abs(radius) * np.sqrt(
+            (float(major_radius_uncertainty_m) / float(major_radius_m))**2
+            + (float(B_axis_uncertainty_T) / float(B_axis_T))**2
+            + ((np.zeros_like(f) if frequency_sigma is None else frequency_sigma) / f)**2
+        )
+    else:
+        b_axis_sorted = eq_b if eq_b[0] < eq_b[-1] else eq_b[::-1]
+        r_axis_sorted = eq_r if eq_b[0] < eq_b[-1] else eq_r[::-1]
+        dr_db = np.gradient(r_axis_sorted, b_axis_sorted)
+        local_dr_db = np.interp(b_res, b_axis_sorted, dr_db)
+        sigma_b_from_frequency = b_res * ((np.zeros_like(f) if frequency_sigma is None else frequency_sigma) / f)
+        radius_sigma = np.abs(local_dr_db * sigma_b_from_frequency)
     bandwidth_radius_lower = bandwidth_radius_upper = None
     if bandwidth is not None:
         if electron_energy_eV is None:
