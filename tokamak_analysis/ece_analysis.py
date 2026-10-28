@@ -126,6 +126,7 @@ def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
     if np.any(~np.isfinite(integrals)) or np.any(integrals <= 0):
         raise ValueError("Every receiver-response channel must have positive finite integrated weight.")
     normalized = weights / integrals[:, None]
+    effective_center_frequency = trapezoid(weights * rf[None, :], rf, axis=1) / integrals
     sampled = np.asarray([np.interp(rf, f, row) for row in radiance.reshape(-1, f.size)])
     sampled = sampled.reshape(*radiance.shape[:-1], rf.size)
     # Use trapezoidal quadrature, including for irregular response grids.
@@ -139,6 +140,7 @@ def convolve_ece_receiver_response(frequency_Hz, spectral_radiance_W_m2_sr_Hz,
         "channel_spectral_radiance_W_m2_sr_Hz": effective,
         "response_frequency_Hz": rf,
         "normalized_response_weight": normalized,
+        "effective_center_frequency_Hz": effective_center_frequency,
         "response_channel_count": int(weights.shape[0]),
         "response_convolution_performed": True,
         "calibration_performed": False,
