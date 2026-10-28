@@ -570,9 +570,11 @@ def reconstruct_ece_temperature_profile(
         radius_mapping_uncertainty_input = None
     if channel_covariance_eV2 is not None:
         covariance = np.asarray(channel_covariance_eV2, dtype=float)
-        if covariance.shape != (f.size, f.size) or np.any(~np.isfinite(covariance)) or not np.allclose(covariance, covariance.T, rtol=1e-8, atol=1e-12):
+        covariance_scale = max(float(np.max(np.abs(covariance))) if covariance.size else 0.0, np.finfo(float).tiny)
+        if (covariance.shape != (f.size, f.size) or np.any(~np.isfinite(covariance))
+                or not np.allclose(covariance, covariance.T, rtol=1e-8, atol=1e-12 * covariance_scale)):
             raise ValueError("channel_covariance_eV2 must be a finite symmetric channel-by-channel covariance matrix.")
-        if np.min(np.linalg.eigvalsh(covariance)) < -1e-10 * max(1.0, float(np.max(np.abs(covariance)))):
+        if np.min(np.linalg.eigvalsh(covariance)) < -1e-10 * covariance_scale:
             raise ValueError("channel_covariance_eV2 must be positive semidefinite.")
 
     def _channel_array(value, name, *, allow_time_matrix=False, strictly_positive=False):
