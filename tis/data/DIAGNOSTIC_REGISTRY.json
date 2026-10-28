@@ -810,17 +810,20 @@
     "diagnostic": "Electron Cyclotron Emission (ECE)",
     "quantities": "ECE resonance mapping, calibrated brightness temperature, inferred radial electron-temperature profile under declared assumptions, channel fluctuations and spectra",
     "status": "D",
-    "method": "ECE analysis with four dashboard workflows: Rayleigh–Jeans brightness temperature from calibrated radiance; cold resonance field and optional circular-field radius mapping; multi-channel RMS, full-record periodogram and Welch PSD with approximate confidence intervals and optional white-noise PSD reference; and radial/time-resolved Te profile estimates from already-calibrated brightness-temperature inputs.",
-    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Circular-field mapping is approximate, not EFIT or ray tracing. Profile uncertainty is first-order for supplied independent uncertainties and excludes model discrepancy/covariance. Finite channel bandwidth is shown as a radial localization envelope, not a full receiver-response convolution. Low optical depth can make LTE inversion ill-conditioned. No experimental validation is implied.",
+    "method": "ECE analysis with brightness temperature, cold or optional monoenergetic relativistic/Doppler resonance estimates, circular-field or user-supplied monotonic Bphi(R) mapping, multi-channel RMS/periodogram/Welch PSD with approximate confidence bounds, pairwise cross-spectra/coherence/phase, heuristic stationarity audit, and time-windowed PCHIP/linear Te profile reconstruction with optional covariance and model-discrepancy inputs.",
+    "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Radius mapping supports a supplied monotonic Bphi(R) table but remains 1-D, not full EFIT flux-coordinate mapping or line-of-sight ray tracing. Optional monoenergetic relativistic/Doppler correction is a sensitivity estimate, not a distribution-averaged emissivity solver. Profile uncertainty can include channel covariance, temporal autocorrelation adjustment, radial-gradient effects, and a user-specified model-discrepancy floor; unspecified model discrepancy remains unquantified. Finite bandwidth remains a localization envelope, not receiver-response convolution. Cross spectra/coherence do not identify modes automatically. No experimental validation is implied.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
+      "tokamak_analysis.ece_analysis.convolve_ece_receiver_response",
+      "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_field_T",
+      "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_radius_m",
       "tokamak_analysis.ece_analysis.brightness_temperature_K",
       "tokamak_analysis.ece_analysis.brightness_temperature_eV",
       "tokamak_analysis.ece_analysis.reconstruct_ece_temperature_profile"
     ],
-    "implementation_status": "Complete within declared software scope: the dashboard exposes brightness-temperature calculation, resonance mapping, channel fluctuation/periodogram/Welch PSD with approximate confidence bounds, and time-windowed profile reconstruction with optional first-order uncertainty propagation, bandwidth-derived radial localization envelope, and time-resolved Te(R,t). Inputs are already calibrated; no detector calibration is performed. Localization uses a simplified circular toroidal-field model and interpolation, not EFIT/ray tracing or a radiative-transfer inversion.",
+    "implementation_status": "Complete within declared software scope: calibrated-input ECE calculations, optional 1-D supplied Bphi(R) inversion, optional monoenergetic resonance sensitivity correction, channel cross-spectral statistics, stationarity heuristics, PCHIP/linear profile reconstruction, covariance/autocorrelation/radial-gradient uncertainty propagation, and user-selected model-discrepancy floor. Inputs are already calibrated; no detector calibration is performed. Full EFIT/ray tracing, distribution-averaged relativistic emissivity, radiative-transfer inversion and receiver-response convolution remain outside scope.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
