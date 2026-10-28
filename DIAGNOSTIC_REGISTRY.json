@@ -1151,6 +1151,11 @@
           "name": "electron_temperature_channel_time_eV",
           "unit": "eV",
           "description": "Optional time-resolved per-channel electron-temperature estimates within the selected window."
+        },
+        {
+          "name": "channel_bandwidth_Hz",
+          "unit": "Hz",
+          "description": "Optional supplied channel bandwidth used to calculate a radial localization envelope."
         }
       ],
       "assumptions": [
