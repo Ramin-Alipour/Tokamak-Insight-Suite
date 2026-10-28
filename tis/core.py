@@ -12,7 +12,7 @@ from .signal_processing import (butterworth_filter, fft_spectrum, welch_psd, aut
 from .spectral_analysis import fit_spectral_line, _r2
 from .tomography import (build_tomography_matrix_2d, regularized_tomography, select_tikhonov_lambda, abel_reconstruction)
 from .uncertainty import propagate_covariance, propagate_monte_carlo
-from .probe_analysis import probe_iv_summary, langmuir_iv_analysis, floating_potential, triple_probe_temperature_eV
+from .probe_analysis import probe_iv_summary, langmuir_iv_analysis, suggest_langmuir_fit_windows, floating_potential, triple_probe_temperature_eV
 from .transport_analysis import fluctuation_flux, exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile
 from scipy.special import voigt_profile, erfcx, erfc
 
