@@ -795,6 +795,7 @@ def test_mean_profile_uses_channel_covariance_but_time_resolved_uncertainty_does
         frequency_Hz=frequencies, calibrated_brightness_temperature_eV=tb,
         time_s=time_s, major_radius_m=1.0, B_axis_T=2.0,
         assume_optically_thick=True, include_time_resolved_profile=True,
+        brightness_temperature_uncertainty_eV=1.0,
     )
     independent = reconstruct_ece_temperature_profile(
         **kwargs, channel_covariance_eV2=diagonal
