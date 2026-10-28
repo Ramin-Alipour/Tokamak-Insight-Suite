@@ -162,14 +162,14 @@ def test_resonance_mapping_requires_paired_field_geometry():
         analyze_ece([80e9, 90e9], major_radius_m=1.0,
                     mode="resonance_mapping")
 
-def test_ece_profile_reconstruction_from_user_converted_raw_multichannel_data():
+def test_ece_profile_reconstruction_from_already_calibrated_multichannel_data():
     from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
 
     f = np.array([80e9, 90e9, 100e9])
     t = np.arange(16, dtype=float) * 1e-6
-    raw = np.tile([10.0, 20.0, 30.0], (t.size, 1))
+    calibrated_tb = np.tile([25.0, 45.0, 65.0], (t.size, 1))
     result = reconstruct_ece_temperature_profile(
-        f, raw, t, [2.0, 2.0, 2.0], [5.0, 5.0, 5.0],
+        f, calibrated_tb, t,
         major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
         assume_optically_thick=True,
     )
@@ -190,27 +190,29 @@ def test_ece_profile_optical_depth_inversion_uses_single_slab_relation():
     te = np.array([100.0, 200.0, 300.0])
     tb = te * (1 - np.exp(-tau))
     result = reconstruct_ece_temperature_profile(
-        f, np.tile(tb / 2.0, (t.size, 1)), t, 2.0, 0.0,
+        f, np.tile(tb, (t.size, 1)), t,
         major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
         optical_depth=tau,
     )
     np.testing.assert_allclose(result["electron_temperature_channel_eV"], te)
 
 
-def test_ece_profile_requires_calibration_conversion_and_temperature_basis():
+def test_ece_profile_requires_temperature_basis_and_rejects_negative_calibrated_input():
     from tokamak_analysis.ece_analysis import reconstruct_ece_temperature_profile
 
     f = np.array([80e9, 90e9, 100e9])
     t = np.arange(8, dtype=float) * 1e-6
-    raw = np.ones((t.size, f.size))
+    calibrated_tb = np.ones((t.size, f.size))
     with pytest.raises(ValueError, match="optical_depth"):
         reconstruct_ece_temperature_profile(
-            f, raw, t, 1.0, 0.0, major_radius_m=1.0, B_axis_T=2.0
+            f, calibrated_tb, t, major_radius_m=1.0, B_axis_T=2.0
         )
-    with pytest.raises(ValueError, match="gain"):
+    invalid_tb = calibrated_tb.copy()
+    invalid_tb[:, 1] = -1.0
+    with pytest.raises(ValueError, match="brightness temperature"):
         reconstruct_ece_temperature_profile(
-            f, raw, t, [1.0, -1.0, 1.0], 0.0,
-            major_radius_m=1.0, B_axis_T=2.0, assume_optically_thick=True
+            f, invalid_tb, t, major_radius_m=1.0, B_axis_T=2.0,
+            assume_optically_thick=True
         )
 
 
@@ -225,11 +227,11 @@ def test_ece_profile_uses_explicit_time_window_instead_of_whole_shot_average():
     late = np.tile([100.0, 200.0, 300.0], (4, 1))
     signal = np.vstack([early, late])
     result = reconstruct_ece_temperature_profile(
-        frequencies, signal, time_s, 1.0, 0.0,
+        frequencies, signal, time_s,
         major_radius_m=1.0, B_axis_T=2.0, harmonic=2,
         assume_optically_thick=True, time_window_s=(0.0, 3.0),
     )
-    np.testing.assert_allclose(result["mean_raw_signal"], [1.0, 2.0, 3.0])
+    np.testing.assert_allclose(result["mean_calibrated_brightness_temperature_eV"], [1.0, 2.0, 3.0])
     np.testing.assert_allclose(result["electron_temperature_channel_eV"], [1.0, 2.0, 3.0])
     assert result["selected_sample_count"] == 4
     assert result["selected_time_window_s"] == [0.0, 3.0]
@@ -247,11 +249,11 @@ def test_ece_profile_rejects_invalid_or_out_of_range_time_window():
     )
     with pytest.raises(ValueError, match="time_window_s"):
         reconstruct_ece_temperature_profile(
-            frequencies, signal, time_s, 1.0, 0.0,
+            frequencies, signal, time_s,
             time_window_s=(5.0, 2.0), **kwargs,
         )
     with pytest.raises(ValueError, match="within the supplied time_s range"):
         reconstruct_ece_temperature_profile(
-            frequencies, signal, time_s, 1.0, 0.0,
+            frequencies, signal, time_s,
             time_window_s=(-1.0, 2.0), **kwargs,
         )
