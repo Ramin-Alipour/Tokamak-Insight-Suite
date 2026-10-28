@@ -1924,6 +1924,7 @@ elif page=='Plasma Parameters':
                     ece_eq_bphi_text=st.text_input('Matching equilibrium toroidal Bφ grid (T; strictly monotonic; blank uses circular-field approximation)',key='ece_profile_eq_bphi')
                     ece_explicit_radius_text=st.text_input('Optional externally ray-traced / equilibrium-derived channel resonance radii (m; one per channel; overrides the 1-D model)',key='ece_profile_explicit_radii')
                     ece_radius_unc_text=st.text_input('Optional 1-sigma channel-radius uncertainty (m; one value or one per channel)',key='ece_profile_radius_uncertainty')
+                    ece_plasma_bounds_text=st.text_input('Optional physical plasma major-radius bounds (R_min,R_max in m; validates mapped channels)',key='ece_profile_plasma_bounds')
                     if st.button('Reconstruct ECE electron-temperature profile',type='primary',key='ece_run_profile'):
                         if len(ece_signal_cols)!=len(ece_freq_Hz):
                             raise ValueError('Select exactly one calibrated brightness-temperature column per channel frequency.')
@@ -1939,6 +1940,9 @@ elif page=='Plasma Parameters':
                             raise ValueError('Supply both equilibrium R and Bφ arrays, or leave both blank.')
                         explicit_r=None if not ece_explicit_radius_text.strip() else np.asarray([float(v.strip()) for v in ece_explicit_radius_text.split(',') if v.strip()],dtype=float)
                         radius_unc=None if not ece_radius_unc_text.strip() else np.asarray([float(v.strip()) for v in ece_radius_unc_text.split(',') if v.strip()],dtype=float)
+                        plasma_bounds=None if not ece_plasma_bounds_text.strip() else np.asarray([float(v.strip()) for v in ece_plasma_bounds_text.split(',') if v.strip()],dtype=float)
+                        if plasma_bounds is not None and plasma_bounds.shape!=(2,):
+                            raise ValueError('Enter exactly R_min,R_max for physical plasma major-radius bounds.')
                         if explicit_r is not None and eq_r is not None:
                             raise ValueError('Use either explicit channel resonance radii or an equilibrium R/Bφ table, not both.')
                         result=reconstruct_ece_temperature_profile(
@@ -1952,6 +1956,7 @@ elif page=='Plasma Parameters':
                             equilibrium_radius_m=eq_r,equilibrium_toroidal_field_T=eq_b,
                             channel_resonance_radius_m=explicit_r,
                             radius_mapping_uncertainty_m=radius_unc,
+                            plasma_radius_bounds_m=plasma_bounds,
                             electron_energy_eV=(ece_energy_eV if ece_relativistic else None),
                             parallel_beta=ece_beta_parallel,
                             model_discrepancy_fraction=float(ece_model_floor),
