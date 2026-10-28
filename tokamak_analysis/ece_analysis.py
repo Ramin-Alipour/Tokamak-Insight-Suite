@@ -293,7 +293,7 @@ def reconstruct_ece_temperature_profile(
         "profile_method": "linear interpolation between channel resonance locations; no extrapolation",
         "equilibrium_model": "simplified circular toroidal field B(R)=B_axis*R_axis/R",
         "assumptions": [
-            "user-supplied linear signal-to-brightness-temperature conversion is valid",
+            "input channels are already calibrated brightness temperatures in eV; no calibration or conversion is performed",
             "non-relativistic cold resonance mapping",
             "channel center frequencies represent channel response",
             "profile is inferred only between measured channel resonance locations",
