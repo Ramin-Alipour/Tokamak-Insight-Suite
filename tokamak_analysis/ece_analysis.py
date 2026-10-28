@@ -210,7 +210,9 @@ def reconstruct_ece_temperature_profile(
     if t.ndim != 1 or t.size < 3 or np.any(~np.isfinite(t)) or np.any(np.diff(t) <= 0):
         raise ValueError("time_s must contain at least 3 finite, strictly increasing samples.")
     if y.shape != (t.size, f.size) or np.any(~np.isfinite(y)):
-        raise ValueError("signal must be a finite (time samples, channels) matrix matching time_s and frequency_Hz.")
+        raise ValueError("calibrated brightness temperature must be a finite (time samples, channels) matrix matching time_s and frequency_Hz.")
+    if np.any(y < 0):
+        raise ValueError("Calibrated brightness temperature samples must be non-negative.")
     if isinstance(harmonic, bool) or not isinstance(harmonic, (int, np.integer)) or harmonic < 1:
         raise ValueError("harmonic must be a positive integer.")
     if not np.isfinite(major_radius_m) or major_radius_m <= 0 or not np.isfinite(B_axis_T) or B_axis_T <= 0:
