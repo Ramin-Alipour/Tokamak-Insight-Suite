@@ -321,6 +321,11 @@ def density_from_thomson_scattered_power(
             variance += (density * uncertainty_arrays["interaction_length_uncertainty_m"] / length) ** 2
         if "collection_solid_angle_uncertainty_sr" in uncertainty_arrays:
             variance += (density * uncertainty_arrays["collection_solid_angle_uncertainty_sr"] / omega) ** 2
+        if "scattering_angle_uncertainty_rad" in uncertainty_arrays:
+            # n_e is inversely proportional to dσ/dΩ ∝ (1 + cos² θ).
+            # Propagate d ln(n_e)/dθ = 2 cos(θ) sin(θ)/(1 + cos²(θ)).
+            angle_sensitivity = 2.0 * np.cos(theta) * np.sin(theta) / (1.0 + np.cos(theta) ** 2)
+            variance += (density * angle_sensitivity * uncertainty_arrays["scattering_angle_uncertainty_rad"]) ** 2
         if "optical_efficiency_uncertainty" in uncertainty_arrays:
             variance += (density * uncertainty_arrays["optical_efficiency_uncertainty"] / eta) ** 2
         if "scattering_angle_uncertainty_rad" in uncertainty_arrays:
