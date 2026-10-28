@@ -518,6 +518,10 @@ def test_cross_channel_coherence_and_stationarity_audit_are_returned():
         mode="channel_fluctuations", welch_nperseg=128,
     )
     assert len(result["cross_channel_spectra"]) == 3
+    assert result["spectral_peak_candidates"]
+    assert all(np.isfinite(item["prominence"]) for item in result["spectral_peak_candidates"])
+    assert any(abs(item["frequency_Hz"] - 1000.0) < fs / 128
+               for item in result["spectral_peak_candidates"] if item["channel_index"] == 0)
     pair = next(p for p in result["cross_channel_spectra"]
                 if p["channel_i"] == 0 and p["channel_j"] == 1)
     assert np.nanmax(pair["coherence"]) > 0.95
