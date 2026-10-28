@@ -10,7 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 from scipy.constants import elementary_charge as E_CHARGE, electron_mass as M_E, speed_of_light as C_LIGHT, Boltzmann as K_B
-from scipy.signal import welch as welch_psd
+from scipy.signal import welch as welch_psd, get_window
+from scipy.stats import chi2
 
 
 def resonance_field_T(frequency_Hz, harmonic: int = 1):
@@ -77,7 +78,8 @@ def brightness_temperature_eV(spectral_radiance_W_m2_sr_Hz, frequency_Hz):
 def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 spectral_radiance_W_m2_sr_Hz=None, major_radius_m=None,
                 B_axis_T=None, harmonic=2, channel_bandwidth_Hz=None,
-                noise_std=None, optical_depth=None, mode="brightness_temperature"):
+                noise_std=None, optical_depth=None, psd_confidence_level=0.95,
+                mode="brightness_temperature"):
     """Analyze calibrated ECE channels and return validated derived quantities.
 
     signal may be a (time, channel) fluctuation matrix. Temperature inference
@@ -103,6 +105,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         raise ValueError("optical_depth is only consumed in brightness_temperature mode.")
     if mode != "channel_fluctuations" and noise_std is not None:
         raise ValueError("noise_std is only consumed in channel_fluctuations mode.")
+    if not np.isfinite(psd_confidence_level) or not 0.0 < float(psd_confidence_level) < 1.0:
+        raise ValueError("psd_confidence_level must be finite and strictly between 0 and 1.")
     out = {"frequency_Hz": f.copy(), "harmonic": int(harmonic),
            "resonance_field_T": resonance_field_T(f, harmonic),
            "assumptions": ["non-relativistic resonance", "cold-plasma frequency mapping"]}
@@ -175,20 +179,48 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
         # Welch averaging provides a lower-variance PSD estimate alongside the
         # full-record periodogram retained for backward compatibility.
         welch_nperseg = min(256, t.size)
+        welch_noverlap = welch_nperseg // 2
+        welch_step = welch_nperseg - welch_noverlap
         welch_frequency, welch_density = welch_psd(
             y0, fs=fs, window="hann", nperseg=welch_nperseg,
-            noverlap=welch_nperseg // 2, detrend=False, scaling="density",
+            noverlap=welch_noverlap, detrend=False, scaling="density",
             axis=0, return_onesided=True,
         )
+        # Approximate effective degrees of freedom account for correlated
+        # overlapping Welch segments; confidence bounds are asymptotic.
+        segment_count = 1 + (t.size - welch_nperseg) // welch_step
+        window_values = get_window("hann", welch_nperseg, fftbins=True)
+        window_energy = float(np.dot(window_values, window_values))
+        overlap_terms = []
+        for segment_lag in range(1, segment_count):
+            shift = segment_lag * welch_step
+            if shift >= welch_nperseg:
+                break
+            rho = float(np.dot(window_values[:-shift], window_values[shift:]) / window_energy)
+            overlap_terms.append((1.0 - segment_lag / segment_count) * rho**2)
+        welch_dof = float(2.0 * segment_count / (1.0 + 2.0 * sum(overlap_terms)))
+        alpha = 1.0 - float(psd_confidence_level)
+        chi2_lower = float(chi2.ppf(alpha / 2.0, welch_dof))
+        chi2_upper = float(chi2.ppf(1.0 - alpha / 2.0, welch_dof))
+        welch_ci_lower = welch_dof * welch_density / chi2_upper
+        welch_ci_upper = welch_dof * welch_density / chi2_lower
         out.update({"time_s": t, "fluctuation_rms": np.sqrt(np.mean(y0**2, axis=0)),
                     "fluctuation_psd_frequency_Hz": freq, "fluctuation_psd": psd,
                     "welch_psd_frequency_Hz": welch_frequency,
                     "welch_psd": welch_density,
+                    "welch_psd_confidence_level": float(psd_confidence_level),
+                    "welch_psd_degrees_of_freedom_approx": welch_dof,
+                    "welch_psd_confidence_lower": welch_ci_lower,
+                    "welch_psd_confidence_upper": welch_ci_upper,
+                    "welch_psd_segment_count": int(segment_count),
                     "welch_psd_nperseg": welch_nperseg,
                     "welch_psd_window": "hann",
-                    "welch_psd_overlap_samples": welch_nperseg // 2,
+                    "welch_psd_overlap_samples": welch_noverlap,
                     "sampling_frequency_Hz": fs,
-                    "nyquist_frequency_Hz": 0.5 * fs})
+                    "nyquist_frequency_Hz": 0.5 * fs,
+                    "sampling_interval_median_s": float(np.median(dt)),
+                    "sampling_interval_max_deviation_fraction": float(np.max(np.abs(dt - np.median(dt))) / np.median(dt)),
+                    "sampling_uniformity_tolerance": 1e-3})
         if noise_std is not None:
             n = np.asarray(noise_std, dtype=float)
             if np.any(~np.isfinite(n)) or np.any(n < 0):
@@ -197,13 +229,28 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                 raise ValueError("noise_std must be a scalar or one value per frequency channel.")
             out["noise_std"] = n
             out["above_noise_rms"] = out["fluctuation_rms"] > n
+            noise_per_channel = np.broadcast_to(n, (f.size,))
+            expected_noise_psd = np.broadcast_to(
+                (noise_per_channel**2 / fs), (welch_frequency.size, f.size)
+            ).copy()
+            if welch_frequency.size > 1:
+                if welch_nperseg % 2 == 0:
+                    expected_noise_psd[1:-1, :] *= 2.0
+                else:
+                    expected_noise_psd[1:, :] *= 2.0
+            out["white_noise_psd_expected"] = expected_noise_psd
+            out["welch_psd_above_expected_white_noise"] = welch_density > expected_noise_psd
     return out
 
 def reconstruct_ece_temperature_profile(
     frequency_Hz, calibrated_brightness_temperature_eV, time_s, *,
     major_radius_m, B_axis_T, harmonic=2, optical_depth=None,
     background_temperature_eV=0.0, assume_optically_thick=False,
-    profile_radius_m=None, time_window_s=None,
+    profile_radius_m=None, time_window_s=None, channel_bandwidth_Hz=None,
+    brightness_temperature_uncertainty_eV=None, frequency_uncertainty_Hz=None,
+    optical_depth_uncertainty=None, background_temperature_uncertainty_eV=0.0,
+    major_radius_uncertainty_m=0.0, B_axis_uncertainty_T=0.0,
+    include_time_resolved_profile=False,
 ):
     """Reconstruct a radial Te profile from already-calibrated ECE Tb [eV].
 
@@ -234,6 +281,49 @@ def reconstruct_ece_temperature_profile(
         raise ValueError("major_radius_m and B_axis_T must be finite and positive.")
     if not np.isfinite(background_temperature_eV) or background_temperature_eV < 0:
         raise ValueError("background_temperature_eV must be finite and non-negative.")
+    for uncertainty_name, uncertainty_value in (
+        ("background_temperature_uncertainty_eV", background_temperature_uncertainty_eV),
+        ("major_radius_uncertainty_m", major_radius_uncertainty_m),
+        ("B_axis_uncertainty_T", B_axis_uncertainty_T),
+    ):
+        if not np.isfinite(uncertainty_value) or uncertainty_value < 0:
+            raise ValueError(f"{uncertainty_name} must be finite and non-negative.")
+    if not isinstance(include_time_resolved_profile, (bool, np.bool_)):
+        raise ValueError("include_time_resolved_profile must be boolean.")
+
+    def _channel_array(value, name, *, allow_time_matrix=False, strictly_positive=False):
+        arr = np.asarray(value, dtype=float)
+        if allow_time_matrix and arr.shape == y.shape:
+            if np.any(~np.isfinite(arr)) or np.any(arr < 0):
+                raise ValueError(f"{name} must be finite and non-negative.")
+            return arr
+        if arr.ndim == 0:
+            arr = np.full(f.shape, float(arr))
+        elif arr.shape != f.shape:
+            expected = "scalar, per-channel, or time-by-channel" if allow_time_matrix else "scalar or per-channel"
+            raise ValueError(f"{name} must be {expected}.")
+        if np.any(~np.isfinite(arr)) or np.any(arr < 0) or (strictly_positive and np.any(arr <= 0)):
+            bound = "finite and strictly positive" if strictly_positive else "finite and non-negative"
+            raise ValueError(f"{name} must be {bound}.")
+        return arr
+
+    bandwidth = None if channel_bandwidth_Hz is None else _channel_array(
+        channel_bandwidth_Hz, "channel_bandwidth_Hz", strictly_positive=True
+    )
+    if bandwidth is not None and np.any(bandwidth >= 2.0 * f):
+        raise ValueError("Each channel bandwidth must be smaller than twice its center frequency.")
+    frequency_sigma = None if frequency_uncertainty_Hz is None else _channel_array(
+        frequency_uncertainty_Hz, "frequency_uncertainty_Hz"
+    )
+    if frequency_sigma is not None and np.any(frequency_sigma >= f):
+        raise ValueError("frequency_uncertainty_Hz must be smaller than each channel center frequency.")
+    tb_sigma_input = None if brightness_temperature_uncertainty_eV is None else _channel_array(
+        brightness_temperature_uncertainty_eV, "brightness_temperature_uncertainty_eV",
+        allow_time_matrix=True
+    )
+    tau_sigma = None if optical_depth_uncertainty is None else _channel_array(
+        optical_depth_uncertainty, "optical_depth_uncertainty"
+    )
 
     if optical_depth is None:
         if not assume_optically_thick:
@@ -245,6 +335,10 @@ def reconstruct_ece_temperature_profile(
             tau = np.full(f.shape, float(tau))
         if tau.shape != f.shape or np.any(~np.isfinite(tau)) or np.any(tau <= 0):
             raise ValueError("optical_depth must be finite, positive, and scalar or one value per channel.")
+        if tau_sigma is not None and tau_sigma.shape != f.shape:
+            raise ValueError("optical_depth_uncertainty requires optical_depth to be supplied.")
+    if tau is None and tau_sigma is not None:
+        raise ValueError("optical_depth_uncertainty requires optical_depth to be supplied.")
 
     dt = np.diff(t)
     if not np.allclose(dt, np.median(dt), rtol=1e-3, atol=0):
@@ -266,23 +360,53 @@ def reconstruct_ece_temperature_profile(
     selected_signal = y[selected, :]
     mean_signal = np.mean(selected_signal, axis=0)
     tb_eV = mean_signal
+    tb_mean_sigma = None
+    if tb_sigma_input is not None:
+        sigma_selected = tb_sigma_input[selected, :] if tb_sigma_input.shape == y.shape else np.broadcast_to(tb_sigma_input, selected_signal.shape)
+        tb_mean_sigma = np.sqrt(np.sum(sigma_selected**2, axis=0)) / selected_signal.shape[0]
     if np.any(~np.isfinite(tb_eV)) or np.any(tb_eV < 0):
         raise ValueError("Calibrated brightness temperature must be finite and non-negative.")
+    te_sigma = None
     if tau is None:
         te_eV = tb_eV.copy()
+        if tb_mean_sigma is not None:
+            te_sigma = tb_mean_sigma.copy()
         inference = "Tb approximates Te under the user-declared optically thick assumption."
     else:
         emissivity = -np.expm1(-tau)
-        te_eV = (tb_eV - background_temperature_eV * np.exp(-tau)) / emissivity
+        exp_tau = np.exp(-tau)
+        te_eV = (tb_eV - background_temperature_eV * exp_tau) / emissivity
         if np.any(~np.isfinite(te_eV)) or np.any(te_eV < 0):
             raise ValueError("Optical-depth inversion produced non-physical Te; check calibration, background and optical depth.")
+        variance = np.zeros(f.shape, dtype=float)
+        if tb_mean_sigma is not None:
+            variance += (tb_mean_sigma / emissivity)**2
+        if tau_sigma is not None:
+            dte_dtau = exp_tau * (background_temperature_eV - tb_eV) / emissivity**2
+            variance += (dte_dtau * tau_sigma)**2
+        if background_temperature_uncertainty_eV:
+            dte_dtbg = -exp_tau / emissivity
+            variance += (dte_dtbg * background_temperature_uncertainty_eV)**2
+        if tb_mean_sigma is not None or tau_sigma is not None or background_temperature_uncertainty_eV:
+            te_sigma = np.sqrt(variance)
         inference = "Single-slab LTE inversion using user-supplied optical depth and background temperature."
 
     b_res = resonance_field_T(f, harmonic)
     radius = float(major_radius_m) * float(B_axis_T) / b_res
+    radius_sigma = np.abs(radius) * np.sqrt(
+        (float(major_radius_uncertainty_m) / float(major_radius_m))**2
+        + (float(B_axis_uncertainty_T) / float(B_axis_T))**2
+        + ((np.zeros_like(f) if frequency_sigma is None else frequency_sigma) / f)**2
+    )
+    bandwidth_radius_lower = bandwidth_radius_upper = None
+    if bandwidth is not None:
+        bandwidth_radius_lower = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f + bandwidth / 2.0, harmonic)
+        bandwidth_radius_upper = float(major_radius_m) * float(B_axis_T) / resonance_field_T(f - bandwidth / 2.0, harmonic)
     order = np.argsort(radius)
     r_sorted = radius[order]
     te_sorted = te_eV[order]
+    radius_sigma_sorted = radius_sigma[order]
+    te_sigma_sorted = None if te_sigma is None else te_sigma[order]
     if np.any(np.diff(r_sorted) <= 0):
         raise ValueError("Resonance radii must be distinct to reconstruct a profile.")
     if profile_radius_m is None:
@@ -294,21 +418,39 @@ def reconstruct_ece_temperature_profile(
         if np.any(np.diff(r_profile) <= 0) or r_profile[0] < r_sorted[0] or r_profile[-1] > r_sorted[-1]:
             raise ValueError("profile_radius_m must be strictly increasing and remain within the measured resonance-radius range.")
 
-    return {
+    profile_te = np.interp(r_profile, r_sorted, te_sorted)
+    profile_te_sigma = None
+    if te_sigma_sorted is not None:
+        right = np.clip(np.searchsorted(r_sorted, r_profile, side="right"), 1, r_sorted.size - 1)
+        left = right - 1
+        fraction = (r_profile - r_sorted[left]) / (r_sorted[right] - r_sorted[left])
+        profile_te_sigma = np.sqrt(((1.0 - fraction) * te_sigma_sorted[left])**2 + (fraction * te_sigma_sorted[right])**2)
+    profile_radius_sigma = np.interp(r_profile, r_sorted, radius_sigma_sorted)
+    output = {
         "frequency_Hz": f,
         "harmonic": int(harmonic),
         "mean_calibrated_brightness_temperature_eV": mean_signal,
         "selected_time_window_s": [window_start, window_end],
         "selected_sample_count": int(selected_time.size),
+        "selected_time_s": selected_time,
         "brightness_temperature_eV": tb_eV,
+        "brightness_temperature_uncertainty_eV": tb_mean_sigma,
         "electron_temperature_channel_eV": te_eV,
+        "electron_temperature_channel_uncertainty_eV": te_sigma,
         "resonance_field_T": b_res,
         "resonance_radius_m": radius,
+        "resonance_radius_uncertainty_m": radius_sigma,
         "profile_radius_m": r_profile,
-        "electron_temperature_profile_eV": np.interp(r_profile, r_sorted, te_sorted),
+        "profile_radius_uncertainty_m": profile_radius_sigma,
+        "electron_temperature_profile_eV": profile_te,
+        "electron_temperature_profile_uncertainty_eV": profile_te_sigma,
+        "channel_bandwidth_Hz": bandwidth,
+        "resonance_radius_bandwidth_lower_m": bandwidth_radius_lower,
+        "resonance_radius_bandwidth_upper_m": bandwidth_radius_upper,
         "inference_basis": inference,
         "profile_method": "linear interpolation between channel resonance locations; no extrapolation",
         "equilibrium_model": "simplified circular toroidal field B(R)=B_axis*R_axis/R",
+        "uncertainty_method": "first-order independent-input propagation; excludes model discrepancy and correlations",
         "assumptions": [
             "input channels are already calibrated brightness temperatures in eV; no calibration or conversion is performed",
             "non-relativistic cold resonance mapping",
@@ -318,10 +460,22 @@ def reconstruct_ece_temperature_profile(
         "limitations": [
             "not EFIT equilibrium or ray tracing",
             "no relativistic or Doppler correction",
-            "no finite-bandwidth convolution or regularized inverse problem",
-            "no uncertainty propagation",
+            "bandwidth is represented as a radial localization envelope, not a full receiver-response convolution",
+            "uncertainties are first-order independent-input estimates and exclude model discrepancy/correlations",
             "temperature inference depends on user-supplied optical depth or optically thick assertion",
-            "channel values are averaged over the selected time window; time evolution is not reconstructed",
+            "time-resolved profiles are optional and are not a substitute for a radiative-transfer inversion",
         ],
     }
+    if include_time_resolved_profile:
+        if tau is None:
+            te_time = selected_signal.copy()
+        else:
+            te_time = (selected_signal - background_temperature_eV * np.exp(-tau)[None, :]) / (-np.expm1(-tau))[None, :]
+            if np.any(~np.isfinite(te_time)) or np.any(te_time < 0):
+                raise ValueError("Time-resolved optical-depth inversion produced non-physical Te.")
+        output["electron_temperature_channel_time_eV"] = te_time
+        output["electron_temperature_profile_time_eV"] = np.vstack([
+            np.interp(r_profile, r_sorted, row[order]) for row in te_time
+        ])
+    return output
 
