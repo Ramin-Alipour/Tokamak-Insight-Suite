@@ -1885,6 +1885,7 @@ elif page=='Plasma Parameters':
                         result=convolve_ece_receiver_response(spec_f,spec_rad,response_f,response_w)
                         result['channel_brightness_temperature_K']=brightness_temperature_K(result['channel_spectral_radiance_W_m2_sr_Hz'],result['effective_center_frequency_Hz'])
                         st.success('ECE receiver-response convolution completed using the supplied kernel.')
+                        st.caption('Brightness temperature evaluated at the response-weighted center frequency is approximate for broad channels.')
                         st.dataframe(pd.DataFrame({'Channel':np.arange(response_w.shape[0]),'Effective spectral radiance (W m⁻² sr⁻¹ Hz⁻¹)':result['channel_spectral_radiance_W_m2_sr_Hz'],'Brightness temperature (K)':result['channel_brightness_temperature_K']}),use_container_width=True,hide_index=True)
                         st.json(result)
                         json_download('Export ECE receiver-response convolution',result,'tis_ece_receiver_response.json')
