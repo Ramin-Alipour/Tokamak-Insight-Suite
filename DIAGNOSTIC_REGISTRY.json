@@ -814,6 +814,8 @@
     "caveat": "Brightness temperature approximates electron temperature only for optically thick, thermalized emission. Radius mapping supports a supplied monotonic Bphi(R) table but remains 1-D, not full EFIT flux-coordinate mapping or line-of-sight ray tracing. Optional monoenergetic relativistic/Doppler correction is a sensitivity estimate, not a distribution-averaged emissivity solver. Profile uncertainty can include channel covariance, temporal autocorrelation adjustment, radial-gradient effects, and a user-specified model-discrepancy floor; unspecified model discrepancy remains unquantified. Finite bandwidth remains a localization envelope, not receiver-response convolution. Cross spectra/coherence do not identify modes automatically. No experimental validation is implied.",
     "implementation_functions": [
       "tokamak_analysis.ece_analysis.analyze_ece",
+      "tokamak_analysis.ece_analysis.convolve_ece_receiver_response",
+      "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_field_T",
       "tokamak_analysis.ece_analysis.resonance_field_relativistic_T",
       "tokamak_analysis.ece_analysis.resonance_radius_m",
