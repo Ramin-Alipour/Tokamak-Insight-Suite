@@ -2,12 +2,12 @@
 
 ## Scope and status
 
-The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and exposed in the Streamlit workspace. It supports four explicitly scoped workflows:
+The ECE workflow is implemented in `tokamak_analysis/ece_analysis.py` and exposed in the Streamlit workspace. It supports five explicitly scoped workflows:
 
 1. **Brightness temperature** from absolutely calibrated spectral radiance.
 2. **Channel fluctuations, full-record one-sided periodogram, and Hann-window Welch PSD** from aligned multi-channel time series, with approximate PSD confidence intervals and an optional white-noise reference.
 3. **Cold resonance mapping** from channel frequency to resonance field, with an optional simplified circular toroidal-field major-radius estimate.
-4. **Time-windowed radial electron-temperature profile reconstruction** from already-calibrated brightness-temperature samples, using supplied optical depth with a single-slab LTE inversion or an explicit optically-thick assumption.
+4. **Receiver-response convolution** of an already-calibrated spectrum with a user-supplied, validated channel response kernel, using in-range interpolation and trapezoidal integration.\n5. **Time-windowed radial electron-temperature profile reconstruction** from already-calibrated brightness-temperature samples, using supplied optical depth with a single-slab LTE inversion or an explicit optically-thick assumption. Optional profile mapping supports a supplied monotonic toroidal-field table or externally derived channel resonance locations.
 
 The dashboard exposes all four workflows. It is not a general-purpose ECE radiative-transfer solver, equilibrium mapper, or instrument-calibration package. Numerical/software verification does not establish experimental validation. Numerical/software verification does not constitute experimental validation for a particular tokamak.
 
@@ -23,7 +23,7 @@ f=s f_{ce},\qquad
 B_{res}=\frac{2\pi m_e f}{s e}.
 \]
 
-The implementation is `resonance_field_T(frequency_Hz, harmonic)`. Frequencies must be finite and positive; the harmonic must be a positive integer. Relativistic mass shifts, Doppler shifts, finite-orbit effects, and detailed polarization/cutoff effects are not modeled.
+The implementation is `resonance_field_T(frequency_Hz, harmonic)`. Frequencies must be finite and positive; the harmonic must be a positive integer. The default is cold/non-relativistic. `resonance_field_relativistic_T` optionally applies a monoenergetic relativistic/Doppler sensitivity correction using user-supplied kinetic energy and signed line-of-sight beta. This is not a distribution-averaged emissivity solver. Finite-orbit effects, polarization/cutoff effects and full ray tracing remain outside scope.
 
 ### Simplified major-radius mapping
 
@@ -47,9 +47,9 @@ T_b[\mathrm{eV}]=\frac{k_B T_b[\mathrm K]}{e}.
 
 The implementation is `brightness_temperature_K` and `brightness_temperature_eV`. Input radiance must be finite and non-negative and frequency finite and positive. The input must be a calibrated spectral radiance in W m⁻² sr⁻¹ Hz⁻¹, not raw detector counts, arbitrary voltage, or an uncalibrated channel amplitude.
 
-**Brightness temperature is not automatically electron temperature.** Interpreting \(T_b\) as \(T_e\) requires optically thick emission and a thermalized electron distribution, in addition to valid calibration and appropriate propagation assumptions. The optional `optical_depth` argument is recorded as metadata only: the code does not infer thermalization or certify that a channel is optically thick from optical depth alone.
+**Brightness temperature is not automatically electron temperature.** Interpreting \(T_b\) as \(T_e\) requires optically thick emission and a thermalized electron distribution, in addition to valid calibration and appropriate propagation assumptions. In `analyze_ece`, optional `optical_depth` is metadata/conditioning information only; it does not certify thermalization. The separate profile workflow uses optical depth in an explicitly declared single-slab LTE inversion, or requires the user to affirm the optically thick approximation.
 
-### Channel fluctuation spectra
+### Receiver-response convolution\n\n`convolve_ece_receiver_response` integrates calibrated spectral radiance against user-supplied non-negative channel response weights. The spectrum and response grids must be finite, positive, strictly increasing, and fully covered by the measured spectrum; extrapolation is rejected. Response rows are normalized by their trapezoidal integral. This operation is not detector calibration, response-function inference, or radiative-transfer inversion. If channel brightness temperature is reported using the response-weighted center frequency, treat it as an approximation for broad channels.\n\n## Channel fluctuation spectra
 
 For a sampled channel signal \(x_j(t)\), the workflow subtracts each channel's temporal mean and computes an FFT-based one-sided periodogram. It reports per-channel fluctuation RMS, PSD, sample frequency, and Nyquist frequency. The periodogram normalization is checked against Parseval's relation for odd and even sample counts. DC and (for even sample counts) Nyquist bins are not doubled.
 
@@ -106,7 +106,7 @@ All channel center frequencies must be a non-empty, finite, positive, strictly i
 
 ## Validation
 
-Automated numerical tests are in `tests/test_ece_analysis.py`; Streamlit dashboard interaction coverage is in `tests/test_ece_dashboard_interaction.py`. They cover:
+Automated numerical tests are in `tests/test_ece_analysis.py`; Streamlit interaction coverage is in `tests/test_ece_dashboard.py`, with a dedicated real-browser smoke test in `tests/e2e/test_ece_live_browser.py`. They cover:
 - fundamental and harmonic resonance scaling;
 - inversion of the simplified toroidal-field model;
 - zero-radiance brightness temperature and required calibrated radiance;
@@ -130,7 +130,7 @@ Before interpreting results, document and verify:
 - noise-floor estimate, channel-to-channel calibration, and reproducibility across independent analysis settings;
 - comparison with an independent diagnostic or a trusted synthetic diagnostic before claiming device-level validation.
 
-Uncertainty estimates assume independent input errors and first-order propagation; they exclude correlated errors and model discrepancy. Low optical depth can make the single-slab inversion ill-conditioned. The workflow intentionally reports the model and its limitations rather than silently upgrading a simplified estimate into a device-validated physical inference.
+Uncertainty estimates are first-order approximations. Optional channel covariance and temporal-autocorrelation adjustment are supported when supplied/selected; a user-supplied fractional model-discrepancy floor can be added, but unknown model discrepancy remains unquantified. Time-resolved profile covariance is propagated through interpolation. These estimates do not include unprovided calibration, equilibrium or response-kernel uncertainty. Low optical depth can make the single-slab inversion ill-conditioned. The workflow intentionally reports the model and its limitations rather than silently upgrading a simplified estimate into a device-validated physical inference.
 
 ## Radial electron-temperature profile reconstruction
 
@@ -142,5 +142,5 @@ For temperature inference, the user must either supply optical depth per channel
 
 or explicitly declare the optically thick approximation `Te ≈ Tb`. The app does not silently assume that brightness temperature is electron temperature. Optical depths below 1e-3 trigger a conditioning warning because inversion amplifies input errors approximately as 1/(1 − exp(−τ)).
 
-The profile is a linear interpolation between distinct channel resonance locations and is restricted to the measured radial interval. An optional output retains inferred channel and radial profiles at each sample in the selected time window, rather than only the time-window mean. It is a profile estimate, not a regularized inversion of a full radiative-transfer forward model. Optional first-order uncertainty propagation is available when independent measurement/model-input uncertainties are supplied; it excludes covariance and model discrepancy. Finite channel bandwidth is represented as a radial localization envelope, not a receiver-response convolution. The workflow does not perform ray tracing or use EFIT equilibrium. Results must therefore report these assumptions and must not be described as device-validated without independent validation.
+The profile is a linear interpolation between distinct channel resonance locations and is restricted to the measured radial interval. An optional output retains inferred channel and radial profiles at each sample in the selected time window, rather than only the time-window mean. It is a profile estimate, not a regularized inversion of a full radiative-transfer forward model. Optional first-order uncertainty propagation accepts measurement/model-input uncertainties and channel covariance; temporal autocorrelation can adjust effective sample counts, and a user-selected fractional model-discrepancy floor can be added. Unknown covariance and model discrepancy remain unquantified. Finite channel bandwidth is represented as a radial localization envelope, not a receiver-response convolution. The workflow does not perform full ray tracing or reconstruct EFIT equilibrium. Results must therefore report these assumptions and must not be described as device-validated without independent validation.
 
