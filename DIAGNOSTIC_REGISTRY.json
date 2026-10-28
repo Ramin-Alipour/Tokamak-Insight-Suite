@@ -1146,6 +1146,11 @@
           "name": "optical_depth_condition_message",
           "unit": "text",
           "description": "Warning explanation when low optical depth makes inversion ill-conditioned."
+        },
+        {
+          "name": "electron_temperature_channel_time_eV",
+          "unit": "eV",
+          "description": "Optional time-resolved per-channel electron-temperature estimates within the selected window."
         }
       ],
       "assumptions": [
