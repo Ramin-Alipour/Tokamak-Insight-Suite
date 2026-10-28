@@ -106,7 +106,7 @@ All channel center frequencies must be a non-empty, finite, positive, strictly i
 
 ## Validation
 
-Automated tests are in `tests/test_ece_analysis.py`. They cover:
+Automated numerical tests are in `tests/test_ece_analysis.py`; Streamlit dashboard interaction coverage is in `tests/test_ece_dashboard_interaction.py`. They cover:
 - fundamental and harmonic resonance scaling;
 - inversion of the simplified toroidal-field model;
 - zero-radiance brightness temperature and required calibrated radiance;
