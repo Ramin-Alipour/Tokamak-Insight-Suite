@@ -859,13 +859,64 @@ def reconstruct_ece_temperature_profile(
     if include_time_resolved_profile:
         if tau is None:
             te_time = selected_signal.copy()
+            te_time_sigma = None
+            if tb_sigma_input is not None:
+                te_time_sigma = (
+                    tb_sigma_input[selected, :].copy() if tb_sigma_input.shape == y.shape
+                    else np.broadcast_to(tb_sigma_input, selected_signal.shape).copy()
+                )
         else:
-            te_time = (selected_signal - background_temperature_eV * np.exp(-tau)[None, :]) / (-np.expm1(-tau))[None, :]
+            emissivity = -np.expm1(-tau)
+            exp_tau = np.exp(-tau)
+            te_time = (selected_signal - background_temperature_eV * exp_tau[None, :]) / emissivity[None, :]
             if np.any(~np.isfinite(te_time)) or np.any(te_time < 0):
                 raise ValueError("Time-resolved optical-depth inversion produced non-physical Te.")
+            te_time_sigma = None
+            if tb_sigma_input is not None:
+                sigma_time = (
+                    tb_sigma_input[selected, :].copy() if tb_sigma_input.shape == y.shape
+                    else np.broadcast_to(tb_sigma_input, selected_signal.shape).copy()
+                )
+                te_time_variance = (sigma_time / emissivity[None, :])**2
+                if tau_sigma is not None:
+                    dte_dtau_time = exp_tau[None, :] * (background_temperature_eV - selected_signal) / emissivity[None, :]**2
+                    te_time_variance += (dte_dtau_time * tau_sigma[None, :])**2
+                if background_temperature_uncertainty_eV:
+                    dte_dtbg_time = -exp_tau / emissivity
+                    te_time_variance += (dte_dtbg_time[None, :] * background_temperature_uncertainty_eV)**2
+                te_time_sigma = np.sqrt(te_time_variance)
+            elif tau_sigma is not None or background_temperature_uncertainty_eV:
+                te_time_variance = np.zeros_like(te_time)
+                if tau_sigma is not None:
+                    dte_dtau_time = exp_tau[None, :] * (background_temperature_eV - selected_signal) / emissivity[None, :]**2
+                    te_time_variance += (dte_dtau_time * tau_sigma[None, :])**2
+                if background_temperature_uncertainty_eV:
+                    dte_dtbg_time = -exp_tau / emissivity
+                    te_time_variance += (dte_dtbg_time[None, :] * background_temperature_uncertainty_eV)**2
+                te_time_sigma = np.sqrt(te_time_variance)
         output["electron_temperature_channel_time_eV"] = te_time
-        output["electron_temperature_profile_time_eV"] = np.vstack([
-            np.interp(r_profile, r_sorted, row[order]) for row in te_time
+        profile_time = np.vstack([
+            PchipInterpolator(r_sorted, row[order], extrapolate=False)(r_profile)
+            if profile_method == "pchip" else np.interp(r_profile, r_sorted, row[order])
+            for row in te_time
         ])
+        output["electron_temperature_profile_time_eV"] = profile_time
+        if te_time_sigma is not None:
+            profile_time_sigma = np.vstack([
+                np.sqrt(
+                    (((1.0 - np.clip(np.searchsorted(r_sorted, r_profile, side="right"), 1, r_sorted.size - 1) * 0.0))**2)
+                ) for _ in []
+            ]) if False else None
+            profile_time_sigma = np.vstack([
+                np.interp(r_profile, r_sorted, row[order]) for row in te_time_sigma
+            ])
+            # Add the radial-location contribution using each time slice's local gradient.
+            for row_index, row in enumerate(profile_time):
+                profile_time_sigma[row_index] = np.sqrt(
+                    profile_time_sigma[row_index]**2
+                    + (np.abs(np.gradient(row, r_profile, edge_order=2)) * profile_radius_sigma)**2
+                )
+            output["electron_temperature_channel_time_uncertainty_eV"] = te_time_sigma
+            output["electron_temperature_profile_time_uncertainty_eV"] = profile_time_sigma
     return output
 
