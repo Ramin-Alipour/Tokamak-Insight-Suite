@@ -1,7 +1,7 @@
 # Analysis 2 — Langmuir probe
 
 ## Scope
-This workflow analyzes a calibrated, quasi-static, single-probe I–V sweep. It reports cleaned and voltage-sorted samples, descriptive current tails, the floating-potential crossing(s), a maximum-slope plasma-potential proxy, and optional fit-window-based electron temperature, ion-branch metrics, and sheath-model ion-density estimate.
+This workflow analyzes a calibrated, quasi-static, single-probe I–V sweep. It reports cleaned and voltage-sorted samples, descriptive current tails, the floating-potential crossing(s), a maximum-slope plasma-potential proxy, and optional fit-window-based electron temperature and ion-branch metrics.
 
 ## Inputs and preprocessing
 - `voltage` (V) and `current` (A): paired one-dimensional arrays.
@@ -16,12 +16,7 @@ I_e(V)=I_{e,\mathrm{sat}}\exp\left(\frac{V-V_p}{T_e[\mathrm{eV}]}\right),\qquad
 T_e[\mathrm{eV}]=\left(\frac{d\ln I_e}{dV}\right)^{-1}.
 \]
 
-The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The optional ion-density model is
-\[
-n_i \approx \frac{|I_{i,\mathrm{sat}}|}{\alpha e A c_s},\qquad
-c_s=\sqrt{\frac{e(\gamma_i T_i+T_e)}{m_i}},
-\]
-where `A` is the effective collection area, `α` is the selected sheath factor, temperatures are in eV, and `m_i` is ion mass. This is a model-dependent estimate, not a universal probe inversion.
+The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The ion-branch fit characterizes current versus voltage; it is not used to infer density or particle flux.
 
 The floating-potential result includes all detected zero crossings. A zero-current plateau is represented by its voltage midpoint. `floating_potential_V` is populated only for exactly one unique crossing; no crossing or multiple crossings produces `null` with an explicit status.
 
