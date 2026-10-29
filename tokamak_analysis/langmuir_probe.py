@@ -125,6 +125,11 @@ def analyze_langmuir_probe_array(
 # Advanced calibrated-data workflows; see docs/analyses/langmuir_probe.md for assumptions.
 from .langmuir_advanced import (  # noqa: E402
     analyze_langmuir_probe_series,
+    estimate_electron_density_from_saturation,
+    estimate_ion_particle_flux,
     estimate_multispecies_ion_density,
+    estimate_smoothed_plasma_potential_candidates,
     fit_langmuir_electron_models,
+    fit_langmuir_stretched_exponential,
+    langmuir_fit_window_sensitivity,
 )
