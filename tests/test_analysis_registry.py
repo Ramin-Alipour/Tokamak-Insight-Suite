@@ -30,7 +30,7 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["density_m3"]["unit"] == "m^-3"
     assert inputs["temperature_ev"]["unit"] == "eV"
     assert "major_radius_m" not in inputs
-    assert "geometry-weighted volume averages" in " ".join(contract["limitations"])
+    assert "geometry-weighted volume averages" in " ".join(contract["limitations"]).lower()
     outputs = {item["name"]: item for item in contract["output_specs"]}
     assert {
         "density_m3", "temperature_eV", "density_gradient_m-4",
