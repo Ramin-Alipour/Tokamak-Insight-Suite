@@ -268,7 +268,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed. Processed voltage/current arrays and the corresponding dI/dV array are now returned explicitly for auditability; these are computational outputs, not inferred measurements.",
+    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics including ion-branch residual diagnostics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed. Processed voltage/current arrays and the corresponding dI/dV array are now returned explicitly for auditability; these are computational outputs, not inferred measurements.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -532,6 +532,26 @@
           "name": "dIdV_A_per_V",
           "unit": "A/V",
           "description": "Numerical gradient of processed current with respect to processed voltage, using the same samples used to determine the maximum-slope plasma-potential proxy."
+        },
+        {
+          "name": "ion_saturation_fit_residual_rms_A",
+          "unit": "A",
+          "description": "Root-mean-square current residual for the optional linear fit over the analyst-selected ion-branch interval."
+        },
+        {
+          "name": "ion_saturation_fit_normalized_rmse",
+          "unit": "dimensionless",
+          "description": "Ion-branch residual RMS normalized by the current range in the selected interval; null for a zero current range."
+        },
+        {
+          "name": "ion_saturation_fit_points",
+          "unit": "count",
+          "description": "Number of samples included in the optional ion-branch linear fit."
+        },
+        {
+          "name": "ion_saturation_fit_status",
+          "unit": "text",
+          "description": "Indicates that fit quality must be reviewed using R-squared and residual diagnostics; numerical fit quality does not certify physical regime validity."
         }
       ],
       "assumptions": [
