@@ -8,7 +8,6 @@
     "caveat": "Core analysis does not infer calibration, device dimensions, major radius, optical collection geometry, or geometry-weighted volume averages. Raw-spectrum temperature fitting requires scattering angle and instrument width; absolute density inversion requires optical-power and collection-geometry inputs. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-      "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
     "implementation_status": "Core geometry-independent profile analysis and within-domain reconstruction are implemented. Raw-spectrum temperature fitting and scattered-power density inversion remain separately callable extensions and require additional diagnostic/geometry parameters. Software completeness does not imply experimental validation.",
@@ -36,39 +35,6 @@
           "description": "Mode-specific: calibrated electron-temperature profile for calibrated_profile.",
           "required": false,
           "minimum": 0
-        },
-        {
-          "name": "wavelength_nm",
-          "unit": "nm",
-          "description": "Mode-specific: finite, strictly increasing calibrated wavelength axis for raw-spectrum and combined spectral modes.",
-          "required": false
-        },
-        {
-          "name": "signal",
-          "unit": "detector units",
-          "description": "Measured spectral signal used only for shape fitting; absolute scattered-power and density inference are outside the core workflow.",
-          "required": false
-        },
-        {
-          "name": "laser_wavelength_nm",
-          "unit": "nm",
-          "description": "Mode-specific: positive laser wavelength for spectral modes.",
-          "required": false,
-          "minimum": 1e-15
-        },
-        {
-          "name": "scattering_angle_rad",
-          "unit": "rad",
-          "description": "Mode-specific: scattering angle in (0, pi] for spectral/power-density modes.",
-          "required": false,
-          "minimum": 1e-15
-        },
-        {
-          "name": "instrument_sigma_nm",
-          "unit": "nm",
-          "description": "Mode-specific: known positive Gaussian instrumental standard deviation for spectral fitting.",
-          "required": false,
-          "minimum": 1e-15
         },
         {
           "name": "density_uncertainty_m3",
@@ -107,6 +73,21 @@
         }
       ],
       "output_specs": [
+        {
+          "name": "radius_m",
+          "unit": "m",
+          "description": "Supplied calibrated spatial coordinate for the measured profile; not inferred from machine geometry."
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "description": "Calibrated electron-density profile supplied by the user."
+        },
+        {
+          "name": "temperature_eV",
+          "unit": "eV",
+          "description": "Calibrated electron-temperature profile supplied by the user."
+        },
         {
           "name": "density_gradient_m-4",
           "unit": "m^-4",
@@ -171,21 +152,6 @@
           "name": "temperature_normalized_gradient_m-1",
           "unit": "m^-1",
           "description": "Radial temperature gradient normalized by temperature; NaN where temperature is zero."
-        },
-        {
-          "name": "electron_temperature_eV",
-          "unit": "eV",
-          "description": "Electron temperature from supported raw-spectrum fit or combined calibrated-spectrum workflow."
-        },
-        {
-          "name": "electron_temperature_uncertainty_eV",
-          "unit": "eV",
-          "description": "Local covariance-based fit uncertainty; excludes calibration, geometry, and instrument-width uncertainty."
-        },
-        {
-          "name": "fit_diagnostics",
-          "unit": "structured",
-          "description": "Fitted spectrum, residuals, covariance, and available fit-quality metrics."
         },
         {
           "name": "reconstructed_radius_m",
@@ -333,7 +299,11 @@
       ],
       "completion_scope": "Core: calibrated profiles and within-domain reconstruction only. No machine dimensions, major radius, optical collection geometry, geometry-weighted volume averages, or independent experimental validation. Raw-spectrum temperature fitting and absolute-density inversion are separate extensions."
     },
-    "extension_functions": []
+    "extension_functions": [
+      "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum",
+      "tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density",
+      "tokamak_analysis.thomson_scattering.density_from_thomson_scattered_power"
+    ]
   },
   {
     "family": "Plasma parameters",
