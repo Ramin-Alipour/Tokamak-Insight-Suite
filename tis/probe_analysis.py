@@ -17,6 +17,30 @@ def _is_finite_real_scalar(value: Any) -> bool:
         return False
 
 
+def _floating_potential_candidates(voltage: np.ndarray, current: np.ndarray) -> list[float]:
+    """Return distinct zero-current crossings for sorted, unique voltage samples."""
+    exact_zero = current == 0.0
+    candidates: list[float] = []
+    zero_idx = np.flatnonzero(exact_zero)
+    if zero_idx.size:
+        groups = np.split(zero_idx, np.flatnonzero(np.diff(zero_idx) > 1) + 1)
+        candidates.extend(float(0.5 * (voltage[g[0]] + voltage[g[-1]])) for g in groups)
+    for k in range(len(current) - 1):
+        if exact_zero[k] or exact_zero[k + 1]:
+            continue
+        if (current[k] < 0 < current[k + 1]) or (current[k] > 0 > current[k + 1]):
+            candidates.append(float(
+                voltage[k] - current[k] * (voltage[k + 1] - voltage[k]) /
+                (current[k + 1] - current[k])
+            ))
+    candidates.sort()
+    unique: list[float] = []
+    for candidate in candidates:
+        if not unique or not np.isclose(candidate, unique[-1], rtol=1e-10, atol=1e-12):
+            unique.append(candidate)
+    return unique
+
+
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
     """Descriptive I-V preprocessing only; does not infer plasma parameters from an unvalidated regime model."""
     raw_v = np.asarray(voltage)
@@ -31,20 +55,37 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
         raise ValueError("Voltage and current arrays must have equal lengths.")
     good = np.isfinite(v) & np.isfinite(i)
     v, i = v[good], i[good]
-    if len(v)<5: raise ValueError('At least 5 finite I-V points are required.')
-    order=np.argsort(v); v,i=v[order],i[order]
+    if len(v) < 5:
+        raise ValueError("At least 5 finite I-V points are required.")
+    order = np.argsort(v)
+    v, i = v[order], i[order]
     unique_v, inverse = np.unique(v, return_inverse=True)
-    if len(unique_v)<5: raise ValueError('Voltage must contain at least 5 unique values.')
-    if len(unique_v)<len(v):
-        sums=np.bincount(inverse,weights=i)
-        counts=np.bincount(inverse)
-        v,i=unique_v,sums/counts
-    dIdV=np.gradient(i,v)
-    return {'n_points':int(len(v)),'voltage_min_V':float(v.min()),'voltage_max_V':float(v.max()),
-            'current_min_A':float(i.min()),'current_max_A':float(i.max()),
-            'floating_potential_interpolated_V':float(np.interp(0, i[np.argsort(i)], v[np.argsort(i)])) if (np.all(np.diff(i)>=0) or np.all(np.diff(i)<=0)) and (i.min()<=0<=i.max()) else None,
-            'max_dIdV_A_per_V':float(np.max(dIdV)),'min_dIdV_A_per_V':float(np.min(dIdV)),
-            'warning':'Descriptive summary only. Physical interpretation and temperature estimates require a justified probe regime/model; density and particle flux are not inferred.'}
+    if len(unique_v) < 5:
+        raise ValueError("Voltage must contain at least 5 unique values.")
+    if len(unique_v) < len(v):
+        sums = np.bincount(inverse, weights=i)
+        counts = np.bincount(inverse)
+        v, i = unique_v, sums / counts
+    dIdV = np.gradient(i, v)
+    crossings = _floating_potential_candidates(v, i)
+    fp = crossings[0] if len(crossings) == 1 else None
+    status = ("single_zero_crossing" if len(crossings) == 1 else
+              "no_zero_crossing_in_measured_sweep" if not crossings else
+              "ambiguous_multiple_zero_crossings")
+    return {
+        "n_points": int(len(v)),
+        "voltage_min_V": float(v.min()),
+        "voltage_max_V": float(v.max()),
+        "current_min_A": float(i.min()),
+        "current_max_A": float(i.max()),
+        "floating_potential_interpolated_V": fp,
+        "floating_potential_candidates_V": crossings,
+        "floating_potential_status": status,
+        "max_dIdV_A_per_V": float(np.max(dIdV)),
+        "min_dIdV_A_per_V": float(np.min(dIdV)),
+        "warning": "Descriptive summary only. Physical interpretation and temperature estimates require a justified probe regime/model; density and particle flux are not inferred.",
+    }
+
 
 # Expanded diagnostic workflows (v0.3): calculations operate on user-supplied,
 # calibrated data. They do not invent device calibration or geometry.
@@ -121,23 +162,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out["ion_saturation_current_method"] = "median_lowest_voltage_tail_fallback"
     out["electron_saturation_current_A"] = float(np.median(i[-tail_n:]))
     out["electron_saturation_current_method"] = "median_highest_voltage_tail_descriptive"
-    # Find every zero-current crossing in voltage order. A zero-current plateau
-    # is represented by its midpoint; multiple crossings are ambiguous and must
-    # not be silently collapsed to the first crossing.
-    exact_zero = (i == 0.0)
-    candidates: list[float] = []
-    zero_idx = np.flatnonzero(exact_zero)
-    if zero_idx.size:
-        groups = np.split(zero_idx, np.flatnonzero(np.diff(zero_idx) > 1) + 1)
-        candidates.extend(float(0.5 * (v[g[0]] + v[g[-1]])) for g in groups)
-    for k in range(len(i) - 1):
-        if not exact_zero[k] and not exact_zero[k + 1] and i[k] * i[k + 1] < 0:
-            candidates.append(float(v[k] - i[k] * (v[k + 1] - v[k]) / (i[k + 1] - i[k])))
-    candidates.sort()
-    unique_candidates: list[float] = []
-    for candidate in candidates:
-        if not unique_candidates or not np.isclose(candidate, unique_candidates[-1], rtol=1e-10, atol=1e-12):
-            unique_candidates.append(candidate)
+    # Zero-current plateaus use their midpoint; ambiguous crossings stay explicit.
+    unique_candidates = _floating_potential_candidates(v, i)
     out['floating_potential_candidates_V'] = unique_candidates
     out['floating_potential_V'] = unique_candidates[0] if len(unique_candidates) == 1 else None
     if not unique_candidates:
@@ -339,15 +365,35 @@ def suggest_langmuir_fit_windows(
     }
 
 def floating_potential(voltage: Any, current: Any) -> float | None:
-    v=np.asarray(voltage,float).ravel(); i=np.asarray(current,float).ravel()
-    if len(v) != len(i): raise ValueError('Voltage and current arrays must have equal lengths.')
-    m=np.isfinite(v)&np.isfinite(i); v,i=v[m],i[m]
-    if len(v)<2: return None
-    o=np.argsort(v); v,i=v[o],i[o]; ix=np.where(i[:-1]*i[1:]<=0)[0]
-    if not len(ix): return None
-    k=ix[0]
-    if i[k+1]==i[k]: return float((v[k]+v[k+1])/2)
-    return float(v[k]-i[k]*(v[k+1]-v[k])/(i[k+1]-i[k]))
+    """Return the unique interpolated floating potential, or None if absent/ambiguous.
+
+    Inputs are calibrated voltage/current arrays. Non-finite pairs are ignored;
+    duplicate voltages are combined by averaging their current values.
+    """
+    raw_v, raw_i = np.asarray(voltage), np.asarray(current)
+    if raw_v.ndim != 1 or raw_i.ndim != 1:
+        raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
+    if raw_v.dtype.kind not in "iuf" or raw_i.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must contain real numeric values.")
+    if len(raw_v) != len(raw_i):
+        raise ValueError("Voltage and current arrays must have equal lengths.")
+    v, i = raw_v.astype(float, copy=True), raw_i.astype(float, copy=True)
+    good = np.isfinite(v) & np.isfinite(i)
+    v, i = v[good], i[good]
+    if len(v) < 2:
+        return None
+    order = np.argsort(v)
+    v, i = v[order], i[order]
+    unique_v, inverse = np.unique(v, return_inverse=True)
+    if len(unique_v) < 2:
+        return None
+    if len(unique_v) != len(v):
+        sums = np.bincount(inverse, weights=i)
+        counts = np.bincount(inverse)
+        v, i = unique_v, sums / counts
+    candidates = _floating_potential_candidates(v, i)
+    return candidates[0] if len(candidates) == 1 else None
+
 
 def triple_probe_temperature_eV(v_difference_V: float, model_factor: float = 1.0) -> dict[str, float | str]:
     """First-order triple-probe Te estimate under a user-selected idealized exponential-current model."""
