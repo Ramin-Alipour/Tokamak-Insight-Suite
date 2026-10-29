@@ -42,7 +42,8 @@ def test_langmuir_analysis_exposes_electron_fit_residual_diagnostics():
     assert np.isfinite(result["electron_retarding_fit_R2"])
     assert np.isfinite(result["electron_retarding_fit_residual_rms_A"])
     assert np.isfinite(result["electron_retarding_fit_normalized_rmse"])
-    assert result["electron_retarding_fit_status"] == "fit_completed_review_R2_and_residuals"
+    assert result["electron_retarding_fit_status"] in {"numerical_fit_review_pass_not_physical_validation", "weak_or_undefined_numerical_fit_review_required"}
+    assert result["electron_retarding_regime_review"]["physical_regime_confirmed"] is False
 
 
 def test_floating_potential_helper_uses_zero_plateau_midpoint():
@@ -82,5 +83,56 @@ def test_langmuir_ion_branch_fit_reports_residual_quality_diagnostics():
     assert np.isfinite(result["ion_saturation_fit_R2"])
     assert np.isfinite(result["ion_saturation_fit_residual_rms_A"])
     assert result["ion_saturation_fit_normalized_rmse"] is not None
-    assert result["ion_saturation_fit_status"] == "fit_completed_review_R2_and_residuals"
+    assert result["ion_saturation_fit_status"] in {"numerical_fit_review_pass_not_physical_validation", "weak_or_undefined_numerical_fit_review_required"}
+    assert result["ion_saturation_regime_review"]["physical_ion_saturation_confirmed"] is False
     assert result["ion_saturation_current_method"] == "median_user_selected_ion_fit_range"
+
+
+
+def test_langmuir_density_uncertainty_propagates_explicit_inputs_only():
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    result = langmuir_iv_analysis(
+        voltage, current,
+        electron_fit_range=(-8.0, 0.0),
+        ion_fit_range=(-10.0, -7.0),
+        probe_area_m2=1e-4,
+        ion_mass_kg=3.34e-27,
+        ion_saturation_coefficient=0.61,
+        sheath_model="test-model",
+        ion_current_uncertainty_A=1e-5,
+        probe_area_relative_uncertainty=0.02,
+        ion_mass_relative_uncertainty=0.01,
+        ion_saturation_coefficient_relative_uncertainty=0.05,
+        electron_temperature_relative_uncertainty=0.03,
+    )
+    assert result["ion_density_estimate_m-3"] > 0
+    assert result["ion_density_standard_uncertainty_m-3"] > 0
+    assert result["ion_density_relative_standard_uncertainty"] > 0
+    assert result["ion_density_uncertainty_status"] == "partial_first_order_propagation_supplied_components_only"
+
+
+def test_langmuir_density_uncertainty_rejects_negative_components():
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        langmuir_iv_analysis(
+            voltage, current,
+            electron_fit_range=(-8.0, 0.0),
+            ion_fit_range=(-10.0, -7.0),
+            probe_area_m2=1e-4,
+            ion_mass_kg=3.34e-27,
+            ion_saturation_coefficient=0.61,
+            sheath_model="test-model",
+            probe_area_relative_uncertainty=-0.01,
+        )
+
+
+def test_langmuir_proxy_and_scope_are_explicit_without_fit_windows():
+    voltage = np.linspace(-5.0, 5.0, 21)
+    current = np.sinh(voltage / 3.0) * 1e-3
+    result = langmuir_iv_analysis(voltage, current)
+    assert result["plasma_potential_method"] == "maximum_numerical_dIdV_proxy"
+    assert result["plasma_potential_status"] == "proxy_only_requires_probe_regime_review"
+    assert result["analysis_scope"] == "calibrated_single_probe_IV_sweep_only"
+    assert result["fit_window_review"]["physical_regime_certified"] is False
