@@ -18,6 +18,14 @@ def test_langmuir_analysis_reports_preprocessing_quality_and_duplicate_aggregati
     assert quality["processed_unique_voltage_count"] == 11
     assert quality["current_convention_normalized"] == "electron_positive"
 
+    processed_v = np.asarray(result["processed_voltage_V"])
+    assert np.all(np.diff(processed_v) > 0)
+    assert len(processed_v) == quality["processed_unique_voltage_count"]
+    assert len(result["processed_current_A"]) == len(processed_v)
+    assert len(result["dIdV_A_per_V"]) == len(processed_v)
+    assert processed_v.tolist() == sorted(set(voltage[np.isfinite(voltage)].tolist()))
+
+
 
 def test_langmuir_analysis_exposes_electron_fit_residual_diagnostics():
     voltage = np.linspace(-10.0, 10.0, 81)
