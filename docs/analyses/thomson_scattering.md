@@ -1,143 +1,84 @@
 # Thomson Scattering (Analysis 1 of 80)
 
-## Completion status
+## Scope and completion status
 
-**Core scope: calibrated-profile analysis and within-domain profile reconstruction.** The core analysis consumes already-calibrated electron-density and electron-temperature profiles with calibrated spatial coordinates. It does not require tokamak dimensions, major radius, optical collection geometry, or device-specific geometry models. Raw-spectrum electron-temperature fitting is retained as a separate, explicitly geometry-dependent extension because its temperature relation requires the scattering angle and instrumental-width information. Absolute density inversion from scattered power is also a separate geometry-dependent extension. This status does not claim independent experimental validation or support for collective/relativistic inversion, arbitrary non-Maxwellian reconstruction, or non-Gaussian instrument-response inversion.
+**Complete within the declared geometry-independent software scope.** Analysis 1 consumes already-calibrated electron-density and electron-temperature profiles together with their supplied calibrated spatial coordinate. It does not calibrate raw detector data, infer device dimensions, request optical collection geometry, or calculate geometry-weighted volume averages.
 
-The scope is intentionally bounded: no density inference from uncalibrated amplitude; no collective, relativistic, non-Maxwellian, or non-Gaussian instrument-response inversion; no automatic stray-light correction, full spectral-response correction, or complete calibration/model-discrepancy uncertainty budget. Users must verify instrument calibration, spectral-band coverage, optical geometry, time-gate compatibility, and residuals against the experiment.
+The analysis has two supported workflows:
 
-## Supported implementation paths
+1. **Calibrated profile analysis** — profile extrema and their supplied-coordinate locations, measured-interval line averages, radial gradients, normalized gradients, local scale lengths, and optional first-order uncertainty propagation.
+2. **Within-domain profile reconstruction** — interpolation/smoothing of the supplied calibrated profiles on a denser coordinate grid, restricted to the measured coordinate interval.
 
-1. **Core: calibrated profile analysis** (tokamak_analysis.thomson_workflow.analyze_thomson_profile): computes profile extrema, line averages, gradients, normalized gradients, and local scale lengths from already-calibrated electron-density and electron-temperature profiles. No device dimensions or optical geometry are inferred.
-2. **Core: within-domain profile reconstruction** (tokamak_analysis.thomson_scattering.reconstruct_thomson_profile): reconstructs profiles only over the measured coordinate interval; it does not extrapolate.
-3. **Separate extension: raw spectral-shape temperature fit** (tokamak_analysis.thomson_spectrum.fit_thomson_spectrum): fits a Gaussian Doppler profile plus a linear local background and deconvolves a known Gaussian instrument width. This path requires the scattering angle and is therefore not part of the geometry-independent core.
+Raw-spectrum fitting and density inversion from scattered optical power are not part of Analysis 1. They require additional spectral/instrument or optical-geometry inputs and are intentionally excluded from this analysis contract and its dashboard workflow list. Their underlying modules/tests, where present, do not change the scope of Analysis 1.
 
-The single-band helper density_from_thomson_scattered_power estimates density from calibrated collected power and specified geometry. The spectral fit can optionally integrate its Gaussian component to collected power only when the signal is explicitly declared to be calibrated spectral power density in W/nm. The spectral-fit amplitude itself is **not** a density measurement. The power-based density helper also supports first-order propagation of optional independent 1-sigma uncertainties for measured power, incident power, interaction length, scattering angle, collection solid angle, and optical efficiency. The dashboard can pass the integrated spectral power and its fit uncertainty directly into this density calculation. The dashboard exposes this as a separate calibrated scattered-power density workflow, including optional uncertainty inputs.
+No independent experimental validation is claimed. Automated tests check software behavior for specified inputs; they do not establish experimental validity.
 
-## Raw spectrum input contract
+## Calibrated profile input contract
 
 | Input | Unit | Requirement |
 |---|---|---|
-| wavelength_nm | nm | One-dimensional, finite, strictly increasing calibrated wavelength axis; at least 7 samples |
-| signal | detector units by default; W/nm when calibrated-power mode is enabled | One-dimensional finite measured signal, same length as wavelength |
-| laser_wavelength_nm | nm | Positive finite laser wavelength |
-| scattering_angle_rad | rad | In (0, pi] |
-| instrument_sigma_nm | nm | Positive known Gaussian instrumental standard deviation |
-| signal_uncertainty | same units as signal | Optional positive finite 1-sigma uncertainty for every signal sample |
+| `radius_m` | m | Required; supplied calibrated spatial coordinate, one-dimensional, finite, unique |
+| `density_m3` | m⁻³ | Required; calibrated electron-density profile, finite and non-negative |
+| `temperature_ev` | eV | Required; calibrated electron-temperature profile, finite and non-negative |
+| `density_uncertainty_m3` | m⁻³ | Optional pointwise 1-sigma uncertainty, finite and non-negative |
+| `temperature_uncertainty_ev` | eV | Optional pointwise 1-sigma uncertainty, finite and non-negative |
 
-The fitted model is a Gaussian Doppler-broadened profile plus a linear background. Instrumental broadening is removed in quadrature:
+The three required arrays must have equal lengths and at least two samples. Samples are sorted by the supplied coordinate, and all associated profile and uncertainty arrays are reordered consistently. The coordinate is a supplied data axis, not a machine dimension inferred by TIS. The measured interval need not cover the entire plasma.
 
-~~~text
-sigma_physical = sqrt(sigma_fit^2 - sigma_instrument^2)
-~~~
+## Calculations and equations
 
-For the non-relativistic, non-collective Maxwellian approximation:
+For calibrated density \(n_e(r)\) and electron temperature \(T_e(r)\), the numerical gradients are
 
-~~~text
-T_e[eV] = (sigma_physical / lambda_0)^2
-          * (m_e c^2 / 4) / sin(scattering_angle / 2)^2
-~~~
+\[
+\frac{dn_e}{dr}, \qquad \frac{dT_e}{dr}.
+\]
 
-The module rejects a fit when the fitted width does not exceed the supplied instrumental width. That case is unresolved by the stated model and must not be reported as a temperature. It also rejects wavelength windows that do not cover at least ±3 fitted standard deviations around the line center.
+The normalized gradients are
 
-## Raw-spectrum outputs
+\[
+\frac{1}{n_e}\frac{dn_e}{dr}, \qquad
+\frac{1}{T_e}\frac{dT_e}{dr},
+\]
 
-- Electron temperature and local covariance-based fit uncertainty (eV)
-- Fitted center wavelength and measured, instrumental, and deconvolved widths (nm)
-- Fitted spectrum and residual arrays
-- Residual sum of squares; chi-square and reduced chi-square only when per-sample uncertainties are supplied
-- R-squared and fit covariance
-- Optional integrated collected power and its fit uncertainty when the signal is calibrated in W/nm
-- Explicit model assumptions and limitations
+and the local scale lengths are
 
-The reported temperature uncertainty does not include uncertainty in laser wavelength, scattering angle, or instrument width. A covariance-based fit uncertainty is not a complete measurement uncertainty budget.
+\[
+L_{n_e}=-\frac{n_e}{dn_e/dr}, \qquad
+L_{T_e}=-\frac{T_e}{dT_e/dr}.
+\]
 
-## Profile input contract
+A normalized gradient is undefined where its corresponding profile value is zero. A local scale length is reported as undefined (NaN) where the profile value is zero or the numerical gradient is unresolved. Derivatives use numerical finite differences on the supplied coordinate.
 
-The core profile workflow expects calibrated radius_m (m), density_m3 (m^-3), and temperature_ev (eV) arrays with equal lengths and at least two finite samples. Here radius_m is a supplied, calibrated profile coordinate—not a request for machine dimensions or a device geometry model. Coordinate values must be unique; density, temperature, and supplied pointwise uncertainties must be non-negative. The arrays are sorted consistently. Line averages and derivatives apply only to the measured coordinate interval; they do not establish full-plasma coverage or extrapolate to the magnetic axis/plasma edge, and they are not an equilibrium reconstruction. Geometry-weighted volume averages are outside the core scope.
+The line average for a profile \(f(r)\) over the measured interval \([r_0,r_N]\) is calculated by trapezoidal integration:
 
-Pointwise uncertainties are validated and propagated through finite-difference gradients, normalized gradients, local scale lengths, and line averages over the measured coordinate interval, assuming independent samples. Geometry-weighted volume averages are excluded. Peak-location uncertainty is not estimated.
+\[
+\langle f\rangle_{\mathrm{line}} =
+\frac{1}{r_N-r_0}\int_{r_0}^{r_N}f(r)\,dr.
+\]
 
-## Example
+This is an average over the measured coordinate interval, not a geometry-weighted volume average and not automatically a full-plasma average.
 
-~~~python
-import numpy as np
-from tokamak_analysis.thomson_spectrum import fit_thomson_spectrum
+## Outputs
 
-wavelength_nm = ...  # calibrated wavelength axis
-signal = ...         # measured spectrum
-fit = fit_thomson_spectrum(
-    wavelength_nm,
-    signal,
-    laser_wavelength_nm=532.0,
-    scattering_angle_rad=np.pi / 2,
-    instrument_sigma_nm=0.05,
-)
-print(fit["electron_temperature_eV"], fit["electron_temperature_uncertainty_eV"])
-~~~
+- Sorted supplied coordinate, density and temperature profiles.
+- Peak density and temperature values and their locations on the supplied coordinate.
+- Coordinate range and measured-interval line averages.
+- Density and temperature gradients.
+- Normalized density and temperature gradients.
+- Local density and temperature scale lengths.
+- When corresponding pointwise uncertainties are provided: propagated uncertainties for line averages, gradients, normalized gradients and scale lengths.
+- For the optional reconstruction workflow: reconstructed profiles and gradients only within the measured coordinate interval, with method and domain metadata.
 
-## Separate extension: calibrated spectrum-to-density workflow (outside core scope)
+## Uncertainty assumptions and limitations
 
-The callable `tokamak_analysis.thomson_workflow.analyze_thomson_spectrum_and_density` composes the spectral fit and calibrated scattered-power density estimate into one reproducible Python entry point.
-
-Required inputs include a calibrated wavelength axis, spectral power density in W/nm, laser wavelength, scattering angle, known Gaussian instrument sigma, incident laser power, effective interaction length, collection solid angle, and total optical efficiency. Optional independent 1-sigma uncertainties can be supplied for the spectral samples and optical geometry.
-
-The function returns electron temperature from the Gaussian spectral width and electron density from the integrated fitted Gaussian power using the classical unpolarized differential Thomson cross-section. Temperature uncertainty is fit-only. Density uncertainty is returned when at least one supported input uncertainty is supplied and uses first-order independent-error propagation.
-
-This workflow is only appropriate when the measured spectrum is absolutely calibrated in W/nm over a band compatible with the integrated-power model, the plasma is optically thin, the signal is dominated by non-collective non-relativistic Maxwellian Thomson scattering, and the instrument response is adequately Gaussian. It does not automatically correct stray light, wavelength-dependent throughput, spectral-band truncation, polarization-specific collection geometry, calibration covariance, or model discrepancy. Results require an independent uncertainty budget and experiment-specific review.
-
-
-## Separate extension: user-defined spectral model (outside core scope)
-
-Users can register an experiment-specific or research-specific spectral model in Python without changing the built-in Gaussian workflow. The extension is an explicit in-process registry: users provide a callable of the form `model(wavelength_nm, *parameters)`, parameter names, initial values, optional lower/upper bounds, and a description. The generic fitter returns fitted parameters, their covariance-based uncertainties, fitted spectrum, residuals, and (when signal uncertainties are supplied) chi-square diagnostics.
-
-```python
-import numpy as np
-from tokamak_analysis.thomson_models import (
-    register_spectral_model,
-    fit_custom_spectral_model,
-)
-
-def my_spectrum(wavelength_nm, amplitude, center_nm, sigma_nm, background):
-    return amplitude * np.exp(
-        -0.5 * ((wavelength_nm - center_nm) / sigma_nm) ** 2
-    ) + background
-
-register_spectral_model(
-    "my_experiment_model",
-    my_spectrum,
-    parameter_names=("amplitude", "center_nm", "sigma_nm", "background"),
-    initial_values=(100.0, 532.0, 0.2, 1.0),
-    bounds=((0.0, 500.0, 1e-6, -np.inf),
-            (np.inf, 560.0, np.inf, np.inf)),
-    description="Example model; replace with a validated physical model",
-)
-
-fit = fit_custom_spectral_model(
-    wavelength_nm,
-    measured_signal,
-    model_name="my_experiment_model",
-    signal_uncertainty=signal_sigma,  # optional
-)
-print(fit["parameters"])
-```
-
-The built-in registry is process-local, not isolated per web-app user: registered models remain available to code running in that Python process until unregistered or the process exits. In a multi-user service, do not use this global registry for private per-user model state; use isolated processes or a dedicated per-session registry layer. Register the model during application setup or from the user's own Python module. The software does not automatically load arbitrary files or execute downloaded plugins. The generic fitter does not automatically infer electron temperature, density, or other physical quantities from custom parameters; the model author must define and validate that interpretation, its instrument-response treatment, and its uncertainty budget. Registration is not evidence that a model is physically valid. The built-in Thomson workflow remains unchanged and continues to be the default supported model.
-
-## Scientific limitations
-
-- Assumes a non-collective, non-relativistic Maxwellian electron distribution.
-- Assumes a Gaussian instrument line-spread function with known standard deviation.
-- Uses a locally linear background; it does not perform full stray-light or spectral-response calibration.
-- Does not fit collective spectra, relativistic/non-Maxwellian spectra, or non-Gaussian instrument responses.
-- Does not infer density from uncalibrated spectral amplitude. Absolute density needs calibrated spectral power density or collected power, laser power, interaction length, differential cross-section, collection solid angle, optical efficiency, and appropriate spectral-band treatment.
-- Synthetic tests establish numerical recovery for the stated model only; they do not constitute independent experimental validation.
+- Input profiles and coordinates are assumed calibrated; TIS does not perform calibration in this analysis.
+- Optional uncertainty propagation assumes independent pointwise measurement errors.
+- Covariance between samples, calibration uncertainty, model discrepancy, and peak-location uncertainty are not estimated.
+- Numerical derivatives can amplify noise, especially for sparse or noisy profiles.
+- No extrapolation beyond the measured coordinate interval is performed.
+- No machine dimensions, major radius, optical collection geometry, equilibrium reconstruction, or geometry-weighted volume averages are inferred.
+- No independent experimental validation is claimed.
 
 ## Completion gate
 
-The core analysis is complete within the following bounded software scope: calibrated profile summaries/gradients/scale lengths, scoped raw-spectrum electron-temperature fitting, and spatial profile interpolation/reconstruction only within the measured radial interval. Scattered-power density inversion and user-defined spectral models remain separate optional extensions and are not part of the core geometry-independent workflow. This is a software-completeness statement only; it does not claim independent experimental validation or support for broader physics extensions. This status does **not** mean complete Thomson-scattering physics or independent experimental validation. The following remain explicitly out of scope and must not be implied by the UI, registry, or reports: collective-scattering inversion, relativistic/non-Maxwellian spectral models, non-Gaussian instrument-response deconvolution, automatic stray-light and wavelength-dependent throughput correction, spectral-band completeness correction, and a full calibration/model-discrepancy uncertainty budget. Absolute density inversion from scattered power is a separate extension and is not part of the core geometry-independent analysis.
-
-
-## Geometry-independent core contract
-
-The core Analysis 1 API accepts already-calibrated profiles or a calibrated wavelength axis and spectral signal. It does not request tokamak major radius, machine dimensions, vessel dimensions, or geometry-weighted volume averages. Profile calculations are restricted to pointwise values and radial derivatives/scale lengths in the supplied calibrated coordinate. Raw-spectrum electron-temperature fitting still requires the laser wavelength, scattering angle, and known instrumental Gaussian width because these are inputs to the physical inference, not machine-size parameters. The core workflow does not infer absolute electron density from spectral amplitude or scattered power; provide calibrated density profiles as input when density analysis is required. All numerical checks are software checks only; no independent experimental validation is claimed.
+Analysis 1 is complete for the stated software scope: calibrated profile analysis and reconstruction within the measured coordinate interval. The dashboard and diagnostic registry should expose only these two workflows under Analysis 1. Raw-spectrum fitting and scattered-power density inversion are outside this contract and must not be presented as part of its geometry-independent workflow.
