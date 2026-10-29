@@ -204,3 +204,58 @@ def estimate_multispecies_ion_density(
         "physical_regime_confirmed": False,
         "uncertainty_propagation_performed": False,
     }
+
+
+def langmuir_fit_window_sensitivity(
+    voltage_V: Any,
+    current_A: Any,
+    electron_fit_range_V: tuple[float, float],
+    *,
+    relative_shifts: Sequence[float] = (-0.1, 0.0, 0.1),
+    analysis_options: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Re-fit Te over nearby nested windows and report window-selection sensitivity."""
+    from .langmuir_probe import analyze_langmuir_probe
+
+    lo, hi = map(float, electron_fit_range_V)
+    if not (math.isfinite(lo) and math.isfinite(hi) and lo < hi):
+        raise ValueError("electron_fit_range_V must contain finite increasing bounds.")
+    shifts = list(relative_shifts)
+    if not shifts or any(not isinstance(x, (int, float, np.integer, np.floating)) or isinstance(x, (bool, np.bool_)) or not math.isfinite(float(x)) or abs(float(x)) >= 0.5 for x in shifts):
+        raise ValueError("relative_shifts must be a non-empty sequence of finite values with absolute value below 0.5.")
+    span = hi - lo
+    runs = []
+    for shift in shifts:
+        shrink = float(shift) * span
+        candidate = (lo + max(0.0, shrink), hi - max(0.0, shrink)) if shift >= 0 else (lo + shrink, hi - shrink)
+        if candidate[0] >= candidate[1]:
+            runs.append({"relative_shift": float(shift), "fit_range_V": list(candidate), "status": "invalid_window"})
+            continue
+        try:
+            result = analyze_langmuir_probe(
+                voltage_V, current_A, electron_fit_range=candidate, **dict(analysis_options or {})
+            )
+            te = result.get("electron_temperature_eV")
+            runs.append({
+                "relative_shift": float(shift),
+                "fit_range_V": list(candidate),
+                "electron_temperature_eV": te,
+                "fit_R2": result.get("electron_retarding_fit_R2"),
+                "fit_normalized_rmse": result.get("electron_retarding_fit_normalized_rmse"),
+                "status": "fit_returned" if te is not None else "temperature_unavailable",
+            })
+        except (ValueError, RuntimeError, FloatingPointError) as exc:
+            runs.append({"relative_shift": float(shift), "fit_range_V": list(candidate),
+                         "status": "fit_failed", "reason": str(exc)})
+    valid = [float(x["electron_temperature_eV"]) for x in runs
+             if isinstance(x.get("electron_temperature_eV"), (int, float)) and math.isfinite(float(x["electron_temperature_eV"]))]
+    spread = (max(valid) - min(valid)) if len(valid) >= 2 else None
+    mean = float(np.mean(valid)) if valid else None
+    return {
+        "reference_fit_range_V": [lo, hi],
+        "window_trials": runs,
+        "valid_temperature_fit_count": len(valid),
+        "temperature_window_sensitivity_span_eV": spread,
+        "temperature_window_sensitivity_relative_to_mean": (spread / mean if spread is not None and mean not in (None, 0.0) else None),
+        "interpretation": "Sensitivity diagnostic, not a statistical confidence interval or a replacement for justified physical fit-window selection.",
+    }
