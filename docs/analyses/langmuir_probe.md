@@ -102,3 +102,13 @@ The canonical covariance estimate is conditional on the selected fit model and v
 ## Regression tests
 
 The advanced contracts are covered by `tests/test_langmuir_advanced.py`. These tests check software behavior only; they are not empirical validation against a tokamak or probe experiment.
+
+
+Additional explicit helpers extend the declared calculation scope without changing the canonical single-sweep default:
+
+- `fit_langmuir_stretched_exponential` provides an empirical curve-shape alternative. Its shape exponent is not a kinetic kappa parameter and does not identify a unique non-Maxwellian distribution.
+- `estimate_smoothed_plasma_potential_candidates` reports raw-gradient and Savitzky–Golay-smoothed derivative candidates separately, with the smoothing window and polynomial order exposed. Neither candidate is automatically certified as the plasma potential.
+- `estimate_electron_density_from_saturation` estimates electron density from a positive electron-saturation current using the stated Maxwellian collection relation and user-supplied effective area.
+- `estimate_ion_particle_flux` computes a Bohm-like ion particle flux from supplied density, electron temperature, ion mass, and explicit sheath factor.
+
+These helpers do not infer area, species composition, sheath coefficients, or uncertainty inputs. Electron-density and particle-flux estimates are model-dependent and report no uncertainty propagation unless a separate uncertainty model is supplied. Their presence means these quantities can be calculated under explicit assumptions; it does not mean the physical regime is confirmed.
