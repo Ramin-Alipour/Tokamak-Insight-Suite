@@ -4,7 +4,6 @@ import math
 from typing import Any
 import numpy as np
 from scipy import optimize
-from .constants import E_CHARGE, AMU
 from .spectral_analysis import _r2
 
 
@@ -19,7 +18,7 @@ def _is_finite_real_scalar(value: Any) -> bool:
 
 
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
-    """Descriptive I-V preprocessing only; does not silently infer Te/ne without a validated regime model."""
+    """Descriptive I-V preprocessing only; does not infer plasma parameters from an unvalidated regime model."""
     raw_v = np.asarray(voltage)
     raw_i = np.asarray(current)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
@@ -45,7 +44,7 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
             'current_min_A':float(i.min()),'current_max_A':float(i.max()),
             'floating_potential_interpolated_V':float(np.interp(0, i[np.argsort(i)], v[np.argsort(i)])) if (np.all(np.diff(i)>=0) or np.all(np.diff(i)<=0)) and (i.min()<=0<=i.max()) else None,
             'max_dIdV_A_per_V':float(np.max(dIdV)),'min_dIdV_A_per_V':float(np.min(dIdV)),
-            'warning':'Descriptive summary only. Plasma potential, Te and density require a justified probe regime/sheath model, collection geometry and uncertainty.'}
+            'warning':'Descriptive summary only. Physical interpretation and temperature estimates require a justified probe regime/model; density and particle flux are not inferred.'}
 
 # Expanded diagnostic workflows (v0.3): calculations operate on user-supplied,
 # calibrated data. They do not invent device calibration or geometry.
@@ -54,7 +53,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                          electron_fit_range: tuple[float, float] | None = None,
                          ion_fit_range: tuple[float, float] | None = None,
                          current_convention: str = "electron_positive") -> dict[str, Any]:
-    """Analyze a single Langmuir I-V sweep with explicit model-input validation.
+    """Analyze a calibrated single Langmuir I-V sweep without geometry-dependent inversion.
 
     current_convention: "electron_positive" (default; ion saturation current is negative)
     or "ion_positive" (collected-ion current is positive, as in many probe circuits); the
