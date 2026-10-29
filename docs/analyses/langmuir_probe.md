@@ -34,6 +34,12 @@ The result includes an `input_quality` object with original pair count, finite p
 Regression tests: `tests/test_langmuir_qc_contract.py`. These are software regression checks only; they are not experimental validation.
 
 
-## Geometry-independent scope
+## Geometry-independent scope and optional density estimate
 
-This analysis accepts calibrated voltage and current samples only. It does not infer ion density or particle flux because those require additional probe-collection geometry and a declared sheath/ion model. No tokamak dimensions, converter geometry, or device-specific geometry are inferred. The ion-branch fit is retained only as a current-versus-voltage characterization.
+The core analysis accepts already-calibrated voltage and current samples and does not infer instrument calibration or tokamak geometry. An optional ion-density estimate is available only when the user supplies both analyst-selected electron-retarding and ion-branch fit windows, a positive effective collection area, a positive assumed ion mass, a positive coefficient from an explicitly selected sheath/Bohm model, and a non-empty model label. The estimate uses
+
+\[
+ n_i = \frac{|I_{i,\mathrm{sat}}|}{C_s e A_p\sqrt{eT_e/m_i}},
+\]
+
+where \(T_e\) is in eV, \(I_{i,\mathrm{sat}}\) is the negative ion-saturation current in the normalized electron-positive convention, and the supplied coefficient must match the stated probe geometry and plasma regime. This is a model-based estimate under a single-dominant-ion-species assumption, not a direct or experimentally validated measurement. No density is produced from descriptive tail fallbacks. Automatic uncertainty propagation for density and its model inputs is not implemented. Particle flux remains outside this analysis.
