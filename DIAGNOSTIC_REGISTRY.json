@@ -45,8 +45,8 @@
         },
         {
           "name": "signal",
-          "unit": "detector units or W/nm",
-          "description": "Mode-specific: measured spectral signal; W/nm is mandatory for combined density extraction.",
+          "unit": "detector units",
+          "description": "Measured spectral signal used only for shape fitting; absolute scattered-power and density inference are outside the core workflow.",
           "required": false
         },
         {
@@ -278,10 +278,9 @@
             "electron_temperature_uncertainty_eV (eV)",
             "fitted spectrum",
             "residual",
-            "fit quality metrics",
-            "optional integrated_scattered_power_W and fit uncertainty when signal is calibrated in W/nm"
+            "fit quality metrics"
           ],
-          "scope": "Non-collective, non-relativistic Maxwellian Gaussian approximation, known Gaussian instrument response, and linear background. Optional integrated power is only reported for an explicitly calibrated W/nm signal; density requires the separate calibrated-power relation."
+          "scope": "Non-collective, non-relativistic Maxwellian Gaussian approximation, known Gaussian instrument response, and linear background. Spectral amplitude is not converted to absolute density or scattered power."
         },
         {
           "name": "spatial_profile_reconstruction",
