@@ -14,16 +14,17 @@ _BAD = [True, np.bool_(True), "1.0", np.nan, np.inf, 10**1000]
     ("sheath_factor", np.bool_(True)),
     ("gamma_i", 10**1000),
 ])
+@pytest.mark.parametrize("field,bad", [
+    ("electron_fit_range", (0.0, 0.0)),
+    ("current_convention", "unknown"),
+    ("ion_fit_range", (1.0, 1.0)),
+])
 def test_langmuir_rejects_invalid_physics_scalars(field, bad):
-    kwargs = dict(area_m2=1e-5, ion_mass_amu=2.0)
-    kwargs[field] = bad
     voltage = np.linspace(-20.0, 20.0, 41)
     current = np.tanh(voltage / 5.0)
     with pytest.raises(ValueError):
-        langmuir_iv_analysis(voltage, current, **kwargs)
+        langmuir_iv_analysis(voltage, current, **{field: bad})
 
-
-@pytest.mark.parametrize("bad", _BAD)
 def test_triple_probe_rejects_invalid_scalar_inputs(bad):
     with pytest.raises(ValueError):
         triple_probe_temperature_eV(bad, 1.0)
