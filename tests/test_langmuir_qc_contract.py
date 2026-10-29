@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tis.probe_analysis import floating_potential, langmuir_iv_analysis, probe_iv_summary
 
