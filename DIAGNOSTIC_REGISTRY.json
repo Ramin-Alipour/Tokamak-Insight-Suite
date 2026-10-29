@@ -268,11 +268,11 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Canonical calibrated single-sweep analysis now exposes a consistent maximum-dI/dV plasma-potential proxy contract and a multi-channel batch entry point. Multi-channel sweeps are analyzed independently; non-Maxwellian/multi-temperature fitting, multi-species density inversion, and complete automatic uncertainty propagation remain unsupported. Software tests are not experimental validation.",
+    "implementation_status": "Canonical calibrated single-sweep analysis plus explicit advanced functions for single-/two-temperature exponential model fitting, time-by-channel sweep batches, multi-species ion-density estimates, and fit-window sensitivity. These extensions retain declared assumptions and do not claim physical-regime certification or experimental validation.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "partial_with_declared_scope",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "voltage_V",
@@ -775,11 +775,18 @@
         "Te and density uncertainty propagation includes only fit statistics and explicitly supplied components; missing systematic components are not inferred.",
         "Multi-channel batch processing does not provide spatial reconstruction, cross-channel correlation, or multi-probe geometry inference.",
         "Non-Maxwellian and multi-temperature electron-distribution fits are not implemented.",
-        "Multi-species ion-density inversion is not implemented."
+        "Multi-species density is available only through the explicit advanced function and requires user-supplied fractions, masses, and sheath coefficients; no uncertainty propagation is performed by that function.",
+        "Two-temperature fitting is an empirical two-exponential decomposition and does not confirm a physical bi-Maxwellian distribution.",
+        "Time-series batching processes each time/channel sweep independently and does not infer temporal trends or cross-channel physics.",
+        "Fit-window sensitivity is a diagnostic spread, not a statistical confidence interval."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
+      "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_series",
+      "tokamak_analysis.langmuir_probe.fit_langmuir_electron_models",
+      "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
+      "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
         "tis.core.langmuir_iv_analysis",
         "tis.core.probe_iv_summary"
       ],
