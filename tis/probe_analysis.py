@@ -328,7 +328,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out['current_convention_input'] = current_convention
     out['current_convention'] = 'electron_positive'  # All returned current values use this normalized convention.
     if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
-        out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention.'
+        out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention_input.'
     out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
     return out
 
@@ -342,7 +342,7 @@ def suggest_langmuir_fit_windows(
     Electron candidates are ranked using log(I - low-voltage-tail median) linearity.
     The low-voltage interval is only a candidate, not proof of ion saturation.
     """
-    if current_convention not in {"electron_positive", "ion_positive"}:
+    if not isinstance(current_convention, str) or current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     if isinstance(min_points, bool) or not isinstance(min_points, (int, np.integer)) or min_points < 6:
         raise ValueError("min_points must be an integer of at least 6.")

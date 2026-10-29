@@ -441,7 +441,12 @@
         {
           "name": "current_convention",
           "unit": "text",
-          "description": "Input polarity convention; ion_positive is internally sign-flipped."
+          "description": "Normalized convention used by all returned current values: electron_positive."
+        },
+        {
+          "name": "current_convention_input",
+          "unit": "text",
+          "description": "Original input current polarity convention before normalization."
         },
         {
           "name": "sign_warning",

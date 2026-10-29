@@ -49,3 +49,12 @@ def test_analysis_2_current_convention_metadata_matches_normalized_outputs():
         electron_result["processed_current_A"],
         ion_positive_result["processed_current_A"],
     )
+
+
+def test_analysis_2_fit_window_suggester_rejects_non_string_convention():
+    from tis.probe_analysis import suggest_langmuir_fit_windows
+
+    voltage = np.linspace(-5.0, 5.0, 21)
+    current = 1e-3 * voltage
+    with pytest.raises(ValueError, match="current_convention"):
+        suggest_langmuir_fit_windows(voltage, current, current_convention=[])
