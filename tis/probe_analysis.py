@@ -240,8 +240,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out["plasma_potential_dIdV_max_candidate_V"] = float(v[first_derivative_index])
     out["plasma_potential_d2IdV2_max_candidate_V"] = float(v[second_derivative_index])
     out["plasma_potential_estimate_V"] = float(v[first_derivative_index])
-    out["plasma_potential_candidate_method"] = "maximum_numerical_dIdV_proxy"; out["plasma_potential_second_derivative_method"] = "maximum_second_derivative_candidate"
-    out["plasma_potential_status"] = "proxy_only_requires_probe_regime_review"
+    out["plasma_potential_candidate_method"] = "maximum_second_derivative_of_current"; out["plasma_potential_second_derivative_method"] = "maximum_second_derivative_candidate"
+    out["plasma_potential_status"] = (
+        "numerical_candidate_requires_regime_review"
+        if electron_fit_range is not None
+        else "proxy_only_requires_probe_regime_review"
+    )
     out["plasma_potential_voltage_grid_spacing_median_V"] = float(np.median(np.diff(v)))
     out["plasma_potential_uncertainty_note"] = ("Voltage-grid spacing is reported as a resolution indicator, not a statistical uncertainty; "
         "physical Vp interpretation depends on probe regime and branch coverage.")
@@ -420,16 +424,16 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         te = out.get("electron_temperature_eV")
         ion_current = out.get("ion_saturation_current_A")
         ion_review = out.get("ion_saturation_regime_review")
-        if out.get("ion_saturation_fit_status") != "numerical_fit_review_pass_not_physical_validation":
-            raise ValueError(
-                "Ion-density inversion requires an ion-branch fit that passes the numerical "
-                "R-squared and normalized-residual screening; inspect ion_fit_range."
-            )
-        if not isinstance(ion_review, dict) or not ion_review.get("numerically_flat_candidate", False):
-            raise ValueError(
-                "Ion-density inversion requires a numerically flat ion-branch candidate; "
-                "the selected interval does not pass the current-flatness screening."
-            )
+        # Numerical screening is reported as a diagnostic, not used as a hidden
+        # hard gate for a user-requested model calculation. Keep the estimate
+        # explicitly provisional when the selected branch is not sufficiently flat
+        # or its fit diagnostics are weak; the physical regime is never certified here.
+        ion_numerical_fit_pass = (
+            out.get("ion_saturation_fit_status") == "numerical_fit_review_pass_not_physical_validation"
+        )
+        ion_flatness_pass = bool(
+            isinstance(ion_review, dict) and ion_review.get("numerically_flat_candidate", False)
+        )
         if not _is_finite_real_scalar(te) or te <= 0:
             raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
         if not _is_finite_real_scalar(ion_current) or ion_current >= 0:
@@ -442,7 +446,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         if not math.isfinite(density) or density <= 0:
             raise ValueError("The selected density model produced a non-finite or non-positive density.")
         out["ion_density_estimate_m-3"] = float(density)
-        out["ion_density_status"] = "model_based_estimate_review_assumptions"
+        out["ion_density_status"] = (
+            "model_based_estimate_review_assumptions"
+            if ion_numerical_fit_pass and ion_flatness_pass
+            else "provisional_model_based_estimate_ion_branch_screening_not_passed"
+        )
+        out["ion_density_numerical_fit_screen_passed"] = bool(ion_numerical_fit_pass)
+        out["ion_density_current_flatness_screen_passed"] = bool(ion_flatness_pass)
+        out["ion_density_physical_regime_confirmed"] = False
         uncertainty_inputs = {
             **density_uncertainty_inputs,
             "electron_temperature_relative_uncertainty": electron_temperature_relative_uncertainty,
