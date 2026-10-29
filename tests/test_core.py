@@ -180,8 +180,7 @@ def test_spectral_calibration():
 
 def test_probe_summary_does_not_claim_temperature():
     r=probe_iv_summary(np.linspace(-5,5,11),np.tanh(np.linspace(-5,5,11)))
-    assert 'warning' in r and 'Te' in r['warning']
-
+    assert 'warning' in r and 'temperature estimates' in r['warning']
 
 def test_signal_quality_missing():
     r=signal_quality([1,np.nan,3])
