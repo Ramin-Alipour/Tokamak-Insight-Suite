@@ -20,17 +20,17 @@ The implementation performs a joint nonlinear fit of the current offset, positiv
 
 The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The optional ion-branch fit is a linear current-versus-voltage characterization; its median current is reported as a selected-window estimate, not a geometry-derived density or particle flux.
 
-The floating-potential result includes all detected zero crossings. A zero-current plateau is represented by its voltage midpoint. `floating_potential_V` is populated only for exactly one unique crossing; no crossing or multiple crossings produces `null` with an explicit status.
+The floating-potential result includes all detected zero crossings. A zero-current plateau is represented by the midpoint of the plateau, not the first adjacent zero pair. `floating_potential_V` is populated only for exactly one unique crossing; no crossing or multiple crossings produces `null` with an explicit status. The standalone `floating_potential()` helper follows the same rule, ignores non-finite pairs, averages currents at duplicate voltages, and rejects malformed array shapes rather than flattening them.
 
 ## Validation and limitations
-Focused regression tests cover crossing interpolation, zero plateaus, ambiguous crossings, fit-range validation, current polarity, duplicate voltages, and non-finite sample handling. Fit-window choice, probe calibration, RF pickup, magnetic-field effects, collisions, secondary emission, sheath expansion, surface condition, and sweep direction remain experiment-specific. The reported temperature regression error is statistical only; calibration and model uncertainty are not propagated. Do not interpret a numerical proxy or model estimate as independently validated experimental truth.
+Focused regression tests cover crossing interpolation, zero plateaus, ambiguous crossings across both the main analysis and helper APIs, malformed helper inputs, fit-range validation, current polarity, duplicate voltages, and non-finite sample handling. Fit-window choice, probe calibration, RF pickup, magnetic-field effects, collisions, secondary emission, sheath expansion, surface condition, and sweep direction remain experiment-specific. The reported temperature regression error is statistical only; calibration and model uncertainty are not propagated. Do not interpret a numerical proxy or model estimate as independently validated experimental truth.
 
 
 ## Auditable quality and fit diagnostics
 
 The result includes an `input_quality` object with original pair count, finite pairs retained, non-finite pairs discarded, duplicate-voltage pairs averaged, processed unique-voltage count, voltage span, and normalized current convention. When an electron-retarding fit is enabled, the output also includes fit residual RMS (A), normalized RMSE, R-squared, fit-point count, and a status explicitly instructing the analyst to review the residuals and R-squared. These diagnostics do not certify that the selected voltage interval is physically valid and do not replace calibration or systematic uncertainty analysis.
 
-Regression tests: `tests/test_langmuir_qc_contract.py`.
+Regression tests: `tests/test_langmuir_qc_contract.py`. These are software regression checks only; they are not experimental validation.
 
 
 ## Geometry-independent scope
