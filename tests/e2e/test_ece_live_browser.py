@@ -57,6 +57,7 @@ def test_live_streamlit_ece_response_workflow_upload_and_download(tmp_path):
             expect(page.get_by_text("ece_live_smoke.csv", exact=False)).to_be_visible(timeout=30_000)
 
             page.get_by_text("Plasma Parameters", exact=True).first.click()
+            page.get_by_text("Reflectometry / ECE", exact=True).click()
             workflow = page.get_by_role("combobox", name="ECE workflow")
             workflow.click()
             page.get_by_role("option", name="Receiver response convolution").click()
