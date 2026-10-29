@@ -53,11 +53,14 @@ def test_live_streamlit_ece_response_workflow_upload_and_download(tmp_path):
             page.get_by_text("Reflectometry / ECE", exact=True).click()
             workflow = page.get_by_role("combobox", name="ECE workflow")
             workflow.click()
-            # Streamlit's custom select menu does not expose a consistently
-            # clickable option node in headless Chromium. Keyboard navigation
-            # exercises the actual widget and selects its final documented mode.
-            workflow.press("End")
-            workflow.press("Enter")
+            # Streamlit's BaseWeb selectbox keeps keyboard focus on its menu
+            # after opening. Navigate from the current first option to the
+            # fifth option (Receiver response convolution) using page-level
+            # keyboard events, then verify that the widget state actually changed.
+            for _ in range(4):
+                page.keyboard.press("ArrowDown")
+            page.keyboard.press("Enter")
+            expect(workflow).to_contain_text("Receiver response convolution", timeout=15_000)
             expect(page.get_by_text("Convolve calibrated spectral radiance with a supplied receiver response", exact=False)).to_be_visible(timeout=15_000)
 
             page.get_by_label("Spectral frequency grid (Hz; comma-separated, increasing)").fill(
