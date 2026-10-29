@@ -102,14 +102,12 @@ def test_langmuir_iv_rejects_electron_window_without_positive_excess():
         )
 
 
-def test_langmuir_iv_density_does_not_use_descriptive_tail_without_fit_window():
+def test_langmuir_iv_does_not_return_geometry_dependent_density():
     voltage, current = _synthetic_iv_for_regression()
-    result = langmuir_iv_analysis(
-        voltage, current, area_m2=1.0e-6, ion_mass_amu=2.0
-    )
+    result = langmuir_iv_analysis(voltage, current)
     assert "ion_density_estimate_m-3" not in result
-    assert result["ion_density_status"].startswith("not_estimated:")
-
+    assert "ion_density_status" not in result
+    assert "ion_density_model" not in result
 
 def test_one_shot_fit_range_iterables_are_normalized_and_reusable():
     voltage, current = _synthetic_iv_for_regression()
