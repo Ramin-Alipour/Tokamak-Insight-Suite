@@ -261,14 +261,14 @@
     "diagnostic": "Langmuir Probe",
     "quantities": "Calibrated I–V curve, floating/plasma-potential indicators, electron temperature, ion saturation current and optional sheath-model ion density",
     "status": "D",
-    "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Optional ion density uses the selected ion-current median, fitted electron temperature, supplied collection area, ion mass, sheath-model coefficient and model label. No model coefficient or geometry is silently inferred.",
-    "caveat": "Density is a model-dependent estimate: the coefficient must be appropriate for the stated probe geometry and plasma regime. Descriptive tail fallbacks cannot be used for density. Fit windows, mixture composition, magnetic-field/collisional effects, secondary emission, RF pickup and systematic uncertainties require review.",
+    "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Optional ion density is computed only when fitted electron temperature, selected ion-current interval, effective collection area, ion mass, positive sheath-model coefficient and model label are supplied.",
+    "caveat": "Density is a model-dependent estimate; the coefficient must match the declared probe geometry and plasma regime. Descriptive tail fallbacks are never used for density. Plasma-potential dI/dV maximum is a proxy only; fit-window, composition, magnetic-field/collisional, secondary-emission, RF and systematic effects remain outside automatic inference.",
     "implementation_functions": [
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented calibrated single-sweep I–V analysis and optional ion-density inversion only when collection area, ion mass, positive sheath coefficient, model label and both fit windows are supplied. No default sheath coefficient is assumed. Synthetic tests check formula and input validation; independent experimental validation and full uncertainty propagation are not claimed.",
+    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -531,7 +531,7 @@
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "Validate and clean calibrated I–V samples; calculate floating-potential crossings, dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit selected ion and electron branches. When all explicit density inputs and both fit windows are supplied, compute n_i = |I_i,sat| / (C_s e A_p sqrt(e T_e / m_i)), with T_e in eV and C_s supplied by the analyst. No coefficient or geometry is inferred.",
+      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report explicitly labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs.",
       "uncertainty_model": "Only the optional electron-temperature fit returns a local covariance-based standard error. Electron-branch residual RMS, normalized RMSE and R-squared are exposed for fit review. Calibration, current/voltage covariance, fit-window sensitivity, systematic errors and model discrepancy are not propagated.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
@@ -539,7 +539,9 @@
         "Single-ion-species assumption; mixtures require an appropriate model or separate treatment.",
         "No automatic propagation of current, area, mass, temperature, coefficient or model uncertainty.",
         "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
-        "Check fit quality and probe-specific magnetic-field, RF, collision, secondary-emission, surface and sweep-direction effects."
+        "Check fit quality and probe-specific magnetic-field, RF, collision, secondary-emission, surface and sweep-direction effects.",
+        "The dI/dV maximum is a plasma-potential proxy, not a universally valid plasma-potential measurement.",
+        "Ion density is a model-based estimate only when all required fit-window, geometry, ion-mass and sheath-model inputs are supplied; particle flux is outside scope."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
