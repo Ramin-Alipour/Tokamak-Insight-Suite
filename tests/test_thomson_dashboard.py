@@ -4,6 +4,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
