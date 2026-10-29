@@ -58,3 +58,12 @@ For density inversion, callers may supply the absolute standard uncertainty of t
 ## Declared scope
 
 This workflow analyzes a single calibrated Langmuir-probe I–V sweep. It does not claim full support for multi-probe arrays, triple probes, probe-system geometry reconstruction or all electrostatic-probe configurations. Other configurations require their own explicitly defined models and execution contracts.
+
+
+## Canonical entry point and compatibility contract
+
+The canonical calculation pipeline is `tis.probe_analysis.langmuir_iv_analysis`. The public diagnostic wrapper is `tokamak_analysis.langmuir_probe.analyze_langmuir_probe`. The generic `tokamak_analysis.probe_analysis.analyze_probe_voltage_current` entry point delegates to that same wrapper and adds legacy output aliases only; it does not maintain a separate Langmuir fitting implementation. All three entry points therefore share the same minimum of eight valid samples and eight distinct voltages, polarity normalization, fit calculations, optional density guards, and canonical output fields. Legacy names are compatibility aliases and should not define new result contracts.
+
+## Software completion criterion
+
+The registry label `complete_with_declared_scope` means that the implemented software contract and regression tests cover the explicitly declared calibrated single-probe I–V scope. It does not claim independent experimental validation, full systematic uncertainty propagation, automatic physical-regime certification, or support for every probe geometry. Those exclusions are intentional scope boundaries, not claims of experimental validation. Contract parity is tested across the canonical and generic public entry points; optional estimates remain absent or null when their required fit windows and model inputs are not supplied.
