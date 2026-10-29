@@ -26,7 +26,6 @@ def test_thomson_workflow_preserves_sorted_uncertainties():
         [1, 0], [2e19, 1e19], [20, 10],
         density_uncertainty_m3=[2e18, 1e18],
         temperature_uncertainty_ev=[2, 1],
-        major_radius_m=1.0,
     )
     np.testing.assert_allclose(out["density_uncertainty_m3"], [1e18, 2e18])
     np.testing.assert_allclose(out["temperature_uncertainty_eV"], [1, 2])
@@ -37,8 +36,6 @@ def test_thomson_workflow_preserves_sorted_uncertainties():
     assert np.all(np.isfinite(out["temperature_normalized_gradient_uncertainty_m-1"]))
     assert out["summary"].density_line_average_uncertainty_m3 is not None
     assert out["summary"].temperature_line_average_uncertainty_ev is not None
-    assert out["summary"].density_volume_average_uncertainty_m3 is not None
-    assert out["summary"].temperature_volume_average_uncertainty_ev is not None
 
 
 def test_thomson_differential_cross_section_limits_and_symmetry():
@@ -80,14 +77,6 @@ def test_thomson_density_rejects_invalid_scattering_angle():
 
     with pytest.raises(ValueError, match="angle"):
         density_from_thomson_scattered_power(1.0, 2.0, 0.1, 4.0, 1.0e-3)
-
-
-def test_thomson_volume_average_rejects_signed_radius_coordinate():
-    from tokamak_analysis.thomson_scattering import build_profile, profile_summary
-
-    profile = build_profile([-0.2, 0.0, 0.2], [1e19, 2e19, 1e19], [20.0, 40.0, 20.0])
-    with pytest.raises(ValueError, match="non-negative minor-radius"):
-        profile_summary(profile, major_radius_m=1.0)
 
 
 
@@ -184,18 +173,3 @@ def test_thomson_density_rejects_collection_solid_angle_above_sphere():
         )
 
 
-def test_thomson_volume_average_reports_sampled_domain_and_scope():
-    from tokamak_analysis.thomson_scattering import build_profile, profile_summary
-
-    profile = build_profile(
-        [0.2, 0.3, 0.4],
-        [1.0e19, 2.0e19, 1.0e19],
-        [20.0, 40.0, 20.0],
-    )
-    summary = profile_summary(profile, major_radius_m=1.5)
-
-    assert summary.density_volume_average_m3 is not None
-    assert summary.temperature_volume_average_ev is not None
-    assert summary.volume_average_radial_domain_m == pytest.approx((0.2, 0.4))
-    assert "sampled radial interval only" in summary.volume_average_scope
-    assert "does not establish full-plasma coverage" in summary.volume_average_scope
