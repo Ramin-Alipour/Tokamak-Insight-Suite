@@ -23,11 +23,11 @@ def test_all_eighty_entries_have_explicit_conservative_contracts():
     )
 
 
-def test_thomson_contract_marks_scoped_raw_spectrum_analysis_explicitly():
+def test_thomson_contract_is_limited_to_calibrated_profiles():
     contract = get_diagnostic_contract("Thomson scattering")
     assert contract.level is ExecutionLevel.ANALYSIS_PIPELINE
     assert contract.completeness == "complete_with_declared_scope"
-    assert contract.raw_data_to_physics
+    assert not contract.raw_data_to_physics
     assert not contract.supports_raw_data
 
 
