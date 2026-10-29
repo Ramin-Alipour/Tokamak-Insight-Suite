@@ -50,3 +50,65 @@ def analyze_langmuir_probe(
         electron_temperature_fit_window_relative_uncertainty=electron_temperature_fit_window_relative_uncertainty,
         density_model_relative_uncertainty=density_model_relative_uncertainty,
     )
+
+
+
+def analyze_langmuir_probe_array(
+    voltage_V,
+    current_A,
+    *,
+    channel_names=None,
+    **analysis_options,
+):
+    """Analyze calibrated multi-channel Langmuir I–V sweeps independently.
+
+    Accepts either (channels, samples) arrays sharing a voltage grid, or a
+    mapping of channel name to {'voltage_V': ..., 'current_A': ...}. Each
+    channel is passed through the canonical single-sweep implementation;
+    no spatial interpolation or cross-channel physical inference is performed.
+    """
+    import numpy as np
+
+    if isinstance(voltage_V, dict) and current_A is None:
+        channels = voltage_V
+        results = {}
+        for name, pair in channels.items():
+            if not isinstance(pair, dict) or "voltage_V" not in pair or "current_A" not in pair:
+                raise ValueError("Each channel must provide voltage_V and current_A arrays.")
+            results[str(name)] = analyze_langmuir_probe(
+                pair["voltage_V"], pair["current_A"], **analysis_options
+            )
+        return {
+            "analysis_scope": "calibrated_multi_channel_independent_IV_sweeps",
+            "channel_count": len(results),
+            "channels": results,
+            "cross_channel_inference_performed": False,
+        }
+
+    v = np.asarray(voltage_V)
+    i = np.asarray(current_A)
+    if v.ndim == 1 and i.ndim == 2:
+        if i.shape[1] != v.size:
+            raise ValueError("For a shared voltage grid, current_A shape must be (channels, samples).")
+        v = np.broadcast_to(v, i.shape)
+    elif v.ndim == 2 and i.ndim == 2:
+        if v.shape != i.shape:
+            raise ValueError("Two-dimensional voltage_V and current_A arrays must have identical shapes.")
+    else:
+        raise ValueError("Array inputs must be (samples,) with (channels, samples), or matching (channels, samples) arrays.")
+    if channel_names is None:
+        names = [f"channel_{index + 1}" for index in range(i.shape[0])]
+    else:
+        names = list(channel_names)
+        if len(names) != i.shape[0] or len(set(names)) != len(names):
+            raise ValueError("channel_names must contain one unique name per channel.")
+    results = {
+        str(name): analyze_langmuir_probe(v[index], i[index], **analysis_options)
+        for index, name in enumerate(names)
+    }
+    return {
+        "analysis_scope": "calibrated_multi_channel_independent_IV_sweeps",
+        "channel_count": len(results),
+        "channels": results,
+        "cross_channel_inference_performed": False,
+    }
