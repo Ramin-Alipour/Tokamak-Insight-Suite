@@ -93,12 +93,16 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
 def langmuir_iv_analysis(voltage: Any, current: Any,
                          electron_fit_range: tuple[float, float] | None = None,
                          ion_fit_range: tuple[float, float] | None = None,
-                         current_convention: str = "electron_positive") -> dict[str, Any]:
-    """Analyze a calibrated single Langmuir I-V sweep without geometry-dependent inversion.
+                         current_convention: str = "electron_positive",
+                         probe_area_m2: float | None = None,
+                         ion_mass_kg: float | None = None,
+                         ion_saturation_coefficient: float | None = None,
+                         sheath_model: str | None = None) -> dict[str, Any]:
+    """Analyze a calibrated Langmuir I-V sweep with optional explicit sheath-model density.
 
-    current_convention: "electron_positive" (default; ion saturation current is negative)
-    or "ion_positive" (collected-ion current is positive, as in many probe circuits); the
-    latter is flipped internally so the analysis always works in the electron-positive form.
+    Density requires explicit collection area, ion mass, sheath-model coefficient and
+    model label, plus analyst-selected ion/electron fit windows. No coefficient is
+    silently defaulted because it depends on geometry and plasma regime.
     """
     if not isinstance(current_convention, str) or current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
@@ -263,6 +267,41 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "Local covariance from a joint offset-plus-exponential fit; excludes calibration, "
             "fit-window choice, sheath expansion and RF/noise systematics."
         )
+    density_args = (probe_area_m2, ion_mass_kg, ion_saturation_coefficient, sheath_model)
+    if any(value is not None for value in density_args):
+        if not all(value is not None for value in density_args):
+            raise ValueError("Density inversion requires probe_area_m2, ion_mass_kg, ion_saturation_coefficient, and sheath_model together.")
+        if electron_fit_range is None or ion_fit_range is None:
+            raise ValueError("Density inversion requires analyst-selected electron_fit_range and ion_fit_range; descriptive tail fallbacks are not sufficient.")
+        for name, value in (("probe_area_m2", probe_area_m2), ("ion_mass_kg", ion_mass_kg), ("ion_saturation_coefficient", ion_saturation_coefficient)):
+            if not _is_finite_real_scalar(value) or value <= 0:
+                raise ValueError(f"{name} must be a positive finite real numeric scalar.")
+        if not isinstance(sheath_model, str) or not sheath_model.strip():
+            raise ValueError("sheath_model must be a non-empty label for the selected physical model.")
+        te = out.get("electron_temperature_eV")
+        ion_current = out.get("ion_saturation_current_A")
+        if not _is_finite_real_scalar(te) or te <= 0:
+            raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
+        if not _is_finite_real_scalar(ion_current) or ion_current >= 0:
+            raise ValueError("Ion-density inversion requires a negative ion-saturation current after normalization to the electron-positive convention; inspect polarity and ion_fit_range.")
+        from .constants import E_CHARGE
+        denominator = float(ion_saturation_coefficient) * E_CHARGE * float(probe_area_m2) * math.sqrt(E_CHARGE * float(te) / float(ion_mass_kg))
+        if not math.isfinite(denominator) or denominator <= 0:
+            raise ValueError("The selected density model produced an invalid denominator.")
+        density = abs(float(ion_current)) / denominator
+        if not math.isfinite(density) or density <= 0:
+            raise ValueError("The selected density model produced a non-finite or non-positive density.")
+        out["ion_density_estimate_m-3"] = float(density)
+        out["ion_density_status"] = "model_based_estimate_review_assumptions"
+        out["ion_density_model"] = {
+            "sheath_model": sheath_model.strip(),
+            "ion_saturation_coefficient": float(ion_saturation_coefficient),
+            "probe_area_m2": float(probe_area_m2),
+            "ion_mass_kg": float(ion_mass_kg),
+            "formula": "n_i = |I_i,sat| / (C_s e A_p sqrt(e T_e / m_i)); T_e in eV",
+            "assumption": "Single-ion species; supplied coefficient is appropriate for the declared sheath model, probe geometry and plasma regime.",
+            "uncertainty_note": "No automatic propagation of current, area, mass, temperature, coefficient or model uncertainty is performed.",
+        }
     out['current_convention']=current_convention
     if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
         out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention.'
