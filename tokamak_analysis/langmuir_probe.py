@@ -73,11 +73,15 @@ def analyze_langmuir_probe_array(
         channels = voltage_V
         if not channels:
             raise ValueError("At least one calibrated probe channel is required.")
+        channel_items = [(str(name), pair) for name, pair in channels.items()]
+        channel_names = [name for name, _ in channel_items]
+        if len(set(channel_names)) != len(channel_names):
+            raise ValueError("Channel mapping keys must remain unique when converted to strings.")
         results = {}
-        for name, pair in channels.items():
+        for name, pair in channel_items:
             if not isinstance(pair, dict) or "voltage_V" not in pair or "current_A" not in pair:
                 raise ValueError("Each channel must provide voltage_V and current_A arrays.")
-            results[str(name)] = analyze_langmuir_probe(
+            results[name] = analyze_langmuir_probe(
                 pair["voltage_V"], pair["current_A"], **analysis_options
             )
         return {
