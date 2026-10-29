@@ -325,7 +325,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "assumption": "Single-ion species; supplied coefficient is appropriate for the declared sheath model, probe geometry and plasma regime.",
             "uncertainty_note": "No automatic propagation of current, area, mass, temperature, coefficient or model uncertainty is performed.",
         }
-    out['current_convention']=current_convention
+    out['current_convention_input'] = current_convention
+    out['current_convention'] = 'electron_positive'  # All returned current values use this normalized convention.
     if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
         out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention.'
     out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
