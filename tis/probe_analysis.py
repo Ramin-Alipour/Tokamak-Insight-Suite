@@ -50,10 +50,9 @@ def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
 # Expanded diagnostic workflows (v0.3): calculations operate on user-supplied,
 # calibrated data. They do not invent device calibration or geometry.
 
-def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[float,float] | None = None,
-                         ion_fit_range: tuple[float,float] | None = None, area_m2: float | None = None,
-                         ion_mass_amu: float | None = None, ti_eV: float = 0.0,
-                         sheath_factor: float = 0.61, gamma_i: float = 1.0,
+def langmuir_iv_analysis(voltage: Any, current: Any,
+                         electron_fit_range: tuple[float, float] | None = None,
+                         ion_fit_range: tuple[float, float] | None = None,
                          current_convention: str = "electron_positive") -> dict[str, Any]:
     """Analyze a single Langmuir I-V sweep with explicit model-input validation.
 
@@ -80,15 +79,6 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
                 electron_fit_range = (float(limits[0]), float(limits[1]))
             else:
                 ion_fit_range = (float(limits[0]), float(limits[1]))
-    if (area_m2 is None) != (ion_mass_amu is None):
-        raise ValueError("area_m2 and ion_mass_amu must be supplied together for density estimation.")
-    if area_m2 is not None and (not _is_finite_real_scalar(area_m2) or area_m2 <= 0):
-        raise ValueError("Collection area must be positive and finite.")
-    if ion_mass_amu is not None and (not _is_finite_real_scalar(ion_mass_amu) or ion_mass_amu <= 0):
-        raise ValueError("Ion mass must be positive and finite.")
-    if (not _is_finite_real_scalar(ti_eV) or not _is_finite_real_scalar(sheath_factor)
-            or not _is_finite_real_scalar(gamma_i) or ti_eV < 0 or sheath_factor <= 0 or gamma_i < 0):
-        raise ValueError("ti_eV and gamma_i must be finite and nonnegative; sheath_factor must be positive and finite.")
     raw_v=np.asarray(voltage); raw_i=np.asarray(current)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
         raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
@@ -248,18 +238,6 @@ def langmuir_iv_analysis(voltage: Any, current: Any, electron_fit_range: tuple[f
             "Local covariance from a joint offset-plus-exponential fit; excludes calibration, "
             "fit-window choice, sheath expansion and RF/noise systematics."
         )
-    if area_m2 is not None and ion_fit_range is None:
-        out['ion_density_status'] = "not_estimated: provide a physically selected ion_fit_range containing at least three points; tail fallback is descriptive only"
-    if area_m2 is not None and ion_fit_range is not None and 'ion_saturation_current_A' in out:
-        te_value = out.get('electron_temperature_eV')
-        if te_value is None or not np.isfinite(te_value) or te_value <= 0:
-            raise ValueError("Ion-density estimation requires a valid positive electron temperature from the electron-retarding fit; refusing to substitute Te=0.")
-        te=float(te_value)
-        cs=math.sqrt(E_CHARGE*(ti_eV*gamma_i + te)/(ion_mass_amu*AMU))
-        denom=sheath_factor*E_CHARGE*area_m2*cs
-        out['ion_sound_speed_m_s']=cs
-        out['ion_density_estimate_m-3']=abs(out['ion_saturation_current_A'])/denom if denom>0 else None
-        out['ion_density_model']='n_i≈|I_isat|/(sheath_factor·e·A·c_s); depends on sheath model, geometry and ion temperature.'
     out['current_convention']=current_convention
     if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
         out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention.'
