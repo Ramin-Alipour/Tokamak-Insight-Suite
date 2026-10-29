@@ -386,6 +386,15 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "Combined uncertainty includes fit covariance and only user-supplied nonstatistical, calibration, "
             "and fit-window components. Unspecified effects remain unquantified.")
     density_args = (probe_area_m2, ion_mass_kg, ion_saturation_coefficient, sheath_model)
+    if not any(value is not None for value in density_args):
+        supplied_density_uncertainty = [
+            name for name, value in density_uncertainty_inputs.items() if value is not None
+        ]
+        if supplied_density_uncertainty:
+            raise ValueError(
+                "Density-specific uncertainty inputs require density inversion parameters; "
+                f"received {', '.join(supplied_density_uncertainty)} without density inputs."
+            )
     if any(value is not None for value in density_args):
         if not all(value is not None for value in density_args):
             raise ValueError("Density inversion requires probe_area_m2, ion_mass_kg, ion_saturation_coefficient, and sheath_model together.")
