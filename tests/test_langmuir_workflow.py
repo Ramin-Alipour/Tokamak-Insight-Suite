@@ -20,7 +20,7 @@ def test_registered_langmuir_workflow_exposes_a_scoped_executable_contract():
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is True
+    assert contract["raw_data_to_physics"] is False
     assert {"voltage_V", "current_A"} <= {
         spec["name"] for spec in contract["input_specs"]
     }
