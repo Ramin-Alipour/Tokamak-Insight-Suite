@@ -465,7 +465,7 @@
       "assumptions": [
         "Voltage and current are calibrated and synchronized samples from a quasi-static single-probe I–V sweep.",
         "The electron-retarding branch is adequately described by an exponential current after subtracting the ion-current baseline.",
-        "The ion branch and collection model are appropriate for the experimental regime; the user selects fit intervals and geometry."
+        "The user selects and justifies fit intervals for the experimental regime; no collection-geometry or density model is used."
       ],
       "preprocessing": [
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
