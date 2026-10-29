@@ -263,6 +263,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         }
         out['ion_saturation_current_A'] = float(np.median(i[m]))
         out['ion_saturation_current_method'] = 'median_user_selected_ion_fit_range'
+        out["ion_saturation_current_status"] = "selected_window_estimate_physical_regime_not_confirmed"
+        out["ion_saturation_current_physical_regime_confirmed"] = False
     if electron_fit_range is not None:
         if min(electron_fit_range) < min(v) or max(electron_fit_range) > max(v):
             raise ValueError(
