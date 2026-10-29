@@ -77,39 +77,31 @@ def test_langmuir_workflow_aggregates_duplicate_voltages_and_discards_bad_pairs(
 
 def test_langmuir_density_is_not_estimated_from_descriptive_tail_without_fit_window():
     voltage, current = _synthetic_sweep()
-    result = analyze_langmuir_probe(
-        voltage, current, electron_fit_range=(-5.0, 3.0),
-        area_m2=1e-4, ion_mass_amu=2.0,
-    )
+    result = analyze_langmuir_probe(voltage, current, electron_fit_range=(-5.0, 3.0))
     assert "ion_density_estimate_m-3" not in result
-    assert result["ion_density_status"].startswith("not_estimated:")
+    assert "ion_density_status" not in result
     assert "ion_density_model" not in result
 
-
-def test_langmuir_density_requires_valid_temperature_and_selected_ion_branch():
+def test_langmuir_density_inversion_is_excluded_from_analysis_scope():
     voltage, current = _synthetic_sweep()
     result = analyze_langmuir_probe(
         voltage, current, electron_fit_range=(-5.0, 3.0),
-        ion_fit_range=(-8.0, -5.0), area_m2=1e-4, ion_mass_amu=2.0,
+        ion_fit_range=(-8.0, -5.0),
     )
-    assert np.isfinite(result["ion_density_estimate_m-3"])
-    assert result["ion_density_estimate_m-3"] > 0
-    assert np.isfinite(result["ion_sound_speed_m_s"])
-    assert "ion_density_model" in result
-
+    assert np.isfinite(result["electron_temperature_eV"])
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_sound_speed_m_s" not in result
 
 @pytest.mark.parametrize("kwargs", [
-    {"area_m2": 1e-4},
-    {"ion_mass_amu": 2.0},
-    {"area_m2": 0.0, "ion_mass_amu": 2.0},
-    {"area_m2": 1e-4, "ion_mass_amu": float("inf")},
+    {"electron_fit_range": (1.0, 1.0)},
+    {"ion_fit_range": (1.0, 1.0)},
+    {"electron_fit_range": (float("inf"), 2.0)},
     {"current_convention": "unknown"},
 ])
 def test_langmuir_rejects_invalid_density_or_polarity_configuration(kwargs):
     voltage, current = _synthetic_sweep()
     with pytest.raises(ValueError):
         analyze_langmuir_probe(voltage, current, **kwargs)
-
 
 def test_langmuir_does_not_silently_accept_an_unphysical_fit_range():
     voltage, current = _synthetic_sweep()
