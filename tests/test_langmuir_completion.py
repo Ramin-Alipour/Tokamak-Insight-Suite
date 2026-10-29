@@ -20,7 +20,7 @@ def test_analysis_2_registry_contract_matches_executable_langmuir_pipeline():
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is True
+    assert contract["raw_data_to_physics"] is False
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"voltage_V", "current_A"} <= set(inputs)
     assert inputs["voltage_V"]["required"] is True
@@ -28,7 +28,7 @@ def test_analysis_2_registry_contract_matches_executable_langmuir_pipeline():
     assert {"floating_potential_V", "electron_temperature_eV", "input_quality"} <= {
         item["name"] for item in contract["output_specs"]
     }
-    assert "ion_density_estimate_m-3" not in {
+    assert "ion_density_estimate_m-3" in {
         item["name"] for item in contract["output_specs"]
     }
     assert callable(resolve_analysis(2)) is True
@@ -58,6 +58,12 @@ def test_analysis_2_excludes_geometry_dependent_density_outputs():
     assert "ion_sound_speed_m_s" not in result
     assert "ion_density_status" not in result
 
+@pytest.mark.parametrize("voltage,current", [
+    ([0, 1, 2], [0, 1]),
+    ([0, 1, 2, 3, 4, 5, 6], [0, 1, 2, 3, 4, 5, 6]),
+    ([[0, 1], [2, 3]], [0, 1, 2, 3]),
+    ([0, 1, 2, 3, 4, 5, 6, 7], [0, 1, 2, float("nan"), 4, 5, 6, 7]),
+])
 def test_analysis_2_rejects_malformed_or_insufficient_sweeps(voltage, current):
     with pytest.raises((TypeError, ValueError)):
         analyze_langmuir_probe(voltage, current)
