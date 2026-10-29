@@ -60,7 +60,7 @@ def test_live_streamlit_ece_response_workflow_upload_and_download(tmp_path):
             for _ in range(4):
                 page.keyboard.press("ArrowDown")
             page.keyboard.press("Enter")
-            expect(workflow).to_contain_text("Receiver response convolution", timeout=15_000)
+            expect(workflow).to_have_value("Receiver response convolution", timeout=15_000)
             expect(page.get_by_text("Convolve calibrated spectral radiance with a supplied receiver response", exact=False)).to_be_visible(timeout=15_000)
 
             page.get_by_label("Spectral frequency grid (Hz; comma-separated, increasing)").fill(
