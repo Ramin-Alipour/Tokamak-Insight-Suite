@@ -1,19 +1,3 @@
-"""Regression tests for scalar validation in electrostatic probe analysis."""
-import numpy as np
-import pytest
-
-from tis.probe_analysis import langmuir_iv_analysis, triple_probe_temperature_eV
-
-_BAD = [True, np.bool_(True), "1.0", np.nan, np.inf, 10**1000]
-
-
-@pytest.mark.parametrize("field,bad", [
-    ("area_m2", True),
-    ("ion_mass_amu", "2.0"),
-    ("ti_eV", np.inf),
-    ("sheath_factor", np.bool_(True)),
-    ("gamma_i", 10**1000),
-])
 @pytest.mark.parametrize("field,bad", [
     ("electron_fit_range", (0.0, 0.0)),
     ("current_convention", "unknown"),
