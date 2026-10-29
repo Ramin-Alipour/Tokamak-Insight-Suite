@@ -89,5 +89,7 @@ def test_analysis_2_current_polarity_conventions_produce_equivalent_physics():
     assert ion_positive["floating_potential_V"] == pytest.approx(
         electron_positive["floating_potential_V"], abs=1e-10
     )
-    assert ion_positive["current_convention"] == "ion_positive"
+    assert ion_positive["current_convention_input"] == "ion_positive"
+    assert ion_positive["current_convention"] == "electron_positive"
+    assert electron_positive["current_convention_input"] == "electron_positive"
     assert electron_positive["current_convention"] == "electron_positive"
