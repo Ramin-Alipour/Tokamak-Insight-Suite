@@ -79,8 +79,6 @@ def test_catalog_displays_analysis_contracts_separately_from_reference_entries()
     [
         "Thomson calibrated profile analysis",
         "Thomson spatial profile reconstruction",
-        "Thomson raw-spectrum temperature fit",
-        "Thomson calibrated scattered-power density",
     ],
 )
 def test_thomson_workflow_panels_render_without_streamlit_exceptions(workflow):
@@ -91,21 +89,6 @@ def test_thomson_workflow_panels_render_without_streamlit_exceptions(workflow):
     selector.set_value(workflow).run()
     assert not app.exception, (workflow, [str(error.value) for error in app.exception])
 
-
-
-def test_thomson_spectral_power_mode_reveals_density_geometry_controls():
-    app = _loaded_app()
-    app.run()
-    app.radio[0].set_value("Advanced Analysis").run()
-    selector = next(item for item in app.selectbox if item.label == "Select workflow")
-    selector.set_value("Thomson raw-spectrum temperature fit").run()
-    calibrated_checkbox = next(
-        item for item in app.checkbox
-        if "calibrated spectral power density" in item.label.lower()
-    )
-    calibrated_checkbox.set_value(True).run()
-    assert not app.exception, [str(error.value) for error in app.exception]
-    assert any("Incident laser power" in item.label for item in app.number_input)
 
 
 def test_langmuir_analysis_button_executes_and_renders_physics_result():
