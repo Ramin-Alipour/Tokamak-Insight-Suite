@@ -120,3 +120,11 @@ def analyze_langmuir_probe_array(
         "channels": results,
         "cross_channel_inference_performed": False,
     }
+
+
+# Advanced calibrated-data workflows; see docs/analyses/langmuir_probe.md for assumptions.
+from .langmuir_advanced import (  # noqa: E402
+    analyze_langmuir_probe_series,
+    estimate_multispecies_ion_density,
+    fit_langmuir_electron_models,
+)
