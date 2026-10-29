@@ -31,6 +31,14 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["temperature_ev"]["unit"] == "eV"
     assert "major_radius_m" not in inputs
     assert "geometry-weighted volume averages" in " ".join(contract["limitations"])
+    outputs = {item["name"]: item for item in contract["output_specs"]}
+    assert {
+        "density_m3", "temperature_eV", "density_gradient_m-4",
+        "temperature_gradient_eV_m-1", "density_normalized_gradient_m-1",
+        "temperature_normalized_gradient_m-1", "density_scale_length_m",
+        "temperature_scale_length_m", "summary",
+    } <= set(outputs)
+    assert "radius_m" not in outputs or outputs["radius_m"]["unit"] == "m"
     assert any("Gaussian" in item for item in contract["limitations"])
     assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
     assert {mode["name"] for mode in contract["workflow_modes"]} == {
