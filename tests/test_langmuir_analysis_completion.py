@@ -69,7 +69,7 @@ def test_langmuir_ambiguous_zero_crossings_are_not_collapsed():
     [
         {"current_convention": "unknown"},
         {"electron_fit_range": (1.0, 1.0)},
-        {"ion_fit_range": (0.0, 1.0)},
+        {"ion_fit_range": (1.0, 1.0)},
         {"electron_fit_range": ("bad", 2.0)},
     ],
 )
