@@ -21,45 +21,38 @@ def test_temperature_fit_is_invariant_to_current_unit_scale():
     )
 
 
-def test_density_requires_temperature_fit_even_when_geometry_is_supplied():
+def test_density_inversion_is_excluded_even_when_fit_windows_are_supplied():
     voltage, current = iv_sweep()
-    with pytest.raises(ValueError, match="valid positive electron temperature"):
-        analyze_langmuir_probe(
-            voltage, current, ion_fit_range=(-20.0, -12.0),
-            area_m2=1e-5, ion_mass_amu=2.0,
-        )
-
-
-def test_density_estimate_scales_inverse_with_collection_area():
-    voltage, current = iv_sweep()
-    kwargs = {
-        "electron_fit_range": (-2.0, 12.0),
-        "ion_fit_range": (-20.0, -12.0),
-        "ion_mass_amu": 2.0,
-    }
-    small_area = analyze_langmuir_probe(voltage, current, area_m2=1e-5, **kwargs)
-    large_area = analyze_langmuir_probe(voltage, current, area_m2=2e-5, **kwargs)
-    assert small_area["ion_density_estimate_m-3"] == pytest.approx(
-        2.0 * large_area["ion_density_estimate_m-3"], rel=1e-10
+    result = analyze_langmuir_probe(
+        voltage, current, electron_fit_range=(-2.0, 12.0),
+        ion_fit_range=(-20.0, -12.0),
     )
+    assert result["electron_temperature_eV"] == pytest.approx(4.0, rel=2e-5)
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_density_status" not in result
 
+def test_density_does_not_depend_on_collection_area_because_not_inferred():
+    voltage, current = iv_sweep()
+    result = analyze_langmuir_probe(
+        voltage, current, electron_fit_range=(-2.0, 12.0),
+        ion_fit_range=(-20.0, -12.0),
+    )
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_sound_speed_m_s" not in result
 
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"ti_eV": -1.0},
-        {"ti_eV": float("nan")},
-        {"sheath_factor": 0.0},
-        {"gamma_i": -0.1},
-        {"area_m2": float("inf"), "ion_mass_amu": 2.0},
-        {"area_m2": 1e-5, "ion_mass_amu": float("nan")},
+        {"current_convention": "automatic"},
+        {"electron_fit_range": (0.0, 0.0)},
+        {"ion_fit_range": (1.0, 1.0)},
+        {"electron_fit_range": (float("nan"), 2.0)},
     ],
 )
 def test_nonphysical_or_nonfinite_model_inputs_are_rejected(kwargs):
     voltage, current = iv_sweep()
     with pytest.raises(ValueError):
         analyze_langmuir_probe(voltage, current, **kwargs)
-
 
 def test_fit_ranges_must_contain_enough_measured_points():
     voltage, current = iv_sweep()
