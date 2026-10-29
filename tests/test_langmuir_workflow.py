@@ -75,22 +75,51 @@ def test_langmuir_workflow_aggregates_duplicate_voltages_and_discards_bad_pairs(
     assert quality["processed_unique_voltage_count"] == 33
 
 
-def test_langmuir_density_is_not_estimated_from_descriptive_tail_without_fit_window():
-    voltage, current = _synthetic_sweep()
-    result = analyze_langmuir_probe(voltage, current, electron_fit_range=(-5.0, 3.0))
-    assert "ion_density_estimate_m-3" not in result
-    assert "ion_density_status" not in result
-    assert "ion_density_model" not in result
+def test_langmuir_density_uses_explicit_sheath_model_inputs():
+    from tis.constants import E_CHARGE
 
-def test_langmuir_density_inversion_is_excluded_from_analysis_scope():
     voltage, current = _synthetic_sweep()
+    area, mass, coefficient = 1.0e-6, 2.0 * 1.66053906660e-27, 0.61
     result = analyze_langmuir_probe(
         voltage, current, electron_fit_range=(-5.0, 3.0),
-        ion_fit_range=(-8.0, -5.0),
+        ion_fit_range=(-8.0, -5.0), probe_area_m2=area,
+        ion_mass_kg=mass, ion_saturation_coefficient=coefficient,
+        sheath_model="synthetic test only",
     )
-    assert np.isfinite(result["electron_temperature_eV"])
-    assert "ion_density_estimate_m-3" not in result
-    assert "ion_sound_speed_m_s" not in result
+    expected = abs(result["ion_saturation_current_A"]) / (
+        coefficient * E_CHARGE * area
+        * np.sqrt(E_CHARGE * result["electron_temperature_eV"] / mass)
+    )
+    assert result["ion_density_estimate_m-3"] == pytest.approx(expected, rel=1e-12)
+    assert result["ion_density_model"]["sheath_model"] == "synthetic test only"
+
+
+def test_langmuir_density_rejects_incomplete_model_inputs():
+    voltage, current = _synthetic_sweep()
+    with pytest.raises(ValueError, match="requires probe_area_m2"):
+        analyze_langmuir_probe(voltage, current, probe_area_m2=1e-6)
+
+
+def test_langmuir_density_requires_both_fit_windows():
+    voltage, current = _synthetic_sweep()
+    with pytest.raises(ValueError, match="electron_fit_range and ion_fit_range"):
+        analyze_langmuir_probe(
+            voltage, current, electron_fit_range=(-5.0, 3.0),
+            probe_area_m2=1e-6, ion_mass_kg=3e-27,
+            ion_saturation_coefficient=0.61, sheath_model="test",
+        )
+
+
+def test_langmuir_density_rejects_nonpositive_area():
+    voltage, current = _synthetic_sweep()
+    with pytest.raises(ValueError, match="probe_area_m2 must be positive"):
+        analyze_langmuir_probe(
+            voltage, current, electron_fit_range=(-5.0, 3.0),
+            ion_fit_range=(-8.0, -5.0), probe_area_m2=0.0,
+            ion_mass_kg=3e-27, ion_saturation_coefficient=0.61,
+            sheath_model="test",
+        )
+
 
 @pytest.mark.parametrize("kwargs", [
     {"electron_fit_range": (1.0, 1.0)},
