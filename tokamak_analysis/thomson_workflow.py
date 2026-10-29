@@ -13,9 +13,15 @@ from .thomson_scattering import build_profile, profile_summary
 
 
 def _scale_length(value, gradient):
+    """Return -value/gradient where the gradient is numerically resolvable.
+
+    The zero-gradient threshold is scaled to the gradient itself, so values
+    with different physical units are never compared in the validity test.
+    """
     out = np.full(value.shape, np.nan, dtype=float)
-    threshold = np.finfo(float).eps * np.maximum(1.0, np.abs(value))
-    valid = (value > 0) & (np.abs(gradient) > threshold)
+    gradient_scale = float(np.max(np.abs(gradient))) if gradient.size else 0.0
+    threshold = np.finfo(float).eps * gradient_scale
+    valid = (value > 0) & np.isfinite(gradient) & (np.abs(gradient) > threshold)
     out[valid] = -value[valid] / gradient[valid]
     return out
 
