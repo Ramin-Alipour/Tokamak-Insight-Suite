@@ -1,18 +1,11 @@
-"""Real-browser ECE smoke test against a running Streamlit server.
+"""Real-browser ECE workflow test against a running Streamlit server.
 
-This test is opt-in so the normal unit-test matrix does not require a browser.
-The dedicated GitHub Actions job sets TIS_RUN_LIVE_BROWSER_E2E=1.
+The complete test suite requires Playwright and an installed Chromium browser.
 """
-import os
 import subprocess
 import sys
 import time
 import urllib.request
-
-import pytest
-
-if os.environ.get("TIS_RUN_LIVE_BROWSER_E2E") != "1":
-    pytest.skip("Dedicated live-browser job only", allow_module_level=True)
 
 from playwright.sync_api import sync_playwright, expect
 
