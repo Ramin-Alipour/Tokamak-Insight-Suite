@@ -377,6 +377,11 @@
           "description": "Descriptive median of the high-voltage tail; not a validated saturation-branch fit."
         },
         {
+          "name": "electron_saturation_current_method",
+          "unit": "text",
+          "description": "Labels the high-voltage-tail electron current as a descriptive median, not a validated saturation fit."
+        },
+        {
           "name": "electron_temperature_eV",
           "unit": "eV",
           "description": "Optional electron temperature from a user-selected electron-retarding exponential fit."
@@ -452,6 +457,11 @@
           "description": "Number of samples in the electron-retarding fit window."
         },
         {
+          "name": "electron_fit_points",
+          "unit": "count",
+          "description": "Backward-compatible alias for electron_retarding_fit_points."
+        },
+        {
           "name": "ion_current_baseline_subtracted_A",
           "unit": "A",
           "description": "Offset current fitted jointly with the exponential electron-retarding branch."
@@ -460,6 +470,11 @@
           "name": "electron_retarding_log_slope_per_V",
           "unit": "V^-1",
           "description": "Positive exponential slope used for Te=1/slope."
+        },
+        {
+          "name": "electron_retarding_fit_intercept",
+          "unit": "dimensionless",
+          "description": "Natural-log intercept of the fitted exponential amplitude at zero voltage; a fit diagnostic, not an independent physical observable."
         }
       ],
       "assumptions": [
