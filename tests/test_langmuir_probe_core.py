@@ -27,7 +27,8 @@ def test_current_polarity_conventions_produce_equivalent_physics():
     b = langmuir_iv_analysis(voltage, -current, electron_fit_range=(-8.0, -2.0), current_convention="ion_positive")
     assert b["electron_temperature_eV"] == pytest.approx(a["electron_temperature_eV"], rel=1e-8)
     assert b["floating_potential_V"] == pytest.approx(a["floating_potential_V"], abs=1e-10)
-    assert b["current_convention"] == "ion_positive"
+    assert b["current_convention_input"] == "ion_positive"
+    assert b["current_convention"] == "electron_positive"
     assert b["input_quality"]["current_convention_normalized"] == "electron_positive"
 
 
