@@ -145,6 +145,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         counts=np.bincount(inverse)
         v,i=unique_v,sums/counts
     out=probe_iv_summary(v,i)
+    # Preserve the exact calibrated samples used by every downstream calculation.
+    # These are processed values only: non-finite pairs are removed, duplicate
+    # voltages are averaged, polarity is normalized, and rows are voltage-sorted.
+    out["processed_voltage_V"] = v.tolist()
+    out["processed_current_A"] = i.tolist()
     # Keep preprocessing decisions machine-readable so exported results can be
     # audited without reconstructing how many points were dropped or averaged.
     out["input_quality"] = {
@@ -179,6 +184,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     didv=np.gradient(i,v)
     if not np.all(np.isfinite(didv)):
         raise ValueError("dI/dV is non-finite; voltage values must be distinct and well-conditioned.")
+    out["dIdV_A_per_V"] = didv.tolist()
     out['max_dIdV_A_per_V']=float(np.max(didv)); out['plasma_potential_proxy_V']=float(v[np.argmax(didv)])
     if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
