@@ -250,3 +250,35 @@ def test_langmuir_array_rejects_mismatched_channel_shapes():
 
     with pytest.raises(ValueError, match="identical shapes"):
         analyze_langmuir_probe_array(np.zeros((2, 8)), np.zeros((3, 8)))
+
+
+def test_langmuir_array_accepts_named_mapping_without_current_argument():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    voltage = np.linspace(-5.0, 5.0, 21)
+    current = np.sinh(voltage / 3.0) * 1e-3
+    result = analyze_langmuir_probe_array({
+        "inner": {"voltage_V": voltage, "current_A": current},
+        "outer": {"voltage_V": voltage, "current_A": 0.8 * current},
+    })
+    assert result["channel_count"] == 2
+    assert set(result["channels"]) == {"inner", "outer"}
+
+
+def test_langmuir_array_rejects_empty_channels_and_stringified_duplicate_names():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    with pytest.raises(ValueError, match="at least one calibrated probe channel"):
+        analyze_langmuir_probe_array({})
+    voltage = np.linspace(-5.0, 5.0, 8)
+    currents = np.vstack([voltage, voltage])
+    with pytest.raises(ValueError, match="unique string name"):
+        analyze_langmuir_probe_array(voltage, currents, channel_names=[1, "1"])
+
+
+def test_langmuir_array_rejects_too_few_samples_before_dispatch():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    with pytest.raises(ValueError, match="at least one channel and eight samples"):
+        analyze_langmuir_probe_array(np.arange(7.0), np.ones((1, 7)))
+
