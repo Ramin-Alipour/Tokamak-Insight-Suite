@@ -59,7 +59,10 @@ def test_langmuir_workflow_normalizes_current_polarity_consistently():
     assert ion_positive["ion_saturation_current_A"] == pytest.approx(
         electron_positive["ion_saturation_current_A"], rel=1e-8
     )
-    assert ion_positive["current_convention"] == "ion_positive"
+    # The input convention is preserved separately; all calculated current
+    # quantities are returned in the documented electron-positive convention.
+    assert ion_positive["current_convention_input"] == "ion_positive"
+    assert ion_positive["current_convention"] == "electron_positive"
     assert ion_positive["input_quality"]["current_convention_normalized"] == "electron_positive"
 
 
@@ -131,6 +134,7 @@ def test_langmuir_rejects_invalid_density_or_polarity_configuration(kwargs):
     voltage, current = _synthetic_sweep()
     with pytest.raises(ValueError):
         analyze_langmuir_probe(voltage, current, **kwargs)
+
 
 def test_langmuir_does_not_silently_accept_an_unphysical_fit_range():
     voltage, current = _synthetic_sweep()
