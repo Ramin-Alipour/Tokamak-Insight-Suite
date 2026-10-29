@@ -4,17 +4,17 @@
     "diagnostic": "Thomson scattering",
     "quantities": "n_e, T_e profiles; electron distribution constraints",
     "status": "D",
-    "method": "Core: analyze already-calibrated electron-density and electron-temperature profiles on supplied calibrated spatial coordinates; compute profile summaries, gradients, normalized gradients, scale lengths and within-domain reconstruction. Raw-spectrum temperature fitting and scattered-power density inversion are separate geometry-dependent extensions.",
-    "caveat": "Core analysis does not infer calibration, device dimensions, major radius, optical collection geometry, or geometry-weighted volume averages. Raw-spectrum temperature fitting requires scattering angle and instrument width; absolute density inversion requires optical-power and collection-geometry inputs. No independent experimental validation is claimed.",
+    "method": "Core scope: analyze already-calibrated electron-density and electron-temperature profiles on supplied calibrated spatial coordinates; compute extrema, measured-interval line averages, gradients, normalized gradients, scale lengths, optional independent-error uncertainties, and within-domain reconstruction. Raw-spectrum fitting and absolute scattered-power density inversion are separate extensions.",
+    "caveat": "Inputs are assumed calibrated. The core workflow does not infer machine dimensions, major radius, optical geometry, or geometry-weighted volume averages. Spectral fitting requires a calibrated wavelength axis and a stated Gaussian instrument model; absolute density inversion requires optical-power and collection-geometry inputs. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Core geometry-independent profile analysis and within-domain reconstruction are implemented. Raw-spectrum temperature fitting and scattered-power density inversion remain separately callable extensions and require additional diagnostic/geometry parameters. Software completeness does not imply experimental validation.",
+    "implementation_status": "Core geometry-independent profile analysis and within-domain reconstruction are implemented. Spectral fitting and scattered-power density inversion are separate extensions, not part of the core workflow. Software completeness does not imply experimental validation.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete_with_declared_core_scope",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "radius_m",
@@ -209,7 +209,7 @@
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
       ],
       "raw_data_to_physics": true,
-      "note": "Core geometry-independent scope is calibrated profile analysis and within-domain reconstruction. Spatial coordinates are supplied calibrated measurements, not inferred device dimensions. Raw-spectrum temperature fitting and scattered-power density inversion are separate geometry-dependent extensions. No independent experimental validation is claimed.",
+      "note": "Core scope is calibrated profile analysis and within-domain reconstruction only. Supplied spatial coordinates are data inputs, not inferred device dimensions. Spectral fitting and absolute-density inversion are separate extensions. No independent experimental validation is claimed.",
       "workflow_modes": [
         {
           "name": "calibrated_profile",
