@@ -142,3 +142,52 @@ def test_langmuir_does_not_silently_accept_an_unphysical_fit_range():
         analyze_langmuir_probe(
             voltage, current, electron_fit_range=(-10.0, -5.0)
         )
+
+
+def test_langmuir_reports_distinct_plasma_potential_candidates_without_claiming_validation():
+    voltage, current = _synthetic_sweep()
+    result = analyze_langmuir_probe(voltage, current, electron_fit_range=(-5.0, 3.0))
+    assert len(result["d2IdV2_A_per_V2"]) == len(voltage)
+    assert result["plasma_potential_candidate_method"] == "maximum_second_derivative_of_current"
+    assert voltage.min() <= result["plasma_potential_estimate_V"] <= voltage.max()
+    assert voltage.min() <= result["plasma_potential_dIdV_max_candidate_V"] <= voltage.max()
+    assert result["plasma_potential_status"] == "numerical_candidate_requires_regime_review"
+    assert "not a statistical uncertainty" in result["plasma_potential_uncertainty_note"]
+
+
+def test_langmuir_labels_ion_tail_fallback_as_descriptive_not_physical():
+    voltage, current = _synthetic_sweep()
+    result = analyze_langmuir_probe(voltage, current)
+    assert result["ion_saturation_current_method"] == "median_lowest_voltage_tail_fallback"
+    assert result["ion_saturation_current_status"] == "descriptive_tail_fallback_not_physical_saturation"
+    assert result["ion_saturation_current_physical_regime_confirmed"] is False
+
+
+def test_langmuir_combines_explicit_temperature_uncertainty_components():
+    voltage, current = _synthetic_sweep()
+    result = analyze_langmuir_probe(
+        voltage, current, electron_fit_range=(-5.0, 3.0),
+        electron_temperature_relative_uncertainty=0.02,
+        electron_temperature_calibration_relative_uncertainty=0.03,
+        electron_temperature_fit_window_relative_uncertainty=0.04,
+    )
+    components = result["electron_temperature_uncertainty_components_relative"]
+    expected_nonstat = np.sqrt(0.02**2 + 0.03**2 + 0.04**2)
+    assert components["calibration"] == pytest.approx(0.03)
+    assert components["fit_window"] == pytest.approx(0.04)
+    assert result["electron_temperature_relative_standard_uncertainty"] == pytest.approx(
+        np.sqrt(components["fit_statistical"]**2 + expected_nonstat**2)
+    )
+    assert result["electron_temperature_total_standard_uncertainty_eV"] > 0
+
+
+def test_langmuir_density_uncertainty_includes_explicit_model_discrepancy():
+    voltage, current = _synthetic_sweep()
+    result = analyze_langmuir_probe(
+        voltage, current, electron_fit_range=(-5.0, 3.0), ion_fit_range=(-8.0, -5.0),
+        probe_area_m2=1e-6, ion_mass_kg=3.3210781332e-27,
+        ion_saturation_coefficient=0.61, sheath_model="test model",
+        ion_current_uncertainty_A=1e-6, density_model_relative_uncertainty=0.1,
+    )
+    assert result["ion_density_uncertainty_components_relative"]["density_model_discrepancy"] == pytest.approx(0.1)
+    assert result["ion_density_standard_uncertainty_m-3"] > 0
