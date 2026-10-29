@@ -61,19 +61,13 @@ def test_multiple_crossings_are_flagged_as_ambiguous():
     assert result["floating_potential_status"] == "ambiguous_multiple_zero_crossings"
 
 
-def test_density_requires_valid_temperature_fit_and_geometry():
+def test_density_inversion_is_outside_geometry_independent_contract():
     voltage, current = synthetic_iv()
-    no_fit = langmuir_iv_analysis(voltage, current, area_m2=1e-5, ion_mass_amu=2.0)
-    assert "not_estimated" in no_fit["ion_density_status"]
-    with pytest.raises(ValueError, match="valid positive electron temperature"):
-        langmuir_iv_analysis(voltage, current, ion_fit_range=(-10.0, -8.0),
-                             area_m2=1e-5, ion_mass_amu=2.0)
-    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-8.0, -2.0),
-                                  ion_fit_range=(-10.0, -8.0), area_m2=1e-5, ion_mass_amu=2.0)
-    assert result["ion_density_estimate_m-3"] > 0
-    assert result["ion_sound_speed_m_s"] > 0
-    assert "model" in result["ion_density_model"]
-
+    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-8.0, -2.0))
+    assert result["electron_temperature_eV"] == pytest.approx(4.0, rel=0.08)
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_sound_speed_m_s" not in result
+    assert "ion_density_model" not in result
 
 def test_probe_summary_does_not_infer_floating_potential_for_nonmonotonic_current():
     result = probe_iv_summary(np.arange(5.0), np.array([-2.0, 1.0, -1.0, 2.0, 3.0]))
