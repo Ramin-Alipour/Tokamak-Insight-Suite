@@ -29,7 +29,8 @@ def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     assert inputs["radius_m"]["unit"] == "m"
     assert inputs["density_m3"]["unit"] == "m^-3"
     assert inputs["temperature_ev"]["unit"] == "eV"
-    assert inputs["major_radius_m"]["minimum"] > 0
+    assert "major_radius_m" not in inputs
+    assert "geometry-weighted volume averages" in " ".join(contract["limitations"])
     assert any("Gaussian" in item for item in contract["limitations"])
     assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
     assert {mode["name"] for mode in contract["workflow_modes"]} == {
