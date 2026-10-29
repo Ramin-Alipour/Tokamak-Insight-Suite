@@ -556,7 +556,7 @@
         {
           "name": "ion_density_model",
           "unit": "structured",
-          "description": "Records sheath-model label, coefficient, area, ion mass, equation, single-species assumption and omitted uncertainty propagation."
+          "description": "Records the selected sheath-model label, coefficient, collection area, ion mass, density equation, single-species assumption and uncertainty limitation. Partial propagated uncertainty, when calculated, is reported separately in ion_density_standard_uncertainty_m-3, ion_density_relative_standard_uncertainty, ion_density_uncertainty_components_relative and ion_density_uncertainty_status."
         },
         {
           "name": "processed_voltage_V",
