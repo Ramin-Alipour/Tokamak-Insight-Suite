@@ -6,8 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 COPY . .
-# '.[data]' = xarray/zarr/fsspec so the Public Data Access page works inside the image.
-RUN python -m pip install --upgrade pip && pip install ".[data]"
+# The image build installs packages as root; suppress pip's expected root-user warning.
+RUN python -m pip install --root-user-action=ignore --upgrade pip && python -m pip install --root-user-action=ignore ".[data]"
 RUN useradd --create-home --uid 10001 tis && chown -R tis:tis /app
 USER tis
 EXPOSE 8501
