@@ -20,13 +20,16 @@ def analyze_langmuir_probe(
     ion_mass_relative_uncertainty=None,
     ion_saturation_coefficient_relative_uncertainty=None,
     electron_temperature_relative_uncertainty=None,
+    electron_temperature_calibration_relative_uncertainty=None,
+    electron_temperature_fit_window_relative_uncertainty=None,
+    density_model_relative_uncertainty=None,
 ):
     """Analyze one calibrated Langmuir I–V sweep with explicit physical assumptions.
 
     Fit windows and, for optional density inversion, collection area, ion mass,
     sheath-model coefficient and model label are supplied explicitly by the analyst.
     Density is not inferred from descriptive tail fallbacks. Optional density
-    uncertainty inputs are forwarded to the core for partial first-order propagation.
+    uncertainty inputs are forwarded to the core for explicit-component propagation.
     """
     return langmuir_iv_analysis(
         voltage_V,
@@ -43,4 +46,7 @@ def analyze_langmuir_probe(
         ion_mass_relative_uncertainty=ion_mass_relative_uncertainty,
         ion_saturation_coefficient_relative_uncertainty=ion_saturation_coefficient_relative_uncertainty,
         electron_temperature_relative_uncertainty=electron_temperature_relative_uncertainty,
+        electron_temperature_calibration_relative_uncertainty=electron_temperature_calibration_relative_uncertainty,
+        electron_temperature_fit_window_relative_uncertainty=electron_temperature_fit_window_relative_uncertainty,
+        density_model_relative_uncertainty=density_model_relative_uncertainty,
     )
