@@ -732,7 +732,7 @@
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and first/second derivatives, report distinct plasma-potential candidates and resolution indicator, label ion-current fallbacks and selected-window estimates with physical-regime status, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs. Uncertainty propagation includes fit covariance and explicitly supplied components only.",
+      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and first/second derivatives, report distinct plasma-potential candidates and resolution indicator, label ion-current fallbacks and selected-window estimates with physical-regime status, optionally fit selected electron and ion branches, and permit ion-density inversion only when explicit sheath-model and geometry inputs are supplied and the selected ion branch passes numerical fit-quality and flatness screening. Uncertainty propagation includes fit covariance and explicitly supplied components only.",
       "uncertainty_model": "Electron-temperature relative standard uncertainty combines local fit-covariance uncertainty with explicitly supplied nonstatistical, calibration and fit-window components in quadrature. Ion-density uncertainty uses supplied current, area, ion-mass, sheath-coefficient and temperature uncertainties plus optional model-discrepancy floor. This is partial propagation only; unspecified covariance, correlated errors and systematics are not inferred.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
@@ -742,7 +742,7 @@
         "Check fit quality and probe-specific magnetic-field, RF, collision, secondary-emission, surface and sweep-direction effects.",
         "The dI/dV maximum is a plasma-potential proxy, not a universally valid plasma-potential measurement.",
         "Ion density is a model-based estimate only when all required fit-window, geometry, ion-mass and sheath-model inputs are supplied; particle flux is outside scope.",
-        "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.",
+        "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.","Density inversion is refused when the selected ion interval fails numerical fit-quality or flatness screening; passing this screen does not confirm physical ion saturation.",
         "Density uncertainty propagation is partial and includes only explicitly supplied uncertainty components.",
         "The maximum dI/dV voltage is a proxy only; physical plasma potential requires regime-specific justification.",
         "This workflow covers calibrated single-probe I-V sweeps, not all multi-probe, array or triple-probe configurations.",
