@@ -131,6 +131,29 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                 electron_fit_range = (float(limits[0]), float(limits[1]))
             else:
                 ion_fit_range = (float(limits[0]), float(limits[1]))
+    # Validate optional relative-uncertainty inputs before any float coercion.
+    # In Python, bool is an int subclass, so float(True) would otherwise silently
+    # turn an invalid uncertainty into 1.0.
+    te_uncertainty_inputs = {
+        "electron_temperature_relative_uncertainty": electron_temperature_relative_uncertainty,
+        "electron_temperature_calibration_relative_uncertainty": electron_temperature_calibration_relative_uncertainty,
+        "electron_temperature_fit_window_relative_uncertainty": electron_temperature_fit_window_relative_uncertainty,
+    }
+    for name, value in te_uncertainty_inputs.items():
+        if value is not None and (not _is_finite_real_scalar(value) or value < 0):
+            raise ValueError(f"{name} must be finite and non-negative.")
+
+    density_uncertainty_inputs = {
+        "ion_current_uncertainty_A": ion_current_uncertainty_A,
+        "probe_area_relative_uncertainty": probe_area_relative_uncertainty,
+        "ion_mass_relative_uncertainty": ion_mass_relative_uncertainty,
+        "ion_saturation_coefficient_relative_uncertainty": ion_saturation_coefficient_relative_uncertainty,
+        "density_model_relative_uncertainty": density_model_relative_uncertainty,
+    }
+    for name, value in density_uncertainty_inputs.items():
+        if value is not None and (not _is_finite_real_scalar(value) or value < 0):
+            raise ValueError(f"{name} must be finite and non-negative.")
+
     raw_v=np.asarray(voltage); raw_i=np.asarray(current)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
         raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
@@ -353,9 +376,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "calibration": float(electron_temperature_calibration_relative_uncertainty or 0.0),
             "fit_window": float(electron_temperature_fit_window_relative_uncertainty or 0.0),
         }
-        for component_name, component_value in te_relative_components.items():
-            if not _is_finite_real_scalar(component_value) or component_value < 0:
-                raise ValueError(f"{component_name} relative electron-temperature uncertainty must be finite and non-negative.")
+        # User-supplied components were type/range-checked before conversion above.
         te_total_relative = math.sqrt(sum(value ** 2 for value in te_relative_components.values()))
         out["electron_temperature_relative_standard_uncertainty"] = float(te_total_relative)
         out["electron_temperature_total_standard_uncertainty_eV"] = float(out["electron_temperature_eV"] * te_total_relative)
@@ -375,8 +396,22 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                 raise ValueError(f"{name} must be positive and finite (a real numeric scalar).")
         if not isinstance(sheath_model, str) or not sheath_model.strip():
             raise ValueError("sheath_model must be a non-empty label for the selected physical model.")
+        # Density-specific uncertainty values must not be silently ignored when
+        # density inversion is not requested; when requested, all were validated
+        # before any coercion or arithmetic.
         te = out.get("electron_temperature_eV")
         ion_current = out.get("ion_saturation_current_A")
+        ion_review = out.get("ion_saturation_regime_review")
+        if out.get("ion_saturation_fit_status") != "numerical_fit_review_pass_not_physical_validation":
+            raise ValueError(
+                "Ion-density inversion requires an ion-branch fit that passes the numerical "
+                "R-squared and normalized-residual screening; inspect ion_fit_range."
+            )
+        if not isinstance(ion_review, dict) or not ion_review.get("numerically_flat_candidate", False):
+            raise ValueError(
+                "Ion-density inversion requires a numerically flat ion-branch candidate; "
+                "the selected interval does not pass the current-flatness screening."
+            )
         if not _is_finite_real_scalar(te) or te <= 0:
             raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
         if not _is_finite_real_scalar(ion_current) or ion_current >= 0:
@@ -391,18 +426,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         out["ion_density_estimate_m-3"] = float(density)
         out["ion_density_status"] = "model_based_estimate_review_assumptions"
         uncertainty_inputs = {
-            "ion_current_uncertainty_A": ion_current_uncertainty_A,
-            "probe_area_relative_uncertainty": probe_area_relative_uncertainty,
-            "ion_mass_relative_uncertainty": ion_mass_relative_uncertainty,
-            "ion_saturation_coefficient_relative_uncertainty": ion_saturation_coefficient_relative_uncertainty,
+            **density_uncertainty_inputs,
             "electron_temperature_relative_uncertainty": electron_temperature_relative_uncertainty,
             "electron_temperature_calibration_relative_uncertainty": electron_temperature_calibration_relative_uncertainty,
             "electron_temperature_fit_window_relative_uncertainty": electron_temperature_fit_window_relative_uncertainty,
-            "density_model_relative_uncertainty": density_model_relative_uncertainty,
         }
-        for name, value in uncertainty_inputs.items():
-            if value is not None and (not _is_finite_real_scalar(value) or value < 0):
-                raise ValueError(f"{name} must be finite and non-negative.")
         out["ion_density_model"] = {
             "sheath_model": sheath_model.strip(),
             "ion_saturation_coefficient": float(ion_saturation_coefficient),
