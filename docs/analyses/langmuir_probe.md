@@ -42,7 +42,7 @@ The core analysis accepts already-calibrated voltage and current samples and doe
  n_i = \frac{|I_{i,\mathrm{sat}}|}{C_s e A_p\sqrt{eT_e/m_i}},
 \]
 
-where \(T_e\) is in eV, \(I_{i,\mathrm{sat}}\) is the negative ion-saturation current in the normalized electron-positive convention, and the supplied coefficient must match the stated probe geometry and plasma regime. This is a model-based estimate under a single-dominant-ion-species assumption, not a direct or experimentally validated measurement. No density is produced from descriptive tail fallbacks. Automatic uncertainty propagation for density and its model inputs is not implemented. Particle flux remains outside this analysis.
+where \(T_e\) is in eV, \(I_{i,\mathrm{sat}}\) is the negative ion-saturation current in the normalized electron-positive convention, and the supplied coefficient must match the stated probe geometry and plasma regime. This is a model-based estimate under a single-dominant-ion-species assumption, not a direct or experimentally validated measurement. No density is produced from descriptive tail fallbacks. Optional first-order uncertainty propagation for density is implemented only for uncertainty components explicitly supplied by the caller. It is partial, not a complete propagation of calibration covariance, correlated errors, fit-window sensitivity, model discrepancy, or other systematic effects. Particle flux remains outside this analysis.
 
 
 ## Fit-window review and interpretation status
