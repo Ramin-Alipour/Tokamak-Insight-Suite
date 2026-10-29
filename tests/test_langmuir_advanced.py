@@ -97,3 +97,36 @@ def test_smoothed_plasma_potential_candidates_keep_raw_and_smoothed_methods_sepa
     assert "raw_max_dIdV_candidate_V" in result
     assert "smoothed_max_dIdV_candidate_V" in result
     assert result["physical_plasma_potential_confirmed"] is False
+
+
+def test_advanced_helpers_are_exported_from_public_langmuir_module():
+    from tokamak_analysis.langmuir_probe import (
+        estimate_electron_density_from_saturation,
+        estimate_ion_particle_flux,
+        estimate_smoothed_plasma_potential_candidates,
+        fit_langmuir_stretched_exponential,
+        langmuir_fit_window_sensitivity,
+    )
+
+    assert callable(estimate_electron_density_from_saturation)
+    assert callable(estimate_ion_particle_flux)
+    assert callable(estimate_smoothed_plasma_potential_candidates)
+    assert callable(fit_langmuir_stretched_exponential)
+    assert callable(langmuir_fit_window_sensitivity)
+
+
+def test_electron_density_is_separate_model_helper_not_canonical_sweep_output():
+    from tokamak_analysis.langmuir_probe import (
+        analyze_langmuir_probe,
+        estimate_electron_density_from_saturation,
+    )
+
+    v = np.linspace(-5.0, 5.0, 41)
+    i = np.sinh(v / 3.0) * 1e-3
+    canonical = analyze_langmuir_probe(v, i)
+    estimate = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4)
+
+    assert "electron_density_estimate_m-3" not in canonical
+    assert estimate["electron_density_estimate_m-3"] > 0
+    assert estimate["physical_regime_confirmed"] is False
+    assert estimate["uncertainty_propagation_performed"] is False
