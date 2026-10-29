@@ -56,7 +56,7 @@ The reported temperature uncertainty does not include uncertainty in laser wavel
 
 The core profile workflow expects calibrated radius_m (m), density_m3 (m^-3), and temperature_ev (eV) arrays with equal lengths and at least two finite samples. Here radius_m is a supplied, calibrated profile coordinate—not a request for machine dimensions or a device geometry model. Coordinate values must be unique; density, temperature, and supplied pointwise uncertainties must be non-negative. The arrays are sorted consistently. Line averages and derivatives apply only to the measured coordinate interval; they do not establish full-plasma coverage or extrapolate to the magnetic axis/plasma edge, and they are not an equilibrium reconstruction. Geometry-weighted volume averages are outside the core scope.
 
-Pointwise uncertainties are validated and propagated through finite-difference gradients, normalized gradients, local scale lengths, and line/approximate volume averages assuming independent samples. Peak-location uncertainty is not estimated.
+Pointwise uncertainties are validated and propagated through finite-difference gradients, normalized gradients, local scale lengths, and line averages over the measured coordinate interval, assuming independent samples. Geometry-weighted volume averages are excluded. Peak-location uncertainty is not estimated.
 
 ## Example
 
