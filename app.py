@@ -2543,10 +2543,7 @@ elif page=='Advanced Analysis':
             uncertainty_options=['(none)']+list(numeric)
             density_uncertainty_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_profile_density_unc')
             temperature_uncertainty_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_profile_temperature_unc')
-            use_volume_average=st.checkbox('Calculate approximate volume-weighted averages',value=False,key='tis_thomson_profile_volume')
-            major_radius=None
-            if use_volume_average:
-                major_radius=st.number_input('Major radius (m)',min_value=0.000001,value=1.0,format='%.6f',key='tis_thomson_profile_major_radius')
+            st.caption('This workflow is geometry-independent: it uses only the supplied calibrated profile coordinate and calibrated density/temperature values. Geometry-weighted volume averages are intentionally excluded.')
             if st.button('Analyze calibrated Thomson profiles',type='primary',key='run_thomson_profile'):
                 try:
                     required_cols=[radius_col,density_col,temperature_col]
@@ -2564,7 +2561,6 @@ elif page=='Advanced Analysis':
                         radius_values,density_values,temperature_values,
                         density_uncertainty_m3=density_uncertainty,
                         temperature_uncertainty_ev=temperature_uncertainty,
-                        major_radius_m=major_radius,
                     )
                     summary=profile['summary']
                     st.success('Calibrated Thomson profile analysis completed.')
