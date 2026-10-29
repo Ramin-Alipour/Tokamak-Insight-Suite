@@ -55,7 +55,7 @@ def analyze_langmuir_probe(
 
 def analyze_langmuir_probe_array(
     voltage_V,
-    current_A,
+    current_A=None,
     *,
     channel_names=None,
     **analysis_options,
