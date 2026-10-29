@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 
@@ -61,6 +63,21 @@ def test_one_sided_psd_obeys_parseval_for_even_and_odd_sample_counts():
         integrated = np.sum(result["fluctuation_psd"], axis=0) * df
         expected = np.mean((y - y.mean(axis=0)) ** 2, axis=0)
         np.testing.assert_allclose(integrated, expected, rtol=1e-12, atol=1e-12)
+
+
+def test_invalid_noise_shape_fails_before_spectral_warning():
+    # Invalid noise metadata must be rejected before coherence is evaluated;
+    # constant channels otherwise cause SciPy to emit an invalid-division warning.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        with pytest.raises(ValueError, match="noise_std"):
+            analyze_ece(
+                [80e9, 90e9],
+                signal=np.ones((8, 2)),
+                time_s=np.arange(8),
+                noise_std=[1, 2, 3],
+                mode="channel_fluctuations",
+            )
 
 
 def test_noise_and_optical_depth_shape_validation():
