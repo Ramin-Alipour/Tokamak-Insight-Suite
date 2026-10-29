@@ -2573,6 +2573,8 @@ elif page=='Advanced Analysis':
                         'Electron temperature (eV)':profile['temperature_eV'],
                         'Density gradient (m⁻⁴)':profile['density_gradient_m-4'],
                         'Temperature gradient (eV/m)':profile['temperature_gradient_eV_m-1'],
+                        'Normalized density gradient (m⁻¹)':profile['density_normalized_gradient_m-1'],
+                        'Normalized temperature gradient (m⁻¹)':profile['temperature_normalized_gradient_m-1'],
                         'Density scale length (m)':profile['density_scale_length_m'],
                         'Temperature scale length (m)':profile['temperature_scale_length_m'],
                     })
@@ -2581,6 +2583,8 @@ elif page=='Advanced Analysis':
                         'Temperature uncertainty (eV)':'temperature_uncertainty_eV',
                         'Density-gradient uncertainty (m⁻⁴)':'density_gradient_uncertainty_m-4',
                         'Temperature-gradient uncertainty (eV/m)':'temperature_gradient_uncertainty_eV_m-1',
+                        'Normalized density-gradient uncertainty (m⁻¹)':'density_normalized_gradient_uncertainty_m-1',
+                        'Normalized temperature-gradient uncertainty (m⁻¹)':'temperature_normalized_gradient_uncertainty_m-1',
                         'Density scale-length uncertainty (m)':'density_scale_length_uncertainty_m',
                         'Temperature scale-length uncertainty (m)':'temperature_scale_length_uncertainty_m',
                     }
