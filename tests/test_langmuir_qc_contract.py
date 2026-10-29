@@ -185,3 +185,42 @@ def test_public_langmuir_wrapper_forwards_density_uncertainty_contract():
         "ion_current", "probe_area", "ion_mass", "sheath_coefficient",
         "electron_temperature",
     }
+
+
+
+def test_generic_probe_entry_point_uses_canonical_langmuir_contract():
+    from tokamak_analysis.probe_analysis import analyze_probe_voltage_current
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
+
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    kwargs = {"electron_fit_range": (-8.0, 0.0), "ion_fit_range": (-10.0, -7.0)}
+    canonical = analyze_langmuir_probe(voltage, current, **kwargs)
+    generic = analyze_probe_voltage_current(voltage, current, **kwargs)
+
+    for key in ("processed_voltage_V", "processed_current_A", "dIdV_A_per_V",
+                "floating_potential_V", "electron_temperature_eV",
+                "ion_saturation_current_A", "ion_saturation_fit_R2",
+                "analysis_scope", "input_quality"):
+        assert generic[key] == canonical[key]
+    assert np.array_equal(generic["voltage_V"], voltage)
+    assert np.array_equal(generic["current_A"], current)
+    assert np.array_equal(generic["dI_dV_S"], canonical["dIdV_A_per_V"])
+    assert generic["electron_temperature_estimate_eV"] == canonical["electron_temperature_eV"]
+
+
+def test_generic_probe_entry_point_enforces_canonical_minimum_sample_count():
+    from tokamak_analysis.probe_analysis import analyze_probe_voltage_current
+    with pytest.raises(ValueError, match="At least 8 valid voltage points"):
+        analyze_probe_voltage_current(np.arange(7.0), np.arange(7.0))
+
+
+def test_public_langmuir_contract_omits_optional_estimates_when_not_requested():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
+    voltage = np.linspace(-5.0, 5.0, 21)
+    current = np.sinh(voltage / 3.0) * 1e-3
+    result = analyze_langmuir_probe(voltage, current)
+    assert result["electron_temperature_eV"] is None
+    assert "ion_density_estimate_m-3" not in result
+    assert result["ion_saturation_current_method"] == "median_lowest_voltage_tail_fallback"
+    assert result["analysis_scope"] == "calibrated_single_probe_IV_sweep_only"
