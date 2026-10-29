@@ -67,7 +67,6 @@ def analyze_thomson_profile(
     *,
     density_uncertainty_m3=None,
     temperature_uncertainty_ev=None,
-    major_radius_m=None,
 ):
     """Calculate profile summaries, gradients, scale lengths, and available uncertainties."""
     p = build_profile(
@@ -95,11 +94,10 @@ def analyze_thomson_profile(
         "temperature_normalized_gradient_m-1": temperature_normalized_gradient,
         "density_scale_length_m": _scale_length(ne, dne_dr),
         "temperature_scale_length_m": _scale_length(te, dte_dr),
-        "summary": profile_summary(p, major_radius_m=major_radius_m),
+        "summary": profile_summary(p),
         "notes": [
             "Input must be calibrated Thomson-scattering profile data.",
             "Gradient and derived uncertainty propagation assumes independent pointwise errors.",
-            "Volume averages use circular large-aspect-ratio weighting over the sampled radial interval only; full-plasma coverage is not inferred.",
             "NaN scale lengths mark zero/near-zero gradients or profile values.",
             "Peak-location uncertainty is not estimated by this workflow.",
         ],
