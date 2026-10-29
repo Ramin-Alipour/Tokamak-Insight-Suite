@@ -172,4 +172,32 @@ def test_thomson_density_rejects_collection_solid_angle_above_sphere():
             collection_solid_angle_sr=4.0 * np.pi + 1e-6,
         )
 
+def test_scale_length_threshold_is_dimensionally_consistent_for_small_values():
+    # Small but valid calibrated values must not be discarded merely because
+    # their magnitudes are below one in SI units.
+    out = analyze_thomson_profile(
+        [0.0, 1.0, 2.0],
+        [3.0e-20, 2.0e-20, 1.0e-20],
+        [3.0e-12, 2.0e-12, 1.0e-12],
+    )
+    np.testing.assert_allclose(
+        out["density_scale_length_m"],
+        [3.0, 2.0, 1.0],
+        rtol=1e-12,
+    )
+    np.testing.assert_allclose(
+        out["temperature_scale_length_m"],
+        [3.0, 2.0, 1.0],
+        rtol=1e-12,
+    )
+
+
+def test_scale_length_is_undefined_for_constant_profiles():
+    out = analyze_thomson_profile(
+        [0.0, 1.0, 2.0],
+        [2.0e19, 2.0e19, 2.0e19],
+        [100.0, 100.0, 100.0],
+    )
+    assert np.all(np.isnan(out["density_scale_length_m"]))
+    assert np.all(np.isnan(out["temperature_scale_length_m"]))
 
