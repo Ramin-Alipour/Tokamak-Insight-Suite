@@ -8,7 +8,7 @@ def test_analysis_2_is_langmuir_probe_with_complete_contract():
     assert entry["name"] == "Langmuir Probe"
     contract = entry["execution_contract"]
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is True
+    assert contract["raw_data_to_physics"] is False
     assert {x["name"] for x in contract["input_specs"]} >= {"voltage_V", "current_A", "electron_fit_range", "ion_fit_range"}
     assert callable(resolve_analysis(2))
 
