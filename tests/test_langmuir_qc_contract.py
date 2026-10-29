@@ -1,6 +1,6 @@
 import numpy as np
 
-from tis.probe_analysis import langmuir_iv_analysis
+from tis.probe_analysis import floating_potential, langmuir_iv_analysis, probe_iv_summary
 
 
 def test_langmuir_analysis_reports_preprocessing_quality_and_duplicate_aggregation():
@@ -34,3 +34,27 @@ def test_langmuir_analysis_exposes_electron_fit_residual_diagnostics():
     assert np.isfinite(result["electron_retarding_fit_residual_rms_A"])
     assert np.isfinite(result["electron_retarding_fit_normalized_rmse"])
     assert result["electron_retarding_fit_status"] == "fit_completed_review_R2_and_residuals"
+
+
+def test_floating_potential_helper_uses_zero_plateau_midpoint():
+    assert floating_potential([-2, -1, 0, 1, 2], [-2, 0, 0, 2, 3]) == -0.5
+    summary = probe_iv_summary([-2, -1, 0, 1, 2], [-2, 0, 0, 2, 3])
+    assert summary["floating_potential_interpolated_V"] == -0.5
+    assert summary["floating_potential_candidates_V"] == [-0.5]
+    assert summary["floating_potential_status"] == "single_zero_crossing"
+
+
+def test_floating_potential_helper_does_not_hide_multiple_crossings():
+    voltage = [-2, -1, 0, 1, 2]
+    current = [-1, 1, -1, 1, 2]
+    assert floating_potential(voltage, current) is None
+    summary = probe_iv_summary(voltage, current)
+    assert summary["floating_potential_interpolated_V"] is None
+    assert summary["floating_potential_status"] == "ambiguous_multiple_zero_crossings"
+    assert np.allclose(summary["floating_potential_candidates_V"], [-1.5, -0.5, 0.5])
+
+
+def test_floating_potential_helper_validates_array_shape_and_averages_duplicate_voltage():
+    with pytest.raises(ValueError, match="one-dimensional"):
+        floating_potential([[0, 1]], [[-1, 1]])
+    assert floating_potential([-1, 0, 0, 1], [-1, -1, 1, 1]) == 0.0
