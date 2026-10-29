@@ -329,3 +329,104 @@ def reconstruct_thomson_profile(
             "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
         ],
     }
+
+
+# Classical Thomson-scattering differential cross-section and calibrated-power density inversion.
+_ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
+
+
+def _positive_finite_scalar(value, name: str, *, allow_zero: bool = False) -> float:
+    """Validate a finite real scalar, rejecting booleans and numeric strings."""
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise ValueError(f"{name} must be a finite real number")
+    result = float(value)
+    if not np.isfinite(result) or (result < 0 if allow_zero else result <= 0):
+        qualifier = "non-negative" if allow_zero else "positive"
+        raise ValueError(f"{name} must be finite and {qualifier}")
+    return result
+
+
+def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float) -> float:
+    """Unpolarized Thomson differential cross-section in m^2 sr^-1."""
+    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
+    if theta > np.pi:
+        raise ValueError("scattering_angle_rad must lie between 0 and pi")
+    return float(0.5 * _ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2))
+
+
+def density_from_thomson_scattered_power(
+    scattered_power_W,
+    incident_power_W,
+    interaction_length_m,
+    scattering_angle_rad,
+    collection_solid_angle_sr,
+    *,
+    optical_efficiency=1.0,
+    scattered_power_uncertainty_W=None,
+    incident_power_uncertainty_W=None,
+    interaction_length_uncertainty_m=None,
+    scattering_angle_uncertainty_rad=None,
+    collection_solid_angle_uncertainty_sr=None,
+    optical_efficiency_uncertainty=None,
+):
+    """Infer density from calibrated collected Thomson power.
+
+    P_s = n_e P_i L (d sigma/d Omega) DeltaOmega eta. Optional independent
+    1-sigma uncertainties are propagated with first-order derivatives.
+    """
+    ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
+    pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
+    length = _positive_finite_scalar(interaction_length_m, "interaction_length_m")
+    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
+    if theta > np.pi:
+        raise ValueError("scattering_angle_rad must lie between 0 and pi")
+    omega = _positive_finite_scalar(collection_solid_angle_sr, "collection_solid_angle_sr")
+    eta = _positive_finite_scalar(optical_efficiency, "optical_efficiency")
+    if eta > 1.0:
+        raise ValueError("optical_efficiency must not exceed 1")
+    dsigma = thomson_differential_cross_section_m2_sr(theta)
+    density = ps / (pi * length * dsigma * omega * eta)
+    model_power = density * pi * length * dsigma * omega * eta
+
+    rel_variance = 0.0
+    uncertainty_supplied = False
+    inputs = (
+        ("scattered_power_uncertainty_W", scattered_power_uncertainty_W, ps),
+        ("incident_power_uncertainty_W", incident_power_uncertainty_W, pi),
+        ("interaction_length_uncertainty_m", interaction_length_uncertainty_m, length),
+        ("collection_solid_angle_uncertainty_sr", collection_solid_angle_uncertainty_sr, omega),
+        ("optical_efficiency_uncertainty", optical_efficiency_uncertainty, eta),
+    )
+    for name, uncertainty, nominal in inputs:
+        if uncertainty is None:
+            continue
+        sigma = _positive_finite_scalar(uncertainty, name, allow_zero=True)
+        uncertainty_supplied = True
+        if nominal == 0.0:
+            if sigma > 0.0:
+                raise ValueError(f"{name} cannot be propagated relative to a zero nominal value")
+        else:
+            rel_variance += (sigma / nominal) ** 2
+    if scattering_angle_uncertainty_rad is not None:
+        sigma_theta = _positive_finite_scalar(
+            scattering_angle_uncertainty_rad, "scattering_angle_uncertainty_rad", allow_zero=True
+        )
+        uncertainty_supplied = True
+        relative_sensitivity = abs(
+            2.0 * np.sin(theta) * np.cos(theta) / (1.0 + np.cos(theta) ** 2)
+        )
+        rel_variance += (relative_sensitivity * sigma_theta) ** 2
+
+    return {
+        "electron_density_m3": float(density),
+        "electron_density_uncertainty_m3": float(density * np.sqrt(rel_variance)) if uncertainty_supplied else None,
+        "model_scattered_power_W": float(model_power),
+        "differential_cross_section_m2_sr": float(dsigma),
+        "assumptions": [
+            "Absolutely calibrated scattered and incident laser power.",
+            "Optically thin, single-scattering Thomson relation for unpolarized incident light.",
+            "Uniform electron density over the stated interaction length.",
+            "Collection solid angle and optical efficiency describe the actual collection path.",
+        ],
+        "uncertainty_model": "Optional first-order independent-input propagation; covariance and model discrepancy are not included.",
+    }
