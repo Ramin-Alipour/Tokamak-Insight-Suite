@@ -65,3 +65,35 @@ def test_fit_window_sensitivity_reports_spread_separately_from_uncertainty():
     assert result["valid_temperature_fit_count"] >= 2
     assert result["temperature_window_sensitivity_span_eV"] is not None
     assert "not a statistical confidence interval" in result["interpretation"]
+
+
+def test_stretched_exponential_model_is_explicitly_empirical():
+    from tokamak_analysis.langmuir_advanced import fit_langmuir_stretched_exponential
+    v = np.linspace(-5.0, 5.0, 81)
+    i = -2e-3 + 3e-4 * np.exp(np.maximum((v + 5.0) / 2.5, 0.0) ** 1.2)
+    result = fit_langmuir_stretched_exponential(v, i, (-4.0, 3.0))
+    assert result["model"] == "stretched_exponential_empirical_shape"
+    assert result["kinetic_distribution_identified"] is False
+
+
+def test_electron_density_and_particle_flux_helpers_are_positive():
+    from tokamak_analysis.langmuir_advanced import (
+        estimate_electron_density_from_saturation,
+        estimate_ion_particle_flux,
+    )
+    ne = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4)
+    flux = estimate_ion_particle_flux(1e18, 5.0, 3.34e-27)
+    assert ne["electron_density_estimate_m-3"] > 0
+    assert ne["physical_regime_confirmed"] is False
+    assert flux["ion_particle_flux_m-2_s-1"] > 0
+    assert flux["uncertainty_propagation_performed"] is False
+
+
+def test_smoothed_plasma_potential_candidates_keep_raw_and_smoothed_methods_separate():
+    from tokamak_analysis.langmuir_advanced import estimate_smoothed_plasma_potential_candidates
+    v = np.linspace(-5.0, 5.0, 51)
+    i = np.sinh(v / 2.0) * 1e-3 + 1e-5 * np.sin(17.0 * v)
+    result = estimate_smoothed_plasma_potential_candidates(v, i, window_length=7, polynomial_order=2)
+    assert "raw_max_dIdV_candidate_V" in result
+    assert "smoothed_max_dIdV_candidate_V" in result
+    assert result["physical_plasma_potential_confirmed"] is False
