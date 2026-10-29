@@ -511,7 +511,7 @@ def test_langmuir_exact_zero_current_uses_sample_without_division_by_zero():
 @pytest.mark.parametrize("kwargs", [
     {"electron_fit_range": (float("nan"), 1.0)},
 ])
-def test_langmuir_rejects_nonphysical_model_inputs(kwargs):
+def test_langmuir_rejects_invalid_fit_range(kwargs):
     from tis.core import langmuir_iv_analysis
     v=np.linspace(-4,4,9)
     i=np.linspace(-1,1,9)
@@ -817,7 +817,7 @@ def test_zero_weight_sensor_does_not_corrupt_integer_mode_fit():
     assert result["mode_number_fit"] == 2
 
 
-def test_langmuir_missing_ion_range_is_reported_not_silently_omitted():
+def test_langmuir_analysis_excludes_geometry_dependent_density_outputs():
     voltage = np.linspace(-5, 5, 101)
     current = 0.01*np.exp(voltage/2) - 0.02
     result = langmuir_iv_analysis(voltage, current)
