@@ -336,7 +336,7 @@ def suggest_langmuir_fit_windows(
         "suggestion_sampled": suggestion_sampled,
         "suggestion_input_unique_voltage_count": original_unique_count,
         "suggestion_points_scanned": int(n),
-        "warning": "Automated ranges are suggestions, not proof of a physical regime. Inspect the I-V curve and fit residuals; density remains a model-dependent estimate.",
+        "warning": "Automated ranges are suggestions, not proof of a physical regime. Inspect the I-V curve and fit residuals.",
     }
 
 def floating_potential(voltage: Any, current: Any) -> float | None:
