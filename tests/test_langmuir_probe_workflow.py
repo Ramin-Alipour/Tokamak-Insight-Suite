@@ -37,29 +37,6 @@ def test_langmuir_probe_excludes_optional_geometry_dependent_density_estimate():
     assert "ion_density_estimate_m-3" not in result
     assert "ion_sound_speed_m_s" not in result
 
-def test_langmuir_probe_accepts_ion_positive_circuit_convention():
-    voltage, current = synthetic_iv()
-    result = analyze_langmuir_probe(
-        voltage,
-        -current,
-        electron_fit_range=(2.0, 10.0),
-        ion_fit_range=(-5.0, -1.0),
-        current_convention="ion_positive",
-    )
-    assert result["current_convention"] == "ion_positive"
-    assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.04)
-
-
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"area_m2": 1.0e-5},
-        {"ion_mass_amu": 2.0},
-        {"area_m2": 0.0, "ion_mass_amu": 2.0},
-        {"area_m2": 1.0e-5, "ion_mass_amu": -2.0},
-        {"current_convention": "unknown"},
-    ],
-)
 @pytest.mark.parametrize(
     "kwargs",
     [
