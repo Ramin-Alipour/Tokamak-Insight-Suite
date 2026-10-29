@@ -77,3 +77,28 @@ The public helper `analyze_langmuir_probe_array` accepts either a shared voltage
 
 ## Model and uncertainty boundaries
 The current fit remains the declared single-Maxwellian exponential-plus-offset model. The software does not fit non-Maxwellian or multi-temperature distributions. Statistical covariance is conditional on that model and selected window; uncertainty remains partial when calibration covariance, model discrepancy, correlations, or fit-window sensitivity are not explicitly quantified. These are not claimed as solved by multi-channel batching.
+
+
+## Advanced calibrated-data extensions
+
+The canonical single-sweep pipeline remains the default and retains its original output contract. Additional explicit functions are available from `tokamak_analysis.langmuir_probe`:
+
+- `fit_langmuir_electron_models(..., model="single_maxwellian")` fits the existing single-exponential-plus-offset model independently and returns fit quality.
+- `fit_langmuir_electron_models(..., model="two_temperature")` fits a two-exponential mixture and reports both component temperatures. This is an empirical model, not proof of a bi-Maxwellian electron distribution; ill-conditioning and component non-identifiability must be reviewed.
+- `analyze_langmuir_probe_series` accepts calibrated sweeps shaped (time, channel, sample) and processes each sweep independently. It does not infer temporal trends or cross-channel physics.
+- `estimate_multispecies_ion_density` supports an explicitly supplied species mixture (mass, fraction, sheath coefficient). Fractions must sum to one. It assumes a common electron temperature and effective collection area, and reports a model estimate without physical-regime certification.
+- `langmuir_fit_window_sensitivity` re-fits nearby windows and reports the spread in fitted temperature. This is a sensitivity diagnostic, not a statistical confidence interval.
+
+All of these functions require calibrated input and explicit physical assumptions. No calibration is inferred, no experimental validation is claimed, and no automated output is promoted to a confirmed physical measurement.
+
+## Plasma-potential derivative handling
+
+The canonical output keeps the maximum-`dI/dV` proxy and maximum-`d²I/dV²` candidate separate. The canonical derivative is not silently smoothed because smoothing changes the effective method and can shift extrema. Users who need a noise-robust derivative estimate should compare a declared smoothing/window method and retain its parameters and sensitivity; neither derivative candidate alone certifies plasma potential.
+
+## Uncertainty scope
+
+The canonical covariance estimate is conditional on the selected fit model and voltage window. The advanced window-sensitivity helper quantifies the observed temperature spread across the caller-specified alternative windows, but does not combine that spread into a formal standard uncertainty. Model discrepancy, correlated errors, calibration covariance and other systematic effects must not be silently treated as zero. Multispecies density currently returns no uncertainty estimate unless a separate uncertainty model is supplied; its output explicitly marks propagation as not performed.
+
+## Regression tests
+
+The advanced contracts are covered by `tests/test_langmuir_advanced.py`. These tests check software behavior only; they are not empirical validation against a tokamak or probe experiment.
