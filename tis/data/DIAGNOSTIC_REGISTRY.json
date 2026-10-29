@@ -261,7 +261,7 @@
     "diagnostic": "Langmuir Probe",
     "quantities": "I–V curve, T_e, V_f, V_p estimate, density/flux estimates",
     "status": "D",
-    "method": "Analyze a calibrated single-probe I–V sweep with explicit current polarity and user-selected electron-retarding and ion-branch fit intervals. Report floating-potential zero crossing, dI/dV plasma-potential proxy, optional log-linear electron-temperature fit, ion-branch fit and optional sheath-model ion-density estimate when geometry and ion mass are supplied.",
+    "method": "Analyze a calibrated single-probe I–V sweep with explicit current polarity and user-selected electron-retarding and ion-branch fit intervals. Report floating-potential zero crossing, dI/dV plasma-potential proxy, optional joint nonlinear offset-plus-exponential electron-temperature fit and ion-branch fit. Geometry-dependent density/flux inversion is excluded.",
     "caveat": "This is a single-probe, model-dependent workflow, not an automatic substitute for calibration or device-specific sheath theory. Fit windows must be physically justified; estimates are sensitive to magnetic field, collisions, RF pickup, secondary emission, sheath expansion, sweep direction and surface condition.",
     "implementation_functions": [
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
@@ -295,7 +295,7 @@
         {
           "name": "electron_fit_range",
           "unit": "V",
-          "description": "Optional physically selected electron-retarding voltage interval for an unweighted log-linear fit after subtracting the estimated ion-current baseline.",
+          "description": "Optional analyst-selected electron-retarding voltage interval for a joint nonlinear fit of current offset, positive amplitude and positive exponential slope; at least four interval samples and at least three above the initial low-voltage-tail baseline estimate are required.",
           "required": false
         },
         {
@@ -530,7 +530,7 @@
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate every floating-potential zero crossing (including zero-plateau midpoint handling and explicit ambiguity), dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion branch and a log-linear electron-retarding branch; optionally infer ion density only with valid fit, geometry and ion-mass inputs.",
+      "algorithm": "Validate and clean a one-dimensional calibrated I–V sweep; sort paired samples and average duplicate voltages; calculate all floating-potential crossings, the numerical dI/dV plasma-potential proxy and descriptive saturation-tail currents; optionally fit an ion-branch linear current trend and a joint nonlinear offset-plus-exponential electron-retarding branch. No geometry-dependent density/flux inversion.",
       "uncertainty_model": "Only the optional electron-temperature fit returns a local covariance-based standard error. Electron-branch residual RMS, normalized RMSE and R-squared are exposed for fit review. Calibration, current/voltage covariance, fit-window sensitivity, sheath-model uncertainty and density uncertainty are not propagated.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and are not substitutes for a physically selected ion-saturation interval.",
@@ -544,7 +544,7 @@
         "tis.core.probe_iv_summary"
       ],
       "raw_data_to_physics": true,
-      "note": "Implemented and exposed in the dashboard within the declared calibrated single-sweep I–V model scope. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. Density is only inferred when a selected ion branch, positive fitted Te, and valid geometry/model inputs are supplied. Calibration, physical fit-window selection, systematic uncertainty propagation and independent device validation remain analyst responsibilities."
+      "note": "Geometry-independent calibrated single-sweep I–V analysis. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. The electron temperature fit jointly estimates current offset, amplitude and exponential slope; its covariance error is conditional on that fit. No device geometry, collection area, density inversion or independent device validation is included."
     },
     "note": "Implemented and exposed in the dashboard within the declared calibrated single-sweep I–V model scope. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. Density is only inferred when a selected ion branch, positive fitted Te, and valid geometry/model inputs are supplied. Calibration, physical fit-window selection, systematic uncertainty propagation and independent device validation remain analyst responsibilities."
   },
