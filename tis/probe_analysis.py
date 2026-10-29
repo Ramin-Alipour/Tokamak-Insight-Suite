@@ -275,7 +275,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             raise ValueError("Density inversion requires analyst-selected electron_fit_range and ion_fit_range; descriptive tail fallbacks are not sufficient.")
         for name, value in (("probe_area_m2", probe_area_m2), ("ion_mass_kg", ion_mass_kg), ("ion_saturation_coefficient", ion_saturation_coefficient)):
             if not _is_finite_real_scalar(value) or value <= 0:
-                raise ValueError(f"{name} must be a positive finite real numeric scalar.")
+                raise ValueError(f"{name} must be positive and finite (a real numeric scalar).")
         if not isinstance(sheath_model, str) or not sheath_model.strip():
             raise ValueError("sheath_model must be a non-empty label for the selected physical model.")
         te = out.get("electron_temperature_eV")
