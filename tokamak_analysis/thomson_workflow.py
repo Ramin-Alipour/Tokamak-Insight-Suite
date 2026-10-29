@@ -52,8 +52,11 @@ def _normalized_gradient_uncertainty(value, gradient, value_uncertainty, gradien
 
 def _scale_length_uncertainty(value, gradient, value_uncertainty, gradient_uncertainty, covariance):
     out = np.full(value.shape, np.nan, dtype=float)
-    threshold = np.finfo(float).eps * np.maximum(1.0, np.abs(value))
-    valid = (value > 0) & (np.abs(gradient) > threshold)
+    # Use the same gradient-relative, dimensionally consistent resolvability
+    # threshold as _scale_length; never compare a gradient to the profile value.
+    gradient_scale = float(np.max(np.abs(gradient))) if gradient.size else 0.0
+    threshold = np.finfo(float).eps * gradient_scale
+    valid = (value > 0) & np.isfinite(gradient) & (np.abs(gradient) > threshold)
     if not np.any(valid):
         return out
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
