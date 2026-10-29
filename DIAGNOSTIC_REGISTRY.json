@@ -486,8 +486,8 @@
         "tis.core.langmuir_iv_analysis",
         "tis.core.probe_iv_summary"
       ],
-      "raw_data_to_physics": true,
-      "note": "Geometry-independent calibrated single-sweep I–V analysis. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. The electron temperature fit jointly estimates current offset, amplitude and exponential slope; its covariance error is conditional on that fit. No device geometry, collection area, density inversion or independent device validation is included."
+      "raw_data_to_physics": false,
+      "note": "Analysis uses already-calibrated single-sweep I–V samples, not raw instrument data. Current convention, fit-window validation, zero-crossing ambiguity (including plateau midpoint), preprocessing provenance and electron-fit residual diagnostics are explicit. The electron temperature fit jointly estimates current offset, amplitude and exponential slope; its covariance error is conditional on that fit. No device geometry, collection area, density inversion, particle-flux inversion or independent experimental validation is included."
     },
     "note": "Geometry-independent calibrated single-sweep I–V analysis. Current convention, fit-window validation, zero-crossing ambiguity, preprocessing provenance and electron-fit residual diagnostics are explicit. No device geometry, collection area, density inversion or independent device validation is included."
   },
