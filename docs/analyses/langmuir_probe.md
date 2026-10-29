@@ -19,7 +19,7 @@ T_e[\mathrm{eV}]=\frac{1}{s[\mathrm{V}^{-1}]}.
 
 The implementation performs a joint nonlinear fit of the current offset, positive amplitude, and positive exponential slope over the selected interval. It does not perform an unweighted log-linear fit after subtracting a fixed baseline. The reported covariance-based standard error is conditional on this three-parameter model and the selected interval.
 
-The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The optional ion-branch fit is a linear current-versus-voltage characterization; its median current is reported as a selected-window estimate, not a geometry-derived density or particle flux.
+The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The optional ion-branch fit is a linear current-versus-voltage characterization and reports slope, intercept, R-squared, residual RMS, normalized RMSE, point count, and an explicit fit-review status. Its median current is a selected-window estimate, not a geometry-derived density or particle flux. Fit diagnostics describe numerical agreement only; they do not certify that the selected interval is physically an ion-saturation regime.
 
 The floating-potential result includes all detected zero crossings. A zero-current plateau is represented by the midpoint of the plateau, not the first adjacent zero pair. `floating_potential_V` is populated only for exactly one unique crossing; no crossing or multiple crossings produces `null` with an explicit status. The standalone `floating_potential()` helper follows the same rule, ignores non-finite pairs, averages currents at duplicate voltages, and rejects malformed array shapes rather than flattening them.
 
