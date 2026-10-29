@@ -43,3 +43,18 @@ The core analysis accepts already-calibrated voltage and current samples and doe
 \]
 
 where \(T_e\) is in eV, \(I_{i,\mathrm{sat}}\) is the negative ion-saturation current in the normalized electron-positive convention, and the supplied coefficient must match the stated probe geometry and plasma regime. This is a model-based estimate under a single-dominant-ion-species assumption, not a direct or experimentally validated measurement. No density is produced from descriptive tail fallbacks. Automatic uncertainty propagation for density and its model inputs is not implemented. Particle flux remains outside this analysis.
+
+
+## Fit-window review and interpretation status
+
+The analysis reports numerical screening separately from physical interpretation. An electron fit is marked as a numerical review pass only when its R-squared is at least 0.98 and normalized RMSE is at most 0.1; the ion-branch fit uses the same numerical thresholds. These are transparent screening thresholds, not universal physics acceptance criteria. The electron branch must still be checked for an appropriate exponential retarding regime. For an ion branch, the optional relative-current-change indicator is a flatness candidate only; it cannot certify ion saturation. Outputs explicitly retain `physical_regime_confirmed: false`.
+
+The maximum-`dI/dV` voltage is labelled as a proxy-only plasma-potential indicator. It is not automatically promoted to a validated plasma potential. Tail-derived ion current remains descriptive only and is never sufficient for density inversion.
+
+## Optional first-order density uncertainty propagation
+
+For density inversion, callers may supply the absolute standard uncertainty of the selected ion current and relative standard uncertainties for collection area, ion mass, sheath coefficient and electron temperature. The code combines the fitted statistical temperature uncertainty with the supplied relative temperature component, then propagates the supplied terms in quadrature to a first-order density uncertainty. The output lists each propagated component and clearly reports that the result is partial: unprovided calibration covariance, correlated errors, model discrepancy, fit-window sensitivity and other systematic effects are not inferred. With no uncertainty inputs, density uncertainty fields are null and the status states that propagation was not performed.
+
+## Declared scope
+
+This workflow analyzes a single calibrated Langmuir-probe I–V sweep. It does not claim full support for multi-probe arrays, triple probes, probe-system geometry reconstruction or all electrostatic-probe configurations. Other configurations require their own explicitly defined models and execution contracts.
