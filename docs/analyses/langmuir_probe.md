@@ -7,6 +7,7 @@ This workflow analyzes a calibrated, quasi-static, single-probe I–V sweep. It 
 - `voltage` (V) and `current` (A): paired one-dimensional arrays.
 - At least eight valid samples and eight distinct voltage values are required. Non-finite pairs are discarded; duplicate voltages are aggregated by averaging current; pairs are sorted together by voltage.
 - `current_convention`: `electron_positive` (default) or `ion_positive`. The latter is sign-flipped before analysis.
+- Returned audit arrays: `processed_voltage_V`, `processed_current_A`, and `dIdV_A_per_V` expose the exact sorted, duplicate-aggregated, polarity-normalized samples and derivative used downstream. They are outputs of the calculation, not additional inferred measurements.
 - Optional fit intervals must have two finite, strictly increasing voltage bounds within the measured sweep. The electron-retarding fit requires at least four selected samples and at least three samples above the initial low-voltage-tail baseline estimate. The ion-branch fit requires at least three selected samples. Intervals are selected and justified by the analyst; the software does not automatically establish the physical regime.
 
 ## Physics and outputs
