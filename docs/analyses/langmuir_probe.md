@@ -34,3 +34,8 @@ Focused regression tests cover crossing interpolation, zero plateaus, ambiguous 
 The result includes an `input_quality` object with original pair count, finite pairs retained, non-finite pairs discarded, duplicate-voltage pairs averaged, processed unique-voltage count, voltage span, and normalized current convention. When an electron-retarding fit is enabled, the output also includes fit residual RMS (A), normalized RMSE, R-squared, fit-point count, and a status explicitly instructing the analyst to review the residuals and R-squared. These diagnostics do not certify that the selected voltage interval is physically valid and do not replace calibration or systematic uncertainty analysis.
 
 Regression tests: `tests/test_langmuir_qc_contract.py`.
+
+
+## Geometry-independent scope
+
+This analysis accepts calibrated voltage and current samples only. It does not infer ion density or particle flux because those require additional probe-collection geometry and a declared sheath/ion model. No tokamak dimensions, converter geometry, or device-specific geometry are inferred. The ion-branch fit is retained only as a current-versus-voltage characterization.
