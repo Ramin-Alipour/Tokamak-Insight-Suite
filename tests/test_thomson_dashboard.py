@@ -4,7 +4,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 from streamlit.testing.v1 import AppTest
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
@@ -22,6 +21,7 @@ def _app_with_table(frame: pd.DataFrame) -> AppTest:
     assert not app.exception, [str(error.value) for error in app.exception]
     next(item for item in app.selectbox if item.label == "Select workflow")
     return app
+
 
 def test_thomson_geometry_dependent_workflows_are_not_in_analysis_1_ui():
     frame = pd.DataFrame({
