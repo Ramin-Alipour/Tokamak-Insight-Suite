@@ -28,3 +28,24 @@ def test_analysis_2_langmuir_rejects_invalid_input():
     analyze = resolve_analysis(2)
     with pytest.raises(ValueError):
         analyze([0, 1, 2], [0, 1, 2])
+
+
+
+def test_analysis_2_current_convention_metadata_matches_normalized_outputs():
+    analyze = resolve_analysis(2)
+    voltage = np.linspace(-5.0, 5.0, 21)
+    electron_positive_current = 1e-3 * voltage
+    electron_result = analyze(
+        voltage, electron_positive_current, current_convention="electron_positive"
+    )
+    ion_positive_result = analyze(
+        voltage, -electron_positive_current, current_convention="ion_positive"
+    )
+    assert electron_result["current_convention_input"] == "electron_positive"
+    assert ion_positive_result["current_convention_input"] == "ion_positive"
+    assert electron_result["current_convention"] == "electron_positive"
+    assert ion_positive_result["current_convention"] == "electron_positive"
+    assert np.allclose(
+        electron_result["processed_current_A"],
+        ion_positive_result["processed_current_A"],
+    )
