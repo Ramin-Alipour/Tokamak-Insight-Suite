@@ -268,7 +268,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics including ion-branch residual diagnostics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed. Processed voltage/current arrays and the corresponding dI/dV array are now returned explicitly for auditability; these are computational outputs, not inferred measurements.",
+    "implementation_status": "Canonical calibrated single-sweep I–V pipeline with shared public wrapper contract; generic probe entry point delegates to the canonical Langmuir implementation and retains legacy aliases only. Regression tests cover cross-entry-point parity, common minimum sample count, optional-output behavior, fit diagnostics, polarity normalization, density guards and supplied-component uncertainty propagation. Synthetic software regression checks only; no independent experimental validation or full input/systematic uncertainty propagation is claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -277,7 +277,7 @@
         {
           "name": "voltage_V",
           "unit": "V",
-          "description": "One-dimensional calibrated voltage sweep; at least eight distinct finite values are required.",
+          "description": "One-dimensional calibrated voltage sweep; at least eight distinct finite values are required across all public Langmuir entry points.",
           "required": true
         },
         {
@@ -646,12 +646,12 @@
         "Density inversion assumes one dominant ion species and requires a supplied coefficient appropriate to the stated sheath model, probe geometry and plasma regime."
       ],
       "preprocessing": [
-        "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points.",
+        "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points across all public Langmuir entry points.",
         "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report explicitly labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs.",
+      "algorithm": "All public Langmuir entry points delegate to the canonical pipeline: normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report explicitly labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs. The generic probe function adds legacy aliases only and performs no independent fit.",
       "uncertainty_model": "Optional first-order quadrature propagation for ion density using explicitly supplied ion-current absolute uncertainty and relative uncertainties for collection area, ion mass, sheath coefficient and electron temperature. Fitted statistical Te uncertainty is combined with the supplied relative Te component. This is partial only; unspecified calibration covariance, correlated errors, fit-window sensitivity, model discrepancy and other systematics are not inferred.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
@@ -672,9 +672,23 @@
         "tis.core.probe_iv_summary"
       ],
       "raw_data_to_physics": false,
-      "note": "Analysis uses already-calibrated single-probe I-V samples. Fit-window diagnostics are numerical screening only and do not certify physical regimes. Density is optional and requires explicit physical inputs and analyst-selected fit windows; uncertainty propagation includes only supplied components. Synthetic tests are software regression checks, not experimental validation."
+      "note": "Analysis uses already-calibrated single-probe I–V samples. All public entry points share the canonical implementation and minimum-input contract. Fit-window diagnostics are numerical screening only and do not certify physical regimes. Density is optional and requires explicit physical inputs and analyst-selected fit windows; uncertainty propagation includes only supplied components. Synthetic tests are software regression checks, not experimental validation.",
+      "completion_criteria": {
+        "meaning": "Complete means the documented software contract is implemented and regression-tested within the declared calibrated single-probe I–V scope.",
+        "required": [
+          "Canonical and public entry points share one calculation implementation and consistent minimum-input requirements.",
+          "Registry input/output contract matches the canonical runtime result, including optional outputs.",
+          "Regression tests cover wrapper parity, minimum sample count, optional outputs, fit paths, density guards and uncertainty-input validation."
+        ],
+        "explicitly_not_required": [
+          "Independent experimental validation.",
+          "Automatic certification of physical fit regimes.",
+          "Full systematic or calibration covariance uncertainty propagation.",
+          "Support for every multi-probe or array configuration."
+        ]
+      }
     },
-    "note": "Calibrated single-sweep I–V analysis with optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred."
+    "note": "Canonical calibrated single-sweep I–V analysis with consistent public entry points and optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred. Completion is scoped to the documented software contract and does not imply independent experimental validation."
   },
   {
     "family": "Plasma parameters",
