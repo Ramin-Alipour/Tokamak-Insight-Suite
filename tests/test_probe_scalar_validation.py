@@ -18,6 +18,7 @@ def test_langmuir_rejects_invalid_physics_scalars(field, bad):
     with pytest.raises(ValueError):
         langmuir_iv_analysis(voltage, current, **{field: bad})
 
+@pytest.mark.parametrize("bad", _BAD)
 def test_triple_probe_rejects_invalid_scalar_inputs(bad):
     with pytest.raises(ValueError):
         triple_probe_temperature_eV(bad, 1.0)
