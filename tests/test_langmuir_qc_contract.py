@@ -224,3 +224,29 @@ def test_public_langmuir_contract_omits_optional_estimates_when_not_requested():
     assert "ion_density_estimate_m-3" not in result
     assert result["ion_saturation_current_method"] == "median_lowest_voltage_tail_fallback"
     assert result["analysis_scope"] == "calibrated_single_probe_IV_sweep_only"
+
+
+
+def test_langmuir_array_analysis_processes_channels_independently():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    voltage = np.linspace(-5.0, 5.0, 21)
+    currents = np.vstack([
+        np.sinh(voltage / 3.0) * 1e-3,
+        np.sinh((voltage - 0.25) / 3.5) * 8e-4,
+    ])
+    result = analyze_langmuir_probe_array(
+        voltage, currents, channel_names=["inner", "outer"]
+    )
+    assert result["channel_count"] == 2
+    assert set(result["channels"]) == {"inner", "outer"}
+    assert result["analysis_scope"] == "calibrated_multi_channel_independent_IV_sweeps"
+    assert result["cross_channel_inference_performed"] is False
+    assert result["channels"]["inner"]["analysis_scope"] == "calibrated_single_probe_IV_sweep_only"
+
+
+def test_langmuir_array_rejects_mismatched_channel_shapes():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    with pytest.raises(ValueError, match="identical shapes"):
+        analyze_langmuir_probe_array(np.zeros((2, 8)), np.zeros((3, 8)))
