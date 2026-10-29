@@ -362,3 +362,60 @@ def estimate_smoothed_plasma_potential_candidates(
         "physical_plasma_potential_confirmed": False,
         "interpretation": "Compare candidates and parameter sensitivity; smoothing is explicit and does not certify the physical plasma potential.",
     }
+
+
+def fit_langmuir_stretched_exponential(
+    voltage_V: Any,
+    current_A: Any,
+    fit_range_V: tuple[float, float],
+) -> dict[str, Any]:
+    """Fit a generalized stretched-exponential shape as a non-Maxwellian-shape diagnostic.
+
+    The shape exponent is empirical; this is not a kinetic kappa-distribution model
+    and must not be interpreted as a unique non-Maxwellian electron distribution.
+    """
+    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
+    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
+        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
+    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must be real numeric arrays.")
+    finite = np.isfinite(v0) & np.isfinite(i0)
+    v, i = v0[finite].astype(float), i0[finite].astype(float)
+    order = np.argsort(v)
+    v, i = v[order], i[order]
+    if len(v) < 8:
+        raise ValueError("At least eight finite paired samples are required.")
+    lo, hi = map(float, fit_range_V)
+    if not (math.isfinite(lo) and math.isfinite(hi) and lo < hi and lo >= v[0] and hi <= v[-1]):
+        raise ValueError("fit_range_V must be finite, increasing, and inside the measured voltage range.")
+    mask = (v >= lo) & (v <= hi)
+    x, y = v[mask], i[mask]
+    if len(x) < 5:
+        raise ValueError("Stretched-exponential fit requires at least five samples.")
+    xref = float(x[0])
+    scale = max(float(np.ptp(y)), float(np.max(np.abs(y))), np.finfo(float).tiny)
+    def fn(xx, offset, amplitude, slope, shape):
+        z = np.maximum(slope * (np.asarray(xx) - xref), 0.0)
+        return offset + amplitude * np.exp(np.clip(np.power(z, shape), -700.0, 700.0))
+    pars, cov = curve_fit(
+        fn, x, y / scale,
+        p0=(float(np.min(y / scale)), max(float(np.ptp(y / scale)), 1e-8), 1.0 / max(float(np.ptp(x)), 1e-6), 1.0),
+        bounds=([-np.inf, 0.0, 1e-12, 0.2], [np.inf, np.inf, np.inf, 3.0]),
+        maxfev=50000,
+    )
+    fitted = fn(x, *pars) * scale
+    residual = y - fitted
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    ss_res = float(np.sum(residual ** 2))
+    return {
+        "model": "stretched_exponential_empirical_shape",
+        "fit_range_V": [lo, hi],
+        "fit_points": int(len(x)),
+        "shape_exponent": float(pars[3]),
+        "scale_slope_per_V": float(pars[2]),
+        "fit_R2": (1.0 - ss_res / ss_tot if ss_tot > 0 else None),
+        "fit_residual_rms_A": float(np.sqrt(np.mean(residual ** 2))),
+        "covariance_finite": bool(np.all(np.isfinite(cov))),
+        "kinetic_distribution_identified": False,
+        "interpretation": "Empirical curve-shape alternative only; not a kappa model or proof of a physical non-Maxwellian distribution.",
+    }
