@@ -23,6 +23,20 @@ def _app_with_table(frame: pd.DataFrame) -> AppTest:
     next(item for item in app.selectbox if item.label == "Select workflow")
     return app
 
+def test_thomson_geometry_dependent_workflows_are_not_in_analysis_1_ui():
+    frame = pd.DataFrame({
+        "radius_m": [0.0, 0.1, 0.2],
+        "density_m3": [2.0e19, 1.8e19, 1.6e19],
+        "temperature_eV": [100.0, 90.0, 80.0],
+    })
+    app = _app_with_table(frame)
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    assert "Thomson calibrated profile analysis" in workflow.options
+    assert "Thomson spatial profile reconstruction" in workflow.options
+    assert "Thomson raw-spectrum temperature fit" not in workflow.options
+    assert "Thomson calibrated scattered-power density" not in workflow.options
+
+
 
 def test_thomson_calibrated_profile_dashboard_executes_and_exports():
     radius = np.linspace(0.0, 0.4, 9)
@@ -55,102 +69,6 @@ def test_thomson_calibrated_profile_dashboard_executes_and_exports():
     assert any("Calibrated Thomson profile analysis completed." in str(item.value) for item in app.success)
     assert any(item.label == "Download Thomson profile results" for item in app.get("download_button"))
     assert any(item.label == "Export Thomson profile summary" for item in app.get("download_button"))
-
-
-def test_thomson_raw_spectrum_dashboard_executes_fit_residuals_and_exports():
-    wavelength = np.linspace(530.8, 533.2, 241)
-    physical_sigma_nm = 532.0 * np.sqrt(4.0 * 0.01 / 510_998.95069) * np.sin(np.pi / 4.0)
-    fitted_sigma_nm = np.sqrt(physical_sigma_nm**2 + 0.05**2)
-    signal = (
-        1000.0 * np.exp(-0.5 * ((wavelength - 532.0) / fitted_sigma_nm) ** 2)
-        + 12.0 + 0.8 * (wavelength - 532.0)
-    )
-    frame = pd.DataFrame({"wavelength_nm": wavelength, "signal": signal})
-    app = _app_with_table(frame)
-    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
-        "Thomson raw-spectrum temperature fit"
-    ).run()
-
-    selectors = {item.label: item for item in app.selectbox}
-    selectors["Wavelength (nm)"].set_value("wavelength_nm")
-    selectors["Measured spectral signal"].set_value("signal")
-    app.run()
-    next(
-        item for item in app.button
-        if item.label == "Fit Thomson spectrum and estimate electron temperature"
-    ).click().run()
-
-    assert not app.exception, [str(error.value) for error in app.exception]
-    assert any("Thomson spectral fit completed." in str(item.value) for item in app.success)
-    assert any(item.label == "Download Thomson spectrum fit and residuals" for item in app.get("download_button"))
-    assert any(item.label == "Export Thomson fit summary" for item in app.get("download_button"))
-    assert any("Electron temperature" in str(item.label) for item in app.metric)
-    result = app.session_state.get("tis_thomson_spectrum_fit")
-    if result is not None:
-        assert result["electron_temperature_eV"] == pytest.approx(0.01, rel=0.05)
-
-
-def test_thomson_calibrated_power_density_dashboard_executes_and_exports():
-    frame = pd.DataFrame({"unused_signal": [0.0, 1.0, 2.0]})
-    app = _app_with_table(frame)
-    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
-        "Thomson calibrated scattered-power density"
-    ).run()
-
-    next(item for item in app.checkbox if item.label == "Propagate independent input uncertainties").check().run()
-    next(item for item in app.button if item.label == "Estimate Thomson electron density").click().run()
-
-    assert not app.exception, [str(error.value) for error in app.exception]
-    assert any(
-        "Calibrated scattered-power density estimate completed." in str(item.value)
-        for item in app.success
-    )
-    assert any(item.label == "Electron density" for item in app.metric)
-    assert any(item.label == "Propagated 1-sigma uncertainty" for item in app.metric)
-    assert any(
-        item.label == "Export Thomson power-density estimate"
-        for item in app.get("download_button")
-    )
-
-
-def test_thomson_calibrated_spectrum_dashboard_estimates_temperature_and_density():
-    wavelength = np.linspace(530.8, 533.2, 241)
-    physical_sigma_nm = 532.0 * np.sqrt(4.0 * 0.01 / 510_998.95069) * np.sin(np.pi / 4.0)
-    fitted_sigma_nm = np.sqrt(physical_sigma_nm**2 + 0.05**2)
-    signal = (
-        1.0e-12 * np.exp(-0.5 * ((wavelength - 532.0) / fitted_sigma_nm) ** 2)
-        + 1.2e-14 + 8.0e-16 * (wavelength - 532.0)
-    )
-    app = _app_with_table(pd.DataFrame({"wavelength_nm": wavelength, "power_density_W_nm": signal}))
-    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
-        "Thomson raw-spectrum temperature fit"
-    ).run()
-
-    selectors = {item.label: item for item in app.selectbox}
-    selectors["Wavelength (nm)"].set_value("wavelength_nm")
-    selectors["Measured spectral signal"].set_value("power_density_W_nm")
-    next(
-        item for item in app.checkbox
-        if item.label == "Signal is calibrated spectral power density (W/nm); also estimate electron density"
-    ).check().run()
-    next(
-        item for item in app.button
-        if item.label == "Fit Thomson spectrum and estimate electron temperature"
-    ).click().run()
-
-    assert not app.exception, [str(error.value) for error in app.exception]
-    assert any("Thomson spectral fit completed." in str(item.value) for item in app.success)
-    assert any(item.label == "Electron temperature" for item in app.metric)
-    assert any(item.label == "Integrated collected scattered power" for item in app.metric)
-    assert any(item.label == "Electron density" for item in app.metric)
-    assert any(item.label == "Export Thomson fit summary" for item in app.get("download_button"))
-    temperature_metric = next(item for item in app.metric if item.label == "Electron temperature")
-    density_metric = next(item for item in app.metric if item.label == "Electron density")
-    power_metric = next(item for item in app.metric if item.label == "Integrated collected scattered power")
-    assert float(temperature_metric.value.split()[0]) == pytest.approx(0.01, rel=0.05)
-    assert float(density_metric.value.split()[0]) > 0.0
-    assert float(power_metric.value.split()[0]) > 0.0
-
 
 
 def test_thomson_spatial_profile_reconstruction_dashboard_executes_and_exports():
