@@ -32,14 +32,8 @@ class ThomsonSummary:
     temperature_peak_radius_m: float
     density_line_average_m3: float
     temperature_line_average_ev: float
-    density_volume_average_m3: float | None
-    temperature_volume_average_ev: float | None
     density_line_average_uncertainty_m3: float | None = None
     temperature_line_average_uncertainty_ev: float | None = None
-    density_volume_average_uncertainty_m3: float | None = None
-    temperature_volume_average_uncertainty_ev: float | None = None
-    volume_average_radial_domain_m: tuple[float, float] | None = None
-    volume_average_scope: str | None = None
 
 
 def _array(values: Iterable[float], name: str) -> np.ndarray:
@@ -139,23 +133,11 @@ def _weighted_standard_uncertainty(weights, uncertainty) -> float | None:
     return float(np.sqrt(np.sum(np.square(weights * uncertainty))))
 
 
-def _is_finite_real_scalar(value) -> bool:
-    if not isinstance(value, (int, float, np.integer, np.floating)) or isinstance(value, (bool, np.bool_)):
-        return False
-    try:
-        return bool(np.isfinite(value))
-    except (TypeError, ValueError, OverflowError):
-        return False
+def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
+    """Summarize calibrated profiles over the measured radial interval only.
 
-
-def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None) -> ThomsonSummary:
-    """Summarize measured profiles and propagate independent pointwise errors.
-
-    If major_radius_m is supplied, cylindrical toroidal-volume weighting uses
-    the large-aspect-ratio approximation dV proportional to R_major * r * dr.
-    The returned average covers only the sampled radial interval; it must not
-    be interpreted as a whole-plasma average unless full plasma coverage is
-    independently established. This is not an equilibrium reconstruction.
+    The summary deliberately excludes geometry-weighted volume averages: those
+    require additional geometric assumptions and are outside the core workflow.
     """
     r, ne, te = profile.radius_m, profile.density_m3, profile.temperature_ev
     radial_span = float(r[-1] - r[0])
@@ -166,27 +148,6 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
     ne_line_unc = _weighted_standard_uncertainty(line_weights, profile.density_uncertainty_m3)
     te_line_unc = _weighted_standard_uncertainty(line_weights, profile.temperature_uncertainty_ev)
 
-    ne_vol = te_vol = None
-    ne_vol_unc = te_vol_unc = None
-    volume_domain = None
-    volume_scope = None
-    if major_radius_m is not None:
-        if not _is_finite_real_scalar(major_radius_m) or major_radius_m <= 0:
-            raise ValueError("major_radius_m must be positive and finite")
-        if np.any(r < 0):
-            raise ValueError("volume averaging requires a non-negative minor-radius coordinate")
-        volume_domain = (float(r[0]), float(r[-1]))
-        volume_scope = (
-            "Weighted over the sampled radial interval only; does not establish "
-            "full-plasma coverage and does not extrapolate to the magnetic axis or plasma edge."
-        )
-        denom = float(_trapezoid(r, r))
-        if denom > 0:
-            volume_weights = trap_weights * r / denom
-            ne_vol = float(_trapezoid(ne * r, r) / denom)
-            te_vol = float(_trapezoid(te * r, r) / denom)
-            ne_vol_unc = _weighted_standard_uncertainty(volume_weights, profile.density_uncertainty_m3)
-            te_vol_unc = _weighted_standard_uncertainty(volume_weights, profile.temperature_uncertainty_ev)
     ine, ite = int(np.argmax(ne)), int(np.argmax(te))
     return ThomsonSummary(
         point_count=int(r.size),
@@ -198,14 +159,8 @@ def profile_summary(profile: ThomsonProfile, major_radius_m: float | None = None
         temperature_peak_radius_m=float(r[ite]),
         density_line_average_m3=ne_line,
         temperature_line_average_ev=te_line,
-        density_volume_average_m3=ne_vol,
-        temperature_volume_average_ev=te_vol,
         density_line_average_uncertainty_m3=ne_line_unc,
         temperature_line_average_uncertainty_ev=te_line_unc,
-        density_volume_average_uncertainty_m3=ne_vol_unc,
-        temperature_volume_average_uncertainty_ev=te_vol_unc,
-        volume_average_radial_domain_m=volume_domain,
-        volume_average_scope=volume_scope,
     )
 
 def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float]) -> dict[str, np.ndarray]:
