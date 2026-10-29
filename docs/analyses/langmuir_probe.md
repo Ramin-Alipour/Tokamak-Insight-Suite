@@ -7,16 +7,18 @@ This workflow analyzes a calibrated, quasi-static, single-probe I–V sweep. It 
 - `voltage` (V) and `current` (A): paired one-dimensional arrays.
 - At least eight valid samples and eight distinct voltage values are required. Non-finite pairs are discarded; duplicate voltages are aggregated by averaging current; pairs are sorted together by voltage.
 - `current_convention`: `electron_positive` (default) or `ion_positive`. The latter is sign-flipped before analysis.
-- Optional fit intervals must have two finite, strictly increasing voltage bounds. Intervals are selected by the analyst, must overlap the measured sweep, and must contain enough samples for the requested fit.
+- Optional fit intervals must have two finite, strictly increasing voltage bounds within the measured sweep. The electron-retarding fit requires at least four selected samples and at least three samples above the initial low-voltage-tail baseline estimate. The ion-branch fit requires at least three selected samples. Intervals are selected and justified by the analyst; the software does not automatically establish the physical regime.
 
 ## Physics and outputs
 For an electron-retarding Maxwellian branch after subtracting an estimated ion-current baseline,
 \[
-I_e(V)=I_{e,\mathrm{sat}}\exp\left(\frac{V-V_p}{T_e[\mathrm{eV}]}\right),\qquad
-T_e[\mathrm{eV}]=\left(\frac{d\ln I_e}{dV}\right)^{-1}.
+I(V)=I_0+A\exp\!\left[s(V-V_{\rm ref})\right],\qquad
+T_e[\mathrm{eV}]=\frac{1}{s[\mathrm{V}^{-1}]}.
 \]
 
-The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The ion-branch fit characterizes current versus voltage; it is not used to infer density or particle flux.
+The implementation performs a joint nonlinear fit of the current offset, positive amplitude, and positive exponential slope over the selected interval. It does not perform an unweighted log-linear fit after subtracting a fixed baseline. The reported covariance-based standard error is conditional on this three-parameter model and the selected interval.
+
+The maximum of numerical `dI/dV` is reported only as a plasma-potential proxy. The optional ion-branch fit is a linear current-versus-voltage characterization; its median current is reported as a selected-window estimate, not a geometry-derived density or particle flux.
 
 The floating-potential result includes all detected zero crossings. A zero-current plateau is represented by its voltage midpoint. `floating_potential_V` is populated only for exactly one unique crossing; no crossing or multiple crossings produces `null` with an explicit status.
 
