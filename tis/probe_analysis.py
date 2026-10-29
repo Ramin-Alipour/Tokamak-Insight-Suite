@@ -198,8 +198,25 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                 f"ion_fit_range must overlap and lie inside the measured voltage range "
                 f"[{min(v):g}, {max(v):g}] V."
             )
-        p=np.polyfit(v[m],i[m],1); out['ion_saturation_linear_slope_A_per_V']=float(p[0]); out['ion_saturation_intercept_A']=float(p[1]); out['ion_saturation_fit_R2']=_r2(i[m],np.polyval(p,v[m]))
-        out['ion_saturation_current_A']=float(np.median(i[m])); out['ion_saturation_current_method']='median_user_selected_ion_fit_range'
+        p = np.polyfit(v[m], i[m], 1)
+        ion_fitted = np.polyval(p, v[m])
+        ion_residual = i[m] - ion_fitted
+        ion_rms = float(np.sqrt(np.mean(ion_residual ** 2)))
+        ion_span = float(np.ptp(i[m]))
+        ion_r2 = _r2(i[m], ion_fitted)
+        out['ion_saturation_linear_slope_A_per_V'] = float(p[0])
+        out['ion_saturation_intercept_A'] = float(p[1])
+        out['ion_saturation_fit_R2'] = ion_r2
+        out['ion_saturation_fit_residual_rms_A'] = ion_rms
+        out['ion_saturation_fit_normalized_rmse'] = ion_rms / ion_span if ion_span > 0 else None
+        out['ion_saturation_fit_points'] = int(np.count_nonzero(m))
+        out['ion_saturation_fit_status'] = (
+            'fit_completed_review_R2_and_residuals'
+            if ion_r2 is not None and np.isfinite(ion_r2)
+            else 'fit_quality_undefined'
+        )
+        out['ion_saturation_current_A'] = float(np.median(i[m]))
+        out['ion_saturation_current_method'] = 'median_user_selected_ion_fit_range'
     if electron_fit_range is not None:
         if min(electron_fit_range) < min(v) or max(electron_fit_range) > max(v):
             raise ValueError(
