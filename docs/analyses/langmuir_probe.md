@@ -67,3 +67,13 @@ The canonical calculation pipeline is `tis.probe_analysis.langmuir_iv_analysis`.
 ## Software completion criterion
 
 The registry label `complete_with_declared_scope` means that the implemented software contract and regression tests cover the explicitly declared calibrated single-probe I–V scope. It does not claim independent experimental validation, full systematic uncertainty propagation, automatic physical-regime certification, or support for every probe geometry. Those exclusions are intentional scope boundaries, not claims of experimental validation. Contract parity is tested across the canonical and generic public entry points; optional estimates remain absent or null when their required fit windows and model inputs are not supplied.
+
+
+## Multi-channel and multi-probe sweeps
+The public helper `analyze_langmuir_probe_array` accepts either a shared voltage vector with a two-dimensional (channels, samples) current array, matching two-dimensional voltage/current arrays, or a mapping of channel names to calibrated voltage/current pairs. Each channel is analyzed independently with the same canonical calculations and explicit options. Results preserve channel labels and report the channel count. This adds batch execution, not spatial reconstruction, probe geometry inference, cross-channel correlations, or an assertion that all channels share the same physical regime.
+
+## Plasma-potential proxy contract
+`plasma_potential_method` is `maximum_numerical_dIdV_proxy`; `plasma_potential_estimate_V` uses the maximum numerical first derivative. The maximum-second-derivative location remains a separate candidate field and is not silently treated as the primary estimate. Both are numerical indicators, not a physical certification. Derivatives are calculated on the supplied calibrated samples; no smoothing is silently applied.
+
+## Model and uncertainty boundaries
+The current fit remains the declared single-Maxwellian exponential-plus-offset model. The software does not fit non-Maxwellian or multi-temperature distributions. Statistical covariance is conditional on that model and selected window; uncertainty remains partial when calibration covariance, model discrepancy, correlations, or fit-window sensitivity are not explicitly quantified. These are not claimed as solved by multi-channel batching.
