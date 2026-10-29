@@ -259,16 +259,16 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Langmuir Probe",
-    "quantities": "Calibrated I–V curve, floating/plasma-potential indicators, electron temperature, ion saturation current and optional sheath-model ion density",
+    "quantities": "Calibrated I–V curve, floating-potential crossings, first- and second-derivative plasma-potential candidates, electron temperature with explicit-component uncertainty, ion-current estimate with regime status, and optional sheath-model ion density with explicit-component uncertainty",
     "status": "D",
-    "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Optional ion density is computed only when fitted electron temperature, selected ion-current interval, effective collection area, ion mass, positive sheath-model coefficient and model label are supplied.",
-    "caveat": "Density is a model-dependent estimate; the coefficient must match the declared probe geometry and plasma regime. Descriptive tail fallbacks are never used for density. Plasma-potential dI/dV maximum is a proxy only; fit-window, composition, magnetic-field/collisional, secondary-emission, RF and systematic effects remain outside automatic inference.",
+    "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Report maximum-dI/dV and maximum-d2I/dV2 plasma-potential candidates separately without claiming universal validity. Label low-voltage-tail ion current as descriptive unless a selected interval is supplied; numerical flatness still does not certify the physical regime. Optional ion density requires explicit collection area, ion mass, sheath coefficient and model label, plus both fit windows.",
+    "caveat": "All inputs are assumed calibrated. Plasma-potential candidates are numerical indicators and require probe-regime interpretation; median grid spacing is not statistical uncertainty. Ion-current estimates do not automatically certify ion saturation. Te and density uncertainty combine fit statistics with explicitly supplied components only; unspecified calibration covariance, model discrepancy, correlations and systematics remain unquantified.",
     "implementation_functions": [
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Canonical calibrated single-sweep I–V pipeline with shared public wrapper contract; generic probe entry point delegates to the canonical Langmuir implementation and retains legacy aliases only. Regression tests cover cross-entry-point parity, common minimum sample count, optional-output behavior, fit diagnostics, polarity normalization, density guards and supplied-component uncertainty propagation. Synthetic software regression checks only; no independent experimental validation or full input/systematic uncertainty propagation is claimed.",
+    "implementation_status": "Canonical calibrated single-sweep I–V pipeline with distinct plasma-potential candidates, explicit ion-current regime status and expanded uncertainty-component accounting. Synthetic regression tests are software checks only; no experimental validation or automatic physical-regime certification is claimed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -363,6 +363,27 @@
           "name": "electron_temperature_relative_uncertainty",
           "unit": "fraction",
           "description": "Optional relative temperature uncertainty component, combined in quadrature with fitted statistical temperature uncertainty.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "electron_temperature_calibration_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty component for calibrated electron temperature; combined in quadrature.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "electron_temperature_fit_window_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty component representing analyst-estimated fit-window sensitivity.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "density_model_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative model-discrepancy uncertainty floor for ion-density inversion.",
           "required": false,
           "minimum": 0
         }
@@ -637,6 +658,66 @@
           "name": "analysis_scope",
           "unit": "text",
           "description": "Declares that this execution workflow is for a calibrated single-probe I-V sweep only."
+        },
+        {
+          "name": "d2IdV2_A_per_V2",
+          "unit": "A V^-2",
+          "description": "Numerical second derivative of current with respect to voltage, used to report a candidate plasma-potential indicator."
+        },
+        {
+          "name": "plasma_potential_estimate_V",
+          "unit": "V",
+          "description": "Voltage at maximum numerical d2I/dV2, reported as a candidate only; requires probe-regime interpretation."
+        },
+        {
+          "name": "plasma_potential_dIdV_max_candidate_V",
+          "unit": "V",
+          "description": "Independent maximum-dI/dV candidate retained for comparison."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_max_candidate_V",
+          "unit": "V",
+          "description": "Maximum-d2I/dV2 candidate; may be edge-dominated and is not automatically physically validated."
+        },
+        {
+          "name": "plasma_potential_voltage_grid_spacing_median_V",
+          "unit": "V",
+          "description": "Median voltage-grid spacing as a numerical resolution indicator, not a statistical uncertainty."
+        },
+        {
+          "name": "plasma_potential_uncertainty_note",
+          "unit": "text",
+          "description": "Clarifies that voltage-grid spacing is not a statistical uncertainty."
+        },
+        {
+          "name": "ion_saturation_current_status",
+          "unit": "text",
+          "description": "Distinguishes descriptive tail fallback from selected-window estimate; neither certifies physical ion-saturation regime."
+        },
+        {
+          "name": "ion_saturation_current_physical_regime_confirmed",
+          "unit": "boolean",
+          "description": "Always false unless a separate physics-based regime validation is implemented; numerical fit diagnostics alone do not confirm saturation."
+        },
+        {
+          "name": "electron_temperature_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Quadrature combination of fit-statistical and explicitly supplied relative uncertainty components."
+        },
+        {
+          "name": "electron_temperature_total_standard_uncertainty_eV",
+          "unit": "eV",
+          "description": "Combined Te standard uncertainty from fit covariance and supplied nonstatistical components."
+        },
+        {
+          "name": "electron_temperature_uncertainty_components_relative",
+          "unit": "structured",
+          "description": "Relative Te uncertainty components included in the combined uncertainty."
+        },
+        {
+          "name": "electron_temperature_uncertainty_status",
+          "unit": "text",
+          "description": "Declares that only fit statistics and explicitly supplied uncertainty components are included."
         }
       ],
       "assumptions": [
@@ -651,8 +732,8 @@
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "All public Langmuir entry points delegate to the canonical pipeline: normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report explicitly labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs. The generic probe function adds legacy aliases only and performs no independent fit.",
-      "uncertainty_model": "Optional first-order quadrature propagation for ion density using explicitly supplied ion-current absolute uncertainty and relative uncertainties for collection area, ion mass, sheath coefficient and electron temperature. Fitted statistical Te uncertainty is combined with the supplied relative Te component. This is partial only; unspecified calibration covariance, correlated errors, fit-window sensitivity, model discrepancy and other systematics are not inferred.",
+      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and first/second derivatives, report distinct plasma-potential candidates and resolution indicator, label ion-current fallbacks and selected-window estimates with physical-regime status, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs. Uncertainty propagation includes fit covariance and explicitly supplied components only.",
+      "uncertainty_model": "Electron-temperature relative standard uncertainty combines local fit-covariance uncertainty with explicitly supplied nonstatistical, calibration and fit-window components in quadrature. Ion-density uncertainty uses supplied current, area, ion-mass, sheath-coefficient and temperature uncertainties plus optional model-discrepancy floor. This is partial propagation only; unspecified covariance, correlated errors and systematics are not inferred.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
         "Density requires an explicitly justified sheath coefficient, collection area, ion mass, and both physically selected fit windows.",
@@ -664,7 +745,11 @@
         "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.",
         "Density uncertainty propagation is partial and includes only explicitly supplied uncertainty components.",
         "The maximum dI/dV voltage is a proxy only; physical plasma potential requires regime-specific justification.",
-        "This workflow covers calibrated single-probe I-V sweeps, not all multi-probe, array or triple-probe configurations."
+        "This workflow covers calibrated single-probe I-V sweeps, not all multi-probe, array or triple-probe configurations.",
+        "Maximum dI/dV and maximum d2I/dV2 are candidate indicators only; neither universally determines physical plasma potential.",
+        "Voltage-grid spacing is a resolution indicator, not a statistical uncertainty.",
+        "Ion-current estimates are explicitly labelled and do not automatically certify the physical ion-saturation regime.",
+        "Te and density uncertainty propagation includes only fit statistics and explicitly supplied components; missing systematic components are not inferred."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
