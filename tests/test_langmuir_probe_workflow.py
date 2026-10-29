@@ -46,7 +46,8 @@ def test_langmuir_probe_accepts_ion_positive_circuit_convention():
         ion_fit_range=(-5.0, -1.0),
         current_convention="ion_positive",
     )
-    assert result["current_convention"] == "ion_positive"
+    assert result["current_convention_input"] == "ion_positive"
+    assert result["current_convention"] == "electron_positive"
     assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.04)
 
 
