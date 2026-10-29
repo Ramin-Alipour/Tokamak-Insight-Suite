@@ -268,11 +268,11 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Canonical calibrated single-sweep I–V pipeline with distinct plasma-potential candidates, explicit ion-current regime status and expanded uncertainty-component accounting. Synthetic regression tests are software checks only; no experimental validation or automatic physical-regime certification is claimed.",
+    "implementation_status": "Canonical calibrated single-sweep analysis now exposes a consistent maximum-dI/dV plasma-potential proxy contract and a multi-channel batch entry point. Multi-channel sweeps are analyzed independently; non-Maxwellian/multi-temperature fitting, multi-species density inversion, and complete automatic uncertainty propagation remain unsupported. Software tests are not experimental validation.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete_with_declared_scope",
+      "completeness": "partial_with_declared_scope",
       "input_specs": [
         {
           "name": "voltage_V",
@@ -386,6 +386,12 @@
           "description": "Optional relative model-discrepancy uncertainty floor for ion-density inversion.",
           "required": false,
           "minimum": 0
+        },
+        {
+          "name": "channel_names",
+          "unit": "text list",
+          "description": "Optional unique labels for multi-channel array inputs to analyze_langmuir_probe_array.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -617,7 +623,7 @@
         {
           "name": "plasma_potential_method",
           "unit": "text",
-          "description": "Explicitly identifies maximum numerical dI/dV as a proxy only."
+          "description": "Identifies maximum numerical dI/dV as the primary proxy; maximum d2I/dV2 remains a separate candidate."
         },
         {
           "name": "plasma_potential_status",
@@ -657,7 +663,7 @@
         {
           "name": "analysis_scope",
           "unit": "text",
-          "description": "Declares that this execution workflow is for a calibrated single-probe I-V sweep only."
+          "description": "Declares calibrated single-sweep or independently processed calibrated multi-channel I-V batch scope."
         },
         {
           "name": "d2IdV2_A_per_V2",
@@ -667,7 +673,7 @@
         {
           "name": "plasma_potential_estimate_V",
           "unit": "V",
-          "description": "Voltage at maximum numerical d2I/dV2, reported as a candidate only; requires probe-regime interpretation."
+          "description": "Voltage at maximum numerical dI/dV; proxy only and not a physically certified plasma-potential measurement."
         },
         {
           "name": "plasma_potential_dIdV_max_candidate_V",
@@ -718,13 +724,29 @@
           "name": "electron_temperature_uncertainty_status",
           "unit": "text",
           "description": "Declares that only fit statistics and explicitly supplied uncertainty components are included."
+        },
+        {
+          "name": "channel_count",
+          "unit": "count",
+          "description": "Number of independently processed channels returned by analyze_langmuir_probe_array."
+        },
+        {
+          "name": "channels",
+          "unit": "structured",
+          "description": "Per-channel canonical Langmuir analysis outputs keyed by channel label."
+        },
+        {
+          "name": "cross_channel_inference_performed",
+          "unit": "boolean",
+          "description": "False: batch execution does not perform cross-channel physics inference."
         }
       ],
       "assumptions": [
         "Voltage and current are calibrated and synchronized samples from a quasi-static single-probe I–V sweep.",
         "The electron-retarding branch is adequately described by an exponential current after fitting its offset.",
         "Fit intervals are selected and justified by the analyst for the experimental regime.",
-        "Density inversion assumes one dominant ion species and requires a supplied coefficient appropriate to the stated sheath model, probe geometry and plasma regime."
+        "Density inversion assumes one dominant ion species and requires a supplied coefficient appropriate to the stated sheath model, probe geometry and plasma regime.",
+        "Multi-channel batch mode treats each calibrated channel independently and does not infer spatial relationships or shared physical regimes."
       ],
       "preprocessing": [
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points across all public Langmuir entry points.",
@@ -732,7 +754,7 @@
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
-      "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and first/second derivatives, report distinct plasma-potential candidates and resolution indicator, label ion-current fallbacks and selected-window estimates with physical-regime status, optionally fit selected electron and ion branches, and permit ion-density inversion only when explicit sheath-model and geometry inputs are supplied and the selected ion branch passes numerical fit-quality and flatness screening. Uncertainty propagation includes fit covariance and explicitly supplied components only.",
+      "algorithm": "Normalize polarity, clean calibrated I-V pairs, aggregate duplicate voltages, compute zero crossings and derivatives, use maximum dI/dV as the explicitly labelled plasma-potential proxy while retaining maximum d2I/dV2 separately, label ion-current estimates and physical-regime caveats, optionally fit selected electron and ion branches and estimate single-species ion density with explicit inputs. Multi-channel wrapper processes each channel independently.",
       "uncertainty_model": "Electron-temperature relative standard uncertainty combines local fit-covariance uncertainty with explicitly supplied nonstatistical, calibration and fit-window components in quadrature. Ion-density uncertainty uses supplied current, area, ion-mass, sheath-coefficient and temperature uncertainties plus optional model-discrepancy floor. This is partial propagation only; unspecified covariance, correlated errors and systematics are not inferred.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
@@ -742,17 +764,22 @@
         "Check fit quality and probe-specific magnetic-field, RF, collision, secondary-emission, surface and sweep-direction effects.",
         "The dI/dV maximum is a plasma-potential proxy, not a universally valid plasma-potential measurement.",
         "Ion density is a model-based estimate only when all required fit-window, geometry, ion-mass and sheath-model inputs are supplied; particle flux is outside scope.",
-        "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.","Density inversion is refused when the selected ion interval fails numerical fit-quality or flatness screening; passing this screen does not confirm physical ion saturation.",
+        "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.",
+        "Density inversion is refused when the selected ion interval fails numerical fit-quality or flatness screening; passing this screen does not confirm physical ion saturation.",
         "Density uncertainty propagation is partial and includes only explicitly supplied uncertainty components.",
         "The maximum dI/dV voltage is a proxy only; physical plasma potential requires regime-specific justification.",
         "This workflow covers calibrated single-probe I-V sweeps, not all multi-probe, array or triple-probe configurations.",
         "Maximum dI/dV and maximum d2I/dV2 are candidate indicators only; neither universally determines physical plasma potential.",
         "Voltage-grid spacing is a resolution indicator, not a statistical uncertainty.",
         "Ion-current estimates are explicitly labelled and do not automatically certify the physical ion-saturation regime.",
-        "Te and density uncertainty propagation includes only fit statistics and explicitly supplied components; missing systematic components are not inferred."
+        "Te and density uncertainty propagation includes only fit statistics and explicitly supplied components; missing systematic components are not inferred.",
+        "Multi-channel batch processing does not provide spatial reconstruction, cross-channel correlation, or multi-probe geometry inference.",
+        "Non-Maxwellian and multi-temperature electron-distribution fits are not implemented.",
+        "Multi-species ion-density inversion is not implemented."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+        "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
         "tis.core.langmuir_iv_analysis",
         "tis.core.probe_iv_summary"
       ],
