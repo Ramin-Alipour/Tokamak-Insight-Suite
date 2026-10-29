@@ -241,7 +241,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out["plasma_potential_d2IdV2_max_candidate_V"] = float(v[second_derivative_index])
     out["plasma_potential_estimate_V"] = float(v[first_derivative_index])
     out["plasma_potential_candidate_method"] = "maximum_numerical_dIdV_proxy"; out["plasma_potential_second_derivative_method"] = "maximum_second_derivative_candidate"
-    out["plasma_potential_status"] = "numerical_candidate_requires_regime_review"
+    out["plasma_potential_status"] = "proxy_only_requires_probe_regime_review"
     out["plasma_potential_voltage_grid_spacing_median_V"] = float(np.median(np.diff(v)))
     out["plasma_potential_uncertainty_note"] = ("Voltage-grid spacing is reported as a resolution indicator, not a statistical uncertainty; "
         "physical Vp interpretation depends on probe regime and branch coverage.")
