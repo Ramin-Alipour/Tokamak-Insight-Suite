@@ -123,6 +123,7 @@ def test_langmuir_probe_rejects_legacy_collection_area_argument():
     with pytest.raises(TypeError):
         analyze_langmuir_probe(voltage, current, area_m2=1.0e-5)
 
+@pytest.mark.parametrize("fit_range", [(-20.0, -15.0), (15.0, 25.0)])
 def test_langmuir_probe_rejects_fit_windows_outside_measured_sweep(fit_range):
     voltage, current = synthetic_iv()
     with pytest.raises(ValueError, match="overlap"):
