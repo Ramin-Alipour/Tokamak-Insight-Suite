@@ -282,3 +282,16 @@ def test_langmuir_array_rejects_too_few_samples_before_dispatch():
     with pytest.raises(ValueError, match="at least one channel and eight samples"):
         analyze_langmuir_probe_array(np.arange(7.0), np.ones((1, 7)))
 
+
+def test_langmuir_array_mapping_rejects_stringified_key_collisions():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe_array
+
+    voltage = np.linspace(-5.0, 5.0, 8)
+    current = np.sinh(voltage / 3.0) * 1e-3
+    channels = {
+        1: {"voltage_V": voltage, "current_A": current},
+        "1": {"voltage_V": voltage, "current_A": current},
+    }
+    with pytest.raises(ValueError, match="remain unique when converted to strings"):
+        analyze_langmuir_probe_array(channels)
+
