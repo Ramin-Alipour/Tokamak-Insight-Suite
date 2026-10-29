@@ -10,7 +10,7 @@ This workflow analyzes a calibrated, quasi-static, single-probe I–V sweep. It 
 - Optional fit intervals must have two finite, strictly increasing voltage bounds within the measured sweep. The electron-retarding fit requires at least four selected samples and at least three samples above the initial low-voltage-tail baseline estimate. The ion-branch fit requires at least three selected samples. Intervals are selected and justified by the analyst; the software does not automatically establish the physical regime.
 
 ## Physics and outputs
-For an electron-retarding Maxwellian branch after subtracting an estimated ion-current baseline,
+For an electron-retarding branch approximated by a Maxwellian exponential plus a fitted current offset,
 \[
 I(V)=I_0+A\exp\!\left[s(V-V_{\rm ref})\right],\qquad
 T_e[\mathrm{eV}]=\frac{1}{s[\mathrm{V}^{-1}]}.
