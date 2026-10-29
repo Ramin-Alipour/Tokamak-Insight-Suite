@@ -112,3 +112,14 @@ Additional explicit helpers extend the declared calculation scope without changi
 - `estimate_ion_particle_flux` computes a Bohm-like ion particle flux from supplied density, electron temperature, ion mass, and explicit sheath factor.
 
 These helpers do not infer area, species composition, sheath coefficients, or uncertainty inputs. Electron-density and particle-flux estimates are model-dependent and report no uncertainty propagation unless a separate uncertainty model is supplied. Their presence means these quantities can be calculated under explicit assumptions; it does not mean the physical regime is confirmed.
+
+
+## Explicit resolution of the Analysis 2 contract findings
+
+- **Electron density is an advanced, separate model helper, not a field silently inferred by the canonical single-sweep pipeline.** The public module exports `estimate_electron_density_from_saturation`; it requires a positive supplied electron-saturation current, fitted/supplied electron temperature, and effective collection area. It uses the explicitly documented Maxwellian collection relation and always marks `physical_regime_confirmed: false`. This avoids implying that the canonical pipeline derives electron density from the ion-tail fallback or from an unverified branch.
+- **Plasma potential remains a candidate/proxy.** `plasma_potential_estimate_V` is the maximum-numerical-`dI/dV` proxy; the maximum-`d²I/dV²` candidate remains separate. Neither is a certified physical measurement.
+- **Ion saturation remains explicitly qualified.** Without `ion_fit_range`, the low-voltage-tail median is descriptive only. A selected-window estimate is still not physical-regime certification, and descriptive fallback values are not accepted for density inversion.
+- **Uncertainty is partial by contract.** The canonical electron-temperature and ion-density uncertainty outputs include fit covariance and explicitly supplied components only. Missing calibration covariance, correlated errors, model discrepancy, and other unprovided systematic effects are not assumed to be zero or automatically estimated. The electron-density helper and ion-particle-flux helper explicitly report that uncertainty propagation was not performed.
+- **Array and series APIs are batch processors, not spatial/temporal inference.** Each channel and each time/channel sweep is passed through the canonical single-sweep calculation independently. The returned scope flags explicitly state that cross-channel inference and temporal-trend analysis were not performed.
+
+These are software-contract and interpretation safeguards for already-calibrated inputs. They do not add calibration, empirical validation, or automatic physical-regime selection.
