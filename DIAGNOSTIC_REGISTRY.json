@@ -259,12 +259,21 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Langmuir Probe",
-    "quantities": "Calibrated I–V curve, floating-potential crossings, first- and second-derivative plasma-potential candidates, electron temperature with explicit-component uncertainty, ion-current estimate with regime status, and optional sheath-model ion density with explicit-component uncertainty",
+    "quantities": "Calibrated I–V sweeps; floating potential; derivative plasma-potential candidates; single- and two-temperature empirical fits; stretched-exponential shape comparison; electron temperature; electron and ion density estimates under explicit models; ion particle flux; multi-channel/time batches; fit-window sensitivity and explicit smoothing comparisons",
     "status": "D",
     "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Report maximum-dI/dV and maximum-d2I/dV2 plasma-potential candidates separately without claiming universal validity. Label low-voltage-tail ion current as descriptive unless a selected interval is supplied; numerical flatness still does not certify the physical regime. Optional ion density requires explicit collection area, ion mass, sheath coefficient and model label, plus both fit windows.",
     "caveat": "All inputs are assumed calibrated. Plasma-potential candidates are numerical indicators and require probe-regime interpretation; median grid spacing is not statistical uncertainty. Ion-current estimates do not automatically certify ion saturation. Te and density uncertainty combine fit statistics with explicitly supplied components only; unspecified calibration covariance, model discrepancy, correlations and systematics remain unquantified.",
     "implementation_functions": [
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
+      "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
+      "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_series",
+      "tokamak_analysis.langmuir_probe.fit_langmuir_electron_models",
+      "tokamak_analysis.langmuir_probe.fit_langmuir_stretched_exponential",
+      "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
+      "tokamak_analysis.langmuir_probe.estimate_electron_density_from_saturation",
+      "tokamak_analysis.langmuir_probe.estimate_ion_particle_flux",
+      "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
+      "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
@@ -775,7 +784,7 @@
         "Te and density uncertainty propagation includes only fit statistics and explicitly supplied components; missing systematic components are not inferred.",
         "Multi-channel batch processing does not provide spatial reconstruction, cross-channel correlation, or multi-probe geometry inference.",
         "Non-Maxwellian and multi-temperature electron-distribution fits are not implemented.",
-        "Multi-species density is available only through the explicit advanced function and requires user-supplied fractions, masses, and sheath coefficients; no uncertainty propagation is performed by that function.",
+        "Advanced multi-species density requires user-supplied fractions, masses, and sheath coefficients; no uncertainty propagation is performed by that function.",
         "Two-temperature fitting is an empirical two-exponential decomposition and does not confirm a physical bi-Maxwellian distribution.",
         "Time-series batching processes each time/channel sweep independently and does not infer temporal trends or cross-channel physics.",
         "Fit-window sensitivity is a diagnostic spread, not a statistical confidence interval."
