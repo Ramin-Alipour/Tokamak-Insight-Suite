@@ -97,7 +97,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                          probe_area_m2: float | None = None,
                          ion_mass_kg: float | None = None,
                          ion_saturation_coefficient: float | None = None,
-                         sheath_model: str | None = None) -> dict[str, Any]:
+                         sheath_model: str | None = None,
+                         ion_current_uncertainty_A: float | None = None,
+                         probe_area_relative_uncertainty: float | None = None,
+                         ion_mass_relative_uncertainty: float | None = None,
+                         ion_saturation_coefficient_relative_uncertainty: float | None = None,
+                         electron_temperature_relative_uncertainty: float | None = None) -> dict[str, Any]:
     """Analyze a calibrated Langmuir I-V sweep with optional explicit sheath-model density.
 
     Density requires explicit collection area, ion mass, sheath-model coefficient and
@@ -163,6 +168,17 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     }
     out['electron_temperature_eV'] = None
     out['electron_temperature_standard_error_eV'] = None
+    out["plasma_potential_method"] = "maximum_numerical_dIdV_proxy"
+    out["plasma_potential_status"] = "proxy_only_requires_probe_regime_review"
+    out["fit_window_review"] = {
+        "physical_regime_certified": False,
+        "required_review": [
+            "confirm electron-retarding interval is exponential and excludes saturation/transition regions",
+            "confirm ion interval is a physically justified ion-saturation regime",
+            "review fit residuals, R-squared, voltage span and probe-specific theory"
+        ],
+        "note": "Numerical fit quality cannot prove physical regime validity from I-V samples alone."
+    }
     # Always provide explicitly labelled descriptive saturation-tail estimates.
     # These are fallbacks only; a user-supplied ion_fit_range overrides the ion tail.
     # Tail size is bounded to avoid letting a few endpoint samples dominate.
@@ -210,11 +226,21 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         out['ion_saturation_fit_residual_rms_A'] = ion_rms
         out['ion_saturation_fit_normalized_rmse'] = ion_rms / ion_span if ion_span > 0 else None
         out['ion_saturation_fit_points'] = int(np.count_nonzero(m))
+        ion_nrmse = out['ion_saturation_fit_normalized_rmse']
+        ion_relative_slope = abs(float(p[0])) * float(np.ptp(v[m])) / max(abs(float(np.median(i[m]))), np.finfo(float).tiny)
+        ion_numerically_flat = bool(np.isfinite(ion_relative_slope) and ion_relative_slope <= 0.1)
+        ion_fit_good = bool(ion_r2 is not None and np.isfinite(ion_r2) and ion_r2 >= 0.98
+                            and ion_nrmse is not None and np.isfinite(ion_nrmse) and ion_nrmse <= 0.1)
         out['ion_saturation_fit_status'] = (
-            'fit_completed_review_R2_and_residuals'
-            if ion_r2 is not None and np.isfinite(ion_r2)
-            else 'fit_quality_undefined'
+            'numerical_fit_review_pass_not_physical_validation' if ion_fit_good
+            else 'weak_or_undefined_numerical_fit_review_required'
         )
+        out["ion_saturation_regime_review"] = {
+            "numerically_flat_candidate": ion_numerically_flat,
+            "relative_current_change_over_window": float(ion_relative_slope),
+            "physical_ion_saturation_confirmed": False,
+            "note": "Flatness is only a numerical screening indicator; physical saturation requires an appropriate probe regime and theory."
+        }
         out['ion_saturation_current_A'] = float(np.median(i[m]))
         out['ion_saturation_current_method'] = 'median_user_selected_ion_fit_range'
     if electron_fit_range is not None:
@@ -271,11 +297,23 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         )
         out["electron_retarding_fit_points"] = int(np.count_nonzero(m))
         out["electron_fit_points"] = int(np.count_nonzero(m))  # Backward-compatible field name.
-        out["electron_retarding_fit_status"] = (
-            "fit_completed_review_R2_and_residuals"
-            if np.isfinite(out["electron_retarding_fit_R2"])
-            else "fit_quality_undefined"
+        electron_nrmse = out["electron_retarding_fit_normalized_rmse"]
+        electron_fit_good = bool(
+            np.isfinite(out["electron_retarding_fit_R2"])
+            and out["electron_retarding_fit_R2"] >= 0.98
+            and electron_nrmse is not None and np.isfinite(electron_nrmse)
+            and electron_nrmse <= 0.1
         )
+        out["electron_retarding_fit_status"] = (
+            "numerical_fit_review_pass_not_physical_validation" if electron_fit_good
+            else "weak_or_undefined_numerical_fit_review_required"
+        )
+        out["electron_retarding_regime_review"] = {
+            "numerical_fit_quality_pass": electron_fit_good,
+            "physical_regime_confirmed": False,
+            "selected_voltage_span_V": float(np.ptp(x)),
+            "note": "An acceptable exponential fit is necessary but not sufficient to establish a Maxwellian electron-retarding regime."
+        }
         out["ion_current_baseline_subtracted_A"] = baseline_fit_A
         out["electron_retarding_log_slope_per_V"] = slope
         out["electron_retarding_fit_intercept"] = float(np.log(max(parameters[1] * current_scale, np.finfo(float).tiny)) - slope * x_ref)
@@ -316,6 +354,16 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             raise ValueError("The selected density model produced a non-finite or non-positive density.")
         out["ion_density_estimate_m-3"] = float(density)
         out["ion_density_status"] = "model_based_estimate_review_assumptions"
+        uncertainty_inputs = {
+            "ion_current_uncertainty_A": ion_current_uncertainty_A,
+            "probe_area_relative_uncertainty": probe_area_relative_uncertainty,
+            "ion_mass_relative_uncertainty": ion_mass_relative_uncertainty,
+            "ion_saturation_coefficient_relative_uncertainty": ion_saturation_coefficient_relative_uncertainty,
+            "electron_temperature_relative_uncertainty": electron_temperature_relative_uncertainty,
+        }
+        for name, value in uncertainty_inputs.items():
+            if value is not None and (not _is_finite_real_scalar(value) or value < 0):
+                raise ValueError(f"{name} must be finite and non-negative.")
         out["ion_density_model"] = {
             "sheath_model": sheath_model.strip(),
             "ion_saturation_coefficient": float(ion_saturation_coefficient),
@@ -323,13 +371,38 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "ion_mass_kg": float(ion_mass_kg),
             "formula": "n_i = |I_i,sat| / (C_s e A_p sqrt(e T_e / m_i)); T_e in eV",
             "assumption": "Single-ion species; supplied coefficient is appropriate for the declared sheath model, probe geometry and plasma regime.",
-            "uncertainty_note": "No automatic propagation of current, area, mass, temperature, coefficient or model uncertainty is performed.",
+            "uncertainty_note": "Only supplied uncertainty components are propagated; unprovided systematic/model uncertainties remain excluded.",
         }
+        if any(value is not None for value in uncertainty_inputs.values()):
+            rel_i = (float(ion_current_uncertainty_A) / abs(float(ion_current))
+                     if ion_current_uncertainty_A is not None else 0.0)
+            te_se = out.get("electron_temperature_standard_error_eV")
+            rel_te_stat = (float(te_se) / float(te) if _is_finite_real_scalar(te_se) and te_se >= 0 else 0.0)
+            rel_te_sys = float(electron_temperature_relative_uncertainty or 0.0)
+            rel_te = math.sqrt(rel_te_stat**2 + rel_te_sys**2)
+            rel_components = {
+                "ion_current": rel_i,
+                "probe_area": float(probe_area_relative_uncertainty or 0.0),
+                "ion_mass": 0.5 * float(ion_mass_relative_uncertainty or 0.0),
+                "sheath_coefficient": float(ion_saturation_coefficient_relative_uncertainty or 0.0),
+                "electron_temperature": 0.5 * rel_te,
+            }
+            relative_uncertainty = math.sqrt(sum(value**2 for value in rel_components.values()))
+            out["ion_density_standard_uncertainty_m-3"] = float(density * relative_uncertainty)
+            out["ion_density_relative_standard_uncertainty"] = float(relative_uncertainty)
+            out["ion_density_uncertainty_components_relative"] = rel_components
+            out["ion_density_uncertainty_status"] = "partial_first_order_propagation_supplied_components_only"
+        else:
+            out["ion_density_standard_uncertainty_m-3"] = None
+            out["ion_density_relative_standard_uncertainty"] = None
+            out["ion_density_uncertainty_components_relative"] = None
+            out["ion_density_uncertainty_status"] = "not_propagated_uncertainty_inputs_not_supplied"
     out['current_convention_input'] = current_convention
     out['current_convention'] = 'electron_positive'  # All returned current values use this normalized convention.
     if 'ion_saturation_current_A' in out and out['ion_saturation_current_A']>0:
         out['sign_warning']='Ion-saturation current is positive in the electron-positive convention; check current_convention_input.'
-    out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Check fit R² and device-specific probe theory.'
+    out['analysis_scope'] = "calibrated_single_probe_IV_sweep_only"
+    out['interpretation_warning']='Single-probe estimates depend on sweep direction, magnetic field, collisions, secondary emission, sheath expansion, surface condition and fit-window choice. Numerical fit diagnostics do not establish physical regime validity. This workflow does not claim multi-probe, triple-probe, array, or full probe-system analysis.'
     return out
 
 
