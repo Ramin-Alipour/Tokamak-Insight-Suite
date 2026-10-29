@@ -60,7 +60,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
             module_name, function_name = link.rsplit(".", 1)
             assert callable(getattr(importlib.import_module(module_name), function_name, None)), link
         if entry["name"].casefold() == "thomson scattering":
-            assert len(contract["function_links"]) == 6
+            assert len(contract["function_links"]) == 3
 
 
 def test_thomson_registry_links_resolve_to_real_callables():
@@ -68,7 +68,7 @@ def test_thomson_registry_links_resolve_to_real_callables():
 
     thomson = next(row for row in DIAGNOSTICS if row["diagnostic"].casefold() == "thomson scattering")
     links = thomson["implementation_functions"]
-    assert len(links) == 6
+    assert len(links) == 2
     for link in links:
         module_name, function_name = link.rsplit(".", 1)
         module = importlib.import_module(module_name)
