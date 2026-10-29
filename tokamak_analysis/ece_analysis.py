@@ -312,6 +312,20 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
             raise ValueError("Sampling must be approximately uniform for FFT-based spectra.")
         if t.size < 8:
             raise ValueError("channel_fluctuations requires at least 8 samples for a minimally meaningful Welch PSD.")
+        # Validate optional noise metadata before computing spectra. Invalid
+        # metadata must fail without invoking coherence on constant channels,
+        # which is undefined and emits a RuntimeWarning in SciPy.
+        noise_input = None
+        if noise_std is not None:
+            noise_input = np.asarray(noise_std, dtype=float)
+            if np.any(~np.isfinite(noise_input)) or np.any(noise_input < 0):
+                raise ValueError("noise_std must be finite and non-negative.")
+            if noise_input.ndim == 1 and noise_input.shape == (1,):
+                noise_input = np.asarray(float(noise_input[0]))
+            if noise_input.ndim > 1 or (
+                noise_input.ndim == 1 and noise_input.shape != (f.size,)
+            ):
+                raise ValueError("noise_std must be a scalar, one value, or one value per frequency channel.")
         y0 = y - np.mean(y, axis=0, keepdims=True)
         freq = np.fft.rfftfreq(t.size, d=float(np.median(dt)))
         fft = np.fft.rfft(y0, axis=0)
@@ -437,14 +451,8 @@ def analyze_ece(frequency_Hz, *, signal=None, time_s=None,
                     })
             out["cross_channel_spectra"] = pair_rows
             out["cross_channel_spectra_note"] = "Cross-spectra/coherence are signal statistics, not automatic MHD-mode identification; channel timing/phase response must be independently known."
-        if noise_std is not None:
-            n = np.asarray(noise_std, dtype=float)
-            if np.any(~np.isfinite(n)) or np.any(n < 0):
-                raise ValueError("noise_std must be finite and non-negative.")
-            if n.ndim == 1 and n.shape == (1,):
-                n = np.asarray(float(n[0]))
-            if n.ndim > 1 or (n.ndim == 1 and n.shape != (f.size,)):
-                raise ValueError("noise_std must be a scalar, one value, or one value per frequency channel.")
+        if noise_input is not None:
+            n = noise_input
             out["noise_std"] = n
             out["above_noise_rms"] = out["fluctuation_rms"] > n
             noise_per_channel = np.broadcast_to(n, (f.size,))
