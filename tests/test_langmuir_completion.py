@@ -25,13 +25,14 @@ def test_analysis_2_registry_contract_matches_executable_langmuir_pipeline():
     assert {"voltage_V", "current_A"} <= set(inputs)
     assert inputs["voltage_V"]["required"] is True
     assert inputs["current_A"]["required"] is True
-    assert {"floating_potential_V", "electron_temperature_eV",
-            "ion_density_estimate_m-3"} <= {
-                item["name"] for item in contract["output_specs"]
-            }
+    assert {"floating_potential_V", "electron_temperature_eV", "input_quality"} <= {
+        item["name"] for item in contract["output_specs"]
+    }
+    assert "ion_density_estimate_m-3" not in {
+        item["name"] for item in contract["output_specs"]
+    }
     assert callable(resolve_analysis(2)) is True
     assert resolve_analysis(2) is analyze_langmuir_probe
-
 
 def test_analysis_2_recovers_synthetic_electron_temperature_and_quality_metrics():
     voltage, current = _synthetic_sweep()
@@ -46,33 +47,17 @@ def test_analysis_2_recovers_synthetic_electron_temperature_and_quality_metrics(
     assert result["floating_potential_status"] == "single_zero_crossing"
 
 
-def test_analysis_2_density_requires_explicit_ion_window_and_positive_temperature_fit():
+def test_analysis_2_excludes_geometry_dependent_density_outputs():
     voltage, current = _synthetic_sweep()
-    without_window = analyze_langmuir_probe(
-        voltage, current, electron_fit_range=(-8.0, 0.0),
-        area_m2=1.0e-6, ion_mass_amu=2.0,
-    )
-    assert "ion_density_estimate_m-3" not in without_window
-    assert without_window["ion_density_status"].startswith("not_estimated:")
-
     result = analyze_langmuir_probe(
         voltage, current, electron_fit_range=(-8.0, 0.0),
-        ion_fit_range=(-10.0, -5.0), area_m2=1.0e-6, ion_mass_amu=2.0,
+        ion_fit_range=(-10.0, -5.0),
     )
-    assert np.isfinite(result["ion_density_estimate_m-3"])
-    assert result["ion_density_estimate_m-3"] > 0
-    assert np.isfinite(result["ion_sound_speed_m_s"])
+    assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.08)
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_sound_speed_m_s" not in result
+    assert "ion_density_status" not in result
 
-
-@pytest.mark.parametrize(
-    "voltage,current",
-    [
-        ([0.0] * 8, list(range(8))),
-        ([0.0, 1.0, 2.0], [0.0, 1.0]),
-        ([0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, "bad"],
-         list(range(8))),
-    ],
-)
 def test_analysis_2_rejects_malformed_or_insufficient_sweeps(voltage, current):
     with pytest.raises((TypeError, ValueError)):
         analyze_langmuir_probe(voltage, current)
