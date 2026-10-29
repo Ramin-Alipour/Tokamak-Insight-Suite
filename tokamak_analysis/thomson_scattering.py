@@ -175,10 +175,25 @@ def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
         temperature_line_average_uncertainty_ev=te_line_unc,
     )
 
-def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float]) -> dict[str, np.ndarray]:
-    """Linearly interpolate density and temperature inside the measured radial range.
+def _interpolate_independent_uncertainty(target, radius, uncertainty):
+    """Propagate independent endpoint uncertainties through linear interpolation."""
+    upper = np.searchsorted(radius, target, side="right")
+    upper = np.clip(upper, 1, radius.size - 1)
+    lower = upper - 1
+    fraction = (target - radius[lower]) / (radius[upper] - radius[lower])
+    variance = (
+        np.square((1.0 - fraction) * uncertainty[lower])
+        + np.square(fraction * uncertainty[upper])
+    )
+    return np.sqrt(variance)
 
-    Extrapolation is deliberately forbidden to avoid silently inventing edge/core data.
+
+def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float]) -> dict[str, np.ndarray]:
+    """Linearly interpolate profiles and propagate independent point uncertainties.
+
+    Profile values are linearly interpolated. Their independent 1-sigma endpoint
+    uncertainties are propagated using the squared interpolation coefficients.
+    Extrapolation is deliberately forbidden to avoid inventing edge/core data.
     """
     target = np.asarray(target_radius_m, dtype=float)
     if target.ndim != 1 or not np.all(np.isfinite(target)):
@@ -192,9 +207,13 @@ def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float
         "temperature_ev": np.interp(target, r, profile.temperature_ev),
     }
     if profile.density_uncertainty_m3 is not None:
-        result["density_uncertainty_m3"] = np.interp(target, r, profile.density_uncertainty_m3)
+        result["density_uncertainty_m3"] = _interpolate_independent_uncertainty(
+            target, r, profile.density_uncertainty_m3
+        )
     if profile.temperature_uncertainty_ev is not None:
-        result["temperature_uncertainty_ev"] = np.interp(target, r, profile.temperature_uncertainty_ev)
+        result["temperature_uncertainty_ev"] = _interpolate_independent_uncertainty(
+            target, r, profile.temperature_uncertainty_ev
+        )
     return result
 
 
