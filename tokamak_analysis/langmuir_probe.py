@@ -71,6 +71,8 @@ def analyze_langmuir_probe_array(
 
     if isinstance(voltage_V, dict) and current_A is None:
         channels = voltage_V
+        if not channels:
+            raise ValueError("At least one calibrated probe channel is required.")
         results = {}
         for name, pair in channels.items():
             if not isinstance(pair, dict) or "voltage_V" not in pair or "current_A" not in pair:
@@ -96,14 +98,16 @@ def analyze_langmuir_probe_array(
             raise ValueError("Two-dimensional voltage_V and current_A arrays must have identical shapes.")
     else:
         raise ValueError("Array inputs must be (samples,) with (channels, samples), or matching (channels, samples) arrays.")
+    if i.shape[0] < 1 or i.shape[1] < 8:
+        raise ValueError("Multi-channel input must contain at least one channel and eight samples per channel.")
     if channel_names is None:
         names = [f"channel_{index + 1}" for index in range(i.shape[0])]
     else:
-        names = list(channel_names)
+        names = [str(name) for name in channel_names]
         if len(names) != i.shape[0] or len(set(names)) != len(names):
-            raise ValueError("channel_names must contain one unique name per channel.")
+            raise ValueError("channel_names must contain one unique string name per channel.")
     results = {
-        str(name): analyze_langmuir_probe(v[index], i[index], **analysis_options)
+        name: analyze_langmuir_probe(v[index], i[index], **analysis_options)
         for index, name in enumerate(names)
     }
     return {
