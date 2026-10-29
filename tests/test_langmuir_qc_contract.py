@@ -67,3 +67,20 @@ def test_floating_potential_helper_validates_array_shape_and_averages_duplicate_
     with pytest.raises(ValueError, match="one-dimensional"):
         floating_potential([[0, 1]], [[-1, 1]])
     assert floating_potential([-1, 0, 0, 1], [-1, -1, 1, 1]) == 0.0
+
+
+def test_langmuir_ion_branch_fit_reports_residual_quality_diagnostics():
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-5 * voltage
+    result = langmuir_iv_analysis(
+        voltage,
+        current,
+        ion_fit_range=(-10.0, -5.0),
+    )
+
+    assert result["ion_saturation_fit_points"] >= 3
+    assert np.isfinite(result["ion_saturation_fit_R2"])
+    assert np.isfinite(result["ion_saturation_fit_residual_rms_A"])
+    assert result["ion_saturation_fit_normalized_rmse"] is not None
+    assert result["ion_saturation_fit_status"] == "fit_completed_review_R2_and_residuals"
+    assert result["ion_saturation_current_method"] == "median_user_selected_ion_fit_range"
