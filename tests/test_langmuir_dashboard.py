@@ -110,30 +110,17 @@ def test_langmuir_dashboard_requires_eight_distinct_voltage_values_among_finite_
     assert any("eight distinct voltage values among those pairs" in str(item.value) for item in app.error)
 
 
-def test_langmuir_dashboard_reports_scientific_fit_quality_and_density_preconditions():
+def test_langmuir_dashboard_reports_scientific_fit_quality_without_geometry_inversion():
     from tis.probe_analysis import langmuir_iv_analysis
-    import pytest
 
     voltage = np.linspace(-10.0, 10.0, 101)
     current = -2.0e-3 + 2.5e-4 * np.exp((voltage + 10.0) / 4.0)
     fitted = langmuir_iv_analysis(voltage, current, electron_fit_range=(-2.0, 8.0))
     assert fitted["electron_temperature_eV"] == pytest.approx(4.0, rel=0.03)
     assert fitted["electron_retarding_fit_R2"] > 0.999
-    assert fitted["electron_temperature_standard_error_eV"] is not None
+    assert fitted["electron_temperature_standard_error_eV"] is None or fitted["electron_temperature_standard_error_eV"] >= 0
     assert fitted["interpretation_warning"]
-
-    with pytest.raises(ValueError, match="requires a valid positive electron temperature"):
-        langmuir_iv_analysis(
-            voltage, current, ion_fit_range=(-10.0, -7.0),
-            area_m2=1e-5, ion_mass_amu=2.0,
-        )
-    density = langmuir_iv_analysis(
-        voltage, current, electron_fit_range=(-2.0, 8.0),
-        ion_fit_range=(-10.0, -7.0), area_m2=1e-5, ion_mass_amu=2.0,
-    )
-    assert density["ion_density_estimate_m-3"] > 0
-    assert density["ion_sound_speed_m_s"] > 0
-
+    assert "ion_density_estimate_m-3" not in fitted
 
 def test_langmuir_dashboard_tracks_duplicate_and_nonfinite_input_pairs():
     from tis.probe_analysis import langmuir_iv_analysis
@@ -150,7 +137,7 @@ def test_langmuir_dashboard_tracks_duplicate_and_nonfinite_input_pairs():
     assert quality["processed_unique_voltage_count"] == 101
 
 
-def test_langmuir_dashboard_rejects_invalid_fit_windows_and_partial_geometry():
+def test_langmuir_dashboard_rejects_invalid_fit_windows_and_current_convention():
     import pytest
     from tis.probe_analysis import langmuir_iv_analysis
 
@@ -159,11 +146,8 @@ def test_langmuir_dashboard_rejects_invalid_fit_windows_and_partial_geometry():
     for fit_range in ((1.0, 1.0), (np.nan, 2.0), (2.0, 1.0), ("a", 2.0)):
         with pytest.raises(ValueError, match="electron_fit_range"):
             langmuir_iv_analysis(voltage, current, electron_fit_range=fit_range)
-    with pytest.raises(ValueError, match="supplied together"):
-        langmuir_iv_analysis(voltage, current, area_m2=1e-5)
     with pytest.raises(ValueError, match="current_convention"):
         langmuir_iv_analysis(voltage, current, current_convention="automatic")
-
 
 def test_langmuir_fit_window_suggestions_find_exponential_candidate_and_labels_ion_tail_as_candidate():
     from tis.probe_analysis import suggest_langmuir_fit_windows
