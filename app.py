@@ -1660,7 +1660,7 @@ elif page=='Probe Analysis':
         st.error('The selected columns need at least eight finite paired samples and eight distinct voltage values among those pairs before Langmuir analysis can run.')
         st.stop()
     vmin=float(np.min(paired_voltage)); vmax=float(np.max(paired_voltage))
-    st.markdown('### Fit-window and probe geometry')
+    st.markdown('### Fit-window selection')
     st.caption('Fit-window suggestions scan the measured I–V curve for candidate electron-exponential and low-voltage ion-tail intervals. They do not validate physical regimes; inspect the curve, saturation regions and residuals.')
     if st.button('Suggest I–V fit windows', key='probe_suggest_fit_windows'):
         try:
@@ -1689,29 +1689,23 @@ elif page=='Probe Analysis':
         else:
             efit=st.slider('Electron-retarding fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin+(vmax-vmin)*.35),float(vmin+(vmax-vmin)*.75)),key='probe_electron_fit_range')
     ifit=None
-    if st.checkbox('Enable ion-branch fit (required for density estimate)',value=False,key='probe_enable_ion_fit'):
+    if st.checkbox('Enable ion-branch fit (ion-branch slope and intercept)',value=False,key='probe_enable_ion_fit'):
         if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin>=vmax:
             st.error('The selected voltage column must contain a finite, nonzero voltage range.')
         else:
             ifit=st.slider('Ion-branch fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)),key='probe_ion_fit_range')
-    c1,c2,c3=st.columns(3)
-    with c1: area=st.number_input('Effective collection area (m²; 0=omit density)',min_value=0.0,value=0.0,format='%.8g')
-    with c2: mass=st.number_input('Main ion mass (amu; 0 = do not estimate density)',min_value=0.0,value=0.0)
-    with c3: ti=st.number_input('Ion temperature (eV; model input)',min_value=0.0,value=0.0)
-    sheath=st.number_input('Sheath coefficient',min_value=0.01,value=.61)
+    st.caption('Geometry-dependent density/flux inversion is intentionally outside this geometry-independent analysis.')
     cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
         help='electron_positive: ion-saturation current is negative (default). ion_positive: collected ion current is positive; it is flipped internally.')
     if st.button('Analyze probe I–V',type='primary'):
         try:
-            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,area or None,mass or None,ti,sheath,current_convention=cur_conv)
+            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,current_convention=cur_conv)
             st.subheader('Langmuir analysis results')
-            r1,r2,r3=st.columns(3)
+            r1,r2=st.columns(2)
             vf=result.get('floating_potential_V')
             te_result=result.get('electron_temperature_eV')
-            density_result=result.get('ion_density_estimate_m-3')
             with r1: st.metric('Floating potential Vf',f'{vf:.5g} V' if vf is not None else 'Not determined')
             with r2: st.metric('Electron temperature Te',f'{te_result:.5g} eV' if te_result is not None else 'Not fitted')
-            with r3: st.metric('Ion density estimate',f'{density_result:.5g} m⁻³' if density_result is not None else 'Not estimated')
             st.caption('Floating-potential status: '+str(result.get('floating_potential_status','not reported'))+
                        ' · Current convention: '+str(result.get('current_convention',cur_conv)))
             quality=result.get('input_quality',{})
