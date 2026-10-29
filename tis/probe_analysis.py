@@ -272,8 +272,17 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         ion_nrmse = out['ion_saturation_fit_normalized_rmse']
         ion_relative_slope = abs(float(p[0])) * float(np.ptp(v[m])) / max(abs(float(np.median(i[m]))), np.finfo(float).tiny)
         ion_numerically_flat = bool(np.isfinite(ion_relative_slope) and ion_relative_slope <= 0.1)
-        ion_fit_good = bool(ion_r2 is not None and np.isfinite(ion_r2) and ion_r2 >= 0.98
-                            and ion_nrmse is not None and np.isfinite(ion_nrmse) and ion_nrmse <= 0.1)
+        # For a genuinely flat branch, R-squared and range-normalized RMSE are
+        # undefined because the observed current range is zero. In that case,
+        # screen the residual against the absolute current level instead of
+        # incorrectly rejecting the ideal saturation-plateau limit.
+        ion_level_scale = max(abs(float(np.median(i[m]))), np.finfo(float).tiny)
+        ion_level_nrmse = ion_rms / ion_level_scale
+        ion_fit_good = bool(
+            (ion_r2 is not None and np.isfinite(ion_r2) and ion_r2 >= 0.98
+             and ion_nrmse is not None and np.isfinite(ion_nrmse) and ion_nrmse <= 0.1)
+            or (ion_numerically_flat and np.isfinite(ion_level_nrmse) and ion_level_nrmse <= 0.1)
+        )
         out['ion_saturation_fit_status'] = (
             'numerical_fit_review_pass_not_physical_validation' if ion_fit_good
             else 'weak_or_undefined_numerical_fit_review_required'
