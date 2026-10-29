@@ -2,7 +2,7 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "n_e, T_e profiles; electron distribution constraints",
+    "quantities": "Calibrated n_e and T_e profiles; extrema, line averages, gradients, normalized gradients, and scale lengths",
     "status": "D",
     "method": "Core scope: analyze already-calibrated electron-density and electron-temperature profiles on supplied calibrated spatial coordinates; compute extrema, measured-interval line averages, gradients, normalized gradients, scale lengths, optional independent-error uncertainties, and within-domain reconstruction. Raw-spectrum fitting and absolute scattered-power density inversion are separate extensions.",
     "caveat": "Inputs are assumed calibrated. The core workflow does not infer machine dimensions, major radius, optical geometry, or geometry-weighted volume averages. Spectral fitting requires a calibrated wavelength axis and a stated Gaussian instrument model; absolute density inversion requires optical-power and collection-geometry inputs. No independent experimental validation is claimed.",
