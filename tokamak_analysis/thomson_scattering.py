@@ -36,6 +36,18 @@ class ThomsonSummary:
     temperature_line_average_uncertainty_ev: float | None = None
 
 
+def _is_finite_real_scalar(value) -> bool:
+    """Accept finite real scalar values while rejecting booleans and numeric strings."""
+    if not isinstance(value, (int, float, np.integer, np.floating)):
+        return False
+    if isinstance(value, (bool, np.bool_)):
+        return False
+    try:
+        return bool(np.isfinite(value))
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def _array(values: Iterable[float], name: str) -> np.ndarray:
     raw = np.asarray(values)
     if raw.ndim != 1:
