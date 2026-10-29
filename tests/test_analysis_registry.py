@@ -20,6 +20,8 @@ def test_all_registered_analyses_resolve_to_callables():
 def test_thomson_entry_declares_real_inputs_outputs_and_scope():
     entry = ANALYSES[0]
     assert entry["name"] == "Thomson scattering"
+    assert "electron distribution constraints" not in entry["quantities"].lower()
+    assert "normalized gradients" in entry["quantities"].lower()
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
