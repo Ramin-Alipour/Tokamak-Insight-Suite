@@ -136,3 +136,52 @@ def test_langmuir_proxy_and_scope_are_explicit_without_fit_windows():
     assert result["plasma_potential_status"] == "proxy_only_requires_probe_regime_review"
     assert result["analysis_scope"] == "calibrated_single_probe_IV_sweep_only"
     assert result["fit_window_review"]["physical_regime_certified"] is False
+
+
+def test_public_langmuir_wrapper_forwards_density_uncertainty_contract():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
+
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    uncertainty_inputs = {
+        "ion_current_uncertainty_A": 1e-5,
+        "probe_area_relative_uncertainty": 0.02,
+        "ion_mass_relative_uncertainty": 0.01,
+        "ion_saturation_coefficient_relative_uncertainty": 0.05,
+        "electron_temperature_relative_uncertainty": 0.03,
+    }
+    common_inputs = {
+        "electron_fit_range": (-8.0, 0.0),
+        "ion_fit_range": (-10.0, -7.0),
+        "probe_area_m2": 1e-4,
+        "ion_mass_kg": 3.34e-27,
+        "ion_saturation_coefficient": 0.61,
+        "sheath_model": "test-model",
+    }
+
+    core_result = langmuir_iv_analysis(
+        voltage, current, **common_inputs, **uncertainty_inputs
+    )
+    public_result = analyze_langmuir_probe(
+        voltage, current, **common_inputs, **uncertainty_inputs
+    )
+
+    assert public_result["ion_density_estimate_m-3"] == pytest.approx(
+        core_result["ion_density_estimate_m-3"]
+    )
+    assert public_result["ion_density_standard_uncertainty_m-3"] == pytest.approx(
+        core_result["ion_density_standard_uncertainty_m-3"]
+    )
+    assert public_result["ion_density_relative_standard_uncertainty"] == pytest.approx(
+        core_result["ion_density_relative_standard_uncertainty"]
+    )
+    assert public_result["ion_density_uncertainty_components_relative"] == pytest.approx(
+        core_result["ion_density_uncertainty_components_relative"]
+    )
+    assert public_result["ion_density_uncertainty_status"] == (
+        "partial_first_order_propagation_supplied_components_only"
+    )
+    assert set(public_result["ion_density_uncertainty_components_relative"]) == {
+        "ion_current", "probe_area", "ion_mass", "sheath_coefficient",
+        "electron_temperature",
+    }
