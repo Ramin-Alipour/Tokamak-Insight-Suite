@@ -72,7 +72,7 @@ def analyze_langmuir_probe_array(
     if isinstance(voltage_V, dict) and current_A is None:
         channels = voltage_V
         if not channels:
-            raise ValueError("At least one calibrated probe channel is required.")
+            raise ValueError("at least one calibrated probe channel is required.")
         channel_items = [(str(name), pair) for name, pair in channels.items()]
         channel_names = [name for name, _ in channel_items]
         if len(set(channel_names)) != len(channel_names):
