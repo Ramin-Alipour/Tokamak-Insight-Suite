@@ -268,7 +268,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed.",
+    "implementation_status": "Implemented calibrated single-sweep I–V analysis, polarity normalization, zero-crossing and dI/dV indicators, optional electron-retarding and ion-branch fits, fit-quality metrics, and guarded model-based ion-density inversion. No default sheath coefficient is assumed. Synthetic tests only; no independent experimental validation or full input/systematic uncertainty propagation is claimed. Processed voltage/current arrays and the corresponding dI/dV array are now returned explicitly for auditability; these are computational outputs, not inferred measurements.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -517,6 +517,21 @@
           "name": "ion_density_model",
           "unit": "structured",
           "description": "Records sheath-model label, coefficient, area, ion mass, equation, single-species assumption and omitted uncertainty propagation."
+        },
+        {
+          "name": "processed_voltage_V",
+          "unit": "V",
+          "description": "Voltage samples retained after finite-pair filtering and duplicate-voltage aggregation, in strictly ascending order; exact values used by downstream calculations."
+        },
+        {
+          "name": "processed_current_A",
+          "unit": "A",
+          "description": "Current samples corresponding one-to-one with processed_voltage_V after polarity normalization and duplicate-voltage averaging."
+        },
+        {
+          "name": "dIdV_A_per_V",
+          "unit": "A/V",
+          "description": "Numerical gradient of processed current with respect to processed voltage, using the same samples used to determine the maximum-slope plasma-potential proxy."
         }
       ],
       "assumptions": [
