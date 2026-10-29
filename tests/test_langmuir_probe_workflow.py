@@ -367,3 +367,39 @@ def test_langmuir_probe_base_and_optional_outputs_match_registry_contract():
     }
     assert required_runtime_outputs <= result.keys()
     assert required_runtime_outputs <= contract_names
+
+
+
+def test_langmuir_probe_allows_ideal_flat_ion_plateau_for_density_inversion():
+    voltage = np.linspace(-5.0, 20.0, 101)
+    current = -1.0e-3 + 4.0e-5 * np.exp((voltage - 10.0) / 3.0)
+    current[voltage <= 0.0] = -1.0e-3
+    result = analyze_langmuir_probe(
+        voltage,
+        current,
+        electron_fit_range=(10.0, 20.0),
+        ion_fit_range=(-5.0, 0.0),
+        probe_area_m2=1.0e-5,
+        ion_mass_kg=3.3435837724e-27,
+        ion_saturation_coefficient=0.61,
+        sheath_model="synthetic flat-plateau case",
+    )
+    assert result["ion_saturation_fit_normalized_rmse"] is None
+    assert result["ion_saturation_fit_status"] == "numerical_fit_review_pass_not_physical_validation"
+    assert result["ion_saturation_regime_review"]["numerically_flat_candidate"] is True
+    assert result["ion_density_estimate_m-3"] > 0.0
+
+
+def test_langmuir_probe_public_wrapper_matches_canonical_core():
+    from tis.probe_analysis import langmuir_iv_analysis
+
+    voltage, current, kwargs = density_case()
+    public_result = analyze_langmuir_probe(voltage, current, **kwargs)
+    canonical_result = langmuir_iv_analysis(voltage, current, **kwargs)
+    assert public_result.keys() == canonical_result.keys()
+    for key in public_result:
+        left, right = public_result[key], canonical_result[key]
+        if isinstance(left, (float, int)) and not isinstance(left, bool):
+            assert left == pytest.approx(right)
+        else:
+            assert left == right
