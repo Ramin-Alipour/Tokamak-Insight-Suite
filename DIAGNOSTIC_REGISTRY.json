@@ -799,6 +799,48 @@
         "tis.core.langmuir_iv_analysis",
         "tis.core.probe_iv_summary"
       ],
+      "advanced_entry_points": [
+        {
+          "function": "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_series",
+          "input_contract": "Calibrated current array shaped (time, channel, sample), with shared or matching calibrated voltage data and optional time/channel labels.",
+          "outputs": "Independent per-time/per-channel sweep results; no temporal trend or cross-channel inference."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.fit_langmuir_electron_models",
+          "input_contract": "Calibrated voltage/current arrays, explicit fit range, and single_maxwellian or two_temperature model.",
+          "outputs": "Temperature component estimates and fit diagnostics; physical distribution is not confirmed."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.fit_langmuir_stretched_exponential",
+          "input_contract": "Calibrated voltage/current arrays and explicit fit range.",
+          "outputs": "Empirical shape exponent and fit diagnostics; not a kinetic kappa distribution."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
+          "input_contract": "Negative ion current in electron-positive convention, positive temperature and area, and explicit species masses, fractions, and sheath coefficients.",
+          "outputs": "Model-based total ion density; fractions must sum to one; uncertainty propagation is not performed."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.estimate_electron_density_from_saturation",
+          "input_contract": "Positive electron-saturation current, electron temperature, and effective collection area.",
+          "outputs": "Maxwellian-model electron density; physical regime is not confirmed."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.estimate_ion_particle_flux",
+          "input_contract": "Ion density, electron temperature, ion mass, and explicitly supplied sheath factor.",
+          "outputs": "Bohm-like sound speed and particle-flux estimate; uncertainty propagation is not performed."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
+          "input_contract": "Calibrated voltage/current arrays and explicit Savitzky-Golay window length and polynomial order.",
+          "outputs": "Raw and smoothed derivative candidates; no physical certification."
+        },
+        {
+          "function": "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
+          "input_contract": "Calibrated voltage/current arrays, reference fit range, and optional relative shifts.",
+          "outputs": "Temperature spread across alternative windows; not a statistical confidence interval."
+        }
+      ],
       "raw_data_to_physics": false,
       "note": "Analysis uses already-calibrated single-probe I–V samples. All public entry points share the canonical implementation and minimum-input contract. Fit-window diagnostics are numerical screening only and do not certify physical regimes. Density is optional and requires explicit physical inputs and analyst-selected fit windows; uncertainty propagation includes only supplied components. Synthetic tests are software regression checks, not experimental validation.",
       "completion_criteria": {
