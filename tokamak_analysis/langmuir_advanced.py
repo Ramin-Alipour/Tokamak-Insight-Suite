@@ -259,3 +259,106 @@ def langmuir_fit_window_sensitivity(
         "temperature_window_sensitivity_relative_to_mean": (spread / mean if spread is not None and mean not in (None, 0.0) else None),
         "interpretation": "Sensitivity diagnostic, not a statistical confidence interval or a replacement for justified physical fit-window selection.",
     }
+
+
+def estimate_electron_density_from_saturation(
+    electron_saturation_current_A: float,
+    electron_temperature_eV: float,
+    probe_area_m2: float,
+) -> dict[str, Any]:
+    """Estimate electron density from positive electron saturation current.
+
+    Uses I_e,sat = e A n_e sqrt(e T_e / (2 pi m_e)); the user must supply an
+    effective collection area appropriate to the probe regime and geometry.
+    """
+    from tis.constants import E_CHARGE, M_E
+
+    vals = (electron_saturation_current_A, electron_temperature_eV, probe_area_m2)
+    if not all(isinstance(x, (int, float, np.integer, np.floating)) and not isinstance(x, (bool, np.bool_)) and math.isfinite(float(x)) for x in vals):
+        raise ValueError("Current, temperature, and area must be finite real scalars.")
+    if electron_saturation_current_A <= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
+        raise ValueError("Electron saturation current, temperature, and area must be positive.")
+    thermal_speed_factor = math.sqrt(E_CHARGE * electron_temperature_eV / (2.0 * math.pi * M_E))
+    density = electron_saturation_current_A / (E_CHARGE * probe_area_m2 * thermal_speed_factor)
+    return {
+        "electron_density_estimate_m-3": density,
+        "formula": "n_e = I_e,sat / (e A_p sqrt(e T_e / (2 pi m_e)))",
+        "assumption": "Maxwellian electron collection with the supplied effective area and applicable electron-saturation regime.",
+        "physical_regime_confirmed": False,
+        "uncertainty_propagation_performed": False,
+    }
+
+
+def estimate_ion_particle_flux(
+    ion_density_m3: float,
+    electron_temperature_eV: float,
+    ion_mass_kg: float,
+    *,
+    sheath_factor: float = 1.0,
+) -> dict[str, Any]:
+    """Estimate Bohm-like ion particle flux from supplied density and Te."""
+    from tis.constants import E_CHARGE
+
+    vals = (ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_factor)
+    if not all(isinstance(x, (int, float, np.integer, np.floating)) and not isinstance(x, (bool, np.bool_)) and math.isfinite(float(x)) for x in vals):
+        raise ValueError("Density, temperature, mass, and sheath_factor must be finite real scalars.")
+    if ion_density_m3 <= 0 or electron_temperature_eV <= 0 or ion_mass_kg <= 0 or sheath_factor <= 0:
+        raise ValueError("Density, temperature, mass, and sheath_factor must be positive.")
+    sound_speed = math.sqrt(E_CHARGE * electron_temperature_eV / ion_mass_kg)
+    flux = float(sheath_factor) * float(ion_density_m3) * sound_speed
+    return {
+        "ion_sound_speed_m_s": sound_speed,
+        "ion_particle_flux_m-2_s-1": flux,
+        "formula": "Gamma_i = sheath_factor * n_i * sqrt(e T_e / m_i)",
+        "assumption": "Bohm-like flux estimate; sheath_factor and the applicability of the selected edge/sheath model are supplied by the user.",
+        "physical_regime_confirmed": False,
+        "uncertainty_propagation_performed": False,
+    }
+
+
+def estimate_smoothed_plasma_potential_candidates(
+    voltage_V: Any,
+    current_A: Any,
+    *,
+    window_length: int = 7,
+    polynomial_order: int = 2,
+) -> dict[str, Any]:
+    """Compare raw-gradient and explicitly Savitzky-Golay-smoothed derivative candidates."""
+    from scipy.signal import savgol_filter
+
+    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
+    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
+        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
+    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must be real numeric arrays.")
+    finite = np.isfinite(v0) & np.isfinite(i0)
+    v, i = v0[finite].astype(float), i0[finite].astype(float)
+    order = np.argsort(v)
+    v, i = v[order], i[order]
+    unique, inv = np.unique(v, return_inverse=True)
+    if len(unique) != len(v):
+        sums, counts = np.bincount(inv, weights=i), np.bincount(inv)
+        v, i = unique, sums / counts
+    if len(v) < 5 or not np.all(np.diff(v) > 0):
+        raise ValueError("At least five distinct finite voltage values are required.")
+    if isinstance(window_length, bool) or not isinstance(window_length, int) or window_length < 5 or window_length % 2 == 0 or window_length > len(v):
+        raise ValueError("window_length must be an odd integer between 5 and the number of samples.")
+    if isinstance(polynomial_order, bool) or not isinstance(polynomial_order, int) or polynomial_order < 1 or polynomial_order >= window_length:
+        raise ValueError("polynomial_order must be an integer in [1, window_length).")
+    raw_didv = np.gradient(i, v)
+    raw_d2 = np.gradient(raw_didv, v)
+    smooth_i = savgol_filter(i, window_length=window_length, polyorder=polynomial_order, mode="interp")
+    smooth_didv = np.gradient(smooth_i, v)
+    smooth_d2 = np.gradient(smooth_didv, v)
+    return {
+        "raw_max_dIdV_candidate_V": float(v[int(np.argmax(raw_didv))]),
+        "raw_max_d2IdV2_candidate_V": float(v[int(np.argmax(raw_d2))]),
+        "smoothed_max_dIdV_candidate_V": float(v[int(np.argmax(smooth_didv))]),
+        "smoothed_max_d2IdV2_candidate_V": float(v[int(np.argmax(smooth_d2))]),
+        "smoothing_method": "Savitzky-Golay",
+        "window_length_samples": window_length,
+        "polynomial_order": polynomial_order,
+        "smoothed_current_A": smooth_i.tolist(),
+        "physical_plasma_potential_confirmed": False,
+        "interpretation": "Compare candidates and parameter sensitivity; smoothing is explicit and does not certify the physical plasma potential.",
+    }
