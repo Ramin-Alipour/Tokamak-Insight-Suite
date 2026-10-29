@@ -294,7 +294,7 @@ def estimate_ion_particle_flux(
     electron_temperature_eV: float,
     ion_mass_kg: float,
     *,
-    sheath_factor: float = 1.0,
+    sheath_factor: float,
 ) -> dict[str, Any]:
     """Estimate Bohm-like ion particle flux from supplied density and Te."""
     from tis.constants import E_CHARGE
