@@ -82,7 +82,7 @@ def test_electron_density_and_particle_flux_helpers_are_positive():
         estimate_ion_particle_flux,
     )
     ne = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4)
-    flux = estimate_ion_particle_flux(1e18, 5.0, 3.34e-27)
+    flux = estimate_ion_particle_flux(1e18, 5.0, 3.34e-27, sheath_factor=1.0)
     assert ne["electron_density_estimate_m-3"] > 0
     assert ne["physical_regime_confirmed"] is False
     assert flux["ion_particle_flux_m-2_s-1"] > 0
