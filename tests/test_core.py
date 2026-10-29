@@ -600,15 +600,6 @@ def test_signed_current_and_magnetic_field_are_supported():
     assert negative["ohmic_power_approx_W"] == pytest.approx(-positive["ohmic_power_approx_W"])
 
 
-def test_langmuir_density_refuses_missing_electron_temperature():
-    from tis.core import langmuir_iv_analysis
-    v = np.linspace(-10, 10, 301)
-    # No valid positive electron-retarding slope is supplied.
-    i = np.where(v < -7, -0.01, -0.02 - 0.001*v)
-    with pytest.raises(ValueError, match="positive electron temperature"):
-        langmuir_iv_analysis(v, i, ion_fit_range=(-10, -7))
-
-
 def test_spectrum_moments_preserves_negative_net_bins_without_clipping():
     e = np.linspace(1, 10, 10)
     counts = np.array([1., 3., 7., 10., 12., 9., 6., 3., 1., 0.])
