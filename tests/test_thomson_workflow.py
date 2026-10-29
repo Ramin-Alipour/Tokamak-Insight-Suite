@@ -201,3 +201,16 @@ def test_scale_length_is_undefined_for_constant_profiles():
     assert np.all(np.isnan(out["density_scale_length_m"]))
     assert np.all(np.isnan(out["temperature_scale_length_m"]))
 
+def test_scale_length_uncertainty_uses_gradient_units_for_small_profiles():
+    out = analyze_thomson_profile(
+        [0.0, 1.0, 2.0],
+        [3.0e-20, 2.0e-20, 1.0e-20],
+        [3.0e-12, 2.0e-12, 1.0e-12],
+        density_uncertainty_m3=[1.0e-21, 1.0e-21, 1.0e-21],
+        temperature_uncertainty_ev=[1.0e-13, 1.0e-13, 1.0e-13],
+    )
+    assert np.all(np.isfinite(out["density_scale_length_m"]))
+    assert np.all(np.isfinite(out["density_scale_length_uncertainty_m"]))
+    assert np.all(np.isfinite(out["temperature_scale_length_m"]))
+    assert np.all(np.isfinite(out["temperature_scale_length_uncertainty_m"]))
+
