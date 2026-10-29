@@ -53,7 +53,12 @@ def test_live_streamlit_ece_response_workflow_upload_and_download(tmp_path):
             page.get_by_text("Reflectometry / ECE", exact=True).click()
             workflow = page.get_by_role("combobox", name="ECE workflow")
             workflow.click()
-            page.get_by_role("option", name="Receiver response convolution").click()
+            # Streamlit's custom select menu does not expose a consistently
+            # clickable option node in headless Chromium. Keyboard navigation
+            # exercises the actual widget and selects its final documented mode.
+            workflow.press("End")
+            workflow.press("Enter")
+            expect(page.get_by_text("Convolve calibrated spectral radiance with a supplied receiver response", exact=False)).to_be_visible(timeout=15_000)
 
             page.get_by_label("Spectral frequency grid (Hz; comma-separated, increasing)").fill(
                 "80000000000,85000000000,90000000000,95000000000,100000000000"
