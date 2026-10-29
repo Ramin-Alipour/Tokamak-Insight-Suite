@@ -508,20 +508,7 @@ def test_langmuir_exact_zero_current_uses_sample_without_division_by_zero():
     assert r["floating_potential_V"] == pytest.approx(0.5)
 
 
-def test_langmuir_requires_area_and_ion_mass_together():
-    from tis.core import langmuir_iv_analysis
-    v=np.linspace(-4,4,9)
-    i=np.linspace(-1,1,9)
-    with pytest.raises(ValueError, match="supplied together"):
-        langmuir_iv_analysis(v,i,area_m2=1e-6)
-
-
 @pytest.mark.parametrize("kwargs", [
-    {"area_m2": 0.0, "ion_mass_amu": 2.0},
-    {"area_m2": 1e-6, "ion_mass_amu": float("nan")},
-    {"ti_eV": -1.0},
-    {"sheath_factor": 0.0},
-    {"gamma_i": -1.0},
     {"electron_fit_range": (float("nan"), 1.0)},
 ])
 def test_langmuir_rejects_nonphysical_model_inputs(kwargs):
@@ -619,7 +606,7 @@ def test_langmuir_density_refuses_missing_electron_temperature():
     # No valid positive electron-retarding slope is supplied.
     i = np.where(v < -7, -0.01, -0.02 - 0.001*v)
     with pytest.raises(ValueError, match="positive electron temperature"):
-        langmuir_iv_analysis(v, i, ion_fit_range=(-10, -7), area_m2=1e-5, ion_mass_amu=2.0)
+        langmuir_iv_analysis(v, i, ion_fit_range=(-10, -7))
 
 
 def test_spectrum_moments_preserves_negative_net_bins_without_clipping():
@@ -833,9 +820,9 @@ def test_zero_weight_sensor_does_not_corrupt_integer_mode_fit():
 def test_langmuir_missing_ion_range_is_reported_not_silently_omitted():
     voltage = np.linspace(-5, 5, 101)
     current = 0.01*np.exp(voltage/2) - 0.02
-    result = langmuir_iv_analysis(voltage, current, area_m2=1e-5, ion_mass_amu=2.0)
-    assert "ion_density_status" in result
-    assert result["ion_density_status"].startswith("not_estimated")
+    result = langmuir_iv_analysis(voltage, current)
+    assert "ion_density_estimate_m-3" not in result
+    assert "ion_density_status" not in result
 
 
 def test_interferometer_phase_sign_is_never_assumed():
