@@ -946,7 +946,7 @@ def test_prepare_time_series_accepts_microsecond_quantized_clock_without_gap():
     assert fs == pytest.approx(400_000, rel=0.15)
 
 
-def test_langmuir_without_geometry_does_not_require_default_ion_mass():
+def test_langmuir_geometry_independent_analysis_needs_only_iv_and_fit_inputs():
     voltage = np.linspace(-20, 20, 101)
     current = 0.01 * np.exp(voltage / 10) - 0.02
     result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-5, 15), ion_fit_range=(-20, -10))
