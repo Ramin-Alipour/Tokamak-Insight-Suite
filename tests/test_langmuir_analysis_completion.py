@@ -73,11 +73,19 @@ def test_langmuir_ambiguous_zero_crossings_are_not_collapsed():
         {"area_m2": 1e-6, "ion_mass_amu": 0.0},
     ],
 )
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"current_convention": "unknown"},
+        {"electron_fit_range": (1.0, 1.0)},
+        {"ion_fit_range": (0.0, 1.0)},
+        {"electron_fit_range": ("bad", 2.0)},
+    ],
+)
 def test_langmuir_rejects_invalid_model_inputs(kwargs):
     voltage, current = _synthetic_sweep()
     with pytest.raises(ValueError):
         langmuir_iv_analysis(voltage, current, **kwargs)
-
 
 def test_probe_summary_reports_nonfinite_and_insufficient_input_safely():
     with pytest.raises(ValueError, match="At least 5 finite"):
