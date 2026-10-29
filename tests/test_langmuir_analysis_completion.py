@@ -55,6 +55,15 @@ def test_langmuir_duplicate_and_nonfinite_pairs_are_audited():
     assert quality["processed_unique_voltage_count"] == 81
 
 
+def test_langmuir_ambiguous_zero_crossings_are_not_collapsed():
+    voltage = np.arange(9.0)
+    current = np.array([-2.0, -1.0, 1.0, 2.0, -1.0, -2.0, 1.0, 2.0, 3.0])
+    result = langmuir_iv_analysis(voltage, current)
+    assert len(result["floating_potential_candidates_V"]) == 3
+    assert result["floating_potential_V"] is None
+    assert result["floating_potential_status"] == "ambiguous_multiple_zero_crossings"
+
+
 @pytest.mark.parametrize(
     "kwargs",
     [
