@@ -330,6 +330,41 @@
           "unit": "text",
           "description": "Non-empty model label documenting the source/geometry/regime used to select the coefficient.",
           "required": false
+        },
+        {
+          "name": "ion_current_uncertainty_A",
+          "unit": "A",
+          "description": "Optional absolute standard uncertainty of the selected ion-saturation current for first-order density uncertainty propagation.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "probe_area_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of effective collection area.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "ion_mass_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of assumed ion mass.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "ion_saturation_coefficient_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of the selected sheath-model coefficient.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "electron_temperature_relative_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative temperature uncertainty component, combined in quadrature with fitted statistical temperature uncertainty.",
+          "required": false,
+          "minimum": 0
         }
       ],
       "output_specs": [
@@ -557,6 +592,51 @@
           "name": "ion_saturation_fit_status",
           "unit": "text",
           "description": "Indicates that fit quality must be reviewed using R-squared and residual diagnostics; numerical fit quality does not certify physical regime validity."
+        },
+        {
+          "name": "plasma_potential_method",
+          "unit": "text",
+          "description": "Explicitly identifies maximum numerical dI/dV as a proxy only."
+        },
+        {
+          "name": "plasma_potential_status",
+          "unit": "text",
+          "description": "Warns that the dI/dV proxy is not a validated plasma-potential measurement."
+        },
+        {
+          "name": "electron_retarding_regime_review",
+          "unit": "structured",
+          "description": "Numerical fit-screening status and explicit statement that physical regime is not certified."
+        },
+        {
+          "name": "ion_saturation_regime_review",
+          "unit": "structured",
+          "description": "Numerical flatness candidate and explicit statement that physical ion saturation is not confirmed."
+        },
+        {
+          "name": "ion_density_standard_uncertainty_m-3",
+          "unit": "m^-3",
+          "description": "Optional first-order propagated standard uncertainty using only supplied uncertainty components; null when not calculated."
+        },
+        {
+          "name": "ion_density_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Optional first-order relative density standard uncertainty from supplied components."
+        },
+        {
+          "name": "ion_density_uncertainty_components_relative",
+          "unit": "structured",
+          "description": "Relative uncertainty components included in the first-order density propagation."
+        },
+        {
+          "name": "ion_density_uncertainty_status",
+          "unit": "text",
+          "description": "Distinguishes partial supplied-component propagation from no uncertainty propagation."
+        },
+        {
+          "name": "analysis_scope",
+          "unit": "text",
+          "description": "Declares that this execution workflow is for a calibrated single-probe I-V sweep only."
         }
       ],
       "assumptions": [
@@ -572,16 +652,19 @@
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
       "algorithm": "Normalize polarity, validate and clean calibrated I–V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report explicitly labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density from explicit sheath-model and geometry inputs.",
-      "uncertainty_model": "Only the optional electron-temperature fit returns a local covariance-based standard error. Electron-branch residual RMS, normalized RMSE and R-squared are exposed for fit review. Calibration, current/voltage covariance, fit-window sensitivity, systematic errors and model discrepancy are not propagated.",
+      "uncertainty_model": "Optional first-order quadrature propagation for ion density using explicitly supplied ion-current absolute uncertainty and relative uncertainties for collection area, ion mass, sheath coefficient and electron temperature. Fitted statistical Te uncertainty is combined with the supplied relative Te component. This is partial only; unspecified calibration covariance, correlated errors, fit-window sensitivity, model discrepancy and other systematics are not inferred.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
         "Density requires an explicitly justified sheath coefficient, collection area, ion mass, and both physically selected fit windows.",
         "Single-ion-species assumption; mixtures require an appropriate model or separate treatment.",
-        "No automatic propagation of current, area, mass, temperature, coefficient or model uncertainty.",
         "Plasma-potential output is a dI/dV proxy, not a universally valid Vp measurement.",
         "Check fit quality and probe-specific magnetic-field, RF, collision, secondary-emission, surface and sweep-direction effects.",
         "The dI/dV maximum is a plasma-potential proxy, not a universally valid plasma-potential measurement.",
-        "Ion density is a model-based estimate only when all required fit-window, geometry, ion-mass and sheath-model inputs are supplied; particle flux is outside scope."
+        "Ion density is a model-based estimate only when all required fit-window, geometry, ion-mass and sheath-model inputs are supplied; particle flux is outside scope.",
+        "Numerical fit screening cannot certify electron-retarding or ion-saturation physical regimes.",
+        "Density uncertainty propagation is partial and includes only explicitly supplied uncertainty components.",
+        "The maximum dI/dV voltage is a proxy only; physical plasma potential requires regime-specific justification.",
+        "This workflow covers calibrated single-probe I-V sweeps, not all multi-probe, array or triple-probe configurations."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
@@ -589,7 +672,7 @@
         "tis.core.probe_iv_summary"
       ],
       "raw_data_to_physics": false,
-      "note": "Analysis uses already-calibrated single-sweep I–V samples. Density is optional and computed only with explicit physical inputs and analyst-selected ion/electron fit windows; synthetic tests do not constitute experimental validation."
+      "note": "Analysis uses already-calibrated single-probe I-V samples. Fit-window diagnostics are numerical screening only and do not certify physical regimes. Density is optional and requires explicit physical inputs and analyst-selected fit windows; uncertainty propagation includes only supplied components. Synthetic tests are software regression checks, not experimental validation."
     },
     "note": "Calibrated single-sweep I–V analysis with optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred."
   },
