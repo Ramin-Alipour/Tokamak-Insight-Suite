@@ -4407,30 +4407,98 @@
     }
   },
   {
-    "family": "Fast particles",
-    "diagnostic": "Collective Thomson scattering (CTS)",
-    "quantities": "Fast-ion velocity-space constraints",
-    "status": "M→I",
-    "method": "Fit frequency-shifted scattered spectrum using plasma response model.",
-    "caveat": "Calibration, scattering geometry and background rejection are required.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "family": "Plasma parameters",
+    "diagnostic": "Thomson spatial profile reconstruction",
+    "quantities": "Within-domain reconstructed electron-density and electron-temperature radial curves and their gradients from already inferred spatial profile points.",
+    "status": "D",
+    "method": "Weighted smoothing spline or shape-preserving PCHIP interpolation of previously inferred density and temperature samples; no spectral inversion is performed by this downstream utility.",
+    "caveat": "This is a downstream reconstruction utility, not raw measured-spectrum physical inference. Current pointwise uncertainties are fit weights only; reconstructed confidence bands and correlated covariance are not yet propagated.",
+    "implementation_functions": [
+      "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+    ],
+    "implementation_status": "Dedicated downstream profile reconstruction callable; physical parameters must first be inferred from measured spectra. Uncertainty bands and full covariance propagation remain unavailable.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit frequency-shifted scattered spectrum using plasma response model.",
-      "uncertainty_model": "not_specified",
-      "limitations": [
-        "Calibration, scattering geometry and background rejection are required."
+      "execution_level": "limited_calculation",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "radius_m",
+          "unit": "m",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "required": true,
+          "description": "Electron density previously inferred from measured Thomson spectra."
+        },
+        {
+          "name": "temperature_ev",
+          "unit": "eV",
+          "required": true,
+          "description": "Electron temperature previously inferred from measured Thomson spectra."
+        },
+        {
+          "name": "density_uncertainty_m3",
+          "unit": "m^-3",
+          "required": false
+        },
+        {
+          "name": "temperature_uncertainty_ev",
+          "unit": "eV",
+          "required": false
+        },
+        {
+          "name": "method",
+          "unit": "text",
+          "required": false
+        },
+        {
+          "name": "smoothing_factor",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "points",
+          "unit": "count",
+          "required": false
+        }
       ],
-      "function_links": [],
+      "output_specs": [
+        {
+          "name": "reconstructed_density_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "reconstructed_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "reconstruction_gradients",
+          "unit": "derivative units"
+        }
+      ],
+      "assumptions": [
+        "Input profiles are already physically inferred and calibrated.",
+        "No extrapolation is performed beyond the measured radial interval."
+      ],
+      "preprocessing": [
+        "Validate finite profile arrays and uncertainty inputs; no source data are calibrated or repaired."
+      ],
+      "algorithm": "Reconstruct within-domain one-dimensional density and temperature profiles using the selected spline/interpolation method.",
+      "uncertainty_model": "Pointwise uncertainties are currently used as smoothing weights only; reconstructed covariance and confidence bands are not computed.",
+      "limitations": [
+        "Not a raw-spectrum inference workflow.",
+        "No geometry-weighted line average or volume average is inferred.",
+        "Negative spline overshoot is currently clipped; this can affect gradients.",
+        "Correlated point uncertainties are not modeled."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+      ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Downstream profile reconstruction only; use Analysis 1 or subanalysis 7 to infer parameters from measured spectra."
     }
   },
   {

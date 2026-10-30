@@ -634,8 +634,10 @@ def analyze_thomson_spectra(
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
+        expected_parameter_count = (2 if model == "collective_maxwellian" else
+                                    6 if model == "non_collective_kappa" else 5)
         quality = _fit_identifiability(fit.get("fit_covariance"), fit.get("residual"), ui,
-                                       2 if model == "collective_maxwellian" else len(np.asarray(fit.get("fit_covariance"))))
+                                       expected_parameter_count)
         fit.update(quality)
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
