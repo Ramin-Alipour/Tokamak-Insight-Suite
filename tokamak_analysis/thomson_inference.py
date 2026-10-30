@@ -139,9 +139,17 @@ def _fit_identifiability(
     chi2 = None
     if uncertainty is not None and np.all(np.isfinite(residual)):
         u = np.asarray(uncertainty, dtype=float)
-        chi2 = float(np.sum((residual / u) ** 2) / dof)
-        if not np.isfinite(chi2):
-            reasons.append("reduced chi-square is non-finite")
+        if u.shape != residual.shape or np.any(~np.isfinite(u)) or np.any(u <= 0):
+            reasons.append("fit uncertainty is invalid or does not match the residual")
+        else:
+            chi2 = float(np.sum((residual / u) ** 2) / dof)
+            if not np.isfinite(chi2):
+                reasons.append("reduced chi-square is non-finite")
+            elif chi2 > 10.0:
+                reasons.append(
+                    "reduced chi-square exceeds the default acceptance ceiling of 10; "
+                    "the optimizer converged but the spectral model does not adequately explain the data"
+                )
     return {
         "fit_accepted": not reasons,
         "fit_quality_status": "accepted_with_identifiability_diagnostics" if not reasons else "rejected_unidentifiable_or_invalid",
