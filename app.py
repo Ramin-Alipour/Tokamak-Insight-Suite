@@ -2767,7 +2767,7 @@ elif page=='Advanced Analysis':
                 assume_ion_stationary=st.checkbox('Explicitly assume zero ion flow when no ion velocity is supplied',value=False,key='tis_ts_vi_zero')
                 electron_velocity_text=st.text_input('Measured electron-fluid velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_ve')
                 assume_electron_stationary=st.checkbox('Explicitly assume zero electron-fluid flow when no velocity is supplied',value=False,key='tis_ts_ve_zero')
-            with st.expander('Optional absolute-density inference (requires spectral intensity in W/nm)'):
+            with st.expander('Optional absolute-density inference (non-collective models only; requires spectral intensity in W/nm)'):
                 power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
                 laser_power=st.number_input('Incident laser power at scattering volume (W)',min_value=0.0,value=0.0,key='tis_ts_power')
                 laser_power_unc=st.text_input('Laser-power 1-sigma uncertainty (W; blank if unavailable)',value='',key='tis_ts_power_unc')
@@ -2817,6 +2817,8 @@ elif page=='Advanced Analysis':
                     response=response_array[:,0] if response_array.shape[1]==1 else (response_array[0,:] if response_array.shape[0]==1 else response_array)
                     response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
                     kwargs={}
+                    if model_label.startswith('Collective') and power_calibrated:
+                        raise ValueError('Absolute-density optical-power inversion is currently implemented for non-collective models only; collective density is inferred from the kinetic spectral shape when identifiable.')
                     if model_label.startswith('Collective'):
                         species=[s.strip() for s in ion_species_text.split(',') if s.strip()]
                         ion_fractions=[float(v.strip()) for v in ion_fractions_text.split(',') if v.strip()]
