@@ -197,7 +197,7 @@
         "Convolve the physical spectrum with the supplied instrument-response matrix."
       ],
       "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported velocity projection; infer absolute density only when calibrated spectral power and optical geometry are supplied.",
-      "uncertainty_model": "Non-collective fit covariance and supplied LSF uncertainty are propagated; absolute-density uncertainty includes only supplied independent uncertainty terms. Collective parameter covariance and correlated spectral/geometry uncertainties remain limitations.",
+      "uncertainty_model": "Non-collective fit covariance is combined with supplied LSF matrix uncertainty propagated by Monte Carlo into temperature, flow projection and (when absolute density is enabled) integrated scattered power. Absolute-density uncertainty then combines integrated-power uncertainty with only the independently supplied optical-factor uncertainties. Collective fit covariance uses log-parameterized least squares; collective LSF and correlated uncertainty are not propagated.",
       "limitations": [
         "Full 3-D relativistic photon-geometry integration is not implemented; the relativistic option uses a 1-D projected Maxwell-Juttner approximation.",
         "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
@@ -205,7 +205,8 @@
         "Absolute density is not identifiable from spectral shape alone.",
         "No independent experimental validation is claimed.",
         "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
-        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle."
+        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle.",
+        "Collective LSF uncertainty, correlated wavelength-bin/channel errors and model discrepancy are not propagated."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
