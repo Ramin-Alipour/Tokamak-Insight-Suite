@@ -309,3 +309,37 @@ def test_advanced_ui_model_choice_is_defined_before_fit_window_validation():
     validation = source.index("advanced_min_points=")
     assert selector < validation
     assert "advanced_window_points>=advanced_min_points" in source
+
+
+
+def test_multispecies_density_propagates_only_explicit_independent_uncertainties():
+    species = [
+        {"mass_kg": 3.34e-27, "fraction": 0.7, "charge_state": 1,
+         "sheath_coefficient": 0.61, "mass_relative_standard_uncertainty": 0.02,
+         "sheath_coefficient_relative_standard_uncertainty": 0.03},
+        {"mass_kg": 6.68e-27, "fraction": 0.3, "charge_state": 1,
+         "sheath_coefficient": 0.55, "mass_relative_standard_uncertainty": 0.01,
+         "sheath_coefficient_relative_standard_uncertainty": 0.04},
+    ]
+    base = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
+    assert base["ion_density_standard_uncertainty_m-3"] is None
+    assert base["uncertainty_propagation_performed"] is False
+    result = estimate_multispecies_ion_density(
+        -1e-3, 5.0, 1e-4, species,
+        current_standard_uncertainty_A=1e-5,
+        temperature_relative_standard_uncertainty=0.02,
+        area_relative_standard_uncertainty=0.01,
+    )
+    assert result["ion_density_standard_uncertainty_m-3"] > 0
+    assert result["uncertainty_propagation_performed"] is True
+    assert "species_number_density_fraction_covariance" in result["ion_density_uncertainty_omitted_components"]
+    assert result["ion_density_uncertainty_scope"] == "partial_independent_input_propagation_fractions_held_fixed"
+    assert "species_0_mass" in result["ion_density_uncertainty_components_relative"]
+    assert "species_1_sheath_coefficient" in result["ion_density_uncertainty_components_relative"]
+
+
+def test_multispecies_density_rejects_uncertainty_for_composition_without_covariance():
+    species = [{"mass_kg": 3.34e-27, "fraction": 1.0, "charge_state": 1,
+                "sheath_coefficient": 0.61, "fraction_relative_standard_uncertainty": 0.02}]
+    with pytest.raises(ValueError, match="composition covariance"):
+        estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
