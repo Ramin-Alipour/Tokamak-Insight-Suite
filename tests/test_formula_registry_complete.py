@@ -377,3 +377,13 @@ def test_langmuir_ion_density_from_saturation_reference():
     expected = current / (coefficient * E_CHARGE * area * math.sqrt(E_CHARGE * temperature / mass))
     assert result["ion_density_m3"] == pytest.approx(expected, rel=1e-12)
     assert result["uncertainty_ion_density_m3"] > 0
+
+
+def test_langmuir_formula_registry_charge_state_reference():
+    rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    row = next(item for item in rows if item["name"] == "Langmuir ion density from ion-saturation current")
+    assert "Z_i^(3/2)" in row["equation"]
+    assert any(spec["name"] == "charge_state" for spec in row["execution_contract"]["input_specs"])
+    singly = langmuir_ion_density_from_saturation_current(1e-3, 5.0, 1e-4, 3.34e-27, 0.61)
+    doubly = langmuir_ion_density_from_saturation_current(1e-3, 5.0, 1e-4, 3.34e-27, 0.61, charge_state=2)
+    assert doubly["ion_density_m3"] == pytest.approx(singly["ion_density_m3"] / (2.0**1.5))
