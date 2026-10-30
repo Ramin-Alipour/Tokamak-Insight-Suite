@@ -674,7 +674,7 @@ def langmuir_ion_density_from_saturation_current(
     sigma_sheath_coefficient=None,
 ):
     """Single-ion Bohm/sheath-model density inversion from calibrated ion-saturation current."""
-    current = abs(_finite("ion_saturation_current_A", ion_saturation_current_A))
+    current = _positive("ion_saturation_current_magnitude_A", abs(_finite("ion_saturation_current_A", ion_saturation_current_A)))
     temperature = _positive("electron_temperature_eV", electron_temperature_eV)
     area = _positive("probe_area_m2", probe_area_m2)
     mass = _positive("ion_mass_kg", ion_mass_kg)
