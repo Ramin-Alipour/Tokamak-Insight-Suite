@@ -838,7 +838,7 @@
           "description": "Explains whether proxy uncertainty was propagated or remains unquantified."
         },
         {
-          "name": "current_uncertainty_A_per_processed_sample",
+          "name": "current_standard_uncertainty_A_per_processed_sample",
           "unit": "A",
           "description": "Per-processed-sample current standard uncertainty after duplicate-voltage aggregation; null when not supplied."
         },
