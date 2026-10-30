@@ -812,13 +812,19 @@ def analyze_thomson_spectra(
                 "electron_density": "not identifiable from normalized spectral shape; requires absolute calibrated scattered power and optical geometry",
                 "ion_parameters": "not inferred by this non-collective electron feature model",
             }
-        fit["model_discrepancy_uncertainty_available"] = False
-        fit["model_discrepancy_diagnostics"] = {
-            "residual_rms": fit.get("fit_residual_rms"),
-            "reduced_chi_square": fit.get("fit_reduced_chi_square"),
-            "covariance_included": False,
-            "interpretation": "Per-channel fits report goodness-of-fit diagnostics only; no per-channel model-discrepancy covariance is estimated. Joint GLS, when requested, reports a separate covariance component.",
-        }
+        fit["model_discrepancy_uncertainty_available"] = bool(
+            fit.get("model_discrepancy_covariance") is not None
+            and float(fit.get("model_discrepancy_scale", 0.0)) > 0.0
+        )
+        if fit.get("model_discrepancy_covariance") is None:
+            fit["model_discrepancy_diagnostics"] = {
+                "residual_rms": fit.get("fit_residual_rms"),
+                "reduced_chi_square": fit.get("fit_reduced_chi_square"),
+                "covariance_included": False,
+                "interpretation": "No per-channel model-discrepancy covariance is available because a supported reduced chi-square/noise covariance estimate was not produced.",
+            }
+        else:
+            fit["model_discrepancy_diagnostics"]["covariance_included"] = True
         density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
