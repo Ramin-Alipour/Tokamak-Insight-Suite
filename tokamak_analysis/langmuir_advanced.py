@@ -379,7 +379,7 @@ def estimate_multispecies_ion_density(
         "uncertainty_propagation_performed": propagated,
         "uncertainty_status": (
             "partial_explicit_independent_input_components_propagated_composition_covariance_excluded"
-            if propagated else "not_calculated_no_uncertainty_inputs_supplied"
+            if propagated else "not_propagated_no_uncertainty_inputs_supplied"
         ),
     }
 
