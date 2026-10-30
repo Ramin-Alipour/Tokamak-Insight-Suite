@@ -300,3 +300,12 @@ def test_advanced_model_run_button_requires_a_valid_electron_window():
     source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
     assert "advanced_window_valid=(efit is not None and advanced_window_points>=advanced_min_points)" in source
     assert "disabled=bool(needs_electron_window and not advanced_window_valid)" in source
+
+
+def test_advanced_ui_model_choice_is_defined_before_fit_window_validation():
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    selector = source.index("model_choice=st.selectbox('Electron model'")
+    validation = source.index("advanced_min_points=")
+    assert selector < validation
+    assert "advanced_window_points>=advanced_min_points" in source
