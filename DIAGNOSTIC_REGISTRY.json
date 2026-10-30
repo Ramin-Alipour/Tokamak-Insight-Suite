@@ -193,10 +193,10 @@
         "Collective-mode flow vectors and incident/scattered beam directions are expressed in one explicitly supplied coordinate frame; no canonical beam orientation is assumed."
       ],
       "preprocessing": [
-        "Validate channel-by-wavelength arrays and strictly increasing wavelength axes.",
-        "Convolve the physical spectrum with the supplied instrument-response matrix."
+        "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
+        "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported velocity projection; infer absolute density only when calibrated spectral power and optical geometry are supplied.",
+      "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported flow projection; infer collective-mode density only where the collective spectral shape resolves it, and non-collective absolute density only when calibrated spectral power and complete optical geometry are supplied.",
       "uncertainty_model": "Non-collective fit covariance is combined with supplied LSF matrix uncertainty propagated by Monte Carlo into temperature, flow projection and (when absolute density is enabled) integrated scattered power. Absolute-density uncertainty then combines integrated-power uncertainty with only the independently supplied optical-factor uncertainties. Collective fit covariance uses log-parameterized least squares; collective LSF and correlated uncertainty are not propagated.",
       "limitations": [
         "Full 3-D relativistic photon-geometry integration is not implemented; the relativistic option uses a 1-D projected Maxwell-Juttner approximation.",
