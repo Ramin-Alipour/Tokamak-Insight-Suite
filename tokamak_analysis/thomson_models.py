@@ -210,7 +210,8 @@ def fit_custom_spectral_model(
         "chi_square": chi_square,
         "reduced_chi_square": None if chi_square is None or dof <= 0 else float(chi_square / dof),
         "interpretation_note": (
-            "Generic fitted parameters only. Electron temperature, density, and other "
-            "physical quantities are not inferred automatically."
+            "Physical quantities are emitted only through the explicitly registered mapper and physical contract; this is not independent physical validation."
+            if physical_inference is not None else
+            "Generic fitted parameters only. Electron temperature, density, and other physical quantities are not inferred automatically."
         ),
     }
