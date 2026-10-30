@@ -47,7 +47,11 @@ def test_reconstruction_uses_positive_measurement_uncertainties_for_weighting():
     )
     assert np.all(np.isfinite(result["density_m3"]))
     assert np.all(np.isfinite(result["temperature_eV"]))
-    assert "inverse-sigma fit weights" in result["uncertainty_model"]
+    # The public metadata contract is channel-specific and machine-readable.
+    # Do not depend on the former prose-only "inverse-sigma fit weights" label.
+    assert result["uncertainty_model"]["density_channel"] == "inverse_sigma_weighted"
+    assert result["uncertainty_model"]["temperature_channel"] == "inverse_sigma_weighted"
+    assert result["uncertainty_model"]["fit_confidence_intervals_estimated"] is False
 
 
 @pytest.mark.parametrize("kwargs", [
