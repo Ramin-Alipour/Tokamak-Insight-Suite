@@ -1697,7 +1697,7 @@ elif page=='Probe Analysis':
             ifit=st.slider('Ion-branch fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)),key='probe_ion_fit_range')
     cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
         help='All calculations normalize internally to electron_positive; advanced fits use the same convention.')
-    sigma_current=st.number_input('Current standard uncertainty per processed sample (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_current_sigma')
+    sigma_current=st.number_input('Current standard uncertainty per input sample (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_current_sigma')
     density_enabled=st.checkbox('Enable model-based ion-density estimate',value=False,key='probe_enable_density')
     density_options={}
     if density_enabled:
