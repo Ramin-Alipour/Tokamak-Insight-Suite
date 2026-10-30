@@ -81,13 +81,13 @@ ANALYSES = [{
                 {
                     "name": "ion_velocity_m_s",
                     "unit": "m s^-1",
-                    "description": "Optional independently measured ion flow vectors.",
+                    "description": "Required in collective mode: independently measured ion flow vectors or explicit zero vectors declaring stationary ions.",
                     "required": False
                 },
                 {
                     "name": "electron_velocity_m_s",
                     "unit": "m s^-1",
-                    "description": "Optional independently measured electron-fluid flow vector.",
+                    "description": "Required in collective mode: independently measured electron-fluid flow vector or an explicit zero vector declaring stationary electrons.",
                     "required": False
                 },
                 {
@@ -100,7 +100,14 @@ ANALYSES = [{
                     "name": "instrument_response_uncertainty",
                     "unit": "response-matrix 1-sigma",
                     "required": False
-                }
+                },
+                {"name": "laser_wavelength_uncertainty_nm", "unit": "nm", "required": False},
+                {"name": "scattering_angle_uncertainty_rad", "unit": "rad", "required": False},
+                {"name": "laser_power_uncertainty_W", "unit": "W", "required": False},
+                {"name": "interaction_length_uncertainty_m", "unit": "m", "required": False},
+                {"name": "collection_solid_angle_uncertainty_sr", "unit": "sr", "required": False},
+                {"name": "optical_efficiency_uncertainty", "unit": "dimensionless", "required": False},
+                {"name": "polarization_factor_uncertainty", "unit": "dimensionless", "required": False}
             ],
         "output_specs":             [
                 {
@@ -117,6 +124,21 @@ ANALYSES = [{
                     "name": "electron_velocity_projection_profile_m_s",
                     "unit": "m s^-1",
                     "description": "Per-channel electron-flow projection along the scattering wavevector, where supported."
+                },
+                {
+                    "name": "electron_temperature_uncertainty_profile_eV",
+                    "unit": "eV",
+                    "description": "Per-channel fitted temperature uncertainty including supported fit, LSF, laser-wavelength and scattering-angle contributions."
+                },
+                {
+                    "name": "electron_density_uncertainty_profile_m3",
+                    "unit": "m^-3",
+                    "description": "Per-channel absolute-density uncertainty from the fitted spectral area and supplied optical-factor uncertainties."
+                },
+                {
+                    "name": "electron_velocity_projection_uncertainty_profile_m_s",
+                    "unit": "m s^-1",
+                    "description": "Per-channel uncertainty of the electron-flow projection where supported."
                 },
                 {
                     "name": "channels",
