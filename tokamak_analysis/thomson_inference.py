@@ -549,6 +549,9 @@ def analyze_thomson_spectra(
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.sqrt(
                 fit["electron_velocity_projection_uncertainty_m_s"]**2
                 + velocity_laser_sigma**2 + velocity_angle_sigma**2))
+        if lsf_unc is not None and model != "collective_maxwellian" and not fit.get("instrument_response_uncertainty_propagated",False):
+            fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
+            fit["uncertainty_completeness"] = "partial"
         results.append(fit)
     return {
         "model": model, "channel_count": len(results), "channels": results,
