@@ -1794,6 +1794,8 @@ elif page=='Probe Analysis':
     with st.expander('Advanced electron-branch and plasma-potential models'):
         advanced_method=st.selectbox('Advanced analysis',['Single-/two-temperature exponential fit','Stretched-exponential shape fit','Smoothed derivative candidates','Fit-window sensitivity'],key='probe_advanced_method')
         advanced_model='two_temperature' if advanced_method=='Single-/two-temperature exponential fit' else 'stretched' if advanced_method=='Stretched-exponential shape fit' else 'smoothed' if advanced_method=='Smoothed derivative candidates' else 'sensitivity'
+        if advanced_method=='Single-/two-temperature exponential fit':
+            model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
         needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
         advanced_min_points=(8 if advanced_model=='two_temperature' and model_choice=='two_temperature'
                              else 5 if advanced_model=='stretched' else 4)
@@ -1802,8 +1804,6 @@ elif page=='Probe Analysis':
         advanced_window_valid=(efit is not None and advanced_window_points>=advanced_min_points)
         if needs_electron_window and not advanced_window_valid:
             st.info(f'Select a valid electron-retarding interval containing at least {advanced_min_points} distinct calibrated voltage values before running this model.')
-        if advanced_method=='Single-/two-temperature exponential fit':
-            model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
         if advanced_method=='Smoothed derivative candidates':
             sg1,sg2=st.columns(2)
             with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
