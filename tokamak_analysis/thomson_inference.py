@@ -418,6 +418,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
+        "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
             "Non-collective Maxwellian and kappa models are non-relativistic; relativistic kinetic corrections are not implemented.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
