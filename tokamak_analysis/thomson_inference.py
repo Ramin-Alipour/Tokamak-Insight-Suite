@@ -50,6 +50,10 @@ def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     if r.ndim == 1:
         if r.size < 1 or r.size % 2 == 0 or np.any(r < 0) or np.sum(r) <= 0:
             raise ValueError("a 1-D instrument-response kernel must be non-negative, odd-length and have positive area")
+        if wavelength is not None:
+            wavelength_steps = np.diff(np.asarray(wavelength, dtype=float))
+            if not np.allclose(wavelength_steps, wavelength_steps[0], rtol=1e-6, atol=1e-12):
+                raise ValueError("a 1-D index-space response kernel requires a uniform wavelength grid; use a measured wavelength-to-wavelength response matrix for nonuniform grids")
         kernel = r/np.sum(r)
         out = np.zeros((nlam,nlam),dtype=float)
         center = kernel.size//2
