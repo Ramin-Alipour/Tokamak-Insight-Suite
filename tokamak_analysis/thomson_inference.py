@@ -554,8 +554,8 @@ def analyze_thomson_spectra(
 
     joint_covariance = None
     if joint_spectral_covariance is not None:
-        if model != "non_collective_maxwellian":
-            raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian; other physical models require model-specific joint forward models")
+        if model not in {"non_collective_maxwellian","non_collective_kappa"}:
+            raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian and non_collective_kappa; other physical models require model-specific joint forward models")
         joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
         expected_joint_shape = (y.size, y.size)
         if joint_covariance.shape != expected_joint_shape or not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-9, atol=1e-12):
