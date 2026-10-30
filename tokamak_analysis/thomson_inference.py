@@ -582,6 +582,10 @@ def analyze_thomson_spectra(
             raise ValueError("joint_density_relative_covariance already contains the full scattered-power covariance; do not combine it with joint_spectral_covariance.")
         if instrument_response_uncertainty is not None:
             raise ValueError("joint_density_relative_covariance must already include response-matrix uncertainty in its scattered-power blocks; do not also supply instrument_response_uncertainty.")
+        if not spectral_power_density_calibrated or any(value is None for value in (
+            laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency
+        )):
+            raise ValueError("joint_density_relative_covariance requires calibrated W/nm spectra and complete absolute-density optical geometry for every channel.")
         scalar_density_uncertainties = (
             laser_power_uncertainty_W, interaction_length_uncertainty_m,
             collection_solid_angle_uncertainty_sr, optical_efficiency_uncertainty,
