@@ -275,7 +275,7 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
 
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
-    laser_wavelength_uncertainty_nm=0.0, scattering_angle_uncertainty_rad=0.0,
+    laser_wavelength_uncertainty_nm=None, scattering_angle_uncertainty_rad=None,
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
     optical_efficiency=None, incident_polarization=None, incident_direction=None, scattered_direction=None,
@@ -313,9 +313,14 @@ def analyze_thomson_spectra(
         raise ValueError("laser_wavelength_nm must be positive")
     if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
         raise ValueError("scattering_angle_rad must lie in (0, pi]")
-    if (not np.isfinite(laser_wavelength_uncertainty_nm) or laser_wavelength_uncertainty_nm < 0
-            or not np.isfinite(scattering_angle_uncertainty_rad) or scattering_angle_uncertainty_rad < 0):
-        raise ValueError("laser-wavelength and scattering-angle uncertainties must be finite and non-negative")
+    for uncertainty_value, uncertainty_name in (
+        (laser_wavelength_uncertainty_nm,"laser_wavelength_uncertainty_nm"),
+        (scattering_angle_uncertainty_rad,"scattering_angle_uncertainty_rad"),
+    ):
+        if uncertainty_value is not None and (not np.isfinite(uncertainty_value) or uncertainty_value < 0):
+            raise ValueError(f"{uncertainty_name} must be finite and non-negative when supplied")
+    laser_wavelength_unc = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
+    scattering_angle_unc = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
     if model not in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner", "collective_maxwellian"}:
         raise ValueError("model must be non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
@@ -457,7 +462,7 @@ def analyze_thomson_spectra(
                 scattered_power_uncertainty_W=area_sigma,
                 incident_power_uncertainty_W=laser_power_uncertainty_W,
                 interaction_length_uncertainty_m=interaction_length_uncertainty_m,
-                scattering_angle_uncertainty_rad=(None if incident_polarization is not None else scattering_angle_uncertainty_rad),
+                scattering_angle_uncertainty_rad=(None if incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
                 collection_solid_angle_uncertainty_sr=collection_solid_angle_uncertainty_sr,
                 optical_efficiency_uncertainty=optical_efficiency_uncertainty,
                 incident_polarization_vector=incident_polarization,
@@ -480,6 +485,22 @@ def analyze_thomson_spectra(
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
         fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
+        missing_uncertainties=[]
+        if unc is None: missing_uncertainties.append("signal_uncertainty")
+        if lsf_unc is None: missing_uncertainties.append("instrument_response_uncertainty")
+        if laser_wavelength_uncertainty_nm is None: missing_uncertainties.append("laser_wavelength_uncertainty_nm")
+        if scattering_angle_uncertainty_rad is None: missing_uncertainties.append("scattering_angle_uncertainty_rad")
+        if model == "collective_maxwellian":
+            missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
+        if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)):
+            for key,value in (("laser_power_uncertainty_W",laser_power_uncertainty_W),
+                              ("interaction_length_uncertainty_m",interaction_length_uncertainty_m),
+                              ("collection_solid_angle_uncertainty_sr",collection_solid_angle_uncertainty_sr),
+                              ("optical_efficiency_uncertainty",optical_efficiency_uncertainty),
+                              ("polarization_factor_uncertainty",polarization_factor_uncertainty)):
+                if value is None: missing_uncertainties.append(key)
+        fit["uncertainty_inputs_missing"] = missing_uncertainties
+        fit["uncertainty_completeness"] = "partial" if missing_uncertainties else "all_supported_inputs_supplied"
         if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
@@ -511,17 +532,17 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             te = fit["electron_temperature_eV"]
-            te_rel_var = (2.0*float(laser_wavelength_uncertainty_nm)/float(laser_wavelength_nm))**2
+            te_rel_var = (2.0*laser_wavelength_unc/float(laser_wavelength_nm))**2
             te_rel_var += (np.cos(float(scattering_angle_rad)/2.0)/np.sin(float(scattering_angle_rad)/2.0)
-                           * float(scattering_angle_uncertainty_rad))**2
+                           * scattering_angle_unc)**2
             fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                 fit["electron_temperature_uncertainty_eV"], te*np.sqrt(te_rel_var)))
             velocity = fit["electron_velocity_projection_m_s"]
-            velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*float(laser_wavelength_uncertainty_nm)
+            velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*laser_wavelength_unc
                                     /(float(laser_wavelength_nm)**2*2.0*np.sin(float(scattering_angle_rad)/2.0)))
             velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
                                         /np.sin(float(scattering_angle_rad)/2.0)
-                                        *float(scattering_angle_uncertainty_rad))
+                                        *scattering_angle_unc)
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.sqrt(
                 fit["electron_velocity_projection_uncertainty_m_s"]**2
                 + velocity_laser_sigma**2 + velocity_angle_sigma**2))
