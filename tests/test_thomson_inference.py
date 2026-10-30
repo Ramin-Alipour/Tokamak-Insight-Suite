@@ -201,6 +201,60 @@ def test_measured_instrument_response_is_mandatory():
         )
 
 
+def test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_full_model():
+    x = np.linspace(492.0, 572.0, 801)
+    sigma = 2.0 * 532.0 * np.sqrt(120.0 / 510998.95069) * np.sin(np.pi / 4)
+    kappa = 4.0
+    df = 2.0 * kappa - 1.0
+    scale = sigma * np.sqrt((df - 2.0) / df)
+    signal = 900.0 * (1.0 + ((x - 532.0) / scale) ** 2 / df) ** (-kappa) + 20.0
+
+    first = analyze_thomson_spectra(
+        x, signal[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        model="non_collective_kappa",
+    )["channels"][0]
+    second = analyze_thomson_spectra(
+        x, (signal * 1e6)[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        model="non_collective_kappa",
+    )["channels"][0]
+
+    assert second["electron_temperature_eV"] == pytest.approx(first["electron_temperature_eV"], rel=1e-6)
+    assert second["kappa_index"] == pytest.approx(first["kappa_index"], rel=1e-6)
+    assert second["integrated_scattered_power_W"] == pytest.approx(
+        first["integrated_scattered_power_W"] * 1e6, rel=1e-6
+    )
+
+
+def test_spectral_inference_rejects_boolean_and_string_measurements():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="real numeric values"):
+        analyze_thomson_spectra(
+            x, y.astype(str)[None, :], [0.1],
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+            instrument_response=np.eye(x.size),
+        )
+    with pytest.raises(ValueError, match="real numeric values"):
+        analyze_thomson_spectra(
+            x, y.astype(bool)[None, :], [0.1],
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+            instrument_response=np.eye(x.size),
+        )
+
+
+def test_collective_mode_requires_explicit_beam_geometry_before_optional_backend_import():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="explicit incident_direction"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            model="collective_maxwellian", ion_species=["D+"],
+            ion_temperature_eV=[100.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+            electron_velocity_m_s=[0.0, 0.0, 0.0],
+        )
+
+
 def test_descriptive_moments_report_negative_residual_clipping_caveat():
     from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
     x=np.linspace(500.0,564.0,401)
