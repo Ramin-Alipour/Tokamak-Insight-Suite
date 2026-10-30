@@ -265,7 +265,7 @@ def analyze_thomson_spectra(
     laser_wavelength_uncertainty_nm=0.0, scattering_angle_uncertainty_rad=0.0,
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
-    optical_efficiency=None, incident_polarization=None, scattered_direction=None,
+    optical_efficiency=None, incident_polarization=None, incident_direction=None, scattered_direction=None,
     spectral_power_density_calibrated=False, laser_power_uncertainty_W=None,
     interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
@@ -397,7 +397,7 @@ def analyze_thomson_spectra(
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
         if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
-            incident_polarization, scattered_direction
+            incident_polarization, incident_direction, scattered_direction
         )):
             if not spectral_power_density_calibrated:
                 raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
@@ -412,10 +412,11 @@ def analyze_thomson_spectra(
                 scattered_power_uncertainty_W=area_sigma,
                 incident_power_uncertainty_W=laser_power_uncertainty_W,
                 interaction_length_uncertainty_m=interaction_length_uncertainty_m,
-                scattering_angle_uncertainty_rad=scattering_angle_uncertainty_rad,
+                scattering_angle_uncertainty_rad=(None if incident_polarization is not None else scattering_angle_uncertainty_rad),
                 collection_solid_angle_uncertainty_sr=collection_solid_angle_uncertainty_sr,
                 optical_efficiency_uncertainty=optical_efficiency_uncertainty,
                 incident_polarization_vector=incident_polarization,
+                incident_direction_vector=incident_direction,
                 scattered_direction_vector=scattered_direction,
                 polarization_factor_uncertainty=polarization_factor_uncertainty,
             )
