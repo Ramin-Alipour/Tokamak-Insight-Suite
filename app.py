@@ -1729,7 +1729,9 @@ elif page=='Probe Analysis':
                       'Maximum-dI/dV Vp proxy (V)':result.get('plasma_potential_proxy_V'),
                       'Vp proxy standard uncertainty (V)':result.get('plasma_potential_proxy_standard_uncertainty_V'),
                       'Vp proxy uncertainty status':result.get('plasma_potential_proxy_uncertainty_status'),
-                      'd²I/dV² zero-crossing candidates (V)':result.get('plasma_potential_d2IdV2_zero_crossing_candidates_V')})
+                      'd²I/dV² zero-crossing candidates (V)':result.get('plasma_potential_d2IdV2_zero_crossing_candidates_V'),
+                      'd²I/dV² candidate standard uncertainties (V)':result.get('plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V'),
+                      'd²I/dV² candidate uncertainty status':result.get('plasma_potential_d2IdV2_zero_crossing_uncertainty_status')})
             quality=result.get('input_quality',{})
             if quality.get('discarded_nonfinite_pair_count',0):
                 st.warning(f"Discarded {quality['discarded_nonfinite_pair_count']} paired samples containing non-finite voltage/current values.")
