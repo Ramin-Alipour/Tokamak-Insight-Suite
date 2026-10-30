@@ -26,8 +26,12 @@ class ThomsonSummary:
     point_count: int
     radius_min_m: float
     radius_max_m: float
+    density_min_m3: float
+    density_min_radius_m: float
     density_peak_m3: float
     density_peak_radius_m: float
+    temperature_min_ev: float
+    temperature_min_radius_m: float
     temperature_peak_ev: float
     temperature_peak_radius_m: float
     density_line_average_m3: float
@@ -160,15 +164,20 @@ def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
     ne_line_unc = _weighted_standard_uncertainty(line_weights, profile.density_uncertainty_m3)
     te_line_unc = _weighted_standard_uncertainty(line_weights, profile.temperature_uncertainty_ev)
 
-    ine, ite = int(np.argmax(ne)), int(np.argmax(te))
+    ine_min, ine_max = int(np.argmin(ne)), int(np.argmax(ne))
+    ite_min, ite_max = int(np.argmin(te)), int(np.argmax(te))
     return ThomsonSummary(
         point_count=int(r.size),
         radius_min_m=float(r[0]),
         radius_max_m=float(r[-1]),
-        density_peak_m3=float(ne[ine]),
-        density_peak_radius_m=float(r[ine]),
-        temperature_peak_ev=float(te[ite]),
-        temperature_peak_radius_m=float(r[ite]),
+        density_min_m3=float(ne[ine_min]),
+        density_min_radius_m=float(r[ine_min]),
+        density_peak_m3=float(ne[ine_max]),
+        density_peak_radius_m=float(r[ine_max]),
+        temperature_min_ev=float(te[ite_min]),
+        temperature_min_radius_m=float(r[ite_min]),
+        temperature_peak_ev=float(te[ite_max]),
+        temperature_peak_radius_m=float(r[ite_max]),
         density_line_average_m3=ne_line,
         temperature_line_average_ev=te_line,
         density_line_average_uncertainty_m3=ne_line_unc,
