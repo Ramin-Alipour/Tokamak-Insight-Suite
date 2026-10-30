@@ -187,6 +187,93 @@ def doppler_line_of_sight_velocity(delta_lambda, lambda0, *, sigma_delta_lambda=
     return out
 
 
+
+def langmuir_electron_density_from_saturation_current(
+    electron_saturation_current_A, electron_temperature_eV, probe_area_m2, *,
+    sigma_electron_saturation_current_A=None,
+    relative_sigma_electron_temperature=None,
+    relative_sigma_probe_area=None,
+):
+    """Maxwellian electron density from electron-saturation collection (Merlino 2007, Eq. 6)."""
+    current = _positive("electron_saturation_current_A", electron_saturation_current_A)
+    temperature = _positive("electron_temperature_eV", electron_temperature_eV)
+    area = _positive("probe_area_m2", probe_area_m2)
+    density = current / (E_CHARGE * area * math.sqrt(E_CHARGE * temperature / (2.0 * math.pi * M_E)))
+    sigmas = (sigma_electron_saturation_current_A, relative_sigma_electron_temperature, relative_sigma_probe_area)
+    if any(value is not None for value in sigmas) and not all(value is not None for value in sigmas):
+        raise ValueError("Provide current, temperature-relative and area-relative uncertainties together, or none.")
+    out = {"electron_density_m3": density}
+    if sigma_electron_saturation_current_A is not None:
+        si = _nonnegative("sigma_electron_saturation_current_A", sigma_electron_saturation_current_A)
+        sT = _nonnegative("relative_sigma_electron_temperature", relative_sigma_electron_temperature)
+        sA = _nonnegative("relative_sigma_probe_area", relative_sigma_probe_area)
+        relative = math.sqrt((si/current)**2 + (0.5*sT)**2 + sA**2)
+        out["uncertainty_electron_density_m3"] = density * relative
+    return out
+
+
+def langmuir_bohm_particle_flux(
+    ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_coefficient, *,
+    charge_state=1, relative_sigma_ion_density=None,
+    relative_sigma_electron_temperature=None, relative_sigma_ion_mass=None,
+    relative_sigma_sheath_coefficient=None,
+):
+    """Species Bohm particle flux C_s n_i sqrt(Z_i e T_e/m_i) (Merlino 2007, Eq. 3)."""
+    density = _positive("ion_density_m3", ion_density_m3)
+    temperature = _positive("electron_temperature_eV", electron_temperature_eV)
+    mass = _positive("ion_mass_kg", ion_mass_kg)
+    coefficient = _positive("sheath_coefficient", sheath_coefficient)
+    if isinstance(charge_state, bool) or not isinstance(charge_state, (int, np.integer)) or charge_state < 1:
+        raise ValueError("charge_state must be a positive integer.")
+    speed = math.sqrt(int(charge_state) * E_CHARGE * temperature / mass)
+    flux = coefficient * density * speed
+    sigmas = (relative_sigma_ion_density, relative_sigma_electron_temperature,
+              relative_sigma_ion_mass, relative_sigma_sheath_coefficient)
+    out = {"ion_sound_speed_m_s": speed, "ion_particle_flux_m2_s": flux,
+           "ion_charge_state": int(charge_state)}
+    if any(value is not None for value in sigmas) and not all(value is not None for value in sigmas):
+        raise ValueError("Provide all four relative input uncertainties together, or none.")
+    if relative_sigma_ion_density is not None:
+        sn, sT, sm, sC = [_nonnegative(name, value) for name, value in zip(
+            ("relative_sigma_ion_density", "relative_sigma_electron_temperature",
+             "relative_sigma_ion_mass", "relative_sigma_sheath_coefficient"), sigmas)]
+        relative = math.sqrt(sn**2 + (0.5*sT)**2 + (0.5*sm)**2 + sC**2)
+        out["uncertainty_ion_particle_flux_m2_s"] = flux * relative
+    return out
+
+
+def langmuir_multispecies_ion_density(
+    ion_saturation_current_A, electron_temperature_eV, probe_area_m2, species,
+):
+    """Species-summed Bohm/sheath density; species require mass, Z, number fraction and C_s."""
+    current = abs(_finite("ion_saturation_current_A", ion_saturation_current_A))
+    temperature = _positive("electron_temperature_eV", electron_temperature_eV)
+    area = _positive("probe_area_m2", probe_area_m2)
+    if current <= 0 or not species:
+        raise ValueError("A non-zero ion-saturation current and at least one species are required.")
+    normalized = []
+    for item in species:
+        if not all(key in item for key in ("mass_kg", "fraction", "charge_state", "sheath_coefficient")):
+            raise ValueError("Each species requires mass_kg, fraction, charge_state and sheath_coefficient.")
+        mass = _positive("species_mass_kg", item["mass_kg"])
+        fraction = _positive("species_number_density_fraction", item["fraction"])
+        coefficient = _positive("species_sheath_coefficient", item["sheath_coefficient"])
+        charge = item["charge_state"]
+        if isinstance(charge, bool) or not isinstance(charge, (int, np.integer)) or charge < 1:
+            raise ValueError("Each species charge_state must be a positive integer.")
+        normalized.append({"mass_kg": mass, "fraction": fraction, "charge_state": int(charge),
+                           "sheath_coefficient": coefficient})
+    fraction_sum = sum(item["fraction"] for item in normalized)
+    if not math.isclose(fraction_sum, 1.0, rel_tol=1e-6, abs_tol=1e-8):
+        raise ValueError("Ion species number-density fractions must sum to 1.")
+    factor = sum(item["fraction"] * item["sheath_coefficient"] * item["charge_state"]**1.5
+                 / math.sqrt(item["mass_kg"]) for item in normalized)
+    density = current / (E_CHARGE * area * math.sqrt(E_CHARGE * temperature) * factor)
+    return {"ion_density_m3": density, "ion_species": normalized,
+            "ion_species_fraction_sum": fraction_sum,
+            "uncertainty_ion_density_m3": None,
+            "uncertainty_status": "not_propagated_species_fraction_covariance_and_species_model_uncertainties_not_supplied"}
+
 def ion_temperature_from_doppler_sigma(sigma_lambda, lambda0, ion_mass_kg, *,
                                         sigma_sigma_lambda=None, sigma_lambda0=None, sigma_ion_mass_kg=None):
     """Thermal ion temperature from instrument-corrected Gaussian sigma; wavelengths share units."""
