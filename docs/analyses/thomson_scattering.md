@@ -6,12 +6,14 @@
 
 The primary execution path is:
 
-1. Read the measured spectra as a channel-by-wavelength array (or long-form table in the dashboard).
-2. Evaluate the selected physical Thomson forward model on the measured wavelength grid.
-3. Convolve the physical spectrum with the supplied instrument line-spread response.
-4. Fit each spatial channel and report channel-resolved physical parameters and diagnostics.
+1. Read measured spectra as a channel-by-wavelength array; the dashboard accepts a long-form table with one row per channel/wavelength sample.
+2. Evaluate the selected physical Thomson forward model on each supplied calibrated wavelength grid.
+3. Convolve the physical spectrum with the supplied measured instrument line-spread response.
+4. Fit each spatial channel and report channel-resolved physical parameters and fit diagnostics.
 5. Construct the electron-temperature profile and, only when identifiable, the electron-density profile.
 6. Keep the legacy calibrated-profile summary/reconstruction routines as downstream utilities; they are not the primary Analysis 1 input contract.
+
+The Spectral Analysis workspace now exposes this primary multi-channel spectral-inference workflow. It preserves source row order: it does not sort, repair, calibrate, or silently discard samples.
 
 ## Input contract
 
@@ -30,6 +32,7 @@ The primary execution path is:
 | ion_temperature_eV | eV, one value per species | Required for the current collective backend; supply from an independent diagnostic when available |
 | ion_velocity_m_s | m/s, one 3-vector per species | Required in collective mode; measured vectors or explicit zero vectors declaring stationary ions |
 | electron_velocity_m_s | m/s, 3-vector | Required in collective mode; measured vector or explicit zero vector declaring stationary electrons |
+| incident_direction / scattered_direction | dimensionless 3-vectors | Required in collective mode; both are expressed in the same coordinate frame as the supplied ion/electron flow vectors and must agree with the scattering angle |
 | Absolute-density geometry | W, m, sr, dimensionless efficiency, incident direction, polarization and scattered direction vectors | Required with spectral intensity in W/nm to infer absolute density in the non-collective mode |
 | Laser/angle uncertainty | nm / rad | Optional; missing uncertainty inputs are explicitly flagged |
 | Optical-factor uncertainty | W, m, sr, dimensionless | Optional; only supplied uncertainty terms are propagated |
@@ -78,7 +81,7 @@ A spectral shape alone does not determine absolute electron density in the non-c
 - incident polarization vector (perpendicular to the incident beam);
 - scattered-light direction (consistent with the specified scattering angle).
 
-The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. The incident polarization must be perpendicular to the incident beam, and the supplied incident/scattered direction vectors must agree with the specified scattering angle. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties). Each channel lists unavailable uncertainty inputs and marks the uncertainty completeness as partial; missing uncertainties are never silently treated as zero.
+The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. The incident polarization must be perpendicular to the incident beam, and the supplied incident/scattered direction vectors must agree with the specified scattering angle. The fitted Maxwellian and kappa models integrate their analytic intrinsic spectra over the full spectral domain for the power inversion; the projected Maxwell-Juttner model numerically integrates its full physically allowed projected-velocity domain. This avoids treating a finite user-selected wavelength window as the total scattered power. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties). Each channel lists unavailable uncertainty inputs and marks the uncertainty completeness as partial; missing uncertainties are never silently treated as zero.
 
 ## Outputs
 
@@ -95,7 +98,7 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
-- The current collective fit reports a local least-squares covariance for fitted density and temperature, but does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
+- The collective fit uses a log-parameterized least-squares inversion for positive density and temperature. When per-sample 1σ uncertainties are supplied, their weighted covariance is retained as an absolute covariance; without them, the residual variance scales the local covariance. It does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
 - Correlated uncertainty between wavelength bins, calibration factors and channels is not modeled.
 - No independent experimental validation is claimed. Automated tests verify software behavior and mathematical consistency only.
 
