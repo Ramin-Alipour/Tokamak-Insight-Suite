@@ -396,6 +396,15 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
                            "relativistic 1-D projected-velocity approximation along the scattering wavevector",
                            "full 3-D relativistic photon-geometry integration is not included"]}
 
+
+
+def _default_collective_bounds(initial_density_m3, initial_temperature_eV):
+    """Return adaptive two-decade bounds when no experiment-specific bounds are supplied."""
+    density = _finite_scalar(initial_density_m3, "initial density", minimum=np.finfo(float).tiny)
+    temperature = _finite_scalar(initial_temperature_eV, "initial temperature", minimum=np.finfo(float).tiny)
+    return (np.array([density / 100.0, density * 100.0]),
+            np.array([temperature / 100.0, temperature * 100.0]))
+
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
     laser_wavelength_uncertainty_nm=None, scattering_angle_uncertainty_rad=None,
@@ -409,7 +418,7 @@ def analyze_thomson_spectra(
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
-    collective_density_bounds_m3=(1e14, 1e23), collective_temperature_bounds_eV=(0.1, 1e5),
+    collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
     instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
@@ -459,8 +468,16 @@ def analyze_thomson_spectra(
     instrument_response_mc_min_success_fraction = _finite_scalar(instrument_response_mc_min_success_fraction, "instrument_response_mc_min_success_fraction", minimum=0.5, maximum=1.0)
     collective_initial_density_m3 = _finite_scalar(collective_initial_density_m3, "collective_initial_density_m3", minimum=np.finfo(float).tiny)
     collective_initial_temperature_eV = _finite_scalar(collective_initial_temperature_eV, "collective_initial_temperature_eV", minimum=np.finfo(float).tiny)
-    density_bounds = _finite_array(collective_density_bounds_m3, "collective_density_bounds_m3", 1)
-    temperature_bounds = _finite_array(collective_temperature_bounds_eV, "collective_temperature_bounds_eV", 1)
+    # When the caller does not provide priors, keep the search local to a
+    # configurable physical scale around the supplied starting estimates.
+    # This avoids the previous decade-spanning default box unrelated to the shot.
+    default_density_bounds, default_temperature_bounds = _default_collective_bounds(
+        collective_initial_density_m3, collective_initial_temperature_eV
+    )
+    density_bounds = (default_density_bounds if collective_density_bounds_m3 is None else
+                      _finite_array(collective_density_bounds_m3, "collective_density_bounds_m3", 1))
+    temperature_bounds = (default_temperature_bounds if collective_temperature_bounds_eV is None else
+                          _finite_array(collective_temperature_bounds_eV, "collective_temperature_bounds_eV", 1))
     if density_bounds.shape != (2,) or temperature_bounds.shape != (2,) or np.any(density_bounds <= 0) or np.any(temperature_bounds <= 0) or density_bounds[0] >= density_bounds[1] or temperature_bounds[0] >= temperature_bounds[1]:
         raise ValueError("Collective density and temperature bounds must be positive increasing pairs")
     if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1] or not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:

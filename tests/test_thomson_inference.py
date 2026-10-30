@@ -470,3 +470,9 @@ def test_fit_identifiability_gate_rejects_singular_covariance():
     result = _fit_identifiability(covariance, np.array([0.1, -0.1, 0.0]), None, 2)
     assert result["fit_accepted"] is False
     assert result["fit_quality_status"] == "rejected_unidentifiable_or_invalid"
+
+def test_collective_default_bounds_are_scaled_to_user_initial_estimates():
+    from tokamak_analysis.thomson_inference import _default_collective_bounds
+    density, temperature = _default_collective_bounds(3e18, 250.0)
+    np.testing.assert_allclose(density, [3e16, 3e20])
+    np.testing.assert_allclose(temperature, [2.5, 25000.0])
