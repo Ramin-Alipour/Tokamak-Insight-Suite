@@ -3089,7 +3089,8 @@ elif page=='Advanced Analysis':
                     add_report_section('Microwave CTS spectral inversion',result_cts)
                 except Exception as e:
                     st.error(f'CTS inversion failed: {e}')
-\n    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
+
+    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
         if df is None or len(numeric) < 3:
