@@ -421,8 +421,16 @@ def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkey
         incident_direction=[1.0, 0.0, 0.0],
         scattered_direction=[0.0, 1.0, 0.0],
         signal_uncertainty=np.full_like(y, 0.02)[None, :],
+        ion_temperature_uncertainty_eV=[1.0],
+        ion_velocity_uncertainty_m_s=[[100.0,100.0,100.0]],
+        electron_velocity_uncertainty_m_s=[100.0,100.0,100.0],
+        instrument_response_uncertainty=np.zeros((x.size,x.size)),
+        collective_external_parameter_mc_samples=20,
     )
 
+    assert result["collective_external_mc_successes"] >= 12
+    assert result["collective_external_uncertainty_propagated"] is True
+    assert result["collective_external_parameter_covariance"].shape == (2,2)
     channel = result["channels"][0]
     assert channel["optimizer_success"] is True
     assert channel["collective_parameter_jacobian_rank"] == 2
