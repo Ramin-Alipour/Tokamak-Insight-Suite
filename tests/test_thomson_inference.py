@@ -722,3 +722,30 @@ def test_thomson_profile_reconstruction_retains_separate_covariance_compatibilit
     assert out["uncertainty_model"]["density_covariance_model"] == "full_correlated_covariance"
     assert out["uncertainty_model"]["temperature_covariance_model"] == "full_correlated_covariance"
     assert out["reconstructed_joint_density_temperature_covariance"] is None
+
+
+def test_joint_gls_preserves_laser_and_geometry_uncertainty_components():
+    x, y, _ = _spectral_case(110.0)
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.12], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=np.eye(x.size) * 0.8**2,
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=1e-3,
+    )
+    channel = out["channels"][0]
+    assert channel["joint_fit_used"] is True
+    assert channel["electron_temperature_external_uncertainty_eV"] > 0.0
+    assert channel["electron_velocity_projection_external_uncertainty_m_s"] > 0.0
+    assert channel["electron_temperature_uncertainty_eV"] >= channel["electron_temperature_external_uncertainty_eV"]
+    assert channel["electron_velocity_projection_uncertainty_m_s"] >= channel["electron_velocity_projection_external_uncertainty_m_s"]
+
+
+def test_beam_direction_component_uncertainty_is_rejected_outside_collective_model():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="only by the collective"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            incident_direction_uncertainty=[1e-4, 1e-4, 1e-4],
+        )
