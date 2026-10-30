@@ -1821,10 +1821,12 @@ elif page=='Probe Analysis':
     with st.expander('Time × channel independent sweep series'):
         st.caption('Long-form input schema: one row per sample, with time, channel, calibrated voltage and calibrated current columns. Every time/channel group must contain the same number of samples; no temporal trend or cross-channel inference is performed.')
         tcol=col_select('Time label column',numeric,'probe_series_time_col')
-        ccol=st.selectbox('Channel label column',[c for c in df.columns if c not in {tcol,vcol,icol}],key='probe_series_channel_col')
+        channel_column_options=[c for c in df.columns if c not in {tcol,vcol,icol}]
+        ccol=st.selectbox('Channel label column',channel_column_options or ['No channel label column available'],key='probe_series_channel_col')
+        if not channel_column_options: st.info('Add/select a channel-label column to use time × channel batching.')
         svcol=col_select('Series voltage column',numeric,'probe_series_voltage_col',default=vcol)
         sicol=col_select('Series current column',numeric,'probe_series_current_col',default=icol)
-        if st.button('Analyze time × channel series',key='probe_run_series'):
+        if st.button('Analyze time × channel series',key='probe_run_series',disabled=not channel_column_options):
             try:
                 frame=df[[tcol,ccol,svcol,sicol]].copy()
                 frame[tcol]=pd.to_numeric(frame[tcol],errors='coerce')
