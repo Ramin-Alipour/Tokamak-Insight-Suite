@@ -3063,7 +3063,8 @@ elif page=='Advanced Analysis':
                         if vdf.ndim!=2 or vdf.shape[1]!=2:
                             raise ValueError('Fast-ion VDF CSV must contain exactly two columns: velocity and probability density.')
                         fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),
-                            'velocity_m_s':vdf[:,0],'probability_density_m_s_inverse':vdf[:,1],\n                            'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95)}
+                            'velocity_m_s':vdf[:,0] ,'probability_density_m_s_inverse':vdf[:,1],
+                            'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95)}
                         if cts_fast_mode=='Fixed tabulated 1-D VDF':
                             fast_ion['kind']='tabulated_1d'
                         else:
