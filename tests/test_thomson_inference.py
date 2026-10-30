@@ -182,13 +182,25 @@ def test_projected_relativistic_maxwell_juttner_model_is_available():
     assert "Maxwell-Juttner" in out["channels"][0]["model"]
 
 
+def test_nonrelativistic_flow_projection_uses_q_equals_ks_minus_ki_sign():
+    x, y, _ = _spectral_case(100.0, center_nm=531.98)
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.12], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+    )
+    expected = -299792458.0 * (531.98 - 532.0) / (532.0 * np.sqrt(2.0))
+    assert out["channels"][0]["electron_velocity_projection_m_s"] == pytest.approx(
+        expected, rel=0.03
+    )
+
+
 def test_relativistic_maxwell_juttner_flow_uses_relativistic_doppler_inversion():
     x = np.linspace(430.0, 680.0, 2001)
     laser = 532.0
     angle = np.pi / 2
     beta_bulk = 0.02
     sine = np.sin(angle / 2.0)
-    center = laser * (1.0 + beta_bulk * sine) / (1.0 - beta_bulk * sine)
+    center = laser * (1.0 - beta_bulk * sine) / (1.0 + beta_bulk * sine)
     te = 300.0
     theta = te / 510998.95069
     ratio = x / center
