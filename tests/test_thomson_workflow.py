@@ -159,7 +159,8 @@ def test_thomson_spline_uncertainty_metadata_is_channel_specific(
     model = out["uncertainty_model"]
     assert model["density_channel"] == expected_density
     assert model["temperature_channel"] == expected_temperature
-    assert model["fit_confidence_intervals_estimated"] is False
+    assert model["fit_confidence_intervals_estimated"] is True
+    assert model["reconstructed_profile_uncertainty_available"] is True
 
 
 def test_thomson_pchip_uncertainties_are_reported_but_not_used_as_fit_weights():

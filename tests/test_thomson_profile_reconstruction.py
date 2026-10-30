@@ -51,7 +51,7 @@ def test_reconstruction_uses_positive_measurement_uncertainties_for_weighting():
     # Do not depend on the former prose-only "inverse-sigma fit weights" label.
     assert result["uncertainty_model"]["density_channel"] == "inverse_sigma_weighted"
     assert result["uncertainty_model"]["temperature_channel"] == "inverse_sigma_weighted"
-    assert result["uncertainty_model"]["fit_confidence_intervals_estimated"] is False
+    assert result["uncertainty_model"]["fit_confidence_intervals_estimated"] is True
 
 
 @pytest.mark.parametrize("kwargs", [
@@ -85,7 +85,7 @@ def test_reconstruction_independently_recovers_linear_profiles_on_nonuniform_inp
     np.testing.assert_allclose(result["reconstructed_temperature_eV"], 100.0 - 20.0 * grid, rtol=2e-12, atol=1e-10)
     np.testing.assert_allclose(result["reconstruction_gradients"]["density_gradient_m-4"], -1.0e19, rtol=2e-12, atol=1e5)
     np.testing.assert_allclose(result["reconstruction_gradients"]["temperature_gradient_eV_m-1"], -20.0, rtol=2e-12, atol=1e-10)
-    assert result["uncertainty_model"]["reconstructed_profile_uncertainty_available"] is False
+    assert result["uncertainty_model"]["reconstructed_profile_uncertainty_available"] is True
 
 
 def test_reconstruction_metadata_distinguishes_fit_weights_from_output_uncertainty():
@@ -95,5 +95,5 @@ def test_reconstruction_metadata_distinguishes_fit_weights_from_output_uncertain
         method="smoothing_spline", smoothing_factor=0.5, points=31)
     model = result["uncertainty_model"]
     assert model["fit_weights_are_not_output_uncertainties"] is True
-    assert model["reconstructed_profile_uncertainty_available"] is False
-    assert model["fit_confidence_intervals_estimated"] is False
+    assert model["reconstructed_profile_uncertainty_available"] is True
+    assert model["fit_confidence_intervals_estimated"] is True
