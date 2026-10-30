@@ -1003,7 +1003,8 @@
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
           "input_contract": "Calibrated voltage/current arrays and explicit odd local window point count and polynomial order. Local polynomial least squares uses actual voltage coordinates and supports nonuniform grids; raw and smoothed candidates remain separate.",
-          "outputs": "Raw and Savitzky-Golay-smoothed maximum-dI/dV proxies, separate maximum-d²I/dV² extrema, and second-derivative zero-crossing inflection candidates; current polarity is normalized consistently."
+          "outputs": "Raw and Savitzky-Golay-smoothed maximum-dI/dV proxies, separate maximum-d²I/dV² extrema, and second-derivative zero-crossing inflection candidates; current polarity is normalized consistently.",
+          "reference": "Fan and Gijbels (1996), Local Polynomial Modelling and Its Applications, for local polynomial smoothing in actual voltage coordinates."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
@@ -1086,7 +1087,8 @@
       "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5 (Maxwellian electron collection and Bohm/sheath ion flux relations).",
       "Merlino, R. L., Understanding Langmuir probe current-voltage characteristics, American Journal of Physics 75 (12), 1078-1085 (2007), DOI: 10.1119/1.2772282 (Maxwellian electron saturation, Bohm ion current, and two-temperature electron populations in Appendix Problem 1).",
       "Stangeby, P. C., Langmuir-, and bolometer-probe interpretation for plasmas with two electron components, Journal of Nuclear Materials 128-129, 969-973 (1984), DOI: 10.1016/0022-3115(84)90496-3.",
-      "Williams, G. and Watts, D. C., Non-symmetrical dielectric relaxation behaviour arising from a simple empirical decay function, Transactions of the Faraday Society 66, 80-85 (1970), DOI: 10.1039/TF9706600080 (generic empirical KWW stretched-exponential form only; not a Langmuir-probe physical law)."
+      "Williams, G. and Watts, D. C., Non-symmetrical dielectric relaxation behaviour arising from a simple empirical decay function, Transactions of the Faraday Society 66, 80-85 (1970), DOI: 10.1039/TF9706600080 (generic empirical KWW stretched-exponential form only; not a Langmuir-probe physical law).",
+      "Fan, J. and Gijbels, I., Local Polynomial Modelling and Its Applications, Chapman & Hall (1996) (local polynomial regression/smoothing method)."
     ]
   },
   {
