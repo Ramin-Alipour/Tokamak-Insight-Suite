@@ -437,3 +437,23 @@ def test_probe_analysis_ui_uses_engine_fit_status_and_exposes_declared_workflows
     assert "analyze_langmuir_probe_array" in section
     assert "analyze_langmuir_probe_series" in section
 
+def test_canonical_langmuir_result_keys_are_fully_declared_in_registry():
+    import json
+    from pathlib import Path
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -1e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-8.0, 0.0), ion_fit_range=(-10.0, -9.0))
+    rows = json.loads((Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    entry = next(item for item in rows if item["diagnostic"] == "Langmuir Probe")
+    declared = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    assert set(result) <= declared, sorted(set(result) - declared)
+
+
+def test_root_and_packaged_langmuir_diagnostic_registries_are_identical():
+    import json
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1]
+    root_rows = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    package_rows = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    assert root_rows == package_rows
+
