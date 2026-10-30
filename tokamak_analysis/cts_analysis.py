@@ -504,7 +504,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             response_cov=np.cov(np.asarray(draws),rowvar=False,ddof=1)
             out["response_parameter_covariance"]=trans@response_cov@trans.T
             out["fit_covariance"]=cov+out["response_parameter_covariance"]
-            total=np.sqrt(np.maximum(np.diag(out["fit_covariance"]),0.0))
+            total_covariance=out["fit_covariance"]
+            if out.get("model_discrepancy_covariance") is not None:
+                total_covariance=total_covariance+out["model_discrepancy_covariance"]
+            out["total_fit_covariance_including_discrepancy"]=total_covariance
+            total=np.sqrt(np.maximum(np.diag(total_covariance),0.0))
             out["electron_density_uncertainty_m3"]=float(total[0])
             out["electron_temperature_uncertainty_eV"]=float(total[1])
             out["ion_temperature_uncertainty_eV"]=float(total[2])
