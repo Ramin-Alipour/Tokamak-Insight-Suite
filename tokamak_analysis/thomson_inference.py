@@ -135,11 +135,16 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
 
 def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     """Fit the 1-D projection of an isotropic kappa VDF (Student-t form)."""
+    signal_scale=float(np.max(np.abs(signal)))
+    if not np.isfinite(signal_scale) or signal_scale<=0:
+        raise ValueError("signal must have a positive finite scale")
+    signal_scaled=signal/signal_scale
+    uncertainty_scaled=None if uncertainty is None else uncertainty/signal_scale
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
     edge = max(2, wavelength.size // 10)
-    baseline = float(np.median(np.r_[signal[:edge], signal[-edge:]]))
-    peak = int(np.argmax(signal))
+    baseline = float(np.median(np.r_[signal_scaled[:edge], signal_scaled[-edge:]]))
+    peak = int(np.argmax(signal_scaled))
     amp0 = max(float(signal[peak] - baseline), np.finfo(float).eps)
     p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), 3.0, baseline, 0.0]
     lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51, -np.inf, -np.inf]
@@ -151,8 +156,11 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     def observed(x, amp, center, sigma, kappa, offset, slope):
         component = intrinsic(x, amp, center, sigma, kappa, 0.0, 0.0)
         return response @ component + offset+slope*(x-center)
-    p, cov = curve_fit(observed,wavelength,signal,p0=p0,bounds=(lower,upper),
-                       sigma=uncertainty,absolute_sigma=uncertainty is not None,maxfev=80000)
+    p, cov = curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
+                       sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=80000)
+    parameter_scales=np.array([signal_scale,1.0,1.0,1.0,signal_scale,signal_scale])
+    p=np.asarray(p,dtype=float)*parameter_scales
+    cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp,center,sigma,kappa,offset,slope=map(float,p)
     if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
         raise ValueError("Wavelength coverage must include at least ±3 fitted RMS widths")
