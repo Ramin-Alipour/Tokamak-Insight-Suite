@@ -191,7 +191,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=1e19,electron_temperature_initial_eV=1000.,ion_temperature_initial_eV=500.,
     ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=0.,
-    fast_ion=None,global_search=True,random_seed=1729):
+    fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",\n    spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,\n    regularization_strength=0.0):
     """Infer ne, Te, Ti and ion-flow projection with DE global initialization and bounded least squares."""
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); y=_array(spectrum,"spectrum",1)
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
@@ -225,36 +225,65 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if not 0<flo<fi<fhi<1 or not 0<tlo<ft<thi: raise ValueError("invalid fast-ion initial values or bounds")
         fast={"species_index":idx}; p0=np.r_[p0,fi,np.log10(ft)]; lo=np.r_[lo,flo,np.log10(tlo)]; hi=np.r_[hi,fhi,np.log10(thi)]
     noise=unc if unc is not None else np.full_like(y,max(float(np.std(y)),float(np.max(y))*1e-6,np.finfo(float).tiny))
+    if inversion_method not in {"differential_evolution", "improved_genetic", "regularized"}:
+        raise ValueError("inversion_method must be differential_evolution, improved_genetic or regularized")
+    regularization_strength=float(regularization_strength)
+    if not np.isfinite(regularization_strength) or regularization_strength<0:
+        raise ValueError("regularization_strength must be finite and non-negative")
+    if inversion_method=="regularized" and regularization_strength<=0:
+        raise ValueError("regularized inversion requires regularization_strength > 0")
+    if spectral_covariance is not None:
+        cov_y=_array(spectral_covariance,"spectral_covariance",2)
+        if cov_y.shape!=(f.size,f.size) or not np.allclose(cov_y,cov_y.T,rtol=1e-9,atol=1e-12):
+            raise ValueError("spectral_covariance must be a symmetric n_frequency x n_frequency matrix")
+        try: chol=np.linalg.cholesky(cov_y)
+        except np.linalg.LinAlgError as exc: raise ValueError("spectral_covariance must be positive definite") from exc
+        whiten=lambda z: np.linalg.solve(chol,z)
+    else:
+        whiten=lambda z: z/noise
+    response_sigma=None if instrument_response_uncertainty is None else _array(instrument_response_uncertainty,"instrument_response_uncertainty",2)
+    if response_sigma is not None and (response_sigma.shape!=response.shape or np.any(response_sigma<0)):
+        raise ValueError("instrument_response_uncertainty must match the response matrix and be non-negative")
+    if isinstance(response_mc_samples,bool) or not isinstance(response_mc_samples,(int,np.integer)) or response_mc_samples<20:
+        raise ValueError("response_mc_samples must be an integer >= 20")
     def decode(p):
         d={"electron_density_m3":10**p[0],"electron_temperature_eV":10**p[1],"ion_temperature_eV":10**p[2],"ion_velocity_projection_m_s":p[3]*us}
         if fast: d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
         return d
-    def forward(p):
+    def forward(p, response_matrix=None):
         d=decode(p); z=cts_spectral_density(f,f0,scattering_geometry,electron_density_m3=d["electron_density_m3"],
           electron_temperature_eV=d["electron_temperature_eV"],ion_temperature_eV=d["ion_temperature_eV"],
           ion_species=ion_species,ion_fractions=ion_fractions,ion_velocity_projection_m_s=d["ion_velocity_projection_m_s"],
           electron_velocity_projection_m_s=electron_velocity_projection_m_s,fast_ion=d.get("fast_ion"))
-        return _convolve(response,z,f)
+        return _convolve(response if response_matrix is None else response_matrix,z,f)
+    def profile_amplitude(z):
+        A=whiten(np.column_stack((z,np.ones_like(z))))
+        amp,off=np.linalg.lstsq(A,whiten(y),rcond=None)[0]
+        if amp<0: amp,off=0.,float(np.mean(y))
+        return amp,off
+    def data_residual(p, response_matrix=None):
+        z=forward(p,response_matrix); amp,off=profile_amplitude(z)
+        return whiten(amp*z+off-y)
+    prior_scale=np.maximum(hi-lo,1e-12)
     def residual(p):
-        z=forward(p); A=np.column_stack((z,np.ones_like(z)))/noise[:,None]
-        amp,off=np.linalg.lstsq(A,y/noise,rcond=None)[0]
-        if amp<0: amp,off=0.,float(np.average(y,weights=1/noise**2))
-        return (amp*z+off-y)/noise
-    score=None
-    if global_search:
+        data=data_residual(p)
+        return np.r_[data,np.sqrt(regularization_strength)*(p-p0)/prior_scale] if inversion_method=="regularized" else data
+    score=None; genetic_history=None
+    if global_search and inversion_method=="improved_genetic":
+        start,score,genetic_history=_improved_genetic_search(
+            lambda p:float(residual(p)@residual(p)),list(zip(lo,hi)),seed=int(random_seed))
+    elif global_search and inversion_method=="differential_evolution":
         de=differential_evolution(lambda p:float(residual(p)@residual(p)),list(zip(lo,hi)),seed=int(random_seed),maxiter=35,popsize=7,polish=False,workers=1,tol=1e-5)
         start=de.x; score=float(de.fun)
     else: start=p0
     fit=least_squares(residual,start,bounds=(lo,hi),x_scale="jac",max_nfev=6000)
-    d=decode(fit.x); z=forward(fit.x); A=np.column_stack((z,np.ones_like(z)))/noise[:,None]
-    amp,off=np.linalg.lstsq(A,y/noise,rcond=None)[0]
-    if amp<0: amp,off=0.,float(np.average(y,weights=1/noise**2))
-    fitted=amp*z+off; res=y-fitted; dof=max(1,y.size-len(fit.x)-2)
+    d=decode(fit.x); z=forward(fit.x); amp,off=profile_amplitude(z)
+    fitted=amp*z+off; res=y-fitted; data_fit_residual=data_residual(fit.x); dof=max(1,y.size-len(fit.x)-2)
     rank=int(np.linalg.matrix_rank(fit.jac)); cond=float(np.linalg.cond(fit.jac))
     if not fit.success: raise ValueError(f"CTS refinement failed: {fit.message}")
     if rank<len(fit.x) or not np.isfinite(cond) or cond>1e12: raise ValueError("CTS fit rejected: plasma parameters are not jointly identifiable")
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
-    if unc is None: cov0*=float(np.sum(fit.fun**2)/dof)
+    if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
     trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]
     if fast: trans[5,5]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
@@ -263,19 +292,50 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     out={**d,"electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
       "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[3]),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
-      "reduced_chi_square":float(np.sum((res/unc)**2)/dof) if unc is not None else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
-      "optimizer_success":bool(fit.success),"global_search_score":score,"jacobian_rank":rank,"jacobian_condition_number":cond,
+      "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if (unc is not None or spectral_covariance is not None) else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
+      "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"jacobian_rank":rank,"jacobian_condition_number":cond,
       "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,"scattering_wavevector_direction":qhat,
       "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
       "model":"unmagnetized electrostatic longitudinal microwave CTS",
       "parameter_provenance":{"electron_density":"inferred from measured CTS spectral shape","electron_temperature":"inferred from measured CTS spectral shape",
        "ion_temperature":"inferred from measured ion-feature shape","ion_velocity_projection":"inferred from ion-feature Doppler shift","ion_composition":"externally supplied fixed composition"},
-      "uncertainty_model":"Local Jacobian covariance conditional on the selected model, composition, geometry and response; excludes response uncertainty, correlated-bin errors and model discrepancy.",
+      "uncertainty_model":"Local Jacobian covariance with optional full spectral covariance whitening; response-matrix uncertainty is propagated by Monte Carlo when supplied.",
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
        "Ion composition is fixed externally.","Optional fast-ion component is a two-Maxwellian approximation, not arbitrary VDF reconstruction.",
-       "Model discrepancy, response-matrix uncertainty and correlated frequency-bin errors are not propagated."]}
+       "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if fast:
         names += ["fast_ion_fraction","fast_ion_temperature_eV"]; out["parameter_names"]=names
         out["fast_ion_fraction_uncertainty"]=float(su[4]); out["fast_ion_temperature_uncertainty_eV"]=float(su[5])
+    if response_sigma is not None:
+        rng=np.random.default_rng(int(random_seed)+991); draws=[]
+        for _ in range(int(response_mc_samples)):
+            sampled=np.maximum(response+rng.normal(0.0,response_sigma),0.0)
+            sums=sampled.sum(axis=0)
+            if np.any(sums<=0): continue
+            sampled/=sums[None,:]
+            try:
+                draw=least_squares(lambda p: data_residual(p,sampled),fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
+                if draw.success and np.all(np.isfinite(draw.x)): draws.append(draw.x)
+            except (ValueError,RuntimeError,np.linalg.LinAlgError):
+                continue
+        out["response_mc_successes"]=len(draws); out["response_mc_requested"]=int(response_mc_samples)
+        if len(draws)>=max(12,int(np.ceil(.7*response_mc_samples))):
+            response_cov=np.cov(np.asarray(draws),rowvar=False,ddof=1)
+            out["response_parameter_covariance"]=trans@response_cov@trans.T
+            out["fit_covariance"]=cov+out["response_parameter_covariance"]
+            total=np.sqrt(np.maximum(np.diag(out["fit_covariance"]),0.0))
+            out["electron_density_uncertainty_m3"]=float(total[0])
+            out["electron_temperature_uncertainty_eV"]=float(total[1])
+            out["ion_temperature_uncertainty_eV"]=float(total[2])
+            out["ion_velocity_projection_uncertainty_m_s"]=float(total[3])
+            if fast:
+                out["fast_ion_fraction_uncertainty"]=float(total[4])
+                out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
+            out["response_uncertainty_propagated"]=True
+        else:
+            out["response_uncertainty_propagated"]=False
+            out["response_uncertainty_warning"]="Too few successful response-perturbation refits; no Monte Carlo contribution was added."
+    else:
+        out["response_uncertainty_propagated"]=False
     return out
