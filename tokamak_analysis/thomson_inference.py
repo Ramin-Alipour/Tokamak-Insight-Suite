@@ -8,6 +8,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import curve_fit
 
+from .thomson_scattering import density_from_thomson_scattered_power
+
 ELECTRON_REST_ENERGY_EV = 510_998.95069
 C_M_S = 299_792_458.0
 R_E_M = 2.8179403262e-15
@@ -325,34 +327,29 @@ def analyze_thomson_spectra(
                 raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
             area = float(fit["integrated_scattered_power_W"])
             area_sigma = fit.get("integrated_scattered_power_uncertainty_W")
-            ne, pol = _density_from_power(area, laser_power_w, interaction_length_m,
-                collection_solid_angle_sr, optical_efficiency, scattering_angle_rad,
-                incident_polarization, scattered_direction)
-            rel_var = 0.0
-            for value, sigma_value, label in (
-                (area, area_sigma, "scattered_power"),
-                (laser_power_w, laser_power_uncertainty_W, "laser_power"),
-                (interaction_length_m, interaction_length_uncertainty_m, "interaction_length"),
-                (collection_solid_angle_sr, collection_solid_angle_uncertainty_sr, "collection_solid_angle"),
-                (optical_efficiency, optical_efficiency_uncertainty, "optical_efficiency"),
-            ):
-                if sigma_value is not None:
-                    if not np.isfinite(sigma_value) or sigma_value < 0:
-                        raise ValueError(f"{label} uncertainty must be finite and non-negative")
-                    if value <= 0:
-                        raise ValueError(f"{label} must be positive")
-                    rel_var += (float(sigma_value)/float(value))**2
-            if polarization_factor_uncertainty is not None:
-                if not np.isfinite(polarization_factor_uncertainty) or polarization_factor_uncertainty < 0 or pol <= 0:
-                    raise ValueError("polarization_factor_uncertainty must be finite and non-negative")
-                rel_var += (float(polarization_factor_uncertainty)/pol)**2
-            fit["electron_density_m3"] = ne
-            fit["electron_density_uncertainty_m3"] = float(ne*np.sqrt(rel_var)) if rel_var > 0 else None
+            density_result = density_from_thomson_scattered_power(
+                scattered_power_W=area, incident_power_W=laser_power_w,
+                interaction_length_m=interaction_length_m,
+                scattering_angle_rad=scattering_angle_rad,
+                collection_solid_angle_sr=collection_solid_angle_sr,
+                optical_efficiency=optical_efficiency,
+                scattered_power_uncertainty_W=area_sigma,
+                incident_power_uncertainty_W=laser_power_uncertainty_W,
+                interaction_length_uncertainty_m=interaction_length_uncertainty_m,
+                scattering_angle_uncertainty_rad=scattering_angle_uncertainty_rad,
+                collection_solid_angle_uncertainty_sr=collection_solid_angle_uncertainty_sr,
+                optical_efficiency_uncertainty=optical_efficiency_uncertainty,
+                incident_polarization_vector=incident_polarization,
+                scattered_direction_vector=scattered_direction,
+                polarization_factor_uncertainty=polarization_factor_uncertainty,
+            )
+            fit["electron_density_m3"] = density_result["electron_density_m3"]
+            fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
             fit["integrated_scattered_power_W"] = area
             fit["integrated_scattered_power_uncertainty_W"] = area_sigma
-            fit["polarization_factor"] = pol
-            fit["density_method"] = "absolute integrated Thomson power with supplied optical geometry and polarization"
-            fit["density_uncertainty_model"] = "first-order independent-input propagation; only supplied uncertainty terms are included"
+            fit["differential_cross_section_m2_sr"] = density_result["differential_cross_section_m2_sr"]
+            fit["density_method"] = "absolute integrated Thomson power using shared polarization-aware density inversion"
+            fit["density_uncertainty_model"] = density_result["uncertainty_model"]
         else:
             fit["electron_density_m3"] = fit.get("electron_density_m3")
             fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
