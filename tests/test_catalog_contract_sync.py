@@ -170,3 +170,25 @@ def test_primary_analysis_registry_groups_all_80_entry_points_into_20_families()
     assert support["category"] == "instrumentation_support"
     assert set(support["entry_ids"]) == {26, 27, 77, 78, 79, 80}
     assert len(get_family_entry_points(1)) == len(thomson["entry_ids"])
+
+
+def test_thomson_family_callable_contracts_match_canonical_diagnostic_registry():
+    from tokamak_analysis.analysis_registry import ANALYSES
+
+    by_name = {row["diagnostic"]: row for row in DIAGNOSTICS}
+    analysis_by_name = {row["name"]: row for row in ANALYSES}
+    for name in (
+        "Thomson scattering",
+        "Thomson spectral distribution analysis",
+        "Collective Thomson / coherent scattering (CTS)",
+        "Thomson spatial profile reconstruction",
+    ):
+        canonical = by_name[name]["execution_contract"]
+        callable_contract = analysis_by_name[name]["execution_contract"]
+        assert callable_contract["input_specs"] == canonical["input_specs"]
+        assert callable_contract["output_specs"] == canonical["output_specs"]
+        assert callable_contract["completeness"] == canonical["completeness"]
+        assert callable_contract["raw_data_to_physics"] == canonical["raw_data_to_physics"]
+        assert callable_contract["calibrated_measurements_to_physics"] == canonical.get(
+            "calibrated_measurements_to_physics", False
+        )
