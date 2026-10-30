@@ -87,8 +87,10 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
     for index,frequency in np.ndenumerate(np.asarray(omega,dtype=float)):
         resonance=float(frequency/k-flow)
         if resonance<=velocity_grid[0] or resonance>=velocity_grid[-1]:
-            pv=quad(lambda v: float(derivative(v)),float(velocity_grid[0]),float(velocity_grid[-1]),
-                    weight="cauchy",wvar=resonance,limit=150)[0]
+            if np.isclose(resonance,velocity_grid[0]) or np.isclose(resonance,velocity_grid[-1]):
+                raise ValueError("fast-ion velocity grid must extend beyond every resonant velocity")
+            pv=quad(lambda v: float(derivative(v))/(v-resonance),
+                    float(velocity_grid[0]),float(velocity_grid[-1]),limit=150)[0]
             f_res=0.0
         else:
             pv=quad(lambda v: float(derivative(v)),float(velocity_grid[0]),float(velocity_grid[-1]),
