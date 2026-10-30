@@ -392,12 +392,29 @@ def _positive_finite_scalar(value, name: str, *, allow_zero: bool = False) -> fl
     return result
 
 
-def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float) -> float:
-    """Unpolarized Thomson differential cross-section in m^2 sr^-1."""
+def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float, *, incident_polarization_vector=None, scattered_direction_vector=None) -> float:
+    """Thomson differential cross-section in m^2 sr^-1.
+
+    Without vectors, use the unpolarized result. With both vectors, calculate
+    the polarization-dependent result summed over unanalysed outgoing states.
+    """
     theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
     if theta > np.pi:
         raise ValueError("scattering_angle_rad must lie between 0 and pi")
-    return float(0.5 * _ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2))
+    if incident_polarization_vector is None and scattered_direction_vector is None:
+        return float(0.5 * _ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2))
+    if incident_polarization_vector is None or scattered_direction_vector is None:
+        raise ValueError("incident_polarization_vector and scattered_direction_vector must be supplied together")
+    eps = np.asarray(incident_polarization_vector, dtype=float)
+    direction = np.asarray(scattered_direction_vector, dtype=float)
+    if eps.shape != (3,) or direction.shape != (3,) or not np.all(np.isfinite(eps)) or not np.all(np.isfinite(direction)):
+        raise ValueError("polarization and scattered direction must be finite 3-vectors")
+    eps_norm = float(np.linalg.norm(eps)); direction_norm = float(np.linalg.norm(direction))
+    if eps_norm <= 0 or direction_norm <= 0:
+        raise ValueError("polarization and scattered direction vectors must be nonzero")
+    eps = eps/eps_norm; direction = direction/direction_norm
+    factor = max(0.0, 1.0-float(np.dot(direction, eps))**2)
+    return float(_ELECTRON_CLASSICAL_RADIUS_M**2*factor)
 
 
 def density_from_thomson_scattered_power(
@@ -414,6 +431,9 @@ def density_from_thomson_scattered_power(
     scattering_angle_uncertainty_rad=None,
     collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None,
+    incident_polarization_vector=None,
+    scattered_direction_vector=None,
+    polarization_factor_uncertainty=None,
 ):
     """Infer density from calibrated collected Thomson power.
 
@@ -430,7 +450,10 @@ def density_from_thomson_scattered_power(
     eta = _positive_finite_scalar(optical_efficiency, "optical_efficiency")
     if eta > 1.0:
         raise ValueError("optical_efficiency must not exceed 1")
-    dsigma = thomson_differential_cross_section_m2_sr(theta)
+    dsigma = thomson_differential_cross_section_m2_sr(
+        theta, incident_polarization_vector=incident_polarization_vector,
+        scattered_direction_vector=scattered_direction_vector,
+    )
     density = ps / (pi * length * dsigma * omega * eta)
     model_power = density * pi * length * dsigma * omega * eta
 
@@ -453,6 +476,15 @@ def density_from_thomson_scattered_power(
                 raise ValueError(f"{name} cannot be propagated relative to a zero nominal value")
         else:
             rel_variance += (sigma / nominal) ** 2
+    if polarization_factor_uncertainty is not None:
+        sigma_pol = _positive_finite_scalar(polarization_factor_uncertainty, "polarization_factor_uncertainty", allow_zero=True)
+        if incident_polarization_vector is None or dsigma <= 0:
+            raise ValueError("polarization-factor uncertainty requires a nonzero polarization-dependent cross-section")
+        polarization_factor = dsigma/(_ELECTRON_CLASSICAL_RADIUS_M**2)
+        if polarization_factor <= 0:
+            raise ValueError("polarization factor must be positive to propagate its uncertainty")
+        uncertainty_supplied = True
+        rel_variance += (sigma_pol/polarization_factor)**2
     if scattering_angle_uncertainty_rad is not None:
         sigma_theta = _positive_finite_scalar(
             scattering_angle_uncertainty_rad, "scattering_angle_uncertainty_rad", allow_zero=True
@@ -470,7 +502,7 @@ def density_from_thomson_scattered_power(
         "differential_cross_section_m2_sr": float(dsigma),
         "assumptions": [
             "Absolutely calibrated scattered and incident laser power.",
-            "Optically thin, single-scattering Thomson relation for unpolarized incident light.",
+            "Optically thin, single-scattering Thomson relation; polarization dependence is included when incident polarization and scattered direction vectors are supplied, otherwise the unpolarized cross-section is used.",
             "Uniform electron density over the stated interaction length.",
             "Collection solid angle and optical efficiency describe the actual collection path.",
         ],
