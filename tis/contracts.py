@@ -40,6 +40,7 @@ class ExecutionContract:
     limitations: tuple[str, ...] = ()
     function_links: tuple[str, ...] = ()
     raw_data_to_physics: bool = False
+    calibrated_measurements_to_physics: bool = False
     completeness: str = "incomplete"
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
@@ -49,7 +50,17 @@ class ExecutionContract:
 
     @property
     def supports_raw_data(self) -> bool:
+        """Whether uncalibrated instrument data are explicitly supported."""
         return self.raw_data_to_physics and self.completeness == "complete"
+
+    @property
+    def supports_calibrated_measurements(self) -> bool:
+        """Whether measured, calibrated diagnostic data reach a physical result."""
+        return (
+            self.calibrated_measurements_to_physics
+            and self.level in {ExecutionLevel.ANALYSIS_PIPELINE, ExecutionLevel.INVERSE_RECONSTRUCTION}
+            and self.completeness in {"complete", "complete_with_declared_scope"}
+        )
 
     def validate_inputs(self, values: Mapping[str, Any]) -> None:
         if not isinstance(values, Mapping):
@@ -124,6 +135,7 @@ def contract_from_registry(row: Mapping[str, Any]) -> ExecutionContract:
         limitations=tuple(raw.get("limitations", ())),
         function_links=tuple(raw.get("function_links", row.get("implementation_functions", ()))),
         raw_data_to_physics=bool(raw.get("raw_data_to_physics", False)),
+        calibrated_measurements_to_physics=bool(raw.get("calibrated_measurements_to_physics", False)),
         completeness=str(raw.get("completeness", "incomplete")),
         metadata={"family": row.get("family"), "quantities": row.get("quantities"),
                   "catalogue_status": row.get("implementation_status")})
