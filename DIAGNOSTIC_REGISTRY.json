@@ -3996,33 +3996,125 @@
   {
     "family": "Density and refractive diagnostics",
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
-    "quantities": "Ion/electron fluctuation spectrum and fast-ion constraints",
-    "status": "M→I",
-    "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
-    "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
+    "quantities": "Electron density and temperature, bulk ion temperature and ion-flow projection from a calibrated microwave frequency-shift spectrum; optional fitted hot-Maxwellian ion fraction and temperature.",
+    "status": "P",
+    "method": "Frequency-domain microwave CTS inversion using an unmagnetized electrostatic longitudinal dielectric model, multi-ion Maxwellian response, instrument-response convolution, differential-evolution global initialization and bounded least-squares refinement.",
+    "caveat": "Scoped electrostatic longitudinal model, not a full magnetized electromagnetic CTS scattering tensor, ray-tracing or absolute power-transfer calculation. Ion composition is fixed externally. Optional fast-ion fitting is a two-Maxwellian hot-component approximation, not arbitrary VDF reconstruction. Model discrepancy, response-matrix uncertainty and correlated frequency-bin errors are not propagated.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
     ],
-    "implementation_status": "Dedicated callable fails closed; microwave frequency-domain CTS forward model and inversion are not implemented.",
+    "implementation_status": "A frequency-domain microwave CTS forward model and shape-based inversion are implemented within the declared electrostatic Maxwellian scope; full electromagnetic CTS and arbitrary fast-ion VDF inversion remain out of scope.",
     "execution_contract": {
-      "schema_version": "1.0",
-      "execution_level": "limited_calculation",
-      "completeness": "incomplete",
-      "input_specs": [],
-      "output_specs": [],
-      "assumptions": [],
-      "preprocessing": [],
-      "algorithm": "Fit scattered spectrum using scattering geometry and plasma response model.",
-      "uncertainty_model": "not_specified",
+      "schema_version": "2.0",
+      "execution_level": "analysis_pipeline",
+      "completeness": "partial_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "spectrum",
+          "unit": "calibrated spectral power",
+          "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "scattering_geometry",
+          "unit": "structured",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "charge-density fraction",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "normalized frequency response matrix",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "same as spectrum, 1-sigma",
+          "required": false
+        },
+        {
+          "name": "fast_ion",
+          "unit": "structured",
+          "required": false
+        },
+        {
+          "name": "parameter_bounds",
+          "unit": "structured",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "ion_velocity_projection_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "fit_covariance",
+          "unit": "parameter covariance"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "same as spectrum"
+        },
+        {
+          "name": "residual",
+          "unit": "same as spectrum"
+        }
+      ],
+      "assumptions": [
+        "Unmagnetized electrostatic longitudinal dielectric response.",
+        "Maxwellian bulk electrons and ions; optional hot-Maxwellian ion component.",
+        "Quasi-neutral plasma and supplied fixed ion composition.",
+        "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate."
+      ],
+      "preprocessing": [
+        "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
+        "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
+      ],
+      "algorithm": "Compute the multi-species longitudinal dielectric spectral density and infer electron density, electron temperature, ion temperature and ion-flow projection using global differential-evolution initialization followed by bounded least-squares refinement.",
+      "uncertainty_model": "Local Jacobian covariance conditional on the chosen model, fixed composition, geometry and instrument response. Response-matrix uncertainty, correlated frequency-bin uncertainty and model discrepancy are not propagated.",
       "limitations": [
-        "No physical microwave CTS inversion is implemented; callable raises NotImplementedError.",
-        "Do not substitute optical Thomson, density-wave or particle-loss routines for CTS."
+        "Not a full magnetized electromagnetic CTS scattering tensor or ray-tracing/beam-overlap model.",
+        "Absolute received-power transfer, probe polarization coupling and receiver calibration are not inverted.",
+        "Ion composition is fixed externally.",
+        "Fast-ion fitting is a two-Maxwellian hot-component approximation, not arbitrary fast-ion distribution reconstruction.",
+        "Model discrepancy, response-matrix uncertainty and correlated frequency-bin errors are excluded."
       ],
       "function_links": [
+        "tokamak_analysis.cts_analysis.cts_spectral_density",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
-      "raw_data_to_physics": false,
-      "note": "Callable guard prevents incorrect execution; this is not a completed CTS analysis."
+      "raw_data_to_physics": true,
+      "note": "Measured calibrated microwave CTS frequency spectra map to plasma parameters within the declared unmagnetized electrostatic model scope."
     }
   },
   {
