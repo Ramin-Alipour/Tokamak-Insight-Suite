@@ -325,6 +325,8 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,
             "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
             "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
+            "fit_parameters":np.asarray(p,dtype=float),
+            "fit_parameter_names":["amplitude","center_nm","intrinsic_sigma_nm","kappa_index","background_intercept","background_slope_per_nm"],
             "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
             "fitted_spectrum":observed(wavelength,*p),
@@ -928,18 +930,30 @@ def analyze_thomson_spectra(
         nchan, nlam = y.shape
         initial = np.concatenate([np.asarray(item["fit_parameters"], dtype=float) for item in results])
         lower_parts, upper_parts = [], []
+        joint_parameter_count=5 if model=="non_collective_maxwellian" else 6
         for i in range(nchan):
             dx = float(np.median(np.diff(xs[i])))
             span_i = float(xs[i, -1] - xs[i, 0])
-            lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), -np.inf, -np.inf])
-            upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf])
+            if model=="non_collective_maxwellian":
+                lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), -np.inf, -np.inf])
+                upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf])
+            else:
+                lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), 1.51, -np.inf, -np.inf])
+                upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf, np.inf])
         lower = np.asarray(lower_parts).ravel()
         upper = np.asarray(upper_parts).ravel()
         def joint_forward(parameters):
             predicted = []
             for channel in range(nchan):
-                amp, center, sigma, offset, slope = parameters[5*channel:5*(channel+1)]
-                signal_component = amp * np.exp(-0.5*((xs[channel]-center)/sigma)**2)
+                p=parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
+                if model=="non_collective_maxwellian":
+                    amp,center,sigma,offset,slope=p
+                    signal_component=amp*np.exp(-0.5*((xs[channel]-center)/sigma)**2)
+                else:
+                    amp,center,sigma,kappa,offset,slope=p
+                    df=2.0*kappa-1.0
+                    scale=sigma*np.sqrt((df-2.0)/df)
+                    signal_component=amp*(1.0+((xs[channel]-center)/scale)**2/df)**(-kappa)
                 predicted.append(_apply_response(channel_responses[channel], signal_component, xs[channel])
                                  + offset + slope*(xs[channel]-center))
             return np.asarray(predicted)
@@ -959,15 +973,16 @@ def analyze_thomson_spectra(
         def physical_vector(parameters):
             values=[]
             for channel in range(nchan):
-                _, center, sigma, _, _ = parameters[5*channel:5*(channel+1)]
+                p=parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
+                center=float(p[1]); sigma=float(p[2])
                 te=(sigma/float(laser_wavelength_nm))**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(float(scattering_angle_rad)/2.0)**2
                 qproj=2.0*np.sin(float(scattering_angle_rad)/2.0)
                 velocity=-C_M_S*(center-float(laser_wavelength_nm))/(float(laser_wavelength_nm)*qproj)
                 values.extend([te,velocity])
             return np.asarray(values,dtype=float)
         base_physical=physical_vector(joint_fit.x)
-        transform=np.zeros((2*nchan,5*nchan))
-        for j in range(5*nchan):
+        transform=np.zeros((2*nchan,joint_parameter_count*nchan))
+        for j in range(joint_parameter_count*nchan):
             step=np.cbrt(np.finfo(float).eps)*max(abs(float(joint_fit.x[j])),1.0)
             plus=joint_fit.x.copy(); minus=joint_fit.x.copy()
             plus[j]+=step; minus[j]-=step
@@ -979,13 +994,20 @@ def analyze_thomson_spectra(
         total_physical_covariance=physical_covariance+discrepancy_covariance
         joint_fitted=joint_forward(joint_fit.x)
         for channel in range(nchan):
-            p=joint_fit.x[5*channel:5*(channel+1)]
-            block=parameter_covariance[5*channel:5*(channel+1),5*channel:5*(channel+1)]
+            p=joint_fit.x[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
+            block=parameter_covariance[joint_parameter_count*channel:joint_parameter_count*(channel+1),
+                                        joint_parameter_count*channel:joint_parameter_count*(channel+1)]
             te_index=2*channel; velocity_index=te_index+1
             fit=results[channel]
+            if model=="non_collective_maxwellian":
+                amp,center,sigma,offset,slope=p
+                extra={}
+            else:
+                amp,center,sigma,kappa,offset,slope=p
+                extra={"kappa_index":float(kappa)}
             fit.update({
-                "amplitude":float(p[0]),"fitted_center_nm":float(p[1]),"intrinsic_sigma_nm":float(p[2]),
-                "background_intercept":float(p[3]),"background_slope_per_nm":float(p[4]),
+                "amplitude":float(amp),"fitted_center_nm":float(center),"intrinsic_sigma_nm":float(sigma),
+                "background_intercept":float(offset),"background_slope_per_nm":float(slope),**extra,
                 "fit_parameters":p.copy(),"fit_covariance":block.copy(),
                 "electron_temperature_eV":float(base_physical[te_index]),
                 "electron_velocity_projection_m_s":float(base_physical[velocity_index]),
@@ -996,8 +1018,22 @@ def analyze_thomson_spectra(
                 "joint_fit_used":True,
                 "joint_channel_parameter_covariance":parameter_covariance.copy(),
             })
-            area=float(p[0]*p[2]*np.sqrt(2.0*np.pi))
-            grad=np.array([p[2]*np.sqrt(2*np.pi),0.0,p[0]*np.sqrt(2*np.pi),0.0,0.0])
+            if model=="non_collective_maxwellian":
+                area=float(amp*sigma*np.sqrt(2.0*np.pi))
+                def area_function(v): return float(v[0]*v[2]*np.sqrt(2*np.pi))
+            else:
+                df=2.0*kappa-1.0
+                scale=sigma*np.sqrt((df-2.0)/df)
+                area=float(amp*scale*np.sqrt(df*np.pi)*np.exp(gammaln(kappa-0.5)-gammaln(kappa)))
+                def area_function(v):
+                    dfv=2.0*v[3]-1.0
+                    scalev=v[2]*np.sqrt((dfv-2.0)/dfv)
+                    return float(v[0]*scalev*np.sqrt(dfv*np.pi)*np.exp(gammaln(v[3]-0.5)-gammaln(v[3])))
+            grad=np.zeros(p.size)
+            for j in range(p.size):
+                step=1e-5*max(abs(float(p[j])),1.0)
+                plus=p.copy(); minus=p.copy(); plus[j]+=step; minus[j]-=step
+                grad[j]=(area_function(plus)-area_function(minus))/(2.0*step)
             fit["integrated_scattered_power_W"]=area
             fit["integrated_scattered_power_uncertainty_W"]=float(np.sqrt(max(grad@block@grad,0.0)))
         joint_summary={
@@ -1005,6 +1041,7 @@ def analyze_thomson_spectra(
             "channel_major_covariance_order":True,
             "joint_parameter_covariance":parameter_covariance,
             "physical_parameter_order":[name for i in range(nchan) for name in (f"channel_{i}_electron_temperature_eV",f"channel_{i}_electron_velocity_projection_m_s")],
+            "joint_parameter_count_per_channel":joint_parameter_count,
             "physical_parameter_covariance":physical_covariance,
             "model_discrepancy_covariance":discrepancy_covariance,
             "total_physical_parameter_covariance":total_physical_covariance,
