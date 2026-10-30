@@ -433,6 +433,8 @@ def test_probe_analysis_ui_uses_engine_fit_status_and_exposes_declared_workflows
     assert "electron_retarding_fit_status" in section
     assert "estimate_electron_density_from_saturation" in section
     assert "estimate_ion_particle_flux" in section
+    assert "estimate_multispecies_ion_density" in section
+    assert "fraction_basis='number_density'" in section
     assert "fit_langmuir_electron_models" in section
     assert "analyze_langmuir_probe_array" in section
     assert "analyze_langmuir_probe_series" in section
