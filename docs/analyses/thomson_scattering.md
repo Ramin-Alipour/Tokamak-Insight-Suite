@@ -43,7 +43,7 @@ The measured spectra are assumed to be calibrated intensity data. No wavelength 
 
 ### 1. Non-collective Maxwellian
 
-The electron feature is represented by the non-relativistic Maxwellian Doppler spectrum. Its intrinsic width is fitted after applying the supplied instrument-response matrix in the forward model. The fitted spectral centroid yields the electron-flow projection along the scattering wavevector, not a full three-dimensional velocity vector.
+The electron feature is represented by the non-relativistic Maxwellian Doppler spectrum. Its intrinsic width is fitted after applying the supplied instrument-response matrix in the forward model. The fitted spectral centroid yields the electron-flow projection along q = k_scattered − k_incident, not a full three-dimensional velocity vector. With this q convention, the non-relativistic projection is v_q = −c(λ_c − λ_L)/[2 λ_L sin(θ/2)].
 
 Assumptions: non-collective single-particle scattering, isotropic Maxwellian electrons, non-relativistic velocities, and known scattering geometry.
 
@@ -55,7 +55,7 @@ Assumptions: non-collective scattering, isotropic kappa distribution, kappa inde
 
 ### 3. Relativistic Maxwell-Juttner (projected)
 
-A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. Its fitted centroid is converted to bulk-flow projection with the inverse relativistic Doppler relation β = (λc/λL − 1) / [sin(θ/2)(λc/λL + 1)], rather than the non-relativistic linearized shift used by the Maxwellian and kappa fits; superluminal centroid solutions are rejected. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
+A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. Its fitted centroid is converted to bulk-flow projection with the inverse relativistic Doppler relation β_q = (1 − λc/λL) / [sin(θ/2)(λc/λL + 1)], rather than the non-relativistic linearized shift used by the Maxwellian and kappa fits; superluminal centroid solutions are rejected. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
 
 ### 4. Collective Maxwellian
 
