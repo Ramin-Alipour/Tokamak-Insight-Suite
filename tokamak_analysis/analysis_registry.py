@@ -139,11 +139,12 @@ ANALYSES = [{
                 "Absolute-density uncertainty propagation includes only the independently supplied uncertainty terms.",
                 "No independent experimental validation is claimed."
             ],
-        "function_links":             [
-                "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-                "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-                "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
-            ],
+        "function_links": [
+            "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+            "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+            "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+            "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+        ],
         "raw_data_to_physics": True,
         "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Calibrated-profile routines remain downstream utilities. No detector calibration or independent experimental validation is performed.",
         "workflow_modes":             [
