@@ -490,10 +490,13 @@ def density_from_thomson_scattered_power(
             scattering_angle_uncertainty_rad, "scattering_angle_uncertainty_rad", allow_zero=True
         )
         uncertainty_supplied = True
-        relative_sensitivity = abs(
-            2.0 * np.sin(theta) * np.cos(theta) / (1.0 + np.cos(theta) ** 2)
-        )
-        rel_variance += (relative_sensitivity * sigma_theta) ** 2
+        if incident_polarization_vector is not None and sigma_theta > 0:
+            raise ValueError("For polarized geometry, propagate angle uncertainty through the supplied direction vectors or provide polarization_factor_uncertainty; the scalar unpolarized angle derivative is not applicable.")
+        if incident_polarization_vector is None:
+            relative_sensitivity = abs(
+                2.0 * np.sin(theta) * np.cos(theta) / (1.0 + np.cos(theta) ** 2)
+            )
+            rel_variance += (relative_sensitivity * sigma_theta) ** 2
 
     return {
         "electron_density_m3": float(density),
