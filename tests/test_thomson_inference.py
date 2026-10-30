@@ -531,3 +531,38 @@ def test_fit_identifiability_rejects_mismatched_uncertainty_shape():
     assert result["fit_accepted"] is False
     assert any("does not match the residual" in reason
                for reason in result["fit_quality_reasons"])
+
+
+def test_joint_multi_channel_gls_propagates_cross_channel_spectral_covariance():
+    x=np.linspace(492.0,572.0,161)
+    _,y1,_=_spectral_case(100.0,n=x.size)
+    _,y2,_=_spectral_case(150.0,n=x.size)
+    n=x.size
+    base=np.eye(2*n)*0.5**2
+    cross=np.eye(n)*0.2*0.5**2
+    base[:n,n:]=cross
+    base[n:,:n]=cross
+    out=analyze_thomson_spectra(
+        x,np.vstack([y1,y2]),[0.1,0.2],
+        laser_wavelength_nm=532.0,scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(n),joint_spectral_covariance=base,
+    )
+    joint=out["joint_inference"]
+    assert joint["method"]=="joint generalized least squares across all channels"
+    assert joint["joint_parameter_covariance"].shape==(10,10)
+    assert joint["physical_parameter_covariance"].shape==(4,4)
+    assert joint["total_physical_parameter_covariance"][0,2] != pytest.approx(0.0,abs=1e-18)
+    np.testing.assert_allclose(out["electron_temperature_profile_eV"],[100.0,150.0],rtol=0.05)
+    assert all(ch["joint_fit_used"] for ch in out["channels"])
+
+
+def test_joint_multi_channel_gls_rejects_non_positive_definite_covariance():
+    x,y,_=_spectral_case(100.0,n=81)
+    covariance=np.eye(2*x.size)
+    covariance[0,1]=covariance[1,0]=2.0
+    with pytest.raises(ValueError,match="positive definite"):
+        analyze_thomson_spectra(
+            x,np.vstack([y,y]),[0.1,0.2],laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,instrument_response=np.eye(x.size),
+            joint_spectral_covariance=covariance,
+        )
