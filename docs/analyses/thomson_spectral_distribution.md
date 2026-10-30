@@ -34,7 +34,8 @@ It uses signed background-subtracted spectral samples for moments; negative resi
 - Relativistic Maxwell-Juttner is a one-dimensional projected approximation, not full three-dimensional photon-geometry integration.
 - The current optical collective Maxwellian path requires externally supplied ion temperatures and ion/electron flow vectors; these are not fitted as independent CTS outputs.
 - Microwave CTS and fast-ion CTS inversion are separate capabilities and are not implied by this optical Thomson workflow.
-- Shared wavelength-bin/channel covariance and model-discrepancy uncertainty remain incomplete.
+- Full joint covariance inference is available for non-collective Maxwellian and Kappa models when a complete channel-major covariance matrix is supplied; Collective, relativistic and custom models do not yet use the joint GLS path.
+- Residual-based model-discrepancy covariance is reported separately and remains conditional on the selected model and supplied noise model.
 - No detector calibration, source-data repair or experimental validation is performed.
 
 ## API
@@ -51,3 +52,10 @@ result = analyze_thomson_spectral_distribution_inference(
     instrument_response=response_matrix,
 )
 ```
+
+
+## Joint covariance option
+
+The registered physical-inference workflow accepts an optional joint_spectral_covariance matrix. Its shape must be (n_channels*n_wavelengths, n_channels*n_wavelengths), ordered channel-major, and it must be symmetric positive definite. For non-collective Maxwellian and Kappa models, all channels are fitted in one generalized least-squares objective and the output includes the cross-channel physical-parameter covariance. This is not a post-hoc correlation estimate.
+
+The descriptive helper remains separate from physical inference: spectral centroid, width, skewness and kurtosis do not uniquely determine an electron velocity distribution.
