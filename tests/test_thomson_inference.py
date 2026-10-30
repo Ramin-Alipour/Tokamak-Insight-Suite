@@ -96,6 +96,25 @@ def test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_sup
     assert channel["density_method"].startswith("absolute integrated")
 
 
+def test_instrument_response_uncertainty_propagates_into_absolute_density():
+    x, y, _ = _spectral_case(100.0, n=161)
+    response = np.eye(x.size)
+    response_uncertainty = np.full_like(response, 1e-7)
+    out = analyze_thomson_spectra(
+        x, (y * 1e-18)[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=response,
+        instrument_response_uncertainty=response_uncertainty,
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+    )
+    channel = out["channels"][0]
+    assert channel["instrument_response_density_uncertainty_propagated"] is True
+    assert channel["integrated_scattered_power_lsf_uncertainty_W"] >= 0.0
+    assert channel["electron_density_uncertainty_m3"] > 0.0
+
+
 def test_collective_mode_never_runs_without_explicit_ion_species():
     x, y, _ = _spectral_case(100.0)
     with pytest.raises(ValueError, match="ion species"):
