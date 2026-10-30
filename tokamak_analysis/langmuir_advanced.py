@@ -288,7 +288,10 @@ def estimate_multispecies_ion_density(
     if not math.isfinite(density) or density <= 0:
         raise ValueError("Multispecies density estimate is not finite and positive.")
     return {
-        "ion_density_estimate_m-3": density, "ion_species": normalized,
+        "ion_density_estimate_m-3": density,
+        "ion_density_standard_uncertainty_m-3": None,
+        "ion_density_relative_standard_uncertainty": None,
+        "ion_species": normalized,
         "ion_species_fraction_sum": total_fraction, "ion_species_fraction_basis": "number_density_fraction",
         "current_convention_input": current_convention, "current_convention_normalized": "electron_positive",
         "model": "species_summed_bohm_sheath_current",
@@ -427,6 +430,7 @@ def estimate_ion_particle_flux(
         sigma_flux = flux * rel
     return {
         "ion_sound_speed_m_s": speed, "ion_particle_flux_m-2_s-1": flux,
+        "ion_charge_state": int(charge_state),
         "ion_particle_flux_standard_uncertainty_m-2_s-1": sigma_flux,
         "uncertainty_status": "conditional_independent_input_uncertainties_propagated" if supplied else "not_calculated_all_four_independent_uncertainties_required",
         "formula": "Gamma_i = C_s n_i sqrt(Z_i e T_e / m_i)",
