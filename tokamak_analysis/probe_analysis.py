@@ -51,6 +51,7 @@ def analyze_probe_voltage_current(
                 if name == "ion_fit_range" and np.count_nonzero((v >= lo) & (v <= hi)) < 2:
                     raise ValueError("ion_fit_range must contain at least two measured points.")
         result = probe_iv_summary(v, i)
+        result["analysis_scope"] = "descriptive_short_sweep_compatibility_only"
         result["floating_potential_V"] = result["floating_potential_interpolated_V"]
         result["floating_potential_status"] = {
             "single_zero_crossing": "unique_crossing",
