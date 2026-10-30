@@ -400,10 +400,21 @@ def analyze_thomson_spectra(
             residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
             weights = 1.0/np.square(residual_scale)
             weights = weights/np.max(weights)
+            def fit_nuisance(shape):
+                design=np.column_stack((shape,np.ones_like(shape),xi-float(laser_wavelength_nm)))
+                weighted_design=design/residual_scale[:,None]
+                weighted_signal=y[i]/residual_scale
+                coefficients=np.linalg.lstsq(weighted_design,weighted_signal,rcond=None)[0]
+                if coefficients[0] < 0:
+                    background_design=design[:,1:]/residual_scale[:,None]
+                    background=np.linalg.lstsq(background_design,weighted_signal,rcond=None)[0]
+                    coefficients=np.array([0.0,background[0],background[1]])
+                return coefficients
             def objective(params):
                 shape = collective_shape(params)
-                amp = float(np.sum(weights*y[i]*shape)/max(np.sum(weights*shape*shape),1e-300))
-                return (amp*shape-y[i])/residual_scale
+                coefficients=fit_nuisance(shape)
+                model_signal=coefficients[0]*shape+coefficients[1]+coefficients[2]*(xi-float(laser_wavelength_nm))
+                return (model_signal-y[i])/residual_scale
             fitopt = least_squares(objective, [1e18, 100.0], bounds=([1e12, 0.01],[1e25, 1e7]), max_nfev=5000)
             ne_fit, te_fit = map(float, fitopt.x)
             dof = max(1, y[i].size-fitopt.x.size)
@@ -420,7 +431,9 @@ def analyze_thomson_spectra(
                 ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
                 probe_vec=probe_vec, scatter_vec=scatter_vec)
             alpha_value=float(np.asarray(getattr(alpha_fit,"value",alpha_fit)))
-            amp_fit = float(np.sum(weights*y[i]*model_spec)/max(np.sum(weights*model_spec*model_spec),1e-300))
+            amp_fit, background_fit, background_slope_fit = map(float,fit_nuisance(model_spec))
+            fitted_collective = amp_fit*model_spec+background_fit+background_slope_fit*(xi-float(laser_wavelength_nm))
+            residual_collective = y[i]-fitted_collective
             q_vector = scatter_vec-probe_vec
             q_hat = q_vector/np.linalg.norm(q_vector)
             electron_flow_projection = float(np.dot(electron_v[0],q_hat))
@@ -429,13 +442,15 @@ def analyze_thomson_spectra(
                    "electron_velocity_projection_m_s": electron_flow_projection,
                    "ion_velocity_projection_m_s": ion_flow_projections.tolist(),
                    "electron_flow_source": "explicitly supplied electron velocity vector",
-                   "fitted_spectrum": amp_fit*model_spec, "residual": y[i]-amp_fit*model_spec,
+                   "fitted_spectrum": fitted_collective, "residual": residual_collective,
+                   "amplitude": amp_fit, "background_intercept": background_fit,
+                   "background_slope_per_nm": background_slope_fit,
                    "model": "PlasmaPy Maxwellian kinetic dielectric spectral-density model",
                    "electron_density_uncertainty_m3": float(parameter_uncertainties[0]),
                    "electron_temperature_uncertainty_eV": float(parameter_uncertainties[1]),
                    "fit_covariance": parameter_covariance,
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
-                   "reduced_chi_square": float(np.sum(((y[i]-amp_fit*model_spec)/residual_scale)**2)/dof),
+                   "reduced_chi_square": float(np.sum((residual_collective/residual_scale)**2)/dof),
                    "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
                    "scattering_parameter_alpha": alpha_value,
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
