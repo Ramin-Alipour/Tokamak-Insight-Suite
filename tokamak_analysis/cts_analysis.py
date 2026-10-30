@@ -456,6 +456,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["fast_ion_fraction_uncertainty"]=float(total_sigma[4] if out.get("model_discrepancy_scale") is not None else su[4])
         if fast["kind"]=="maxwellian":
             out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[5] if out.get("model_discrepancy_scale") is not None else su[5])
+        elif fast["kind"]=="infer_tabulated_1d":
+            logits=fit.x[5:]
+            def decode_pdf(values):
+                return _softmax(np.r_[values,0.0])/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
+            pdf_jac=np.empty((fast["vdf"]["velocity_m_s"].size,logits.size))
+            for j in range(logits.size):
+                step=1e-5
+                plus=logits.copy(); minus=logits.copy()
+                plus[j]+=step; minus[j]-=step
+                pdf_jac[:,j]=(decode_pdf(plus)-decode_pdf(minus))/(2.0*step)
+            vdf_parameter_covariance=cov[5:,5:]
+            if out.get("model_discrepancy_scale") is not None:
+                vdf_parameter_covariance=(cov+discrepancy_covariance)[5:,5:]
+            vdf_covariance=pdf_jac@vdf_parameter_covariance@pdf_jac.T
+            out["fast_ion_vdf_covariance"]=vdf_covariance
+            out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(vdf_covariance),0.0))
     if response_sigma is not None or ext_unc:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
         for _ in range(int(response_mc_samples)):
@@ -497,6 +513,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 out["fast_ion_fraction_uncertainty"]=float(total[4])
                 if fast["kind"]=="maxwellian":
                     out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
+                elif fast["kind"]=="infer_tabulated_1d":
+                    response_vdf_covariance=pdf_jac@response_cov[5:,5:]@pdf_jac.T
+                    out["fast_ion_vdf_covariance"]=out["fast_ion_vdf_covariance"]+response_vdf_covariance
+                    out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(out["fast_ion_vdf_covariance"]),0.0))
             out["response_uncertainty_propagated"]=response_sigma is not None
             out["external_parameter_uncertainty_propagated"]=bool(ext_unc)
         else:
