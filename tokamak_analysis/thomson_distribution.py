@@ -70,6 +70,8 @@ def analyze_thomson_spectral_distribution(
     background = slope * x + intercept_at_zero
     corrected = y - background
     weights = np.clip(corrected, 0.0, None)
+    negative_area = float(np.trapezoid(np.minimum(corrected,0.0),x) if hasattr(np,"trapezoid") else np.trapz(np.minimum(corrected,0.0),x))
+    clipping_fraction = abs(negative_area)/(abs(negative_area)+float(np.trapezoid(weights,x) if hasattr(np,"trapezoid") else np.trapz(weights,x)))
     area = float(np.trapezoid(weights, x) if hasattr(np, "trapezoid") else np.trapz(weights, x))
     # Keep the degeneracy threshold homogeneous in signal units. An absolute
     # floor of 1.0 rejects physically valid low-amplitude spectra merely because
@@ -156,6 +158,10 @@ def analyze_thomson_spectral_distribution(
         "wavelength_quadrature_weights_nm": quadrature,
         "integrated_spectral_measure": spectral_measure,
         "integrated_positive_spectral_signal": area,
+        "integrated_negative_background_subtracted_signal": negative_area,
+        "negative_area_fraction_removed_by_clipping": float(clipping_fraction),
+        "moment_weighting_method": "positive_part_of_background_subtracted_signal",
+        "moment_clipping_bias_warning": "Zero-clipping negative residuals changes the effective spectral distribution and can bias centroid, width, skewness and kurtosis; these are descriptive diagnostics only.",
         "spectral_centroid_nm": center,
         "observed_sigma_nm": sigma_observed,
         "observed_variance_nm2": variance_observed,
@@ -188,10 +194,11 @@ def analyze_thomson_spectral_distribution(
             "Calibrated, strictly increasing wavelength axis",
             "Known Gaussian instrumental line-spread standard deviation",
             "Locally linear background estimated from both spectral-window edges",
-            "Positive background-subtracted signal used as spectral weights",
+            "Positive background-subtracted signal used as spectral weights; negative residual area is separately reported because clipping can bias moments",
         ],
         "limitations": [
             "Spectral moments characterize measured wavelength distribution and are not a unique electron velocity distribution",
+            "Clipping negative background-subtracted residuals to zero can bias all reported moments; use the full forward-inference workflow for physical parameter extraction",
             "Instrument-width deconvolution assumes independent Gaussian variances and is unresolved when observed variance does not exceed instrument variance",
             "No electron temperature or density is inferred by this generic distribution analysis",
             "Collective, relativistic, non-Maxwellian physical inference requires an appropriate validated forward model and instrument response",
