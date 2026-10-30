@@ -3010,14 +3010,14 @@ elif page=='Advanced Analysis':
                 cts_regularization=st.number_input('Regularization strength (used by regularized mode)',min_value=0.0,value=0.1,format='%.6g',key='cts_regularization')
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
-                cts_electron_flow=st.text_input('Electron-flow projection (m/s; default 0)',value='0',key='cts_electron_flow')
+                cts_electron_flow=st.text_input('Electron-flow projection (m/s; required; enter 0 only to assume stationary flow)',key='cts_electron_flow')
                 cts_electron_flow_unc=st.text_input('Electron-flow projection 1σ uncertainty (m/s; optional)',key='cts_electron_flow_unc')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
-            with s1: cts_species_text=st.text_input('Ion species names (comma-separated)',value='D+',key='cts_species')
-            with s2: cts_charge_text=st.text_input('Charge states (comma-separated)',value='1',key='cts_charges')
-            with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated)',value='2.014',key='cts_masses')
-            cts_fraction_text=st.text_input('Charge-density fractions (comma-separated)',value='1.0',key='cts_fractions')
+            with s1: cts_species_text=st.text_input('Ion species names (comma-separated; required)',key='cts_species')
+            with s2: cts_charge_text=st.text_input('Charge states (comma-separated; required)',key='cts_charges')
+            with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated; required)',key='cts_masses')
+            cts_fraction_text=st.text_input('Charge-density fractions (comma-separated; required; sum to 1)',key='cts_fractions')
             cts_fraction_unc_text=st.text_input('Ion-fraction 1σ uncertainties (comma-separated; optional)',key='cts_fraction_unc')
             cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'],key='cts_fast_mode')
             cts_fast_vdf_upload=None
@@ -3046,6 +3046,8 @@ elif page=='Advanced Analysis':
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_response_unc=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    if not cts_electron_flow.strip():
+                        raise ValueError('Enter the electron-flow projection explicitly; enter 0 only if stationary electron flow is an intentional assumption.')
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
@@ -3081,7 +3083,7 @@ elif page=='Advanced Analysis':
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
                         'instrument_response_uncertainty':cts_response_unc,
-                        'electron_velocity_projection_m_s':float(cts_electron_flow or 0.0),
+                        'electron_velocity_projection_m_s':float(cts_electron_flow),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
                     }
                     external_unc={}
