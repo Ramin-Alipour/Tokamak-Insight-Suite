@@ -392,11 +392,13 @@ def analyze_thomson_spectra(
                     probe_vec=probe_vec, scatter_vec=scatter_vec)
                 z = np.asarray(spec.value, dtype=float)
                 return response @ z
-            scale = max(float(np.max(np.abs(y[i]))), np.finfo(float).tiny)
+            residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
+            weights = 1.0/np.square(residual_scale)
+            weights = weights/np.max(weights)
             def objective(params):
                 shape = collective_shape(params)
-                amp = float(np.dot(y[i], shape)/max(np.dot(shape,shape),1e-300))
-                return (amp*shape-y[i])/scale
+                amp = float(np.sum(weights*y[i]*shape)/max(np.sum(weights*shape*shape),1e-300))
+                return (amp*shape-y[i])/residual_scale
             fitopt = least_squares(objective, [1e18, 100.0], bounds=([1e12, 0.01],[1e25, 1e7]), max_nfev=5000)
             ne_fit, te_fit = map(float, fitopt.x)
             dof = max(1, y[i].size-fitopt.x.size)
@@ -428,6 +430,7 @@ def analyze_thomson_spectra(
                    "electron_temperature_uncertainty_eV": float(parameter_uncertainties[1]),
                    "fit_covariance": parameter_covariance,
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
+                   "reduced_chi_square": float(np.sum(((y[i]-amp_fit*model_spec)/residual_scale)**2)/dof),
                    "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
                    "scattering_parameter_alpha": alpha_value,
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
