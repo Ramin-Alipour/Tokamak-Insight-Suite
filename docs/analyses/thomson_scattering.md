@@ -133,7 +133,7 @@ The new test module checks multi-channel data flow, arbitrary non-Gaussian respo
 
 ## Profile terminology and reconstruction
 
-The profile summary reports radial-coordinate averages over the supplied interval. They are not line-of-sight averages or volume averages unless the corresponding geometric weighting is explicitly applied. The legacy attribute names containing "line_average" are compatibility aliases and are deprecated.
+The profile summary reports radial-coordinate averages over the supplied interval. They are not line-of-sight averages or volume averages unless the corresponding geometric weighting is explicitly applied. The legacy attribute names containing "line_average" are compatibility aliases and emit DeprecationWarning when accessed.
 
 For reconstruction, omitting smoothing_factor selects the smoothing-spline regularization parameter by generalized cross-validation. An explicitly supplied smoothing_factor selects the legacy weighted-residual target. A negative reconstructed density or temperature overshoot is rejected rather than clipped, because clipping would change both the profile and its derivative.
 
