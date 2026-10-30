@@ -476,3 +476,32 @@ def test_collective_default_bounds_are_scaled_to_user_initial_estimates():
     density, temperature = _default_collective_bounds(3e18, 250.0)
     np.testing.assert_allclose(density, [3e16, 3e20])
     np.testing.assert_allclose(temperature, [2.5, 25000.0])
+
+
+def test_fit_identifiability_rejects_optimizer_failure_even_with_finite_covariance():
+    from tokamak_analysis.thomson_inference import _fit_identifiability
+
+    result = _fit_identifiability(
+        np.eye(2), np.array([0.01, -0.01, 0.0]), None, 2,
+        optimizer_success=False,
+    )
+    assert result["fit_accepted"] is False
+    assert any("optimizer" in reason for reason in result["fit_quality_reasons"])
+
+
+def test_fit_identifiability_rejects_rank_deficient_or_ill_conditioned_jacobian():
+    from tokamak_analysis.thomson_inference import _fit_identifiability
+
+    rank_deficient = _fit_identifiability(
+        np.eye(2), np.array([0.01, -0.01, 0.0]), None, 2,
+        jacobian_rank=1,
+    )
+    assert rank_deficient["fit_accepted"] is False
+    assert any("Jacobian is rank deficient" in reason for reason in rank_deficient["fit_quality_reasons"])
+
+    ill_conditioned = _fit_identifiability(
+        np.eye(2), np.array([0.01, -0.01, 0.0]), None, 2,
+        jacobian_rank=2, jacobian_condition_number=1e13,
+    )
+    assert ill_conditioned["fit_accepted"] is False
+    assert any("Jacobian is ill-conditioned" in reason for reason in ill_conditioned["fit_quality_reasons"])
