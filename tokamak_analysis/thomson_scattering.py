@@ -311,7 +311,7 @@ def reconstruct_thomson_profile(
             else:
                 fitted = UnivariateSpline(r, y, w=weights, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1))
             derivative = fitted.derivative() if hasattr(fitted, "derivative") else fitted.derivative
-            return np.asarray(fitted(grid), dtype=float), np.asarray(derivative()(grid), dtype=float)
+            return np.asarray(fitted(grid), dtype=float), np.asarray(derivative(grid), dtype=float)
 
         scale = float(np.max(np.abs(y)))
         if scale == 0:
@@ -326,7 +326,7 @@ def reconstruct_thomson_profile(
         derivative = fitted.derivative() if hasattr(fitted, "derivative") else fitted.derivative
         return (
             np.asarray(fitted(grid), dtype=float) * scale,
-            np.asarray(derivative()(grid), dtype=float) * scale,
+            np.asarray(derivative(grid), dtype=float) * scale,
         )
 
     density_fit, density_gradient = fit_channel(
