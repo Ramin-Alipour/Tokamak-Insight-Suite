@@ -321,7 +321,12 @@ def test_multispecies_density_propagates_only_explicit_independent_uncertainties
          "sheath_coefficient": 0.55, "mass_relative_standard_uncertainty": 0.01,
          "sheath_coefficient_relative_standard_uncertainty": 0.04},
     ]
-    base = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
+    species_without_sigmas = [
+        {key: value for key, value in item.items()
+         if key not in {"mass_relative_standard_uncertainty", "sheath_coefficient_relative_standard_uncertainty"}}
+        for item in species
+    ]
+    base = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species_without_sigmas)
     assert base["ion_density_standard_uncertainty_m-3"] is None
     assert base["uncertainty_propagation_performed"] is False
     result = estimate_multispecies_ion_density(
