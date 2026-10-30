@@ -824,7 +824,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True,key='spectral_analysis_workflow')
     if mode=='Thomson multi-channel spectral inference':
         st.caption('Primary Analysis 1: fit measured, calibrated multi-channel Thomson spectra and infer physical parameters. No detector calibration, data repair, or experimental validation is performed.')
         all_cols=[str(c) for c in df.columns]
@@ -2964,8 +2964,14 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
-    if workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    if workflow=='Thomson multi-channel spectral inference (canonical Analysis 1)':
+        st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
+        if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
+            st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
+            st.session_state['jump']='Spectral Analysis'
+            st.rerun()
+    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
         if df is None or len(numeric) < 3:
