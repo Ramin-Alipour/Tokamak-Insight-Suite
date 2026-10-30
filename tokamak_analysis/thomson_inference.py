@@ -1,0 +1,258 @@
+"""End-to-end, spatially resolved Thomson spectral inference.
+
+Input spectra are measured, wavelength-calibrated and intensity-calibrated data.
+This module does not calibrate detectors or repair/prepare measurements.
+"""
+from __future__ import annotations
+
+import numpy as np
+from scipy.optimize import curve_fit
+
+ELECTRON_REST_ENERGY_EV = 510_998.95069
+C_M_S = 299_792_458.0
+R_E_M = 2.8179403262e-15
+
+
+def _finite_array(value, name, ndim=None):
+    a = np.asarray(value, dtype=float)
+    if ndim is not None and a.ndim != ndim:
+        raise ValueError(f"{name} must be {ndim}-dimensional")
+    if a.size == 0 or not np.all(np.isfinite(a)):
+        raise ValueError(f"{name} must contain finite numeric values")
+    return a
+
+
+def _response_for_channel(response, channel, nchan, nlam):
+    if response is None:
+        return np.eye(nlam)
+    r = _finite_array(response, "instrument_response")
+    if r.ndim == 2:
+        out = r
+    elif r.ndim == 3 and r.shape[0] == nchan:
+        out = r[channel]
+    else:
+        raise ValueError("instrument_response must have shape (n_wavelength, n_wavelength) or (n_channel, n_wavelength, n_wavelength)")
+    if out.shape != (nlam, nlam) or np.any(out < 0):
+        raise ValueError("instrument response must be a non-negative square matrix on the measured wavelength grid")
+    sums = out.sum(axis=0)
+    if np.any(sums <= 0):
+        raise ValueError("each instrument-response column must have positive normalization")
+    return out / sums[None, :]
+
+
+def _gaussian(x, amp, center, sigma, offset, slope):
+    return amp * np.exp(-0.5 * ((x-center)/sigma)**2) + offset + slope*(x-center)
+
+
+def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertainty):
+    spacing = float(np.median(np.diff(wavelength)))
+    span = float(wavelength[-1] - wavelength[0])
+    edge = max(2, wavelength.size // 10)
+    baseline = float(np.median(np.r_[signal[:edge], signal[-edge:]]))
+    peak = int(np.argmax(signal))
+    amp0 = max(float(signal[peak] - baseline), np.finfo(float).eps)
+    p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), baseline, 0.0]
+    lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), -np.inf, -np.inf]
+    upper = [np.inf, wavelength[-1], span, np.inf, np.inf]
+
+    def observed(x, amp, center, sigma, offset, slope):
+        intrinsic = _gaussian(x, amp, center, sigma, offset, slope)
+        # The LSF acts on the signal component; a slowly varying background is
+        # represented in detector space and is therefore not convolved.
+        signal_only = amp*np.exp(-0.5*((x-center)/sigma)**2)
+        return response @ signal_only + offset + slope*(x-center)
+
+    p, cov = curve_fit(observed, wavelength, signal, p0=p0, bounds=(lower, upper),
+                       sigma=uncertainty, absolute_sigma=uncertainty is not None,
+                       maxfev=50000)
+    amp, center, sigma, offset, slope = map(float, p)
+    if sigma <= 0:
+        raise ValueError("Fitted intrinsic spectral width is not positive")
+    if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
+        raise ValueError("Wavelength coverage must include at least ±3 fitted intrinsic widths")
+    # Non-collective, non-relativistic, isotropic Maxwellian electron model.
+    thermal_sigma = sigma
+    te = (thermal_sigma/laser_nm)**2 * (ELECTRON_REST_ENERGY_EV/4.0) / np.sin(angle/2.0)**2
+    # The fitted spectral shift measures the velocity projection along q.
+    q_projection = 2.0*np.sin(angle/2.0)
+    velocity = C_M_S * (center-laser_nm)/(laser_nm*q_projection)
+    dof = max(1, wavelength.size-len(p))
+    residual = signal-observed(wavelength, *p)
+    fit_cov = np.asarray(cov, dtype=float)
+    te_unc = float(te*2*np.sqrt(max(fit_cov[2,2], 0.0))/sigma)
+    return {
+        "electron_temperature_eV": float(te),
+        "electron_temperature_uncertainty_eV": te_unc,
+        "electron_velocity_projection_m_s": float(velocity),
+        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(fit_cov[1,1],0.0))/(laser_nm*q_projection)),
+        "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
+        "amplitude": amp, "background_intercept": offset, "background_slope_per_nm": slope,
+        "fit_covariance": fit_cov, "residual": residual,
+        "reduced_chi_square": float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
+        "fitted_spectrum": observed(wavelength, *p),
+        "model": "non-collective, non-relativistic Maxwellian electron spectrum",
+        "assumptions": ["single-scattering non-collective regime", "isotropic Maxwellian electrons",
+                        "non-relativistic electron velocities", "known scattering geometry"],
+    }
+
+
+def _density_from_power(power_w, laser_power_w, interaction_length_m, collection_solid_angle_sr,
+                        optical_efficiency, scattering_angle_rad, incident_polarization,
+                        scattered_direction):
+    vals = [laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency]
+    if any(not np.isfinite(v) or v <= 0 for v in vals):
+        raise ValueError("Absolute density inference requires positive laser power, interaction length, solid angle and optical efficiency")
+    eps = _finite_array(incident_polarization, "incident_polarization", 1)
+    direction = _finite_array(scattered_direction, "scattered_direction", 1)
+    if eps.size != 3 or direction.size != 3:
+        raise ValueError("polarization and scattered_direction must be 3-vectors")
+    en = np.linalg.norm(eps); dn = np.linalg.norm(direction)
+    if en == 0 or dn == 0:
+        raise ValueError("polarization and scattered_direction vectors must be nonzero")
+    eps = eps/en; direction = direction/dn
+    # Sum over unanalysed outgoing polarization states for a linearly polarized
+    # incident beam: dσ/dΩ = r_e² [1 - |n_s · ε_i|²].
+    polarization_factor = max(0.0, 1.0-float(np.dot(direction, eps))**2)
+    dsigma = R_E_M**2 * polarization_factor
+    if dsigma <= 0:
+        raise ValueError("The specified polarization/collection geometry has zero Thomson differential cross-section")
+    denominator = laser_power_w*interaction_length_m*collection_solid_angle_sr*optical_efficiency*dsigma
+    return float(power_w/denominator), float(polarization_factor)
+
+
+def analyze_thomson_spectra(
+    wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
+    instrument_response=None, signal_uncertainty=None,
+    laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
+    optical_efficiency=None, incident_polarization=None, scattered_direction=None,
+    instrument_response_uncertainty=None, model="non_collective_maxwellian",
+    ion_species=None, ion_temperature_eV=None, ion_velocity_m_s=None,
+):
+    """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
+
+    Spectra have shape (channel, wavelength); wavelength may be shared (1-D) or
+    channel-specific (2-D). A response matrix maps true spectral bins to detector
+    bins; its columns are normalized internally. Absolute density is emitted only
+    when all optical-power/geometry/polarization factors are supplied.
+    """
+    y = _finite_array(spectra, "spectra", 2)
+    radii = _finite_array(radius_m, "radius_m", 1)
+    if y.shape[0] != radii.size:
+        raise ValueError("radius_m length must equal the number of spectral channels")
+    x = _finite_array(wavelength_nm)
+    if x.ndim == 1:
+        if x.size != y.shape[1]:
+            raise ValueError("wavelength_nm length must equal the spectral width")
+        xs = np.broadcast_to(x, y.shape)
+    elif x.ndim == 2 and x.shape == y.shape:
+        xs = x
+    else:
+        raise ValueError("wavelength_nm must be shared 1-D or channel-shaped 2-D")
+    if np.any(np.diff(xs, axis=1) <= 0):
+        raise ValueError("Each channel wavelength axis must be strictly increasing")
+    if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0:
+        raise ValueError("laser_wavelength_nm must be positive")
+    if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
+        raise ValueError("scattering_angle_rad must lie in (0, pi]")
+    if model not in {"non_collective_maxwellian", "collective_maxwellian"}:
+        raise ValueError("model must be non_collective_maxwellian or collective_maxwellian")
+    if model == "collective_maxwellian":
+        if not ion_species:
+            raise ValueError("Collective Thomson inference requires at least one explicitly specified ion species")
+        if ion_temperature_eV is None:
+            raise ValueError("Collective Maxwellian inference requires independently supplied ion temperature(s); no ion temperature is assumed")
+        try:
+            from astropy import units as u
+            from plasmapy.diagnostics import thomson
+        except ImportError as exc:
+            raise ImportError("Collective Thomson inference requires the optional PlasmaPy and Astropy packages") from exc
+        # PlasmaPy is used below with an explicit, user-supplied species list.
+    else:
+        thomson = None
+
+    unc = None if signal_uncertainty is None else _finite_array(signal_uncertainty, "signal_uncertainty", 2)
+    if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
+        raise ValueError("signal_uncertainty must match spectra and be strictly positive")
+    lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
+    if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.shape != np.asarray(instrument_response).shape):
+        raise ValueError("instrument_response_uncertainty must be non-negative and match instrument_response")
+
+    results = []
+    for i in range(y.shape[0]):
+        xi = xs[i]
+        response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1])
+        ui = None if unc is None else unc[i]
+        if model == "non_collective_maxwellian":
+            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
+        else:
+            # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
+            # collective and non-collective regimes from the same dielectric
+            # response; ion species/temperature are never silently defaulted.
+            ion_t = np.atleast_1d(ion_temperature_eV)
+            ion_v = np.zeros((len(ion_species), 3)) if ion_velocity_m_s is None else _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
+            if ion_v.shape != (len(ion_species), 3):
+                raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
+            probe_vec = np.array([1.0, 0.0, 0.0])
+            theta = float(scattering_angle_rad)
+            scatter_vec = np.array([np.cos(theta), np.sin(theta), 0.0])
+            # Fit ne and Te against the full PlasmaPy spectrum. Absolute signal
+            # scaling is a nuisance amplitude; density is identifiable from
+            # the collective spectral shape when the spectrum resolves it.
+            from scipy.optimize import least_squares
+            def collective_shape(params):
+                ne, te = params
+                _, spec = thomson.spectral_density(
+                    xi*u.nm, float(laser_wavelength_nm)*u.nm, ne/u.m**3,
+                    T_e=te*u.eV, T_i=ion_t*u.eV, ions=ion_species,
+                    ion_vel=ion_v*u.m/u.s, probe_vec=probe_vec, scatter_vec=scatter_vec)
+                z = np.asarray(spec.value, dtype=float)
+                return response @ z
+            scale = max(float(np.max(np.abs(y[i]))), np.finfo(float).tiny)
+            def objective(params):
+                shape = collective_shape(params)
+                amp = float(np.dot(y[i], shape)/max(np.dot(shape,shape),1e-300))
+                return (amp*shape-y[i])/scale
+            fitopt = least_squares(objective, [1e18, 100.0], bounds=([1e12, 0.01],[1e25, 1e7]), max_nfev=5000)
+            ne_fit, te_fit = map(float, fitopt.x)
+            model_spec = collective_shape(fitopt.x)
+            amp_fit = float(np.dot(y[i], model_spec)/max(np.dot(model_spec,model_spec),1e-300))
+            fit = {"electron_density_m3": ne_fit, "electron_temperature_eV": te_fit,
+                   "fitted_spectrum": amp_fit*model_spec, "residual": y[i]-amp_fit*model_spec,
+                   "model": "PlasmaPy Maxwellian kinetic dielectric spectral-density model",
+                   "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
+                   "ion_species": list(ion_species), "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
+                   "ion_velocity_m_s": ion_v.tolist()}
+        if model == "non_collective_maxwellian" and all(v is not None for v in (
+            laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
+            incident_polarization, scattered_direction
+        )):
+            area = float(np.trapz(np.maximum(fit["fitted_spectrum"]-fit["background_intercept"], 0.0), xi))
+            ne, pol = _density_from_power(area, laser_power_w, interaction_length_m,
+                collection_solid_angle_sr, optical_efficiency, scattering_angle_rad,
+                incident_polarization, scattered_direction)
+            fit["electron_density_m3"] = ne
+            fit["polarization_factor"] = pol
+            fit["density_method"] = "absolute integrated Thomson power with supplied optical geometry"
+        else:
+            fit["electron_density_m3"] = fit.get("electron_density_m3")
+            fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
+        fit["channel_index"] = int(i)
+        fit["radius_m"] = float(radii[i])
+        fit["instrument_response_used"] = instrument_response is not None
+        fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
+        if lsf_unc is not None:
+            fit["instrument_response_uncertainty_note"] = "LSF uncertainty supplied; full nuisance-parameter marginalization is not yet implemented."
+        results.append(fit)
+    return {
+        "model": model, "channel_count": len(results), "channels": results,
+        "radius_m": radii.copy(),
+        "electron_temperature_profile_eV": np.array([r.get("electron_temperature_eV", np.nan) for r in results]),
+        "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
+        "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
+        "limitations": [
+            "Non-collective model assumes non-relativistic isotropic Maxwellian electrons.",
+            "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
+            "Absolute density in the non-collective model requires absolute spectral power and all listed optical geometry/polarization factors.",
+            "Instrument-response uncertainty is recorded but is not yet marginalized into fitted parameter uncertainties.",
+        ],
+    }
