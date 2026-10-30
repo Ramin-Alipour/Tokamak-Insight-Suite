@@ -175,15 +175,21 @@ def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=32
         best_history.append(float(scores[0]))
         elite_count = max(2, population_size // 10)
         next_population = [p.copy() for p in population[:elite_count]]
-        mutation_scale = 0.18 * (1.0 - generation / max(generations, 1)) + 0.015
+        progress=generation/max(generations-1,1)
+        mutation_scale = 0.18 * (1.0 - progress) + 0.015
+        crossover_rate = 0.90 - 0.35*progress
+        mutation_rate = min(0.5,(1.0/dimension)*(1.0+2.0*progress))
         def tournament():
             candidates = rng.integers(0, population_size, size=3)
             return population[candidates[np.argmin(scores[candidates])]]
         while len(next_population) < population_size:
             p1, p2 = tournament(), tournament()
-            alpha = rng.uniform(-0.15, 1.15, size=dimension)
-            child = alpha * p1 + (1.0 - alpha) * p2
-            mutate = rng.random(dimension) < (1.0 / dimension)
+            if rng.random()<crossover_rate:
+                alpha = rng.uniform(-0.15, 1.15, size=dimension)
+                child = alpha * p1 + (1.0 - alpha) * p2
+            else:
+                child=p1.copy()
+            mutate = rng.random(dimension) < mutation_rate
             child += mutate * rng.normal(0.0, mutation_scale, size=dimension) * (upper - lower)
             next_population.append(np.clip(child, lower, upper))
         population = np.asarray(next_population)
