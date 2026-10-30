@@ -502,11 +502,14 @@ def fit_langmuir_stretched_exponential(
     x, y = v[mask], i[mask]
     if np.unique(x).size < 5:
         raise ValueError("Stretched-exponential fit requires at least five distinct voltage values in the selected window.")
-    xref = float(x[0])
+    # Mirrored Kohlrausch-Williams-Watts form for a monotonically increasing
+    # retarding-branch signal. The reference voltage is the selected window's
+    # upper endpoint, not an inferred plasma potential.
+    xref = float(x[-1])
     scale = max(float(np.ptp(y)), float(np.max(np.abs(y))), np.finfo(float).tiny)
     def fn(xx, offset, amplitude, slope, shape):
-        z = np.maximum(slope * (np.asarray(xx) - xref), 0.0)
-        return offset + amplitude * np.exp(np.clip(np.power(z, shape), -700.0, 700.0))
+        z = np.maximum(slope * (xref - np.asarray(xx)), 0.0)
+        return offset + amplitude * np.exp(-np.clip(np.power(z, shape), 0.0, 700.0))
     pars, cov = curve_fit(
         fn, x, y / scale,
         p0=(float(np.min(y / scale)), max(float(np.ptp(y / scale)), 1e-8), 1.0 / max(float(np.ptp(x)), 1e-6), 1.0),
@@ -532,6 +535,8 @@ def fit_langmuir_stretched_exponential(
         "current_convention_normalized": "electron_positive",
         "fit_range_V": [lo, hi],
         "fit_points": int(len(x)),
+        "reference_voltage_V": xref,
+        "reference_voltage_interpretation": "upper_endpoint_of_selected_fit_window_not_a_plasma_potential_estimate",
         "shape_exponent": float(pars[3]),
         "scale_slope_per_V": float(pars[2]),
         "fit_R2": (1.0 - ss_res / ss_tot if ss_tot > 0 else None),
