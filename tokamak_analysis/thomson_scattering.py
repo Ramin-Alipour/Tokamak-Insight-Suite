@@ -306,7 +306,10 @@ def reconstruct_thomson_profile(
     temperature_covariance_input = validate_covariance(temperature_covariance_eV2, "temperature_covariance_eV2")
     joint_covariance_input = None
     if joint_density_temperature_covariance is not None:
-        joint_covariance_input = np.asarray(joint_density_temperature_covariance, dtype=float)
+        joint_covariance_raw = np.asarray(joint_density_temperature_covariance)
+        if joint_covariance_raw.dtype.kind not in "iuf":
+            raise ValueError("joint_density_temperature_covariance must contain real numeric values, not booleans or strings")
+        joint_covariance_input = joint_covariance_raw.astype(float, copy=False)
         expected_joint_shape = (2 * radius_original.size, 2 * radius_original.size)
         if joint_covariance_input.shape != expected_joint_shape or not np.all(np.isfinite(joint_covariance_input)):
             raise ValueError("joint_density_temperature_covariance must be a finite (2N x 2N) matrix ordered [density_0..N-1, temperature_0..N-1]")
