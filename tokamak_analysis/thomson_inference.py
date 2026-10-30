@@ -431,6 +431,7 @@ def _default_collective_bounds(initial_density_m3, initial_temperature_eV):
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
     laser_wavelength_uncertainty_nm=None, scattering_angle_uncertainty_rad=None,
+    incident_direction_uncertainty=None, scattered_direction_uncertainty=None,
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
     optical_efficiency=None, incident_polarization=None, incident_direction=None, scattered_direction=None,
@@ -485,6 +486,16 @@ def analyze_thomson_spectra(
             _finite_scalar(uncertainty_value, uncertainty_name, minimum=0.0)
     laser_wavelength_unc = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
     scattering_angle_unc = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
+    incident_direction_unc = None if incident_direction_uncertainty is None else _finite_array(
+        incident_direction_uncertainty, "incident_direction_uncertainty", 1)
+    scattered_direction_unc = None if scattered_direction_uncertainty is None else _finite_array(
+        scattered_direction_uncertainty, "scattered_direction_uncertainty", 1)
+    for name, value in (("incident_direction_uncertainty", incident_direction_unc),
+                        ("scattered_direction_uncertainty", scattered_direction_unc)):
+        if value is not None and (value.shape != (3,) or np.any(value < 0)):
+            raise ValueError(f"{name} must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
+    if (incident_direction_unc is not None or scattered_direction_unc is not None) and scattering_angle_uncertainty_rad is not None:
+        raise ValueError("Use scattering_angle_uncertainty_rad or beam-direction component uncertainties, not both; they describe the same geometry uncertainty.")
     if model not in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner", "collective_maxwellian"}:
         raise ValueError("model must be non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
@@ -1164,7 +1175,8 @@ def analyze_thomson_spectra(
         ],
     }
     if model=="collective_maxwellian" and any(v is not None for v in (
-        ion_t_unc,ion_v_unc,electron_v_unc,lsf_unc,laser_wavelength_uncertainty_nm
+        ion_t_unc,ion_v_unc,electron_v_unc,lsf_unc,laser_wavelength_uncertainty_nm,
+        scattering_angle_uncertainty_rad,incident_direction_unc,scattered_direction_unc
     )):
         if lsf_unc is not None and (callable(instrument_response) or np.asarray(instrument_response).ndim==1):
             raise ValueError("Collective response uncertainty requires a measured 2-D or channel-specific 3-D response matrix")
@@ -1173,6 +1185,37 @@ def analyze_thomson_spectra(
         for _ in range(int(collective_external_parameter_mc_samples)):
             sampled_laser=float(laser_wavelength_nm)+rng.normal(0.0,laser_wavelength_unc)
             if sampled_laser<=0: continue
+            sampled_angle=float(scattering_angle_rad)
+            sampled_incident_direction=incident_direction
+            sampled_scattered_direction=scattered_direction
+            if scattering_angle_uncertainty_rad is not None:
+                sampled_angle += float(rng.normal(0.0, scattering_angle_unc))
+                if not 0.0 < sampled_angle < np.pi: continue
+                # Rotate the scattered beam in the plane defined by the nominal
+                # incident/scattered directions, preserving a normalized beam pair.
+                incident_unit=np.asarray(incident_direction,dtype=float)
+                incident_unit=incident_unit/np.linalg.norm(incident_unit)
+                scattered_unit=np.asarray(scattered_direction,dtype=float)
+                scattered_unit=scattered_unit/np.linalg.norm(scattered_unit)
+                tangent=scattered_unit-np.dot(scattered_unit,incident_unit)*incident_unit
+                tangent_norm=np.linalg.norm(tangent)
+                if tangent_norm<=1e-12: continue
+                tangent=tangent/tangent_norm
+                sampled_scattered_direction=np.cos(sampled_angle)*incident_unit+np.sin(sampled_angle)*tangent
+            elif incident_direction_unc is not None or scattered_direction_unc is not None:
+                incident_draw=np.asarray(incident_direction,dtype=float)
+                scattered_draw=np.asarray(scattered_direction,dtype=float)
+                if incident_direction_unc is not None:
+                    incident_draw=incident_draw+rng.normal(0.0,incident_direction_unc)
+                if scattered_direction_unc is not None:
+                    scattered_draw=scattered_draw+rng.normal(0.0,scattered_direction_unc)
+                if np.linalg.norm(incident_draw)<=0 or np.linalg.norm(scattered_draw)<=0: continue
+                incident_draw=incident_draw/np.linalg.norm(incident_draw)
+                scattered_draw=scattered_draw/np.linalg.norm(scattered_draw)
+                sampled_angle=float(np.arccos(np.clip(np.dot(incident_draw,scattered_draw),-1.0,1.0)))
+                if not 0.0 < sampled_angle <= np.pi: continue
+                sampled_incident_direction=incident_draw
+                sampled_scattered_direction=scattered_draw
             sampled_ion_t=ion_t.copy() if ion_t_unc is None else np.maximum(ion_t+rng.normal(0.0,ion_t_unc),np.finfo(float).tiny)
             sampled_ion_v=ion_v.copy() if ion_v_unc is None else ion_v+rng.normal(0.0,ion_v_unc)
             sampled_electron_v=electron_v.copy() if electron_v_unc is None else electron_v+rng.normal(0.0,electron_v_unc.reshape(1,3))
@@ -1198,11 +1241,11 @@ def analyze_thomson_spectra(
             try:
                 draw=analyze_thomson_spectra(
                     wavelength_nm,spectra,radius_m,laser_wavelength_nm=sampled_laser,
-                    scattering_angle_rad=scattering_angle_rad,instrument_response=sampled_response,
+                    scattering_angle_rad=sampled_angle,instrument_response=sampled_response,
                     signal_uncertainty=signal_uncertainty,model=model,ion_species=ion_species,
                     ion_fractions=ion_fractions,ion_temperature_eV=sampled_ion_t,
                     ion_velocity_m_s=sampled_ion_v,electron_velocity_m_s=sampled_electron_v,
-                    incident_direction=incident_direction,scattered_direction=scattered_direction,
+                    incident_direction=sampled_incident_direction,scattered_direction=sampled_scattered_direction,
                     collective_initial_density_m3=collective_initial_density_m3,
                     collective_initial_temperature_eV=collective_initial_temperature_eV,
                     collective_density_bounds_m3=collective_density_bounds_m3,
@@ -1213,7 +1256,9 @@ def analyze_thomson_spectra(
                 for channel_result in draw["channels"]:
                     density_value=channel_result.get("electron_density_m3")
                     vector.extend([np.nan if density_value is None else float(density_value),
-                                   float(channel_result["electron_temperature_eV"])])
+                                   float(channel_result["electron_temperature_eV"]),
+                                   float(channel_result["electron_velocity_projection_m_s"])])
+                    vector.extend(np.asarray(channel_result["ion_velocity_projection_m_s"],dtype=float).tolist())
                 draws.append(vector)
             except (ValueError,RuntimeError,ImportError,np.linalg.LinAlgError):
                 continue
@@ -1229,16 +1274,35 @@ def analyze_thomson_spectra(
                 for channel in range(len(results)):
                     density_col=2*channel
                     temperature_col=density_col+1
+                    velocity_col=density_col+2
                     results[channel]["electron_temperature_uncertainty_eV"]=float(np.hypot(
                         results[channel]["electron_temperature_uncertainty_eV"],
                         np.sqrt(max(covariance[temperature_col,temperature_col],0.0))))
+                    results[channel]["electron_velocity_projection_uncertainty_m_s"]=float(np.hypot(
+                        results[channel]["electron_velocity_projection_uncertainty_m_s"],
+                        np.sqrt(max(covariance[velocity_col,velocity_col],0.0))))
                     if results[channel].get("electron_density_m3") is not None:
                         results[channel]["electron_density_uncertainty_m3"]=float(np.hypot(
                             results[channel]["electron_density_uncertainty_m3"],
                             np.sqrt(max(covariance[density_col,density_col],0.0))))
-            output["collective_external_parameter_covariance_order"]=[
-                name for i in range(len(results)) for name in
-                (f"channel_{i}_electron_density_m3",f"channel_{i}_electron_temperature_eV")]
+                    ion_offset=density_col+3
+                    ion_uncertainties=[]
+                    for species_index in range(len(ion_species)):
+                        ion_col=ion_offset+species_index
+                        ion_uncertainties.append(float(np.sqrt(max(covariance[ion_col,ion_col],0.0))))
+                    results[channel]["ion_velocity_projection_uncertainty_m_s"]=ion_uncertainties
+            covariance_order=[]
+            for i in range(len(results)):
+                covariance_order.extend([
+                    f"channel_{i}_electron_density_m3",
+                    f"channel_{i}_electron_temperature_eV",
+                    f"channel_{i}_electron_velocity_projection_m_s",
+                ])
+                covariance_order.extend(
+                    f"channel_{i}_ion_{species_index}_velocity_projection_m_s"
+                    for species_index in range(len(ion_species))
+                )
+            output["collective_external_parameter_covariance_order"]=covariance_order
             output["collective_external_parameter_covariance"]=covariance
             output["collective_external_uncertainty_propagated"]=True
             output["electron_temperature_uncertainty_profile_eV"]=np.array([r.get("electron_temperature_uncertainty_eV",np.nan) for r in results])
