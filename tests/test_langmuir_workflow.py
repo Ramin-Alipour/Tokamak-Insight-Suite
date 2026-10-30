@@ -118,7 +118,7 @@ def test_langmuir_density_rejects_nonpositive_area():
     with pytest.raises(ValueError, match="probe_area_m2 must be positive"):
         analyze_langmuir_probe(
             voltage, current, electron_fit_range=(-5.0, 3.0),
-            ion_fit_range=(-8.0, -5.0), probe_area_m2=0.0,
+            ion_fit_range=(-8.0, -5.5), probe_area_m2=0.0,
             ion_mass_kg=3e-27, ion_saturation_coefficient=0.61,
             sheath_model="test",
         )
@@ -185,7 +185,7 @@ def test_langmuir_combines_explicit_temperature_uncertainty_components():
 def test_langmuir_density_uncertainty_includes_explicit_model_discrepancy():
     voltage, current = _synthetic_sweep()
     result = analyze_langmuir_probe(
-        voltage, current, electron_fit_range=(-5.0, 3.0), ion_fit_range=(-8.0, -5.0),
+        voltage, current, electron_fit_range=(-5.0, 3.0), ion_fit_range=(-8.0, -5.5),
         probe_area_m2=1e-6, ion_mass_kg=3.3210781332e-27,
         ion_saturation_coefficient=0.61, sheath_model="test model",
         ion_current_uncertainty_A=1e-6, density_model_relative_uncertainty=0.1,
