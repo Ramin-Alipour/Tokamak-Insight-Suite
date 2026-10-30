@@ -47,6 +47,10 @@ A finite-variance isotropic kappa electron velocity distribution is represented 
 
 Assumptions: non-collective scattering, isotropic kappa distribution, kappa index greater than 1.5, and non-relativistic velocities.
 
+### 3. Relativistic Maxwell-Juttner (projected)
+
+A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
+
 ### 3. Collective Maxwellian
 
 The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion temperatures and optional species flow vectors, and an optional electron-fluid flow vector. Missing ion temperatures are not silently replaced with electron temperature. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
@@ -83,8 +87,8 @@ The differential Thomson cross-section uses the incident polarization dependence
 
 ## Deliberate limitations
 
-- Relativistic kinetic corrections are not implemented in this revision. The non-collective Maxwellian and kappa models are explicitly non-relativistic.
-- Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.
+- The relativistic Maxwell-Juttner option is a 1-D projected-velocity approximation. Full 3-D relativistic photon-geometry integration is not implemented.
+- Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
 - The current collective fit reports optimizer diagnostics but does not yet provide a fully marginalized posterior/covariance for all plasma parameters.
@@ -104,6 +108,7 @@ References:
 - PlasmaPy, “Thomson Scattering: Spectral Density,” https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html
 - Verdier, T. et al. (2025), DOI: 10.1063/5.0238948.
 - Skolar, C. R., Longley, W. J. & Goodwin, L. V. (2025), DOI: 10.1109/ICEAA65662.2025.11306000.
+- Suazo Betancourt, J. L. et al. (2024), DOI: 10.1063/5.0158749.
 - Eisenbach, S. et al. (2025), DOI: 10.1088/1361-6463/ad89d6.
 
 ## Legacy profile utilities
