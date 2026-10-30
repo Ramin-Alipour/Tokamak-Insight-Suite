@@ -319,7 +319,7 @@ def reconstruct_thomson_profile(
         covariance = np.asarray(value, dtype=float)
         if covariance.shape != (radius_original.size, radius_original.size) or not np.all(np.isfinite(covariance)):
             raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
             raise ValueError(f"{name} must be symmetric")
         if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError(f"{name} must be positive semidefinite")
@@ -336,7 +336,7 @@ def reconstruct_thomson_profile(
         expected_joint_shape = (2 * radius_original.size, 2 * radius_original.size)
         if joint_covariance_input.shape != expected_joint_shape or not np.all(np.isfinite(joint_covariance_input)):
             raise ValueError("joint_density_temperature_covariance must be a finite (2N x 2N) matrix ordered [density_0..N-1, temperature_0..N-1]")
-        if not np.allclose(joint_covariance_input, joint_covariance_input.T, rtol=1e-10, atol=1e-14):
+        if not np.allclose(joint_covariance_input, joint_covariance_input.T, rtol=1e-10, atol=0.0):
             raise ValueError("joint_density_temperature_covariance must be symmetric")
         if not _covariance_is_positive_semidefinite(joint_covariance_input):
             raise ValueError("joint_density_temperature_covariance must be positive semidefinite")
@@ -694,7 +694,7 @@ def density_from_thomson_scattered_power(
         covariance = np.asarray(relative_input_covariance, dtype=float)
         if covariance.shape != (6, 6) or not np.all(np.isfinite(covariance)):
             raise ValueError("relative_input_covariance must be a finite 6x6 matrix")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
             raise ValueError("relative_input_covariance must be symmetric")
         if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError("relative_input_covariance must be positive semidefinite")
