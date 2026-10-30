@@ -392,7 +392,7 @@ def _positive_finite_scalar(value, name: str, *, allow_zero: bool = False) -> fl
     return result
 
 
-def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float, *, incident_polarization_vector=None, scattered_direction_vector=None) -> float:
+def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float, *, incident_polarization_vector=None, incident_direction_vector=None, scattered_direction_vector=None) -> float:
     """Thomson differential cross-section in m^2 sr^-1.
 
     Without vectors, use the unpolarized result. With both vectors, calculate
@@ -401,18 +401,24 @@ def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float, *, inc
     theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
     if theta > np.pi:
         raise ValueError("scattering_angle_rad must lie between 0 and pi")
-    if incident_polarization_vector is None and scattered_direction_vector is None:
+    if incident_polarization_vector is None and incident_direction_vector is None and scattered_direction_vector is None:
         return float(0.5 * _ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2))
-    if incident_polarization_vector is None or scattered_direction_vector is None:
-        raise ValueError("incident_polarization_vector and scattered_direction_vector must be supplied together")
+    if any(v is None for v in (incident_polarization_vector, incident_direction_vector, scattered_direction_vector)):
+        raise ValueError("incident polarization, incident direction and scattered direction vectors must be supplied together")
     eps = np.asarray(incident_polarization_vector, dtype=float)
+    incident = np.asarray(incident_direction_vector, dtype=float)
     direction = np.asarray(scattered_direction_vector, dtype=float)
-    if eps.shape != (3,) or direction.shape != (3,) or not np.all(np.isfinite(eps)) or not np.all(np.isfinite(direction)):
-        raise ValueError("polarization and scattered direction must be finite 3-vectors")
-    eps_norm = float(np.linalg.norm(eps)); direction_norm = float(np.linalg.norm(direction))
-    if eps_norm <= 0 or direction_norm <= 0:
-        raise ValueError("polarization and scattered direction vectors must be nonzero")
-    eps = eps/eps_norm; direction = direction/direction_norm
+    if any(v.shape != (3,) or not np.all(np.isfinite(v)) for v in (eps,incident,direction)):
+        raise ValueError("polarization and beam-direction inputs must be finite 3-vectors")
+    eps_norm = float(np.linalg.norm(eps)); incident_norm=float(np.linalg.norm(incident)); direction_norm = float(np.linalg.norm(direction))
+    if eps_norm <= 0 or incident_norm <= 0 or direction_norm <= 0:
+        raise ValueError("polarization and beam-direction vectors must be nonzero")
+    eps = eps/eps_norm; incident=incident/incident_norm; direction = direction/direction_norm
+    if abs(float(np.dot(eps,incident))) > 1e-6:
+        raise ValueError("incident polarization must be perpendicular to the incident beam direction")
+    geometric_angle=float(np.arccos(np.clip(np.dot(incident,direction),-1.0,1.0)))
+    if abs(geometric_angle-theta)>1e-5:
+        raise ValueError("scattering_angle_rad is inconsistent with the supplied beam-direction vectors")
     factor = max(0.0, 1.0-float(np.dot(direction, eps))**2)
     return float(_ELECTRON_CLASSICAL_RADIUS_M**2*factor)
 
@@ -432,6 +438,7 @@ def density_from_thomson_scattered_power(
     collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None,
     incident_polarization_vector=None,
+    incident_direction_vector=None,
     scattered_direction_vector=None,
     polarization_factor_uncertainty=None,
 ):
@@ -452,8 +459,11 @@ def density_from_thomson_scattered_power(
         raise ValueError("optical_efficiency must not exceed 1")
     dsigma = thomson_differential_cross_section_m2_sr(
         theta, incident_polarization_vector=incident_polarization_vector,
+        incident_direction_vector=incident_direction_vector,
         scattered_direction_vector=scattered_direction_vector,
     )
+    if dsigma <= 0:
+        raise ValueError("The supplied polarization/collection geometry has zero Thomson differential cross-section")
     density = ps / (pi * length * dsigma * omega * eta)
     model_power = density * pi * length * dsigma * omega * eta
 
