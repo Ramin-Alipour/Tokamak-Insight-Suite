@@ -138,6 +138,18 @@
           "name": "polarization_factor_uncertainty",
           "unit": "dimensionless",
           "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Incident beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Scattered beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
         }
       ],
       "output_specs": [
@@ -177,7 +189,8 @@
         "Spatial coordinates are supplied for each measured channel.",
         "Non-collective Maxwellian model assumes isotropic non-relativistic Maxwellian electrons.",
         "Collective Maxwellian model requires explicit ion species and ion temperatures; missing values are not silently inferred.",
-        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs."
+        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
+        "Collective-mode flow vectors and incident/scattered beam directions are expressed in one explicitly supplied coordinate frame; no canonical beam orientation is assumed."
       ],
       "preprocessing": [
         "Validate channel-by-wavelength arrays and strictly increasing wavelength axes.",
@@ -191,7 +204,8 @@
         "The kappa model is a parameterized isotropic non-Maxwellian approximation, not arbitrary VDF inversion.",
         "Absolute density is not identifiable from spectral shape alone.",
         "No independent experimental validation is claimed.",
-        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared."
+        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
+        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
