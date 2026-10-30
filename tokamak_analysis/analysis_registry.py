@@ -46,7 +46,7 @@ ANALYSES = [{
                 {
                     "name": "instrument_response",
                     "unit": "normalized response matrix",
-                    "description": "Required measured instrument line-spread response matrix, common to channels or channel-specific; an identity matrix must be explicitly supplied if justified.",
+                    "description": "Required measured instrument line-spread response: callable, 1-D kernel, 2-D matrix or channel-specific 3-D matrix; an identity matrix must be explicitly supplied if justified.",
                     "required": True
                 },
                 {
