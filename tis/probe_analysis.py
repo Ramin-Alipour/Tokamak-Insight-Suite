@@ -573,11 +573,19 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             electron_numerical_fit_pass and ion_numerical_fit_pass and ion_flatness_pass
         )
         if not numerical_screen_pass and not allow_density_when_numerical_screen_fails:
+            failed_screens = []
+            if not electron_numerical_fit_pass:
+                failed_screens.append("electron-retarding fit that passes the numerical review")
+            if not ion_numerical_fit_pass:
+                failed_screens.append("ion-branch fit that passes the numerical review")
+            if not ion_flatness_pass:
+                failed_screens.append("numerically flat ion-branch review")
             raise ValueError(
-                "Ion-density inversion is blocked because one or more configurable numerical review "
-                "screens failed. These screens are not physical-regime criteria. Review the I-V fit "
-                "and thresholds; set allow_density_when_numerical_screen_fails=True only to explicitly "
-                "request a provisional calculation from the available fitted values."
+                "Ion-density inversion is blocked because the following configurable numerical review "
+                "screens failed: " + "; ".join(failed_screens) + ". These screens are not physical-regime "
+                "criteria. Review the I-V fit and thresholds; set "
+                "allow_density_when_numerical_screen_fails=True only to explicitly request a provisional "
+                "calculation from the available fitted values."
             )
         if not _is_finite_real_scalar(te) or te <= 0:
             raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
