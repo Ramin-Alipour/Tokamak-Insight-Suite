@@ -822,3 +822,14 @@ def test_lsf_variance_adds_to_density_covariance_without_rescaling_cross_terms()
     gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
     expected_sigma = channel["electron_density_m3"] * np.sqrt(gradient @ covariance @ gradient)
     assert channel["electron_density_uncertainty_m3"] == pytest.approx(expected_sigma, rel=1e-8)
+
+
+def test_per_channel_density_covariance_cannot_be_combined_with_joint_spectral_covariance():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="do not combine it with joint_spectral_covariance"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            density_relative_covariance=np.eye(6),
+            joint_spectral_covariance=np.eye(x.size),
+        )
