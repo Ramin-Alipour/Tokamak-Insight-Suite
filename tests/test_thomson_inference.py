@@ -28,7 +28,7 @@ def test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius()
     _, y2, _ = _spectral_case(150.0)
     out = analyze_thomson_spectra(
         x, np.vstack([y1,y2]), [0.12,0.24],
-        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
     )
     assert out["channel_count"] == 2
     np.testing.assert_allclose(out["radius_m"], [0.12,0.24])
@@ -54,7 +54,7 @@ def test_absolute_density_requires_explicit_watt_per_nm_calibration():
     with pytest.raises(ValueError, match="spectral_power_density_calibrated"):
         analyze_thomson_spectra(
             x, (y*1e-18)[None,:], [0.1], laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi/2, laser_power_w=2.0,
+            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), laser_power_w=2.0,
             interaction_length_m=0.1, collection_solid_angle_sr=1e-3,
             optical_efficiency=0.5, incident_polarization=[0,0,1],
             incident_direction=[1,0,0], scattered_direction=[0,1,0],
@@ -65,7 +65,7 @@ def test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_sup
     x, y, _ = _spectral_case(100.0)
     out = analyze_thomson_spectra(
         x, (y*1e-18)[None,:], [0.1], laser_wavelength_nm=532.0,
-        scattering_angle_rad=np.pi/2, signal_uncertainty=np.full((1,x.size),0.8e-18), laser_power_w=2.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), signal_uncertainty=np.full((1,x.size),0.8e-18), laser_power_w=2.0,
         laser_power_uncertainty_W=0.02, interaction_length_m=0.1,
         interaction_length_uncertainty_m=0.001, collection_solid_angle_sr=1e-3,
         collection_solid_angle_uncertainty_sr=1e-5, optical_efficiency=0.5,
@@ -83,7 +83,7 @@ def test_collective_mode_never_runs_without_explicit_ion_species():
     with pytest.raises(ValueError, match="ion species"):
         analyze_thomson_spectra(
             x, y[None,:], [0.1], laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi/2, model="collective_maxwellian",
+            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), model="collective_maxwellian",
         )
 
 
@@ -108,7 +108,7 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     y = 900.0*(1.0+((x-532.0)/scale)**2/df)**(-kappa)+20.0
     out = analyze_thomson_spectra(
         x,y[None,:],[0.15],laser_wavelength_nm=532.0,
-        scattering_angle_rad=np.pi/2,model="non_collective_kappa",
+        scattering_angle_rad=np.pi/2,instrument_response=np.eye(x.size),model="non_collective_kappa",
     )
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.05)
     assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
@@ -131,7 +131,7 @@ def test_projected_relativistic_maxwell_juttner_model_is_available():
     y[valid]+=900.0*marginal*jacobian
     out=analyze_thomson_spectra(
         x,y[None,:],[0.18],laser_wavelength_nm=laser,
-        scattering_angle_rad=angle,model="relativistic_maxwell_juttner",
+        scattering_angle_rad=angle,instrument_response=np.eye(x.size),model="relativistic_maxwell_juttner",
     )
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.08)
     assert "Maxwell-Juttner" in out["channels"][0]["model"]
