@@ -195,3 +195,8 @@ The stretched-exponential helper uses the mirrored increasing-branch KWW form
 \[I(V)=I_0+A\exp\left[-\left(s(V_{\rm ref}-V)\right)^\beta\right],\qquad V\leq V_{\rm ref}.\]
 
 Here V_ref is exactly the upper endpoint of the selected fit window; it is not inferred as the plasma potential. The KWW exponent and scale are empirical curve-shape parameters only. This is not a Langmuir-probe constitutive law, not an EEDF model and not a kinetic kappa parameterization. The KWW literature is cited only for the generic empirical function form.
+
+
+## Formula Registry coverage
+
+The following Langmuir relations are mapped to callable implementations in FORMULA_REGISTRY.json and have independent numerical reference tests: electron temperature from the Maxwellian retarding slope; single-species ion density from the charge-state-aware Bohm/sheath current balance; electron density from Maxwellian electron-saturation current; species Bohm particle flux; and species-summed multispecies ion density. The two-temperature fit and mirrored KWW stretched-exponential fit are model/curve-shape workflows, not additional physical formula claims; their scientific references and interpretation limits are separately recorded in the diagnostic registry.
