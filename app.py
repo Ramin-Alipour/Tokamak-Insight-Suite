@@ -1776,7 +1776,7 @@ elif page=='Probe Analysis':
             except Exception as exc: st.error(f'Advanced Langmuir analysis failed: {exc}')
     with st.expander('Separate electron-density and ion-flux estimates'):
         st.caption('These are separate model calculations, not automatic direct measurements from the canonical I–V fit.')
-        estimate_kind=st.selectbox('Estimate',['Electron density from electron-saturation current','Ion particle flux from supplied density'],key='probe_estimate_kind')
+        estimate_kind=st.selectbox('Estimate',['Electron density from electron-saturation current','Multispecies ion density from ion-saturation current','Ion particle flux from supplied density'],key='probe_estimate_kind')
         if estimate_kind=='Electron density from electron-saturation current':
             ec1,ec2,ec3=st.columns(3)
             with ec1: electron_sat_current=st.number_input('Electron saturation current (A)',value=1e-3,format='%.6g',key='probe_e_sat_current')
@@ -1784,6 +1784,18 @@ elif page=='Probe Analysis':
             with ec3: electron_sat_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_e_sat_area')
             if st.button('Estimate electron density',key='probe_estimate_ne'):
                 try: st.json(estimate_electron_density_from_saturation(electron_sat_current,electron_sat_te,electron_sat_area,current_convention=cur_conv))
+                except Exception as exc: st.error(str(exc))
+        elif estimate_kind=='Multispecies ion density from ion-saturation current':
+            mc1,mc2,mc3=st.columns(3)
+            with mc1: multi_ion_current=st.number_input('Ion-saturation current (A)',value=-1e-3,format='%.6g',key='probe_multi_ion_current')
+            with mc2: multi_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_multi_te')
+            with mc3: multi_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_multi_area')
+            multi_species_text=st.text_area('Species JSON (fraction means number-density fraction)',value='[{"mass_kg": 3.34e-27, "fraction": 1.0, "sheath_coefficient": 0.61}]',key='probe_multi_species_json')
+            if st.button('Estimate multispecies ion density',key='probe_estimate_multi_ni'):
+                try:
+                    multi_species=json.loads(multi_species_text)
+                    st.json(estimate_multispecies_ion_density(multi_ion_current,multi_te,multi_area,multi_species,
+                        current_convention=cur_conv,fraction_basis='number_density'))
                 except Exception as exc: st.error(str(exc))
         else:
             fc1,fc2,fc3,fc4=st.columns(4)
