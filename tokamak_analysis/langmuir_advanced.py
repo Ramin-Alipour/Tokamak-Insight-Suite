@@ -103,7 +103,7 @@ def fit_langmuir_electron_models(
     covariance_valid = bool(
         np.asarray(cov).ndim == 2 and cov.shape[0] == cov.shape[1]
         and np.all(np.isfinite(cov)) and np.all(np.diag(cov) >= 0.0)
-        and np.all(np.linalg.eigvalsh(0.5 * (cov + cov.T)) >= -1e-12 * max(float(np.max(np.abs(cov))), 1.0))
+        and float(np.min(np.linalg.eigvalsh(0.5 * (cov + cov.T)))) > 1e-12 * max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
     )
     parameter_names = (["offset_scaled", "amplitude_scaled", "slope_per_V"]
                        if model == "single_maxwellian" else
