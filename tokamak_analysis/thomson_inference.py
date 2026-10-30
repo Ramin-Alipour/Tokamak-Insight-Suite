@@ -931,8 +931,10 @@ def analyze_thomson_spectra(
             te_rel_var = (2.0*laser_wavelength_unc/float(laser_wavelength_nm))**2
             te_rel_var += (np.cos(float(scattering_angle_rad)/2.0)/np.sin(float(scattering_angle_rad)/2.0)
                            * scattering_angle_unc)**2
+            external_te_sigma = float(te*np.sqrt(te_rel_var))
+            fit["electron_temperature_external_uncertainty_eV"] = external_te_sigma
             fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
-                fit["electron_temperature_uncertainty_eV"], te*np.sqrt(te_rel_var)))
+                fit["electron_temperature_uncertainty_eV"], external_te_sigma))
             velocity = fit["electron_velocity_projection_m_s"]
             if model == "relativistic_maxwell_juttner":
                 center_ratio = float(fit["fitted_center_nm"]) / float(laser_wavelength_nm)
@@ -947,9 +949,10 @@ def analyze_thomson_spectra(
                 velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
                                             /np.sin(float(scattering_angle_rad)/2.0)
                                             *scattering_angle_unc)
-            fit["electron_velocity_projection_uncertainty_m_s"] = float(np.sqrt(
-                fit["electron_velocity_projection_uncertainty_m_s"]**2
-                + velocity_laser_sigma**2 + velocity_angle_sigma**2))
+            external_velocity_sigma = float(np.hypot(velocity_laser_sigma, velocity_angle_sigma))
+            fit["electron_velocity_projection_external_uncertainty_m_s"] = external_velocity_sigma
+            fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
+                fit["electron_velocity_projection_uncertainty_m_s"], external_velocity_sigma))
         if lsf_unc is not None and model != "collective_maxwellian" and not fit.get("instrument_response_uncertainty_propagated",False):
             fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
             fit["uncertainty_completeness"] = "partial"
@@ -1082,6 +1085,22 @@ def analyze_thomson_spectra(
             fit["integrated_scattered_power_W"]=area
             fit["integrated_scattered_power_fit_uncertainty_W"]=float(np.sqrt(max(grad@block@grad,0.0)))
             fit["integrated_scattered_power_uncertainty_W"]=joint_area_sigma
+            te_external = fit.get("electron_temperature_external_uncertainty_eV")
+            te_lsf = fit.get("instrument_response_temperature_uncertainty_eV")
+            if te_external is not None:
+                fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"], float(te_external)))
+            if te_lsf is not None:
+                fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"], float(te_lsf)))
+            velocity_external = fit.get("electron_velocity_projection_external_uncertainty_m_s")
+            velocity_lsf = fit.get("instrument_response_velocity_uncertainty_m_s")
+            if velocity_external is not None:
+                fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"], float(velocity_external)))
+            if velocity_lsf is not None:
+                fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"], float(velocity_lsf)))
             # The absolute density belongs to the final joint-GLS spectrum, not
             # to the superseded independent-channel fit. Re-run the same physical
             # inversion with the final joint area and its uncertainty.
@@ -1125,6 +1144,8 @@ def analyze_thomson_spectra(
             "model_discrepancy_scale":discrepancy_scale,
             "model_discrepancy_interpretation":"Excess whitened residual variance above unity is reported as a separate covariance component; it is a model-adequacy diagnostic, not experimental validation.",
         }
+    for channel_result in results:
+        channel_result.pop("_density_inputs_for_joint_refit", None)
     output = {
         "model": model, "channel_count": len(results), "channels": results,
         "joint_inference": joint_summary,
