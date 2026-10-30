@@ -1339,6 +1339,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
+        "electron_density_external_parameter_covariance_m6": None,
         "electron_density_cross_channel_covariance_available": density_cross_channel_covariance_available,
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
@@ -1490,6 +1491,16 @@ def analyze_thomson_spectra(
                 )
             output["collective_external_parameter_covariance_order"]=covariance_order
             output["collective_external_parameter_covariance"]=covariance
+            density_columns = [channel * (3 + len(ion_species)) for channel in range(len(results))]
+            external_density_covariance = covariance[np.ix_(density_columns, density_columns)].copy()
+            for channel_index, channel_result in enumerate(results):
+                if channel_result.get("electron_density_m3") is None:
+                    external_density_covariance[channel_index, :] = np.nan
+                    external_density_covariance[:, channel_index] = np.nan
+            output["electron_density_external_parameter_covariance_m6"] = external_density_covariance
+            output["electron_density_cross_channel_covariance_available"] = bool(
+                sum(result.get("electron_density_m3") is not None for result in results) >= 2
+            )
             output["collective_external_uncertainty_propagated"]=True
             output["electron_temperature_uncertainty_profile_eV"]=np.array([r.get("electron_temperature_uncertainty_eV",np.nan) for r in results])
             output["electron_density_uncertainty_profile_m3"]=np.array([r.get("electron_density_uncertainty_m3",np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results])
