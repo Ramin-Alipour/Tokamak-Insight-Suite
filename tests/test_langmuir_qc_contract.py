@@ -465,3 +465,12 @@ def test_root_and_packaged_langmuir_diagnostic_registries_are_identical():
     package_rows = json.loads((root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
     assert root_rows == package_rows
 
+def test_duplicate_voltage_averaging_reduces_supplied_current_uncertainty():
+    voltage = np.r_[np.linspace(-4.0, 4.0, 9), 0.0]
+    current = np.r_[1e-3 * np.linspace(-4.0, 4.0, 9), 0.0]
+    result = langmuir_iv_analysis(voltage, current, current_uncertainty_A=2e-5)
+    processed_v = np.asarray(result["processed_voltage_V"])
+    processed_sigma = np.asarray(result["current_standard_uncertainty_A_per_processed_sample"])
+    zero_index = int(np.flatnonzero(processed_v == 0.0)[0])
+    assert processed_sigma[zero_index] == pytest.approx(2e-5 / np.sqrt(2.0))
+
