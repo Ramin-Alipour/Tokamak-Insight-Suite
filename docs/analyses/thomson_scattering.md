@@ -54,7 +54,7 @@ A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-
 
 ### 3. Collective Maxwellian
 
-The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion composition fractions, ion temperatures and species flow vectors, and an electron-fluid flow vector. Missing ion temperatures are not silently replaced with electron temperature; multi-ion fractions are not silently assumed. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
+The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion composition fractions, ion temperatures, ion flow vectors and an electron-fluid flow vector. Flow vectors must be independently measured or explicitly set to zero to declare a stationary-flow assumption. Missing ion temperatures are not silently replaced with electron temperature; multi-ion fractions are not silently assumed. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
 
 The collective model can cover both collective and non-collective scattering regimes through the dielectric spectral-density calculation. The scattering parameter and spectral shape depend on the supplied plasma parameters and geometry.
 
@@ -62,7 +62,7 @@ The collective model can cover both collective and non-collective scattering reg
 
 The instrument response is represented by a non-negative matrix whose columns are normalized probability distributions for detected wavelength bins conditional on each true wavelength bin. The measured response is mandatory and may be supplied as a callable evaluated on the wavelength grid, a 1-D odd-length kernel, a 2-D wavelength-to-wavelength matrix, or a channel-specific 3-D matrix. The same response can be used for all channels, or a separate matrix can be supplied per channel. An identity matrix is accepted only when explicitly supplied and physically justified. This supports asymmetric and wavelength-dependent line-spread functions; a Gaussian response is not imposed.
 
-For the non-collective Maxwellian and kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature and velocity uncertainties combine fit covariance and the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend currently does not marginalize response uncertainty into its parameter covariance.
+For the non-collective Maxwellian, kappa and projected relativistic fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature and velocity uncertainties combine fit covariance and the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend currently does not marginalize response uncertainty into its parameter covariance.
 
 ## Electron density and identifiability
 
@@ -76,7 +76,7 @@ A spectral shape alone does not determine absolute electron density in the non-c
 - incident polarization vector (perpendicular to the incident beam);
 - scattered-light direction (consistent with the specified scattering angle).
 
-The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. The incident polarization must be perpendicular to the incident beam, and the supplied incident/scattered direction vectors must agree with the specified scattering angle. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties).
+The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. The incident polarization must be perpendicular to the incident beam, and the supplied incident/scattered direction vectors must agree with the specified scattering angle. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties). Each channel lists unavailable uncertainty inputs and marks the uncertainty completeness as partial; missing uncertainties are never silently treated as zero.
 
 ## Outputs
 
@@ -93,7 +93,7 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
-- The current collective fit reports optimizer diagnostics but does not yet provide a fully marginalized posterior/covariance for all plasma parameters.
+- The current collective fit reports a local least-squares covariance for fitted density and temperature, but does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
 - Correlated uncertainty between wavelength bins, calibration factors and channels is not modeled.
 - No independent experimental validation is claimed. Automated tests verify software behavior and mathematical consistency only.
 
