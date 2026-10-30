@@ -1723,6 +1723,10 @@ elif page=='Probe Analysis':
             with dc3: density_coeff=st.number_input('Sheath/Bohm coefficient',min_value=1e-6,value=0.61,format='%.6g',key='probe_density_coeff')
             density_model=st.text_input('Sheath model/source label',value='',key='probe_density_model')
             density_charge=st.number_input('Ion charge state Zᵢ (positive integer)',min_value=1,value=1,step=1,key='probe_density_charge')
+            density_allow_screen_override=st.checkbox(
+                'Allow provisional density calculation if a numerical review screen fails',
+                value=False,key='probe_density_screen_override',
+                help='This bypasses only the configurable numerical review gate. It does not establish that the selected branches are physically valid or in saturation.')
             uc1,uc2,uc3=st.columns(3)
             with uc1: density_sigma_current=st.number_input('Ion saturation-current σ (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_density_sigma_current')
             with uc2: density_area_rel=st.number_input('Area relative σ (0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_density_area_rel')
@@ -1737,6 +1741,7 @@ elif page=='Probe Analysis':
             density_options={'probe_area_m2':density_area,'ion_mass_kg':density_mass,
                              'ion_saturation_coefficient':density_coeff,'sheath_model':density_model,
                              'ion_charge_state':int(density_charge),
+                             'allow_density_when_numerical_screen_fails':bool(density_allow_screen_override),
                              'ion_current_uncertainty_A':density_sigma_current if density_sigma_current>0 else None,
                              'probe_area_relative_uncertainty':density_area_rel if density_area_rel>0 else None,
                              'ion_mass_relative_uncertainty':density_mass_rel if density_mass_rel>0 else None,
