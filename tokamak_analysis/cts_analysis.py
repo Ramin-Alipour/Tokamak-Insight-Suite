@@ -156,7 +156,7 @@ def _convolve(response,spectrum,axis):
 
 
 
-def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=48, generations=100):
+def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=32, generations=40):
     """Bounded real-coded GA: tournament selection, blend crossover, elitism and adaptive mutation."""
     rng = np.random.default_rng(seed)
     bounds = np.asarray(bounds, dtype=float)
