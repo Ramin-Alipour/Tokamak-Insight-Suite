@@ -440,7 +440,10 @@ def analyze_thomson_spectra(
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
-    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,\n    joint_spectral_covariance=None,\n    ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,\n    electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
+    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
+    joint_spectral_covariance=None,
+    ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
+    electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
