@@ -157,7 +157,7 @@ The smoothed derivative helper performs local polynomial least-squares fits usin
 
 ## Numerical fit-screen thresholds
 
-Default numerical review settings are minimum R² = 0.98, maximum normalized RMSE = 0.1, and maximum relative ion-branch current change = 0.1. These values are configurable through the public API and application UI and are returned in numerical_fit_screen_thresholds. They are numerical screening defaults, not universal physical acceptance criteria or plasma constants. They cannot certify electron-retarding Maxwellian behavior or physical ion saturation. Density inversion remains gated by configured numerical screens; a pass does not establish the physical regime.
+Default numerical review settings are minimum R² = 0.98, maximum normalized RMSE = 0.1, and maximum relative ion-branch current change = 0.1. These values are configurable through the public API and application UI and are returned in numerical_fit_screen_thresholds. They are software review defaults, not universal physical acceptance criteria or plasma constants. They cannot certify electron-retarding Maxwellian behavior or physical ion saturation. By default, density inversion is blocked when one or more configured numerical screens fail. The caller may explicitly set allow_density_when_numerical_screen_fails=True (also exposed as a UI checkbox) to calculate a provisional model-based density from otherwise available fitted values. Such a result is labelled provisional_model_based_estimate_numerical_screen_override_used, records ion_density_numerical_screen_override_used=true, and still reports physical_regime_confirmed=false. Missing/invalid Te or ion current continues to block calculation. This override changes only the numerical gate; it does not certify a physical regime.
 
 ## Ion charge-state dependence
 
@@ -176,7 +176,7 @@ For a single ion species with charge state Z_i, the Bohm speed used by the decla
 - Stretched-exponential parameters expose covariance-derived standard errors only when fitted covariance is finite, positive-definite and numerically valid; otherwise uncertainty fields are null with explicit status.
 - Electron-density uncertainty is propagated only when absolute current standard uncertainty and relative temperature and area standard uncertainties are all supplied.
 - Bohm-like ion particle-flux uncertainty is propagated only when relative uncertainties for density, temperature, mass and sheath factor are all supplied. The explicit integer charge state is treated as a fixed species identity.
-- Multispecies density does not propagate uncertainty in species fractions, species-resolved sheath coefficients or composition covariance. It returns an explicit not-propagated status rather than zero uncertainty.
+- Multispecies density supports partial first-order propagation from explicitly supplied current, Te, area, per-species mass and sheath-coefficient uncertainties. Species fractions are held fixed; fraction uncertainty is not propagated because the sum-to-one constraint requires a composition covariance model. Every included and omitted component is reported; with no supplied components, the standard uncertainty remains null rather than zero.
 - No omitted uncertainty component is silently treated as a measured zero; propagated values remain conditional on the supplied independent-input model.
 
 
@@ -200,3 +200,23 @@ Here V_ref is exactly the upper endpoint of the selected fit window; it is not i
 ## Formula Registry coverage
 
 The following Langmuir relations are mapped to callable implementations in FORMULA_REGISTRY.json and have independent numerical reference tests: electron temperature from the Maxwellian retarding slope; single-species ion density from the charge-state-aware Bohm/sheath current balance; electron density from Maxwellian electron-saturation current; species Bohm particle flux; and species-summed multispecies ion density. The two-temperature fit and mirrored KWW stretched-exponential fit are model/curve-shape workflows, not additional physical formula claims; their scientific references and interpretation limits are separately recorded in the diagnostic registry.
+
+## Multispecies density uncertainty contract
+
+The `estimate_multispecies_ion_density` helper accepts optional `current_standard_uncertainty_A`, `temperature_relative_standard_uncertainty` and `area_relative_standard_uncertainty`. Each species record may also include `mass_relative_standard_uncertainty` and `sheath_coefficient_relative_standard_uncertainty`. The helper applies first-order independent-input propagation to only the components actually supplied. For species s, with denominator weight w_s = f_s C_s Z_s^(3/2)/sqrt(m_s) and normalized contribution r_s = w_s/sum_j(w_j), the relative contribution is r_s sigma_Cs/C_s for the sheath coefficient and r_s sigma_ms/(2 m_s) for mass. The current, area and half-weighted Te terms are also included when supplied. Number-density fractions are treated as fixed: an independent fraction uncertainty is rejected because the fractions are constrained to sum to one and require a composition covariance model. The output lists included terms, omitted terms and the partial-propagation scope. This is not a complete composition/model uncertainty.
+
+## Public API array and batch shapes
+
+The registry contract covers the actual public API modes:
+
+- Single sweep: `voltage_V` and `current_A` both have shape `(samples,)`.
+- Shared-grid multi-channel batch: `voltage_V` has shape `(samples,)`; `current_A` has shape `(channels, samples)`.
+- Per-channel voltage batch: both arrays have shape `(channels, samples)` and must match exactly.
+- Named mapping: `{channel_name: {voltage_V: (samples,), current_A: (samples,)}}`; each channel is processed independently.
+- Time/channel series: `current_A` has shape `(time, channels, samples)`; `voltage_V` is either a shared `(samples,)` grid or a matching three-dimensional array. Optional `time_labels` and `channel_names` must match their respective dimensions.
+
+The array and series functions return named per-channel or per-time/per-channel canonical results. They do not interpolate mismatched voltage grids, align channels, reconstruct spatial profiles, calculate temporal derivatives/trends, or infer cross-channel physics. The input shape, labels and independent-processing scope are recorded in the diagnostic registry.
+
+## Model-class reporting
+
+The single-Maxwellian exponential fit is a published diagnostic relation only under its Maxwellian electron-retarding assumptions and a physically justified fit window; the output still requires regime review. The two-temperature result is an empirical two-exponential decomposition and is reported as such through model_class and physical_interpretation_status; it does not establish two physical electron populations. The stretched-exponential result is an empirical KWW curve-shape fit, not a Langmuir constitutive relation, EEDF, or kinetic kappa model. Its covariance errors are conditional on that empirical curve and selected window. Reports must retain these model-class labels rather than presenting all three fits as equivalent physical models.
