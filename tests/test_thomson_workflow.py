@@ -17,6 +17,23 @@ def test_thomson_workflow_sorts_and_calculates_linear_gradients():
     assert np.all(np.isfinite(out["density_scale_length_m"]))
 
 
+def test_thomson_workflow_reports_minimum_and_maximum_values_and_locations():
+    out = analyze_thomson_profile(
+        [0.2, 0.0, 0.3, 0.1],
+        [5.0e19, 2.0e19, 8.0e19, 3.0e19],
+        [50.0, 20.0, 80.0, 30.0],
+    )
+    summary = out["summary"]
+    assert summary.density_min_m3 == pytest.approx(2.0e19)
+    assert summary.density_min_radius_m == pytest.approx(0.0)
+    assert summary.density_peak_m3 == pytest.approx(8.0e19)
+    assert summary.density_peak_radius_m == pytest.approx(0.3)
+    assert summary.temperature_min_ev == pytest.approx(20.0)
+    assert summary.temperature_min_radius_m == pytest.approx(0.0)
+    assert summary.temperature_peak_ev == pytest.approx(80.0)
+    assert summary.temperature_peak_radius_m == pytest.approx(0.3)
+
+
 def test_thomson_workflow_rejects_mismatched_profile_lengths():
     with pytest.raises(ValueError, match="equal lengths"):
         analyze_thomson_profile([0, 1, 2], [1, 2], [10, 20, 30])
