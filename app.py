@@ -844,13 +844,13 @@ elif page=='Spectral Analysis':
             ],key='ts_infer_model')
             g1,g2,g3=st.columns(3)
             with g1:
-                laser_nm=st.number_input('Laser wavelength (nm)',min_value=1e-9,value=532.0,format='%.10g',key='ts_infer_laser')
+                laser_nm_text=st.text_input('Laser wavelength (nm; required)',value='',key='ts_infer_laser')
                 use_laser_unc=st.checkbox('Supply laser-wavelength uncertainty',value=False,key='ts_infer_use_laser_unc')
-                laser_unc=st.number_input('Laser wavelength 1σ uncertainty (nm)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_laser_unc') if use_laser_unc else None
+                laser_unc_text=st.text_input('Laser wavelength 1σ uncertainty (nm)',value='',key='ts_infer_laser_unc') if use_laser_unc else None
             with g2:
-                angle_rad=st.number_input('Scattering angle (rad)',min_value=1e-9,max_value=float(np.pi),value=float(np.pi/2),format='%.9g',key='ts_infer_angle')
+                angle_rad_text=st.text_input('Scattering angle (rad; required)',value='',key='ts_infer_angle')
                 use_angle_unc=st.checkbox('Supply scattering-angle uncertainty',value=False,key='ts_infer_use_angle_unc')
-                angle_unc=st.number_input('Scattering angle 1σ uncertainty (rad)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_angle_unc') if use_angle_unc else None
+                angle_unc_text=st.text_input('Scattering angle 1σ uncertainty (rad)',value='',key='ts_infer_angle_unc') if use_angle_unc else None
             with g3:
                 response_upload=st.file_uploader('Measured instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
                 response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
@@ -878,22 +878,21 @@ elif page=='Spectral Analysis':
                 st.markdown('**Absolute Thomson-power geometry**')
                 d1,d2,d3=st.columns(3)
                 with d1:
-                    laser_power=st.number_input('Laser power at scattering volume (W)',min_value=1e-30,value=1.0,format='%.8g',key='ts_infer_laser_power')
-                    interaction_length=st.number_input('Interaction length (m)',min_value=1e-12,value=0.01,format='%.8g',key='ts_infer_interaction_length')
+                    laser_power_text=st.text_input('Laser power at scattering volume (W; required)',value='',key='ts_infer_laser_power')
+                    laser_power_unc_text=st.text_input('Laser-power 1σ uncertainty (W; optional)',value='',key='ts_infer_laser_power_unc')
+                    interaction_length_text=st.text_input('Interaction length (m; required)',value='',key='ts_infer_interaction_length')
+                    interaction_length_unc_text=st.text_input('Interaction-length 1σ uncertainty (m; optional)',value='',key='ts_infer_interaction_length_unc')
                 with d2:
-                    solid_angle=st.number_input('Collection solid angle (sr)',min_value=1e-12,value=0.01,format='%.8g',key='ts_infer_solid_angle')
-                    efficiency=st.number_input('Optical efficiency (0–1)',min_value=1e-12,max_value=1.0,value=0.5,format='%.8g',key='ts_infer_efficiency')
+                    solid_angle_text=st.text_input('Collection solid angle (sr; required)',value='',key='ts_infer_solid_angle')
+                    solid_angle_unc_text=st.text_input('Solid-angle 1σ uncertainty (sr; optional)',value='',key='ts_infer_solid_angle_unc')
+                    efficiency_text=st.text_input('Optical efficiency (0–1; required)',value='',key='ts_infer_efficiency')
+                    efficiency_unc_text=st.text_input('Optical-efficiency 1σ uncertainty (optional)',value='',key='ts_infer_efficiency_unc')
                 with d3:
-                    polarization_text=st.text_input('Incident polarization vector (x,y,z)',key='ts_infer_polarization')
-                    incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_abs_incident_direction')
-                    scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_abs_scattered_direction')
-                density_kwargs={
-                    'laser_power_w':float(laser_power),
-                    'interaction_length_m':float(interaction_length),
-                    'collection_solid_angle_sr':float(solid_angle),
-                    'optical_efficiency':float(efficiency),
-                    'spectral_power_density_calibrated':True,
-                }
+                    polarization_text=st.text_input('Incident polarization vector (x,y,z; required)',value='',key='ts_infer_polarization')
+                    incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
+                    scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
+                    polarization_unc_text=st.text_input('Polarization-factor 1σ uncertainty (optional)',value='',key='ts_infer_polarization_unc')
+                density_kwargs={}
             def _parse_ts_vector(raw,label):
                 try:
                     values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
@@ -910,6 +909,16 @@ elif page=='Spectral Analysis':
                 if values.size==0 or not np.all(np.isfinite(values)):
                     raise ValueError(f'{label} must contain finite numeric values.')
                 return values
+            def _parse_ts_scalar(raw,label,minimum=None,maximum=None):
+                try:
+                    value=float(raw)
+                except (TypeError,ValueError) as exc:
+                    raise ValueError(f'{label} must be supplied as a numeric value.') from exc
+                if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
+                    raise ValueError(f'{label} is outside its permitted finite range.')
+                return value
+            def _parse_ts_optional_scalar(raw,label):
+                return None if raw is None or not str(raw).strip() else _parse_ts_scalar(raw,label,minimum=0.0)
             if st.button('Infer Thomson plasma parameters from measured spectra',type='primary',key='ts_infer_run'):
                 st.session_state.pop('tis_thomson_spectral_inference',None)
                 try:
@@ -961,17 +970,33 @@ elif page=='Spectral Analysis':
                     response_uncertainty=None
                     if response_unc_upload is not None:
                         response_uncertainty=pd.read_csv(response_unc_upload,header=None).to_numpy(dtype=float)
+                    laser_nm=_parse_ts_scalar(laser_nm_text,'Laser wavelength',minimum=1e-9)
+                    angle_rad=_parse_ts_scalar(angle_rad_text,'Scattering angle',minimum=1e-9,maximum=float(np.pi))
+                    laser_unc_value=None if laser_unc_text is None else _parse_ts_scalar(laser_unc_text,'Laser-wavelength uncertainty',minimum=0.0)
+                    angle_unc_value=None if angle_unc_text is None else _parse_ts_scalar(angle_unc_text,'Scattering-angle uncertainty',minimum=0.0)
                     kwargs={
-                        'laser_wavelength_nm':float(laser_nm),
-                        'scattering_angle_rad':float(angle_rad),
-                        'laser_wavelength_uncertainty_nm':None if laser_unc is None else float(laser_unc),
-                        'scattering_angle_uncertainty_rad':None if angle_unc is None else float(angle_unc),
+                        'laser_wavelength_nm':laser_nm,
+                        'scattering_angle_rad':angle_rad,
+                        'laser_wavelength_uncertainty_nm':laser_unc_value,
+                        'scattering_angle_uncertainty_rad':angle_unc_value,
                         'instrument_response':instrument_response,
                         'signal_uncertainty':signal_uncertainty,
                         'instrument_response_uncertainty':response_uncertainty,
                         'model':model,
-                        **density_kwargs,
                     }
+                    if absolute_density:
+                        kwargs.update({
+                            'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
+                            'laser_power_uncertainty_W':_parse_ts_optional_scalar(laser_power_unc_text,'Laser-power uncertainty'),
+                            'interaction_length_m':_parse_ts_scalar(interaction_length_text,'Interaction length',minimum=1e-12),
+                            'interaction_length_uncertainty_m':_parse_ts_optional_scalar(interaction_length_unc_text,'Interaction-length uncertainty'),
+                            'collection_solid_angle_sr':_parse_ts_scalar(solid_angle_text,'Collection solid angle',minimum=1e-12),
+                            'collection_solid_angle_uncertainty_sr':_parse_ts_optional_scalar(solid_angle_unc_text,'Solid-angle uncertainty'),
+                            'optical_efficiency':_parse_ts_scalar(efficiency_text,'Optical efficiency',minimum=1e-12,maximum=1.0),
+                            'optical_efficiency_uncertainty':_parse_ts_optional_scalar(efficiency_unc_text,'Optical-efficiency uncertainty'),
+                            'polarization_factor_uncertainty':_parse_ts_optional_scalar(polarization_unc_text,'Polarization-factor uncertainty'),
+                            'spectral_power_density_calibrated':True,
+                        })
                     if model=='collective_maxwellian':
                         species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
                         fractions=None if not ion_fraction_text.strip() else _parse_ts_float_list(ion_fraction_text,'Ion fractions')
