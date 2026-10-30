@@ -1007,12 +1007,11 @@ def analyze_thomson_spectra(
                     covariance = np.asarray(density_inputs["relative_input_covariance"], dtype=float).copy()
                     base_relative_sigma = float(np.sqrt(max(covariance[0, 0], 0.0)))
                     lsf_relative_sigma = 0.0 if area == 0.0 else lsf_area_uncertainty / abs(area)
-                    combined_relative_sigma = float(np.hypot(base_relative_sigma, lsf_relative_sigma))
-                    if base_relative_sigma > 0.0:
-                        scale_covariance = combined_relative_sigma / base_relative_sigma
-                        covariance[0, :] *= scale_covariance
-                        covariance[:, 0] *= scale_covariance
-                    covariance[0, 0] = combined_relative_sigma**2
+                    # LSF Monte Carlo is an independent response contribution:
+                    # add only its variance to the scattered-power marginal and
+                    # preserve supplied cross-covariances with the optical factors.
+                    covariance[0, 0] += lsf_relative_sigma**2
+                    combined_relative_sigma = float(np.sqrt(max(covariance[0, 0], 0.0)))
                     density_inputs["relative_input_covariance"] = covariance
                     density_inputs["scattered_power_uncertainty_W"] = None
                     combined_area_uncertainty = float(abs(area) * combined_relative_sigma)
