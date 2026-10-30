@@ -66,14 +66,14 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).
 
-**Implementation coverage audit:** [80 diagnostic records, 80 ordered analysis entry points, and 37 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
+**Implementation coverage audit:** [80 diagnostic records, 80 ordered analysis entry points, and 39 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
 
 ## Workspace
 
 - **Data Import & QC:** CSV, TXT, Excel and Parquet import, column inspection, missing-data checks, signal quality metrics, SHA-256 provenance and exportable QC reports.
 - **Time Series & MHD:** filtering, FFT, configurable Welch PSD, cross-correlation/coherence, channel-derived coherence-weighted mode-number estimates, calibrated time-series integration with optional baseline subtraction, time-frequency spectrograms, and autocorrelation/correlation-time estimates.
 - **Spectral Analysis:** line fitting, spectral calibration, Doppler temperature/velocity estimates, spectral moments and line-ratio utilities.
-- **Probe Analysis:** Langmuir I–V analysis, probe summaries, triple-probe estimates and fluctuation/particle-flux utilities.
+- **Probe Analysis:** calibrated Langmuir I–V analysis, electron/ion density and particle-flux model estimates, advanced electron-branch fits, plasma-potential derivative candidates, multi-channel and time-series batch workflows.
 - **Plasma Parameters:** parameter estimates from explicitly selected measurements and assumptions.
 - **Equilibrium & Reconstruction:** derivatives of an input flux grid and profile analysis; Public Data Access can fetch and plot an existing FAIR-MAST EFIT `plasma_current_rz` grid without claiming to reconstruct equilibrium.
 - **Equilibrium reconstruction (analysis 13):** [prescribed-boundary Grad–Shafranov solve, weighted inverse magnetic fit, inputs, outputs, acceptance tests, and EFIT limitations](docs/analyses/equilibrium_reconstruction.md).
