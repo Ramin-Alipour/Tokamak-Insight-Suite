@@ -1,4 +1,4 @@
-"""Independent reference and contract checks for all 39 formula registry entries."""
+"""Independent reference and contract checks for all 42 formula registry entries."""
 import ast
 import importlib
 import json
@@ -14,6 +14,7 @@ MU0 = 1.25663706212e-6  # CODATA 2018 reference
 M_E = 9.1093837139e-31  # CODATA 2022 reference
 from tokamak_analysis.formula_library import (
     plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity, ion_sound_speed, langmuir_electron_temperature_from_slope, langmuir_ion_density_from_saturation_current,
+    langmuir_electron_density_from_saturation_current, langmuir_bohm_particle_flux, langmuir_multispecies_ion_density,
     ion_temperature_from_doppler_sigma, gaussian_fwhm_from_sigma,
     magnetic_energy_density, toroidal_beta, safety_factor_large_aspect_ratio,
     faraday_induction, plasma_loop_resistance_proxy, ohmic_power_approximation,
@@ -226,8 +227,8 @@ def test_particle_balance_reference():
 
 def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(rows) == 39
-    assert len({row["name"] for row in rows}) == 39
+    assert len(rows) == 42
+    assert len({row["name"] for row in rows}) == 42
     for row in rows:
         contract = row["execution_contract"]
         assert contract["implementation_link_status"] == "mapped", row["name"]
@@ -387,3 +388,36 @@ def test_langmuir_formula_registry_charge_state_reference():
     singly = langmuir_ion_density_from_saturation_current(1e-3, 5.0, 1e-4, 3.34e-27, 0.61)
     doubly = langmuir_ion_density_from_saturation_current(1e-3, 5.0, 1e-4, 3.34e-27, 0.61, charge_state=2)
     assert doubly["ion_density_m3"] == pytest.approx(singly["ion_density_m3"] / (2.0**1.5))
+
+
+def test_langmuir_electron_density_from_saturation_reference():
+    n = langmuir_electron_density_from_saturation_current(1e-3, 5.0, 1e-4)
+    expected = 1e-3 / (E_CHARGE * 1e-4 * math.sqrt(E_CHARGE*5.0/(2.0*math.pi*M_E)))
+    assert n["electron_density_m3"] == pytest.approx(expected, rel=1e-12)
+    u = langmuir_electron_density_from_saturation_current(
+        1e-3, 5.0, 1e-4, sigma_electron_saturation_current_A=1e-5,
+        relative_sigma_electron_temperature=0.02, relative_sigma_probe_area=0.01)
+    assert u["uncertainty_electron_density_m3"] > 0
+
+
+def test_langmuir_bohm_particle_flux_reference():
+    n, te, mass, coeff, charge = 1e18, 5.0, 3.34e-27, 0.61, 2
+    result = langmuir_bohm_particle_flux(n, te, mass, coeff, charge_state=charge)
+    expected = coeff*n*math.sqrt(charge*E_CHARGE*te/mass)
+    assert result["ion_particle_flux_m2_s"] == pytest.approx(expected, rel=1e-12)
+    u = langmuir_bohm_particle_flux(n, te, mass, coeff, charge_state=charge,
+        relative_sigma_ion_density=0.01, relative_sigma_electron_temperature=0.02,
+        relative_sigma_ion_mass=0.01, relative_sigma_sheath_coefficient=0.03)
+    assert u["uncertainty_ion_particle_flux_m2_s"] > 0
+
+
+def test_langmuir_multispecies_density_reference():
+    species = [
+        {"mass_kg": 3.34e-27, "fraction": 0.7, "charge_state": 1, "sheath_coefficient": 0.61},
+        {"mass_kg": 6.68e-27, "fraction": 0.3, "charge_state": 2, "sheath_coefficient": 0.58},
+    ]
+    result = langmuir_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
+    factor = sum(x["fraction"]*x["sheath_coefficient"]*x["charge_state"]**1.5/math.sqrt(x["mass_kg"]) for x in species)
+    expected = 1e-3/(E_CHARGE*1e-4*math.sqrt(E_CHARGE*5.0)*factor)
+    assert result["ion_density_m3"] == pytest.approx(expected, rel=1e-12)
+    assert result["uncertainty_ion_density_m3"] is None
