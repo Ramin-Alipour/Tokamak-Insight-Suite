@@ -2754,7 +2754,7 @@ elif page=='Advanced Analysis':
             laser_nm_unc=st.number_input('Laser-wavelength 1-sigma uncertainty (nm)',min_value=0.0,value=0.0,key='tis_ts_laser_unc')
             angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
             angle_deg_unc=st.number_input('Scattering-angle 1-sigma uncertainty (degrees)',min_value=0.0,value=0.0,key='tis_ts_angle_unc')
-            model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
+            model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Relativistic Maxwell-Juttner (projected)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
             response_file=st.file_uploader('Instrument line-spread response matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf')
             response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
             st.caption('The response matrix must be square on the wavelength grid. Its columns represent normalized detector-bin probabilities for each true-wavelength bin.')
@@ -2845,7 +2845,7 @@ elif page=='Advanced Analysis':
                         scattering_angle_uncertainty_rad=float(np.deg2rad(angle_deg_unc)),
                         instrument_response=response,instrument_response_uncertainty=response_unc,
                         signal_uncertainty=None if not uncertainties else np.asarray(uncertainties),
-                        model=('collective_maxwellian' if model_label.startswith('Collective') else ('non_collective_kappa' if model_label.startswith('Non-collective kappa') else 'non_collective_maxwellian')),
+                        model=('collective_maxwellian' if model_label.startswith('Collective') else ('non_collective_kappa' if model_label.startswith('Non-collective kappa') else ('relativistic_maxwell_juttner' if model_label.startswith('Relativistic') else 'non_collective_maxwellian'))),
                         **kwargs)
                     result['channel_ids']=[str(v) for v in channel_ids]
                     result_frame=pd.DataFrame({
