@@ -84,6 +84,31 @@ def _array(values: Iterable[float], name: str) -> np.ndarray:
     return arr
 
 
+def _covariance_is_positive_semidefinite(covariance, *, rtol=1e-10):
+    """Check PSD after scaling to a dimensionless correlation matrix.
+
+    Raw covariance eigenvalues are unsafe when a joint matrix mixes quantities
+    with very different units, such as density in m^-3 and temperature in eV.
+    """
+    matrix = np.asarray(covariance, dtype=float)
+    if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or not np.all(np.isfinite(matrix)):
+        return False
+    diagonal = np.diag(matrix)
+    if np.any(diagonal < 0.0):
+        return False
+    standard = np.sqrt(diagonal)
+    positive = np.flatnonzero(standard > 0.0)
+    zero = np.flatnonzero(standard == 0.0)
+    if zero.size and np.any(matrix[zero, :] != 0.0):
+        return False
+    correlation = np.zeros_like(matrix)
+    if positive.size:
+        scale = np.outer(standard[positive], standard[positive])
+        correlation[np.ix_(positive, positive)] = matrix[np.ix_(positive, positive)] / scale
+    eigenvalues = np.linalg.eigvalsh(correlation)
+    return bool(float(np.min(eigenvalues)) >= -float(rtol))
+
+
 def build_profile(
     radius_m: Iterable[float],
     density_m3: Iterable[float],
@@ -296,9 +321,7 @@ def reconstruct_thomson_profile(
             raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
             raise ValueError(f"{name} must be symmetric")
-        eigenvalues = np.linalg.eigvalsh(covariance)
-        scale = max(1.0, float(np.max(np.abs(eigenvalues))))
-        if float(np.min(eigenvalues)) < -1e-10 * scale:
+        if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError(f"{name} must be positive semidefinite")
         return covariance
 
@@ -315,9 +338,7 @@ def reconstruct_thomson_profile(
             raise ValueError("joint_density_temperature_covariance must be a finite (2N x 2N) matrix ordered [density_0..N-1, temperature_0..N-1]")
         if not np.allclose(joint_covariance_input, joint_covariance_input.T, rtol=1e-10, atol=1e-14):
             raise ValueError("joint_density_temperature_covariance must be symmetric")
-        eigenvalues = np.linalg.eigvalsh(joint_covariance_input)
-        scale = max(1.0, float(np.max(np.abs(eigenvalues))))
-        if float(np.min(eigenvalues)) < -1e-10 * scale:
+        if not _covariance_is_positive_semidefinite(joint_covariance_input):
             raise ValueError("joint_density_temperature_covariance must be positive semidefinite")
         n_profile = radius_original.size
         joint_density_block = joint_covariance_input[:n_profile, :n_profile]
@@ -675,8 +696,7 @@ def density_from_thomson_scattered_power(
             raise ValueError("relative_input_covariance must be a finite 6x6 matrix")
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
             raise ValueError("relative_input_covariance must be symmetric")
-        eigenvalues = np.linalg.eigvalsh(covariance)
-        if float(np.min(eigenvalues)) < -1e-10 * max(1.0, float(np.max(np.abs(eigenvalues)))):
+        if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError("relative_input_covariance must be positive semidefinite")
         if any(v is not None for v in (scattered_power_uncertainty_W, incident_power_uncertainty_W,
                 interaction_length_uncertainty_m, collection_solid_angle_uncertainty_sr,
