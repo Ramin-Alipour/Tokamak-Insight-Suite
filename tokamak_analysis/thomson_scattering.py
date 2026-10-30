@@ -271,13 +271,16 @@ def reconstruct_thomson_profile(
     Inputs must already be calibrated. The reconstruction is restricted to the
     measured radial interval (no extrapolation). smoothing_factor controls the
     weighted residual target for smoothing_spline: s = factor * N. If
-    uncertainties are provided, they are treated as independent 1-sigma errors
-    and used as inverse-uncertainty weights. Without uncertainties, each profile
-    is scaled before fitting and the residual target is relative to that scale.
+    Pointwise uncertainties are used as inverse-sigma fit weights for smoothing
+    splines. Optional full density/temperature covariance matrices preserve
+    correlated input errors. Parametric Monte Carlo propagates the supplied
+    covariance through the selected reconstruction and returns pointwise
+    standard uncertainties and 95% bands when enough non-negative draws succeed.
 
     Returns sampled reconstructed profiles and first derivatives. This is a
-    one-dimensional profile fit, not an equilibrium or transport reconstruction;
-    it does not estimate fit confidence intervals or systematic uncertainties.
+    one-dimensional downstream profile fit, not an equilibrium or transport
+    reconstruction. Calibration, systematic uncertainty and model discrepancy
+    remain outside this function.
     """
     from scipy.interpolate import PchipInterpolator, UnivariateSpline, make_smoothing_spline
 
@@ -480,7 +483,7 @@ def reconstruct_thomson_profile(
             "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
             "Negative spline overshoot is rejected rather than clipped; clipping would alter the fitted profile and its derivative. PCHIP is available when shape preservation is preferred.",
             "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
-            "When smoothing_factor is omitted, the smoothing spline selects its regularization parameter by generalized cross-validation. Supplied uncertainties are fit weights only; reconstructed-profile uncertainties and confidence intervals are not yet estimated.",
+            "When smoothing_factor is omitted, the smoothing spline selects its regularization parameter by generalized cross-validation. Supplied uncertainties determine fit weights; output uncertainty bands are estimated separately by Monte Carlo from the supplied pointwise or full covariance model.",
         ],
     }
 
