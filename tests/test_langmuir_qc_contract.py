@@ -95,7 +95,7 @@ def test_langmuir_density_uncertainty_propagates_explicit_inputs_only():
     result = langmuir_iv_analysis(
         voltage, current,
         electron_fit_range=(-8.0, 0.0),
-        ion_fit_range=(-10.0, -7.0),
+        ion_fit_range=(-10.0, -9.0),
         probe_area_m2=1e-4,
         ion_mass_kg=3.34e-27,
         ion_saturation_coefficient=0.61,
@@ -130,7 +130,7 @@ def test_langmuir_density_uncertainty_rejects_negative_components():
 
 def test_langmuir_proxy_and_scope_are_explicit_without_fit_windows():
     voltage = np.linspace(-5.0, 5.0, 21)
-    current = np.sinh(voltage / 3.0) * 1e-3
+    current = np.tanh(voltage / 3.0) * 1e-3
     result = langmuir_iv_analysis(voltage, current)
     assert result["plasma_potential_method"] == "maximum_numerical_dIdV_proxy"
     assert result["plasma_potential_status"] == "proxy_only_requires_probe_regime_review"
@@ -152,7 +152,7 @@ def test_public_langmuir_wrapper_forwards_density_uncertainty_contract():
     }
     common_inputs = {
         "electron_fit_range": (-8.0, 0.0),
-        "ion_fit_range": (-10.0, -7.0),
+        "ion_fit_range": (-10.0, -9.0),
         "probe_area_m2": 1e-4,
         "ion_mass_kg": 3.34e-27,
         "ion_saturation_coefficient": 0.61,
