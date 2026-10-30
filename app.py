@@ -833,15 +833,15 @@ elif page=='Spectral Analysis':
             st.warning('The uploaded table needs numeric radius, wavelength and spectral-intensity columns, plus a channel identifier.')
         else:
             with st.expander('Measured spectrum table mapping', expanded=True):
-                channel_col=st.selectbox('Spatial channel identifier',all_cols,key='ts_infer_channel')
-                radius_col=st.selectbox('Calibrated channel coordinate (m)',numeric_cols,key='ts_infer_radius')
-                wavelength_col=st.selectbox('Calibrated wavelength (nm)',numeric_cols,key='ts_infer_wavelength')
-                signal_col=st.selectbox('Calibrated spectral intensity',numeric_cols,key='ts_infer_signal')
+                channel_col=st.selectbox('Spatial channel identifier',all_cols,index=None,placeholder='Select channel-ID column',key='ts_infer_channel')
+                radius_col=st.selectbox('Calibrated channel coordinate (m)',numeric_cols,index=None,placeholder='Select radius column',key='ts_infer_radius')
+                wavelength_col=st.selectbox('Calibrated wavelength (nm)',numeric_cols,index=None,placeholder='Select wavelength column',key='ts_infer_wavelength')
+                signal_col=st.selectbox('Calibrated spectral intensity',numeric_cols,index=None,placeholder='Select intensity column',key='ts_infer_signal')
                 uncertainty_col=st.selectbox('Per-sample spectral 1σ uncertainty (optional)',['<none>']+numeric_cols,key='ts_infer_uncertainty')
             model=st.selectbox('Physical spectral model',[
                 'non_collective_maxwellian','non_collective_kappa',
                 'relativistic_maxwell_juttner','collective_maxwellian'
-            ],key='ts_infer_model')
+            ],index=None,placeholder='Select a physical model',key='ts_infer_model')
             g1,g2,g3=st.columns(3)
             with g1:
                 laser_nm_text=st.text_input('Laser wavelength (nm; required)',value='',key='ts_infer_laser')
@@ -922,6 +922,10 @@ elif page=='Spectral Analysis':
             if st.button('Infer Thomson plasma parameters from measured spectra',type='primary',key='ts_infer_run'):
                 st.session_state.pop('tis_thomson_spectral_inference',None)
                 try:
+                    if model is None:
+                        raise ValueError('Select the physical Thomson model explicitly before running the analysis.')
+                    if any(value is None for value in (channel_col,radius_col,wavelength_col,signal_col)):
+                        raise ValueError('Select the channel-ID, radius, wavelength and spectral-intensity columns explicitly.')
                     required_cols=[channel_col,radius_col,wavelength_col,signal_col]
                     if len(set(required_cols))!=4:
                         raise ValueError('Channel ID, radius, wavelength and intensity must use four distinct columns.')
