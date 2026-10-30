@@ -17,6 +17,7 @@ from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+from tokamak_analysis.thomson_inference import analyze_thomson_spectra
 from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
@@ -2735,8 +2736,123 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson calibrated profile analysis','Thomson spatial profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
-    if workflow=='Thomson calibrated profile analysis':
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference','Thomson calibrated profile analysis','Thomson spatial profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    if workflow=='Thomson multi-channel spectral inference':
+        st.markdown('Infer electron parameters from calibrated, spatially resolved Thomson spectra. The input table must be long-form: one row per channel and wavelength sample.')
+        st.caption('Required columns: channel identifier, calibrated radius (m), calibrated wavelength (nm), calibrated spectral intensity. No detector calibration or data repair is performed here.')
+        if df is None or len(df) < 7:
+            st.info('Load a long-form multi-channel Thomson spectral table first.')
+        else:
+            all_columns=list(df.columns)
+            channel_col=st.selectbox('Spatial channel identifier',all_columns,key='tis_ts_channel')
+            radius_col=col_select('Channel radius (m)',numeric,'tis_ts_radius')
+            wavelength_col=col_select('Calibrated wavelength (nm)',numeric,'tis_ts_wavelength')
+            signal_col=col_select('Calibrated spectral intensity',numeric,'tis_ts_signal')
+            uncertainty_options=['(none)']+numeric
+            signal_unc_col=st.selectbox('Optional spectral 1-sigma uncertainty',uncertainty_options,key='tis_ts_unc')
+            laser_nm=st.number_input('Incident laser wavelength (nm)',min_value=1e-9,value=532.0,key='tis_ts_laser')
+            angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
+            model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
+            response_file=st.file_uploader('Instrument line-spread response matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf')
+            response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
+            st.caption('The response matrix must be square on the wavelength grid. Its columns represent normalized detector-bin probabilities for each true-wavelength bin.')
+            if model_label.startswith('Collective'):
+                st.caption('Collective mode requires explicit ion species and independently measured/supplied ion temperatures. No missing ion temperature is assumed.')
+                ion_species_text=st.text_input('Ion species (comma-separated PlasmaPy names, e.g. H+, He-4 2+)',value='H+',key='tis_ts_ions')
+                ion_temperature_text=st.text_input('Ion temperature(s), eV (comma-separated; one per species)',value='',key='tis_ts_ti')
+                ion_velocity_text=st.text_input('Ion velocity vector (vx,vy,vz) in m/s; optional common vector',value='0,0,0',key='tis_ts_vi')
+                electron_velocity_text=st.text_input('Electron fluid velocity vector (vx,vy,vz) in m/s; optional',value='0,0,0',key='tis_ts_ve')
+            with st.expander('Optional absolute-density inference (requires spectral intensity in W/nm)'):
+                power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
+                laser_power=st.number_input('Incident laser power at scattering volume (W)',min_value=0.0,value=0.0,key='tis_ts_power')
+                laser_power_unc=st.number_input('Laser-power 1-sigma uncertainty (W)',min_value=0.0,value=0.0,key='tis_ts_power_unc')
+                interaction_length=st.number_input('Interaction length (m)',min_value=0.0,value=0.0,key='tis_ts_length')
+                interaction_length_unc=st.number_input('Interaction-length 1-sigma uncertainty (m)',min_value=0.0,value=0.0,key='tis_ts_length_unc')
+                solid_angle=st.number_input('Collection solid angle (sr)',min_value=0.0,value=0.0,key='tis_ts_solid')
+                solid_angle_unc=st.number_input('Solid-angle 1-sigma uncertainty (sr)',min_value=0.0,value=0.0,key='tis_ts_solid_unc')
+                efficiency=st.number_input('Optical efficiency (0–1)',min_value=0.0,max_value=1.0,value=0.0,key='tis_ts_eff')
+                efficiency_unc=st.number_input('Optical-efficiency 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_eff_unc')
+                polarization_text=st.text_input('Incident polarization unit vector (x,y,z)',value='1,0,0',key='tis_ts_pol')
+                direction_text=st.text_input('Scattered-light unit direction (x,y,z)',value='0,1,0',key='tis_ts_dir')
+                polarization_unc=st.number_input('Polarization-factor 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_pol_unc')
+            if st.button('Run multi-channel Thomson spectral inference',type='primary',key='run_thomson_spectral_inference'):
+                try:
+                    selected=[channel_col,radius_col,wavelength_col,signal_col]
+                    if len(set(selected))!=4:
+                        raise ValueError('Channel, radius, wavelength and signal must be separate columns.')
+                    frame=df[selected + ([] if signal_unc_col=='(none)' else [signal_unc_col])].copy()
+                    frame=frame.sort_values([channel_col,wavelength_col])
+                    channel_ids=list(frame[channel_col].drop_duplicates())
+                    spectra=[]; radii=[]; wavelengths=[]; uncertainties=[]
+                    for channel_id in channel_ids:
+                        part=frame[frame[channel_col]==channel_id].sort_values(wavelength_col)
+                        rvals=pd.to_numeric(part[radius_col],errors='raise').to_numpy(float)
+                        if not np.allclose(rvals,rvals[0],rtol=0,atol=1e-12):
+                            raise ValueError(f'Channel {channel_id} has more than one radius value.')
+                        xvals=pd.to_numeric(part[wavelength_col],errors='raise').to_numpy(float)
+                        yvals=pd.to_numeric(part[signal_col],errors='raise').to_numpy(float)
+                        if len(xvals)<7 or np.any(np.diff(xvals)<=0):
+                            raise ValueError(f'Channel {channel_id} requires at least seven unique, increasing wavelength samples.')
+                        if wavelengths and (len(xvals)!=len(wavelengths[0]) or not np.allclose(xvals,wavelengths[0],rtol=0,atol=1e-10)):
+                            raise ValueError('All channels must share the same wavelength grid in this table.')
+                        wavelengths.append(xvals); spectra.append(yvals); radii.append(float(rvals[0]))
+                        if signal_unc_col!='(none)':
+                            uncertainties.append(pd.to_numeric(part[signal_unc_col],errors='raise').to_numpy(float))
+                    response=None if response_file is None else pd.read_csv(response_file,header=None).to_numpy(float)
+                    response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
+                    kwargs={}
+                    if model_label.startswith('Collective'):
+                        species=[s.strip() for s in ion_species_text.split(',') if s.strip()]
+                        ion_t=[float(v.strip()) for v in ion_temperature_text.split(',') if v.strip()]
+                        if len(ion_t)!=len(species):
+                            raise ValueError('Provide one independently measured ion temperature for each ion species.')
+                        iv=np.array([float(v.strip()) for v in ion_velocity_text.split(',')])
+                        ev=np.array([float(v.strip()) for v in electron_velocity_text.split(',')])
+                        if iv.size!=3 or ev.size!=3:
+                            raise ValueError('Ion and electron velocity inputs must each contain three components.')
+                        kwargs.update(ion_species=species,ion_temperature_eV=ion_t,
+                                     ion_velocity_m_s=np.tile(iv,(len(species),1)),electron_velocity_m_s=ev)
+                    if power_calibrated:
+                        if not all(v>0 for v in (laser_power,interaction_length,solid_angle,efficiency)):
+                            raise ValueError('Absolute density requires positive laser power, interaction length, solid angle and efficiency.')
+                        pol=np.array([float(v.strip()) for v in polarization_text.split(',')])
+                        direction=np.array([float(v.strip()) for v in direction_text.split(',')])
+                        if pol.size!=3 or direction.size!=3:
+                            raise ValueError('Polarization and scattered direction must each have three components.')
+                        kwargs.update(spectral_power_density_calibrated=True,laser_power_w=laser_power,
+                            laser_power_uncertainty_W=laser_power_unc,interaction_length_m=interaction_length,
+                            interaction_length_uncertainty_m=interaction_length_unc,
+                            collection_solid_angle_sr=solid_angle,
+                            collection_solid_angle_uncertainty_sr=solid_angle_unc,
+                            optical_efficiency=efficiency,optical_efficiency_uncertainty=efficiency_unc,
+                            incident_polarization=pol,scattered_direction=direction,
+                            polarization_factor_uncertainty=polarization_unc)
+                    result=analyze_thomson_spectra(
+                        np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
+                        laser_wavelength_nm=float(laser_nm),scattering_angle_rad=float(np.deg2rad(angle_deg)),
+                        instrument_response=response,instrument_response_uncertainty=response_unc,
+                        signal_uncertainty=None if not uncertainties else np.asarray(uncertainties),
+                        model='collective_maxwellian' if model_label.startswith('Collective') else 'non_collective_maxwellian',
+                        **kwargs)
+                    result['channel_ids']=[str(v) for v in channel_ids]
+                    result_frame=pd.DataFrame({
+                        'Channel':result['channel_ids'],'Radius (m)':result['radius_m'],
+                        'Electron temperature (eV)':result['electron_temperature_profile_eV'],
+                        'Electron density (m^-3)':result['electron_density_profile_m3'],
+                        'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s']})
+                    st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'result':result,'frame':result_frame}
+                except Exception as e:
+                    st.error(f'Thomson spectral inference failed: {e}')
+            saved=st.session_state.get('tis_thomson_spectral_inference')
+            if saved and saved.get('data_sha')==sha:
+                st.dataframe(saved['frame'],width='stretch',hide_index=True)
+                st.line_chart(saved['frame'].set_index('Radius (m)')[['Electron temperature (eV)']])
+                density_frame=saved['frame'].dropna(subset=['Electron density (m^-3)'])
+                if not density_frame.empty:
+                    st.line_chart(density_frame.set_index('Radius (m)')[['Electron density (m^-3)']])
+                json_download('Export multi-channel Thomson inference',saved['result'],'thomson_spectral_inference.json')
+                st.caption('NaN density values mean absolute density was not identifiable from the supplied spectral shape and optical calibration inputs. The model and limitations are included in the JSON export.')
+    elif workflow=='Thomson calibrated profile analysis':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
         if df is None or len(numeric) < 3:
