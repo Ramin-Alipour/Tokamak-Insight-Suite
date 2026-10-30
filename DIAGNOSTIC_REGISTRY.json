@@ -465,6 +465,33 @@
           "description": "Explicit opt-in to calculate a provisional density when one or more configurable numerical review screens fail; never confirms a physical regime.",
           "required": false,
           "default": false
+        },
+        {
+          "name": "species",
+          "unit": "list of mappings",
+          "description": "For multispecies density: each item requires mass_kg, fraction, positive integer charge_state and sheath_coefficient; optional per-species mass_relative_standard_uncertainty and sheath_coefficient_relative_standard_uncertainty.",
+          "required": false
+        },
+        {
+          "name": "current_standard_uncertainty_A",
+          "unit": "A",
+          "description": "Optional absolute standard uncertainty of multispecies ion-saturation current.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "temperature_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of common electron temperature for multispecies density.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "area_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of common effective collection area.",
+          "required": false,
+          "minimum": 0
         }
       ],
       "output_specs": [
@@ -947,6 +974,16 @@
           "name": "temporal_trend_analysis_performed",
           "unit": "boolean",
           "description": "False: the series API does not infer trends or temporal derivatives."
+        },
+        {
+          "name": "ion_density_uncertainty_omitted_components",
+          "unit": "list",
+          "description": "Uncertainty components not propagated, including species number-fraction covariance."
+        },
+        {
+          "name": "ion_density_uncertainty_scope",
+          "unit": "text",
+          "description": "Declares partial independent-input propagation with species fractions held fixed."
         }
       ],
       "assumptions": [
