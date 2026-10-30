@@ -61,7 +61,7 @@ This is an average over the measured coordinate interval, not a geometry-weighte
 ## Outputs
 
 - Sorted supplied coordinate, density and temperature profiles.
-- Peak density and temperature values and their locations on the supplied coordinate.
+- Minimum and maximum density and temperature values and their locations on the supplied coordinate.
 - Coordinate range and measured-interval line averages.
 - Density and temperature gradients.
 - Normalized density and temperature gradients.
