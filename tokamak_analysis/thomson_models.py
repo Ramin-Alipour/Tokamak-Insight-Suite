@@ -199,7 +199,8 @@ def fit_custom_spectral_model(
     return {
         "model_name": spec.name,
         "parameter_names": list(spec.parameter_names),
-        "parameters": parameter_map,\n        "physical_inference": physical_inference,
+        "parameters": parameter_map,
+        "physical_inference": physical_inference,
         "parameter_uncertainties": parameter_uncertainties,
         "covariance": covariance,
         "wavelength_nm": x.copy(),
