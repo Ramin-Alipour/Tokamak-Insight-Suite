@@ -291,7 +291,10 @@ def estimate_multispecies_ion_density(
     if normalized_current >= 0:
         raise ValueError("Ion current must be negative after normalization to electron_positive.")
     result = langmuir_multispecies_ion_density(
-        abs(normalized_current), electron_temperature_eV, probe_area_m2, species
+        abs(normalized_current), electron_temperature_eV, probe_area_m2, species,
+        current_standard_uncertainty_A=current_standard_uncertainty_A,
+        temperature_relative_standard_uncertainty=temperature_relative_standard_uncertainty,
+        area_relative_standard_uncertainty=area_relative_standard_uncertainty,
     )
 
     # The species-summed denominator is F=sum(w_s), where each normalized
