@@ -301,3 +301,139 @@ def test_langmuir_array_mapping_rejects_stringified_key_collisions():
     with pytest.raises(ValueError, match="remain unique when converted to strings"):
         analyze_langmuir_probe_array(channels)
 
+def test_second_derivative_method_reports_inflection_zero_crossings_not_its_maximum():
+    voltage = np.linspace(-2.0, 2.0, 41)
+    current = voltage**3 + 0.01 * voltage
+    result = langmuir_iv_analysis(voltage, current)
+    assert result["plasma_potential_candidate_method"].startswith("maximum_first_derivative")
+    assert result["plasma_potential_second_derivative_method"] == "zero_crossings_of_second_derivative_for_inflection_candidates"
+    assert any(abs(value) < 1e-10 for value in result["plasma_potential_d2IdV2_zero_crossing_candidates_V"])
+    assert result["plasma_potential_d2IdV2_max_candidate_method"] == "maximum_second_derivative_extremum_not_inflection_method"
+
+
+def test_floating_and_plasma_proxy_uncertainties_are_conditional_and_not_grid_spacing():
+    voltage = np.linspace(-1.0, 1.0, 9)
+    current = 1e-3 * voltage
+    no_sigma = langmuir_iv_analysis(voltage, current)
+    assert no_sigma["floating_potential_standard_uncertainty_V"] is None
+    assert no_sigma["floating_potential_uncertainty_status"] == "not_quantified_current_uncertainty_not_supplied"
+    assert no_sigma["plasma_potential_proxy_standard_uncertainty_V"] is None
+    assert no_sigma["plasma_potential_voltage_grid_spacing_median_V"] == pytest.approx(0.25)
+    with_sigma = langmuir_iv_analysis(voltage, current, current_uncertainty_A=1e-5)
+    assert with_sigma["floating_potential_standard_uncertainty_V"] is not None
+    assert with_sigma["floating_potential_standard_uncertainty_V"] > 0
+    assert with_sigma["plasma_potential_proxy_standard_uncertainty_V"] is not None
+    assert with_sigma["plasma_potential_proxy_uncertainty_status"] == "monte_carlo_current_noise_only_not_physical_validation"
+
+
+def test_current_uncertainty_validation_and_zero_is_explicit():
+    voltage = np.linspace(-1.0, 1.0, 9)
+    current = 1e-3 * voltage
+    with pytest.raises(ValueError, match="finite non-negative"):
+        langmuir_iv_analysis(voltage, current, current_uncertainty_A=-1e-5)
+    result = langmuir_iv_analysis(voltage, current, current_uncertainty_A=0.0)
+    assert result["plasma_potential_proxy_uncertainty_status"] == "monte_carlo_current_noise_only_not_physical_validation"
+    assert result["plasma_potential_proxy_standard_uncertainty_V"] == pytest.approx(0.0)
+
+
+def test_density_inversion_rejects_overlapping_or_touching_fit_windows():
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    with pytest.raises(ValueError, match="must be disjoint"):
+        langmuir_iv_analysis(voltage, current, electron_fit_range=(-8.0, 1.0), ion_fit_range=(1.0, 3.0))
+
+
+def test_density_inversion_requires_numerically_acceptable_electron_fit(monkeypatch):
+    import tis.probe_analysis as probe_module
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    real_r2 = probe_module._r2
+    calls = {"count": 0}
+    def controlled_r2(observed, fitted):
+        calls["count"] += 1
+        return 0.99 if calls["count"] == 1 else 0.5
+    monkeypatch.setattr(probe_module, "_r2", controlled_r2)
+    with pytest.raises(ValueError, match="electron-retarding fit that passes"):
+        langmuir_iv_analysis(
+            voltage, current, electron_fit_range=(-8.0, 0.0), ion_fit_range=(-10.0, -9.0),
+            probe_area_m2=1e-4, ion_mass_kg=3.34e-27,
+            ion_saturation_coefficient=0.61, sheath_model="test sheath",
+        )
+    monkeypatch.setattr(probe_module, "_r2", real_r2)
+
+
+def test_invalid_electron_fit_covariance_is_never_reported_as_zero_uncertainty(monkeypatch):
+    import tis.probe_analysis as probe_module
+    real_curve_fit = probe_module.optimize.curve_fit
+    def invalid_covariance(*args, **kwargs):
+        parameters, covariance = real_curve_fit(*args, **kwargs)
+        return parameters, np.full_like(covariance, np.nan)
+    monkeypatch.setattr(probe_module.optimize, "curve_fit", invalid_covariance)
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -1e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-8.0, 0.0))
+    assert result["electron_retarding_covariance_valid"] is False
+    assert result["electron_temperature_standard_error_eV"] is None
+    assert result["electron_temperature_relative_standard_uncertainty"] is None
+    assert result["electron_temperature_total_standard_uncertainty_eV"] is None
+    assert result["electron_temperature_uncertainty_status"] == "incomplete_fit_covariance_statistical_uncertainty_unavailable"
+
+
+def test_density_uncertainty_is_not_calculated_when_te_statistical_uncertainty_is_unavailable(monkeypatch):
+    import tis.probe_analysis as probe_module
+    real_curve_fit = probe_module.optimize.curve_fit
+    def invalid_covariance(*args, **kwargs):
+        parameters, covariance = real_curve_fit(*args, **kwargs)
+        return parameters, np.full_like(covariance, np.nan)
+    monkeypatch.setattr(probe_module.optimize, "curve_fit", invalid_covariance)
+    voltage = np.linspace(-10.0, 10.0, 81)
+    current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    result = langmuir_iv_analysis(
+        voltage, current, electron_fit_range=(-8.0, 0.0), ion_fit_range=(-10.0, -9.0),
+        probe_area_m2=1e-4, ion_mass_kg=3.34e-27,
+        ion_saturation_coefficient=0.61, sheath_model="test sheath",
+        ion_current_uncertainty_A=1e-5, probe_area_relative_uncertainty=0.02,
+    )
+    assert result["ion_density_estimate_m-3"] > 0
+    assert result["ion_density_standard_uncertainty_m-3"] is None
+    assert result["ion_density_relative_standard_uncertainty"] is None
+    assert result["ion_density_uncertainty_status"] == "not_calculated_electron_temperature_fit_uncertainty_unavailable"
+
+
+def test_registry_declares_corrected_langmuir_output_contract_fields():
+    import json
+    from pathlib import Path
+    registry = json.loads((Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    entry = next(item for item in registry if item["diagnostic"] == "Langmuir Probe")
+    declared = {item["name"] for item in entry["execution_contract"]["output_specs"]}
+    required = {
+        "plasma_potential_candidate_method",
+        "plasma_potential_second_derivative_method",
+        "plasma_potential_d2IdV2_zero_crossing_candidates_V",
+        "fit_window_review",
+        "ion_density_numerical_fit_screen_passed",
+        "ion_density_current_flatness_screen_passed",
+        "ion_density_physical_regime_confirmed",
+        "electron_retarding_covariance_valid",
+        "floating_potential_standard_uncertainty_V",
+        "floating_potential_uncertainty_status",
+        "plasma_potential_proxy_standard_uncertainty_V",
+        "plasma_potential_proxy_uncertainty_status",
+    }
+    assert required <= declared
+
+
+def test_probe_analysis_ui_uses_engine_fit_status_and_exposes_declared_workflows():
+    from pathlib import Path
+    app = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    start = app.index("### Langmuir probe I–V analysis")
+    end = app.index("elif page=='Plasma Parameters':", start)
+    section = app[start:end]
+    assert "0.95" not in section
+    assert "electron_retarding_fit_status" in section
+    assert "estimate_electron_density_from_saturation" in section
+    assert "estimate_ion_particle_flux" in section
+    assert "fit_langmuir_electron_models" in section
+    assert "analyze_langmuir_probe_array" in section
+    assert "analyze_langmuir_probe_series" in section
+
