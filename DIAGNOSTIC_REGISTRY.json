@@ -259,10 +259,10 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Langmuir Probe",
-    "quantities": "Calibrated I–V sweeps; floating potential; derivative plasma-potential candidates; single- and two-temperature empirical fits; stretched-exponential shape comparison; electron temperature; electron and ion density estimates under explicit models; ion particle flux; multi-channel/time batches; fit-window sensitivity and explicit smoothing comparisons",
+    "quantities": "Calibrated I–V sweeps; floating potential and conditional uncertainty; maximum-dI/dV proxy and second-derivative zero-crossing candidates; single-/two-temperature empirical fits; stretched-exponential shape comparison; electron temperature; model-based electron/ion density and ion particle flux; multispecies density with number-density fractions; independent multi-channel/time batches; fit-window sensitivity and explicitly parameterized smoothing.",
     "status": "D",
-    "method": "Analyze calibrated single-probe I–V samples with explicit polarity and analyst-selected fit intervals. Report maximum-dI/dV and maximum-d2I/dV2 plasma-potential candidates separately without claiming universal validity. Label low-voltage-tail ion current as descriptive unless a selected interval is supplied; numerical flatness still does not certify the physical regime. Optional ion density requires explicit collection area, ion mass, sheath coefficient and model label, plus both fit windows.",
-    "caveat": "All inputs are assumed calibrated. Plasma-potential candidates are numerical indicators and require probe-regime interpretation; median grid spacing is not statistical uncertainty. Ion-current estimates do not automatically certify ion saturation. Te and density uncertainty combine fit statistics with explicitly supplied components only; unspecified calibration covariance, model discrepancy, correlations and systematics remain unquantified.",
+    "method": "Analyze already-calibrated single-probe I–V data with explicit current polarity and disjoint analyst-selected electron/ion fit windows. Report maximum-dI/dV as a proxy and second-derivative zero crossings as separate inflection candidates; retain the second-derivative maximum only as a distinct extremum. Numerical fit screens are identical across engine and UI. Optional density/flux outputs use published Maxwellian collection and sheath/Bohm relations with explicitly supplied geometry, species and model coefficients.",
+    "caveat": "All inputs are assumed calibrated and correctly organized. Numerical candidates and model estimates are not confirmed measurements; physical regimes are never automatically certified. Grid spacing is resolution only. Current-noise uncertainty is conditional on supplied per-sample standard uncertainty. Missing/invalid fit covariance is reported as unavailable, never zero. Number-density fractions are required for multispecies inversion. No empirical validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
       "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
@@ -277,7 +277,7 @@
       "tis.core.langmuir_iv_analysis",
       "tis.core.probe_iv_summary"
     ],
-    "implementation_status": "Canonical calibrated single-sweep analysis plus explicitly exported advanced helpers for electron-density estimation, single-/two-temperature empirical fits, stretched-exponential shape comparison, time-by-channel sweep batches, multi-species ion-density estimates, particle-flux estimates, smoothed derivative candidates, and fit-window sensitivity. Electron density is a separate helper result and is not silently inferred or inserted into the canonical single-sweep output. All extensions retain declared assumptions and do not claim physical-regime certification or experimental validation.",
+    "implementation_status": "Canonical calibrated single-sweep workflow plus UI-accessible advanced models, density/flux estimates and independent channel/time batch workflows. All advanced fits normalize current polarity to electron_positive, report covariance-based component uncertainties and identifiability diagnostics where available, and explicitly avoid physical-regime certification. Multispecies fractions are number-density fractions. No calibration or empirical validation is performed.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -400,6 +400,19 @@
           "name": "channel_names",
           "unit": "text list",
           "description": "Optional unique labels for multi-channel array inputs to analyze_langmuir_probe_array.",
+          "required": false
+        },
+        {
+          "name": "current_uncertainty_A",
+          "unit": "A",
+          "description": "Optional scalar 1-sigma current uncertainty per original sweep sample; independent current errors are propagated through duplicate averaging and numerical proxy calculations.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "fraction_basis",
+          "unit": "text",
+          "description": "Multispecies fraction basis; must be number_density. Mass and current fractions are rejected.",
           "required": false
         }
       ],
@@ -748,6 +761,86 @@
           "name": "cross_channel_inference_performed",
           "unit": "boolean",
           "description": "False: batch execution does not perform cross-channel physics inference."
+        },
+        {
+          "name": "plasma_potential_candidate_method",
+          "unit": "text",
+          "description": "Declares maximum-dI/dV as the primary proxy and separates second-derivative zero-crossing candidates."
+        },
+        {
+          "name": "plasma_potential_second_derivative_method",
+          "unit": "text",
+          "description": "Declares zero crossings of d²I/dV² as inflection candidates."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_max_candidate_method",
+          "unit": "text",
+          "description": "Identifies the maximum-d²I/dV² extremum as distinct from an inflection-point method."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_zero_crossing_candidates_V",
+          "unit": "V",
+          "description": "Interpolated zero-crossing candidates of d²I/dV²."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_zero_crossing_status",
+          "unit": "text",
+          "description": "Reports whether second-derivative inflection candidates were found."
+        },
+        {
+          "name": "fit_window_review",
+          "unit": "structured",
+          "description": "Lists required physical fit-window review; physical regime certification remains false."
+        },
+        {
+          "name": "ion_density_numerical_fit_screen_passed",
+          "unit": "boolean",
+          "description": "Whether the selected ion-branch fit passes the numerical quality screen."
+        },
+        {
+          "name": "ion_density_current_flatness_screen_passed",
+          "unit": "boolean",
+          "description": "Whether the selected ion branch passes the numerical flatness screen."
+        },
+        {
+          "name": "ion_density_physical_regime_confirmed",
+          "unit": "boolean",
+          "description": "Always false; numerical screens do not certify a physical ion-saturation regime."
+        },
+        {
+          "name": "electron_retarding_covariance_valid",
+          "unit": "boolean",
+          "description": "Indicates whether the electron-fit covariance is finite and positive-semidefinite."
+        },
+        {
+          "name": "floating_potential_standard_uncertainty_V",
+          "unit": "V",
+          "description": "Conditional first-order uncertainty from supplied independent per-sample current standard uncertainty; null if not quantifiable."
+        },
+        {
+          "name": "floating_potential_uncertainty_status",
+          "unit": "text",
+          "description": "Explains whether floating-potential uncertainty was propagated or remains unquantified."
+        },
+        {
+          "name": "plasma_potential_proxy_standard_uncertainty_V",
+          "unit": "V",
+          "description": "Conditional Monte Carlo standard uncertainty of the maximum-dI/dV proxy from supplied current noise; not physical-potential uncertainty."
+        },
+        {
+          "name": "plasma_potential_proxy_uncertainty_95pct_interval_V",
+          "unit": "V",
+          "description": "Conditional Monte Carlo 95% interval of the numerical maximum-dI/dV proxy."
+        },
+        {
+          "name": "plasma_potential_proxy_uncertainty_status",
+          "unit": "text",
+          "description": "Explains whether proxy uncertainty was propagated or remains unquantified."
+        },
+        {
+          "name": "current_uncertainty_A_per_processed_sample",
+          "unit": "A",
+          "description": "Per-processed-sample current standard uncertainty after duplicate-voltage aggregation; null when not supplied."
         }
       ],
       "assumptions": [
@@ -764,7 +857,7 @@
         "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
       ],
       "algorithm": "Normalize polarity, clean calibrated I-V pairs, aggregate duplicate voltages, compute zero crossings and derivatives, use maximum dI/dV as the explicitly labelled plasma-potential proxy while retaining maximum d2I/dV2 separately, label ion-current estimates and physical-regime caveats, optionally fit selected electron and ion branches and estimate single-species ion density with explicit inputs. Multi-channel wrapper processes each channel independently.",
-      "uncertainty_model": "Electron-temperature relative standard uncertainty combines local fit-covariance uncertainty with explicitly supplied nonstatistical, calibration and fit-window components in quadrature. Ion-density uncertainty uses supplied current, area, ion-mass, sheath-coefficient and temperature uncertainties plus optional model-discrepancy floor. This is partial propagation only; unspecified covariance, correlated errors and systematics are not inferred.",
+      "uncertainty_model": "Electron-temperature covariance is used only when finite and valid; invalid covariance yields null uncertainty, not zero. Optional current standard uncertainty is propagated to the unique floating-potential crossing by first-order interpolation and to the maximum-dI/dV proxy by reproducible Monte Carlo, conditional on independent sample errors. Density uncertainty is not calculated if the electron-temperature statistical covariance is unavailable. Other uncertainty components are included only when explicitly supplied.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
         "Density requires an explicitly justified sheath coefficient, collection area, ion mass, and both physically selected fit windows.",
@@ -844,22 +937,20 @@
       ],
       "raw_data_to_physics": false,
       "note": "Analysis uses already-calibrated single-probe I–V samples. The canonical output contract covers the single-sweep pipeline; optional ion density is part of that pipeline and requires explicit fit windows and physical inputs. Electron density and particle flux are separate advanced helper calls with their own explicit inputs and outputs, not canonical single-sweep output fields. All public entry points share the canonical implementation where applicable. Fit-window diagnostics are numerical screening only and do not certify physical regimes. Uncertainty propagation includes only explicitly supplied components; other systematics are not inferred. Synthetic tests are software regression checks, not experimental validation.",
-      "completion_criteria": {
-        "meaning": "Complete means the documented software contract is implemented and regression-tested within the declared calibrated single-probe I–V scope.",
-        "required": [
-          "Canonical and public entry points share one calculation implementation and consistent minimum-input requirements.",
-          "Registry input/output contract matches the canonical runtime result, including optional outputs.",
-          "Regression tests cover wrapper parity, minimum sample count, optional outputs, fit paths, density guards and uncertainty-input validation."
-        ],
-        "explicitly_not_required": [
-          "Independent experimental validation.",
-          "Automatic certification of physical fit regimes.",
-          "Full systematic or calibration covariance uncertainty propagation.",
-          "Support for every multi-probe or array configuration."
-        ]
-      }
+      "completion_criteria": [
+        "Canonical output keys are covered by the diagnostic registry output_specs and tested for contract parity.",
+        "Current polarity is normalized consistently across canonical and advanced public functions.",
+        "Electron and ion fit windows are disjoint; density inversion requires both electron and ion numerical fit screens to pass.",
+        "All model-based density and flux estimates retain explicit assumptions and physical_regime_confirmed=false.",
+        "Advanced single-/two-temperature, stretched-exponential, smoothing, sensitivity, multispecies, array and series helpers are accessible through the public module and application UI.",
+        "Software tests verify numerical contracts; no empirical validation is claimed."
+      ]
     },
-    "note": "Canonical calibrated single-sweep I–V analysis with consistent public entry points and optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred. Completion is scoped to the documented software contract and does not imply independent experimental validation."
+    "note": "Canonical calibrated single-sweep I–V analysis with consistent public entry points and optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred. Completion is scoped to the documented software contract and does not imply independent experimental validation.",
+    "references": [
+      "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5, Eqs. 3.2.33–3.2.37.",
+      "Bernatskiy, A. V., Draganov, I. I., Kochetov, I. V., Lagunov, V. V., and Ochkin, V. N., Determination of gas discharge plasma potential by Langmuir probe using different methods, Vacuum 225 (2024), 113279, https://doi.org/10.1016/j.vacuum.2024.113279."
+    ]
   },
   {
     "family": "Plasma parameters",
