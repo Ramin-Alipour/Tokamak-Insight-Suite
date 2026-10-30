@@ -126,7 +126,7 @@ def analyze_thomson_spectra(
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
     optical_efficiency=None, incident_polarization=None, scattered_direction=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
-    ion_species=None, ion_temperature_eV=None, ion_velocity_m_s=None,
+    ion_species=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -190,6 +190,9 @@ def analyze_thomson_spectra(
             # response; ion species/temperature are never silently defaulted.
             ion_t = np.atleast_1d(ion_temperature_eV)
             ion_v = np.zeros((len(ion_species), 3)) if ion_velocity_m_s is None else _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
+            electron_v = np.zeros((1, 3)) if electron_velocity_m_s is None else _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
+            if electron_v.shape != (1, 3):
+                raise ValueError("electron_velocity_m_s must be a 3-vector")
             if ion_v.shape != (len(ion_species), 3):
                 raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
             probe_vec = np.array([1.0, 0.0, 0.0])
@@ -204,7 +207,8 @@ def analyze_thomson_spectra(
                 _, spec = thomson.spectral_density(
                     xi*u.nm, float(laser_wavelength_nm)*u.nm, ne/u.m**3,
                     T_e=te*u.eV, T_i=ion_t*u.eV, ions=ion_species,
-                    ion_vel=ion_v*u.m/u.s, probe_vec=probe_vec, scatter_vec=scatter_vec)
+                    ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
+                    probe_vec=probe_vec, scatter_vec=scatter_vec)
                 z = np.asarray(spec.value, dtype=float)
                 return response @ z
             scale = max(float(np.max(np.abs(y[i]))), np.finfo(float).tiny)
@@ -221,7 +225,7 @@ def analyze_thomson_spectra(
                    "model": "PlasmaPy Maxwellian kinetic dielectric spectral-density model",
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
                    "ion_species": list(ion_species), "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
-                   "ion_velocity_m_s": ion_v.tolist()}
+                   "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
         if model == "non_collective_maxwellian" and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, scattered_direction
@@ -240,8 +244,34 @@ def analyze_thomson_spectra(
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
         fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
-        if lsf_unc is not None:
-            fit["instrument_response_uncertainty_note"] = "LSF uncertainty supplied; full nuisance-parameter marginalization is not yet implemented."
+        if lsf_unc is not None and model == "non_collective_maxwellian":
+            lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
+            rng = np.random.default_rng(7319 + i)
+            te_samples, velocity_samples = [], []
+            for _ in range(48):
+                sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
+                colsum = sampled.sum(axis=0)
+                if np.any(colsum <= 0):
+                    continue
+                sampled /= colsum[None, :]
+                try:
+                    draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm),
+                                              float(scattering_angle_rad), sampled, ui)
+                    te_samples.append(draw["electron_temperature_eV"])
+                    velocity_samples.append(draw["electron_velocity_projection_m_s"])
+                except (ValueError, RuntimeError):
+                    continue
+            if len(te_samples) >= 12:
+                fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"], np.std(te_samples, ddof=1)))
+                fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"], np.std(velocity_samples, ddof=1)))
+                fit["instrument_response_uncertainty_propagated"] = True
+                fit["instrument_response_mc_successful_samples"] = len(te_samples)
+            else:
+                fit["instrument_response_uncertainty_propagated"] = False
+                fit["instrument_response_mc_successful_samples"] = len(te_samples)
+                fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         results.append(fit)
     return {
         "model": model, "channel_count": len(results), "channels": results,
@@ -253,6 +283,6 @@ def analyze_thomson_spectra(
             "Non-collective model assumes non-relativistic isotropic Maxwellian electrons.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires absolute spectral power and all listed optical geometry/polarization factors.",
-            "Instrument-response uncertainty is recorded but is not yet marginalized into fitted parameter uncertainties.",
+            "For non-collective fits, supplied instrument-response uncertainty is propagated by Monte Carlo perturbation of the LSF matrix; uncertainty in the optical power/geometry inputs must be supplied separately in future extensions.",
         ],
     }
