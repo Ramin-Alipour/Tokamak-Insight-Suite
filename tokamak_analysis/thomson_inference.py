@@ -59,6 +59,26 @@ def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     return out / sums[None, :]
 
 
+def _apply_response(response, spectrum, wavelength):
+    """Apply a bin-probability response to spectral-density samples.
+
+    The response columns describe probabilities from true wavelength bins to
+    measured bins. Convert spectral density to bin-integrated power before the
+    matrix operation, then divide by measured-bin widths. This reduces to the
+    usual matrix product for a uniform wavelength grid.
+    """
+    x = np.asarray(wavelength, dtype=float)
+    values = np.asarray(spectrum, dtype=float)
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5 * (x[1] - x[0])
+    edges[-1] = x[-1] + 0.5 * (x[-1] - x[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0) or values.shape != x.shape:
+        raise ValueError("Wavelength-bin widths and spectrum shape must be valid")
+    return (response @ (values * widths)) / widths
+
+
 def _gaussian(x, amp, center, sigma, offset, slope):
     return amp * np.exp(-0.5 * ((x-center)/sigma)**2) + offset + slope*(x-center)
 
@@ -84,7 +104,7 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         # The LSF acts on the signal component; a slowly varying background is
         # represented in detector space and is therefore not convolved.
         signal_only = amp*np.exp(-0.5*((x-center)/sigma)**2)
-        return response @ signal_only + offset + slope*(x-center)
+        return _apply_response(response, signal_only, x) + offset + slope*(x-center)
 
     p, cov = curve_fit(observed, wavelength, signal_scaled, p0=p0, bounds=(lower, upper),
                        sigma=uncertainty_scaled, absolute_sigma=uncertainty_scaled is not None,
@@ -153,7 +173,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         return amp*(1.0+((x-center)/scale)**2/df)**(-kappa)+offset+slope*(x-center)
     def observed(x, amp, center, sigma, kappa, offset, slope):
         component = intrinsic(x, amp, center, sigma, kappa, 0.0, 0.0)
-        return response @ component + offset+slope*(x-center)
+        return _apply_response(response, component, x) + offset+slope*(x-center)
     p, cov = curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
                        sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=80000)
     parameter_scales=np.array([signal_scale,1.0,1.0,1.0,signal_scale,signal_scale])
@@ -235,7 +255,7 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
         return profile+offset+slope*(x-center)
     def observed(x,amp,center,temperature,offset,slope):
         physical=component(x,amp,center,temperature,0.0,0.0)
-        return response@physical+offset+slope*(x-center)
+        return _apply_response(response, physical, x)+offset+slope*(x-center)
     p,cov=curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
                     sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=100000)
     parameter_scales=np.array([signal_scale,1.0,1.0,signal_scale,signal_scale])
@@ -419,7 +439,7 @@ def analyze_thomson_spectra(
                     ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
                     probe_vec=probe_vec, scatter_vec=scatter_vec)
                 z = np.asarray(spec.value, dtype=float)
-                return response @ z
+                return _apply_response(response, z, xi)
             residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
             def fit_nuisance(shape):
                 shape_scale=max(float(np.max(np.abs(shape))),np.finfo(float).tiny)
