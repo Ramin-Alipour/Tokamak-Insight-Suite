@@ -343,6 +343,21 @@ def analyze_thomson_spectra(
             if len(ion_species) > 1:
                 raise ValueError("Collective multi-species inference requires explicit ion_fractions summing to one")
             ion_fractions = [1.0]
+        if incident_direction is None or scattered_direction is None:
+            raise ValueError("Collective Thomson inference requires explicit incident_direction and scattered_direction 3-vectors in the same coordinate frame as the supplied flow vectors")
+        probe_vec = _finite_array(incident_direction, "incident_direction", 1)
+        scatter_vec = _finite_array(scattered_direction, "scattered_direction", 1)
+        if probe_vec.shape != (3,) or scatter_vec.shape != (3,):
+            raise ValueError("incident_direction and scattered_direction must each be 3-vectors")
+        probe_norm = float(np.linalg.norm(probe_vec))
+        scatter_norm = float(np.linalg.norm(scatter_vec))
+        if probe_norm <= 0 or scatter_norm <= 0:
+            raise ValueError("incident_direction and scattered_direction must be non-zero")
+        probe_vec = probe_vec / probe_norm
+        scatter_vec = scatter_vec / scatter_norm
+        geometry_angle = float(np.arccos(np.clip(np.dot(probe_vec, scatter_vec), -1.0, 1.0)))
+        if not np.isclose(geometry_angle, float(scattering_angle_rad), rtol=0.0, atol=1e-5):
+            raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
         try:
             from astropy import units as u
             from plasmapy.diagnostics import thomson
@@ -392,21 +407,6 @@ def analyze_thomson_spectra(
                 raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
             if np.any(np.linalg.norm(ion_v,axis=1) >= C_M_S) or np.linalg.norm(electron_v[0]) >= C_M_S:
                 raise ValueError("Collective ion/electron flow speeds must be subluminal")
-            if incident_direction is None or scattered_direction is None:
-                raise ValueError("Collective Thomson inference requires explicit incident_direction and scattered_direction 3-vectors in the same coordinate frame as the supplied flow vectors")
-            probe_vec = _finite_array(incident_direction, "incident_direction", 1)
-            scatter_vec = _finite_array(scattered_direction, "scattered_direction", 1)
-            if probe_vec.shape != (3,) or scatter_vec.shape != (3,):
-                raise ValueError("incident_direction and scattered_direction must each be 3-vectors")
-            probe_norm = float(np.linalg.norm(probe_vec))
-            scatter_norm = float(np.linalg.norm(scatter_vec))
-            if probe_norm <= 0 or scatter_norm <= 0:
-                raise ValueError("incident_direction and scattered_direction must be non-zero")
-            probe_vec = probe_vec / probe_norm
-            scatter_vec = scatter_vec / scatter_norm
-            geometry_angle = float(np.arccos(np.clip(np.dot(probe_vec, scatter_vec), -1.0, 1.0)))
-            if not np.isclose(geometry_angle, float(scattering_angle_rad), rtol=0.0, atol=1e-5):
-                raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
             # Fit ne and Te against the full PlasmaPy spectrum. Absolute signal
             # scaling is a nuisance amplitude; density is identifiable from
             # the collective spectral shape when the spectrum resolves it.
