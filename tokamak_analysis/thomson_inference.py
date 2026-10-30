@@ -746,16 +746,25 @@ def analyze_thomson_spectra(
             }
             total_sigma=np.sqrt(np.maximum(np.diag(fit["total_fit_covariance_including_discrepancy"]),0.0))
             if model=="collective_maxwellian" and total_sigma.size>=2:
-                fit["electron_density_uncertainty_m3"]=float(total_sigma[0])
+                if fit.get("electron_density_m3") is not None:
+                    fit["electron_density_uncertainty_m3"]=float(total_sigma[0])
                 fit["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
             elif model=="non_collective_kappa":
                 fit["electron_temperature_uncertainty_eV"]=float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"],
                     2.0*fit["electron_temperature_eV"]*total_sigma[2]/max(float(fit["intrinsic_sigma_nm"]),np.finfo(float).tiny)))
+                qproj=2.0*np.sin(float(scattering_angle_rad)/2.0)
+                velocity_discrepancy=C_M_S*total_sigma[1]/(float(laser_wavelength_nm)*qproj)
+                fit["electron_velocity_projection_uncertainty_m_s"]=float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"],velocity_discrepancy))
             elif model=="non_collective_maxwellian":
                 fit["electron_temperature_uncertainty_eV"]=float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"],
                     2.0*fit["electron_temperature_eV"]*total_sigma[2]/max(float(fit["intrinsic_sigma_nm"]),np.finfo(float).tiny)))
+                qproj=2.0*np.sin(float(scattering_angle_rad)/2.0)
+                velocity_discrepancy=C_M_S*total_sigma[1]/(float(laser_wavelength_nm)*qproj)
+                fit["electron_velocity_projection_uncertainty_m_s"]=float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"],velocity_discrepancy))
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
         if model == "collective_maxwellian":
