@@ -408,16 +408,16 @@ def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkey
         electron_velocity_m_s=[0.0, 0.0, 0.0],
         incident_direction=[1.0, 0.0, 0.0],
         scattered_direction=[0.0, 1.0, 0.0],
+        signal_uncertainty=np.full_like(y, 0.02)[None, :],
     )
 
     channel = result["channels"][0]
     assert channel["optimizer_success"] is True
+    assert channel["collective_parameter_jacobian_rank"] == 2
     assert channel["electron_density_m3"] == pytest.approx(true_density, rel=0.08)
     assert channel["electron_temperature_eV"] == pytest.approx(true_temperature, rel=0.05)
     assert np.allclose(channel["fitted_spectrum"], y, rtol=0.02, atol=0.03)
     expected_dof = max(1, x.size - 5)
-    expected_chi_square = np.sum(channel["residual"] ** 2) / (
-        max(float(np.max(np.abs(y))), np.finfo(float).tiny) ** 2 * expected_dof
-    )
+    expected_chi_square = np.sum((channel["residual"] / 0.02) ** 2) / expected_dof
     assert channel["reduced_chi_square"] == pytest.approx(expected_chi_square, rel=1e-8)
 
