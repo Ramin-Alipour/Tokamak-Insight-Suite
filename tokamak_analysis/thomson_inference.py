@@ -24,17 +24,30 @@ def _finite_array(value, name, ndim=None):
     return a
 
 
-def _response_for_channel(response, channel, nchan, nlam):
-    if response is None:
-        return np.eye(nlam)
+def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
+    if callable(response):
+        if wavelength is None:
+            raise ValueError("wavelength_nm is required when instrument_response is callable")
+        response = response(np.asarray(wavelength,dtype=float))
     r = _finite_array(response, "instrument_response")
-    if r.ndim == 2:
+    if r.ndim == 1:
+        if r.size < 1 or r.size % 2 == 0 or np.any(r < 0) or np.sum(r) <= 0:
+            raise ValueError("a 1-D instrument-response kernel must be non-negative, odd-length and have positive area")
+        kernel = r/np.sum(r)
+        out = np.zeros((nlam,nlam),dtype=float)
+        center = kernel.size//2
+        for col in range(nlam):
+            for k,value in enumerate(kernel):
+                row=col+(k-center)
+                if 0 <= row < nlam:
+                    out[row,col]+=value
+    elif r.ndim == 2:
         out = r
     elif r.ndim == 3 and r.shape[0] == nchan:
         out = r[channel]
     else:
-        raise ValueError("instrument_response must have shape (n_wavelength, n_wavelength) or (n_channel, n_wavelength, n_wavelength)")
-    if out.shape != (nlam, nlam) or np.any(out < 0):
+        raise ValueError("instrument_response must be a callable, a 1-D kernel, a 2-D response matrix, or a channel-specific 3-D response matrix")
+    if out.shape != (nlam,nlam) or np.any(out < 0):
         raise ValueError("instrument response must be a non-negative square matrix on the measured wavelength grid")
     sums = out.sum(axis=0)
     if np.any(sums <= 0):
@@ -307,13 +320,13 @@ def analyze_thomson_spectra(
     if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
         raise ValueError("signal_uncertainty must match spectra and be strictly positive")
     lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
-    if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.shape != np.asarray(instrument_response).shape):
-        raise ValueError("instrument_response_uncertainty must be non-negative and match instrument_response")
+    if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
+        raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
     results = []
     for i in range(y.shape[0]):
         xi = xs[i]
-        response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1])
+        response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1], xi)
         ui = None if unc is None else unc[i]
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
