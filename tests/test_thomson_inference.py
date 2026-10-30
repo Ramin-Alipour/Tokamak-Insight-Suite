@@ -597,3 +597,18 @@ def test_joint_multi_channel_gls_supports_kappa_projected_spectra():
     assert out["joint_inference"]["joint_parameter_count_per_channel"]==6
     np.testing.assert_allclose(out["electron_temperature_profile_eV"],[100.0,150.0],rtol=0.08)
     assert all("kappa_index" in ch for ch in out["channels"])
+
+
+def test_thomson_fit_reports_separate_model_discrepancy_covariance():
+    x,y,_=_spectral_case(100.0,n=161)
+    perturbation=0.12*np.sin(np.linspace(0.0,14.0*np.pi,x.size))
+    measured=y+perturbation
+    out=analyze_thomson_spectra(
+        x,measured[None,:],[0.1],laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full((1,x.size),0.1),
+    )
+    channel=out["channels"][0]
+    assert "model_discrepancy_covariance" in channel
+    assert channel["model_discrepancy_scale"] >= 0
+    assert channel["total_fit_covariance_including_discrepancy"].shape==(5,5)
