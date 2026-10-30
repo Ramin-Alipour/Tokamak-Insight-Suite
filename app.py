@@ -3008,12 +3008,17 @@ elif page=='Advanced Analysis':
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
                 cts_method=st.selectbox('Inversion method',['differential_evolution','improved_genetic','regularized'],key='cts_inversion_method')
                 cts_regularization=st.number_input('Regularization strength (used by regularized mode)',min_value=0.0,value=0.1,format='%.6g',key='cts_regularization')
+                cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
+                cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
+                cts_electron_flow=st.text_input('Electron-flow projection (m/s; default 0)',value='0',key='cts_electron_flow')
+                cts_electron_flow_unc=st.text_input('Electron-flow projection 1σ uncertainty (m/s; optional)',key='cts_electron_flow_unc')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
             with s1: cts_species_text=st.text_input('Ion species names (comma-separated)',value='D+',key='cts_species')
             with s2: cts_charge_text=st.text_input('Charge states (comma-separated)',value='1',key='cts_charges')
             with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated)',value='2.014',key='cts_masses')
             cts_fraction_text=st.text_input('Charge-density fractions (comma-separated)',value='1.0',key='cts_fractions')
+            cts_fraction_unc_text=st.text_input('Ion-fraction 1σ uncertainties (comma-separated; optional)',key='cts_fraction_unc')
             cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'],key='cts_fast_mode')
             cts_fast_vdf_upload=None
             if cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
@@ -3075,8 +3080,17 @@ elif page=='Advanced Analysis':
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
                         'instrument_response_uncertainty':cts_response_unc,
+                        'electron_velocity_projection_m_s':float(cts_electron_flow or 0.0),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
                     }
+                    external_unc={}
+                    if cts_probe_frequency_unc.strip(): external_unc['probe_frequency_Hz']=float(cts_probe_frequency_unc)
+                    if cts_angle_unc.strip(): external_unc['scattering_angle_rad']=float(cts_angle_unc)
+                    if cts_electron_flow_unc.strip(): external_unc['electron_velocity_projection_m_s']=float(cts_electron_flow_unc)
+                    if cts_fraction_unc_text.strip():
+                        fraction_unc=[float(v.strip()) for v in cts_fraction_unc_text.split(',') if v.strip()]
+                        external_unc['ion_fractions']=fraction_unc
+                    if external_unc: kwargs_cts['external_parameter_uncertainties']=external_unc
                     if cts_method=='regularized':
                         kwargs_cts['regularization_strength']=float(cts_regularization)
                     result_cts=analyze_cts_spectrum(frequency,spectrum,**kwargs_cts)
