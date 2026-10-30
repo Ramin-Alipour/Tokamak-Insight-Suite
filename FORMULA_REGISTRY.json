@@ -2451,5 +2451,253 @@
     "references": [
       "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5, Eqs. 3.2.33–3.2.37."
     ]
+  },
+  {
+    "name": "Langmuir electron density from electron-saturation current",
+    "equation": "n_e = I_e,sat / [e A_p sqrt(e T_e / (2 pi m_e))]",
+    "inputs": "Positive electron-saturation current [A], T_e [eV], effective collection area A_p [m^2]",
+    "output": "m^-3",
+    "assumptions": "Maxwellian electron collection; supplied effective area and applicable electron-saturation regime. Merlino (2007), AJP 75, Eq. (6), DOI 10.1119/1.2772282; Hutchinson (2002), Ch. 3, §3.2.5.",
+    "status": "D",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.langmuir_electron_density_from_saturation_current",
+      "formula_key": "langmuir_electron_density_from_saturation_current",
+      "input_specs": [
+        {
+          "name": "electron_saturation_current_A",
+          "unit": "A",
+          "description": "Positive electron-saturation current after polarity normalization.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive Maxwellian electron temperature.",
+          "required": true
+        },
+        {
+          "name": "probe_area_m2",
+          "unit": "m^2",
+          "description": "Positive effective electron collection area.",
+          "required": true
+        },
+        {
+          "name": "sigma_electron_saturation_current_A",
+          "unit": "A",
+          "description": "Optional absolute standard uncertainty of electron-saturation current.",
+          "required": false
+        },
+        {
+          "name": "relative_sigma_electron_temperature",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of electron temperature.",
+          "required": false
+        },
+        {
+          "name": "relative_sigma_probe_area",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of effective area.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "description": "Maxwellian electron-density estimate."
+        },
+        {
+          "name": "uncertainty_electron_density_m3",
+          "unit": "m^-3",
+          "description": "First-order uncertainty, returned only when all three independent uncertainty inputs are supplied."
+        }
+      ],
+      "prerequisites": [
+        "Maxwellian electron collection; no automatic certification of electron-saturation regime."
+      ],
+      "uncertainty_model": "Optional independent-input first-order propagation; all three uncertainty inputs must be supplied together or none.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_langmuir_electron_density_from_saturation_reference"
+      ],
+      "note": "Published Maxwellian collection relation; analytic/software verification only, not empirical validation."
+    }
+  },
+  {
+    "name": "Langmuir Bohm ion particle flux",
+    "equation": "Gamma_i = C_s n_i sqrt(Z_i e T_e / m_i)",
+    "inputs": "Positive ion density n_i [m^-3], T_e [eV], ion mass m_i [kg], positive sheath coefficient C_s, integer charge state Z_i",
+    "output": "m^-2 s^-1",
+    "assumptions": "Species Bohm speed sqrt(Z_i e T_e/m_i) and supplied sheath factor; Merlino (2007), AJP 75, Eq. (3), DOI 10.1119/1.2772282; Hutchinson (2002), Ch. 3, §3.2.5.",
+    "status": "D",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.langmuir_bohm_particle_flux",
+      "formula_key": "langmuir_bohm_particle_flux",
+      "input_specs": [
+        {
+          "name": "ion_density_m3",
+          "unit": "m^-3",
+          "description": "Positive ion density supplied by the researcher.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive electron temperature in eV.",
+          "required": true
+        },
+        {
+          "name": "ion_mass_kg",
+          "unit": "kg",
+          "description": "Positive mass of the selected ion species.",
+          "required": true
+        },
+        {
+          "name": "sheath_coefficient",
+          "unit": "1",
+          "description": "Positive coefficient for the declared Bohm/sheath model.",
+          "required": true
+        },
+        {
+          "name": "charge_state",
+          "unit": "integer",
+          "description": "Positive integer ion charge state Z_i; default 1.",
+          "required": false,
+          "default": 1
+        },
+        {
+          "name": "relative_sigma_ion_density",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of ion density.",
+          "required": false
+        },
+        {
+          "name": "relative_sigma_electron_temperature",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of electron temperature.",
+          "required": false
+        },
+        {
+          "name": "relative_sigma_ion_mass",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of ion mass.",
+          "required": false
+        },
+        {
+          "name": "relative_sigma_sheath_coefficient",
+          "unit": "fraction",
+          "description": "Optional relative standard uncertainty of sheath coefficient.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_sound_speed_m_s",
+          "unit": "m s^-1",
+          "description": "Species Bohm speed."
+        },
+        {
+          "name": "ion_particle_flux_m2_s",
+          "unit": "m^-2 s^-1",
+          "description": "Model-based ion particle flux."
+        },
+        {
+          "name": "ion_charge_state",
+          "unit": "integer",
+          "description": "Charge state used in the Bohm speed."
+        },
+        {
+          "name": "uncertainty_ion_particle_flux_m2_s",
+          "unit": "m^-2 s^-1",
+          "description": "First-order uncertainty returned only when all four relative input uncertainties are supplied."
+        }
+      ],
+      "prerequisites": [
+        "Single species and Bohm-like sheath model; C_s is user-supplied and regime-dependent."
+      ],
+      "uncertainty_model": "Optional independent-input first-order propagation; all four relative uncertainty inputs must be supplied together or none.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_langmuir_bohm_particle_flux_reference"
+      ],
+      "note": "Published Bohm particle-flux relation; analytic/software verification only, not empirical validation."
+    }
+  },
+  {
+    "name": "Langmuir multispecies ion density from ion-saturation current",
+    "equation": "n_i = |I_i,sat| / [e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]",
+    "inputs": "Ion-saturation current [A], T_e [eV], effective area A_p [m^2], species masses m_s [kg], number-density fractions f_s, integer charge states Z_s and sheath coefficients C_s",
+    "output": "m^-3",
+    "assumptions": "Species-summed Bohm/sheath current balance; common electron temperature and effective area; fractions are number-density fractions summing to one; charge state enters via Z_s^(3/2). Based on Hutchinson (2002), Ch. 3, §3.2.5.",
+    "status": "D",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.langmuir_multispecies_ion_density",
+      "formula_key": "langmuir_multispecies_ion_density",
+      "input_specs": [
+        {
+          "name": "ion_saturation_current_A",
+          "unit": "A",
+          "description": "Finite signed ion-saturation current; magnitude is used after polarity normalization.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive common electron temperature.",
+          "required": true
+        },
+        {
+          "name": "probe_area_m2",
+          "unit": "m^2",
+          "description": "Positive effective collection area shared by the species.",
+          "required": true
+        },
+        {
+          "name": "species",
+          "unit": "sequence",
+          "description": "Each species requires mass_kg, fraction (number-density fraction), positive integer charge_state and sheath_coefficient.",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_density_m3",
+          "unit": "m^-3",
+          "description": "Total model-based ion density from species-summed current balance."
+        },
+        {
+          "name": "ion_species",
+          "unit": "sequence",
+          "description": "Normalized species input definitions."
+        },
+        {
+          "name": "ion_species_fraction_sum",
+          "unit": "1",
+          "description": "Sum of number-density fractions; must equal one."
+        },
+        {
+          "name": "uncertainty_ion_density_m3",
+          "unit": "m^-3",
+          "description": "Null until a composition-covariance uncertainty model is supplied."
+        },
+        {
+          "name": "uncertainty_status",
+          "unit": "text",
+          "description": "Explicit status that composition and species-model uncertainty were not propagated."
+        }
+      ],
+      "prerequisites": [
+        "Species number-density fractions must sum to one; charge states are positive integers; common T_e and area; sheath coefficients are explicit."
+      ],
+      "uncertainty_model": "Not propagated: species fraction covariance, species-resolved sheath coefficient uncertainty and composition/model discrepancy are not supplied by this formula.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_langmuir_multispecies_density_reference"
+      ],
+      "note": "Species-summed extension of published Bohm/sheath current balance; analytic/software verification only, not empirical validation."
+    }
   }
 ]
