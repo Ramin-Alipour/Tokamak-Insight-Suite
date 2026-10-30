@@ -464,7 +464,13 @@ def analyze_thomson_spectra(
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
                    "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
-            if alpha_value <= 1.0:
+            if not fitopt.success:
+                fit["electron_density_m3"] = None
+                fit["electron_temperature_eV"] = None
+                fit["electron_density_uncertainty_m3"] = None
+                fit["electron_temperature_uncertainty_eV"] = None
+                fit["density_status"] = "collective_spectral_optimizer_failed"
+            elif alpha_value <= 1.0:
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
