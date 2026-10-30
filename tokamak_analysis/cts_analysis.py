@@ -109,7 +109,8 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
 
     Electron flow is an explicit external input. Pass 0.0 only when a stationary
     electron-flow assumption is intentionally selected by the caller.
-    """    f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
+    """
+    f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     ne=_positive(electron_density_m3,"electron_density_m3"); te=_positive(electron_temperature_eV,"electron_temperature_eV")
     ti=_positive(ion_temperature_eV,"ion_temperature_eV"); ions=_species(ion_species,ion_fractions)
     if electron_velocity_projection_m_s is None:
