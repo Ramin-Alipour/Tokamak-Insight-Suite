@@ -474,3 +474,16 @@ def test_duplicate_voltage_averaging_reduces_supplied_current_uncertainty():
     zero_index = int(np.flatnonzero(processed_v == 0.0)[0])
     assert processed_sigma[zero_index] == pytest.approx(2e-5 / np.sqrt(2.0))
 
+
+
+def test_langmuir_numerical_fit_thresholds_are_configurable_and_reported():
+    voltage = np.linspace(-5.0, 5.0, 81)
+    current = -2e-3 + 3e-4 * np.exp((voltage + 5.0) / 2.5)
+    result = langmuir_iv_analysis(voltage, current, electron_fit_range=(-4.0, 2.0),
+        fit_quality_min_r2=0.9, fit_quality_max_nrmse=0.2,
+        ion_flatness_max_relative_change=0.15)
+    thresholds = result["numerical_fit_screen_thresholds"]
+    assert thresholds["electron_fit_minimum_R2"] == pytest.approx(0.9)
+    assert thresholds["electron_fit_maximum_normalized_RMSE"] == pytest.approx(0.2)
+    assert thresholds["ion_maximum_relative_current_change"] == pytest.approx(0.15)
+    assert "not universal" in thresholds["interpretation"]
