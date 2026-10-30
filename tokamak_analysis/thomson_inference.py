@@ -96,6 +96,49 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     }
 
 
+
+def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
+    """Fit the 1-D projection of an isotropic kappa VDF (Student-t form)."""
+    spacing = float(np.median(np.diff(wavelength)))
+    span = float(wavelength[-1] - wavelength[0])
+    edge = max(2, wavelength.size // 10)
+    baseline = float(np.median(np.r_[signal[:edge], signal[-edge:]]))
+    peak = int(np.argmax(signal))
+    amp0 = max(float(signal[peak] - baseline), np.finfo(float).eps)
+    p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), 3.0, baseline, 0.0]
+    lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51, -np.inf, -np.inf]
+    upper = [np.inf, wavelength[-1], span, 100.0, np.inf, np.inf]
+    def intrinsic(x, amp, center, sigma, kappa, offset, slope):
+        df = 2.0*kappa-1.0
+        scale = sigma*np.sqrt((df-2.0)/df)
+        return amp*(1.0+((x-center)/scale)**2/df)**(-kappa)+offset+slope*(x-center)
+    def observed(x, amp, center, sigma, kappa, offset, slope):
+        component = intrinsic(x, amp, center, sigma, kappa, 0.0, 0.0)
+        return response @ component + offset+slope*(x-center)
+    p, cov = curve_fit(observed,wavelength,signal,p0=p0,bounds=(lower,upper),
+                       sigma=uncertainty,absolute_sigma=uncertainty is not None,maxfev=80000)
+    amp,center,sigma,kappa,offset,slope=map(float,p)
+    if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
+        raise ValueError("Wavelength coverage must include at least ±3 fitted RMS widths")
+    te=(sigma/laser_nm)**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(angle/2.0)**2
+    q_projection=2.0*np.sin(angle/2.0)
+    velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
+    residual=signal-observed(wavelength,*p)
+    dof=max(1,wavelength.size-len(p))
+    return {"electron_temperature_eV":float(te),
+            "electron_temperature_uncertainty_eV":float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
+            "electron_velocity_projection_m_s":float(velocity),
+            "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
+            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,
+            "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
+            "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
+            "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
+            "fitted_spectrum":observed(wavelength,*p),
+            "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
+            "assumptions":["non-collective single-particle scattering","isotropic kappa electron velocity distribution",
+                           "non-relativistic velocities","finite-variance kappa index > 1.5",
+                           "known scattering geometry"]}
+
 def _density_from_power(power_w, laser_power_w, interaction_length_m, collection_solid_angle_sr,
                         optical_efficiency, scattering_angle_rad, incident_polarization,
                         scattered_direction):
@@ -157,8 +200,8 @@ def analyze_thomson_spectra(
         raise ValueError("laser_wavelength_nm must be positive")
     if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
         raise ValueError("scattering_angle_rad must lie in (0, pi]")
-    if model not in {"non_collective_maxwellian", "collective_maxwellian"}:
-        raise ValueError("model must be non_collective_maxwellian or collective_maxwellian")
+    if model not in {"non_collective_maxwellian", "non_collective_kappa", "collective_maxwellian"}:
+        raise ValueError("model must be non_collective_maxwellian, non_collective_kappa or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if model == "collective_maxwellian":
@@ -189,6 +232,8 @@ def analyze_thomson_spectra(
         ui = None if unc is None else unc[i]
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
+        elif model == "non_collective_kappa":
+            fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         else:
             # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
             # collective and non-collective regimes from the same dielectric
@@ -231,7 +276,7 @@ def analyze_thomson_spectra(
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
                    "ion_species": list(ion_species), "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
-        if model == "non_collective_maxwellian" and all(v is not None for v in (
+        if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, scattered_direction
         )):
@@ -279,7 +324,7 @@ def analyze_thomson_spectra(
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
         fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
-        if lsf_unc is not None and model == "non_collective_maxwellian":
+        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples = [], []
@@ -290,8 +335,9 @@ def analyze_thomson_spectra(
                     continue
                 sampled /= colsum[None, :]
                 try:
-                    draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm),
-                                              float(scattering_angle_rad), sampled, ui)
+                    fitter = _fit_kappa if model == "non_collective_kappa" else _fit_noncollective
+                    draw = fitter(xi, y[i], float(laser_wavelength_nm),
+                                  float(scattering_angle_rad), sampled, ui)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                 except (ValueError, RuntimeError):
@@ -315,7 +361,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "limitations": [
-            "Non-collective model assumes non-relativistic isotropic Maxwellian electrons.",
+            "Non-collective Maxwellian and kappa models are non-relativistic; relativistic kinetic corrections are not implemented.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
             "For non-collective fits, supplied instrument-response uncertainty is propagated by Monte Carlo perturbation of the LSF matrix; uncertainty in the optical power/geometry inputs must be supplied separately in future extensions.",
