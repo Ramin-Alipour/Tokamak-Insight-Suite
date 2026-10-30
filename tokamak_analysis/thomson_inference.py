@@ -100,6 +100,66 @@ def _gaussian(x, amp, center, sigma, offset, slope):
     return amp * np.exp(-0.5 * ((x-center)/sigma)**2) + offset + slope*(x-center)
 
 
+
+def _fit_identifiability(covariance, residual, uncertainty, parameter_count):
+    """Assess covariance identifiability without equating optimizer success with validity."""
+    cov = np.asarray(covariance, dtype=float)
+    residual = np.asarray(residual, dtype=float)
+    reasons = []
+    if cov.shape != (parameter_count, parameter_count) or not np.all(np.isfinite(cov)):
+        return {"fit_accepted": False, "fit_quality_status": "rejected_invalid_covariance",
+                "fit_quality_reasons": ["covariance is missing, non-finite or has an invalid shape"],
+                "covariance_correlation_condition_number": None}
+    diagonal = np.diag(cov)
+    if np.any(diagonal <= 0):
+        reasons.append("one or more fitted parameter variances are non-positive")
+    if not np.all(np.isfinite(residual)):
+        reasons.append("residual contains non-finite values")
+    condition = None
+    if not reasons:
+        scale = np.sqrt(diagonal)
+        correlation = cov / np.outer(scale, scale)
+        condition = float(np.linalg.cond(correlation))
+        if np.linalg.matrix_rank(correlation) < parameter_count:
+            reasons.append("parameter covariance correlation matrix is rank deficient")
+        if not np.isfinite(condition) or condition > 1e14:
+            reasons.append("parameter covariance correlation matrix is ill-conditioned")
+    dof = max(1, residual.size - parameter_count)
+    chi2 = None
+    if uncertainty is not None:
+        u = np.asarray(uncertainty, dtype=float)
+        chi2 = float(np.sum((residual / u) ** 2) / dof)
+        if not np.isfinite(chi2):
+            reasons.append("reduced chi-square is non-finite")
+    return {
+        "fit_accepted": not reasons,
+        "fit_quality_status": "accepted_with_covariance_diagnostics" if not reasons else "rejected_unidentifiable_or_invalid",
+        "fit_quality_reasons": reasons,
+        "covariance_correlation_condition_number": condition,
+        "fit_residual_rms": float(np.sqrt(np.mean(residual ** 2))),
+        "fit_reduced_chi_square": chi2,
+        "fit_degrees_of_freedom": int(dof),
+    }
+
+
+def _channel_value(value, channel, n_channels, name, *, vector_length=None):
+    """Accept a scalar shared by channels or a channel-specific value."""
+    if value is None:
+        return None
+    raw = np.asarray(value)
+    if raw.ndim == 0:
+        return value
+    if vector_length is not None:
+        if raw.shape == (vector_length,):
+            return value
+        if raw.shape == (n_channels, vector_length):
+            return raw[channel]
+    if raw.shape == (n_channels,):
+        return raw[channel]
+    raise ValueError(f"{name} must be a scalar shared across channels or have one value per channel")
+
+
+
 def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertainty):
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
@@ -140,6 +200,10 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     # The fitted spectral shift measures the velocity projection along q.
     q_projection = 2.0*np.sin(angle/2.0)
     velocity = -C_M_S * (center-laser_nm)/(laser_nm*q_projection)
+    if te / ELECTRON_REST_ENERGY_EV >= 0.01:
+        raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is not safely small relative to the electron rest energy; select the relativistic Maxwell-Juttner model.")
+    if abs(velocity) >= 0.1 * C_M_S:
+        raise ValueError("Non-relativistic Maxwellian model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     dof = max(1, wavelength.size-len(p))
     residual = signal-observed(wavelength, *p)
     fit_cov = np.asarray(cov, dtype=float)
@@ -202,6 +266,10 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     te=(sigma/laser_nm)**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(angle/2.0)**2
     q_projection=2.0*np.sin(angle/2.0)
     velocity=-C_M_S*(center-laser_nm)/(laser_nm*q_projection)
+    if te / ELECTRON_REST_ENERGY_EV >= 0.01:
+        raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; select the relativistic Maxwell-Juttner model.")
+    if abs(velocity) >= 0.1 * C_M_S:
+        raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
@@ -328,6 +396,9 @@ def analyze_thomson_spectra(
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
+    collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
+    collective_density_bounds_m3=(1e14, 1e23), collective_temperature_bounds_eV=(0.1, 1e5),
+    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -371,6 +442,17 @@ def analyze_thomson_spectra(
         raise ValueError("model must be non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
+    if isinstance(instrument_response_mc_samples, (bool, np.bool_)) or not isinstance(instrument_response_mc_samples, (int, np.integer)) or instrument_response_mc_samples < 20:
+        raise ValueError("instrument_response_mc_samples must be an integer >= 20")
+    instrument_response_mc_min_success_fraction = _finite_scalar(instrument_response_mc_min_success_fraction, "instrument_response_mc_min_success_fraction", minimum=0.5, maximum=1.0)
+    collective_initial_density_m3 = _finite_scalar(collective_initial_density_m3, "collective_initial_density_m3", minimum=np.finfo(float).tiny)
+    collective_initial_temperature_eV = _finite_scalar(collective_initial_temperature_eV, "collective_initial_temperature_eV", minimum=np.finfo(float).tiny)
+    density_bounds = _finite_array(collective_density_bounds_m3, "collective_density_bounds_m3", 1)
+    temperature_bounds = _finite_array(collective_temperature_bounds_eV, "collective_temperature_bounds_eV", 1)
+    if density_bounds.shape != (2,) or temperature_bounds.shape != (2,) or np.any(density_bounds <= 0) or np.any(temperature_bounds <= 0) or density_bounds[0] >= density_bounds[1] or temperature_bounds[0] >= temperature_bounds[1]:
+        raise ValueError("Collective density and temperature bounds must be positive increasing pairs")
+    if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1] or not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:
+        raise ValueError("Collective initial density and temperature must lie within their supplied bounds")
     if model == "collective_maxwellian":
         if not ion_species or isinstance(ion_species, (str, bytes)):
             raise ValueError("Collective Thomson inference requires an explicit non-empty ion-species list")
@@ -477,12 +559,11 @@ def analyze_thomson_spectra(
                 coefficients=fit_nuisance(shape)
                 model_signal=coefficients[0]*shape+coefficients[1]+coefficients[2]*(xi-float(laser_wavelength_nm))
                 return (model_signal-y[i])/residual_scale
-            log_min = np.log10(np.finfo(float).tiny)
-            log_max = np.log10(np.finfo(float).max) - 1.0
             fitopt = least_squares(
                 lambda log_params: objective(10.0**log_params),
-                np.log10([1e18, 100.0]),
-                bounds=([log_min, log_min], [log_max, log_max]),
+                np.log10([collective_initial_density_m3, collective_initial_temperature_eV]),
+                bounds=(np.log10([density_bounds[0], temperature_bounds[0]]),
+                        np.log10([density_bounds[1], temperature_bounds[1]])),
                 x_scale="jac", max_nfev=5000,
             )
             ne_fit, te_fit = map(float, 10.0**fitopt.x)
@@ -553,6 +634,11 @@ def analyze_thomson_spectra(
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
+        quality = _fit_identifiability(fit.get("fit_covariance"), fit.get("residual"), ui,
+                                       2 if model == "collective_maxwellian" else len(np.asarray(fit.get("fit_covariance"))))
+        fit.update(quality)
+        if not fit["fit_accepted"]:
+            raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
         density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
@@ -563,20 +649,20 @@ def analyze_thomson_spectra(
             area = float(fit["integrated_scattered_power_W"])
             area_sigma = fit.get("integrated_scattered_power_uncertainty_W")
             density_inputs = {
-                "scattered_power_W": area, "incident_power_W": laser_power_w,
-                "interaction_length_m": interaction_length_m,
+                "scattered_power_W": area, "incident_power_W": _channel_value(laser_power_w, i, y.shape[0], "laser_power_w"),
+                "interaction_length_m": _channel_value(interaction_length_m, i, y.shape[0], "interaction_length_m"),
                 "scattering_angle_rad": scattering_angle_rad,
-                "collection_solid_angle_sr": collection_solid_angle_sr,
-                "optical_efficiency": optical_efficiency,
+                "collection_solid_angle_sr": _channel_value(collection_solid_angle_sr, i, y.shape[0], "collection_solid_angle_sr"),
+                "optical_efficiency": _channel_value(optical_efficiency, i, y.shape[0], "optical_efficiency"),
                 "scattered_power_uncertainty_W": area_sigma,
-                "incident_power_uncertainty_W": laser_power_uncertainty_W,
-                "interaction_length_uncertainty_m": interaction_length_uncertainty_m,
+                "incident_power_uncertainty_W": _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W"),
+                "interaction_length_uncertainty_m": _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m"),
                 "scattering_angle_uncertainty_rad": (None if incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
-                "collection_solid_angle_uncertainty_sr": collection_solid_angle_uncertainty_sr,
-                "optical_efficiency_uncertainty": optical_efficiency_uncertainty,
-                "incident_polarization_vector": incident_polarization,
-                "incident_direction_vector": incident_direction,
-                "scattered_direction_vector": scattered_direction,
+                "collection_solid_angle_uncertainty_sr": _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr"),
+                "optical_efficiency_uncertainty": _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty"),
+                "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
+                "incident_direction_vector": _channel_value(incident_direction, i, y.shape[0], "incident_direction", vector_length=3),
+                "scattered_direction_vector": _channel_value(scattered_direction, i, y.shape[0], "scattered_direction", vector_length=3),
                 "polarization_factor_uncertainty": polarization_factor_uncertainty,
             }
             density_result = density_from_thomson_scattered_power(**density_inputs)
@@ -618,7 +704,7 @@ def analyze_thomson_spectra(
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples, area_samples = [], [], []
-            for _ in range(24):
+            for _ in range(int(instrument_response_mc_samples)):
                 sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
                 if np.any(colsum <= 0):
@@ -634,7 +720,8 @@ def analyze_thomson_spectra(
                         area_samples.append(float(draw["integrated_scattered_power_W"]))
                 except (ValueError, RuntimeError):
                     continue
-            if len(te_samples) >= 8:
+            required_successes = max(8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples)))
+            if len(te_samples) >= required_successes:
                 fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"], np.std(te_samples, ddof=1)))
                 fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
