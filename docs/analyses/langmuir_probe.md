@@ -178,3 +178,10 @@ For a single ion species with charge state Z_i, the Bohm speed used by the decla
 - Bohm-like ion particle-flux uncertainty is propagated only when relative uncertainties for density, temperature, mass and sheath factor are all supplied. The explicit integer charge state is treated as a fixed species identity.
 - Multispecies density does not propagate uncertainty in species fractions, species-resolved sheath coefficients or composition covariance. It returns an explicit not-propagated status rather than zero uncertainty.
 - No omitted uncertainty component is silently treated as a measured zero; propagated values remain conditional on the supplied independent-input model.
+
+
+### Additional literature for the advanced model choices
+
+- The Maxwellian electron saturation current and Bohm ion current relations are given in R. L. Merlino, “Understanding Langmuir probe current-voltage characteristics,” *American Journal of Physics* 75(12), 1078–1085 (2007), DOI: 10.1119/1.2772282, Eqs. (3) and (6). These are the source relations for the electron-density and Bohm-flux helpers under their stated assumptions.
+- Two-temperature electron collection is described as the sum of cold and hot electron contributions in Merlino (2007), Appendix Problem 1; see also P. C. Stangeby, “Langmuir-, and bolometer-probe interpretation for plasmas with two electron components,” *Journal of Nuclear Materials* 128–129, 969–973 (1984), DOI: 10.1016/0022-3115(84)90496-3. The software fit remains an empirical decomposition and does not prove two populations.
+- The generic stretched-exponential/Kohlrausch–Williams–Watts shape is an empirical relaxation form; see G. Williams and D. C. Watts, “Non-symmetrical dielectric relaxation behaviour arising from a simple empirical decay function,” *Transactions of the Faraday Society* 66, 80–85 (1970), DOI: 10.1039/TF9706600080. This reference supports only the generic empirical curve-shape form, not a Langmuir-probe plasma law. The software's stretched fit remains a comparison ansatz and cannot identify an EEDF.
