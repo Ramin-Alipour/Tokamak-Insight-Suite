@@ -366,8 +366,16 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "Ion composition is fixed externally.","Optional fast-ion component is a two-Maxwellian approximation, not arbitrary VDF reconstruction.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if fast:
-        names += ["fast_ion_fraction","fast_ion_temperature_eV"]; out["parameter_names"]=names
-        out["fast_ion_fraction_uncertainty"]=float(su[4]); out["fast_ion_temperature_uncertainty_eV"]=float(su[5])
+        names += ["fast_ion_fraction"]
+        if fast["kind"]=="maxwellian":
+            names += ["fast_ion_temperature_eV"]
+        else:
+            out["fast_ion_vdf_provenance"]="externally supplied normalized tabulated 1-D velocity distribution; only its density fraction is inferred"
+            out["fast_ion_vdf_regularization"]=fast["vdf"]
+        out["parameter_names"]=names
+        out["fast_ion_fraction_uncertainty"]=float(su[4])
+        if fast["kind"]=="maxwellian":
+            out["fast_ion_temperature_uncertainty_eV"]=float(su[5])
     if response_sigma is not None:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
         for _ in range(int(response_mc_samples)):
@@ -392,7 +400,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["ion_velocity_projection_uncertainty_m_s"]=float(total[3])
             if fast:
                 out["fast_ion_fraction_uncertainty"]=float(total[4])
-                out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
+                if fast["kind"]=="maxwellian":
+                    out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
             out["response_uncertainty_propagated"]=True
         else:
             out["response_uncertainty_propagated"]=False
