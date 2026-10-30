@@ -2864,7 +2864,8 @@ elif page=='Advanced Analysis':
                         'Electron density (m^-3)':result['electron_density_profile_m3'],
                         'Electron density uncertainty (m^-3)':result['electron_density_uncertainty_profile_m3'],
                         'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s'],
-                        'Electron velocity projection uncertainty (m/s)':result['electron_velocity_projection_uncertainty_profile_m_s']})
+                        'Electron velocity projection uncertainty (m/s)':result['electron_velocity_projection_uncertainty_profile_m_s'],
+                        'Uncertainty completeness':[ch.get('uncertainty_completeness','unknown') for ch in result['channels']]})
                     st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'result':result,'frame':result_frame}
                 except Exception as e:
                     st.error(f'Thomson spectral inference failed: {e}')
@@ -2876,7 +2877,7 @@ elif page=='Advanced Analysis':
                 if not density_frame.empty:
                     st.line_chart(density_frame.set_index('Radius (m)')[['Electron density (m^-3)']])
                 json_download('Export multi-channel Thomson inference',saved['result'],'thomson_spectral_inference.json')
-                st.caption('NaN density values mean absolute density was not identifiable from the supplied spectral shape and optical calibration inputs. The model and limitations are included in the JSON export.')
+                st.caption('NaN density values mean absolute density was not identifiable from the supplied spectral shape and optical calibration inputs. Each channel reports which uncertainty inputs were unavailable; no missing uncertainty is silently set to zero.')
     elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
