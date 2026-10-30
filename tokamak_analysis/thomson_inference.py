@@ -587,7 +587,7 @@ def analyze_thomson_spectra(
             raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian and non_collective_kappa; other physical models require model-specific joint forward models")
         joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
         expected_joint_shape = (y.size, y.size)
-        if joint_covariance.shape != expected_joint_shape or not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-9, atol=1e-12):
+        if joint_covariance.shape != expected_joint_shape or not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-9, atol=0.0):
             raise ValueError("joint_spectral_covariance must be a symmetric (n_channels*n_wavelengths) square matrix in channel-major order")
         try:
             joint_cholesky = np.linalg.cholesky(joint_covariance)
