@@ -4578,7 +4578,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "Compute the multi-species longitudinal dielectric spectral density and infer plasma parameters using differential-evolution or adaptive real-coded genetic global initialization followed by bounded least squares. The regularized option adds a scaled prior penalty; infer_tabulated_1d adds a non-negative softmax VDF parameterization and second-difference smoothness penalty. Full spectral covariance whitening, response/external Monte Carlo and residual-based model-discrepancy diagnostics are available.",
-      "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
+      "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Ion-fraction uncertainties are independently perturbed and renormalized; full species-composition covariance is not supported.",
       "limitations": [
         "Not a full magnetized electromagnetic CTS scattering tensor, ray-tracing/beam-overlap model or receiver/absolute-power transfer model.",
         "Ion composition is fixed externally; uncertainty can be supplied for charge-density fractions but the species identities are not inferred.",
@@ -4588,7 +4588,8 @@
         "The electrostatic longitudinal susceptibility omits magnetized electromagnetic tensor response, ray tracing, polarization coupling, beam overlap and absolute received-power calibration.",
         "Model-discrepancy covariance is a residual-based conditional diagnostic, not independent experimental validation.",
         "One common ion temperature and one common projected ion flow are shared across all background ion species; species-specific Ti and flow inference is not implemented.",
-        "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption."
+        "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption.",
+        "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.cts_spectral_density",
