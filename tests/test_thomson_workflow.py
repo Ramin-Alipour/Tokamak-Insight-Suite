@@ -325,3 +325,54 @@ def test_profile_reconstruction_rejects_non_positive_semidefinite_covariance():
             np.linspace(0, 1, 5), np.ones(5), np.ones(5),
             density_covariance_m3_2=bad, method="pchip", points=20,
         )
+
+
+def test_thomson_profile_gradients_propagate_full_correlated_covariance():
+    radius = np.array([2.0, 0.0, 1.0, 3.0])
+    density = np.array([7.0, 3.0, 5.0, 9.0]) * 1e19
+    temperature = np.array([70.0, 30.0, 50.0, 90.0])
+    base = np.array([
+        [1.0, 0.25, 0.10, 0.05],
+        [0.25, 1.0, 0.20, 0.10],
+        [0.10, 0.20, 1.0, 0.25],
+        [0.05, 0.10, 0.25, 1.0],
+    ])
+    sigma_n = np.array([1.0, 1.2, 1.1, 0.9]) * 1e18
+    sigma_t = np.array([1.0, 1.5, 1.2, 0.8])
+    covariance_n = np.outer(sigma_n, sigma_n) * base
+    covariance_t = np.outer(sigma_t, sigma_t) * base
+    out = analyze_thomson_profile(
+        radius, density, temperature,
+        density_covariance_m3_2=covariance_n,
+        temperature_covariance_eV2=covariance_t,
+    )
+    order = np.argsort(radius)
+    sorted_covariance = covariance_n[np.ix_(order, order)]
+    derivative = np.gradient(np.eye(radius.size), np.sort(radius), axis=0, edge_order=2)
+    expected_gradient_covariance = derivative @ sorted_covariance @ derivative.T
+    np.testing.assert_allclose(
+        out["density_gradient_uncertainty_m-4"],
+        np.sqrt(np.diag(expected_gradient_covariance)),
+        rtol=2e-14,
+    )
+    expected_value_gradient_covariance = np.diag(sorted_covariance @ derivative.T)
+    np.testing.assert_allclose(
+        out["density_normalized_gradient_uncertainty_m-1"],
+        np.sqrt(np.maximum(
+            out["density_gradient_uncertainty_m-4"]**2 / out["density_m3"]**2
+            + out["density_gradient_m-4"]**2 * np.diag(sorted_covariance) / out["density_m3"]**4
+            - 2.0 * out["density_gradient_m-4"] * expected_value_gradient_covariance / out["density_m3"]**3,
+            0.0,
+        )),
+        rtol=2e-12,
+    )
+    np.testing.assert_allclose(out["density_input_covariance_m3_2"], sorted_covariance)
+
+
+def test_thomson_profile_covariance_rejects_mismatched_pointwise_uncertainty():
+    with pytest.raises(ValueError, match="match the diagonal"):
+        analyze_thomson_profile(
+            [0.0, 1.0, 2.0], [3.0, 2.0, 1.0], [30.0, 20.0, 10.0],
+            density_uncertainty_m3=[1.0, 1.0, 1.0],
+            density_covariance_m3_2=np.eye(3) * 4.0,
+        )
