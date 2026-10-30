@@ -175,3 +175,19 @@ def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normal
     assert out["fast_ion_vdf_covariance"].shape==(velocity.size,velocity.size)
     assert out["fast_ion_vdf_uncertainty_m_s_inverse"].shape==velocity.shape
     assert "fast_ion_vdf_logit_0" in out["parameter_names"]
+
+
+def test_cts_requires_an_explicit_electron_flow_projection():
+    f0, f, g, ions, frac, _ = _case()
+    with pytest.raises(ValueError, match="electron_velocity_projection_m_s must be supplied explicitly"):
+        cts_spectral_density(
+            f, f0, g, electron_density_m3=2e19,
+            electron_temperature_eV=1200, ion_temperature_eV=800,
+            ion_species=ions, ion_fractions=frac,
+        )
+    with pytest.raises(ValueError, match="electron_velocity_projection_m_s is required"):
+        analyze_cts_spectrum(
+            f, np.ones_like(f), probe_frequency_Hz=f0,
+            scattering_geometry=g, ion_species=ions, ion_fractions=frac,
+            instrument_response=np.eye(f.size),
+        )
