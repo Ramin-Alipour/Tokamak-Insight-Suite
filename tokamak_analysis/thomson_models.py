@@ -7,7 +7,7 @@ imports external plugin files.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Mapping
 
 import numpy as np
 from scipy.optimize import curve_fit
@@ -22,6 +22,8 @@ class SpectralModelSpec:
     lower_bounds: tuple[float, ...]
     upper_bounds: tuple[float, ...]
     description: str
+    physical_parameter_mapper: Callable | None = None
+    physical_contract: dict | None = None
 
 
 _CUSTOM_MODELS: dict[str, SpectralModelSpec] = {}
@@ -36,6 +38,8 @@ def register_spectral_model(
     bounds: tuple[Sequence[float], Sequence[float]] | None = None,
     description: str = "",
     replace: bool = False,
+    physical_parameter_mapper: Callable | None = None,
+    physical_contract: Mapping | None = None,
 ) -> SpectralModelSpec:
     """Register a callable accepting function(wavelength_nm, *parameters)."""
     if not isinstance(name, str) or not name.strip():
@@ -83,9 +87,25 @@ def register_spectral_model(
         if any(v < lo or v > hi for v, lo, hi in zip(initial, lower, upper)):
             raise ValueError("Initial values must lie within bounds")
 
+    if physical_parameter_mapper is not None and not callable(physical_parameter_mapper):
+        raise TypeError("physical_parameter_mapper must be callable")
+    contract = None
+    if physical_parameter_mapper is not None:
+        if not isinstance(physical_contract, Mapping):
+            raise ValueError("A physical_contract mapping is required whenever a physical_parameter_mapper is registered")
+        required_contract = {"output_units", "formula_references", "assumptions", "limitations", "parameter_provenance"}
+        missing = required_contract - set(physical_contract)
+        if missing:
+            raise ValueError(f"physical_contract is missing required fields: {sorted(missing)}")
+        if not all(physical_contract[k] for k in required_contract):
+            raise ValueError("Every physical_contract field must be non-empty")
+        contract = dict(physical_contract)
+    elif physical_contract is not None:
+        raise ValueError("physical_contract cannot be supplied without a physical_parameter_mapper")
     if key in _CUSTOM_MODELS and not replace:
         raise ValueError(f"Spectral model {key!r} is already registered; use replace=True")
-    spec = SpectralModelSpec(key, function, names, initial, lower, upper, str(description))
+    spec = SpectralModelSpec(key, function, names, initial, lower, upper, str(description),
+                             physical_parameter_mapper, contract)
     _CUSTOM_MODELS[key] = spec
     return spec
 
@@ -165,10 +185,21 @@ def fit_custom_spectral_model(
         name: float(np.sqrt(max(value, 0.0))) if np.isfinite(value) else float("inf")
         for name, value in zip(spec.parameter_names, covariance_diagonal)
     }
+    parameter_map = {n: float(v) for n, v in zip(spec.parameter_names, parameters)}
+    physical_inference = None
+    if spec.physical_parameter_mapper is not None:
+        mapped = spec.physical_parameter_mapper(dict(parameter_map))
+        if not isinstance(mapped, Mapping) or not mapped:
+            raise ValueError("physical_parameter_mapper must return a non-empty mapping")
+        physical_inference = {
+            "values": dict(mapped),
+            "contract": dict(spec.physical_contract),
+            "status": "model_contract_mapped_not_independently_validated",
+        }
     return {
         "model_name": spec.name,
         "parameter_names": list(spec.parameter_names),
-        "parameters": {n: float(v) for n, v in zip(spec.parameter_names, parameters)},
+        "parameters": parameter_map,\n        "physical_inference": physical_inference,
         "parameter_uncertainties": parameter_uncertainties,
         "covariance": covariance,
         "wavelength_nm": x.copy(),
