@@ -19,6 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TIS_RUN_LIVE_BROWSER_E2E: "1"
+      # Prevent Git's init.defaultBranch advisory from polluting Actions logs
+      # when actions/checkout initializes its temporary worktree.
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: "init.defaultBranch"
+      GIT_CONFIG_VALUE_0: "main"
     strategy:
       fail-fast: false
       matrix:
