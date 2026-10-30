@@ -349,3 +349,46 @@ def resolve_analysis(analysis_id: int):
     entry = get_analysis(analysis_id)
     module = import_module(f".{entry['module']}", package=__package__)
     return getattr(module, entry["function"])
+
+
+def _load_analysis_families() -> list[dict]:
+    """Load the canonical 20 primary-analysis families and validate their subanalysis map."""
+    import json
+    from pathlib import Path
+
+    root_registry = Path(__file__).resolve().parents[1] / "ANALYSIS_FAMILIES.json"
+    packaged_registry = Path(__file__).resolve().parents[1] / "tis" / "data" / "ANALYSIS_FAMILIES.json"
+    registry_path = root_registry if root_registry.is_file() else packaged_registry
+    try:
+        payload = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Cannot load primary-analysis registry: {exc}") from exc
+    families = payload.get("families") if isinstance(payload, dict) else None
+    if not isinstance(families, list) or len(families) != 20:
+        raise RuntimeError("ANALYSIS_FAMILIES.json must declare exactly 20 primary analyses.")
+    family_ids = [item.get("id") for item in families]
+    if family_ids != list(range(1, 21)):
+        raise RuntimeError("Primary-analysis family IDs must be unique and ordered from 1 to 20.")
+    entry_ids = [entry_id for family in families for entry_id in family.get("entry_ids", [])]
+    if sorted(entry_ids) != list(range(1, 81)) or len(set(entry_ids)) != 80:
+        raise RuntimeError("Primary-analysis families must map every underlying analysis ID 1–80 exactly once.")
+    return families
+
+
+ANALYSIS_FAMILIES = _load_analysis_families()
+
+
+def get_analysis_family(family_id: int) -> dict:
+    """Return a defensive copy of one primary-analysis family."""
+    if isinstance(family_id, bool) or not isinstance(family_id, int):
+        raise ValueError("family_id must be an integer.")
+    for family in ANALYSIS_FAMILIES:
+        if family["id"] == family_id:
+            return deepcopy(family)
+    raise KeyError(f"Unknown primary-analysis family ID: {family_id}")
+
+
+def get_family_entry_points(family_id: int) -> list[dict]:
+    """Return the existing callable analysis records belonging to a primary family."""
+    family = get_analysis_family(family_id)
+    return [get_analysis(entry_id) for entry_id in family["entry_ids"]]
