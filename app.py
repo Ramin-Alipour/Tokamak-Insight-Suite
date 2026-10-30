@@ -824,7 +824,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='Thomson multi-channel spectral inference':
         st.caption('Primary Analysis 1: fit measured, calibrated multi-channel Thomson spectra and infer physical parameters. No detector calibration, data repair, or experimental validation is performed.')
         all_cols=[str(c) for c in df.columns]
