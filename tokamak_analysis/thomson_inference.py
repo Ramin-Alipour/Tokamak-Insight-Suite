@@ -857,7 +857,9 @@ def analyze_thomson_spectra(
                 "interpretation": "No per-channel model-discrepancy covariance is available because a supported reduced chi-square/noise covariance estimate was not produced.",
             }
         else:
-            fit["model_discrepancy_diagnostics"]["covariance_included"] = True
+            fit["model_discrepancy_diagnostics"]["covariance_included"] = fit[
+                "model_discrepancy_uncertainty_available"
+            ]
         density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
