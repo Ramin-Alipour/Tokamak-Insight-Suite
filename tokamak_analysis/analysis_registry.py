@@ -19,81 +19,81 @@ ANALYSES = [{
                     "name": "wavelength_nm",
                     "unit": "nm",
                     "description": "Calibrated spectral wavelength axis shared across channels or supplied per channel.",
-                    "required": true
+                    "required": True
                 },
                 {
                     "name": "spectra",
                     "unit": "calibrated spectral intensity",
                     "description": "Measured full Thomson spectra with shape (channel, wavelength); not pre-extracted ne/Te profiles.",
-                    "required": true
+                    "required": True
                 },
                 {
                     "name": "radius_m",
                     "unit": "m",
                     "description": "Calibrated spatial coordinate for each measured spectral channel.",
-                    "required": true
+                    "required": True
                 },
                 {
                     "name": "laser_wavelength_nm",
                     "unit": "nm",
-                    "required": true
+                    "required": True
                 },
                 {
                     "name": "scattering_angle_rad",
                     "unit": "rad",
-                    "required": true
+                    "required": True
                 },
                 {
                     "name": "instrument_response",
                     "unit": "normalized response matrix",
                     "description": "Measured instrument line-spread response matrix, common to channels or channel-specific; identity only when explicitly absent.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "signal_uncertainty",
                     "unit": "same as spectra",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "model",
                     "unit": "text",
-                    "description": "non_collective_maxwellian or collective_maxwellian.",
-                    "required": false
+                    "description": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian.",
+                    "required": False
                 },
                 {
                     "name": "ion_species",
                     "unit": "species list",
                     "description": "Explicit ion species for collective Maxwellian inference.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "ion_temperature_eV",
                     "unit": "eV",
                     "description": "Independently supplied ion temperature(s); required for the current collective Maxwellian backend.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "ion_velocity_m_s",
                     "unit": "m s^-1",
                     "description": "Optional independently measured ion flow vectors.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "electron_velocity_m_s",
                     "unit": "m s^-1",
                     "description": "Optional independently measured electron-fluid flow vector.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "absolute_density_geometry",
                     "unit": "structured",
                     "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density.",
-                    "required": false
+                    "required": False
                 },
                 {
                     "name": "instrument_response_uncertainty",
                     "unit": "response-matrix 1-sigma",
-                    "required": false
+                    "required": False
                 }
             ],
         "output_specs":             [
@@ -199,8 +199,10 @@ ANALYSES = [{
                 }
             ],
         "test_links": [
-            "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients",
-            "tests/test_thomson_workflow.py::test_thomson_workflow_preserves_sorted_uncertainties"
+            "tests/test_thomson_inference.py::test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius",
+            "tests/test_thomson_inference.py::test_non_gaussian_instrument_response_matrix_is_used_in_forward_fit",
+            "tests/test_thomson_inference.py::test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_supplied",
+            "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients"
         ],
         "completion_scope": "Multi-channel spectral inference with declared Maxwellian/kappa model limits, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
     }
