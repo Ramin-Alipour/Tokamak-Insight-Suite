@@ -2761,6 +2761,7 @@ elif page=='Advanced Analysis':
             if model_label.startswith('Collective'):
                 st.caption('Collective mode requires explicit ion species and independently measured/supplied ion temperatures. No missing ion temperature is assumed.')
                 ion_species_text=st.text_input('Ion species (comma-separated PlasmaPy names, e.g. H+, He-4 2+)',value='H+',key='tis_ts_ions')
+                ion_fractions_text=st.text_input('Ion number fractions (one per species; sum to 1)',value='1',key='tis_ts_ion_fractions')
                 ion_temperature_text=st.text_input('Ion temperature(s), eV (comma-separated; one per species)',value='',key='tis_ts_ti')
                 ion_velocity_text=st.text_input('Measured ion velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_vi')
                 assume_ion_stationary=st.checkbox('Explicitly assume zero ion flow when no ion velocity is supplied',value=False,key='tis_ts_vi_zero')
@@ -2815,6 +2816,9 @@ elif page=='Advanced Analysis':
                     kwargs={}
                     if model_label.startswith('Collective'):
                         species=[s.strip() for s in ion_species_text.split(',') if s.strip()]
+                        ion_fractions=[float(v.strip()) for v in ion_fractions_text.split(',') if v.strip()]
+                        if len(ion_fractions)!=len(species) or not np.isclose(sum(ion_fractions),1.0):
+                            raise ValueError('Provide one positive ion fraction per species; fractions must sum to one.')
                         ion_t=[float(v.strip()) for v in ion_temperature_text.split(',') if v.strip()]
                         if len(ion_t)!=len(species):
                             raise ValueError('Provide one independently measured ion temperature for each ion species.')
@@ -2822,7 +2826,7 @@ elif page=='Advanced Analysis':
                         ev=np.array([float(v.strip()) for v in electron_velocity_text.split(',')]) if electron_velocity_text.strip() else (np.zeros(3) if assume_electron_stationary else np.array([]))
                         if iv.size!=3 or ev.size!=3:
                             raise ValueError('Supply each measured velocity vector, or explicitly check the corresponding stationary-flow assumption.')
-                        kwargs.update(ion_species=species,ion_temperature_eV=ion_t,
+                        kwargs.update(ion_species=species,ion_fractions=ion_fractions,ion_temperature_eV=ion_t,
                                      ion_velocity_m_s=np.tile(iv,(len(species),1)),electron_velocity_m_s=ev)
                     if power_calibrated:
                         if not all(v>0 for v in (laser_power,interaction_length,solid_angle,efficiency)):
