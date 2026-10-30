@@ -1849,12 +1849,24 @@ elif page=='Probe Analysis':
             with mc1: multi_ion_current=st.number_input('Ion-saturation current (A)',value=-1e-3,format='%.6g',key='probe_multi_ion_current')
             with mc2: multi_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_multi_te')
             with mc3: multi_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_multi_area')
-            multi_species_text=st.text_area('Species JSON (fraction means number-density fraction; charge_state is integer Z)',value='[{"mass_kg": 3.34e-27, "fraction": 1.0, "charge_state": 1, "sheath_coefficient": 0.61}]',key='probe_multi_species_json')
+            multi_species_text=st.text_area(
+                'Species JSON (fraction = number-density fraction; optional mass_relative_standard_uncertainty and sheath_coefficient_relative_standard_uncertainty)',
+                value='[{"mass_kg": 3.34e-27, "fraction": 1.0, "charge_state": 1, "sheath_coefficient": 0.61}]',
+                key='probe_multi_species_json')
+            mu1,mu2,mu3=st.columns(3)
+            with mu1: multi_current_sigma=st.number_input('Ion-current σ (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_multi_current_sigma')
+            with mu2: multi_te_rel=st.number_input('Te relative σ (0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_multi_te_rel')
+            with mu3: multi_area_rel=st.number_input('Area relative σ (0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_multi_area_rel')
+            st.caption('Only explicitly supplied independent components are propagated. Species number-fraction covariance is excluded; fractions are treated as fixed. Add per-species mass/sheath-coefficient relative uncertainties in the JSON when available.')
             if st.button('Estimate multispecies ion density',key='probe_estimate_multi_ni'):
                 try:
                     multi_species=json.loads(multi_species_text)
-                    st.json(estimate_multispecies_ion_density(multi_ion_current,multi_te,multi_area,multi_species,
-                        current_convention=cur_conv,fraction_basis='number_density'))
+                    st.json(estimate_multispecies_ion_density(
+                        multi_ion_current,multi_te,multi_area,multi_species,
+                        current_convention=cur_conv,fraction_basis='number_density',
+                        current_standard_uncertainty_A=multi_current_sigma if multi_current_sigma>0 else None,
+                        temperature_relative_standard_uncertainty=multi_te_rel if multi_te_rel>0 else None,
+                        area_relative_standard_uncertainty=multi_area_rel if multi_area_rel>0 else None))
                 except Exception as exc: st.error(str(exc))
         else:
             fc1,fc2,fc3,fc4=st.columns(4)
