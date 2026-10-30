@@ -1794,16 +1794,21 @@ elif page=='Probe Analysis':
     with st.expander('Advanced electron-branch and plasma-potential models'):
         advanced_method=st.selectbox('Advanced analysis',['Single-/two-temperature exponential fit','Stretched-exponential shape fit','Smoothed derivative candidates','Fit-window sensitivity'],key='probe_advanced_method')
         advanced_model='two_temperature' if advanced_method=='Single-/two-temperature exponential fit' else 'stretched' if advanced_method=='Stretched-exponential shape fit' else 'smoothed' if advanced_method=='Smoothed derivative candidates' else 'sensitivity'
-        if advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'} and efit is None:
-            st.info('Enable and select an electron-retarding fit interval above before running this analysis.')
+        needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
+        advanced_min_points=(8 if advanced_model=='two_temperature' and model_choice=='two_temperature'
+                             else 5 if advanced_model=='stretched' else 4)
+        advanced_window_points=(int(np.count_nonzero((distinct_paired_voltage>=efit[0])&(distinct_paired_voltage<=efit[1])))
+                                if efit is not None else 0)
+        advanced_window_valid=(efit is not None and advanced_window_points>=advanced_min_points)
+        if needs_electron_window and not advanced_window_valid:
+            st.info(f'Select a valid electron-retarding interval containing at least {advanced_min_points} distinct calibrated voltage values before running this model.')
         if advanced_method=='Single-/two-temperature exponential fit':
             model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
         if advanced_method=='Smoothed derivative candidates':
             sg1,sg2=st.columns(2)
             with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
             with sg2: sg_order=st.number_input('Polynomial order (at least 2 for d²I/dV²)',min_value=2,max_value=6,value=2,key='probe_sg_order')
-        needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
-        if st.button('Run selected advanced analysis',key='probe_run_advanced',disabled=bool(needs_electron_window and efit is None)):
+        if st.button('Run selected advanced analysis',key='probe_run_advanced',disabled=bool(needs_electron_window and not advanced_window_valid)):
             try:
                 if advanced_model=='two_temperature':
                     advanced_result=fit_langmuir_electron_models(df[vcol],df[icol],efit,model=model_choice,current_convention=cur_conv)
