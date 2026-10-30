@@ -2802,6 +2802,13 @@ elif page=='Advanced Analysis':
                         wavelengths.append(xvals); spectra.append(yvals); radii.append(float(rvals[0]))
                         if signal_unc_col!='(none)':
                             uncertainties.append(pd.to_numeric(part[signal_unc_col],errors='raise').to_numpy(float))
+                    order=np.argsort(np.asarray(radii,dtype=float))
+                    channel_ids=[channel_ids[k] for k in order]
+                    radii=np.asarray(radii,dtype=float)[order].tolist()
+                    spectra=np.asarray(spectra,dtype=float)[order].tolist()
+                    wavelengths=np.asarray(wavelengths,dtype=float)[order].tolist()
+                    if uncertainties:
+                        uncertainties=np.asarray(uncertainties,dtype=float)[order].tolist()
                     response=None if response_file is None else pd.read_csv(response_file,header=None).to_numpy(float)
                     response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
                     kwargs={}
