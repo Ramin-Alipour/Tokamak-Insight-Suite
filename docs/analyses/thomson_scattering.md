@@ -125,3 +125,11 @@ analyze_thomson_profile and reconstruct_thomson_profile remain available for use
 ## Software testing
 
 The new test module checks multi-channel data flow, arbitrary non-Gaussian response matrices, channel-specific wavelength axes, density identifiability, explicit ion-species requirements and uncertainty reporting. Synthetic tests are software regression tests, not independent experimental validation.
+
+## Profile terminology and reconstruction
+
+The profile summary reports radial-coordinate averages over the supplied interval. They are not line-of-sight averages or volume averages unless the corresponding geometric weighting is explicitly applied. The legacy attribute names containing "line_average" are compatibility aliases and are deprecated.
+
+For reconstruction, omitting smoothing_factor selects the smoothing-spline regularization parameter by generalized cross-validation. An explicitly supplied smoothing_factor selects the legacy weighted-residual target. A negative reconstructed density or temperature overshoot is rejected rather than clipped, because clipping would change both the profile and its derivative.
+
+Scale lengths are reported only where the gradient exceeds twice its propagated pointwise 1-sigma uncertainty when those uncertainties are supplied; without uncertainty inputs, the numerical round-off threshold is used. Correlated profile-point covariance and reconstructed confidence bands remain incomplete.

@@ -1,42 +1,53 @@
-# Thomson Spectral Distribution Analysis (callable registry entry 81; user-facing analysis 7)
+# Thomson spectral distribution analysis — subanalysis 7
 
-## Completion status
+## Canonical registry and execution path
 
-**Implemented and integrated within the declared descriptive-analysis scope.** The callable is registered as entry 81 in the current 81-entry analysis registry and exposed as **Thomson spectral distribution** on the dashboard's Spectral Analysis page. The dashboard accepts calibrated wavelength, signal, optional pointwise uncertainty, instrument standard deviation and background-window fraction; executes the analysis; displays fit/moment diagnostics and plots; and exports the full result as JSON. The callable and dashboard interaction have focused automated regression tests.
+This subanalysis is registered as ID 7 in the 80-entry callable registry and belongs to primary Analysis 1 (Thomson Scattering). It accepts measured, calibrated multi-channel Thomson spectra and delegates physical parameter extraction to the canonical forward-inference engine in tokamak_analysis.thomson_inference.
 
-The numbering differs from the user's 80-item diagnostic shortlist: this is item 7 in that shortlist, while the current software's canonical callable registry assigns it ID 81. This distinction does not change which analysis the dashboard runs.
+The lower-level function analyze_thomson_spectral_distribution remains available as a supplementary, model-independent description of a single measured spectral shape. It is not the registered physical-inference workflow and must not be interpreted as an electron velocity-distribution measurement.
 
-## Inputs
+## Physical-inference inputs
 
-- `wavelength_nm`: finite, strictly increasing calibrated wavelength axis in nm; at least nine samples.
-- `signal`: finite measured spectral signal with matching length.
-- `instrument_sigma_nm`: known positive Gaussian instrumental standard deviation in nm.
-- `signal_uncertainty`: optional positive finite per-sample 1-sigma uncertainty.
-- `background_fraction`: optional fraction of edge samples used to estimate a local linear background; range 0.02–0.4.
+- Calibrated wavelength axis and measured spectra with shape (channel, wavelength)
+- Calibrated radius for each channel
+- Probe laser wavelength and scattering angle
+- Measured instrument-response callable, kernel or matrix
+- Optional pointwise signal uncertainty
+- Model-specific inputs required by the selected inference model
 
-## Outputs and method
+## Physical outputs
 
-The workflow estimates a local linear background from both spectral-window edges, preserves the signed background-subtracted spectrum, and calculates positive-weight spectral area, centroid, observed RMS width, skewness and excess kurtosis. Spectral moments use wavelength-space quadrature weights, so nonuniform wavelength sampling does not simply overweight densely sampled regions. It subtracts the known Gaussian instrumental variance from the observed variance. If the result is unresolved or non-positive, the instrument-corrected width and variance are returned as JSON-safe null values rather than fabricated. A Gaussian-plus-linear-background fit supplies fitted parameters, local covariance uncertainties, residuals, R-squared and optional chi-square metrics when sample uncertainties are supplied.
+The canonical inference engine returns per-channel electron temperature, supported electron-flow projection, electron density only where identifiable, fit residuals, covariance and model diagnostics. Absolute non-collective density requires calibrated W/nm spectral power and the complete optical collection/polarization geometry.
 
-## Scientific limits
+## Supplementary descriptive helper
 
-- Spectral moments describe the measured wavelength distribution; they do not uniquely recover the electron velocity distribution.
-- Instrument-width correction assumes independent Gaussian variances and a known instrument standard deviation.
-- Supplied signal uncertainties weight the Gaussian fit and support chi-square metrics. They are not propagated into spectral moments; wavelength-calibration, background-model and instrument-width uncertainties are also not propagated.
-- The Gaussian parameter uncertainties are local covariance estimates and can be unreliable for poorly conditioned fits.
-- No electron temperature or density is inferred; no collective/relativistic/non-Maxwellian forward model, stray-light correction, or complete instrument-response calibration is performed.
-- Use requires appropriate calibration and researcher interpretation. Software tests demonstrate computational behavior, not independent scientific validation.
+The helper analyze_thomson_spectral_distribution accepts one spectrum and either:
+- a scalar Gaussian instrument width, or
+- a measured general instrument-response matrix.
 
-## API example
+It uses signed background-subtracted spectral samples for moments; negative residuals are not clipped. A caller-supplied boolean background mask can replace the edge-background fallback. When signal uncertainty is supplied, moment uncertainty is estimated by deterministic-seed parametric Monte Carlo. Instrument-width uncertainty is included in the corrected-width uncertainty. A general response matrix is used in the Gaussian forward fit, but no scalar Gaussian deconvolution is claimed for that case.
+
+## Model limitations
+
+- Maxwellian non-collective inference is restricted to the declared non-relativistic regime.
+- Kappa is a parameterized one-dimensional projection, not arbitrary VDF reconstruction.
+- Relativistic Maxwell-Juttner is a one-dimensional projected approximation, not full three-dimensional photon-geometry integration.
+- The current optical collective Maxwellian path requires externally supplied ion temperatures and ion/electron flow vectors; these are not fitted as independent CTS outputs.
+- Microwave CTS and fast-ion CTS inversion are separate capabilities and are not implied by this optical Thomson workflow.
+- Shared wavelength-bin/channel covariance and model-discrepancy uncertainty remain incomplete.
+- No detector calibration, source-data repair or experimental validation is performed.
+
+## API
 
 ```python
-from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution_inference
 
-result = analyze_thomson_spectral_distribution(
+result = analyze_thomson_spectral_distribution_inference(
     wavelength_nm,
-    signal,
-    instrument_sigma_nm=0.06,
-    signal_uncertainty=signal_uncertainty,
+    spectra,
+    radius_m,
+    laser_wavelength_nm=532.0,
+    scattering_angle_rad=1.57079632679,
+    instrument_response=response_matrix,
 )
-print(result["spectral_centroid_nm"], result["instrument_corrected_sigma_nm"])
 ```
