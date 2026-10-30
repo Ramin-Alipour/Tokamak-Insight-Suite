@@ -43,16 +43,16 @@ def test_multispecies_density_requires_fractions_sum_to_one():
     with pytest.raises(ValueError, match="sum to 1"):
         estimate_multispecies_ion_density(
             -1e-3, 5.0, 1e-4,
-            [{"mass_kg": 3.3e-27, "fraction": 0.7, "sheath_coefficient": 0.61},
-             {"mass_kg": 6.6e-27, "fraction": 0.2, "sheath_coefficient": 0.61}],
+            [{"mass_kg": 3.3e-27, "fraction": 0.7, "charge_state": 1, "sheath_coefficient": 0.61},
+             {"mass_kg": 6.6e-27, "fraction": 0.2, "charge_state": 1, "sheath_coefficient": 0.61}],
         )
 
 
 def test_multispecies_density_returns_model_labelled_estimate():
     result = estimate_multispecies_ion_density(
         -1e-3, 5.0, 1e-4,
-        [{"mass_kg": 3.3e-27, "fraction": 0.7, "sheath_coefficient": 0.61},
-         {"mass_kg": 6.6e-27, "fraction": 0.3, "sheath_coefficient": 0.61}],
+        [{"mass_kg": 3.3e-27, "fraction": 0.7, "charge_state": 1, "sheath_coefficient": 0.61},
+         {"mass_kg": 6.6e-27, "fraction": 0.3, "charge_state": 1, "sheath_coefficient": 0.61}],
     )
     assert result["ion_density_estimate_m-3"] > 0
     assert result["physical_regime_confirmed"] is False
@@ -174,8 +174,8 @@ def test_stretched_exponential_and_smoothed_derivatives_share_current_polarity_c
 
 def test_multispecies_fraction_basis_and_current_polarity_are_explicit():
     species = [
-        {"mass_kg": 3.3e-27, "fraction": 0.7, "sheath_coefficient": 0.61},
-        {"mass_kg": 6.6e-27, "fraction": 0.3, "sheath_coefficient": 0.61},
+        {"mass_kg": 3.3e-27, "fraction": 0.7, "charge_state": 1, "sheath_coefficient": 0.61},
+        {"mass_kg": 6.6e-27, "fraction": 0.3, "charge_state": 1, "sheath_coefficient": 0.61},
     ]
     electron_positive = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
     ion_positive = estimate_multispecies_ion_density(1e-3, 5.0, 1e-4, species, current_convention="ion_positive")
@@ -212,3 +212,84 @@ def test_smoothed_derivative_helper_reports_second_derivative_zero_crossings_sep
     assert result["second_derivative_inflection_method"].startswith("zero_crossings_of_d2IdV2")
     assert "raw_max_d2IdV2_extremum_V" in result
 
+
+
+def test_advanced_fits_aggregate_duplicate_voltages_before_curve_fit():
+    v = np.linspace(-5.0, 5.0, 81)
+    i = -2e-3 + 3e-4 * np.exp((v + 5.0) / 2.5)
+    v_dup = np.r_[v, v[20], v[20], np.nan]
+    i_dup = np.r_[i, i[20] + 5e-4, i[20] - 5e-4, 0.0]
+    baseline = fit_langmuir_electron_models(v, i, (-4.0, 2.0))
+    aggregated = fit_langmuir_electron_models(v_dup, i_dup, (-4.0, 2.0))
+    assert aggregated["fit_points"] == baseline["fit_points"]
+    assert aggregated["electron_temperature_components_eV"] == pytest.approx(baseline["electron_temperature_components_eV"], rel=1e-8)
+    assert aggregated["input_quality"]["duplicate_voltage_pair_count_aggregated"] == 2
+    assert aggregated["input_quality"]["discarded_nonfinite_pair_count"] == 1
+    with pytest.raises(ValueError, match="eight distinct"):
+        fit_langmuir_electron_models(np.repeat(v[:7], 2), np.repeat(i[:7], 2), (-5.0, -4.0))
+
+
+def test_stretched_fit_aggregates_duplicate_voltages_and_reports_parameter_uncertainty():
+    from tokamak_analysis.langmuir_advanced import fit_langmuir_stretched_exponential
+    v = np.linspace(-5.0, 5.0, 81)
+    i = -2e-3 + 3e-4 * np.exp(np.maximum((v + 5.0) / 2.5, 0.0) ** 1.2)
+    result = fit_langmuir_stretched_exponential(np.r_[v, v[10]], np.r_[i, i[10]], (-4.0, 3.0))
+    assert result["input_quality"]["duplicate_voltage_pair_count_aggregated"] == 1
+    assert result["preprocessing_contract"].endswith("duplicate_voltage_current_mean")
+    assert result["parameter_uncertainty_status"] in {"conditional_covariance_standard_errors_available", "unavailable_invalid_or_singular_fit_covariance"}
+    if result["covariance_valid"]:
+        assert result["shape_exponent_standard_uncertainty"] is not None
+    else:
+        assert result["shape_exponent_standard_uncertainty"] is None
+
+
+def test_local_polynomial_smoothing_uses_nonuniform_voltage_coordinates():
+    from tokamak_analysis.langmuir_advanced import estimate_smoothed_plasma_potential_candidates
+    v = np.sort(np.r_[-4.0 + 3.0*np.linspace(0.0,1.0,15)**1.4, -0.8 + 4.8*np.linspace(0.0,1.0,37)**1.7])
+    v = np.unique(v)
+    i = 2.0 + 3.0*v + 0.5*v**2
+    result = estimate_smoothed_plasma_potential_candidates(v, i, window_length=7, polynomial_order=2)
+    assert result["smoothing_method"] == "local_polynomial_least_squares_on_actual_voltage_coordinates"
+    assert result["voltage_grid_uniformity"].startswith("not_required")
+    assert np.asarray(result["smoothed_current_A"]) == pytest.approx(i, rel=1e-8, abs=1e-8)
+
+
+def test_advanced_helper_uncertainties_are_conditional_and_never_zero_filled():
+    from tokamak_analysis.langmuir_advanced import estimate_electron_density_from_saturation, estimate_ion_particle_flux
+    ne0 = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4)
+    assert ne0["electron_density_standard_uncertainty_m-3"] is None
+    assert ne0["uncertainty_propagation_performed"] is False
+    ne1 = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4,
+        current_standard_uncertainty_A=1e-5, temperature_relative_standard_uncertainty=0.02,
+        area_relative_standard_uncertainty=0.01)
+    assert ne1["electron_density_standard_uncertainty_m-3"] > 0
+    flux0 = estimate_ion_particle_flux(1e18, 5.0, 3.34e-27, sheath_factor=1.0)
+    assert flux0["ion_particle_flux_standard_uncertainty_m-2_s-1"] is None
+    flux1 = estimate_ion_particle_flux(1e18, 5.0, 3.34e-27, sheath_factor=1.0,
+        density_relative_standard_uncertainty=0.01, temperature_relative_standard_uncertainty=0.02,
+        mass_relative_standard_uncertainty=0.01, sheath_factor_relative_standard_uncertainty=0.03)
+    assert flux1["ion_particle_flux_standard_uncertainty_m-2_s-1"] > 0
+
+
+def test_multispecies_density_requires_charge_state_and_applies_charge_dependence():
+    z1 = [{"mass_kg": 3.3e-27, "fraction": 1.0, "charge_state": 1, "sheath_coefficient": 0.61}]
+    z2 = [{"mass_kg": 3.3e-27, "fraction": 1.0, "charge_state": 2, "sheath_coefficient": 0.61}]
+    n1 = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, z1)["ion_density_estimate_m-3"]
+    n2 = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, z2)["ion_density_estimate_m-3"]
+    assert n2 == pytest.approx(n1 / (2.0**1.5))
+    assert "not_propagated" in estimate_multispecies_ion_density(-1e-3,5.0,1e-4,z1)["uncertainty_status"]
+
+
+def test_single_species_core_density_includes_charge_state():
+    from tis.probe_analysis import langmuir_iv_analysis
+    v = np.linspace(-10.0, 10.0, 201)
+    i = -1e-3 + 2e-4*np.exp((v+10.0)/3.0)
+    common = dict(electron_fit_range=(-8.0,-1.0), ion_fit_range=(-10.0,-9.0),
+                  probe_area_m2=1e-4, ion_mass_kg=3.34e-27,
+                  ion_saturation_coefficient=0.61, sheath_model="test model",
+                  fit_quality_min_r2=0.0, fit_quality_max_nrmse=10.0,
+                  ion_flatness_max_relative_change=10.0)
+    a = langmuir_iv_analysis(v,i,ion_charge_state=1,**common)
+    b = langmuir_iv_analysis(v,i,ion_charge_state=2,**common)
+    assert b["ion_density_estimate_m-3"] == pytest.approx(a["ion_density_estimate_m-3"]/(2.0**1.5))
+    assert b["ion_density_model"]["ion_charge_state"] == 2
