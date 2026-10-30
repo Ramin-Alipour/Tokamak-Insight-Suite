@@ -172,5 +172,11 @@ def test_thomson_reconstruction_clipping_keeps_derivative_consistent(method):
     dte = out["reconstruction_gradients"]["temperature_gradient_eV_m-1"]
     assert np.all(ne >= 0.0)
     assert np.all(te >= 0.0)
-    np.testing.assert_array_equal(dne[ne == 0.0], np.zeros(np.count_nonzero(ne == 0.0)))
-    np.testing.assert_array_equal(dte[te == 0.0], np.zeros(np.count_nonzero(te == 0.0)))
+    assert np.all(np.isfinite(dne))
+    assert np.all(np.isfinite(dte))
+    if method == "smoothing_spline":
+        # Any sample projected from a negative spline overshoot has a zero
+        # derivative by construction. Do not impose that rule on native
+        # non-negative PCHIP zeros, whose one-sided slope can be non-zero.
+        np.testing.assert_array_equal(dne[ne == 0.0], np.zeros(np.count_nonzero(ne == 0.0)))
+        np.testing.assert_array_equal(dte[te == 0.0], np.zeros(np.count_nonzero(te == 0.0)))
