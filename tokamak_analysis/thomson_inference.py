@@ -476,7 +476,9 @@ def analyze_thomson_spectra(
                 x_scale="jac", max_nfev=5000,
             )
             ne_fit, te_fit = map(float, 10.0**fitopt.x)
-            dof = max(1, y[i].size-fitopt.x.size)
+            # Two nonlinear plasma parameters plus three profiled linear nuisance parameters
+            # (amplitude, background intercept, and background slope) are estimated.
+            dof = max(1, y[i].size-5)
             try:
                 covariance_log = np.linalg.pinv(fitopt.jac.T @ fitopt.jac)
                 if ui is None:
@@ -487,7 +489,8 @@ def analyze_thomson_spectra(
             except np.linalg.LinAlgError:
                 parameter_covariance = None
                 parameter_uncertainties = np.array([np.nan,np.nan])
-            model_spec = collective_shape(fitopt.x)
+            # fitopt.x is in log10 space; the forward model requires physical ne and Te.
+            model_spec = collective_shape(10.0**fitopt.x)
             alpha_fit, _ = thomson.spectral_density(
                 xi*u.nm, float(laser_wavelength_nm)*u.nm, ne_fit/u.m**3,
                 T_e=te_fit*u.eV, T_i=ion_t*u.eV, ions=ion_species, ifract=ion_fract,
