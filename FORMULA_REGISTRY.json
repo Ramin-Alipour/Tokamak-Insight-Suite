@@ -2630,7 +2630,7 @@
     "equation": "n_i = |I_i,sat| / [e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]",
     "inputs": "Ion-saturation current [A], T_e [eV], effective area A_p [m^2], species masses m_s [kg], number-density fractions f_s, integer charge states Z_s and sheath coefficients C_s",
     "output": "m^-3",
-    "assumptions": "Species-summed Bohm/sheath current balance; common electron temperature and effective area; fractions are number-density fractions summing to one; charge state enters via Z_s^(3/2). Based on Hutchinson (2002), Ch. 3, §3.2.5.",
+    "assumptions": "Maxwellian electron temperature, common Te, number-density fractions sum to one, species Bohm speed sqrt(Z_s e T_e/m_s), species-appropriate supplied sheath coefficients and a common effective collection area. Uncertainty assumes independent supplied input errors; composition covariance is excluded.",
     "status": "D",
     "execution_contract": {
       "schema_version": "1.0",
@@ -2661,39 +2661,79 @@
           "unit": "sequence",
           "description": "Each species requires mass_kg, fraction (number-density fraction), positive integer charge_state and sheath_coefficient.",
           "required": true
+        },
+        {
+          "name": "sigma_ion_saturation_current_A",
+          "unit": "A",
+          "description": "Optional absolute 1-sigma uncertainty of ion-saturation current.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "relative_sigma_electron_temperature",
+          "unit": "fraction",
+          "description": "Optional relative 1-sigma uncertainty of electron temperature.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "relative_sigma_probe_area",
+          "unit": "fraction",
+          "description": "Optional relative 1-sigma uncertainty of effective probe area.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "species[].mass_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Optional per-species relative 1-sigma uncertainty of species mass.",
+          "required": false,
+          "minimum": 0
+        },
+        {
+          "name": "species[].sheath_coefficient_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Optional per-species relative 1-sigma uncertainty of sheath coefficient.",
+          "required": false,
+          "minimum": 0
         }
       ],
       "output_specs": [
         {
           "name": "ion_density_m3",
           "unit": "m^-3",
-          "description": "Total model-based ion density from species-summed current balance."
-        },
-        {
-          "name": "ion_species",
-          "unit": "sequence",
-          "description": "Normalized species input definitions."
-        },
-        {
-          "name": "ion_species_fraction_sum",
-          "unit": "1",
-          "description": "Sum of number-density fractions; must equal one."
+          "description": "Species-summed model-based total ion density."
         },
         {
           "name": "uncertainty_ion_density_m3",
           "unit": "m^-3",
-          "description": "Null until a composition-covariance uncertainty model is supplied."
+          "description": "Partial independent-input propagated standard uncertainty when explicit uncertainty components are supplied; otherwise absent/null."
         },
         {
-          "name": "uncertainty_status",
-          "unit": "text",
-          "description": "Explicit status that composition and species-model uncertainty were not propagated."
+          "name": "ion_density_relative_standard_uncertainty",
+          "unit": "fraction",
+          "description": "Relative partial standard uncertainty."
+        },
+        {
+          "name": "ion_density_uncertainty_components_relative",
+          "unit": "structured",
+          "description": "Explicit relative uncertainty components included in propagation."
+        },
+        {
+          "name": "ion_density_uncertainty_omitted_components",
+          "unit": "list",
+          "description": "Uncertainty terms not propagated, including species number-fraction covariance."
+        },
+        {
+          "name": "ion_species",
+          "unit": "structured",
+          "description": "Normalized species parameters and number-density fractions."
         }
       ],
       "prerequisites": [
         "Species number-density fractions must sum to one; charge states are positive integers; common T_e and area; sheath coefficients are explicit."
       ],
-      "uncertainty_model": "Not propagated: species fraction covariance, species-resolved sheath coefficient uncertainty and composition/model discrepancy are not supplied by this formula.",
+      "uncertainty_model": "Partial first-order independent-input propagation: relative current uncertainty, relative area uncertainty, half the relative Te uncertainty, plus species-weighted relative sheath-coefficient and half-weighted mass uncertainties. Species fractions are held fixed; fraction uncertainty is not propagated because the sum-to-one constraint requires a composition covariance model. Only supplied terms are included and omitted components are listed; no missing term is zero-filled.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_langmuir_multispecies_density_reference"
       ],
