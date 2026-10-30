@@ -49,7 +49,7 @@
         {
           "name": "instrument_response",
           "unit": "normalized response matrix",
-          "required": false,
+          "required": true,
           "description": "Measured LSF matrix common to channels or channel-specific."
         },
         {
