@@ -71,10 +71,11 @@ A spectral shape alone does not determine absolute electron density in the non-c
 - interaction length;
 - collection solid angle;
 - optical efficiency;
-- incident polarization vector;
-- scattered-light direction.
+- incident laser propagation direction;
+- incident polarization vector (perpendicular to the incident beam);
+- scattered-light direction (consistent with the specified scattering angle).
 
-The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties).
+The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. The incident polarization must be perpendicular to the incident beam, and the supplied incident/scattered direction vectors must agree with the specified scattering angle. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties).
 
 ## Outputs
 
