@@ -102,15 +102,21 @@ def analyze_thomson_profile(
     Full covariance matrices are ordered like the supplied profile points and are
     reordered together with the radius/density/temperature arrays.
     """
-    radius_input = np.asarray(radius_m, dtype=float)
-    if radius_input.ndim != 1 or not np.all(np.isfinite(radius_input)):
-        raise ValueError("radius_m must be a finite one-dimensional array")
+    radius_raw = np.asarray(radius_m)
+    if radius_raw.ndim != 1 or radius_raw.dtype.kind not in "iuf":
+        raise ValueError("radius_m must be a one-dimensional real numeric array")
+    radius_input = radius_raw.astype(float, copy=False)
+    if not np.all(np.isfinite(radius_input)):
+        raise ValueError("radius_m must contain only finite values")
     order = np.argsort(radius_input)
 
     def validate_profile_covariance(value, name, supplied_uncertainty):
         if value is None:
             return None, supplied_uncertainty
-        covariance = np.asarray(value, dtype=float)
+        covariance_raw = np.asarray(value)
+        if covariance_raw.dtype.kind not in "iuf":
+            raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+        covariance = covariance_raw.astype(float, copy=False)
         expected = (radius_input.size, radius_input.size)
         if covariance.shape != expected or not np.all(np.isfinite(covariance)):
             raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
