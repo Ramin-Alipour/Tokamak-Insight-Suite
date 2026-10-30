@@ -1,85 +1,115 @@
 # Thomson Scattering (Analysis 1 of 80)
 
-## Scope and completion status
+## Primary contract
 
-**Complete within the declared geometry-independent software scope.** Analysis 1 consumes already-calibrated electron-density and electron-temperature profiles together with their supplied calibrated spatial coordinate. It does not calibrate raw detector data, infer device dimensions, request optical collection geometry, or calculate geometry-weighted volume averages.
+**Analysis 1 starts from measured, wavelength-calibrated and intensity-calibrated Thomson spectra, not from electron-density or electron-temperature profiles.** Its primary input is a complete spectrum for every spatial channel, with the channel's supplied spatial coordinate and the instrument response specified as a measured response matrix/function. Detector calibration and correction of raw detector counts are outside this analysis.
 
-The analysis has two supported workflows:
+The primary execution path is:
 
-1. **Calibrated profile analysis** — profile extrema and their supplied-coordinate locations, measured-interval line averages, radial gradients, normalized gradients, local scale lengths, and optional first-order uncertainty propagation.
-2. **Within-domain profile reconstruction** — interpolation/smoothing of the supplied calibrated profiles on a denser coordinate grid, restricted to the measured coordinate interval.
+1. Read the measured spectra as a channel-by-wavelength array (or long-form table in the dashboard).
+2. Evaluate the selected physical Thomson forward model on the measured wavelength grid.
+3. Convolve the physical spectrum with the supplied instrument line-spread response.
+4. Fit each spatial channel and report channel-resolved physical parameters and diagnostics.
+5. Construct the electron-temperature profile and, only when identifiable, the electron-density profile.
+6. Keep the legacy calibrated-profile summary/reconstruction routines as downstream utilities; they are not the primary Analysis 1 input contract.
 
-Raw-spectrum fitting and density inversion from scattered optical power are not part of Analysis 1. They require additional spectral/instrument or optical-geometry inputs and are intentionally excluded from this analysis contract and its dashboard workflow list. Their underlying modules/tests, where present, do not change the scope of Analysis 1.
+## Input contract
 
-No independent experimental validation is claimed. Automated tests check software behavior for specified inputs; they do not establish experimental validity.
-
-## Calibrated profile input contract
-
-| Input | Unit | Requirement |
+| Input | Unit / shape | Requirement |
 |---|---|---|
-| `radius_m` | m | Required; supplied calibrated spatial coordinate, one-dimensional, finite, unique |
-| `density_m3` | m⁻³ | Required; calibrated electron-density profile, finite and non-negative |
-| `temperature_ev` | eV | Required; calibrated electron-temperature profile, finite and non-negative |
-| `density_uncertainty_m3` | m⁻³ | Optional pointwise 1-sigma uncertainty, finite and non-negative |
-| `temperature_uncertainty_ev` | eV | Optional pointwise 1-sigma uncertainty, finite and non-negative |
+| wavelength_nm | nm; (wavelength,) or (channel,wavelength) | Required calibrated wavelength axis |
+| spectra | calibrated intensity; (channel,wavelength) | Required measured full Thomson spectra |
+| radius_m | m; (channel,) | Required supplied coordinate for each channel |
+| laser_wavelength_nm | nm | Required |
+| scattering_angle_rad | rad | Required |
+| instrument_response | normalized matrix (wavelength,wavelength) or (channel,wavelength,wavelength) | Optional only when no response matrix is available; never replaced by a Gaussian-width assumption |
+| signal_uncertainty | same unit/shape as spectra | Optional 1-sigma spectral uncertainty |
+| instrument_response_uncertainty | same shape as response | Optional 1-sigma response-matrix uncertainty |
+| ion_species | explicit species list | Required for collective Maxwellian mode |
+| ion_temperature_eV | eV, one value per species | Required for the current collective backend; supply from an independent diagnostic when available |
+| ion_velocity_m_s | m/s, one 3-vector per species | Optional externally measured ion-flow vectors |
+| electron_velocity_m_s | m/s, 3-vector | Optional externally measured electron-fluid velocity |
+| Absolute-density geometry | W, m, sr, dimensionless efficiency, polarization and direction vectors | Required with spectral intensity in W/nm to infer absolute density in the non-collective mode |
 
-The three required arrays must have equal lengths and at least two samples. Samples are sorted by the supplied coordinate, and all associated profile and uncertainty arrays are reordered consistently. Interpolation targets must be a non-empty, one-dimensional array of finite real numeric values; Boolean and string values are rejected. The coordinate is a supplied data axis, not a machine dimension inferred by TIS. The measured interval need not cover the entire plasma.
+The measured spectra are assumed to be calibrated intensity data. No wavelength calibration, detector calibration, background correction of the measurement system, or instrument-response measurement is performed by this analysis. The physical fit may include a local background nuisance term, which is part of spectral inference rather than detector calibration.
 
-## Calculations and equations
+## Implemented physical model families
 
-For calibrated density \(n_e(r)\) and electron temperature \(T_e(r)\), the numerical gradients are
+### 1. Non-collective Maxwellian
 
-\[
-\frac{dn_e}{dr}, \qquad \frac{dT_e}{dr}.
-\]
+The electron feature is represented by the non-relativistic Maxwellian Doppler spectrum. Its intrinsic width is fitted after applying the supplied instrument-response matrix in the forward model. The fitted spectral centroid yields the electron-flow projection along the scattering wavevector, not a full three-dimensional velocity vector.
 
-The normalized gradients are
+Assumptions: non-collective single-particle scattering, isotropic Maxwellian electrons, non-relativistic velocities, and known scattering geometry.
 
-\[
-\frac{1}{n_e}\frac{dn_e}{dr}, \qquad
-\frac{1}{T_e}\frac{dT_e}{dr},
-\]
+### 2. Non-collective kappa (non-Maxwellian)
 
-and the local scale lengths are
+A finite-variance isotropic kappa electron velocity distribution is represented by its one-dimensional Student-t projection. The fitted second moment is mapped to an effective electron temperature; the kappa index is also returned. This is a parameterized non-Maxwellian option, not an arbitrary free-form velocity-distribution reconstruction.
 
-\[
-L_{n_e}=-\frac{n_e}{dn_e/dr}, \qquad
-L_{T_e}=-\frac{T_e}{dT_e/dr}.
-\]
+Assumptions: non-collective scattering, isotropic kappa distribution, kappa index greater than 1.5, and non-relativistic velocities.
 
-A normalized gradient is undefined where its corresponding profile value is zero. A local scale length is reported as undefined (NaN) where the profile value is zero or the numerical gradient is unresolved. Gradient resolvability is assessed pointwise against a floating-point round-off bound derived from the absolute terms in that location's finite-difference calculation; a large gradient elsewhere in the profile does not set the local threshold. Derivatives use numerical finite differences on the supplied coordinate.
+### 3. Collective Maxwellian
 
-The line average for a profile \(f(r)\) over the measured interval \([r_0,r_N]\) is calculated by trapezoidal integration:
+The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion temperatures and optional species flow vectors, and an optional electron-fluid flow vector. Missing ion temperatures are not silently replaced with electron temperature. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
 
-\[
-\langle f\rangle_{\mathrm{line}} =
-\frac{1}{r_N-r_0}\int_{r_0}^{r_N}f(r)\,dr.
-\]
+The collective model can cover both collective and non-collective scattering regimes through the dielectric spectral-density calculation. The scattering parameter and spectral shape depend on the supplied plasma parameters and geometry.
 
-This is an average over the measured coordinate interval, not a geometry-weighted volume average and not automatically a full-plasma average.
+## Instrument response
+
+The instrument response is represented by a non-negative matrix whose columns are normalized probability distributions for detected wavelength bins conditional on each true wavelength bin. The same matrix can be used for all channels, or a separate matrix can be supplied per channel. This supports asymmetric and wavelength-dependent line-spread functions; a Gaussian response is not imposed.
+
+For the non-collective Maxwellian and kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature and velocity uncertainties combine fit covariance and the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend currently does not marginalize response uncertainty into its parameter covariance.
+
+## Electron density and identifiability
+
+A spectral shape alone does not determine absolute electron density in the non-collective regime. Absolute density is calculated only when the spectral intensity is explicitly declared calibrated in W/nm and all required optical factors are supplied:
+
+- incident laser power at the scattering volume;
+- interaction length;
+- collection solid angle;
+- optical efficiency;
+- incident polarization vector;
+- scattered-light direction.
+
+The differential Thomson cross-section uses the incident polarization dependence for an unanalysed outgoing polarization measurement. If the absolute-power contract is incomplete, the density profile is reported as unavailable (NaN) with an explicit status; it is not fabricated from the fitted Gaussian amplitude. First-order density uncertainty propagation includes only uncertainty terms supplied by the user (spectral integrated-power fit uncertainty and the listed optical-factor uncertainties).
 
 ## Outputs
 
-- Sorted supplied coordinate, density and temperature profiles.
-- Minimum and maximum density and temperature values and their locations on the supplied coordinate.
-- Coordinate range and measured-interval line averages.
-- Density and temperature gradients.
-- Normalized density and temperature gradients.
-- Local density and temperature scale lengths.
-- When corresponding pointwise uncertainties are provided: propagated uncertainties for line averages, gradients, normalized gradients and scale lengths.
-- For the optional reconstruction workflow: reconstructed profiles and gradients only within the measured coordinate interval, with method and domain metadata. The output explicitly reports that reconstructed-profile uncertainty and fit confidence intervals are not estimated; input uncertainties used as spline weights are not output uncertainties.
+- Per-channel fitted electron temperature and its uncertainty.
+- Per-channel electron-flow projection along the scattering wavevector and its uncertainty, where supported.
+- Per-channel absolute electron density only when identifiable from the selected model and supplied optical inputs.
+- Multi-channel radial profiles of the inferred quantities.
+- Per-channel fitted spectra, residuals, fit covariance and model assumptions.
+- Explicit model, instrument-response usage, input provenance and limitations.
 
-## Uncertainty assumptions and limitations
+## Deliberate limitations
 
-- Input profiles and coordinates are assumed calibrated; TIS does not perform calibration in this analysis.
-- Optional uncertainty propagation assumes independent pointwise measurement errors.
-- For smoothing-spline reconstruction, supplied pointwise uncertainties are used only as inverse-sigma fit weights. They are not propagated to the reconstructed profile values; reconstructed-profile uncertainties and fit confidence intervals are explicitly unavailable. Weighting a fit must not be interpreted as an uncertainty estimate for its output.
-- Covariance between samples, calibration uncertainty, model discrepancy, and peak-location uncertainty are not estimated.
-- Numerical derivatives can amplify noise, especially for sparse or noisy profiles.
-- No extrapolation beyond the measured coordinate interval is performed.
-- No machine dimensions, major radius, optical collection geometry, equilibrium reconstruction, or geometry-weighted volume averages are inferred.
-- No independent experimental validation is claimed.
+- Relativistic kinetic corrections are not implemented in this revision. The non-collective Maxwellian and kappa models are explicitly non-relativistic.
+- Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.
+- The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
+- Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
+- The current collective fit reports optimizer diagnostics but does not yet provide a fully marginalized posterior/covariance for all plasma parameters.
+- Correlated uncertainty between wavelength bins, calibration factors and channels is not modeled.
+- No independent experimental validation is claimed. Automated tests verify software behavior and mathematical consistency only.
 
-## Completion gate
+## Scientific basis and model selection
 
-Analysis 1 is complete for the stated software scope: calibrated profile analysis and reconstruction within the measured coordinate interval. The dashboard and diagnostic registry should expose only these two workflows under Analysis 1. Raw-spectrum fitting and scattered-power density inversion are outside this contract and must not be presented as part of its geometry-independent workflow.
+The implementation uses a small set of model families rather than an unbounded list of fitting options:
+
+1. The Maxwellian collective/non-collective spectral-density formulation follows the kinetic dielectric treatment documented by PlasmaPy. Its spectral-density function explicitly supports one or more ion species, ion temperatures and drift velocities.
+2. Recent experimental CTS work demonstrates the importance of robust spectral/background treatment for thermal- and fast-ion monitoring (Verdier et al., Review of Scientific Instruments 96, 043513, 2025, DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948)).
+3. Recent non-Maxwellian Thomson forward-model work motivates retaining a non-Maxwellian option rather than treating a Gaussian as a universal spectrum (Skolar, Longley & Goodwin, ICEAA 2025, DOI: [10.1109/ICEAA65662.2025.11306000](https://doi.org/10.1109/ICEAA65662.2025.11306000)). The kappa implementation here is a bounded parameterized approximation and is not claimed to reproduce that paper's general arbitrary-distribution solver.
+4. Recent multi-regime analysis of Thomson spectra reports inference in both collective and non-collective regimes using physical spectral models (Eisenbach et al., Journal of Physics D: Applied Physics 58, 035202, 2025, DOI: [10.1088/1361-6463/ad89d6](https://doi.org/10.1088/1361-6463/ad89d6)).
+
+References:
+- PlasmaPy, “Thomson Scattering: Spectral Density,” https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html
+- Verdier, T. et al. (2025), DOI: 10.1063/5.0238948.
+- Skolar, C. R., Longley, W. J. & Goodwin, L. V. (2025), DOI: 10.1109/ICEAA65662.2025.11306000.
+- Eisenbach, S. et al. (2025), DOI: 10.1088/1361-6463/ad89d6.
+
+## Legacy profile utilities
+
+analyze_thomson_profile and reconstruct_thomson_profile remain available for users who already have independently obtained calibrated density/temperature profiles. They are downstream profile-summary utilities only and are no longer the primary Analysis 1 contract or registered entry point.
+
+## Software testing
+
+The new test module checks multi-channel data flow, arbitrary non-Gaussian response matrices, channel-specific wavelength axes, density identifiability, explicit ion-species requirements and uncertainty reporting. Synthetic tests are software regression tests, not independent experimental validation.
