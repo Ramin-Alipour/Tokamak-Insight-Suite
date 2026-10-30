@@ -17,39 +17,22 @@ def test_all_registered_analyses_resolve_to_callables():
         assert callable(resolve_analysis(entry["id"])), entry
 
 
-def test_thomson_entry_declares_only_calibrated_profile_workflows():
+def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     entry = ANALYSES[0]
     assert entry["name"] == "Thomson scattering"
     contract = entry["execution_contract"]
-    output_names = {item["name"] for item in contract["output_specs"]}
-    assert {
-        "density_normalized_gradient_m-1",
-        "temperature_normalized_gradient_m-1",
-        "reconstructed_density_m3",
-        "reconstructed_temperature_eV",
-    } <= output_names
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is False
+    assert contract["raw_data_to_physics"] is True
     inputs = {item["name"]: item for item in contract["input_specs"]}
-    assert {
-        "radius_m", "density_m3", "temperature_ev",
-        "density_uncertainty_m3", "temperature_uncertainty_ev",
-        "reconstruction_method", "smoothing_factor", "reconstruction_points",
-    } == set(inputs)
+    assert {"wavelength_nm", "spectra", "radius_m", "laser_wavelength_nm",
+            "scattering_angle_rad", "instrument_response"} <= set(inputs)
+    assert inputs["wavelength_nm"]["unit"] == "nm"
     assert inputs["radius_m"]["unit"] == "m"
-    assert inputs["density_m3"]["unit"] == "m^-3"
-    assert inputs["temperature_ev"]["unit"] == "eV"
-    assert "major_radius_m" not in inputs
-    assert "geometry-weighted volume averages" in " ".join(contract["limitations"]).lower()
-    assert "raw-spectrum fitting" in " ".join(contract["limitations"]).lower()
-    assert "scattered-power density inversion" in " ".join(contract["limitations"]).lower()
-    assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" not in contract["function_links"]
-    assert {mode["name"] for mode in contract["workflow_modes"]} == {
-        "calibrated_profile",
-        "spatial_profile_reconstruction",
-    }
-    assert "raw-spectrum" not in contract["algorithm"].lower()
+    assert any("measured" in item.lower() and "spectra" in item.lower()
+               for item in contract["assumptions"])
+    assert any("not identifiable" in item.lower() or "absolute density" in item.lower()
+               for item in contract["limitations"])
     assert callable(resolve_analysis(1))
 
 

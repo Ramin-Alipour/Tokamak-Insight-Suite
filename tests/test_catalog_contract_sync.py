@@ -68,7 +68,7 @@ def test_thomson_registry_links_resolve_to_real_callables():
 
     thomson = next(row for row in DIAGNOSTICS if row["diagnostic"].casefold() == "thomson scattering")
     links = thomson["implementation_functions"]
-    assert len(links) == 2
+    assert len(links) == 4
     for link in links:
         module_name, function_name = link.rsplit(".", 1)
         module = importlib.import_module(module_name)
@@ -81,8 +81,8 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
     levels = Counter(row["execution_contract"]["execution_level"] for row in DIAGNOSTICS)
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
     assert len(DIAGNOSTICS) == 80
-    assert levels == {"reference_only": 49, "limited_calculation": 16, "analysis_pipeline": 15}
-    assert completeness == {"incomplete": 64, "complete": 7, "complete_with_declared_scope": 9}
+    assert levels == {"reference_only": 48, "limited_calculation": 17, "analysis_pipeline": 15}
+    assert completeness == {"incomplete": 64, "complete": 6, "complete_with_declared_scope": 10}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.

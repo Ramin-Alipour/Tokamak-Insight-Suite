@@ -12,11 +12,11 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Primary multi-channel spectral inference engine and UI are connected through the registered Thomson workflow. Non-collective Maxwellian/kappa/projected-relativistic models, optional PlasmaPy collective Maxwellian model, measured LSF convolution, LSF uncertainty propagation, polarization-aware absolute density and downstream profile utilities are implemented with explicit limitations. Automated tests are software regression tests, not experimental validation.",
+    "implementation_status": "Measured multi-channel physical inference is implemented within the declared model scope; optical collective inference remains externally parameterized, and correlated/model-discrepancy uncertainty is not yet propagated.",
     "execution_contract": {
       "schema_version": "2.0",
-      "execution_level": "multi_channel_spectral_inference",
-      "completeness": "implemented_with_declared_model_limits",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "wavelength_nm",
