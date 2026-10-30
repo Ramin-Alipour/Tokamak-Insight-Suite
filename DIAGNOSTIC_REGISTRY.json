@@ -1036,7 +1036,8 @@
         {
           "function": "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
           "input_contract": "Calibrated voltage/current arrays, reference fit range, and optional relative shifts.",
-          "outputs": "Temperature spread across alternative windows; not a statistical confidence interval."
+          "outputs": "Temperature spread across alternative windows; not a statistical confidence interval.",
+          "output_contract": "Base and caller-specified alternative fit-window results, fitted electron-temperature estimates, observed spread/sensitivity and per-window fit diagnostics. The spread is a sensitivity diagnostic, not a statistical confidence interval or a physical-regime validation."
         }
       ],
       "raw_data_to_physics": false,
