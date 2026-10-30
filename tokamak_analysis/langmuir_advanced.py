@@ -261,6 +261,10 @@ def estimate_multispecies_ion_density(
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     if fraction_basis != "number_density":
         raise ValueError("fraction_basis must be 'number_density'; mass and current fractions are not interchangeable.")
+    if (not isinstance(ion_saturation_current_A, (int, float, np.integer, np.floating))
+            or isinstance(ion_saturation_current_A, (bool, np.bool_))
+            or not math.isfinite(float(ion_saturation_current_A))):
+        raise ValueError("Ion saturation current must be a finite real scalar.")
     normalized_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
     if normalized_current >= 0:
         raise ValueError("Ion current must be negative after normalization to electron_positive.")
@@ -351,6 +355,16 @@ def estimate_electron_density_from_saturation(
     from tokamak_analysis.formula_library import langmuir_electron_density_from_saturation_current
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
+    if (not isinstance(electron_saturation_current_A, (int, float, np.integer, np.floating))
+            or isinstance(electron_saturation_current_A, (bool, np.bool_))
+            or not math.isfinite(float(electron_saturation_current_A))):
+        raise ValueError("Electron saturation current must be a finite real scalar.")
+    for name, value in (("current_standard_uncertainty_A", current_standard_uncertainty_A),
+                        ("temperature_relative_standard_uncertainty", temperature_relative_standard_uncertainty),
+                        ("area_relative_standard_uncertainty", area_relative_standard_uncertainty)):
+        if value is not None and (not isinstance(value, (int, float, np.integer, np.floating))
+                                  or isinstance(value, (bool, np.bool_)) or not math.isfinite(float(value)) or value < 0):
+            raise ValueError(f"{name} must be finite and non-negative.")
     current = -float(electron_saturation_current_A) if current_convention == "ion_positive" else float(electron_saturation_current_A)
     if current <= 0:
         raise ValueError("Electron saturation current must be positive after normalization.")
@@ -387,6 +401,11 @@ def estimate_ion_particle_flux(
     from tokamak_analysis.formula_library import langmuir_bohm_particle_flux
     sigmas = (density_relative_standard_uncertainty, temperature_relative_standard_uncertainty,
               mass_relative_standard_uncertainty, sheath_factor_relative_standard_uncertainty)
+    for name, value in zip(("density_relative_standard_uncertainty","temperature_relative_standard_uncertainty",
+                            "mass_relative_standard_uncertainty","sheath_factor_relative_standard_uncertainty"), sigmas):
+        if value is not None and (not isinstance(value, (int, float, np.integer, np.floating))
+                                  or isinstance(value, (bool, np.bool_)) or not math.isfinite(float(value)) or value < 0):
+            raise ValueError(f"{name} must be finite and non-negative.")
     supplied = all(value is not None for value in sigmas)
     result = langmuir_bohm_particle_flux(
         ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_factor,
