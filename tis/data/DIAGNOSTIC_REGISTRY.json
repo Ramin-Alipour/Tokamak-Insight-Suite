@@ -1000,10 +1000,10 @@
         },
         {
           "function": "tokamak_analysis.langmuir_probe.fit_langmuir_stretched_exponential",
-          "input_contract": "Calibrated voltage/current arrays, explicit fit range and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive. Shared canonical preprocessing filters non-finite pairs, sorts and averages duplicate voltages; covariance-derived parameter errors are conditional on empirical curve-shape model and fit window.",
+          "input_contract": "Calibrated voltage/current arrays, explicit fit range and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive. Shared canonical preprocessing filters non-finite pairs, sorts and averages duplicate voltages; covariance-derived parameter errors are conditional on empirical curve-shape model and fit window. Uses the mirrored KWW increasing-branch form I(V)=I0+A exp(-[s(V_ref-V)]^beta), with V_ref fixed to the selected fit-window upper endpoint; V_ref is not a plasma-potential estimate.",
           "outputs": "Empirical shape exponent and fit diagnostics; not a kinetic kappa distribution.",
           "reference": "Williams and Watts (1970), Transactions of the Faraday Society 66, 80-85, DOI: 10.1039/TF9706600080, for the generic empirical KWW shape only. This implementation is a mirrored empirical curve-shape fit, not a Langmuir-probe theory relation or a physical EEDF model.",
-          "output_contract": "empirical model_class; fit parameters and fit quality; covariance-derived parameter_standard_errors and shape_exponent_standard_uncertainty only when covariance is valid, otherwise null with parameter_uncertainty_status; kinetic_distribution_identified is false."
+          "output_contract": "empirical model_class; fit parameters and fit quality; covariance-derived parameter_standard_errors and shape_exponent_standard_uncertainty only when covariance is valid, otherwise null with parameter_uncertainty_status; kinetic_distribution_identified is false. Returns reference_voltage_V as the selected fit-window upper endpoint, never as an inferred plasma potential."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
