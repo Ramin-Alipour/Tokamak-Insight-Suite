@@ -489,6 +489,8 @@ def analyze_thomson_spectra(
             # Two nonlinear plasma parameters plus three profiled linear nuisance parameters
             # (amplitude, background intercept, and background slope) are estimated.
             dof = max(1, y[i].size-5)
+            jacobian_rank = int(np.linalg.matrix_rank(fitopt.jac))
+            jacobian_condition = float(np.linalg.cond(fitopt.jac))
             try:
                 covariance_log = np.linalg.pinv(fitopt.jac.T @ fitopt.jac)
                 if ui is None:
@@ -526,7 +528,9 @@ def analyze_thomson_spectra(
                    "electron_temperature_uncertainty_eV": float(parameter_uncertainties[1]),
                    "fit_covariance": parameter_covariance,
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
-                   "reduced_chi_square": float(np.sum((residual_collective/residual_scale)**2)/dof),
+                   "collective_parameter_jacobian_rank": jacobian_rank,
+                   "collective_parameter_jacobian_condition_number": jacobian_condition,
+                   "reduced_chi_square": float(np.sum((residual_collective/ui)**2)/dof) if ui is not None else None,
                    "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
                    "scattering_parameter_alpha": alpha_value,
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
@@ -538,6 +542,13 @@ def analyze_thomson_spectra(
                 fit["electron_density_uncertainty_m3"] = None
                 fit["electron_temperature_uncertainty_eV"] = None
                 fit["density_status"] = "collective_spectral_optimizer_failed"
+            elif jacobian_rank < 2:
+                fit["electron_density_m3"] = None
+                fit["electron_temperature_eV"] = None
+                fit["electron_density_uncertainty_m3"] = None
+                fit["electron_temperature_uncertainty_eV"] = None
+                fit["density_status"] = "collective_density_temperature_not_jointly_identifiable"
+                fit["temperature_status"] = "collective_density_temperature_not_jointly_identifiable"
             elif alpha_value <= 1.0:
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
