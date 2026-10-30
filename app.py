@@ -854,6 +854,7 @@ elif page=='Spectral Analysis':
             with g3:
                 response_upload=st.file_uploader('Measured instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
                 response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
+                joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
             collective_kwargs={}
             if model=='collective_maxwellian':
@@ -863,9 +864,12 @@ elif page=='Spectral Analysis':
                     ion_species_text=st.text_input('Ion species (comma-separated)',key='ts_infer_ions')
                     ion_fraction_text=st.text_input('Ion number fractions (comma-separated)',key='ts_infer_fractions')
                     ion_temperature_text=st.text_input('Ion temperatures (eV; one per species)',key='ts_infer_ion_temperatures')
+                    ion_temperature_unc_text=st.text_input('Ion-temperature 1σ uncertainties (eV; one per species; optional)',key='ts_infer_ion_temperature_unc')
                     ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors)',key='ts_infer_ion_velocities')
+                    ion_velocity_unc_text=st.text_input('Ion-velocity component 1σ uncertainties (m/s; semicolon-separated 3-vectors; optional)',key='ts_infer_ion_velocity_unc')
                 with c2:
                     electron_velocity_text=st.text_input('Electron velocity vector (m/s; x,y,z)',key='ts_infer_electron_velocity')
+                    electron_velocity_unc_text=st.text_input('Electron-velocity component 1σ uncertainties (m/s; x,y,z; optional)',key='ts_infer_electron_velocity_unc')
                     incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_incident_direction')
                     scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_scattered_direction')
             absolute_density=False
@@ -974,6 +978,9 @@ elif page=='Spectral Analysis':
                     response_uncertainty=None
                     if response_unc_upload is not None:
                         response_uncertainty=pd.read_csv(response_unc_upload,header=None).to_numpy(dtype=float)
+                    joint_spectral_covariance=None
+                    if joint_covariance_upload is not None:
+                        joint_spectral_covariance=pd.read_csv(joint_covariance_upload,header=None).to_numpy(dtype=float)
                     laser_nm=_parse_ts_scalar(laser_nm_text,'Laser wavelength',minimum=1e-9)
                     angle_rad=_parse_ts_scalar(angle_rad_text,'Scattering angle',minimum=1e-9,maximum=float(np.pi))
                     laser_unc_value=None if laser_unc_text is None else _parse_ts_scalar(laser_unc_text,'Laser-wavelength uncertainty',minimum=0.0)
@@ -986,6 +993,7 @@ elif page=='Spectral Analysis':
                         'instrument_response':instrument_response,
                         'signal_uncertainty':signal_uncertainty,
                         'instrument_response_uncertainty':response_uncertainty,
+                        'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
                     if absolute_density:
@@ -1018,6 +1026,15 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
+                        if ion_temperature_unc_text.strip():
+                            kwargs['ion_temperature_uncertainty_eV']=_parse_ts_float_list(ion_temperature_unc_text,'Ion-temperature uncertainties')
+                        if ion_velocity_unc_text.strip():
+                            kwargs['ion_velocity_uncertainty_m_s']=np.asarray([
+                                _parse_ts_vector(v,'Ion-velocity uncertainty vector')
+                                for v in ion_velocity_unc_text.split(';') if v.strip()
+                            ],dtype=float)
+                        if electron_velocity_unc_text.strip():
+                            kwargs['electron_velocity_uncertainty_m_s']=_parse_ts_vector(electron_velocity_unc_text,'Electron-velocity uncertainties')
                     if absolute_density:
                         kwargs.update({
                             'incident_polarization':_parse_ts_vector(polarization_text,'Incident polarization'),
