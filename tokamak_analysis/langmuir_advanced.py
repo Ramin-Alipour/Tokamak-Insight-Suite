@@ -489,9 +489,9 @@ def fit_langmuir_stretched_exponential(
     *,
     current_convention: str = "electron_positive",
 ) -> dict[str, Any]:
-    """Fit a generalized stretched-exponential shape as a non-Maxwellian-shape diagnostic.
+    """Fit an empirical stretched-exponential curve shape for comparison only.
 
-    The shape exponent is empirical; this is not a kinetic kappa-distribution model
+    The shape exponent is empirical; this is not a physical EEDF or kinetic kappa-distribution model
     and must not be interpreted as a unique non-Maxwellian electron distribution.
     """
     v, i, input_quality = _prepare_advanced_iv(voltage_V, current_A, current_convention)
