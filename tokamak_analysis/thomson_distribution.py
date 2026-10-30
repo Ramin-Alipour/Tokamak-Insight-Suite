@@ -205,3 +205,13 @@ def analyze_thomson_spectral_distribution(
             "Uncertainty output for Gaussian-fit parameters is local covariance only; moment uncertainties are not propagated",
         ],
     }
+
+
+
+def analyze_thomson_spectral_distribution_inference(*args, **kwargs):
+    """Registered physical-inference workflow; moments remain supplementary only."""
+    from .thomson_inference import analyze_thomson_spectra
+    result = analyze_thomson_spectra(*args, **kwargs)
+    result["registered_subanalysis"] = "Thomson spectral distribution physical inference"
+    result["spectral_shape_moments_are_not_a_velocity_distribution"] = True
+    return result

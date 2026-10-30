@@ -8,7 +8,7 @@
       "id": 1,
       "name": "Thomson Scattering",
       "category": "physical_diagnostic",
-      "description": "All Thomson-scattering spectral and collective/coherent-scattering workflows, including profile utilities, are presented under one analysis.",
+      "description": "Measured Thomson spectral inference, a separately scoped CTS entry point, and downstream radial-profile reconstruction utilities.",
       "entry_ids": [
         1,
         7,

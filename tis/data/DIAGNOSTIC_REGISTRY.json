@@ -2190,119 +2190,66 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson spectral distribution analysis",
-    "quantities": "Calibrated spectral centroid, observed and instrument-corrected width, skewness, excess kurtosis, Gaussian fit diagnostics and residuals",
+    "quantities": "Model-derived electron temperature, density where identifiable, electron-flow projection and per-channel fit diagnostics.",
     "status": "D",
-    "method": "Analyze a calibrated wavelength-resolved Thomson-scattering signal with local linear background estimation, positive-signal spectral moments, Gaussian instrumental variance deconvolution, and a Gaussian-plus-linear-background fit for shape diagnostics. Use the fit residuals and moment-based skewness/kurtosis to identify departures from a single Gaussian spectral shape.",
-    "caveat": "This generic workflow characterizes the measured wavelength distribution; it does not uniquely reconstruct an electron velocity distribution or infer electron temperature/density. Collective, relativistic, or non-Maxwellian physical inference requires a validated experiment-specific forward model and instrument response. Instrument width must be Gaussian and known; moments use positive background-subtracted signal.",
+    "method": "Delegates physical inference to the canonical multi-channel Thomson forward model; standalone moments remain descriptive.",
+    "caveat": "Kappa is a parameterized projection, relativistic Maxwell-Juttner is a 1-D approximation, and collective Maxwellian requires external ion parameters. Microwave CTS and arbitrary VDF inversion are not included.",
     "implementation_functions": [
-      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
     ],
-    "implementation_status": "Complete for the declared model-independent spectral-distribution characterization scope; physical velocity-distribution inversion and device-specific calibration remain outside scope.",
+    "implementation_status": "Physical parameter extraction is delegated to the canonical Thomson inference engine; descriptive moments are supplementary.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "wavelength_nm",
           "unit": "nm",
-          "description": "Finite, strictly increasing calibrated wavelength axis with at least nine samples.",
           "required": true
         },
         {
-          "name": "signal",
-          "unit": "detector units",
-          "description": "Measured spectral signal with the same length as wavelength_nm.",
+          "name": "spectra",
+          "unit": "calibrated spectral intensity",
           "required": true
         },
         {
-          "name": "instrument_sigma_nm",
+          "name": "radius_m",
+          "unit": "m",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
           "unit": "nm",
-          "description": "Known positive Gaussian instrumental line-spread standard deviation.",
-          "required": true,
-          "minimum": 1e-15
+          "required": true
         },
         {
-          "name": "signal_uncertainty",
-          "unit": "signal units",
-          "description": "Optional finite, strictly positive pointwise 1-sigma signal uncertainty.",
-          "required": false,
-          "minimum": 1e-15
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
         },
         {
-          "name": "background_fraction",
-          "unit": "dimensionless",
-          "description": "Fraction of samples at each spectral-window edge used for local linear-background estimation; constrained to [0.02, 0.4].",
-          "required": false,
-          "minimum": 0.02,
-          "maximum": 0.4
+          "name": "instrument_response",
+          "unit": "normalized response matrix",
+          "required": true
         }
       ],
       "output_specs": [
         {
-          "name": "spectral_centroid_nm",
-          "unit": "nm",
-          "description": "First moment of the positive background-subtracted spectral weights."
+          "name": "electron_temperature_profile_eV",
+          "unit": "eV"
         },
         {
-          "name": "observed_sigma_nm",
-          "unit": "nm",
-          "description": "Square root of the second central moment of the observed spectral distribution."
+          "name": "electron_density_profile_m3",
+          "unit": "m^-3 where identifiable"
         },
         {
-          "name": "instrument_corrected_sigma_nm",
-          "unit": "nm",
-          "description": "Square root of observed variance minus Gaussian instrument variance; null when unresolved."
+          "name": "electron_velocity_projection_profile_m_s",
+          "unit": "m s^-1"
         },
         {
-          "name": "instrument_width_resolved",
-          "unit": "boolean",
-          "description": "Whether observed spectral variance exceeds the instrumental variance."
-        },
-        {
-          "name": "spectral_skewness",
-          "unit": "dimensionless",
-          "description": "Third standardized central moment."
-        },
-        {
-          "name": "spectral_excess_kurtosis",
-          "unit": "dimensionless",
-          "description": "Fourth standardized central moment minus three."
-        },
-        {
-          "name": "gaussian_fit_parameters",
-          "unit": "structured",
-          "description": "Gaussian amplitude, center, width and linear background fit parameters."
-        },
-        {
-          "name": "gaussian_fit_parameter_uncertainties",
-          "unit": "structured",
-          "description": "Local covariance-based standard uncertainties for Gaussian fit parameters."
-        },
-        {
-          "name": "fitted_spectrum",
-          "unit": "signal units",
-          "description": "Fitted Gaussian-plus-linear-background spectrum."
-        },
-        {
-          "name": "residual",
-          "unit": "signal units",
-          "description": "Measured minus fitted signal."
-        },
-        {
-          "name": "chi_square",
-          "unit": "dimensionless",
-          "description": "Weighted chi-square, only when signal_uncertainty is supplied."
-        },
-        {
-          "name": "reduced_chi_square",
-          "unit": "dimensionless",
-          "description": "Chi-square divided by fit degrees of freedom, only when uncertainties are supplied."
-        },
-        {
-          "name": "r_squared",
-          "unit": "dimensionless",
-          "description": "Coefficient of determination for the Gaussian fit."
+          "name": "channels",
+          "unit": "structured"
         }
       ],
       "assumptions": [
@@ -2315,19 +2262,18 @@
         "Validate dimensions, lengths, finite values, monotonic wavelength, positive instrument width, and optional strictly positive uncertainties.",
         "Estimate a linear background from both edges and retain positive residual signal for moment calculations."
       ],
-      "algorithm": "Compute background-subtracted spectral moments; deconvolve Gaussian instrument variance when resolvable; fit a Gaussian plus linear background; return residuals, covariance-based parameter uncertainties, fit-quality metrics, skewness, and excess kurtosis.",
-      "uncertainty_model": "Optional weighted nonlinear least-squares covariance for Gaussian fit parameters; moment uncertainty, calibration uncertainty, and instrument-width uncertainty are not propagated.",
+      "algorithm": "Infer physical parameters from measured multi-channel spectra using the canonical forward model.",
+      "uncertainty_model": "Canonical Thomson inference uncertainty model.",
       "limitations": [
-        "Spectral moments characterize measured wavelength distribution and are not a unique electron velocity distribution.",
-        "No electron temperature or density is inferred by this generic analysis.",
-        "Collective, relativistic, and non-Maxwellian physical inversion requires an appropriate validated forward model and instrument response.",
-        "Gaussian variance deconvolution is invalid when observed variance does not exceed instrument variance; the workflow flags this as unresolved.",
-        "Parameter uncertainties are local covariance estimates and exclude systematic uncertainties."
+        "Kappa is a parameterized projection, not arbitrary VDF inversion.",
+        "Relativistic Maxwell-Juttner is a 1-D projected approximation.",
+        "Collective Maxwellian requires external ion parameters.",
+        "Microwave CTS is a separate unimplemented capability."
       ],
       "function_links": [
-        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
       ],
-      "raw_data_to_physics": false,
+      "raw_data_to_physics": true,
       "note": "Contract matches tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution and its dashboard workflow. The analysis characterizes the measured wavelength distribution; it does not infer electron velocity distribution, temperature, or density. Independent experimental validation remains required."
     }
   },
@@ -4022,11 +3968,13 @@
     "status": "M→I",
     "method": "Fit scattered spectrum using scattering geometry and plasma response model.",
     "caveat": "Requires wave-vector geometry, calibration and plasma response model.",
-    "implementation_functions": [],
-    "implementation_status": "Registry reference only",
+    "implementation_functions": [
+      "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+    ],
+    "implementation_status": "Dedicated callable fails closed; microwave frequency-domain CTS forward model and inversion are not implemented.",
     "execution_contract": {
       "schema_version": "1.0",
-      "execution_level": "reference_only",
+      "execution_level": "limited_calculation",
       "completeness": "incomplete",
       "input_specs": [],
       "output_specs": [],
@@ -4035,11 +3983,14 @@
       "algorithm": "Fit scattered spectrum using scattering geometry and plasma response model.",
       "uncertainty_model": "not_specified",
       "limitations": [
-        "Requires wave-vector geometry, calibration and plasma response model."
+        "No physical microwave CTS inversion is implemented; callable raises NotImplementedError.",
+        "Do not substitute optical Thomson, density-wave or particle-loss routines for CTS."
       ],
-      "function_links": [],
+      "function_links": [
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      ],
       "raw_data_to_physics": false,
-      "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
+      "note": "Callable guard prevents incorrect execution; this is not a completed CTS analysis."
     }
   },
   {
