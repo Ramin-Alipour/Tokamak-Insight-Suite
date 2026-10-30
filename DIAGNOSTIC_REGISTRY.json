@@ -4549,6 +4549,21 @@
         {
           "name": "response_parameter_covariance",
           "unit": "mixed physical parameter covariance"
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Explicit externally supplied electron-flow projection used in the CTS forward model; not fitted."
+        },
+        {
+          "name": "electron_velocity_projection_is_fitted",
+          "unit": "boolean",
+          "description": "Always false; electron-flow projection is an external fixed input."
+        },
+        {
+          "name": "electron_velocity_projection_input_uncertainty_m_s",
+          "unit": "m s^-1; optional 1-sigma",
+          "description": "User-supplied uncertainty for the external electron-flow projection."
         }
       ],
       "assumptions": [
