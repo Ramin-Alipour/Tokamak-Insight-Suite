@@ -74,26 +74,6 @@
       ],
       "output_specs": [
         {
-          "name": "density_min_m3",
-          "unit": "m^-3",
-          "description": "Minimum calibrated electron-density value on the measured profile."
-        },
-        {
-          "name": "density_min_radius_m",
-          "unit": "m",
-          "description": "Supplied calibrated coordinate at the minimum electron-density value."
-        },
-        {
-          "name": "temperature_min_ev",
-          "unit": "eV",
-          "description": "Minimum calibrated electron-temperature value on the measured profile."
-        },
-        {
-          "name": "temperature_min_radius_m",
-          "unit": "m",
-          "description": "Supplied calibrated coordinate at the minimum electron-temperature value."
-        },
-        {
           "name": "radius_m",
           "unit": "m",
           "description": "Supplied calibrated spatial coordinate for the measured profile; not inferred from machine geometry."
@@ -131,7 +111,7 @@
         {
           "name": "summary",
           "unit": "structured",
-          "description": "Peak values and locations, radial range, and line averages over the measured interval; no geometry-weighted volume averages."
+          "description": "Minimum and maximum density and temperature values with their supplied-coordinate locations, radial range, and measured-interval line averages; no geometry-weighted volume averages."
         },
         {
           "name": "density_gradient_uncertainty_m-4",
