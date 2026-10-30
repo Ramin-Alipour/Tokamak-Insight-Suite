@@ -60,12 +60,17 @@ def _gaussian(x, amp, center, sigma, offset, slope):
 
 
 def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertainty):
+    signal_scale = float(np.max(np.abs(signal)))
+    if not np.isfinite(signal_scale) or signal_scale <= 0:
+        raise ValueError("signal must have a positive finite scale")
+    signal_scaled = signal/signal_scale
+    uncertainty_scaled = None if uncertainty is None else uncertainty/signal_scale
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
     edge = max(2, wavelength.size // 10)
-    baseline = float(np.median(np.r_[signal[:edge], signal[-edge:]]))
-    peak = int(np.argmax(signal))
-    amp0 = max(float(signal[peak] - baseline), np.finfo(float).eps)
+    baseline = float(np.median(np.r_[signal_scaled[:edge], signal_scaled[-edge:]]))
+    peak = int(np.argmax(signal_scaled))
+    amp0 = max(float(signal_scaled[peak] - baseline), np.finfo(float).eps)
     p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), baseline, 0.0]
     lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), -np.inf, -np.inf]
     upper = [np.inf, wavelength[-1], span, np.inf, np.inf]
@@ -77,9 +82,12 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         signal_only = amp*np.exp(-0.5*((x-center)/sigma)**2)
         return response @ signal_only + offset + slope*(x-center)
 
-    p, cov = curve_fit(observed, wavelength, signal, p0=p0, bounds=(lower, upper),
-                       sigma=uncertainty, absolute_sigma=uncertainty is not None,
+    p, cov = curve_fit(observed, wavelength, signal_scaled, p0=p0, bounds=(lower, upper),
+                       sigma=uncertainty_scaled, absolute_sigma=uncertainty_scaled is not None,
                        maxfev=50000)
+    parameter_scales=np.array([signal_scale,1.0,1.0,signal_scale,signal_scale])
+    p=np.asarray(p,dtype=float)*parameter_scales
+    cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp, center, sigma, offset, slope = map(float, p)
     if sigma <= 0:
         raise ValueError("Fitted intrinsic spectral width is not positive")
