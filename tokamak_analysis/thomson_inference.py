@@ -206,12 +206,17 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     Maxwell-Juttner marginal and relativistic Doppler kinematics along q, but
     does not integrate the full 3-D incident/scattered photon geometry.
     """
+    signal_scale=float(np.max(np.abs(signal)))
+    if not np.isfinite(signal_scale) or signal_scale<=0:
+        raise ValueError("signal must have a positive finite scale")
+    signal_scaled=signal/signal_scale
+    uncertainty_scaled=None if uncertainty is None else uncertainty/signal_scale
     spacing=float(np.median(np.diff(wavelength)))
     span=float(wavelength[-1]-wavelength[0])
     edge=max(2,wavelength.size//10)
-    baseline=float(np.median(np.r_[signal[:edge],signal[-edge:]]))
-    peak=int(np.argmax(signal))
-    amp0=max(float(signal[peak]-baseline),np.finfo(float).eps)
+    baseline=float(np.median(np.r_[signal_scaled[:edge],signal_scaled[-edge:]]))
+    peak=int(np.argmax(signal_scaled))
+    amp0=max(float(signal_scaled[peak]-baseline),np.finfo(float).eps)
     p0=[amp0,float(wavelength[peak]),100.0,baseline,0.0]
     lower=[0.0,wavelength[0],1e-4,-np.inf,-np.inf]
     upper=[np.inf,wavelength[-1],1e7,np.inf,np.inf]
@@ -233,8 +238,11 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     def observed(x,amp,center,temperature,offset,slope):
         physical=component(x,amp,center,temperature,0.0,0.0)
         return response@physical+offset+slope*(x-center)
-    p,cov=curve_fit(observed,wavelength,signal,p0=p0,bounds=(lower,upper),
-                    sigma=uncertainty,absolute_sigma=uncertainty is not None,maxfev=100000)
+    p,cov=curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
+                    sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=100000)
+    parameter_scales=np.array([signal_scale,1.0,1.0,signal_scale,signal_scale])
+    p=np.asarray(p,dtype=float)*parameter_scales
+    cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp,center,temperature,offset,slope=map(float,p)
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
