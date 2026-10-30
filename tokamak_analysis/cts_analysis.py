@@ -104,11 +104,16 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
 
 def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geometry,*,electron_density_m3,
     electron_temperature_eV,ion_temperature_eV,ion_species,ion_fractions,
-    ion_velocity_projection_m_s=0.,electron_velocity_projection_m_s=0.,fast_ion=None):
-    """Evaluate the longitudinal multi-species S(k,omega); ion fractions are charge-density fractions."""
-    f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
+    ion_velocity_projection_m_s=0.,electron_velocity_projection_m_s=None,fast_ion=None):
+    """Evaluate the longitudinal multi-species S(k,omega); ion fractions are charge-density fractions.
+
+    Electron flow is an explicit external input. Pass 0.0 only when a stationary
+    electron-flow assumption is intentionally selected by the caller.
+    """    f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     ne=_positive(electron_density_m3,"electron_density_m3"); te=_positive(electron_temperature_eV,"electron_temperature_eV")
     ti=_positive(ion_temperature_eV,"ion_temperature_eV"); ions=_species(ion_species,ion_fractions)
+    if electron_velocity_projection_m_s is None:
+        raise ValueError("electron_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare a stationary-electron-flow assumption")
     ui=float(_array([ion_velocity_projection_m_s],"ion_velocity_projection_m_s")[0]); ue=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
     if abs(ui)>=C or abs(ue)>=C: raise ValueError("flow projections must be subluminal")
     if np.any(f0+f<=0): raise ValueError("scattered frequencies must remain positive")
@@ -271,7 +276,7 @@ def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness
 def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scattering_geometry,
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=1e19,electron_temperature_initial_eV=1000.,ion_temperature_initial_eV=500.,
-    ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=0.,
+    ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=None,
     fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None):
@@ -280,6 +285,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
     if np.any(y<0): raise ValueError("calibrated CTS power spectrum must be non-negative")
     f0=_positive(probe_frequency_Hz,"probe_frequency_Hz"); _geometry(scattering_geometry,f0); ions=_species(ion_species,ion_fractions)
+    if electron_velocity_projection_m_s is None:
+        raise ValueError("electron_velocity_projection_m_s is required. Enter a measured/provided projection, or explicitly enter 0.0 to declare stationary electron flow.")
+    electron_velocity_projection_m_s=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
+    if abs(electron_velocity_projection_m_s)>=C:
+        raise ValueError("electron_velocity_projection_m_s must be subluminal")
     response=_array(instrument_response,"instrument_response",2)
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
     unc=None if signal_uncertainty is None else _array(signal_uncertainty,"signal_uncertainty",1)
@@ -442,10 +452,16 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
       "model":"unmagnetized electrostatic longitudinal microwave CTS",
       "parameter_provenance":{"electron_density":"inferred from measured CTS spectral shape","electron_temperature":"inferred from measured CTS spectral shape",
-       "ion_temperature":"inferred from measured ion-feature shape","ion_velocity_projection":"inferred from ion-feature Doppler shift","ion_composition":"externally supplied fixed composition"},
+       "ion_temperature":"one common ion temperature inferred from the measured ion feature and shared by all supplied species",
+       "ion_velocity_projection":"one common projected ion flow inferred from the measured ion-feature Doppler shift and shared by all supplied species",
+       "ion_composition":"externally supplied fixed composition",
+       "electron_velocity_projection":"externally supplied fixed scalar projection; no stationary-flow default is imposed"},
       "uncertainty_model":"Local Jacobian covariance with optional full spectral covariance whitening; response-matrix uncertainty is propagated by Monte Carlo when supplied.",
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
-       "Ion composition is fixed externally.","Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
+       "Ion composition is fixed externally.",
+       "The current Maxwellian background model has one common ion temperature and one common projected ion flow for all species; species-specific Ti and flow inference is not implemented.",
+       "Electron flow is a required external scalar projection; enter zero explicitly only when a stationary-electron-flow assumption is intended.",
+       "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if out["reduced_chi_square"] is not None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
