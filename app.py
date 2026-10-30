@@ -974,7 +974,7 @@ elif page=='Spectral Analysis':
                     }
                     if model=='collective_maxwellian':
                         species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
-                        fractions=_parse_ts_float_list(ion_fraction_text,'Ion fractions')
+                        fractions=None if not ion_fraction_text.strip() else _parse_ts_float_list(ion_fraction_text,'Ion fractions')
                         ion_temperatures=_parse_ts_float_list(ion_temperature_text,'Ion temperatures')
                         ion_velocity_vectors=np.asarray([
                             _parse_ts_vector(v,'Ion velocity vector')
