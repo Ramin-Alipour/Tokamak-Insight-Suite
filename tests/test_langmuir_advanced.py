@@ -232,7 +232,7 @@ def test_advanced_fits_aggregate_duplicate_voltages_before_curve_fit():
 def test_stretched_fit_aggregates_duplicate_voltages_and_reports_parameter_uncertainty():
     from tokamak_analysis.langmuir_advanced import fit_langmuir_stretched_exponential
     v = np.linspace(-5.0, 5.0, 81)
-    i = -2e-3 + 3e-4 * np.exp(np.maximum((v + 5.0) / 2.5, 0.0) ** 1.2)
+    i = -2e-3 + 3e-4 * np.exp(-np.maximum((3.0 - v) / 2.5, 0.0) ** 1.2)
     result = fit_langmuir_stretched_exponential(np.r_[v, v[10]], np.r_[i, i[10]], (-4.0, 3.0))
     assert result["input_quality"]["duplicate_voltage_pair_count_aggregated"] == 1
     assert result["preprocessing_contract"].endswith("duplicate_voltage_current_mean")
