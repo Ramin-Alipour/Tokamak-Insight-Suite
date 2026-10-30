@@ -505,7 +505,7 @@ def fit_langmuir_stretched_exponential(
     # Mirrored Kohlrausch-Williams-Watts form for a monotonically increasing
     # retarding-branch signal. The reference voltage is the selected window's
     # upper endpoint, not an inferred plasma potential.
-    xref = float(x[-1])
+    xref = float(hi)
     scale = max(float(np.ptp(y)), float(np.max(np.abs(y))), np.finfo(float).tiny)
     def fn(xx, offset, amplitude, slope, shape):
         z = np.maximum(slope * (xref - np.asarray(xx)), 0.0)
