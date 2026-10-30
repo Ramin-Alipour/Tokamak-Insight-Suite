@@ -899,6 +899,15 @@ def analyze_thomson_spectra(
             fit["differential_cross_section_m2_sr"] = density_result["differential_cross_section_m2_sr"]
             fit["density_method"] = "absolute integrated Thomson power using shared polarization-aware density inversion"
             fit["density_uncertainty_model"] = density_result["uncertainty_model"]
+            if density_inputs.get("relative_input_covariance") is not None:
+                fit["integrated_scattered_power_fit_uncertainty_W"] = float(
+                    fit.get("integrated_scattered_power_fit_uncertainty_W", area_sigma)
+                )
+                covariance_area_sigma = abs(float(area)) * float(np.sqrt(max(
+                    np.asarray(density_inputs["relative_input_covariance"], dtype=float)[0, 0], 0.0
+                )))
+                fit["integrated_scattered_power_covariance_uncertainty_W"] = covariance_area_sigma
+                fit["integrated_scattered_power_uncertainty_W"] = covariance_area_sigma
             # Retain the exact, already validated physical inputs so a later
             # joint spectral fit can recompute density from its own final area.
             fit["_density_inputs_for_joint_refit"] = dict(density_inputs)
@@ -1267,6 +1276,9 @@ def analyze_thomson_spectra(
                     fit["electron_density_m3"] = density_result["electron_density_m3"]
                     fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
                     fit["density_uncertainty_model"] = density_result["uncertainty_model"]
+                    if density_inputs.get("relative_input_covariance") is not None:
+                        fit["integrated_scattered_power_covariance_uncertainty_W"] = joint_area_sigma
+                        fit["integrated_scattered_power_uncertainty_W"] = joint_area_sigma
         joint_summary={
             "method":"joint generalized least squares across all channels",
             "channel_major_covariance_order":True,
