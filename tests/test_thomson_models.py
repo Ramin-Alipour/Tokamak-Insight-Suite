@@ -176,3 +176,44 @@ def test_unregister_invalid_or_blank_name_is_safe():
     assert unregister_spectral_model("") is False
     assert unregister_spectral_model("   ") is False
     assert unregister_spectral_model(None) is False
+
+
+def test_custom_model_physical_mapper_requires_complete_explicit_contract():
+    def model(x, amplitude, center, sigma, offset):
+        return amplitude*np.exp(-0.5*((x-center)/sigma)**2)+offset
+
+    with pytest.raises(ValueError, match="physical_contract mapping is required"):
+        register_spectral_model(
+            "missing_physical_contract", model,
+            parameter_names=("amplitude","center","sigma","offset"),
+            initial_values=(8.0,532.0,.2,1.0),
+            physical_parameter_mapper=lambda p: {"electron_temperature_eV": 100.0},
+        )
+
+
+def test_custom_model_physical_mapper_emits_provenance_and_units():
+    def model(x, amplitude, center, sigma, offset):
+        return amplitude*np.exp(-0.5*((x-center)/sigma)**2)+offset
+    name="contracted_gaussian"
+    register_spectral_model(
+        name, model,
+        parameter_names=("amplitude","center","sigma","offset"),
+        initial_values=(8.0,532.0,.2,1.0),
+        physical_parameter_mapper=lambda p: {"electron_temperature_eV": float(p["sigma"]**2*1e4)},
+        physical_contract={
+            "output_units":{"electron_temperature_eV":"eV"},
+            "formula_references":["user-supplied model relation: T_e = 10^4 sigma^2"],
+            "assumptions":["synthetic test-only calibration"],
+            "limitations":["not a Thomson-scattering validated relation"],
+            "parameter_provenance":{"electron_temperature_eV":"derived from fitted sigma using explicit mapper"},
+        },
+    )
+    try:
+        x=np.linspace(531.0,533.0,101)
+        y=10*np.exp(-.5*((x-532.1)/.16)**2)+2
+        out=fit_custom_spectral_model(x,y,model_name=name)
+        assert out["physical_inference"]["values"]["electron_temperature_eV"] == pytest.approx(256.0,rel=1e-5)
+        assert out["physical_inference"]["contract"]["output_units"]["electron_temperature_eV"]=="eV"
+        assert out["physical_inference"]["status"]=="model_contract_mapped_not_independently_validated"
+    finally:
+        unregister_spectral_model(name)
