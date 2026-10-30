@@ -845,6 +845,21 @@
           "name": "floating_potential_interpolated_V",
           "unit": "V",
           "description": "Unique interpolated zero-current crossing in the descriptive summary; null if not unique."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V",
+          "unit": "V",
+          "description": "Conditional Monte Carlo standard uncertainties for each second-derivative zero-crossing inflection candidate; null when not quantifiable."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_zero_crossing_95pct_intervals_V",
+          "unit": "V",
+          "description": "Conditional Monte Carlo 95% intervals for each second-derivative zero-crossing inflection candidate."
+        },
+        {
+          "name": "plasma_potential_d2IdV2_zero_crossing_uncertainty_status",
+          "unit": "text",
+          "description": "Explains whether current-noise uncertainty for second-derivative zero-crossing candidates was propagated, unresolved or not supplied."
         }
       ],
       "assumptions": [
@@ -863,7 +878,7 @@
         "When a scalar per-sample current standard uncertainty is supplied, propagate it through duplicate-voltage averaging using independent-error averaging; no uncertainty is assumed when omitted."
       ],
       "algorithm": "Normalize the selected current polarity to electron_positive; clean calibrated I–V pairs; aggregate duplicate voltages with corresponding uncertainty reduction; compute floating-potential crossings; compute dI/dV and d²I/dV²; report maximum dI/dV as a proxy, zero crossings of d²I/dV² as inflection candidates, and maximum d²I/dV² only as a separate extremum. Require disjoint analyst-selected fit windows; apply identical numerical fit screens in the engine and UI; gate density inversion on both electron and ion numerical fit quality and ion flatness; retain all physical-regime flags as unconfirmed. Advanced functions use explicitly declared published models and independent channel/time batching.",
-      "uncertainty_model": "Electron-temperature covariance is used only when finite and valid; invalid covariance yields null uncertainty, not zero. Optional current standard uncertainty is propagated to the unique floating-potential crossing by first-order interpolation and to the maximum-dI/dV proxy by reproducible Monte Carlo, conditional on independent sample errors. Density uncertainty is not calculated if the electron-temperature statistical covariance is unavailable. Other uncertainty components are included only when explicitly supplied.",
+      "uncertainty_model": "Electron-temperature covariance is used only when finite and valid; invalid covariance yields null uncertainty, not zero. Optional current standard uncertainty is propagated to the unique floating-potential crossing by first-order interpolation and to the maximum-dI/dV proxy by reproducible Monte Carlo, conditional on independent sample errors. Density uncertainty is not calculated if the electron-temperature statistical covariance is unavailable. Other uncertainty components are included only when explicitly supplied. The same reproducible Monte Carlo draws are also used to estimate conditional location spread for each second-derivative zero-crossing candidate by nearest-root matching; unresolved candidate tracks remain null.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
         "Density requires an explicitly justified sheath coefficient, collection area, ion mass, and both physically selected fit windows.",
