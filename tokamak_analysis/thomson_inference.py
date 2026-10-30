@@ -445,7 +445,7 @@ def analyze_thomson_spectra(
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples = [], []
-            for _ in range(48):
+            for _ in range(24):
                 sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
                 if np.any(colsum <= 0):
@@ -459,7 +459,7 @@ def analyze_thomson_spectra(
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                 except (ValueError, RuntimeError):
                     continue
-            if len(te_samples) >= 12:
+            if len(te_samples) >= 8:
                 fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"], np.std(te_samples, ddof=1)))
                 fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
