@@ -50,7 +50,7 @@
           "name": "instrument_response",
           "unit": "normalized response matrix",
           "required": true,
-          "description": "Measured LSF matrix common to channels or channel-specific."
+          "description": "Required measured response: callable, 1-D kernel, 2-D matrix or channel-specific 3-D matrix; identity matrix must be explicitly justified."
         },
         {
           "name": "signal_uncertainty",
