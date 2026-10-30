@@ -24,6 +24,9 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
     assert out["electron_temperature_eV"]==pytest.approx(truth[1],rel=.08)
     assert out["ion_temperature_eV"]==pytest.approx(truth[2],rel=.08)
     assert out["ion_velocity_projection_m_s"]==pytest.approx(truth[3],rel=.08)
+    assert out["electron_velocity_projection_m_s"] == 0.0
+    assert out["electron_velocity_projection_is_fitted"] is False
+    assert out["electron_velocity_projection_input_uncertainty_m_s"] is None
 
 def test_cts_hot_ion_component_forward_model():
     f0,f,g,ions,frac,_=_case()
