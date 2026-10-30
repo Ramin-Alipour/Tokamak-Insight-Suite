@@ -316,7 +316,10 @@ def reconstruct_thomson_profile(
     def validate_covariance(value, name):
         if value is None:
             return None
-        covariance = np.asarray(value, dtype=float)
+        covariance_raw = np.asarray(value)
+        if covariance_raw.dtype.kind not in "iuf":
+            raise ValueError(f"{name} must contain real numeric values, not booleans or strings")
+        covariance = covariance_raw.astype(float, copy=False)
         if covariance.shape != (radius_original.size, radius_original.size) or not np.all(np.isfinite(covariance)):
             raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
@@ -691,7 +694,10 @@ def density_from_thomson_scattered_power(
     rel_variance = 0.0
     uncertainty_supplied = False
     if relative_input_covariance is not None:
-        covariance = np.asarray(relative_input_covariance, dtype=float)
+        covariance_raw = np.asarray(relative_input_covariance)
+        if covariance_raw.dtype.kind not in "iuf":
+            raise ValueError("relative_input_covariance must contain real numeric values, not booleans or strings")
+        covariance = covariance_raw.astype(float, copy=False)
         if covariance.shape != (6, 6) or not np.all(np.isfinite(covariance)):
             raise ValueError("relative_input_covariance must be a finite 6x6 matrix")
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
