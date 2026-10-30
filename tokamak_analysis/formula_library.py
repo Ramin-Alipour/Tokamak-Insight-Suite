@@ -668,7 +668,7 @@ def langmuir_electron_temperature_from_slope(slope_per_V, *, sigma_slope_per_V=N
 
 def langmuir_ion_density_from_saturation_current(
     ion_saturation_current_A, electron_temperature_eV, probe_area_m2,
-    ion_mass_kg, sheath_coefficient, *,
+    ion_mass_kg, sheath_coefficient, *, charge_state=1,
     sigma_ion_saturation_current_A=None, sigma_electron_temperature_eV=None,
     sigma_probe_area_m2=None, sigma_ion_mass_kg=None,
     sigma_sheath_coefficient=None,
@@ -679,8 +679,11 @@ def langmuir_ion_density_from_saturation_current(
     area = _positive("probe_area_m2", probe_area_m2)
     mass = _positive("ion_mass_kg", ion_mass_kg)
     coefficient = _positive("sheath_coefficient", sheath_coefficient)
+    if isinstance(charge_state, bool) or not isinstance(charge_state, int) or charge_state < 1:
+        raise ValueError("charge_state must be a positive integer.")
     density = current / (
-        coefficient * E_CHARGE * area * math.sqrt(E_CHARGE * temperature / mass)
+        coefficient * E_CHARGE * area * charge_state**1.5
+        * math.sqrt(E_CHARGE * temperature / mass)
     )
     out = {"ion_density_m3": density}
     sigmas = (
