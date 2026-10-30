@@ -2854,7 +2854,8 @@ elif page=='Advanced Analysis':
                         'Electron temperature uncertainty (eV)':result['electron_temperature_uncertainty_profile_eV'],
                         'Electron density (m^-3)':result['electron_density_profile_m3'],
                         'Electron density uncertainty (m^-3)':result['electron_density_uncertainty_profile_m3'],
-                        'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s']})
+                        'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s'],
+                        'Electron velocity projection uncertainty (m/s)':result['electron_velocity_projection_uncertainty_profile_m_s']})
                     st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'result':result,'frame':result_frame}
                 except Exception as e:
                     st.error(f'Thomson spectral inference failed: {e}')
