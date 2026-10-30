@@ -55,7 +55,7 @@ The tabulated susceptibility uses a Landau-contour evaluation of the longitudina
 
 ## Uncertainty and model discrepancy
 
-When supplied, the full frequency-bin covariance is used to whiten residuals in the objective. Response-matrix uncertainty and supported external parameter uncertainties are propagated by Monte Carlo refits. The Monte Carlo success count and requested count are returned; the uncertainty contribution is not added when too few perturbation fits succeed.
+When supplied, the full frequency-bin covariance is used to whiten residuals in the objective. Response-matrix uncertainty and supported external parameter uncertainties are propagated by Monte Carlo refits. The Monte Carlo success count and requested count are returned; the uncertainty contribution is not added when too few perturbation fits succeed. Ion-fraction uncertainties are currently perturbed independently by species and renormalized to sum to one; a full species-composition covariance matrix is not accepted, so correlations between fraction uncertainties cannot be represented.
 
 Excess reduced chi-square above unity is exposed as a separate model-discrepancy covariance component. This is conditional on the supplied noise covariance and chosen forward model; it is not independent experimental validation.
 
