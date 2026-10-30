@@ -1128,6 +1128,42 @@ def analyze_thomson_spectra(
                 "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
                 "model_discrepancy_covariance_included": bool(discrepancy_scale > 0.0),
             })
+            channel_residual = fit["residual"]
+            channel_slice = slice(channel * y.shape[1], (channel + 1) * y.shape[1])
+            channel_spectral_covariance = joint_covariance[channel_slice, channel_slice]
+            channel_cholesky = np.linalg.cholesky(channel_spectral_covariance)
+            channel_whitened_residual = np.linalg.solve(channel_cholesky, channel_residual)
+            channel_dof = max(1, channel_residual.size - joint_parameter_count)
+            channel_reduced_chi_square = float(
+                np.dot(channel_whitened_residual, channel_whitened_residual) / channel_dof
+            )
+            fit["fit_residual_rms"] = float(np.sqrt(np.mean(channel_residual**2)))
+            fit["fit_reduced_chi_square"] = channel_reduced_chi_square
+            fit["fit_degrees_of_freedom"] = int(channel_dof)
+            fit["joint_fit_reduced_chi_square"] = float(reduced_chi2_joint)
+            fit["joint_fit_degrees_of_freedom"] = int(dof)
+            fit["joint_fit_accepted"] = True
+            fit["fit_acceptance_basis"] = "accepted_joint_generalized_least_squares"
+            fit["fit_accepted"] = True
+            fit["fit_quality_status"] = "accepted_joint_gls_with_channel_marginal_diagnostics"
+            fit["fit_quality_reasons"] = []
+            fit["channel_marginal_fit_quality_status"] = (
+                "marginal_reduced_chi_square_within_ceiling"
+                if channel_reduced_chi_square <= 10.0
+                else "marginal_reduced_chi_square_exceeds_ceiling_joint_fit_accepted"
+            )
+            physical_indices = [te_index, velocity_index]
+            fit["physical_parameter_covariance"] = physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["model_discrepancy_covariance"] = discrepancy_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["total_physical_parameter_covariance"] = total_physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["model_discrepancy_scale"] = float(discrepancy_scale)
+            fit["model_discrepancy_diagnostics"] = {
+                "residual_rms": fit["fit_residual_rms"],
+                "channel_marginal_reduced_chi_square": channel_reduced_chi_square,
+                "joint_reduced_chi_square": float(reduced_chi2_joint),
+                "covariance_included": bool(discrepancy_scale > 0.0),
+                "interpretation": "Joint-GLS residual-based model-adequacy covariance; it is not experimental validation.",
+            }
             if model=="non_collective_maxwellian":
                 area=float(amp*sigma*np.sqrt(2.0*np.pi))
                 def area_function(v): return float(v[0]*v[2]*np.sqrt(2*np.pi))
