@@ -3,7 +3,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import differential_evolution, least_squares
-from scipy.special import wofz\nfrom scipy.integrate import quad\nfrom scipy.interpolate import PchipInterpolator
+from scipy.special import wofz
+from scipy.integrate import quad
+from scipy.interpolate import PchipInterpolator
 
 E=1.602176634e-19
 EPS0=8.8541878128e-12
