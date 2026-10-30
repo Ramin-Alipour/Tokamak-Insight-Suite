@@ -576,6 +576,8 @@ def analyze_thomson_spectra(
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
     if joint_density_relative_covariance is not None:
+        if model == "collective_maxwellian":
+            raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective mode returns cross-channel density covariance from its external-parameter Monte Carlo.")
         if density_relative_covariance is not None:
             raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
         if joint_spectral_covariance is not None:
