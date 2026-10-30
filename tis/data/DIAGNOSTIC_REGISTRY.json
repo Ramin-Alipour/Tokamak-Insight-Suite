@@ -408,12 +408,6 @@
           "description": "Optional scalar 1-sigma current uncertainty per original sweep sample; independent current errors are propagated through duplicate averaging and numerical proxy calculations.",
           "required": false,
           "minimum": 0
-        },
-        {
-          "name": "fraction_basis",
-          "unit": "text",
-          "description": "Multispecies fraction basis; must be number_density. Mass and current fractions are rejected.",
-          "required": false
         }
       ],
       "output_specs": [
