@@ -16,11 +16,14 @@ It does not include a full magnetized electromagnetic scattering tensor, ray tra
 - Scattering geometry, either a scalar scattering angle or incident/scattered unit vectors.
 - Explicit ion species metadata (name, charge state and mass in amu).
 - Explicit ion charge-density fractions summing to unity.
+- Explicit electron-flow projection along the scattering wavevector. No stationary-electron-flow default is applied; enter 0 only when that assumption is intentionally selected.
 - Measured frequency-response matrix.
 - Optional per-bin 1-sigma uncertainty or a full positive-definite frequency-bin covariance matrix.
 - Optional response-matrix uncertainty.
 - Optional uncertainties for probe frequency, scalar scattering angle, electron-flow projection and ion fractions.
 - Optional fast-ion model.
+
+The current background-ion model uses one common ion temperature and one common projected ion flow for all supplied ion species. Species-specific ion temperatures and species-specific flow inference are not implemented. Ion species, charge states, masses and fractions must be supplied explicitly; the interface does not prefill D+ or a unit fraction.
 
 ## Inversion strategies
 
