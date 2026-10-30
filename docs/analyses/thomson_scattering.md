@@ -13,7 +13,7 @@ The primary execution path is:
 5. Construct the electron-temperature profile and, only when identifiable, the electron-density profile.
 6. Keep the legacy calibrated-profile summary/reconstruction routines as downstream utilities; they are not the primary Analysis 1 input contract.
 
-The Spectral Analysis workspace now exposes this primary multi-channel spectral-inference workflow. It preserves source row order: it does not sort, repair, calibrate, or silently discard samples.
+The Spectral Analysis workspace exposes this primary multi-channel spectral-inference workflow. Advanced Analysis routes to the same canonical UI rather than maintaining a second inference implementation. The legacy single-channel API in thomson_spectrum.py is now a compatibility adapter to the canonical engine. It preserves source row order: it does not sort, repair, calibrate, or silently discard samples.
 
 ## Input contract
 
@@ -67,7 +67,7 @@ The collective model can cover both collective and non-collective scattering reg
 
 The instrument response is represented by a non-negative matrix whose columns are normalized probability distributions for detected wavelength bins conditional on each true wavelength bin. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, so nonuniform calibrated wavelength grids are handled consistently. The measured response is mandatory and may be supplied as a callable evaluated on the wavelength grid, a 1-D odd-length kernel, a 2-D wavelength-to-wavelength matrix, or a channel-specific 3-D matrix. The same response can be used for all channels, or a separate matrix can be supplied per channel. An identity matrix is accepted only when explicitly supplied and physically justified. This supports asymmetric and wavelength-dependent line-spread functions; a Gaussian response is not imposed.
 
-For the non-collective Maxwellian, kappa and projected relativistic fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature, velocity and (when absolute density is enabled) integrated-power/density uncertainties include the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend currently does not marginalize response uncertainty into its parameter covariance.
+For the non-collective Maxwellian, kappa and projected relativistic fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature, velocity and (when absolute density is enabled) integrated-power/density uncertainties include the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend propagates supplied response-matrix uncertainty by Monte Carlo refits when a measured 2-D or channel-specific 3-D response matrix is supplied. It also supports Monte Carlo refits for supplied ion-temperature, ion-velocity, electron-velocity and laser-wavelength uncertainties. Each draw refits the full set of spatial channels so cross-channel covariance induced by shared external inputs is retained. The current collective uncertainty interface does not propagate uncertainty in vector beam directions or scattering angle when full vector geometry is used.
 
 ## Electron density and identifiability
 
@@ -98,8 +98,8 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
-- The collective fit uses a log-parameterized least-squares inversion for positive density and temperature, with only numerical floating-point bounds rather than user-independent physical range limits. When per-sample 1σ uncertainties are supplied, their weighted covariance is retained as an absolute covariance; without them, the residual variance scales the local covariance. It does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
-- Correlated uncertainty between wavelength bins, calibration factors and channels is not modeled.
+- The collective fit uses a log-parameterized least-squares inversion for positive density and temperature with adaptive bounds around explicit user starting estimates. Ion temperatures and ion/electron flow vectors remain external inputs, not fitted parameters. Their supplied uncertainties and measured response-matrix uncertainty can be propagated by Monte Carlo refitting; these contributions are conditional on the specified uncertainty distributions and successful perturbation fits.
+- Optional joint_spectral_covariance supplies a full channel-major covariance matrix spanning all wavelength bins and channels. A joint generalized least-squares fit then uses Cholesky whitening and returns cross-channel parameter covariance for non-collective Maxwellian and Kappa models. This is a true joint fit, not a post-hoc correlation estimate. Collective, relativistic and custom models do not yet use this joint GLS path. Shared optical calibration covariance for absolute-density factors remains dependent on the covariance terms explicitly supplied by the user.
 - No independent experimental validation is claimed. Automated tests verify software behavior and mathematical consistency only.
 
 ## Scientific basis and model selection
@@ -133,3 +133,21 @@ The profile summary reports radial-coordinate averages over the supplied interva
 For reconstruction, omitting smoothing_factor selects the smoothing-spline regularization parameter by generalized cross-validation. An explicitly supplied smoothing_factor selects the legacy weighted-residual target. A negative reconstructed density or temperature overshoot is rejected rather than clipped, because clipping would change both the profile and its derivative.
 
 Scale lengths are reported only where the gradient exceeds twice its propagated pointwise 1-sigma uncertainty when those uncertainties are supplied; without uncertainty inputs, the numerical round-off threshold is used. Correlated profile-point covariance and reconstructed confidence bands remain incomplete.
+
+
+## Joint multi-channel inference and model-discrepancy uncertainty
+
+The optional joint_spectral_covariance argument is a full positive-definite covariance matrix with dimension (n_channels * n_wavelengths, n_channels * n_wavelengths). Rows and columns use channel-major ordering: all wavelength samples for channel 0, then all samples for channel 1, and so on. It currently activates a joint generalized least-squares fit for:
+
+- non_collective_maxwellian
+- non_collective_kappa
+
+The joint optimizer fits all channel-specific spectral parameters in one objective, whitens the complete residual vector with the Cholesky factor of the supplied covariance, and propagates the resulting parameter covariance to channel-resolved electron temperature and electron-flow projection. The output contains joint_inference.joint_parameter_covariance, physical_parameter_covariance, and total_physical_parameter_covariance.
+
+The collective model accepts optional 1-sigma arrays for ion_temperature_uncertainty_eV, ion_velocity_uncertainty_m_s, and electron_velocity_uncertainty_m_s, as well as the existing instrument_response_uncertainty and laser_wavelength_uncertainty_nm. When any are supplied, Monte Carlo refits perturb these external quantities and the response matrix, and return collective_external_parameter_covariance. This is not a full Bayesian marginalization: the result is conditional on the supplied uncertainty distributions, fixed ion identities/fractions, fixed vector geometry and the selected Maxwellian collective model.
+
+For both per-channel and joint fits, excess reduced chi-square above unity is reported as a separate model_discrepancy_covariance component. This is a residual-based model-adequacy diagnostic; it does not prove that the physical forward model is complete or experimentally validated. Joint full-covariance GLS is not currently implemented for Collective, relativistic Maxwell-Juttner or custom models.
+
+## Dashboard access
+
+The Advanced Analysis menu includes a shortcut to the same canonical Thomson inference interface in Spectral Analysis. It changes the workspace rather than running a duplicate implementation. The input mapping, model selection, response upload, uncertainty handling and output contract therefore remain shared.
