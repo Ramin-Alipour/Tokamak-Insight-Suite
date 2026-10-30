@@ -2776,7 +2776,8 @@ elif page=='Advanced Analysis':
                 solid_angle_unc=st.number_input('Solid-angle 1-sigma uncertainty (sr)',min_value=0.0,value=0.0,key='tis_ts_solid_unc')
                 efficiency=st.number_input('Optical efficiency (0–1)',min_value=0.0,max_value=1.0,value=0.0,key='tis_ts_eff')
                 efficiency_unc=st.number_input('Optical-efficiency 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_eff_unc')
-                polarization_text=st.text_input('Incident polarization unit vector (x,y,z)',value='1,0,0',key='tis_ts_pol')
+                incident_direction_text=st.text_input('Incident laser propagation unit vector (x,y,z)',value='1,0,0',key='tis_ts_inc_dir')
+                polarization_text=st.text_input('Incident polarization unit vector (x,y,z)',value='0,0,1',key='tis_ts_pol')
                 direction_text=st.text_input('Scattered-light unit direction (x,y,z)',value='0,1,0',key='tis_ts_dir')
                 polarization_unc=st.number_input('Polarization-factor 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_pol_unc')
             if st.button('Run multi-channel Thomson spectral inference',type='primary',key='run_thomson_spectral_inference'):
@@ -2826,9 +2827,10 @@ elif page=='Advanced Analysis':
                     if power_calibrated:
                         if not all(v>0 for v in (laser_power,interaction_length,solid_angle,efficiency)):
                             raise ValueError('Absolute density requires positive laser power, interaction length, solid angle and efficiency.')
+                        incident_direction=np.array([float(v.strip()) for v in incident_direction_text.split(',')])
                         pol=np.array([float(v.strip()) for v in polarization_text.split(',')])
                         direction=np.array([float(v.strip()) for v in direction_text.split(',')])
-                        if pol.size!=3 or direction.size!=3:
+                        if incident_direction.size!=3 or pol.size!=3 or direction.size!=3:
                             raise ValueError('Polarization and scattered direction must each have three components.')
                         kwargs.update(spectral_power_density_calibrated=True,laser_power_w=laser_power,
                             laser_power_uncertainty_W=laser_power_unc,interaction_length_m=interaction_length,
@@ -2836,7 +2838,7 @@ elif page=='Advanced Analysis':
                             collection_solid_angle_sr=solid_angle,
                             collection_solid_angle_uncertainty_sr=solid_angle_unc,
                             optical_efficiency=efficiency,optical_efficiency_uncertainty=efficiency_unc,
-                            incident_polarization=pol,scattered_direction=direction,
+                            incident_polarization=pol,incident_direction=incident_direction,scattered_direction=direction,
                             polarization_factor_uncertainty=polarization_unc)
                     result=analyze_thomson_spectra(
                         np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
