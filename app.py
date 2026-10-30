@@ -3541,7 +3541,7 @@ elif page=='Advanced Analysis':
             download_df('Download correlation matrix',mat.reset_index(names='channel'),'tis_correlation_matrix.csv')
 
 elif page=='Diagnostic Catalog':
-    render_catalog_page(st, DIAGNOSTICS, FORMULAS, diagnostic_families, json_download, ANALYSES)
+    render_catalog_page(st, DIAGNOSTICS, FORMULAS, diagnostic_families, json_download, ANALYSES, ANALYSIS_FAMILIES)
 
 elif page=='Project Manager':
     render_project_page(st, session_state=st.session_state, project_title=project, shot_id=shot,
