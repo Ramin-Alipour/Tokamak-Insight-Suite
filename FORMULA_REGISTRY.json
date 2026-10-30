@@ -2341,10 +2341,10 @@
   },
   {
     "name": "Langmuir ion density from ion-saturation current",
-    "equation": "n_i = |I_i,sat| / [C_s e A_p sqrt(e T_e / m_i)]",
-    "inputs": "Ion saturation current [A], T_e [eV], effective area [m^2], ion mass [kg], supplied sheath coefficient C_s",
+    "equation": "n_i = |I_i,sat| / [C_s e A_p Z_i^(3/2) sqrt(e T_e / m_i)]",
+    "inputs": "Ion saturation current [A], T_e [eV], effective area [m^2], ion mass [kg], integer charge state Z_i, supplied sheath coefficient C_s",
     "output": "m^-3",
-    "assumptions": "Single dominant ion species; Maxwellian electron temperature; supplied C_s is appropriate to the declared sheath/Bohm model, geometry and regime. Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Ch. 3, §3.2.5, Eqs. 3.2.33–3.2.37.",
+    "assumptions": "Single ion species with explicitly supplied integer charge state; Bohm speed sqrt(Z_i e T_e/m_i), Maxwellian electron temperature; supplied C_s appropriate to declared sheath/Bohm model, geometry and regime. Hutchinson (2002), Ch. 3, §3.2.5.",
     "status": "D",
     "category": "Langmuir probe",
     "execution_contract": {
@@ -2376,6 +2376,13 @@
           "unit": "kg",
           "description": "Positive mass of the assumed ion species.",
           "required": true
+        },
+        {
+          "name": "charge_state",
+          "unit": "integer",
+          "description": "Positive integer ion charge state Z_i; defaults to 1 for backward compatibility and is explicitly reported.",
+          "required": false,
+          "default": 1
         },
         {
           "name": "sheath_coefficient",
@@ -2427,13 +2434,14 @@
         }
       ],
       "prerequisites": [
-        "Selected ion branch must represent ion saturation; physical regime is not automatically certified."
+        "Selected ion branch must represent ion saturation; physical regime is not automatically certified.",
+        "Ion charge state is explicit; singly charged case is Z_i=1."
       ],
       "uncertainty_model": "Optional independent input standard uncertainties propagated by first-order linearization; all five uncertainty inputs must be supplied together.",
       "test_links": [
         "tests/test_formula_registry_complete.py::test_langmuir_ion_density_from_saturation_reference"
       ],
-      "note": "Published sheath/Bohm current-balance relation; model-based estimate only, not empirical validation."
+      "note": "Published Bohm/sheath current-balance relation with explicit charge-state dependence; model-based estimate only, not empirical validation."
     },
     "references": [
       "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5, Eqs. 3.2.33–3.2.37."
