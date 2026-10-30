@@ -262,6 +262,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
     unc=None if signal_uncertainty is None else _array(signal_uncertainty,"signal_uncertainty",1)
     if unc is not None and (unc.shape!=y.shape or np.any(unc<=0)): raise ValueError("signal_uncertainty must match spectrum and be positive")
+    if unc is not None and spectral_covariance is not None:
+        raise ValueError("Supply either signal_uncertainty or spectral_covariance, not both")
     b=parameter_bounds or {}
     def bounds(name,default):
         lo,hi=map(float,b.get(name,default))
