@@ -9,11 +9,13 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
                         formulas: Iterable[Mapping[str, Any]],
                         diagnostic_families: Callable[[], list[str]],
                         json_download: Callable[[str, Any, str], None],
-                        analyses: Iterable[Mapping[str, Any]] = ()) -> None:
+                        analyses: Iterable[Mapping[str, Any]] = (),
+                        analysis_families: Iterable[Mapping[str, Any]] = ()) -> None:
     """Render the catalogue from canonical registry records."""
     diagnostics = list(diagnostics)
     formulas = list(formulas)
     analyses = list(analyses)
+    analysis_families = list(analysis_families)
     st.title("Diagnostic Knowledge Base")
     # Diagnostic records and callable entry points are separate registry layers.
     from collections import Counter
@@ -65,8 +67,35 @@ def render_catalog_page(st: Any, diagnostics: Iterable[Mapping[str, Any]],
             f"Scoped complete: {analysis_status.get('complete_with_declared_scope', 0)} · "
             f"Incomplete: {analysis_status.get('incomplete', 0)}"
         )
-    view = st.radio("Catalog", ["Diagnostic families", "Analysis entry points", "Formula reference"], horizontal=True)
+    if analysis_families and (len(analysis_families) != 20 or sorted(i for family in analysis_families for i in family.get("entry_ids", [])) != list(range(1, 81))):
+        st.error("Primary-analysis family mapping is invalid; verify ANALYSIS_FAMILIES.json before relying on the grouped catalogue.")
+    st.caption("Primary navigation: 20 analysis families · underlying callable entry points: 80")
+    view = st.radio("Catalog", ["20 primary analyses", "Diagnostic families", "Analysis entry points", "Formula reference"], horizontal=True)
     query = st.text_input("Search by diagnostic, observable, formula, method or caveat", "").strip().lower()
+    if view == "20 primary analyses":
+        analysis_by_id = {item["id"]: item for item in analyses}
+        visible_families = []
+        for family in analysis_families:
+            children = [analysis_by_id[i] for i in family.get("entry_ids", []) if i in analysis_by_id]
+            haystack = " ".join([str(family), *(str(item) for item in children)]).lower()
+            if not query or query in haystack:
+                visible_families.append((family, children))
+        st.write(f"{len(visible_families)} primary analysis families")
+        for family, children in visible_families:
+            with st.expander(f"{family['id']:02d} · {family['name']} · {len(children)} subanalyses"):
+                st.caption(family.get("description", ""))
+                if family.get("category") == "instrumentation_support":
+                    st.info("Shared instrumentation and measurement-support toolkit; not an additional physical diagnostic family.")
+                rows = [{
+                    "Original ID": item["id"],
+                    "Subanalysis / workflow": item["name"],
+                    "Callable": f"tokamak_analysis.{item['module']}.{item['function']}",
+                    "Maturity": maturity_label(item),
+                } for item in children]
+                if rows:
+                    st.dataframe(rows, width="stretch", hide_index=True)
+        json_download("Export 20 primary analysis families", analysis_families, "tis_primary_analysis_families.json")
+        return
     if view == "Diagnostic families":
         family = st.selectbox("Diagnostic family", ["All families"] + diagnostic_families())
         entries = [d for d in diagnostics
