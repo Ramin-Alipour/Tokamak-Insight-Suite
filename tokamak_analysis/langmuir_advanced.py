@@ -255,52 +255,34 @@ def estimate_multispecies_ion_density(
     species: Sequence[Mapping[str, float]], *, current_convention: str = "electron_positive",
     fraction_basis: str = "number_density",
 ) -> dict[str, Any]:
-    """Sum species-resolved Bohm/sheath ion currents using explicit charge states."""
-    from tis.constants import E_CHARGE
-    vals = (ion_saturation_current_A, electron_temperature_eV, probe_area_m2)
-    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
-        raise ValueError("Current, temperature, and area must be finite real scalars.")
+    """Use the registered species-summed Bohm/sheath density relation."""
+    from tokamak_analysis.formula_library import langmuir_multispecies_ion_density
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     if fraction_basis != "number_density":
         raise ValueError("fraction_basis must be 'number_density'; mass and current fractions are not interchangeable.")
-    ion_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
-    if ion_current >= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
-        raise ValueError("Ion current must be negative after normalization; temperature and area must be positive.")
-    if not species:
-        raise ValueError("At least one ion species is required.")
-    normalized = []
-    for item in species:
-        required = ("mass_kg", "fraction", "charge_state", "sheath_coefficient")
-        if not all(k in item for k in required):
-            raise ValueError("Each species requires mass_kg, fraction, charge_state Z_s, and sheath_coefficient.")
-        mass, fraction, charge, coeff = (float(item[k]) for k in required)
-        if not all(math.isfinite(z) and z > 0 for z in (mass, fraction, charge, coeff)):
-            raise ValueError("Species mass, fraction, charge_state and sheath coefficient must be positive and finite.")
-        if not charge.is_integer():
-            raise ValueError("charge_state must be a positive integer ion charge state.")
-        normalized.append({"mass_kg": mass, "fraction": fraction, "charge_state": int(charge), "sheath_coefficient": coeff})
-    total_fraction = sum(z["fraction"] for z in normalized)
-    if not math.isclose(total_fraction, 1.0, rel_tol=1e-6, abs_tol=1e-8):
-        raise ValueError("Ion species fractions must sum to 1.")
-    factor = sum(z["fraction"] * z["sheath_coefficient"] * z["charge_state"]**1.5 / math.sqrt(z["mass_kg"]) for z in normalized)
-    density = abs(ion_current) / (E_CHARGE * probe_area_m2 * math.sqrt(E_CHARGE * electron_temperature_eV) * factor)
-    if not math.isfinite(density) or density <= 0:
-        raise ValueError("Multispecies density estimate is not finite and positive.")
+    normalized_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
+    if normalized_current >= 0:
+        raise ValueError("Ion current must be negative after normalization to electron_positive.")
+    result = langmuir_multispecies_ion_density(
+        abs(normalized_current), electron_temperature_eV, probe_area_m2, species
+    )
     return {
-        "ion_density_estimate_m-3": density,
-        "ion_density_standard_uncertainty_m-3": None,
+        "ion_density_estimate_m-3": result["ion_density_m3"],
+        "ion_density_standard_uncertainty_m-3": result["uncertainty_ion_density_m3"],
         "ion_density_relative_standard_uncertainty": None,
-        "ion_species": normalized,
-        "ion_species_fraction_sum": total_fraction, "ion_species_fraction_basis": "number_density_fraction",
-        "current_convention_input": current_convention, "current_convention_normalized": "electron_positive",
+        "ion_species": result["ion_species"],
+        "ion_species_fraction_sum": result["ion_species_fraction_sum"],
+        "ion_species_fraction_basis": "number_density_fraction",
+        "current_convention_input": current_convention,
+        "current_convention_normalized": "electron_positive",
         "model": "species_summed_bohm_sheath_current",
         "formula": "n_i = |I_i,sat| / [e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]",
         "assumptions": ["common electron temperature", "number-density fractions sum to one",
                         "species Bohm speed sqrt(Z_s e T_e/m_s)", "species sheath coefficients appropriate to geometry and regime",
                         "single effective collection area"],
         "physical_regime_confirmed": False, "uncertainty_propagation_performed": False,
-        "uncertainty_status": "not_propagated_species_fraction_covariance_and_species_model_uncertainties_not_supplied",
+        "uncertainty_status": result["uncertainty_status"],
     }
 
 def langmuir_fit_window_sensitivity(
@@ -365,36 +347,32 @@ def estimate_electron_density_from_saturation(
     temperature_relative_standard_uncertainty: float | None = None,
     area_relative_standard_uncertainty: float | None = None,
 ) -> dict[str, Any]:
-    """Estimate Maxwellian electron density; propagate only complete supplied independent uncertainties."""
-    from tis.constants import E_CHARGE, M_E
-    vals = (electron_saturation_current_A, electron_temperature_eV, probe_area_m2)
-    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
-        raise ValueError("Current, temperature, and area must be finite real scalars.")
+    """Use the registered Maxwellian electron-saturation density relation."""
+    from tokamak_analysis.formula_library import langmuir_electron_density_from_saturation_current
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
-    sigmas = (current_standard_uncertainty_A, temperature_relative_standard_uncertainty, area_relative_standard_uncertainty)
-    if any(z is not None and (not isinstance(z, (int, float, np.integer, np.floating)) or isinstance(z, (bool, np.bool_)) or not math.isfinite(float(z)) or z < 0) for z in sigmas):
-        raise ValueError("Optional uncertainty inputs must be finite non-negative real scalars.")
     current = -float(electron_saturation_current_A) if current_convention == "ion_positive" else float(electron_saturation_current_A)
-    if current <= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
-        raise ValueError("Electron saturation current must be positive after normalization; temperature and area must be positive.")
-    speed = math.sqrt(E_CHARGE * electron_temperature_eV / (2.0 * math.pi * M_E))
-    density = current / (E_CHARGE * probe_area_m2 * speed)
-    supplied = all(z is not None for z in sigmas)
-    sigma_density = None
-    if supplied:
-        rel = math.sqrt((float(current_standard_uncertainty_A)/current)**2
-                        + float(area_relative_standard_uncertainty)**2
-                        + (0.5*float(temperature_relative_standard_uncertainty))**2)
-        sigma_density = density * rel
+    if current <= 0:
+        raise ValueError("Electron saturation current must be positive after normalization.")
+    uncertainty_values = (current_standard_uncertainty_A, temperature_relative_standard_uncertainty, area_relative_standard_uncertainty)
+    supplied = all(value is not None for value in uncertainty_values)
+    result = langmuir_electron_density_from_saturation_current(
+        current, electron_temperature_eV, probe_area_m2,
+        sigma_electron_saturation_current_A=current_standard_uncertainty_A if supplied else None,
+        relative_sigma_electron_temperature=temperature_relative_standard_uncertainty if supplied else None,
+        relative_sigma_probe_area=area_relative_standard_uncertainty if supplied else None,
+    )
+    sigma = result.get("uncertainty_electron_density_m3")
     return {
-        "electron_density_estimate_m-3": density, "electron_density_standard_uncertainty_m-3": sigma_density,
-        "electron_density_uncertainty_status": "conditional_independent_input_uncertainties_propagated" if supplied else "not_calculated_all_three_independent_uncertainties_required",
-        "current_convention_input": current_convention, "current_convention_normalized": "electron_positive",
+        "electron_density_estimate_m-3": result["electron_density_m3"],
+        "electron_density_standard_uncertainty_m-3": sigma,
+        "electron_density_uncertainty_status": "conditional_independent_input_uncertainties_propagated" if sigma is not None else "not_calculated_all_three_independent_uncertainties_required",
+        "current_convention_input": current_convention,
+        "current_convention_normalized": "electron_positive",
         "formula": "n_e = I_e,sat / (e A_p sqrt(e T_e / (2 pi m_e)))",
-        "reference": "Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Chapter 3, Section 3.2.5.",
+        "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (6), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5.",
         "assumption": "Maxwellian electron collection with supplied effective area and applicable electron-saturation regime.",
-        "physical_regime_confirmed": False, "uncertainty_propagation_performed": supplied,
+        "physical_regime_confirmed": False, "uncertainty_propagation_performed": sigma is not None,
     }
 
 def estimate_ion_particle_flux(
@@ -405,38 +383,30 @@ def estimate_ion_particle_flux(
     mass_relative_standard_uncertainty: float | None = None,
     sheath_factor_relative_standard_uncertainty: float | None = None,
 ) -> dict[str, Any]:
-    """Estimate species Bohm particle flux Gamma_i = C_s n_i sqrt(Z_i e T_e/m_i)."""
-    from tis.constants import E_CHARGE
-    vals = (ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_factor)
-    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
-        raise ValueError("Density, temperature, mass, and sheath_factor must be finite real scalars.")
-    if isinstance(charge_state, bool) or not isinstance(charge_state, (int, np.integer)) or charge_state < 1:
-        raise ValueError("charge_state must be a positive integer.")
+    """Use the registered species Bohm particle-flux relation."""
+    from tokamak_analysis.formula_library import langmuir_bohm_particle_flux
     sigmas = (density_relative_standard_uncertainty, temperature_relative_standard_uncertainty,
               mass_relative_standard_uncertainty, sheath_factor_relative_standard_uncertainty)
-    if any(z is not None and (not isinstance(z, (int, float, np.integer, np.floating)) or isinstance(z, (bool, np.bool_)) or not math.isfinite(float(z)) or z < 0) for z in sigmas):
-        raise ValueError("Optional relative uncertainty inputs must be finite non-negative real scalars.")
-    if any(z <= 0 for z in vals):
-        raise ValueError("Density, temperature, mass, and sheath_factor must be positive.")
-    speed = math.sqrt(charge_state * E_CHARGE * electron_temperature_eV / ion_mass_kg)
-    flux = float(sheath_factor) * float(ion_density_m3) * speed
-    supplied = all(z is not None for z in sigmas)
-    sigma_flux = None
-    if supplied:
-        rel = math.sqrt(float(density_relative_standard_uncertainty)**2
-                        + (0.5*float(temperature_relative_standard_uncertainty))**2
-                        + (0.5*float(mass_relative_standard_uncertainty))**2
-                        + float(sheath_factor_relative_standard_uncertainty)**2)
-        sigma_flux = flux * rel
+    supplied = all(value is not None for value in sigmas)
+    result = langmuir_bohm_particle_flux(
+        ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_factor,
+        charge_state=charge_state,
+        relative_sigma_ion_density=density_relative_standard_uncertainty if supplied else None,
+        relative_sigma_electron_temperature=temperature_relative_standard_uncertainty if supplied else None,
+        relative_sigma_ion_mass=mass_relative_standard_uncertainty if supplied else None,
+        relative_sigma_sheath_coefficient=sheath_factor_relative_standard_uncertainty if supplied else None,
+    )
+    sigma = result.get("uncertainty_ion_particle_flux_m2_s")
     return {
-        "ion_sound_speed_m_s": speed, "ion_particle_flux_m-2_s-1": flux,
-        "ion_charge_state": int(charge_state),
-        "ion_particle_flux_standard_uncertainty_m-2_s-1": sigma_flux,
-        "uncertainty_status": "conditional_independent_input_uncertainties_propagated" if supplied else "not_calculated_all_four_independent_uncertainties_required",
+        "ion_sound_speed_m_s": result["ion_sound_speed_m_s"],
+        "ion_particle_flux_m-2_s-1": result["ion_particle_flux_m2_s"],
+        "ion_charge_state": result["ion_charge_state"],
+        "ion_particle_flux_standard_uncertainty_m-2_s-1": sigma,
+        "uncertainty_status": "conditional_independent_input_uncertainties_propagated" if sigma is not None else "not_calculated_all_four_independent_uncertainties_required",
         "formula": "Gamma_i = C_s n_i sqrt(Z_i e T_e / m_i)",
-        "reference": "Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Chapter 3, Section 3.2.5.",
+        "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (3), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5.",
         "assumption": "Bohm-like species flux; charge state and sheath factor are explicit and model applicability is supplied by the user.",
-        "physical_regime_confirmed": False, "uncertainty_propagation_performed": supplied,
+        "physical_regime_confirmed": False, "uncertainty_propagation_performed": sigma is not None,
     }
 
 def estimate_smoothed_plasma_potential_candidates(
