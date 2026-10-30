@@ -2755,7 +2755,7 @@ elif page=='Advanced Analysis':
             angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
             angle_deg_unc=st.number_input('Scattering-angle 1-sigma uncertainty (degrees)',min_value=0.0,value=0.0,key='tis_ts_angle_unc')
             model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Relativistic Maxwell-Juttner (projected)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
-            response_file=st.file_uploader('Instrument line-spread response matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf')
+            response_file=st.file_uploader('Instrument line-spread response matrix (CSV; required)',type=['csv'],key='tis_ts_lsf')
             response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
             st.caption('The response matrix must be square on the wavelength grid. Its columns represent normalized detector-bin probabilities for each true-wavelength bin.')
             if model_label.startswith('Collective'):
@@ -2811,7 +2811,9 @@ elif page=='Advanced Analysis':
                     wavelengths=np.asarray(wavelengths,dtype=float)[order].tolist()
                     if uncertainties:
                         uncertainties=np.asarray(uncertainties,dtype=float)[order].tolist()
-                    response=None if response_file is None else pd.read_csv(response_file,header=None).to_numpy(float)
+                    if response_file is None:
+                        raise ValueError('Upload the measured instrument-response matrix; an identity matrix must be supplied explicitly if justified.')
+                    response=pd.read_csv(response_file,header=None).to_numpy(float)
                     response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
                     kwargs={}
                     if model_label.startswith('Collective'):
