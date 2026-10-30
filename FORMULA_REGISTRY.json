@@ -3076,12 +3076,63 @@
           "name": "ion_fractions",
           "unit": "charge-density fraction",
           "required": true
+        },
+        {
+          "name": "spectral_covariance",
+          "unit": "Hz-bin spectral covariance matrix",
+          "required": false
+        },
+        {
+          "name": "instrument_response_uncertainty",
+          "unit": "frequency-response matrix 1-sigma",
+          "required": false
+        },
+        {
+          "name": "external_parameter_uncertainties",
+          "unit": "structured 1-sigma values",
+          "required": false
+        },
+        {
+          "name": "inversion_method",
+          "unit": "text",
+          "required": false,
+          "description": "differential_evolution, improved_genetic or regularized."
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "fast_ion",
+          "unit": "structured",
+          "required": false,
+          "description": "Optional hot Maxwellian, fixed tabulated VDF, or regularized inferred tabulated 1-D VDF."
         }
       ],
       "output_specs": [
         {
           "name": "spectral_density",
           "unit": "model spectral-density units"
+        },
+        {
+          "name": "parameter_covariance",
+          "unit": "mixed physical parameter covariance"
+        },
+        {
+          "name": "fast_ion_vdf_probability_density_m_s_inverse",
+          "unit": "s m^-1",
+          "required": false
+        },
+        {
+          "name": "fast_ion_vdf_covariance",
+          "unit": "(s m^-1)^2",
+          "required": false
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "mixed physical parameter covariance",
+          "required": false
         }
       ],
       "prerequisites": [
@@ -3089,11 +3140,15 @@
         "Known probe frequency and scattering geometry",
         "Fixed ion composition"
       ],
-      "uncertainty_model": "Forward relation is deterministic; inverse parameter uncertainties are local Jacobian estimates and exclude model discrepancy and response-matrix uncertainty.",
+      "uncertainty_model": "Jacobian covariance uses full spectral covariance whitening when supplied. Response-matrix and supported external-parameter contributions are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. For inferred tabulated fast-ion VDFs, uncertainty is propagated from the regularized logit covariance to the reconstructed non-negative normalized distribution.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
       ],
-      "note": "Scoped electrostatic microwave CTS model; not full magnetized electromagnetic ray-tracing or power-transfer modelling."
+      "note": "Scoped unmagnetized electrostatic longitudinal microwave CTS; no full magnetized electromagnetic tensor, ray tracing, receiver coupling or absolute power transfer. The improved-genetic option is a real-coded adaptive GA implementation informed by Zhang et al. (2024), not a claim of exact reproduction of their published fitness function.",
+      "function_links": [
+        "tokamak_analysis.cts_analysis.cts_spectral_density",
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      ]
     },
     "references": [
       {
@@ -3104,16 +3159,188 @@
         "type": "textbook"
       },
       {
-        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
-        "journal": "Fusion Engineering and Design",
-        "year": 2026,
-        "doi": "10.1016/j.fusengdes.2026.115845"
+        "title": "Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm",
+        "authors": "Jingshuo Zhang, Ting Lan, Qingbin Zeng, Zhengwei Wu, Ge Zhuang, Jinlin Xie",
+        "journal": "Review of Scientific Instruments",
+        "volume": "95",
+        "issue": "9",
+        "article": "093542",
+        "year": 2024,
+        "doi": "10.1063/5.0215734"
       },
       {
-        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
-        "journal": "Journal of Fusion Energy",
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo, M. Cufari, G. D. Sutcliffe, T. M. Johnson, B. L. Reichelt, A. Milder, M. Gatu Johnson",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "issue": "10",
+        "article": "103535",
         "year": 2026,
-        "doi": "10.1007/s10894-026-00595-7"
+        "doi": "10.1063/5.0350497"
+      },
+      {
+        "title": "Thomson Scattering: Spectral Density",
+        "authors": "PlasmaPy documentation",
+        "year": 2026,
+        "url": "https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html",
+        "type": "software documentation"
+      }
+    ]
+  },
+  {
+    "name": "Joint multi-channel Thomson generalized least-squares covariance",
+    "equation": "θ̂ = argmin_θ [(m(θ)−y)^T C_y^-1 (m(θ)−y)]; Cov(θ̂) ≈ (J^T C_y^-1 J)^-1; Cov(g(θ̂)) ≈ G Cov(θ̂) G^T",
+    "inputs": "Channel-major concatenated calibrated spectra y, full positive-definite spectral covariance C_y, per-channel calibrated wavelength axes and instrument-response matrices, model parameters θ",
+    "output": "Joint parameter covariance and propagated covariance of electron temperature and electron-flow projection across channels",
+    "assumptions": "Currently implemented for non-collective Maxwellian and parameterized Kappa projected spectra; supplied covariance includes the modeled cross-channel and cross-wavelength noise; local linearization near the optimum.",
+    "status": "P",
+    "category": "Thomson scattering inference",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+      "formula_key": "thomson_joint_generalized_least_squares",
+      "input_specs": [
+        {
+          "name": "spectra",
+          "unit": "calibrated spectral intensity",
+          "required": true
+        },
+        {
+          "name": "joint_spectral_covariance",
+          "unit": "(channel*wavelength)^2 covariance matrix in channel-major order",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "normalized response matrix per channel",
+          "required": true
+        },
+        {
+          "name": "model",
+          "unit": "non_collective_maxwellian or non_collective_kappa",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "joint_parameter_covariance",
+          "unit": "fit-parameter covariance"
+        },
+        {
+          "name": "physical_parameter_covariance",
+          "unit": "covariance of channel Te and velocity projections"
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "excess-residual covariance component"
+        }
+      ],
+      "prerequisites": [
+        "Positive-definite supplied full covariance matrix",
+        "Measured calibrated multi-channel spectra",
+        "A supported non-collective spectral forward model"
+      ],
+      "uncertainty_model": "Full covariance whitening is used in the joint objective; the inverse information matrix provides local parameter covariance. Excess reduced chi-square above unity is exposed separately as a model-discrepancy covariance component.",
+      "limitations": [
+        "Currently supports non-collective Maxwellian and Kappa models only.",
+        "Collective, relativistic and custom models require dedicated joint forward models.",
+        "The covariance is local and conditional on the selected model and supplied covariance; it does not establish experimental validity."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+      ],
+      "raw_data_to_physics": true,
+      "note": "This is a true joint generalized least-squares fit over all supplied channels, not post-hoc independent-channel error correlation."
+    },
+    "references": [
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Motivates regularized inference over spatial/time series; this registry entry documents the TIS joint GLS covariance relation."
+      }
+    ]
+  },
+  {
+    "name": "CTS longitudinal susceptibility for a tabulated non-Maxwellian fast-ion VDF",
+    "equation": "χ_f(k,ω)=−ω_pf²/k² [PV∫ f′(v)/(v−(ω/k−u_f)) dv + iπ f′(ω/k−u_f)]",
+    "inputs": "Frequency shift [Hz], scattering wave number [m^-1], fast-ion density [m^-3], ion charge [e], ion mass [kg], flow projection [m/s], normalized tabulated 1-D velocity distribution f(v)",
+    "output": "Complex longitudinal susceptibility and resonant VDF value",
+    "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
+    "status": "P",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_analysis._component_tabulated",
+      "formula_key": "cts_tabulated_fast_ion_susceptibility",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "scattering_wave_number_m-1",
+          "unit": "m^-1",
+          "required": true
+        },
+        {
+          "name": "velocity_m_s",
+          "unit": "m s^-1",
+          "required": true
+        },
+        {
+          "name": "probability_density_m_s_inverse",
+          "unit": "s m^-1",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "complex_susceptibility",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "resonant_probability_density",
+          "unit": "s m^-1"
+        }
+      ],
+      "prerequisites": [
+        "Normalized non-negative tabulated 1-D VDF",
+        "Known ion species and flow projection"
+      ],
+      "uncertainty_model": "The susceptibility is deterministic for the supplied VDF. When VDF nodes are inferred by the CTS inverse routine, non-negative softmax parameterization and second-difference regularization are used; the resulting logit covariance is propagated to the VDF node covariance.",
+      "limitations": [
+        "Only longitudinal unmagnetized electrostatic susceptibility is represented.",
+        "The velocity distribution is a 1-D projection; anisotropic 3-D VDFs and magnetized electromagnetic response are not represented.",
+        "VDF inversion is ill-posed and depends on the chosen velocity grid and regularization strength."
+      ],
+      "function_links": [
+        "tokamak_analysis.cts_analysis._component_tabulated",
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      ],
+      "raw_data_to_physics": true,
+      "note": "Tabulated VDF shape can be inferred only when infer_tabulated_1d is selected with regularized inversion; fixed tabulated_1d mode treats the shape as an external input."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield et al.",
+        "year": 2011,
+        "publisher": "Academic Press"
+      },
+      {
+        "title": "Recovering Non-Maxwellian Velocity Distribution Functions from Collective Thomson Scattering Spectra Using Generalized Basis Representations",
+        "authors": "Greg A. Baker et al.",
+        "year": 2026,
+        "url": "https://arxiv.org/abs/2610.37516",
+        "type": "preprint"
       }
     ]
   }
