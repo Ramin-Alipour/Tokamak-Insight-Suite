@@ -241,9 +241,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out["plasma_potential_d2IdV2_max_candidate_V"] = float(v[second_derivative_index])
     out["plasma_potential_estimate_V"] = float(v[first_derivative_index])
     out["plasma_potential_candidate_method"] = "maximum_second_derivative_of_current"; out["plasma_potential_second_derivative_method"] = "maximum_second_derivative_candidate"
+    # An edge-dominated maximum is still a numerical candidate, but must
+    # be flagged for review rather than silently presented as a plasma potential.
+    edge_candidate = first_derivative_index in (0, len(v) - 1)
     out["plasma_potential_status"] = (
         "numerical_candidate_requires_regime_review"
-        if electron_fit_range is not None
+        if edge_candidate or electron_fit_range is not None
         else "proxy_only_requires_probe_regime_review"
     )
     out["plasma_potential_voltage_grid_spacing_median_V"] = float(np.median(np.diff(v)))
@@ -434,6 +437,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         ion_flatness_pass = bool(
             isinstance(ion_review, dict) and ion_review.get("numerically_flat_candidate", False)
         )
+        if not ion_numerical_fit_pass or not ion_flatness_pass:
+            raise ValueError(
+                "Ion-density inversion requires an ion-branch fit that passes numerical fit-quality "
+                "and numerically flat ion-branch screening; revise ion_fit_range and inspect the I-V curve."
+            )
         if not _is_finite_real_scalar(te) or te <= 0:
             raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
         if not _is_finite_real_scalar(ion_current) or ion_current >= 0:
@@ -486,8 +494,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                 "ion_mass": 0.5 * float(ion_mass_relative_uncertainty or 0.0),
                 "sheath_coefficient": float(ion_saturation_coefficient_relative_uncertainty or 0.0),
                 "electron_temperature": 0.5 * rel_te,
-                "density_model_discrepancy": float(density_model_relative_uncertainty or 0.0),
             }
+            # Keep the reported component list faithful to what the caller
+            # actually supplied; an omitted model-discrepancy term is not a
+            # measured zero-uncertainty contribution.
+            if density_model_relative_uncertainty is not None:
+                rel_components["density_model_discrepancy"] = float(density_model_relative_uncertainty)
             relative_uncertainty = math.sqrt(sum(value**2 for value in rel_components.values()))
             out["ion_density_standard_uncertainty_m-3"] = float(density * relative_uncertainty)
             out["ion_density_relative_standard_uncertainty"] = float(relative_uncertainty)
