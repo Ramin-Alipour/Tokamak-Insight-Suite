@@ -200,6 +200,9 @@ def analyze_thomson_spectra(
         raise ValueError("laser_wavelength_nm must be positive")
     if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
         raise ValueError("scattering_angle_rad must lie in (0, pi]")
+    if (not np.isfinite(laser_wavelength_uncertainty_nm) or laser_wavelength_uncertainty_nm < 0
+            or not np.isfinite(scattering_angle_uncertainty_rad) or scattering_angle_uncertainty_rad < 0):
+        raise ValueError("laser-wavelength and scattering-angle uncertainties must be finite and non-negative")
     if model not in {"non_collective_maxwellian", "non_collective_kappa", "collective_maxwellian"}:
         raise ValueError("model must be non_collective_maxwellian, non_collective_kappa or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
@@ -268,11 +271,21 @@ def analyze_thomson_spectra(
                 return (amp*shape-y[i])/scale
             fitopt = least_squares(objective, [1e18, 100.0], bounds=([1e12, 0.01],[1e25, 1e7]), max_nfev=5000)
             ne_fit, te_fit = map(float, fitopt.x)
+            dof = max(1, y[i].size-fitopt.x.size)
+            try:
+                parameter_covariance = np.linalg.pinv(fitopt.jac.T @ fitopt.jac) * (2.0*fitopt.cost/dof)
+                parameter_uncertainties = np.sqrt(np.maximum(np.diag(parameter_covariance),0.0))
+            except np.linalg.LinAlgError:
+                parameter_covariance = None
+                parameter_uncertainties = np.array([np.nan,np.nan])
             model_spec = collective_shape(fitopt.x)
             amp_fit = float(np.dot(y[i], model_spec)/max(np.dot(model_spec,model_spec),1e-300))
             fit = {"electron_density_m3": ne_fit, "electron_temperature_eV": te_fit,
                    "fitted_spectrum": amp_fit*model_spec, "residual": y[i]-amp_fit*model_spec,
                    "model": "PlasmaPy Maxwellian kinetic dielectric spectral-density model",
+                   "electron_density_uncertainty_m3": float(parameter_uncertainties[0]),
+                   "electron_temperature_uncertainty_eV": float(parameter_uncertainties[1]),
+                   "fit_covariance": parameter_covariance,
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
                    "ion_species": list(ion_species), "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
@@ -353,12 +366,30 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_propagated"] = False
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
+        if model in {"non_collective_maxwellian", "non_collective_kappa"}:
+            te = fit["electron_temperature_eV"]
+            te_rel_var = (2.0*float(laser_wavelength_uncertainty_nm)/float(laser_wavelength_nm))**2
+            te_rel_var += (np.cos(float(scattering_angle_rad)/2.0)/np.sin(float(scattering_angle_rad)/2.0)
+                           * float(scattering_angle_uncertainty_rad))**2
+            fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
+                fit["electron_temperature_uncertainty_eV"], te*np.sqrt(te_rel_var)))
+            velocity = fit["electron_velocity_projection_m_s"]
+            velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*float(laser_wavelength_uncertainty_nm)
+                                    /(float(laser_wavelength_nm)**2*2.0*np.sin(float(scattering_angle_rad)/2.0)))
+            velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
+                                        /np.sin(float(scattering_angle_rad)/2.0)
+                                        *float(scattering_angle_uncertainty_rad))
+            fit["electron_velocity_projection_uncertainty_m_s"] = float(np.sqrt(
+                fit["electron_velocity_projection_uncertainty_m_s"]**2
+                + velocity_laser_sigma**2 + velocity_angle_sigma**2))
         results.append(fit)
     return {
         "model": model, "channel_count": len(results), "channels": results,
         "radius_m": radii.copy(),
         "electron_temperature_profile_eV": np.array([r.get("electron_temperature_eV", np.nan) for r in results]),
+        "electron_temperature_uncertainty_profile_eV": np.array([r.get("electron_temperature_uncertainty_eV", np.nan) for r in results]),
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
+        "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "limitations": [
             "Non-collective Maxwellian and kappa models are non-relativistic; relativistic kinetic corrections are not implemented.",
