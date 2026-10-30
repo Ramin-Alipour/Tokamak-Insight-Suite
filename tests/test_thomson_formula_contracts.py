@@ -1,3 +1,4 @@
+import numpy as np
 import math
 import pytest
 from tokamak_analysis.formula_library import thomson_electron_temperature_from_spectral_width, thomson_velocity_projection, thomson_density_from_scattered_power
