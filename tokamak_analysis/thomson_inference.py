@@ -925,9 +925,17 @@ def analyze_thomson_spectra(
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_samples, ddof=1))
                 fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_samples, ddof=1))
+                fit["integrated_scattered_power_fit_uncertainty_W"] = float(
+                    fit.get("integrated_scattered_power_uncertainty_W") or 0.0
+                )
                 fit["integrated_scattered_power_lsf_uncertainty_W"] = (
                     float(np.std(area_samples, ddof=1)) if len(area_samples) >= required_successes else None
                 )
+                if fit["integrated_scattered_power_lsf_uncertainty_W"] is not None:
+                    fit["integrated_scattered_power_uncertainty_W"] = float(np.hypot(
+                        fit["integrated_scattered_power_fit_uncertainty_W"],
+                        fit["integrated_scattered_power_lsf_uncertainty_W"],
+                    ))
             else:
                 fit["instrument_response_uncertainty_propagated"] = False
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
@@ -935,7 +943,10 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
             if len(area_samples) >= required_successes:
-                fit_area_uncertainty = float(fit.get("integrated_scattered_power_uncertainty_W") or 0.0)
+                fit_area_uncertainty = float(
+                    fit.get("integrated_scattered_power_fit_uncertainty_W",
+                            fit.get("integrated_scattered_power_uncertainty_W")) or 0.0
+                )
                 lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
                 if density_inputs.get("relative_input_covariance") is None:
                     combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
