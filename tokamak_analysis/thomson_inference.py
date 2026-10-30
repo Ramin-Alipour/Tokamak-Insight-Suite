@@ -730,6 +730,30 @@ def analyze_thomson_spectra(
                                        if model == "collective_maxwellian" else None),
         )
         fit.update(quality)
+        fit_covariance_for_discrepancy=fit.get("fit_covariance")
+        if fit.get("fit_reduced_chi_square") is not None and fit_covariance_for_discrepancy is not None:
+            discrepancy_scale=max(float(fit["fit_reduced_chi_square"])-1.0,0.0)
+            discrepancy_covariance=discrepancy_scale*np.asarray(fit_covariance_for_discrepancy,dtype=float)
+            fit["model_discrepancy_scale"]=discrepancy_scale
+            fit["model_discrepancy_covariance"]=discrepancy_covariance
+            fit["total_fit_covariance_including_discrepancy"]=np.asarray(fit_covariance_for_discrepancy,dtype=float)+discrepancy_covariance
+            fit["model_discrepancy_diagnostics"]={
+                "residual_rms":fit.get("fit_residual_rms"),
+                "reduced_chi_square":fit.get("fit_reduced_chi_square"),
+                "interpretation":"Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component conditional on the supplied noise model; it is not experimental validation.",
+            }
+            total_sigma=np.sqrt(np.maximum(np.diag(fit["total_fit_covariance_including_discrepancy"]),0.0))
+            if model=="collective_maxwellian" and total_sigma.size>=2:
+                fit["electron_density_uncertainty_m3"]=float(total_sigma[0])
+                fit["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
+            elif model=="non_collective_kappa":
+                fit["electron_temperature_uncertainty_eV"]=float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"],
+                    2.0*fit["electron_temperature_eV"]*total_sigma[2]/max(float(fit["intrinsic_sigma_nm"]),np.finfo(float).tiny)))
+            elif model=="non_collective_maxwellian":
+                fit["electron_temperature_uncertainty_eV"]=float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"],
+                    2.0*fit["electron_temperature_eV"]*total_sigma[2]/max(float(fit["intrinsic_sigma_nm"]),np.finfo(float).tiny)))
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
         if model == "collective_maxwellian":
