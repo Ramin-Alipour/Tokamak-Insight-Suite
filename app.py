@@ -1801,7 +1801,7 @@ elif page=='Probe Analysis':
         if advanced_method=='Smoothed derivative candidates':
             sg1,sg2=st.columns(2)
             with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
-            with sg2: sg_order=st.number_input('Polynomial order',min_value=1,max_value=6,value=2,key='probe_sg_order')
+            with sg2: sg_order=st.number_input('Polynomial order (at least 2 for d²I/dV²)',min_value=2,max_value=6,value=2,key='probe_sg_order')
         needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
         if st.button('Run selected advanced analysis',key='probe_run_advanced',disabled=bool(needs_electron_window and efit is None)):
             try:
