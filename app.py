@@ -1706,6 +1706,12 @@ elif page=='Probe Analysis':
     cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
         help='All calculations normalize internally to electron_positive; advanced fits use the same convention.')
     sigma_current=st.number_input('Current standard uncertainty per input sample (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_current_sigma')
+    with st.expander('Numerical fit-screen settings (not physical-regime criteria)'):
+        threshold_c1,threshold_c2,threshold_c3=st.columns(3)
+        with threshold_c1: fit_min_r2=st.number_input('Minimum fit R²',min_value=0.0,max_value=1.0,value=0.98,step=0.01,key='probe_fit_min_r2')
+        with threshold_c2: fit_max_nrmse=st.number_input('Maximum normalized RMSE',min_value=1e-6,value=0.1,step=0.01,format='%.4g',key='probe_fit_max_nrmse')
+        with threshold_c3: ion_max_relative_change=st.number_input('Maximum ion-branch relative change',min_value=0.0,value=0.1,step=0.01,format='%.4g',key='probe_ion_flatness_threshold')
+        st.caption('These are configurable numerical review screens. They are not universal physical acceptance thresholds and cannot certify an ion-saturation or electron-retarding regime.')
     density_enabled=st.checkbox('Enable model-based ion-density estimate',value=False,key='probe_enable_density')
     density_options={}
     if density_enabled:
@@ -1716,13 +1722,37 @@ elif page=='Probe Analysis':
             with dc2: density_mass=st.number_input('Assumed ion mass (kg)',min_value=1e-30,value=3.34e-27,format='%.6g',key='probe_density_mass')
             with dc3: density_coeff=st.number_input('Sheath/Bohm coefficient',min_value=1e-6,value=0.61,format='%.6g',key='probe_density_coeff')
             density_model=st.text_input('Sheath model/source label',value='',key='probe_density_model')
+            density_charge=st.number_input('Ion charge state Zᵢ (positive integer)',min_value=1,value=1,step=1,key='probe_density_charge')
+            uc1,uc2,uc3=st.columns(3)
+            with uc1: density_sigma_current=st.number_input('Ion saturation-current σ (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_density_sigma_current')
+            with uc2: density_area_rel=st.number_input('Area relative σ (0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_density_area_rel')
+            with uc3: density_mass_rel=st.number_input('Ion-mass relative σ (0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_density_mass_rel')
+            uc4,uc5,uc6=st.columns(3)
+            with uc4: density_coeff_rel=st.number_input('Sheath-coefficient relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_density_coeff_rel')
+            with uc5: density_te_rel=st.number_input('Te relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_density_te_rel')
+            with uc6: density_te_cal_rel=st.number_input('Te calibration relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_density_te_cal_rel')
+            uc7,uc8=st.columns(2)
+            with uc7: density_te_window_rel=st.number_input('Te fit-window relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_density_te_window_rel')
+            with uc8: density_model_rel=st.number_input('Density-model relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_density_model_rel')
             density_options={'probe_area_m2':density_area,'ion_mass_kg':density_mass,
-                             'ion_saturation_coefficient':density_coeff,'sheath_model':density_model}
-            st.caption('The estimate is produced only when both non-overlapping fit windows pass their numerical screens. Physical regime validity remains the researcher’s responsibility.')
+                             'ion_saturation_coefficient':density_coeff,'sheath_model':density_model,
+                             'ion_charge_state':int(density_charge),
+                             'ion_current_uncertainty_A':density_sigma_current if density_sigma_current>0 else None,
+                             'probe_area_relative_uncertainty':density_area_rel if density_area_rel>0 else None,
+                             'ion_mass_relative_uncertainty':density_mass_rel if density_mass_rel>0 else None,
+                             'ion_saturation_coefficient_relative_uncertainty':density_coeff_rel if density_coeff_rel>0 else None,
+                             'electron_temperature_relative_uncertainty':density_te_rel if density_te_rel>0 else None,
+                             'electron_temperature_calibration_relative_uncertainty':density_te_cal_rel if density_te_cal_rel>0 else None,
+                             'electron_temperature_fit_window_relative_uncertainty':density_te_window_rel if density_te_window_rel>0 else None,
+                             'density_model_relative_uncertainty':density_model_rel if density_model_rel>0 else None}
+            st.caption('Only entered uncertainty components are propagated. The fitted Te statistical covariance is required; missing components are not silently set to zero.')
     if st.button('Analyze probe I–V',type='primary'):
         try:
             result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,current_convention=cur_conv,
                                         current_uncertainty_A=(sigma_current if sigma_current>0 else None),
+                                        fit_quality_min_r2=float(fit_min_r2),
+                                        fit_quality_max_nrmse=float(fit_max_nrmse),
+                                        ion_flatness_max_relative_change=float(ion_max_relative_change),
                                         **density_options)
             st.subheader('Langmuir analysis results')
             r1,r2=st.columns(2)
@@ -1770,9 +1800,10 @@ elif page=='Probe Analysis':
             model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
         if advanced_method=='Smoothed derivative candidates':
             sg1,sg2=st.columns(2)
-            with sg1: sg_window=st.number_input('Savitzky–Golay window (odd samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
+            with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
             with sg2: sg_order=st.number_input('Polynomial order',min_value=1,max_value=6,value=2,key='probe_sg_order')
-        if st.button('Run selected advanced analysis',key='probe_run_advanced'):
+        needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
+        if st.button('Run selected advanced analysis',key='probe_run_advanced',disabled=bool(needs_electron_window and efit is None)):
             try:
                 if advanced_model=='two_temperature':
                     advanced_result=fit_langmuir_electron_models(df[vcol],df[icol],efit,model=model_choice,current_convention=cur_conv)
@@ -1792,15 +1823,22 @@ elif page=='Probe Analysis':
             with ec1: electron_sat_current=st.number_input('Electron saturation current (A)',value=1e-3,format='%.6g',key='probe_e_sat_current')
             with ec2: electron_sat_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_e_sat_te')
             with ec3: electron_sat_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_e_sat_area')
+            eu1,eu2,eu3=st.columns(3)
+            with eu1: electron_sat_sigma=st.number_input('Current σ (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_e_sat_sigma')
+            with eu2: electron_sat_te_rel=st.number_input('Te relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_e_sat_te_rel')
+            with eu3: electron_sat_area_rel=st.number_input('Area relative σ',min_value=0.0,value=0.0,format='%.6g',key='probe_e_sat_area_rel')
             if st.button('Estimate electron density',key='probe_estimate_ne'):
-                try: st.json(estimate_electron_density_from_saturation(electron_sat_current,electron_sat_te,electron_sat_area,current_convention=cur_conv))
+                try: st.json(estimate_electron_density_from_saturation(electron_sat_current,electron_sat_te,electron_sat_area,current_convention=cur_conv,
+                    current_standard_uncertainty_A=electron_sat_sigma if electron_sat_sigma>0 else None,
+                    temperature_relative_standard_uncertainty=electron_sat_te_rel if electron_sat_te_rel>0 else None,
+                    area_relative_standard_uncertainty=electron_sat_area_rel if electron_sat_area_rel>0 else None))
                 except Exception as exc: st.error(str(exc))
         elif estimate_kind=='Multispecies ion density from ion-saturation current':
             mc1,mc2,mc3=st.columns(3)
             with mc1: multi_ion_current=st.number_input('Ion-saturation current (A)',value=-1e-3,format='%.6g',key='probe_multi_ion_current')
             with mc2: multi_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_multi_te')
             with mc3: multi_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_multi_area')
-            multi_species_text=st.text_area('Species JSON (fraction means number-density fraction)',value='[{"mass_kg": 3.34e-27, "fraction": 1.0, "sheath_coefficient": 0.61}]',key='probe_multi_species_json')
+            multi_species_text=st.text_area('Species JSON (fraction means number-density fraction; charge_state is integer Z)',value='[{"mass_kg": 3.34e-27, "fraction": 1.0, "charge_state": 1, "sheath_coefficient": 0.61}]',key='probe_multi_species_json')
             if st.button('Estimate multispecies ion density',key='probe_estimate_multi_ni'):
                 try:
                     multi_species=json.loads(multi_species_text)
@@ -1813,8 +1851,18 @@ elif page=='Probe Analysis':
             with fc2: flux_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_flux_te')
             with fc3: flux_mass=st.number_input('Ion mass (kg)',min_value=1e-30,value=3.34e-27,format='%.6g',key='probe_flux_mass')
             with fc4: flux_factor=st.number_input('Sheath factor',min_value=1e-6,value=1.0,key='probe_flux_factor')
+            flux_charge=st.number_input('Ion charge state Zᵢ',min_value=1,value=1,step=1,key='probe_flux_charge')
+            fu1,fu2,fu3,fu4=st.columns(4)
+            with fu1: flux_n_rel=st.number_input('Density relative σ',min_value=0.0,value=0.0,key='probe_flux_n_rel')
+            with fu2: flux_te_rel=st.number_input('Te relative σ',min_value=0.0,value=0.0,key='probe_flux_te_rel')
+            with fu3: flux_mass_rel=st.number_input('Mass relative σ',min_value=0.0,value=0.0,key='probe_flux_mass_rel')
+            with fu4: flux_factor_rel=st.number_input('Sheath-factor relative σ',min_value=0.0,value=0.0,key='probe_flux_factor_rel')
             if st.button('Estimate ion particle flux',key='probe_estimate_flux'):
-                try: st.json(estimate_ion_particle_flux(flux_density,flux_te,flux_mass,sheath_factor=flux_factor))
+                try: st.json(estimate_ion_particle_flux(flux_density,flux_te,flux_mass,sheath_factor=flux_factor,charge_state=int(flux_charge),
+                    density_relative_standard_uncertainty=flux_n_rel if flux_n_rel>0 else None,
+                    temperature_relative_standard_uncertainty=flux_te_rel if flux_te_rel>0 else None,
+                    mass_relative_standard_uncertainty=flux_mass_rel if flux_mass_rel>0 else None,
+                    sheath_factor_relative_standard_uncertainty=flux_factor_rel if flux_factor_rel>0 else None))
                 except Exception as exc: st.error(str(exc))
     with st.expander('Multi-channel independent I–V batch'):
         st.caption('Select multiple calibrated current columns sharing the selected voltage grid. Each channel is analyzed independently.')
