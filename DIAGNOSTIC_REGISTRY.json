@@ -2,9 +2,9 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "Per-channel electron temperature and electron-flow projection from measured full Thomson spectra; absolute electron density where spectral intensity and optical geometry identify it; multi-channel radial profiles; per-channel fit residuals and uncertainty estimates.",
+    "quantities": "Per-channel electron temperature and electron-flow projection with uncertainties from measured full Thomson spectra; absolute electron density and uncertainty where spectral intensity and optical geometry identify it; multi-channel radial profiles; fit residuals and model diagnostics.",
     "status": "D",
-    "method": "Forward-fit the measured, calibrated multi-channel Thomson spectra with the supplied instrument line-spread response. Supports non-collective non-relativistic Maxwellian inference and an optional PlasmaPy collective Maxwellian dielectric model with explicit ion species and independently supplied ion temperatures. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and polarization geometry.",
+    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa, projected relativistic Maxwell-Juttner and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
     "caveat": "Input spectra and wavelength axes are assumed measured and calibrated; detector calibration is outside scope. Absolute density cannot be inferred from spectral shape alone. Missing ion temperatures are not silently assumed in collective mode. The relativistic option is a 1-D projected Maxwell-Juttner approximation, not full 3-D relativistic photon-geometry integration. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -12,7 +12,7 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Spectral inference engine and multi-channel UI are implemented with declared model limits; legacy calibrated-profile analysis remains available only as a downstream profile utility. Software tests are not experimental validation.",
+    "implementation_status": "Primary multi-channel spectral inference engine and UI are connected through the registered Thomson workflow. Non-collective Maxwellian/kappa/projected-relativistic models, optional PlasmaPy collective Maxwellian model, measured LSF convolution, LSF uncertainty propagation, polarization-aware absolute density and downstream profile utilities are implemented with explicit limitations. Automated tests are software regression tests, not experimental validation.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "multi_channel_spectral_inference",
