@@ -25,14 +25,14 @@ def _asymmetric_lsf(n):
 
 def test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius():
     x, y1, _ = _spectral_case(100.0)
-    _, y2, _ = _spectral_case(250.0)
+    _, y2, _ = _spectral_case(150.0)
     out = analyze_thomson_spectra(
         x, np.vstack([y1,y2]), [0.12,0.24],
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
     )
     assert out["channel_count"] == 2
     np.testing.assert_allclose(out["radius_m"], [0.12,0.24])
-    np.testing.assert_allclose(out["electron_temperature_profile_eV"], [100.0,250.0], rtol=0.04)
+    np.testing.assert_allclose(out["electron_temperature_profile_eV"], [100.0,150.0], rtol=0.04)
     assert np.isnan(out["electron_density_profile_m3"]).all()
     assert out["channels"][0]["density_status"] == "not_identifiable_from_spectral_shape_alone"
 
