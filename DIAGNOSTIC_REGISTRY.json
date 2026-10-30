@@ -169,7 +169,7 @@
           "name": "density_relative_covariance",
           "unit": "6x6 relative covariance",
           "required": false,
-          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those."
+          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. Mutually exclusive with scalar optical uncertainties and joint_spectral_covariance."
         },
         {
           "name": "ion_species",
