@@ -57,9 +57,9 @@ Assumptions: non-collective scattering, isotropic kappa distribution, kappa inde
 
 A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
 
-### 3. Collective Maxwellian
+### 4. Collective Maxwellian
 
-The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion composition fractions, ion temperatures, ion flow vectors and an electron-fluid flow vector. Flow vectors must be independently measured or explicitly set to zero to declare a stationary-flow assumption. Missing ion temperatures are not silently replaced with electron temperature; multi-ion fractions are not silently assumed. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
+The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion composition fractions, ion temperatures, ion flow vectors and an electron-fluid flow vector. Ion temperatures and flow vectors are fixed external model inputs: they are not inferred from the Thomson spectrum by this backend. The reported ion/electron flow projections are calculated from those supplied vectors; the collective fit does not estimate their values or uncertainties. Flow vectors must be independently measured or explicitly set to zero to declare a stationary-flow assumption. Missing ion temperatures are not silently replaced with electron temperature; multi-ion fractions are not silently assumed. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
 
 The collective model can cover both collective and non-collective scattering regimes through the dielectric spectral-density calculation. The scattering parameter and spectral shape depend on the supplied plasma parameters and geometry.
 
@@ -86,7 +86,7 @@ The differential Thomson cross-section uses the incident polarization dependence
 ## Outputs
 
 - Per-channel fitted electron temperature and its uncertainty.
-- Per-channel electron-flow projection along the scattering wavevector and its uncertainty, where supported.
+- For non-collective models, the fitted electron-flow projection along the scattering wavevector and its uncertainty. In collective mode, the reported projection is derived from the supplied electron-flow vector; it is not fitted and no uncertainty is estimated for it.
 - Per-channel absolute electron density only when identifiable from the selected model and supplied optical inputs.
 - Multi-channel radial profiles of the inferred quantities.
 - Per-channel fitted spectra, residuals, fit covariance and model assumptions.
