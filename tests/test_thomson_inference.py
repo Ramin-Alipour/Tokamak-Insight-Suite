@@ -574,3 +574,26 @@ def test_joint_multi_channel_gls_rejects_non_positive_definite_covariance():
             scattering_angle_rad=np.pi/2,instrument_response=np.eye(x.size),
             joint_spectral_covariance=covariance,
         )
+
+
+def test_joint_multi_channel_gls_supports_kappa_projected_spectra():
+    x=np.linspace(492.0,572.0,161)
+    kappa=4.0
+    def spectrum(te):
+        sigma=2.0*532.0*np.sqrt(te/510998.95069)*np.sin(np.pi/4)
+        df=2.0*kappa-1.0
+        scale=sigma*np.sqrt((df-2.0)/df)
+        return 900.0*(1.0+((x-532.0)/scale)**2/df)**(-kappa)+20.0
+    y=np.vstack([spectrum(100.0),spectrum(150.0)])
+    n=x.size
+    covariance=np.eye(2*n)*0.4**2
+    covariance[:n,n:]=np.eye(n)*0.15*0.4**2
+    covariance[n:,:n]=np.eye(n)*0.15*0.4**2
+    out=analyze_thomson_spectra(
+        x,y,[0.1,0.2],laser_wavelength_nm=532.0,scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(n),model="non_collective_kappa",
+        joint_spectral_covariance=covariance,
+    )
+    assert out["joint_inference"]["joint_parameter_count_per_channel"]==6
+    np.testing.assert_allclose(out["electron_temperature_profile_eV"],[100.0,150.0],rtol=0.08)
+    assert all("kappa_index" in ch for ch in out["channels"])
