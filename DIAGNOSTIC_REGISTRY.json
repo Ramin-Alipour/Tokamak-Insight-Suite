@@ -841,6 +841,16 @@
           "name": "current_uncertainty_A_per_processed_sample",
           "unit": "A",
           "description": "Per-processed-sample current standard uncertainty after duplicate-voltage aggregation; null when not supplied."
+        },
+        {
+          "name": "warning",
+          "unit": "text",
+          "description": "Descriptive summary warning that the single-sweep result does not certify a physical probe regime."
+        },
+        {
+          "name": "floating_potential_interpolated_V",
+          "unit": "V",
+          "description": "Unique interpolated zero-current crossing in the descriptive summary; null if not unique."
         }
       ],
       "assumptions": [
