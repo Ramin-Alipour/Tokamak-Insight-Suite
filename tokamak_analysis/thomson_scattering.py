@@ -463,6 +463,7 @@ def density_from_thomson_scattered_power(
     incident_direction_vector=None,
     scattered_direction_vector=None,
     polarization_factor_uncertainty=None,
+    relative_input_covariance=None,
 ):
     """Infer density from calibrated collected Thomson power.
 
@@ -491,6 +492,25 @@ def density_from_thomson_scattered_power(
 
     rel_variance = 0.0
     uncertainty_supplied = False
+    if relative_input_covariance is not None:
+        covariance = np.asarray(relative_input_covariance, dtype=float)
+        if covariance.shape != (6, 6) or not np.all(np.isfinite(covariance)):
+            raise ValueError("relative_input_covariance must be a finite 6x6 matrix")
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
+            raise ValueError("relative_input_covariance must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        if float(np.min(eigenvalues)) < -1e-10 * max(1.0, float(np.max(np.abs(eigenvalues)))):
+            raise ValueError("relative_input_covariance must be positive semidefinite")
+        if any(v is not None for v in (scattered_power_uncertainty_W, incident_power_uncertainty_W,
+                interaction_length_uncertainty_m, collection_solid_angle_uncertainty_sr,
+                optical_efficiency_uncertainty, polarization_factor_uncertainty)):
+            raise ValueError("Use relative_input_covariance instead of separate scalar uncertainties; do not double-count uncertainty inputs")
+        gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+        rel_variance = float(gradient @ covariance @ gradient)
+        if rel_variance < -1e-12:
+            raise ValueError("relative_input_covariance produced a negative propagated variance")
+        rel_variance = max(0.0, rel_variance)
+        uncertainty_supplied = True
     inputs = (
         ("scattered_power_uncertainty_W", scattered_power_uncertainty_W, ps),
         ("incident_power_uncertainty_W", incident_power_uncertainty_W, pi),
@@ -538,8 +558,9 @@ def density_from_thomson_scattered_power(
         "assumptions": [
             "Absolutely calibrated scattered and incident laser power.",
             "Optically thin, single-scattering Thomson relation; polarization dependence is included when incident polarization and scattered direction vectors are supplied, otherwise the unpolarized cross-section is used.",
-            "Uniform electron density over the stated interaction length.",
+            "The returned density is the interaction-length-averaged effective density; it equals a local density only when density is uniform along the scattering path.",
             "Collection solid angle and optical efficiency describe the actual collection path.",
         ],
-        "uncertainty_model": "Optional first-order independent-input propagation; covariance and model discrepancy are not included.",
+        "density_interpretation": "interaction_length_averaged_effective_density",
+        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor." if relative_input_covariance is not None else "Optional first-order independent-input propagation; unprovided covariance and model discrepancy are not included."),
     }
