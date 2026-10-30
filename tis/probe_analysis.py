@@ -17,21 +17,21 @@ def _is_finite_real_scalar(value: Any) -> bool:
         return False
 
 
-def _floating_potential_candidates(voltage: np.ndarray, current: np.ndarray) -> list[float]:
-    """Return distinct zero-current crossings for sorted, unique voltage samples."""
-    exact_zero = current == 0.0
+def _zero_crossing_candidates(voltage: np.ndarray, values: np.ndarray) -> list[float]:
+    """Return distinct zero crossings for sorted, unique x samples."""
+    exact_zero = values == 0.0
     candidates: list[float] = []
     zero_idx = np.flatnonzero(exact_zero)
     if zero_idx.size:
         groups = np.split(zero_idx, np.flatnonzero(np.diff(zero_idx) > 1) + 1)
         candidates.extend(float(0.5 * (voltage[g[0]] + voltage[g[-1]])) for g in groups)
-    for k in range(len(current) - 1):
+    for k in range(len(values) - 1):
         if exact_zero[k] or exact_zero[k + 1]:
             continue
-        if (current[k] < 0 < current[k + 1]) or (current[k] > 0 > current[k + 1]):
+        if (values[k] < 0 < values[k + 1]) or (values[k] > 0 > values[k + 1]):
             candidates.append(float(
-                voltage[k] - current[k] * (voltage[k + 1] - voltage[k]) /
-                (current[k + 1] - current[k])
+                voltage[k] - values[k] * (voltage[k + 1] - voltage[k]) /
+                (values[k + 1] - values[k])
             ))
     candidates.sort()
     unique: list[float] = []
@@ -39,6 +39,11 @@ def _floating_potential_candidates(voltage: np.ndarray, current: np.ndarray) -> 
         if not unique or not np.isclose(candidate, unique[-1], rtol=1e-10, atol=1e-12):
             unique.append(candidate)
     return unique
+
+
+def _floating_potential_candidates(voltage: np.ndarray, current: np.ndarray) -> list[float]:
+    """Backward-compatible name for zero-current crossing candidates."""
+    return _zero_crossing_candidates(voltage, current)
 
 
 def probe_iv_summary(voltage: Any, current: Any) -> dict[str, Any]:
@@ -94,6 +99,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                          electron_fit_range: tuple[float, float] | None = None,
                          ion_fit_range: tuple[float, float] | None = None,
                          current_convention: str = "electron_positive",
+                         current_uncertainty_A: float | None = None,
                          probe_area_m2: float | None = None,
                          ion_mass_kg: float | None = None,
                          ion_saturation_coefficient: float | None = None,
@@ -114,6 +120,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     """
     if not isinstance(current_convention, str) or current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
+    if current_uncertainty_A is not None and (not _is_finite_real_scalar(current_uncertainty_A) or current_uncertainty_A < 0):
+        raise ValueError("current_uncertainty_A must be a finite non-negative real scalar.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
         if fit_range is not None:
             try:
@@ -175,6 +183,10 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         sums=np.bincount(inverse,weights=i)
         counts=np.bincount(inverse)
         v,i=unique_v,sums/counts
+    else:
+        counts=np.ones(len(v),dtype=int)
+    processed_current_sigma = (None if current_uncertainty_A is None else
+                               float(current_uncertainty_A) / np.sqrt(counts.astype(float)))
     out=probe_iv_summary(v,i)
     # Preserve the exact calibrated samples used by every downstream calculation.
     # These are processed values only: non-finite pairs are removed, duplicate
@@ -240,7 +252,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     out["plasma_potential_dIdV_max_candidate_V"] = float(v[first_derivative_index])
     out["plasma_potential_d2IdV2_max_candidate_V"] = float(v[second_derivative_index])
     out["plasma_potential_estimate_V"] = float(v[first_derivative_index])
-    out["plasma_potential_candidate_method"] = "maximum_second_derivative_of_current"; out["plasma_potential_second_derivative_method"] = "maximum_second_derivative_candidate"
+    out["plasma_potential_candidate_method"] = "maximum_first_derivative_for_primary_proxy; second_derivative_zero_crossings_reported_separately"
+    out["plasma_potential_second_derivative_method"] = "zero_crossings_of_second_derivative_for_inflection_candidates"
+    out["plasma_potential_d2IdV2_max_candidate_method"] = "maximum_second_derivative_extremum_not_inflection_method"
+    out["plasma_potential_d2IdV2_zero_crossing_candidates_V"] = _zero_crossing_candidates(v, d2IdV2)
+    out["plasma_potential_d2IdV2_zero_crossing_status"] = (
+        "one_or_more_inflection_candidates" if out["plasma_potential_d2IdV2_zero_crossing_candidates_V"]
+        else "no_second_derivative_zero_crossing_in_measured_sweep"
+    )
     # An edge-dominated maximum is still a numerical candidate, but must
     # be flagged for review rather than silently presented as a plasma potential.
     edge_candidate = first_derivative_index in (0, len(v) - 1)
@@ -250,8 +269,45 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         else "proxy_only_requires_probe_regime_review"
     )
     out["plasma_potential_voltage_grid_spacing_median_V"] = float(np.median(np.diff(v)))
-    out["plasma_potential_uncertainty_note"] = ("Voltage-grid spacing is reported as a resolution indicator, not a statistical uncertainty; "
-        "physical Vp interpretation depends on probe regime and branch coverage.")
+    out["plasma_potential_uncertainty_note"] = ("Voltage-grid spacing is a resolution indicator, not a statistical uncertainty. "
+        "The optional Monte Carlo uncertainty quantifies only the maximum-dI/dV numerical proxy under the supplied independent per-sample current standard uncertainty; it does not certify physical Vp.")
+    out["plasma_potential_proxy_standard_uncertainty_V"] = None
+    out["plasma_potential_proxy_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
+    if processed_current_sigma is not None and current_uncertainty_A > 0:
+        rng = np.random.default_rng(20261030)
+        proxy_draws = np.empty(500, dtype=float)
+        for draw_index in range(proxy_draws.size):
+            perturbed = i + rng.normal(0.0, processed_current_sigma)
+            proxy_draws[draw_index] = v[int(np.argmax(np.gradient(perturbed, v)))]
+        out["plasma_potential_proxy_standard_uncertainty_V"] = float(np.std(proxy_draws, ddof=1))
+        out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = [float(x) for x in np.quantile(proxy_draws, [0.025, 0.975])]
+        out["plasma_potential_proxy_uncertainty_status"] = "monte_carlo_current_noise_only_not_physical_validation"
+    else:
+        out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = None
+    out["floating_potential_standard_uncertainty_V"] = None
+    out["floating_potential_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
+    if processed_current_sigma is not None and len(unique_candidates) == 1:
+        fp_value = float(unique_candidates[0])
+        crossing_pairs = [k for k in range(len(v)-1)
+                          if i[k]*i[k+1] <= 0 and not (i[k] == 0 and i[k+1] == 0)
+                          and min(v[k],v[k+1])-1e-12 <= fp_value <= max(v[k],v[k+1])+1e-12]
+        if crossing_pairs:
+            k = crossing_pairs[0]
+            delta_i = float(i[k+1]-i[k])
+            if delta_i != 0:
+                delta_v = float(v[k+1]-v[k])
+                d_v_d_i1 = -delta_v * float(i[k+1]) / delta_i**2
+                d_v_d_i2 = delta_v * float(i[k]) / delta_i**2
+                sigma_fp = math.sqrt((d_v_d_i1*float(processed_current_sigma[k]))**2 +
+                                     (d_v_d_i2*float(processed_current_sigma[k+1]))**2)
+                out["floating_potential_standard_uncertainty_V"] = float(sigma_fp)
+                out["floating_potential_uncertainty_status"] = "first_order_linear_interpolation_independent_current_errors"
+    out["current_standard_uncertainty_A_per_processed_sample"] = (None if processed_current_sigma is None else processed_current_sigma.tolist())
+    if electron_fit_range is not None and ion_fit_range is not None:
+        overlap_low = max(electron_fit_range[0], ion_fit_range[0])
+        overlap_high = min(electron_fit_range[1], ion_fit_range[1])
+        if overlap_low <= overlap_high:
+            raise ValueError("electron_fit_range and ion_fit_range must be disjoint; overlapping or touching fit windows are not accepted.")
     if ion_fit_range is not None:
         m=(v>=min(ion_fit_range))&(v<=max(ion_fit_range))
         if m.sum() < 3:
@@ -383,21 +439,32 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         if not np.isfinite(out["electron_retarding_fit_R2"]):
             raise ValueError("Electron-retarding fit quality is non-finite; check the selected fit range and data.")
         out["electron_temperature_eV"] = 1.0 / slope
-        slope_se = float(np.sqrt(max(float(covariance[2, 2]), 0.0))) if covariance.shape == (3, 3) and np.isfinite(covariance[2, 2]) else None
+        covariance_valid = bool(
+            isinstance(covariance, np.ndarray) and covariance.shape == (3, 3)
+            and np.all(np.isfinite(covariance))
+            and np.all(np.diag(covariance) >= 0.0)
+            and np.all(np.linalg.eigvalsh(0.5 * (covariance + covariance.T)) >= -1e-12 * max(float(np.max(np.abs(covariance))), 1.0))
+        )
+        out["electron_retarding_covariance_valid"] = covariance_valid
+        slope_se = (float(np.sqrt(covariance[2, 2])) if covariance_valid else None)
         out["electron_temperature_standard_error_eV"] = (slope_se / slope**2) if slope_se is not None else None
         te_relative_components = {
             "fit_statistical": ((out["electron_temperature_standard_error_eV"] / out["electron_temperature_eV"])
-                                if out["electron_temperature_standard_error_eV"] is not None else 0.0),
+                                if out["electron_temperature_standard_error_eV"] is not None else None),
             "user_supplied_nonstatistical": float(electron_temperature_relative_uncertainty or 0.0),
             "calibration": float(electron_temperature_calibration_relative_uncertainty or 0.0),
             "fit_window": float(electron_temperature_fit_window_relative_uncertainty or 0.0),
         }
-        # User-supplied components were type/range-checked before conversion above.
-        te_total_relative = math.sqrt(sum(value ** 2 for value in te_relative_components.values()))
-        out["electron_temperature_relative_standard_uncertainty"] = float(te_total_relative)
-        out["electron_temperature_total_standard_uncertainty_eV"] = float(out["electron_temperature_eV"] * te_total_relative)
         out["electron_temperature_uncertainty_components_relative"] = te_relative_components
-        out["electron_temperature_uncertainty_status"] = "quadrature_of_fit_statistical_and_explicitly_supplied_components"
+        if te_relative_components["fit_statistical"] is None:
+            out["electron_temperature_relative_standard_uncertainty"] = None
+            out["electron_temperature_total_standard_uncertainty_eV"] = None
+            out["electron_temperature_uncertainty_status"] = "incomplete_fit_covariance_statistical_uncertainty_unavailable"
+        else:
+            te_total_relative = math.sqrt(sum(value ** 2 for value in te_relative_components.values() if value is not None))
+            out["electron_temperature_relative_standard_uncertainty"] = float(te_total_relative)
+            out["electron_temperature_total_standard_uncertainty_eV"] = float(out["electron_temperature_eV"] * te_total_relative)
+            out["electron_temperature_uncertainty_status"] = "quadrature_of_fit_statistical_and_explicitly_supplied_components"
         out["electron_temperature_uncertainty_note"] = (
             "Combined uncertainty includes fit covariance and only user-supplied nonstatistical, calibration, "
             "and fit-window components. Unspecified effects remain unquantified.")
@@ -437,6 +504,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         ion_flatness_pass = bool(
             isinstance(ion_review, dict) and ion_review.get("numerically_flat_candidate", False)
         )
+        electron_numerical_fit_pass = (
+            out.get("electron_retarding_fit_status") == "numerical_fit_review_pass_not_physical_validation"
+        )
+        if not electron_numerical_fit_pass:
+            raise ValueError("Ion-density inversion requires an electron-retarding fit that passes the numerical R-squared and normalized-RMSE screen; a positive Te from a weak fit is not sufficient.")
         if not ion_numerical_fit_pass or not ion_flatness_pass:
             raise ValueError(
                 "Ion-density inversion requires an ion-branch fit that passes numerical fit-quality "
@@ -481,30 +553,36 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             rel_i = (float(ion_current_uncertainty_A) / abs(float(ion_current))
                      if ion_current_uncertainty_A is not None else 0.0)
             te_se = out.get("electron_temperature_standard_error_eV")
-            rel_te_stat = (float(te_se) / float(te) if _is_finite_real_scalar(te_se) and te_se >= 0 else 0.0)
-            rel_te_sys = math.sqrt(
-                float(electron_temperature_relative_uncertainty or 0.0) ** 2
-                + float(electron_temperature_calibration_relative_uncertainty or 0.0) ** 2
-                + float(electron_temperature_fit_window_relative_uncertainty or 0.0) ** 2
-            )
-            rel_te = math.sqrt(rel_te_stat**2 + rel_te_sys**2)
-            rel_components = {
-                "ion_current": rel_i,
-                "probe_area": float(probe_area_relative_uncertainty or 0.0),
-                "ion_mass": 0.5 * float(ion_mass_relative_uncertainty or 0.0),
-                "sheath_coefficient": float(ion_saturation_coefficient_relative_uncertainty or 0.0),
-                "electron_temperature": 0.5 * rel_te,
-            }
-            # Keep the reported component list faithful to what the caller
-            # actually supplied; an omitted model-discrepancy term is not a
-            # measured zero-uncertainty contribution.
-            if density_model_relative_uncertainty is not None:
-                rel_components["density_model_discrepancy"] = float(density_model_relative_uncertainty)
-            relative_uncertainty = math.sqrt(sum(value**2 for value in rel_components.values()))
-            out["ion_density_standard_uncertainty_m-3"] = float(density * relative_uncertainty)
-            out["ion_density_relative_standard_uncertainty"] = float(relative_uncertainty)
-            out["ion_density_uncertainty_components_relative"] = rel_components
-            out["ion_density_uncertainty_status"] = "partial_first_order_propagation_supplied_components_only"
+            if not _is_finite_real_scalar(te_se) or te_se < 0:
+                out["ion_density_standard_uncertainty_m-3"] = None
+                out["ion_density_relative_standard_uncertainty"] = None
+                out["ion_density_uncertainty_components_relative"] = {
+                    "electron_temperature_fit_statistical": None,
+                    "other_supplied_components": "not_combined_because_fit_statistical_uncertainty_is_unavailable",
+                }
+                out["ion_density_uncertainty_status"] = "not_calculated_electron_temperature_fit_uncertainty_unavailable"
+            else:
+                rel_te_stat = float(te_se) / float(te)
+                rel_te_sys = math.sqrt(
+                    float(electron_temperature_relative_uncertainty or 0.0) ** 2
+                    + float(electron_temperature_calibration_relative_uncertainty or 0.0) ** 2
+                    + float(electron_temperature_fit_window_relative_uncertainty or 0.0) ** 2
+                )
+                rel_te = math.sqrt(rel_te_stat**2 + rel_te_sys**2)
+                rel_components = {
+                    "ion_current": rel_i,
+                    "probe_area": float(probe_area_relative_uncertainty or 0.0),
+                    "ion_mass": 0.5 * float(ion_mass_relative_uncertainty or 0.0),
+                    "sheath_coefficient": float(ion_saturation_coefficient_relative_uncertainty or 0.0),
+                    "electron_temperature": 0.5 * rel_te,
+                }
+                if density_model_relative_uncertainty is not None:
+                    rel_components["density_model_discrepancy"] = float(density_model_relative_uncertainty)
+                relative_uncertainty = math.sqrt(sum(value**2 for value in rel_components.values()))
+                out["ion_density_standard_uncertainty_m-3"] = float(density * relative_uncertainty)
+                out["ion_density_relative_standard_uncertainty"] = float(relative_uncertainty)
+                out["ion_density_uncertainty_components_relative"] = rel_components
+                out["ion_density_uncertainty_status"] = "partial_first_order_propagation_supplied_components_only"
         else:
             out["ion_density_standard_uncertainty_m-3"] = None
             out["ion_density_relative_standard_uncertainty"] = None
