@@ -92,7 +92,7 @@ def test_channel_specific_wavelength_axes_are_supported():
     x2, y2, _ = _spectral_case(150.0, center_nm=532.02)
     out = analyze_thomson_spectra(
         np.vstack([x1,x2]), np.vstack([y1,y2]), [0.1,0.2],
-        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2, instrument_response=np.eye(x1.size),
     )
     assert out["channel_count"] == 2
     assert out["channels"][1]["fitted_center_nm"] == pytest.approx(532.02, abs=0.02)
