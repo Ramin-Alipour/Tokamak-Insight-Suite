@@ -80,6 +80,18 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     residual = signal-observed(wavelength, *p)
     fit_cov = np.asarray(cov, dtype=float)
     te_unc = float(te*2*np.sqrt(max(fit_cov[2,2], 0.0))/sigma)
+    def area_from_params(values):
+        a, cen, sig, off, sl = values
+        component = response @ (a*np.exp(-0.5*((wavelength-cen)/sig)**2))
+        return float(np.trapz(component, wavelength))
+    area = area_from_params(p)
+    area_gradient = np.zeros(len(p))
+    for j in range(len(p)):
+        step = np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
+        plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
+        plus[j]+=step; minus[j]-=step
+        area_gradient[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
+    area_unc=float(np.sqrt(max(float(area_gradient@fit_cov@area_gradient),0.0)))
     return {
         "electron_temperature_eV": float(te),
         "electron_temperature_uncertainty_eV": te_unc,
@@ -88,6 +100,7 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
         "amplitude": amp, "background_intercept": offset, "background_slope_per_nm": slope,
         "fit_covariance": fit_cov, "residual": residual,
+        "integrated_scattered_power_W": area, "integrated_scattered_power_uncertainty_W": area_unc,
         "reduced_chi_square": float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
         "fitted_spectrum": observed(wavelength, *p),
         "model": "non-collective, non-relativistic Maxwellian electron spectrum",
@@ -125,6 +138,20 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
+    def area_from_params(values):
+        a, cen, sig, kap, off, sl = values
+        df_local=2.0*kap-1.0
+        scale_local=sig*np.sqrt((df_local-2.0)/df_local)
+        component=a*(1.0+((wavelength-cen)/scale_local)**2/df_local)**(-kap)
+        return float(np.trapz(response @ component,wavelength))
+    area=area_from_params(p)
+    area_gradient=np.zeros(len(p))
+    for j in range(len(p)):
+        step=np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
+        plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
+        plus[j]+=step; minus[j]-=step
+        area_gradient[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
+    area_unc=float(np.sqrt(max(float(area_gradient@cov@area_gradient),0.0)))
     return {"electron_temperature_eV":float(te),
             "electron_temperature_uncertainty_eV":float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
             "electron_velocity_projection_m_s":float(velocity),
@@ -132,6 +159,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,
             "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
             "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
+            "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
             "fitted_spectrum":observed(wavelength,*p),
             "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
@@ -295,13 +323,8 @@ def analyze_thomson_spectra(
         )):
             if not spectral_power_density_calibrated:
                 raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
-            area = float(np.trapz(np.maximum(fit["fitted_spectrum"]-fit["background_intercept"], 0.0), xi))
-            area_sigma = None
-            cov = fit.get("fit_covariance")
-            if cov is not None:
-                amp = float(fit["amplitude"]); sig = float(fit["intrinsic_sigma_nm"])
-                area_var = 2.0*np.pi*(sig**2*cov[0,0] + amp**2*cov[2,2] + 2*amp*sig*cov[0,2])
-                area_sigma = float(np.sqrt(max(area_var, 0.0)))
+            area = float(fit["integrated_scattered_power_W"])
+            area_sigma = fit.get("integrated_scattered_power_uncertainty_W")
             ne, pol = _density_from_power(area, laser_power_w, interaction_length_m,
                 collection_solid_angle_sr, optical_efficiency, scattering_angle_rad,
                 incident_polarization, scattered_direction)
