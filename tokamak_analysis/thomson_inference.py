@@ -241,6 +241,8 @@ def analyze_thomson_spectra(
     if model == "collective_maxwellian":
         if not ion_species:
             raise ValueError("Collective Thomson inference requires at least one explicitly specified ion species")
+        if ion_velocity_m_s is None or electron_velocity_m_s is None:
+            raise ValueError("Collective inference requires measured ion/electron flow vectors or explicit zero vectors to declare a stationary-flow assumption")
         if ion_temperature_eV is None:
             raise ValueError("Collective Maxwellian inference requires independently supplied ion temperature(s); no ion temperature is assumed")
         try:
@@ -273,8 +275,8 @@ def analyze_thomson_spectra(
             # collective and non-collective regimes from the same dielectric
             # response; ion species/temperature are never silently defaulted.
             ion_t = np.atleast_1d(ion_temperature_eV)
-            ion_v = np.zeros((len(ion_species), 3)) if ion_velocity_m_s is None else _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
-            electron_v = np.zeros((1, 3)) if electron_velocity_m_s is None else _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
+            ion_v = _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
+            electron_v = _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
             if electron_v.shape != (1, 3):
                 raise ValueError("electron_velocity_m_s must be a 3-vector")
             if ion_v.shape != (len(ion_species), 3):
