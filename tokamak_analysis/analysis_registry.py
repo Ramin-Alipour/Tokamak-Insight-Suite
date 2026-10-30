@@ -46,8 +46,8 @@ ANALYSES = [{
                 {
                     "name": "instrument_response",
                     "unit": "normalized response matrix",
-                    "description": "Measured instrument line-spread response matrix, common to channels or channel-specific; identity only when explicitly absent.",
-                    "required": False
+                    "description": "Required measured instrument line-spread response matrix, common to channels or channel-specific; an identity matrix must be explicitly supplied if justified.",
+                    "required": True
                 },
                 {
                     "name": "signal_uncertainty",
