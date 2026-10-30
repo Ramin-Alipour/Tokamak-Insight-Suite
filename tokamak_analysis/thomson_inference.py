@@ -987,7 +987,7 @@ def analyze_thomson_spectra(
             "model_discrepancy_scale":discrepancy_scale,
             "model_discrepancy_interpretation":"Excess whitened residual variance above unity is reported as a separate covariance component; it is a model-adequacy diagnostic, not experimental validation.",
         }
-    return {
+    output = {
         "model": model, "channel_count": len(results), "channels": results,
         "joint_inference": joint_summary,
         "radius_m": radii.copy(),
@@ -1002,5 +1002,88 @@ def analyze_thomson_spectra(
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
             "For non-collective fits, supplied LSF uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied independent optical-factor uncertainties, with correlations and model discrepancy excluded.",
-        ],
-    }
+
+    if model=="collective_maxwellian" and any(v is not None for v in (
+        ion_t_unc,ion_v_unc,electron_v_unc,lsf_unc,laser_wavelength_uncertainty_nm
+    )):
+        if lsf_unc is not None and (callable(instrument_response) or np.asarray(instrument_response).ndim==1):
+            raise ValueError("Collective response uncertainty requires a measured 2-D or channel-specific 3-D response matrix")
+        rng=np.random.default_rng(91427)
+        draws=[]
+        for _ in range(int(collective_external_parameter_mc_samples)):
+            sampled_laser=float(laser_wavelength_nm)+rng.normal(0.0,laser_wavelength_unc)
+            if sampled_laser<=0: continue
+            sampled_ion_t=ion_t.copy() if ion_t_unc is None else np.maximum(ion_t+rng.normal(0.0,ion_t_unc),np.finfo(float).tiny)
+            sampled_ion_v=ion_v.copy() if ion_v_unc is None else ion_v+rng.normal(0.0,ion_v_unc)
+            sampled_electron_v=electron_v.copy() if electron_v_unc is None else electron_v+rng.normal(0.0,electron_v_unc.reshape(1,3))
+            sampled_response=instrument_response
+            if lsf_unc is not None:
+                sampled_response=np.asarray(instrument_response,dtype=float).copy()
+                if sampled_response.ndim==2:
+                    sampled_response=np.maximum(sampled_response+rng.normal(0.0,lsf_unc),0.0)
+                    sums=sampled_response.sum(axis=0)
+                    if np.any(sums<=0): continue
+                    sampled_response/=sums[None,:]
+                else:
+                    valid_response=True
+                    for channel in range(sampled_response.shape[0]):
+                        sigma_response=lsf_unc[channel] if lsf_unc.ndim==3 else lsf_unc
+                        sampled_response[channel]=np.maximum(sampled_response[channel]+rng.normal(0.0,sigma_response),0.0)
+                        sums=sampled_response[channel].sum(axis=0)
+                        if np.any(sums<=0):
+                            valid_response=False
+                            break
+                        sampled_response[channel]/=sums[None,:]
+                    if not valid_response: continue
+            try:
+                draw=analyze_thomson_spectra(
+                    wavelength_nm,spectra,radius_m,laser_wavelength_nm=sampled_laser,
+                    scattering_angle_rad=scattering_angle_rad,instrument_response=sampled_response,
+                    signal_uncertainty=signal_uncertainty,model=model,ion_species=ion_species,
+                    ion_fractions=ion_fractions,ion_temperature_eV=sampled_ion_t,
+                    ion_velocity_m_s=sampled_ion_v,electron_velocity_m_s=sampled_electron_v,
+                    incident_direction=incident_direction,scattered_direction=scattered_direction,
+                    collective_initial_density_m3=collective_initial_density_m3,
+                    collective_initial_temperature_eV=collective_initial_temperature_eV,
+                    collective_density_bounds_m3=collective_density_bounds_m3,
+                    collective_temperature_bounds_eV=collective_temperature_bounds_eV,
+                    collective_external_parameter_mc_samples=20,
+                )
+                vector=[]
+                for channel_result in draw["channels"]:
+                    density_value=channel_result.get("electron_density_m3")
+                    vector.extend([np.nan if density_value is None else float(density_value),
+                                   float(channel_result["electron_temperature_eV"])])
+                draws.append(vector)
+            except (ValueError,RuntimeError,ImportError,np.linalg.LinAlgError):
+                continue
+        output["collective_external_mc_successes"]=len(draws)
+        output["collective_external_mc_requested"]=int(collective_external_parameter_mc_samples)
+        required=max(12,int(np.ceil(.7*collective_external_parameter_mc_samples)))
+        if len(draws)>=required:
+            draw_array=np.asarray(draws,dtype=float)
+            valid_columns=np.all(np.isfinite(draw_array),axis=0)
+            covariance=np.zeros((draw_array.shape[1],draw_array.shape[1]))
+            if np.any(valid_columns):
+                covariance[np.ix_(valid_columns,valid_columns)]=np.cov(draw_array[:,valid_columns],rowvar=False,ddof=1)
+                for channel in range(len(results)):
+                    density_col=2*channel
+                    temperature_col=density_col+1
+                    results[channel]["electron_temperature_uncertainty_eV"]=float(np.hypot(
+                        results[channel]["electron_temperature_uncertainty_eV"],
+                        np.sqrt(max(covariance[temperature_col,temperature_col],0.0))))
+                    if results[channel].get("electron_density_m3") is not None:
+                        results[channel]["electron_density_uncertainty_m3"]=float(np.hypot(
+                            results[channel]["electron_density_uncertainty_m3"],
+                            np.sqrt(max(covariance[density_col,density_col],0.0))))
+            output["collective_external_parameter_covariance_order"]=[
+                name for i in range(len(results)) for name in
+                (f"channel_{i}_electron_density_m3",f"channel_{i}_electron_temperature_eV")]
+            output["collective_external_parameter_covariance"]=covariance
+            output["collective_external_uncertainty_propagated"]=True
+            output["electron_temperature_uncertainty_profile_eV"]=np.array([r.get("electron_temperature_uncertainty_eV",np.nan) for r in results])
+            output["electron_density_uncertainty_profile_m3"]=np.array([r.get("electron_density_uncertainty_m3",np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results])
+        else:
+            output["collective_external_uncertainty_propagated"]=False
+            output["collective_external_uncertainty_warning"]="Too few successful external-parameter/response perturbation refits."
+    return output
