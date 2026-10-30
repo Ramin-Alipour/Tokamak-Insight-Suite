@@ -415,7 +415,7 @@ def analyze_thomson_spectra(
                 ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
                 probe_vec=probe_vec, scatter_vec=scatter_vec)
             alpha_value=float(np.asarray(getattr(alpha_fit,"value",alpha_fit)))
-            amp_fit = float(np.dot(y[i], model_spec)/max(np.dot(model_spec,model_spec),1e-300))
+            amp_fit = float(np.sum(weights*y[i]*model_spec)/max(np.sum(weights*model_spec*model_spec),1e-300))
             q_vector = scatter_vec-probe_vec
             q_hat = q_vector/np.linalg.norm(q_vector)
             electron_flow_projection = float(np.dot(electron_v[0],q_hat))
