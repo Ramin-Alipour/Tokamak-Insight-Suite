@@ -273,7 +273,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         "The optional Monte Carlo uncertainty quantifies only the maximum-dI/dV numerical proxy under the supplied independent per-sample current standard uncertainty; it does not certify physical Vp.")
     out["plasma_potential_proxy_standard_uncertainty_V"] = None
     out["plasma_potential_proxy_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
-    if processed_current_sigma is not None and current_uncertainty_A > 0:
+    if processed_current_sigma is not None:
         rng = np.random.default_rng(20261030)
         proxy_draws = np.empty(500, dtype=float)
         for draw_index in range(proxy_draws.size):
