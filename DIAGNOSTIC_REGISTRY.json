@@ -4219,6 +4219,41 @@
           "unit": "m s^-1",
           "required": true,
           "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed."
+        },
+        {
+          "name": "electron_density_initial_m3",
+          "unit": "m^-3; optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "electron_temperature_initial_eV",
+          "unit": "eV; optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_initial_eV",
+          "unit": "eV; common ion-temperature optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_initial_m_s",
+          "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "global_search",
+          "unit": "boolean; enables differential-evolution global initialization",
+          "required": false
+        },
+        {
+          "name": "random_seed",
+          "unit": "integer; deterministic search seed",
+          "required": false
+        },
+        {
+          "name": "response_mc_samples",
+          "unit": "count",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4819,6 +4854,11 @@
           "unit": "(2N x 2N) covariance",
           "required": false,
           "description": "Full joint covariance ordered [density_0..N-1, temperature_0..N-1], propagated jointly through the downstream profile fit."
+        },
+        {
+          "name": "uncertainty_mc_samples",
+          "unit": "count; minimum 20",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4857,6 +4897,14 @@
         {
           "name": "reconstructed_density_temperature_cross_covariance",
           "unit": "N_grid x N_grid covariance"
+        },
+        {
+          "name": "reconstructed_temperature_lower_95_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "reconstructed_temperature_upper_95_eV",
+          "unit": "eV"
         }
       ],
       "assumptions": [
