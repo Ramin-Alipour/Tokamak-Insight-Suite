@@ -287,3 +287,41 @@ def test_profile_reconstruction_reports_gcv_when_smoothing_factor_is_omitted():
         method="smoothing_spline", points=31,
     )
     assert out["smoothing_selection"] == "generalized_cross_validation"
+
+
+def test_profile_reconstruction_propagates_correlated_point_covariance():
+    radius = np.linspace(0.0, 1.0, 5)
+    density = np.array([1.0, 1.2, 1.4, 1.2, 1.0]) * 1e19
+    temperature = np.array([50.0, 70.0, 90.0, 70.0, 50.0])
+    sigma_n = np.full(5, 1e17)
+    sigma_t = np.full(5, 2.0)
+    correlation = np.full((5, 5), 0.25)
+    np.fill_diagonal(correlation, 1.0)
+    covariance_n = np.outer(sigma_n, sigma_n) * correlation
+    covariance_t = np.outer(sigma_t, sigma_t) * correlation
+    out = reconstruct_thomson_profile(
+        radius, density, temperature,
+        density_uncertainty_m3=sigma_n,
+        temperature_uncertainty_ev=sigma_t,
+        density_covariance_m3_2=covariance_n,
+        temperature_covariance_eV2=covariance_t,
+        method="pchip", points=31, uncertainty_mc_samples=40,
+    )
+    model = out["uncertainty_model"]
+    assert model["density_covariance_model"] == "full_correlated_covariance"
+    assert model["temperature_covariance_model"] == "full_correlated_covariance"
+    assert model["density_mc_successful_draws"] >= 32
+    assert out["reconstructed_density_uncertainty_m3"].shape == (31,)
+    assert out["reconstructed_temperature_uncertainty_eV"].shape == (31,)
+    assert out["reconstructed_density_lower_95_m3"].shape == (31,)
+    assert out["reconstructed_density_upper_95_m3"].shape == (31,)
+
+
+def test_profile_reconstruction_rejects_non_positive_semidefinite_covariance():
+    bad = np.eye(5)
+    bad[0, 1] = bad[1, 0] = 2.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_thomson_profile(
+            np.linspace(0, 1, 5), np.ones(5), np.ones(5),
+            density_covariance_m3_2=bad, method="pchip", points=20,
+        )
