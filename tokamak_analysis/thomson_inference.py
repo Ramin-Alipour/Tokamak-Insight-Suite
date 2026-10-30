@@ -496,6 +496,8 @@ def analyze_thomson_spectra(
             raise ValueError(f"{name} must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and scattering_angle_uncertainty_rad is not None:
         raise ValueError("Use scattering_angle_uncertainty_rad or beam-direction component uncertainties, not both; they describe the same geometry uncertainty.")
+    if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "collective_maxwellian":
+        raise ValueError("Beam-direction component uncertainty is currently propagated only by the collective Maxwellian model.")
     if model not in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner", "collective_maxwellian"}:
         raise ValueError("model must be non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
@@ -921,7 +923,13 @@ def analyze_thomson_spectra(
                 fit_area_uncertainty = 0.0 if fit_area_uncertainty is None else float(fit_area_uncertainty)
                 lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
                 combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
-                density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
+                if density_inputs.get("relative_input_covariance") is None:
+                    density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
+                else:
+                    # The supplied relative covariance is authoritative. Its
+                    # scattered-power variance must already include the spectral
+                    # fit and response contributions; never mix it with scalars.
+                    density_inputs["scattered_power_uncertainty_W"] = None
                 density_result = density_from_thomson_scattered_power(**density_inputs)
                 fit["electron_density_m3"] = density_result["electron_density_m3"]
                 fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
@@ -1278,9 +1286,16 @@ def analyze_thomson_spectra(
                     results[channel]["electron_temperature_uncertainty_eV"]=float(np.hypot(
                         results[channel]["electron_temperature_uncertainty_eV"],
                         np.sqrt(max(covariance[temperature_col,temperature_col],0.0))))
-                    results[channel]["electron_velocity_projection_uncertainty_m_s"]=float(np.hypot(
-                        results[channel]["electron_velocity_projection_uncertainty_m_s"],
-                        np.sqrt(max(covariance[velocity_col,velocity_col],0.0))))
+                    velocity_mc_sigma=float(np.sqrt(max(covariance[velocity_col,velocity_col],0.0)))
+                    base_velocity_sigma=results[channel].get("electron_velocity_projection_uncertainty_m_s")
+                    if base_velocity_sigma is None:
+                        results[channel]["electron_velocity_projection_uncertainty_m_s"]=(
+                            velocity_mc_sigma if electron_v_unc is not None or scattering_angle_uncertainty_rad is not None
+                            or incident_direction_unc is not None or scattered_direction_unc is not None else None
+                        )
+                    else:
+                        results[channel]["electron_velocity_projection_uncertainty_m_s"]=float(np.hypot(
+                            base_velocity_sigma,velocity_mc_sigma))
                     if results[channel].get("electron_density_m3") is not None:
                         results[channel]["electron_density_uncertainty_m3"]=float(np.hypot(
                             results[channel]["electron_density_uncertainty_m3"],
@@ -1289,7 +1304,11 @@ def analyze_thomson_spectra(
                     ion_uncertainties=[]
                     for species_index in range(len(ion_species)):
                         ion_col=ion_offset+species_index
-                        ion_uncertainties.append(float(np.sqrt(max(covariance[ion_col,ion_col],0.0))))
+                        ion_sigma=float(np.sqrt(max(covariance[ion_col,ion_col],0.0)))
+                        ion_uncertainties.append(
+                            ion_sigma if ion_v_unc is not None or scattering_angle_uncertainty_rad is not None
+                            or incident_direction_unc is not None or scattered_direction_unc is not None else None
+                        )
                     results[channel]["ion_velocity_projection_uncertainty_m_s"]=ion_uncertainties
             covariance_order=[]
             for i in range(len(results)):
