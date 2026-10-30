@@ -2750,7 +2750,8 @@
       ],
       "uncertainty_model": "Partial first-order independent-input propagation: relative current uncertainty, relative area uncertainty, half the relative Te uncertainty, plus species-weighted relative sheath-coefficient and half-weighted mass uncertainties. Species fractions are held fixed; fraction uncertainty is not propagated because the sum-to-one constraint requires a composition covariance model. Only supplied terms are included and omitted components are listed; no missing term is zero-filled.",
       "test_links": [
-        "tests/test_formula_registry_complete.py::test_langmuir_multispecies_density_reference"
+        "tests/test_formula_registry_complete.py::test_langmuir_multispecies_density_reference",
+        "tests/test_formula_registry_complete.py::test_langmuir_multispecies_density_uncertainty_wrapper_reference"
       ],
       "note": "Species-summed extension of published Bohm/sheath current balance; analytic/software verification only, not empirical validation."
     }
