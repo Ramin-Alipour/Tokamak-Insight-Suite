@@ -38,12 +38,14 @@ def _scale_length(value, gradient, gradient_threshold):
     return out
 
 
-def _gradient_uncertainty(derivative_matrix, uncertainty):
+def _gradient_uncertainty(derivative_matrix, uncertainty, covariance=None):
     if uncertainty is None:
         return None, None
-    variance = (derivative_matrix**2) @ (uncertainty**2)
+    input_covariance = np.diag(np.square(uncertainty)) if covariance is None else np.asarray(covariance, dtype=float)
+    gradient_covariance = derivative_matrix @ input_covariance @ derivative_matrix.T
+    variance = np.diag(gradient_covariance)
     standard_uncertainty = np.sqrt(np.maximum(variance, 0.0))
-    covariance_value_gradient = np.diag(derivative_matrix) * uncertainty**2
+    covariance_value_gradient = np.diag(input_covariance @ derivative_matrix.T)
     return standard_uncertainty, covariance_value_gradient
 
 
@@ -92,8 +94,49 @@ def analyze_thomson_profile(
     *,
     density_uncertainty_m3=None,
     temperature_uncertainty_ev=None,
+    density_covariance_m3_2=None,
+    temperature_covariance_eV2=None,
 ):
-    """Calculate profile summaries, gradients, scale lengths, and available uncertainties."""
+    """Calculate profile summaries and gradients with pointwise or full covariance.
+
+    Full covariance matrices are ordered like the supplied profile points and are
+    reordered together with the radius/density/temperature arrays.
+    """
+    radius_input = np.asarray(radius_m, dtype=float)
+    if radius_input.ndim != 1 or not np.all(np.isfinite(radius_input)):
+        raise ValueError("radius_m must be a finite one-dimensional array")
+    order = np.argsort(radius_input)
+
+    def validate_profile_covariance(value, name, supplied_uncertainty):
+        if value is None:
+            return None, supplied_uncertainty
+        covariance = np.asarray(value, dtype=float)
+        expected = (radius_input.size, radius_input.size)
+        if covariance.shape != expected or not np.all(np.isfinite(covariance)):
+            raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
+            raise ValueError(f"{name} must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(covariance)
+        scale = max(1.0, float(np.max(np.abs(eigenvalues))))
+        if float(np.min(eigenvalues)) < -1e-10 * scale:
+            raise ValueError(f"{name} must be positive semidefinite")
+        diagonal_sigma = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        if supplied_uncertainty is not None:
+            supplied = np.asarray(supplied_uncertainty, dtype=float)
+            if supplied.shape != diagonal_sigma.shape or not np.allclose(
+                supplied**2, np.diag(covariance), rtol=1e-6, atol=1e-24
+            ):
+                raise ValueError(f"Pointwise uncertainty must match the diagonal of {name}")
+        else:
+            supplied_uncertainty = diagonal_sigma
+        return covariance[np.ix_(order, order)], supplied_uncertainty
+
+    density_covariance, density_uncertainty_m3 = validate_profile_covariance(
+        density_covariance_m3_2, "density_covariance_m3_2", density_uncertainty_m3
+    )
+    temperature_covariance, temperature_uncertainty_ev = validate_profile_covariance(
+        temperature_covariance_eV2, "temperature_covariance_eV2", temperature_uncertainty_ev
+    )
     p = build_profile(
         radius_m, density_m3, temperature_ev,
         density_uncertainty_m3, temperature_uncertainty_ev,
@@ -106,10 +149,14 @@ def analyze_thomson_profile(
     density_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, ne)
     temperature_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, te)
     if p.density_uncertainty_m3 is not None:
-        density_gradient_sigma, _ = _gradient_uncertainty(derivative_matrix, p.density_uncertainty_m3)
+        density_gradient_sigma, _ = _gradient_uncertainty(
+            derivative_matrix, p.density_uncertainty_m3, density_covariance
+        )
         density_gradient_threshold = np.maximum(density_gradient_threshold, 2.0 * density_gradient_sigma)
     if p.temperature_uncertainty_ev is not None:
-        temperature_gradient_sigma, _ = _gradient_uncertainty(derivative_matrix, p.temperature_uncertainty_ev)
+        temperature_gradient_sigma, _ = _gradient_uncertainty(
+            derivative_matrix, p.temperature_uncertainty_ev, temperature_covariance
+        )
         temperature_gradient_threshold = np.maximum(temperature_gradient_threshold, 2.0 * temperature_gradient_sigma)
     density_normalized_gradient = np.divide(
         dne_dr, ne, out=np.full_like(dne_dr, np.nan), where=ne > 0
@@ -132,15 +179,18 @@ def analyze_thomson_profile(
         "notes": [
             "Input must be calibrated Thomson-scattering profile data.",
             "When pointwise uncertainties are supplied, a scale length is reported only where the local gradient exceeds twice its propagated 1-sigma uncertainty; otherwise the numerical round-off threshold is used.",
-            "The current gradient-uncertainty propagation assumes independent pointwise errors; full covariance input is not yet supported.",
+            "Full density and temperature covariance matrices are propagated through the gradient operator when supplied; otherwise pointwise uncertainties are treated as independent.",
             "NaN scale lengths mark zero, unresolved or statistically insignificant gradients or profile values.",
             "Peak-location uncertainty is not estimated by this workflow.",
         ],
     }
     if p.density_uncertainty_m3 is not None:
         sne = p.density_uncertainty_m3
-        grad_unc, cov = _gradient_uncertainty(derivative_matrix, sne)
+        grad_unc, cov = _gradient_uncertainty(derivative_matrix, sne, density_covariance)
         result["density_uncertainty_m3"] = sne.copy()
+        result["density_input_covariance_m3_2"] = (
+            density_covariance.copy() if density_covariance is not None else np.diag(sne**2)
+        )
         result["density_gradient_uncertainty_m-4"] = grad_unc
         result["density_normalized_gradient_uncertainty_m-1"] = _normalized_gradient_uncertainty(
             ne, dne_dr, sne, grad_unc, cov
@@ -150,8 +200,11 @@ def analyze_thomson_profile(
         )
     if p.temperature_uncertainty_ev is not None:
         ste = p.temperature_uncertainty_ev
-        grad_unc, cov = _gradient_uncertainty(derivative_matrix, ste)
+        grad_unc, cov = _gradient_uncertainty(derivative_matrix, ste, temperature_covariance)
         result["temperature_uncertainty_eV"] = ste.copy()
+        result["temperature_input_covariance_eV2"] = (
+            temperature_covariance.copy() if temperature_covariance is not None else np.diag(ste**2)
+        )
         result["temperature_gradient_uncertainty_eV_m-1"] = grad_unc
         result["temperature_normalized_gradient_uncertainty_m-1"] = _normalized_gradient_uncertainty(
             te, dte_dr, ste, grad_unc, cov
