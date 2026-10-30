@@ -261,6 +261,20 @@ def test_spectral_inference_rejects_boolean_and_string_measurements():
         )
 
 
+def test_thomson_scalar_physical_inputs_reject_booleans():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="laser_wavelength_nm"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=True,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        )
+    with pytest.raises(ValueError, match="scattering_angle_rad"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=True, instrument_response=np.eye(x.size),
+        )
+
+
 def test_collective_mode_requires_explicit_beam_geometry_before_optional_backend_import():
     x, y, _ = _spectral_case(100.0)
     with pytest.raises(ValueError, match="explicit incident_direction"):
