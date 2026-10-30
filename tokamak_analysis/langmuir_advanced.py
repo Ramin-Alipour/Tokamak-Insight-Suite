@@ -212,9 +212,10 @@ def estimate_multispecies_ion_density(
 ) -> dict[str, Any]:
     """Estimate total ion density from supplied species fractions and sheath coefficients.
 
-    Each species item must contain mass_kg, fraction, and sheath_coefficient.
-    Fractions must sum to one. The formula assumes a common electron temperature
-    and an explicitly supplied species-resolved ion-saturation current model.
+    Each species item must contain mass_kg, number-density fraction, and sheath_coefficient.
+    Fractions must sum to one; mass and current fractions are not interchangeable.
+    The formula assumes a common electron temperature and an explicitly supplied
+    species-resolved ion-saturation current model.
     """
     from tis.constants import E_CHARGE
 
