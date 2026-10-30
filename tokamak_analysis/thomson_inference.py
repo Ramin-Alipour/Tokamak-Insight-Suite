@@ -183,7 +183,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     amp0 = max(float(signal_scaled[peak] - baseline), np.finfo(float).eps)
     p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), 3.0, baseline, 0.0]
     lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51, -np.inf, -np.inf]
-    upper = [np.inf, wavelength[-1], span, 100.0, np.inf, np.inf]
+    upper = [np.inf, wavelength[-1], span, np.inf, np.inf, np.inf]
     def intrinsic(x, amp, center, sigma, kappa, offset, slope):
         df = 2.0*kappa-1.0
         scale = sigma*np.sqrt((df-2.0)/df)
@@ -254,7 +254,7 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     amp0=max(float(signal_scaled[peak]-baseline),np.finfo(float).eps)
     p0=[amp0,float(wavelength[peak]),100.0,baseline,0.0]
     lower=[0.0,wavelength[0],1e-4,-np.inf,-np.inf]
-    upper=[np.inf,wavelength[-1],1e7,np.inf,np.inf]
+    upper=[np.inf,wavelength[-1],np.inf,np.inf,np.inf]
     sine=float(np.sin(angle/2.0))
     def component(x, amp, center, temperature, offset=0.0, slope=0.0):
         ratio=x/center
@@ -473,10 +473,12 @@ def analyze_thomson_spectra(
                 coefficients=fit_nuisance(shape)
                 model_signal=coefficients[0]*shape+coefficients[1]+coefficients[2]*(xi-float(laser_wavelength_nm))
                 return (model_signal-y[i])/residual_scale
+            log_min = np.log10(np.finfo(float).tiny)
+            log_max = np.log10(np.finfo(float).max) - 1.0
             fitopt = least_squares(
                 lambda log_params: objective(10.0**log_params),
                 np.log10([1e18, 100.0]),
-                bounds=(np.log10([1e12, 0.01]), np.log10([1e25, 1e7])),
+                bounds=([log_min, log_min], [log_max, log_max]),
                 x_scale="jac", max_nfev=5000,
             )
             ne_fit, te_fit = map(float, 10.0**fitopt.x)
