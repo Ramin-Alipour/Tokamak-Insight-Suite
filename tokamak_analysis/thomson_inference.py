@@ -440,7 +440,7 @@ def analyze_thomson_spectra(
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
-    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,\n    joint_spectral_covariance=None,
+    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,\n    joint_spectral_covariance=None,\n    ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,\n    electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -504,6 +504,8 @@ def analyze_thomson_spectra(
     if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1] or not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:
         raise ValueError("Collective initial density and temperature must lie within their supplied bounds")
     if model == "collective_maxwellian":
+        if isinstance(collective_external_parameter_mc_samples,bool) or not isinstance(collective_external_parameter_mc_samples,(int,np.integer)) or collective_external_parameter_mc_samples<20:
+            raise ValueError("collective_external_parameter_mc_samples must be an integer >= 20")
         if not ion_species or isinstance(ion_species, (str, bytes)):
             raise ValueError("Collective Thomson inference requires an explicit non-empty ion-species list")
         if ion_velocity_m_s is None or electron_velocity_m_s is None:
@@ -592,6 +594,22 @@ def analyze_thomson_spectra(
                 raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
             if np.any(np.linalg.norm(ion_v,axis=1) >= C_M_S) or np.linalg.norm(electron_v[0]) >= C_M_S:
                 raise ValueError("Collective ion/electron flow speeds must be subluminal")
+            if ion_temperature_uncertainty_eV is not None:
+                ion_t_unc=_finite_array(np.atleast_1d(ion_temperature_uncertainty_eV),"ion_temperature_uncertainty_eV",1)
+                if ion_t_unc.shape!=ion_t.shape or np.any(ion_t_unc<0):
+                    raise ValueError("ion_temperature_uncertainty_eV must be non-negative and match ion species")
+            else: ion_t_unc=None
+            if ion_velocity_uncertainty_m_s is not None:
+                ion_v_unc=_finite_array(ion_velocity_uncertainty_m_s,"ion_velocity_uncertainty_m_s")
+                if ion_v_unc.shape==(3,) and len(ion_species)==1: ion_v_unc=ion_v_unc.reshape(1,3)
+                if ion_v_unc.shape!=ion_v.shape or np.any(ion_v_unc<0):
+                    raise ValueError("ion_velocity_uncertainty_m_s must be non-negative and match ion velocity vectors")
+            else: ion_v_unc=None
+            if electron_velocity_uncertainty_m_s is not None:
+                electron_v_unc=_finite_array(electron_velocity_uncertainty_m_s,"electron_velocity_uncertainty_m_s",1)
+                if electron_v_unc.shape!=(3,) or np.any(electron_v_unc<0):
+                    raise ValueError("electron_velocity_uncertainty_m_s must be a non-negative 3-vector")
+            else: electron_v_unc=None
             # Fit ne and Te against the full PlasmaPy spectrum. Absolute signal
             # scaling is a nuisance amplitude; density is identifiable from
             # the collective spectral shape when the spectrum resolves it.
