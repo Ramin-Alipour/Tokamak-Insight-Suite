@@ -2,7 +2,7 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "Calibrated electron-density and electron-temperature profiles; profile extrema and locations; measured-interval line averages; radial gradients; normalized gradients; local scale lengths; optional independent-error uncertainty propagation; within-domain profile reconstruction",
+    "quantities": "Calibrated electron-density and electron-temperature profiles; profile minima and maxima with locations; measured-interval line averages; radial gradients; normalized gradients; local scale lengths; optional independent-error uncertainty propagation; within-domain profile reconstruction.",
     "status": "D",
     "method": "Analyze already-calibrated electron-density and electron-temperature profiles on supplied calibrated spatial coordinates. Compute extrema, measured-interval line averages, numerical gradients, normalized gradients, local scale lengths and optional independent-error uncertainties; optionally reconstruct profiles only inside the measured coordinate interval.",
     "caveat": "Inputs are assumed calibrated and correctly organized. The supplied coordinate is a data coordinate, not an inferred machine dimension. No optical-geometry inversion, geometry-weighted volume average, raw-spectrum fitting, or absolute density inversion is part of Analysis 1. Numerical derivatives can amplify noise; uncertainty propagation assumes independent pointwise errors. No independent experimental validation is claimed.",
@@ -111,7 +111,7 @@
         {
           "name": "summary",
           "unit": "structured",
-          "description": "Peak values and locations, radial range, and line averages over the measured interval; no geometry-weighted volume averages."
+          "description": "Minimum and maximum density and temperature values with their supplied-coordinate locations, radial range, and measured-interval line averages; no geometry-weighted volume averages."
         },
         {
           "name": "density_gradient_uncertainty_m-4",
