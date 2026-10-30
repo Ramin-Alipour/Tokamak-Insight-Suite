@@ -440,6 +440,24 @@
           "required": false,
           "default": 0.1,
           "minimum": 0
+        },
+        {
+          "name": "time_labels",
+          "unit": "sequence",
+          "description": "Optional sequence with exactly one user-supplied label per time index in a (time,channels,samples) series.",
+          "required": false
+        },
+        {
+          "name": "channel_names",
+          "unit": "sequence",
+          "description": "Optional unique channel labels matching the channel dimension for array and time-series inputs.",
+          "required": false
+        },
+        {
+          "name": "analysis_options",
+          "unit": "mapping",
+          "description": "Optional keyword options forwarded independently to the canonical calibrated single-sweep analysis for each channel/time slice.",
+          "required": false
         }
       ],
       "output_specs": [
@@ -945,7 +963,8 @@
         "Monte Carlo uncertainty for the maximum-dI/dV proxy is conditional on supplied independent current errors and is not an uncertainty for the true physical plasma potential.",
         "Numerical R², NRMSE and ion-flatness thresholds are configurable screening parameters, not universal physical acceptance criteria.",
         "Multispecies density includes species charge state through Z_s^(3/2); species composition covariance is not propagated.",
-        "Local polynomial smoothing fits in actual voltage coordinates and supports nonuniform voltage spacing; smoothing window is specified in sample count."
+        "Local polynomial smoothing fits in actual voltage coordinates and supports nonuniform voltage spacing; smoothing window is specified in sample count.",
+        "Time-series output preserves time_labels and channel_names but does not compute temporal derivatives, trends, correlations, or spatial reconstruction."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
@@ -1078,7 +1097,44 @@
         ],
         "meaning": "Numerical fit-quality and flatness screens only. Defaults are software review settings, not universal physical criteria, not plasma constants and never certify a Maxwellian electron-retarding or ion-saturation regime.",
         "density_gate": "Density inversion requires selected electron and ion intervals to pass configured numerical screens. A pass remains numerical screening only; regime selection and applicability remain the researcher's responsibility."
-      }
+      },
+      "output_modes": [
+        {
+          "mode": "single_sweep",
+          "shape": "mapping",
+          "fields": [
+            "canonical single-sweep output fields",
+            "numerical_fit_screen_thresholds"
+          ],
+          "description": "One canonical result mapping."
+        },
+        {
+          "mode": "multi_channel",
+          "shape": "mapping",
+          "fields": [
+            "analysis_scope",
+            "channel_count",
+            "channels[channel_name]",
+            "cross_channel_inference_performed"
+          ],
+          "description": "A mapping of independently analyzed channel results; no spatial reconstruction or cross-channel inference."
+        },
+        {
+          "mode": "time_channel_series",
+          "shape": "mapping",
+          "fields": [
+            "analysis_scope",
+            "time_count",
+            "channel_count",
+            "sample_count_per_sweep",
+            "time_slices[time_index].time_label",
+            "time_slices[time_index].channels[channel_name]",
+            "temporal_trend_analysis_performed",
+            "cross_channel_inference_performed"
+          ],
+          "description": "One result mapping per time/channel sweep; labels preserve supplied metadata and no temporal trend or cross-channel inference is performed."
+        }
+      ]
     },
     "note": "Canonical calibrated single-sweep I–V analysis with consistent public entry points and optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred. Completion is scoped to the documented software contract and does not imply independent experimental validation.",
     "references": [
