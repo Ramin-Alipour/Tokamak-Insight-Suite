@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Iterable
+import warnings
 
 import numpy as np
 
@@ -41,20 +42,38 @@ class ThomsonSummary:
 
     @property
     def density_line_average_m3(self):
-        """Deprecated alias; this is a radial-coordinate average, not a line average."""
+        """Deprecated compatibility alias; this is a radial-coordinate average, not a line average."""
+        warnings.warn(
+            "density_line_average_m3 is deprecated; use density_radial_average_m3.",
+            DeprecationWarning, stacklevel=2,
+        )
         return self.density_radial_average_m3
 
     @property
     def temperature_line_average_ev(self):
-        """Deprecated alias; this is a radial-coordinate average, not a line average."""
+        """Deprecated compatibility alias; this is a radial-coordinate average, not a line average."""
+        warnings.warn(
+            "temperature_line_average_ev is deprecated; use temperature_radial_average_ev.",
+            DeprecationWarning, stacklevel=2,
+        )
         return self.temperature_radial_average_ev
 
     @property
     def density_line_average_uncertainty_m3(self):
+        """Deprecated compatibility alias; use density_radial_average_uncertainty_m3."""
+        warnings.warn(
+            "density_line_average_uncertainty_m3 is deprecated; use density_radial_average_uncertainty_m3.",
+            DeprecationWarning, stacklevel=2,
+        )
         return self.density_radial_average_uncertainty_m3
 
     @property
     def temperature_line_average_uncertainty_ev(self):
+        """Deprecated compatibility alias; use temperature_radial_average_uncertainty_ev."""
+        warnings.warn(
+            "temperature_line_average_uncertainty_ev is deprecated; use temperature_radial_average_uncertainty_ev.",
+            DeprecationWarning, stacklevel=2,
+        )
         return self.temperature_radial_average_uncertainty_ev
 
 
