@@ -3029,7 +3029,7 @@
     "inputs": "Probe frequency [Hz], frequency shift [Hz], scattering wave vector [m^-1], electron density/temperature, ion composition, ion temperature and flow",
     "output": "Model spectral-density units",
     "assumptions": "Unmagnetized electrostatic longitudinal dielectric response; Maxwellian bulk species; quasi-neutrality; fixed ion composition",
-    "status": "P",
+    "status": "D",
     "category": "Microwave collective Thomson scattering",
     "execution_contract": {
       "schema_version": "1.0",
@@ -3193,7 +3193,7 @@
     "inputs": "Channel-major concatenated calibrated spectra y, full positive-definite spectral covariance C_y, per-channel calibrated wavelength axes and instrument-response matrices, model parameters θ",
     "output": "Joint parameter covariance and propagated covariance of electron temperature and electron-flow projection across channels",
     "assumptions": "Currently implemented for non-collective Maxwellian and parameterized Kappa projected spectra; supplied covariance includes the modeled cross-channel and cross-wavelength noise; local linearization near the optimum.",
-    "status": "P",
+    "status": "D",
     "category": "Thomson scattering inference",
     "execution_contract": {
       "schema_version": "1.0",
@@ -3272,7 +3272,7 @@
     "inputs": "Frequency shift [Hz], scattering wave number [m^-1], fast-ion density [m^-3], ion charge [e], ion mass [kg], flow projection [m/s], normalized tabulated 1-D velocity distribution f(v)",
     "output": "Complex longitudinal susceptibility and resonant VDF value",
     "assumptions": "Unmagnetized electrostatic longitudinal response, 1-D projected velocity distribution, Landau-contour prescription, PCHIP interpolation of supplied tabulated VDF.",
-    "status": "P",
+    "status": "D",
     "category": "Microwave collective Thomson scattering",
     "execution_contract": {
       "schema_version": "1.0",
