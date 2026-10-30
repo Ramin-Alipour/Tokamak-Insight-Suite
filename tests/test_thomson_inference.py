@@ -794,3 +794,31 @@ def test_joint_density_covariance_rejects_incompatible_spectral_covariance():
             joint_spectral_covariance=np.eye(x.size),
             joint_density_relative_covariance=np.eye(6),
         )
+
+
+def test_lsf_variance_adds_to_density_covariance_without_rescaling_cross_terms():
+    x, y, _ = _spectral_case(100.0, n=161)
+    response = np.eye(x.size)
+    response_uncertainty = np.full_like(response, 1e-7)
+    relative_covariance = np.eye(6) * 1e-4
+    relative_covariance[0, 1] = relative_covariance[1, 0] = 0.5e-4
+    out = analyze_thomson_spectra(
+        x, (y * 1e-18)[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=response,
+        instrument_response_uncertainty=response_uncertainty,
+        density_relative_covariance=relative_covariance,
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+    )
+    channel = out["channels"][0]
+    assert channel["integrated_scattered_power_lsf_uncertainty_W"] > 0.0
+    covariance = relative_covariance.copy()
+    covariance[0, 0] += (
+        channel["integrated_scattered_power_lsf_uncertainty_W"]
+        / channel["integrated_scattered_power_W"]
+    ) ** 2
+    gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+    expected_sigma = channel["electron_density_m3"] * np.sqrt(gradient @ covariance @ gradient)
+    assert channel["electron_density_uncertainty_m3"] == pytest.approx(expected_sigma, rel=1e-8)
