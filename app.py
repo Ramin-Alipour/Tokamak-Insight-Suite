@@ -824,8 +824,199 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
-    if mode=='ECE channel/profile analysis':
+    mode=st.radio('Workflow',['Thomson multi-channel spectral inference','Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    if mode=='Thomson multi-channel spectral inference':
+        st.caption('Primary Analysis 1: fit measured, calibrated multi-channel Thomson spectra and infer physical parameters. No detector calibration, data repair, or experimental validation is performed.')
+        all_cols=[str(c) for c in df.columns]
+        numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        if len(numeric_cols)<3:
+            st.warning('The uploaded table needs numeric radius, wavelength and spectral-intensity columns, plus a channel identifier.')
+        else:
+            with st.expander('Measured spectrum table mapping', expanded=True):
+                channel_col=st.selectbox('Spatial channel identifier',all_cols,key='ts_infer_channel')
+                radius_col=st.selectbox('Calibrated channel coordinate (m)',numeric_cols,key='ts_infer_radius')
+                wavelength_col=st.selectbox('Calibrated wavelength (nm)',numeric_cols,key='ts_infer_wavelength')
+                signal_col=st.selectbox('Calibrated spectral intensity',numeric_cols,key='ts_infer_signal')
+                uncertainty_col=st.selectbox('Per-sample spectral 1σ uncertainty (optional)',['<none>']+numeric_cols,key='ts_infer_uncertainty')
+            model=st.selectbox('Physical spectral model',[
+                'non_collective_maxwellian','non_collective_kappa',
+                'relativistic_maxwell_juttner','collective_maxwellian'
+            ],key='ts_infer_model')
+            g1,g2,g3=st.columns(3)
+            with g1:
+                laser_nm=st.number_input('Laser wavelength (nm)',min_value=1e-9,value=532.0,format='%.10g',key='ts_infer_laser')
+                laser_unc=st.number_input('Laser wavelength 1σ uncertainty (nm)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_laser_unc')
+            with g2:
+                angle_rad=st.number_input('Scattering angle (rad)',min_value=1e-9,max_value=float(np.pi),value=float(np.pi/2),format='%.9g',key='ts_infer_angle')
+                angle_unc=st.number_input('Scattering angle 1σ uncertainty (rad)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_angle_unc')
+            with g3:
+                response_upload=st.file_uploader('Measured instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
+                response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
+                identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
+            collective_kwargs={}
+            if model=='collective_maxwellian':
+                st.markdown('**Collective-model inputs (explicit measured values / geometry; no defaults are inferred)**')
+                c1,c2=st.columns(2)
+                with c1:
+                    ion_species_text=st.text_input('Ion species (comma-separated)',key='ts_infer_ions')
+                    ion_fraction_text=st.text_input('Ion number fractions (comma-separated)',key='ts_infer_fractions')
+                    ion_temperature_text=st.text_input('Ion temperatures (eV; one per species)',key='ts_infer_ion_temperatures')
+                    ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors)',key='ts_infer_ion_velocities')
+                with c2:
+                    electron_velocity_text=st.text_input('Electron velocity vector (m/s; x,y,z)',key='ts_infer_electron_velocity')
+                    incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_incident_direction')
+                    scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_scattered_direction')
+            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
+            density_kwargs={}
+            if absolute_density:
+                st.markdown('**Absolute Thomson-power geometry**')
+                d1,d2,d3=st.columns(3)
+                with d1:
+                    laser_power=st.number_input('Laser power at scattering volume (W)',min_value=1e-30,value=1.0,format='%.8g',key='ts_infer_laser_power')
+                    interaction_length=st.number_input('Interaction length (m)',min_value=1e-12,value=0.01,format='%.8g',key='ts_infer_interaction_length')
+                with d2:
+                    solid_angle=st.number_input('Collection solid angle (sr)',min_value=1e-12,value=0.01,format='%.8g',key='ts_infer_solid_angle')
+                    efficiency=st.number_input('Optical efficiency (0–1)',min_value=1e-12,max_value=1.0,value=0.5,format='%.8g',key='ts_infer_efficiency')
+                with d3:
+                    polarization_text=st.text_input('Incident polarization vector (x,y,z)',key='ts_infer_polarization')
+                    incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_abs_incident_direction')
+                    scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_abs_scattered_direction')
+                density_kwargs={
+                    'laser_power_w':float(laser_power),
+                    'interaction_length_m':float(interaction_length),
+                    'collection_solid_angle_sr':float(solid_angle),
+                    'optical_efficiency':float(efficiency),
+                    'spectral_power_density_calibrated':True,
+                }
+            def _parse_ts_vector(raw,label):
+                try:
+                    values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
+                except ValueError as exc:
+                    raise ValueError(f'{label} must be three comma-separated numeric components.') from exc
+                if values.shape!=(3,) or not np.all(np.isfinite(values)):
+                    raise ValueError(f'{label} must contain exactly three finite components.')
+                return values
+            def _parse_ts_float_list(raw,label):
+                try:
+                    values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
+                except ValueError as exc:
+                    raise ValueError(f'{label} must be comma-separated numeric values.') from exc
+                if values.size==0 or not np.all(np.isfinite(values)):
+                    raise ValueError(f'{label} must contain finite numeric values.')
+                return values
+            if st.button('Infer Thomson plasma parameters from measured spectra',type='primary',key='ts_infer_run'):
+                st.session_state.pop('tis_thomson_spectral_inference',None)
+                try:
+                    required_cols=[channel_col,radius_col,wavelength_col,signal_col]
+                    if len(set(required_cols))!=4:
+                        raise ValueError('Channel ID, radius, wavelength and intensity must use four distinct columns.')
+                    work=df[required_cols+([] if uncertainty_col=='<none>' else [uncertainty_col])].copy()
+                    for column in [radius_col,wavelength_col,signal_col]+([] if uncertainty_col=='<none>' else [uncertainty_col]):
+                        work[column]=pd.to_numeric(work[column],errors='coerce')
+                    if work[channel_col].isna().any():
+                        raise ValueError('Channel identifiers must be present for every spectrum sample.')
+                    numeric_values=work[[radius_col,wavelength_col,signal_col]+([] if uncertainty_col=='<none>' else [uncertainty_col])].to_numpy(dtype=float)
+                    if not np.all(np.isfinite(numeric_values)):
+                        raise ValueError('The selected calibrated measurements contain missing or non-finite values; no rows are dropped or repaired.')
+                    channel_ids=list(pd.unique(work[channel_col]))
+                    if not channel_ids:
+                        raise ValueError('No spatial channels were found.')
+                    wavelength_rows=[]; signal_rows=[]; uncertainty_rows=[]; radii=[]
+                    expected_samples=None
+                    for channel_id in channel_ids:
+                        channel_frame=work.loc[work[channel_col]==channel_id]
+                        x_values=channel_frame[wavelength_col].to_numpy(dtype=float)
+                        y_values=channel_frame[signal_col].to_numpy(dtype=float)
+                        r_values=channel_frame[radius_col].to_numpy(dtype=float)
+                        if np.unique(r_values).size!=1:
+                            raise ValueError(f'Channel {channel_id!r} must have exactly one calibrated radius value.')
+                        if x_values.size<7 or np.any(np.diff(x_values)<=0):
+                            raise ValueError(f'Channel {channel_id!r} must contain at least seven samples on a strictly increasing wavelength axis; source order is preserved.')
+                        if expected_samples is None: expected_samples=x_values.size
+                        elif x_values.size!=expected_samples:
+                            raise ValueError('All channels must contain the same number of wavelength samples.')
+                        wavelength_rows.append(x_values); signal_rows.append(y_values); radii.append(float(r_values[0]))
+                        if uncertainty_col!='<none>':
+                            uncertainty_rows.append(channel_frame[uncertainty_col].to_numpy(dtype=float))
+                    wavelengths=np.vstack(wavelength_rows)
+                    spectra=np.vstack(signal_rows)
+                    signal_uncertainty=None if uncertainty_col=='<none>' else np.vstack(uncertainty_rows)
+                    if response_upload is not None:
+                        response_frame=pd.read_csv(response_upload,header=None)
+                        instrument_response=response_frame.to_numpy(dtype=float)
+                        if instrument_response.ndim==2 and instrument_response.shape[1]==1:
+                            instrument_response=instrument_response[:,0]
+                    elif identity_response:
+                        instrument_response=np.eye(expected_samples)
+                    else:
+                        raise ValueError('Upload the measured instrument-response kernel/matrix, or explicitly declare that the supplied spectra are already corrected and use the identity response.')
+                    response_uncertainty=None
+                    if response_unc_upload is not None:
+                        response_uncertainty=pd.read_csv(response_unc_upload,header=None).to_numpy(dtype=float)
+                    kwargs={
+                        'laser_wavelength_nm':float(laser_nm),
+                        'scattering_angle_rad':float(angle_rad),
+                        'laser_wavelength_uncertainty_nm':float(laser_unc),
+                        'scattering_angle_uncertainty_rad':float(angle_unc),
+                        'instrument_response':instrument_response,
+                        'signal_uncertainty':signal_uncertainty,
+                        'instrument_response_uncertainty':response_uncertainty,
+                        'model':model,
+                        **density_kwargs,
+                    }
+                    if model=='collective_maxwellian':
+                        species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
+                        fractions=_parse_ts_float_list(ion_fraction_text,'Ion fractions')
+                        ion_temperatures=_parse_ts_float_list(ion_temperature_text,'Ion temperatures')
+                        ion_velocity_vectors=np.asarray([
+                            _parse_ts_vector(v,'Ion velocity vector')
+                            for v in ion_velocity_text.split(';') if v.strip()
+                        ],dtype=float)
+                        kwargs.update({
+                            'ion_species':species,
+                            'ion_fractions':fractions,
+                            'ion_temperature_eV':ion_temperatures,
+                            'ion_velocity_m_s':ion_velocity_vectors,
+                            'electron_velocity_m_s':_parse_ts_vector(electron_velocity_text,'Electron velocity'),
+                            'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
+                            'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
+                        })
+                    if absolute_density:
+                        kwargs.update({
+                            'incident_polarization':_parse_ts_vector(polarization_text,'Incident polarization'),
+                            'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
+                            'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
+                        })
+                    result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
+                    st.session_state['tis_thomson_spectral_inference']={
+                        'data_sha':sha,'channel_col':channel_col,'radius_col':radius_col,
+                        'wavelength_col':wavelength_col,'signal_col':signal_col,
+                        'uncertainty_col':uncertainty_col,'model':model,'result':result,
+                    }
+                except Exception as e:
+                    st.error(f'Thomson spectral inference failed: {e}')
+            saved_ts=st.session_state.get('tis_thomson_spectral_inference')
+            if saved_ts and saved_ts.get('data_sha')==sha and saved_ts.get('model')==model:
+                result=saved_ts['result']
+                st.success('Thomson spectral inference completed within the selected physical model.')
+                profile=pd.DataFrame({
+                    'radius_m':result['radius_m'],
+                    'electron_temperature_eV':result['electron_temperature_profile_eV'],
+                    'electron_temperature_uncertainty_eV':result['electron_temperature_uncertainty_profile_eV'],
+                    'electron_density_m3':result['electron_density_profile_m3'],
+                    'electron_density_uncertainty_m3':result['electron_density_uncertainty_profile_m3'],
+                    'electron_velocity_projection_m_s':result['electron_velocity_projection_profile_m_s'],
+                    'electron_velocity_projection_uncertainty_m_s':result['electron_velocity_projection_uncertainty_profile_m_s'],
+                })
+                st.dataframe(profile,width="stretch")
+                st.line_chart(profile.set_index('radius_m')[['electron_temperature_eV']])
+                if np.any(np.isfinite(result['electron_density_profile_m3'])):
+                    st.line_chart(profile.set_index('radius_m')[['electron_density_m3']])
+                st.caption('Electron density is reported only when identifiable from the selected physical model and supplied calibrated intensity/geometry. Flow is the projection along the scattering wavevector, not a reconstructed 3-D velocity vector.')
+                export=_json_safe(result)
+                json_download('Export Thomson spectral-inference results',export,'tis_thomson_spectral_inference.json')
+                add_report_section('Thomson multi-channel spectral inference',export)
+    elif mode=='ECE channel/profile analysis':
         st.caption('ECE tools use already-calibrated radiance or brightness-temperature inputs. TIS never calibrates detector data. Cold resonance and circular-field radius estimates are approximate, not EFIT/ray-tracing results.')
         numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
         if len(numeric_cols)<2:
