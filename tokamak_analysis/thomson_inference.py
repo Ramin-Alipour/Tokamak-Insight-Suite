@@ -255,6 +255,8 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         "integrated_scattered_power_W": area, "integrated_scattered_power_uncertainty_W": area_unc,
         "reduced_chi_square": float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
         "fitted_spectrum": observed(wavelength, *p),
+        "fit_parameters": np.asarray(p, dtype=float),
+        "fit_parameter_names": ["amplitude", "center_nm", "intrinsic_sigma_nm", "background_intercept", "background_slope_per_nm"],
         "model": "non-collective, non-relativistic Maxwellian electron spectrum",
         "assumptions": ["single-scattering non-collective regime", "isotropic Maxwellian electrons",
                         "non-relativistic electron velocities", "known scattering geometry"],
@@ -438,7 +440,7 @@ def analyze_thomson_spectra(
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
-    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
+    instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,\n    joint_spectral_covariance=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -543,10 +545,24 @@ def analyze_thomson_spectra(
     if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
+    joint_covariance = None
+    if joint_spectral_covariance is not None:
+        if model != "non_collective_maxwellian":
+            raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian; other physical models require model-specific joint forward models")
+        joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
+        expected_joint_shape = (y.size, y.size)
+        if joint_covariance.shape != expected_joint_shape or not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("joint_spectral_covariance must be a symmetric (n_channels*n_wavelengths) square matrix in channel-major order")
+        try:
+            joint_cholesky = np.linalg.cholesky(joint_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("joint_spectral_covariance must be positive definite") from exc
     results = []
+    channel_responses = []
     for i in range(y.shape[0]):
         xi = xs[i]
         response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1], xi)
+        channel_responses.append(response)
         ui = None if unc is None else unc[i]
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
@@ -861,8 +877,101 @@ def analyze_thomson_spectra(
             fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
             fit["uncertainty_completeness"] = "partial"
         results.append(fit)
+    joint_summary = None
+    if joint_covariance is not None:
+        from scipy.optimize import least_squares
+        nchan, nlam = y.shape
+        initial = np.concatenate([np.asarray(item["fit_parameters"], dtype=float) for item in results])
+        lower_parts, upper_parts = [], []
+        for i in range(nchan):
+            dx = float(np.median(np.diff(xs[i])))
+            span_i = float(xs[i, -1] - xs[i, 0])
+            lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), -np.inf, -np.inf])
+            upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf])
+        lower = np.asarray(lower_parts).ravel()
+        upper = np.asarray(upper_parts).ravel()
+        def joint_forward(parameters):
+            predicted = []
+            for channel in range(nchan):
+                amp, center, sigma, offset, slope = parameters[5*channel:5*(channel+1)]
+                signal_component = amp * np.exp(-0.5*((xs[channel]-center)/sigma)**2)
+                predicted.append(_apply_response(channel_responses[channel], signal_component, xs[channel])
+                                 + offset + slope*(xs[channel]-center))
+            return np.asarray(predicted)
+        measured_flat = y.ravel()
+        def joint_residual(parameters):
+            return np.linalg.solve(joint_cholesky, (joint_forward(parameters)-y).ravel())
+        joint_fit = least_squares(joint_residual, initial, bounds=(lower, upper), x_scale="jac", max_nfev=30000)
+        joint_rank = int(np.linalg.matrix_rank(joint_fit.jac))
+        joint_condition = float(np.linalg.cond(joint_fit.jac))
+        if not joint_fit.success or joint_rank < initial.size or not np.isfinite(joint_condition) or joint_condition > 1e12:
+            raise ValueError("Joint Thomson GLS fit rejected: optimizer failure or non-identifiable channel parameters")
+        parameter_covariance = np.linalg.pinv(joint_fit.jac.T @ joint_fit.jac)
+        dof_joint = max(1, measured_flat.size-initial.size)
+        standardized = joint_residual(joint_fit.x)
+        reduced_chi2_joint = float(standardized @ standardized / dof_joint)
+        # Transform the full parameter covariance to all channel Te and flow values.
+        def physical_vector(parameters):
+            values=[]
+            for channel in range(nchan):
+                _, center, sigma, _, _ = parameters[5*channel:5*(channel+1)]
+                te=(sigma/float(laser_wavelength_nm))**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(float(scattering_angle_rad)/2.0)**2
+                qproj=2.0*np.sin(float(scattering_angle_rad)/2.0)
+                velocity=-C_M_S*(center-float(laser_wavelength_nm))/(float(laser_wavelength_nm)*qproj)
+                values.extend([te,velocity])
+            return np.asarray(values,dtype=float)
+        base_physical=physical_vector(joint_fit.x)
+        transform=np.zeros((2*nchan,5*nchan))
+        for j in range(5*nchan):
+            step=np.cbrt(np.finfo(float).eps)*max(abs(float(joint_fit.x[j])),1.0)
+            plus=joint_fit.x.copy(); minus=joint_fit.x.copy()
+            plus[j]+=step; minus[j]-=step
+            transform[:,j]=(physical_vector(plus)-physical_vector(minus))/(2.0*step)
+        physical_covariance=transform@parameter_covariance@transform.T
+        # Excess lack-of-fit is reported as a separate model-discrepancy component.
+        discrepancy_scale=max(reduced_chi2_joint-1.0,0.0)
+        discrepancy_covariance=discrepancy_scale*physical_covariance
+        total_physical_covariance=physical_covariance+discrepancy_covariance
+        joint_fitted=joint_forward(joint_fit.x)
+        for channel in range(nchan):
+            p=joint_fit.x[5*channel:5*(channel+1)]
+            block=parameter_covariance[5*channel:5*(channel+1),5*channel:5*(channel+1)]
+            te_index=2*channel; velocity_index=te_index+1
+            fit=results[channel]
+            fit.update({
+                "amplitude":float(p[0]),"fitted_center_nm":float(p[1]),"intrinsic_sigma_nm":float(p[2]),
+                "background_intercept":float(p[3]),"background_slope_per_nm":float(p[4]),
+                "fit_parameters":p.copy(),"fit_covariance":block.copy(),
+                "electron_temperature_eV":float(base_physical[te_index]),
+                "electron_velocity_projection_m_s":float(base_physical[velocity_index]),
+                "electron_temperature_uncertainty_eV":float(np.sqrt(max(total_physical_covariance[te_index,te_index],0.0))),
+                "electron_velocity_projection_uncertainty_m_s":float(np.sqrt(max(total_physical_covariance[velocity_index,velocity_index],0.0))),
+                "fitted_spectrum":joint_fitted[channel].copy(),
+                "residual":(y[channel]-joint_fitted[channel]).copy(),
+                "joint_fit_used":True,
+                "joint_channel_parameter_covariance":parameter_covariance.copy(),
+            })
+            area=float(p[0]*p[2]*np.sqrt(2.0*np.pi))
+            grad=np.array([p[2]*np.sqrt(2*np.pi),0.0,p[0]*np.sqrt(2*np.pi),0.0,0.0])
+            fit["integrated_scattered_power_W"]=area
+            fit["integrated_scattered_power_uncertainty_W"]=float(np.sqrt(max(grad@block@grad,0.0)))
+        joint_summary={
+            "method":"joint generalized least squares across all channels",
+            "channel_major_covariance_order":True,
+            "joint_parameter_covariance":parameter_covariance,
+            "physical_parameter_order":[name for i in range(nchan) for name in (f"channel_{i}_electron_temperature_eV",f"channel_{i}_electron_velocity_projection_m_s")],
+            "physical_parameter_covariance":physical_covariance,
+            "model_discrepancy_covariance":discrepancy_covariance,
+            "total_physical_parameter_covariance":total_physical_covariance,
+            "reduced_chi_square":reduced_chi2_joint,
+            "jacobian_rank":joint_rank,"jacobian_condition_number":joint_condition,
+            "degrees_of_freedom":int(dof_joint),
+            "model_discrepancy_scale":discrepancy_scale,
+            "model_discrepancy_interpretation":"Excess whitened residual variance above unity is reported as a separate covariance component; it is a model-adequacy diagnostic, not experimental validation.",
+        }
     return {
         "model": model, "channel_count": len(results), "channels": results,
+        "joint_inference": joint_summary,
         "radius_m": radii.copy(),
         "electron_temperature_profile_eV": np.array([r.get("electron_temperature_eV", np.nan) for r in results]),
         "electron_temperature_uncertainty_profile_eV": np.array([r.get("electron_temperature_uncertainty_eV", np.nan) for r in results]),
