@@ -343,3 +343,27 @@ def test_multispecies_density_rejects_uncertainty_for_composition_without_covari
                 "sheath_coefficient": 0.61, "fraction_relative_standard_uncertainty": 0.02}]
     with pytest.raises(ValueError, match="composition covariance"):
         estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
+
+
+
+def test_density_screen_gate_is_configurable_and_override_is_marked_provisional():
+    from tis.probe_analysis import langmuir_iv_analysis
+
+    voltage = np.linspace(-10.0, 10.0, 201)
+    current = -1e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
+    options = dict(
+        electron_fit_range=(-8.0, -1.0), ion_fit_range=(-10.0, -9.0),
+        probe_area_m2=1e-4, ion_mass_kg=3.34e-27,
+        ion_saturation_coefficient=0.61, sheath_model="explicit test model",
+        fit_quality_min_r2=0.0, fit_quality_max_nrmse=10.0,
+        ion_flatness_max_relative_change=0.0,
+    )
+    with pytest.raises(ValueError, match="configurable numerical review screens failed"):
+        langmuir_iv_analysis(voltage, current, **options)
+    provisional = langmuir_iv_analysis(
+        voltage, current, allow_density_when_numerical_screen_fails=True, **options
+    )
+    assert provisional["ion_density_estimate_m-3"] > 0
+    assert provisional["ion_density_physical_regime_confirmed"] is False
+    assert provisional["ion_density_numerical_screen_override_used"] is True
+    assert provisional["ion_density_status"] == "provisional_model_based_estimate_numerical_screen_override_used"
