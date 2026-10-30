@@ -2974,67 +2974,70 @@ elif page=='Advanced Analysis':
             signal_col=col_select('Calibrated spectral intensity',numeric,'tis_ts_signal')
             uncertainty_options=['(none)']+numeric
             signal_unc_col=st.selectbox('Optional spectral 1-sigma uncertainty',uncertainty_options,key='tis_ts_unc')
-            laser_nm=st.number_input('Incident laser wavelength (nm)',min_value=1e-9,value=532.0,key='tis_ts_laser')
+            laser_nm_text=st.text_input('Incident laser wavelength (nm; required)',value='',key='tis_ts_laser')
             laser_nm_unc=st.text_input('Laser-wavelength 1-sigma uncertainty (nm; blank if unavailable)',value='',key='tis_ts_laser_unc')
-            angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
+            angle_deg_text=st.text_input('Scattering angle (degrees; required)',value='',key='tis_ts_angle')
             angle_deg_unc=st.text_input('Scattering-angle 1-sigma uncertainty (degrees; blank if unavailable)',value='',key='tis_ts_angle_unc')
             model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Relativistic Maxwell-Juttner (projected)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
             response_file=st.file_uploader('Instrument line-spread response kernel or matrix (CSV; required)',type=['csv'],key='tis_ts_lsf')
             response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
             st.caption('The response matrix must be square on the wavelength grid. Its columns represent normalized detector-bin probabilities for each true-wavelength bin.')
+            power_calibrated=False
             if model_label.startswith('Collective'):
-                st.caption('Collective mode requires explicit ion species and independently measured/supplied ion temperatures. No missing ion temperature is assumed.')
-                ion_species_text=st.text_input('Ion species (comma-separated PlasmaPy names, e.g. H+, He-4 2+)',value='H+',key='tis_ts_ions')
-                ion_fractions_text=st.text_input('Ion number fractions (one per species; sum to 1)',value='1',key='tis_ts_ion_fractions')
-                ion_temperature_text=st.text_input('Ion temperature(s), eV (comma-separated; one per species)',value='',key='tis_ts_ti')
-                ion_velocity_text=st.text_input('Measured ion velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_vi')
-                assume_ion_stationary=st.checkbox('Explicitly assume zero ion flow when no ion velocity is supplied',value=False,key='tis_ts_vi_zero')
-                electron_velocity_text=st.text_input('Measured electron-fluid velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_ve')
-                assume_electron_stationary=st.checkbox('Explicitly assume zero electron-fluid flow when no velocity is supplied',value=False,key='tis_ts_ve_zero')
-            with st.expander('Optional absolute-density inference (non-collective models only; requires spectral intensity in W/nm)'):
-                power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
-                laser_power=st.number_input('Incident laser power at scattering volume (W)',min_value=0.0,value=0.0,key='tis_ts_power')
-                laser_power_unc=st.text_input('Laser-power 1-sigma uncertainty (W; blank if unavailable)',value='',key='tis_ts_power_unc')
-                interaction_length=st.number_input('Interaction length (m)',min_value=0.0,value=0.0,key='tis_ts_length')
-                interaction_length_unc=st.text_input('Interaction-length 1-sigma uncertainty (m; blank if unavailable)',value='',key='tis_ts_length_unc')
-                solid_angle=st.number_input('Collection solid angle (sr)',min_value=0.0,value=0.0,key='tis_ts_solid')
-                solid_angle_unc=st.text_input('Solid-angle 1-sigma uncertainty (sr; blank if unavailable)',value='',key='tis_ts_solid_unc')
-                efficiency=st.number_input('Optical efficiency (0–1)',min_value=0.0,max_value=1.0,value=0.0,key='tis_ts_eff')
-                efficiency_unc=st.text_input('Optical-efficiency 1-sigma uncertainty (blank if unavailable)',value='',key='tis_ts_eff_unc')
-                incident_direction_text=st.text_input('Incident laser propagation unit vector (x,y,z)',value='1,0,0',key='tis_ts_inc_dir')
-                polarization_text=st.text_input('Incident polarization unit vector (x,y,z)',value='0,0,1',key='tis_ts_pol')
-                direction_text=st.text_input('Scattered-light unit direction (x,y,z)',value='0,1,0',key='tis_ts_dir')
-                polarization_unc=st.text_input('Polarization-factor 1-sigma uncertainty (blank if unavailable)',value='',key='tis_ts_pol_unc')
+                st.caption('Collective mode requires explicit ion species, composition, ion temperatures, ion/electron flow vectors and beam geometry. These are fixed model inputs, not inferred by this backend.')
+                ion_species_text=st.text_input('Ion species (comma-separated PlasmaPy names)',value='',key='tis_ts_ions')
+                ion_fractions_text=st.text_input('Ion number fractions (one per species; blank only for a single species)',value='',key='tis_ts_ion_fractions')
+                ion_temperature_text=st.text_input('Ion temperature(s), eV (one per species)',value='',key='tis_ts_ti')
+                ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors, one per species)',value='',key='tis_ts_vi')
+                assume_ion_stationary=st.checkbox('Explicitly assume zero ion flow for every species',value=False,key='tis_ts_vi_zero')
+                electron_velocity_text=st.text_input('Electron-fluid velocity vector (m/s; x,y,z)',value='',key='tis_ts_ve')
+                assume_electron_stationary=st.checkbox('Explicitly assume zero electron-fluid flow',value=False,key='tis_ts_ve_zero')
+                incident_direction_text=st.text_input('Incident beam direction (x,y,z)',value='',key='tis_ts_collective_inc_dir')
+                direction_text=st.text_input('Scattered beam direction (x,y,z)',value='',key='tis_ts_collective_scatter_dir')
+            else:
+                with st.expander('Optional absolute-density inference (requires spectral intensity in W/nm)'):
+                    power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
+                    laser_power_text=st.text_input('Incident laser power at scattering volume (W; required)',value='',key='tis_ts_power')
+                    laser_power_unc=st.text_input('Laser-power 1-sigma uncertainty (W; optional)',value='',key='tis_ts_power_unc')
+                    interaction_length_text=st.text_input('Interaction length (m; required)',value='',key='tis_ts_length')
+                    interaction_length_unc=st.text_input('Interaction-length 1-sigma uncertainty (m; optional)',value='',key='tis_ts_length_unc')
+                    solid_angle_text=st.text_input('Collection solid angle (sr; required)',value='',key='tis_ts_solid')
+                    solid_angle_unc=st.text_input('Solid-angle 1-sigma uncertainty (sr; optional)',value='',key='tis_ts_solid_unc')
+                    efficiency_text=st.text_input('Optical efficiency (0–1; required)',value='',key='tis_ts_eff')
+                    efficiency_unc=st.text_input('Optical-efficiency 1-sigma uncertainty (optional)',value='',key='tis_ts_eff_unc')
+                    incident_direction_text=st.text_input('Incident laser propagation unit vector (x,y,z; required)',value='',key='tis_ts_inc_dir')
+                    polarization_text=st.text_input('Incident polarization unit vector (x,y,z; required)',value='',key='tis_ts_pol')
+                    direction_text=st.text_input('Scattered-light unit direction (x,y,z; required)',value='',key='tis_ts_dir')
+                    polarization_unc=st.text_input('Polarization-factor 1-sigma uncertainty (optional)',value='',key='tis_ts_pol_unc')
             if st.button('Run multi-channel Thomson spectral inference',type='primary',key='run_thomson_spectral_inference'):
                 try:
                     selected=[channel_col,radius_col,wavelength_col,signal_col]
                     if len(set(selected))!=4:
                         raise ValueError('Channel, radius, wavelength and signal must be separate columns.')
+                    if signal_unc_col!='(none)' and signal_unc_col in selected:
+                        raise ValueError('The uncertainty column must be distinct from channel, radius, wavelength and signal columns.')
                     frame=df[selected + ([] if signal_unc_col=='(none)' else [signal_unc_col])].copy()
-                    frame=frame.sort_values([channel_col,wavelength_col])
-                    channel_ids=list(frame[channel_col].drop_duplicates())
+                    if frame[channel_col].isna().any():
+                        raise ValueError('Channel identifiers must be present for every spectrum sample.')
+                    channel_ids=list(pd.unique(frame[channel_col]))
                     spectra=[]; radii=[]; wavelengths=[]; uncertainties=[]
+                    expected_samples=None
                     for channel_id in channel_ids:
-                        part=frame[frame[channel_col]==channel_id].sort_values(wavelength_col)
+                        part=frame[frame[channel_col]==channel_id]
                         rvals=pd.to_numeric(part[radius_col],errors='raise').to_numpy(float)
                         if not np.allclose(rvals,rvals[0],rtol=0,atol=1e-12):
                             raise ValueError(f'Channel {channel_id} has more than one radius value.')
                         xvals=pd.to_numeric(part[wavelength_col],errors='raise').to_numpy(float)
                         yvals=pd.to_numeric(part[signal_col],errors='raise').to_numpy(float)
                         if len(xvals)<7 or np.any(np.diff(xvals)<=0):
-                            raise ValueError(f'Channel {channel_id} requires at least seven unique, increasing wavelength samples.')
-                        if wavelengths and len(xvals)!=len(wavelengths[0]):
-                            raise ValueError('All channels must have the same number of wavelength samples; their calibrated wavelength values may differ by channel.')
+                            raise ValueError(f'Channel {channel_id} requires at least seven unique, increasing wavelength samples in source order.')
+                        if expected_samples is None: expected_samples=len(xvals)
+                        elif len(xvals)!=expected_samples:
+                            raise ValueError('All channels must have the same number of wavelength samples; source order is preserved.')
                         wavelengths.append(xvals); spectra.append(yvals); radii.append(float(rvals[0]))
                         if signal_unc_col!='(none)':
                             uncertainties.append(pd.to_numeric(part[signal_unc_col],errors='raise').to_numpy(float))
-                    order=np.argsort(np.asarray(radii,dtype=float))
-                    channel_ids=[channel_ids[k] for k in order]
-                    radii=np.asarray(radii,dtype=float)[order].tolist()
-                    spectra=np.asarray(spectra,dtype=float)[order].tolist()
-                    wavelengths=np.asarray(wavelengths,dtype=float)[order].tolist()
-                    if uncertainties:
-                        uncertainties=np.asarray(uncertainties,dtype=float)[order].tolist()
+                    radii=np.asarray(radii,dtype=float).tolist()
                     if response_file is None:
                         raise ValueError('Upload the measured instrument-response matrix; an identity matrix must be supplied explicitly if justified.')
                     response_array=pd.read_csv(response_file,header=None).to_numpy(float)
@@ -3042,40 +3045,84 @@ elif page=='Advanced Analysis':
                     response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
                     kwargs={}
                     if model_label.startswith('Collective') and power_calibrated:
-                        raise ValueError('Absolute-density optical-power inversion is currently implemented for non-collective models only; collective density is inferred from the kinetic spectral shape when identifiable.')
+                        raise ValueError('Absolute-density optical-power inversion is currently implemented for non-collective models only.')
                     if model_label.startswith('Collective'):
-                        species=[s.strip() for s in ion_species_text.split(',') if s.strip()]
-                        ion_fractions=[float(v.strip()) for v in ion_fractions_text.split(',') if v.strip()]
-                        if len(ion_fractions)!=len(species) or not np.isclose(sum(ion_fractions),1.0):
-                            raise ValueError('Provide one positive ion fraction per species; fractions must sum to one.')
+                        species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
+                        fractions=None if not ion_fractions_text.strip() else [float(v.strip()) for v in ion_fractions_text.split(',') if v.strip()]
                         ion_t=[float(v.strip()) for v in ion_temperature_text.split(',') if v.strip()]
-                        if len(ion_t)!=len(species):
-                            raise ValueError('Provide one independently measured ion temperature for each ion species.')
-                        iv=np.array([float(v.strip()) for v in ion_velocity_text.split(',')]) if ion_velocity_text.strip() else (np.zeros(3) if assume_ion_stationary else np.array([]))
-                        ev=np.array([float(v.strip()) for v in electron_velocity_text.split(',')]) if electron_velocity_text.strip() else (np.zeros(3) if assume_electron_stationary else np.array([]))
-                        if iv.size!=3 or ev.size!=3:
-                            raise ValueError('Supply each measured velocity vector, or explicitly check the corresponding stationary-flow assumption.')
-                        kwargs.update(ion_species=species,ion_fractions=ion_fractions,ion_temperature_eV=ion_t,
-                                     ion_velocity_m_s=np.tile(iv,(len(species),1)),electron_velocity_m_s=ev)
+                        def _parse_advanced_vector(raw,label):
+                            try:
+                                values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
+                            except ValueError as exc:
+                                raise ValueError(f'{label} must contain three comma-separated numeric values.') from exc
+                            if values.shape!=(3,) or not np.all(np.isfinite(values)):
+                                raise ValueError(f'{label} must contain exactly three finite values.')
+                            return values
+                        if ion_velocity_text.strip():
+                            ion_vectors=np.asarray([_parse_advanced_vector(v,'Ion velocity vector') for v in ion_velocity_text.split(';') if v.strip()],dtype=float)
+                        elif assume_ion_stationary:
+                            ion_vectors=np.zeros((len(species),3),dtype=float)
+                        else:
+                            ion_vectors=np.empty((0,3),dtype=float)
+                        if electron_velocity_text.strip():
+                            electron_vector=_parse_advanced_vector(electron_velocity_text,'Electron velocity')
+                        elif assume_electron_stationary:
+                            electron_vector=np.zeros(3,dtype=float)
+                        else:
+                            electron_vector=np.empty(0,dtype=float)
+                        if ion_vectors.shape!=(len(species),3):
+                            raise ValueError('Supply one measured ion velocity vector per species, or explicitly declare all ion species stationary.')
+                        if electron_vector.shape!=(3,):
+                            raise ValueError('Supply the measured electron-fluid velocity vector, or explicitly declare stationary electrons.')
+                        kwargs.update(ion_species=species,ion_fractions=fractions,ion_temperature_eV=ion_t,
+                                     ion_velocity_m_s=ion_vectors,electron_velocity_m_s=electron_vector,
+                                     incident_direction=_parse_advanced_vector(incident_direction_text,'Incident direction'),
+                                     scattered_direction=_parse_advanced_vector(direction_text,'Scattered direction'))
                     if power_calibrated:
-                        if not all(v>0 for v in (laser_power,interaction_length,solid_angle,efficiency)):
-                            raise ValueError('Absolute density requires positive laser power, interaction length, solid angle and efficiency.')
-                        incident_direction=np.array([float(v.strip()) for v in incident_direction_text.split(',')])
-                        pol=np.array([float(v.strip()) for v in polarization_text.split(',')])
-                        direction=np.array([float(v.strip()) for v in direction_text.split(',')])
-                        if incident_direction.size!=3 or pol.size!=3 or direction.size!=3:
-                            raise ValueError('Polarization and scattered direction must each have three components.')
+                        def _parse_advanced_scalar(raw,label,minimum=None,maximum=None):
+                            try:
+                                value=float(raw)
+                            except (TypeError,ValueError) as exc:
+                                raise ValueError(f'{label} must be supplied as a numeric value.') from exc
+                            if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
+                                raise ValueError(f'{label} is outside its permitted finite range.')
+                            return value
+                        def _parse_advanced_optional_scalar(raw,label):
+                            return None if not raw.strip() else _parse_advanced_scalar(raw,label,minimum=0.0)
+                        laser_power=_parse_advanced_scalar(laser_power_text,'Laser power',minimum=1e-30)
+                        interaction_length=_parse_advanced_scalar(interaction_length_text,'Interaction length',minimum=1e-12)
+                        solid_angle=_parse_advanced_scalar(solid_angle_text,'Collection solid angle',minimum=1e-12)
+                        efficiency=_parse_advanced_scalar(efficiency_text,'Optical efficiency',minimum=1e-12,maximum=1.0)
+                        incident_direction=_parse_advanced_vector(incident_direction_text,'Incident direction')
+                        pol=_parse_advanced_vector(polarization_text,'Incident polarization')
+                        direction=_parse_advanced_vector(direction_text,'Scattered direction')
                         kwargs.update(spectral_power_density_calibrated=True,laser_power_w=laser_power,
-                            laser_power_uncertainty_W=(float(laser_power_unc) if laser_power_unc.strip() else None),interaction_length_m=interaction_length,
-                            interaction_length_uncertainty_m=(float(interaction_length_unc) if interaction_length_unc.strip() else None),
+                            laser_power_uncertainty_W=_parse_advanced_optional_scalar(laser_power_unc,'Laser-power uncertainty'),interaction_length_m=interaction_length,
+                            interaction_length_uncertainty_m=_parse_advanced_optional_scalar(interaction_length_unc,'Interaction-length uncertainty'),
                             collection_solid_angle_sr=solid_angle,
-                            collection_solid_angle_uncertainty_sr=(float(solid_angle_unc) if solid_angle_unc.strip() else None),
-                            optical_efficiency=efficiency,optical_efficiency_uncertainty=(float(efficiency_unc) if efficiency_unc.strip() else None),
+                            collection_solid_angle_uncertainty_sr=_parse_advanced_optional_scalar(solid_angle_unc,'Solid-angle uncertainty'),
+                            optical_efficiency=efficiency,optical_efficiency_uncertainty=_parse_advanced_optional_scalar(efficiency_unc,'Optical-efficiency uncertainty'),
                             incident_polarization=pol,incident_direction=incident_direction,scattered_direction=direction,
-                            polarization_factor_uncertainty=(float(polarization_unc) if polarization_unc.strip() else None))
+                            polarization_factor_uncertainty=_parse_advanced_optional_scalar(polarization_unc,'Polarization-factor uncertainty'))
+                    try:
+                        laser_nm=_parse_advanced_scalar(laser_nm_text,'Incident laser wavelength',minimum=1e-9)
+                        angle_deg=_parse_advanced_scalar(angle_deg_text,'Scattering angle',minimum=0.001,maximum=180.0)
+                    except NameError:
+                        # The scalar parser is also defined in the absolute-density branch;
+                        # keep these required acquisition parameters independent of that option.
+                        def _parse_advanced_scalar(raw,label,minimum=None,maximum=None):
+                            try:
+                                value=float(raw)
+                            except (TypeError,ValueError) as exc:
+                                raise ValueError(f'{label} must be supplied as a numeric value.') from exc
+                            if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
+                                raise ValueError(f'{label} is outside its permitted finite range.')
+                            return value
+                        laser_nm=_parse_advanced_scalar(laser_nm_text,'Incident laser wavelength',minimum=1e-9)
+                        angle_deg=_parse_advanced_scalar(angle_deg_text,'Scattering angle',minimum=0.001,maximum=180.0)
                     result=analyze_thomson_spectra(
                         np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
-                        laser_wavelength_nm=float(laser_nm),scattering_angle_rad=float(np.deg2rad(angle_deg)),
+                        laser_wavelength_nm=laser_nm,scattering_angle_rad=float(np.deg2rad(angle_deg)),
                         laser_wavelength_uncertainty_nm=(float(laser_nm_unc) if laser_nm_unc.strip() else None),
                         scattering_angle_uncertainty_rad=(float(np.deg2rad(float(angle_deg_unc))) if angle_deg_unc.strip() else None),
                         instrument_response=response,instrument_response_uncertainty=response_unc,
@@ -3092,11 +3139,11 @@ elif page=='Advanced Analysis':
                         'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s'],
                         'Electron velocity projection uncertainty (m/s)':result['electron_velocity_projection_uncertainty_profile_m_s'],
                         'Uncertainty completeness':[ch.get('uncertainty_completeness','unknown') for ch in result['channels']]})
-                    st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'result':result,'frame':result_frame}
+                    st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'model_label':model_label,'result':result,'frame':result_frame}
                 except Exception as e:
                     st.error(f'Thomson spectral inference failed: {e}')
             saved=st.session_state.get('tis_thomson_spectral_inference')
-            if saved and saved.get('data_sha')==sha:
+            if saved and saved.get('data_sha')==sha and saved.get('model_label')==model_label:
                 st.dataframe(saved['frame'],width='stretch',hide_index=True)
                 st.line_chart(saved['frame'].set_index('Radius (m)')[['Electron temperature (eV)']])
                 density_frame=saved['frame'].dropna(subset=['Electron density (m^-3)'])
