@@ -2286,5 +2286,157 @@
       ],
       "note": "Callable linkage, units, preconditions, uncertainty policy and independent analytic reference tests are declared. This is software/analytic verification, not empirical validation on tokamak measurements."
     }
+  },
+  {
+    "name": "Langmuir electron temperature from exponential slope",
+    "equation": "T_e[eV] = 1 / s[V^-1]",
+    "inputs": "Positive electron-retarding exponential slope s [V^-1]",
+    "output": "eV",
+    "assumptions": "Single-Maxwellian electron-retarding branch represented by I(V)=I0+A exp(s(V−Vref)); selected interval must be physically justified. Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Ch. 3, §3.2.5.",
+    "status": "D",
+    "category": "Langmuir probe",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.langmuir_electron_temperature_from_slope",
+      "formula_key": "langmuir_electron_temperature_from_slope",
+      "input_specs": [
+        {
+          "name": "slope_per_V",
+          "unit": "V^-1",
+          "description": "Finite positive fitted exponential slope.",
+          "required": true
+        },
+        {
+          "name": "sigma_slope_per_V",
+          "unit": "V^-1",
+          "description": "Optional 1-sigma slope uncertainty; propagated by first-order linearization.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Electron temperature from the reciprocal exponential slope."
+        },
+        {
+          "name": "uncertainty_electron_temperature_eV",
+          "unit": "eV",
+          "description": "First-order propagated standard uncertainty, returned only when slope uncertainty is supplied."
+        }
+      ],
+      "prerequisites": [
+        "Maxwellian electron-retarding exponential approximation and a physically justified fit interval."
+      ],
+      "uncertainty_model": "Optional slope standard uncertainty propagated as sigma_Te = sigma_s / s^2.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_langmuir_electron_temperature_slope_reference"
+      ],
+      "note": "Published Langmuir-probe relation; analytic/software verification only, not empirical validation."
+    },
+    "references": [
+      "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5."
+    ]
+  },
+  {
+    "name": "Langmuir ion density from ion-saturation current",
+    "equation": "n_i = |I_i,sat| / [C_s e A_p sqrt(e T_e / m_i)]",
+    "inputs": "Ion saturation current [A], T_e [eV], effective area [m^2], ion mass [kg], supplied sheath coefficient C_s",
+    "output": "m^-3",
+    "assumptions": "Single dominant ion species; Maxwellian electron temperature; supplied C_s is appropriate to the declared sheath/Bohm model, geometry and regime. Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Ch. 3, §3.2.5, Eqs. 3.2.33–3.2.37.",
+    "status": "D",
+    "category": "Langmuir probe",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.langmuir_ion_density_from_saturation_current",
+      "formula_key": "langmuir_ion_density_from_saturation_current",
+      "input_specs": [
+        {
+          "name": "ion_saturation_current_A",
+          "unit": "A",
+          "description": "Finite nonzero signed ion-saturation current; magnitude is used after the caller has normalized polarity.",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "description": "Positive electron temperature in eV.",
+          "required": true
+        },
+        {
+          "name": "probe_area_m2",
+          "unit": "m^2",
+          "description": "Positive effective collection area for the selected geometry.",
+          "required": true
+        },
+        {
+          "name": "ion_mass_kg",
+          "unit": "kg",
+          "description": "Positive mass of the assumed ion species.",
+          "required": true
+        },
+        {
+          "name": "sheath_coefficient",
+          "unit": "1",
+          "description": "Positive coefficient from the explicitly identified sheath/Bohm model.",
+          "required": true
+        },
+        {
+          "name": "sigma_ion_saturation_current_A",
+          "unit": "A",
+          "description": "Optional absolute 1-sigma current uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_electron_temperature_eV",
+          "unit": "eV",
+          "description": "Optional 1-sigma temperature uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_probe_area_m2",
+          "unit": "m^2",
+          "description": "Optional 1-sigma effective area uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_ion_mass_kg",
+          "unit": "kg",
+          "description": "Optional 1-sigma ion mass uncertainty.",
+          "required": false
+        },
+        {
+          "name": "sigma_sheath_coefficient",
+          "unit": "1",
+          "description": "Optional 1-sigma sheath coefficient uncertainty.",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "ion_density_m3",
+          "unit": "m^-3",
+          "description": "Single-species model-based ion-density estimate."
+        },
+        {
+          "name": "uncertainty_ion_density_m3",
+          "unit": "m^-3",
+          "description": "First-order propagated standard uncertainty when all five independent input uncertainties are supplied."
+        }
+      ],
+      "prerequisites": [
+        "Selected ion branch must represent ion saturation; physical regime is not automatically certified."
+      ],
+      "uncertainty_model": "Optional independent input standard uncertainties propagated by first-order linearization; all five uncertainty inputs must be supplied together.",
+      "test_links": [
+        "tests/test_formula_registry_complete.py::test_langmuir_ion_density_from_saturation_reference"
+      ],
+      "note": "Published sheath/Bohm current-balance relation; model-based estimate only, not empirical validation."
+    },
+    "references": [
+      "Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5, Eqs. 3.2.33–3.2.37."
+    ]
   }
 ]
