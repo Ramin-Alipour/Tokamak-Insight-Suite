@@ -2814,7 +2814,7 @@ elif page=='Advanced Analysis':
                     if response_file is None:
                         raise ValueError('Upload the measured instrument-response matrix; an identity matrix must be supplied explicitly if justified.')
                     response_array=pd.read_csv(response_file,header=None).to_numpy(float)
-                    response=response_array[:,0] if response_array.shape[1]==1 else response_array
+                    response=response_array[:,0] if response_array.shape[1]==1 else (response_array[0,:] if response_array.shape[0]==1 else response_array)
                     response_unc=None if response_unc_file is None else pd.read_csv(response_unc_file,header=None).to_numpy(float)
                     kwargs={}
                     if model_label.startswith('Collective'):
