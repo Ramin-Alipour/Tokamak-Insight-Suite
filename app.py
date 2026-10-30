@@ -3055,7 +3055,7 @@ elif page=='Advanced Analysis':
                     ion_species=[{'name':name,'charge_state':charge,'mass_amu':mass} for name,charge,mass in zip(species_names,charges,masses)]
                     fast_ion=None
                     if cts_fast_mode=='Hot Maxwellian component':
-                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),'temperature_eV':float(cts_fast_temperature)}
+                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95),'temperature_eV':float(cts_fast_temperature)}
                     elif cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
                         if cts_fast_vdf_upload is None:
                             raise ValueError('Upload a two-column fast-ion VDF CSV.')
@@ -3063,7 +3063,7 @@ elif page=='Advanced Analysis':
                         if vdf.ndim!=2 or vdf.shape[1]!=2:
                             raise ValueError('Fast-ion VDF CSV must contain exactly two columns: velocity and probability density.')
                         fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),
-                            'velocity_m_s':vdf[:,0],'probability_density_m_s_inverse':vdf[:,1]}
+                            'velocity_m_s':vdf[:,0],'probability_density_m_s_inverse':vdf[:,1],\n                            'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95)}
                         if cts_fast_mode=='Fixed tabulated 1-D VDF':
                             fast_ion['kind']='tabulated_1d'
                         else:
