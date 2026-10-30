@@ -214,6 +214,7 @@ def test_custom_model_physical_mapper_emits_provenance_and_units():
         out=fit_custom_spectral_model(x,y,model_name=name)
         assert out["physical_inference"]["values"]["electron_temperature_eV"] == pytest.approx(256.0,rel=1e-5)
         assert out["physical_inference"]["contract"]["output_units"]["electron_temperature_eV"]=="eV"
-        assert out["physical_inference"]["status"]=="model_contract_mapped_not_independently_validated"
+        assert out["physical_inference"]["status"]=="model_contract_mapped_with_local_covariance_not_independently_validated"
+        assert out["physical_inference"]["uncertainties"]["electron_temperature_eV"] >= 0
     finally:
         unregister_spectral_model(name)
