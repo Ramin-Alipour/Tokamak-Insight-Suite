@@ -153,7 +153,7 @@ Single- and two-temperature exponential fits and the stretched-exponential empir
 
 ## Nonuniform-grid smoothing
 
-The smoothed derivative helper performs local polynomial least-squares fits using the actual voltage coordinate centered at each output sample. The odd window length is a number of neighboring distinct samples; the local polynomial is scaled by the actual local voltage span. First and second derivatives are obtained from fitted polynomial coefficients. Nonuniform voltage spacing is supported without treating sample index as a uniformly spaced voltage coordinate. Rank-deficient local windows are rejected.
+The smoothed derivative helper performs local polynomial least-squares fits using the actual voltage coordinate centered at each output sample. The odd window length is a number of neighboring distinct samples; the local polynomial is scaled by the actual local voltage span. First and second derivatives are obtained from fitted polynomial coefficients. Nonuniform voltage spacing is supported without treating sample index as a uniformly spaced voltage coordinate. The polynomial order must be at least two because the workflow reports second derivatives; rank-deficient local windows are rejected.
 
 ## Numerical fit-screen thresholds
 
