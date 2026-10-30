@@ -209,6 +209,22 @@ def _whitener(covariance, n, uncertainty):
     return lambda residual: residual / noise, np.diag(noise ** 2)
 
 
+def _trapezoid_node_weights(axis):
+    axis=np.asarray(axis,dtype=float)
+    weights=np.empty_like(axis)
+    weights[0]=0.5*(axis[1]-axis[0])
+    weights[-1]=0.5*(axis[-1]-axis[-2])
+    weights[1:-1]=0.5*(axis[2:]-axis[:-2])
+    return weights
+
+
+def _softmax(values):
+    z=np.asarray(values,dtype=float)
+    z=z-np.max(z)
+    e=np.exp(z)
+    return e/e.sum()
+
+
 def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness=1e-2):
     """Validate and regularize a non-negative tabulated 1-D fast-ion VDF."""
     v = _array(velocity_m_s, "fast-ion velocity grid", 1)
@@ -273,6 +289,16 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                                                 smoothness=fast_ion.get("smoothness",0.0))
             fast={"species_index":idx,"kind":"tabulated_1d","vdf":vdf}
             p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
+        elif fast_ion.get("kind")=="infer_tabulated_1d":
+            vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("initial_probability_density_m_s_inverse"),
+                                                smoothness=fast_ion.get("smoothness",1.0))
+            weights=_trapezoid_node_weights(vdf["velocity_m_s"])
+            masses=vdf["probability_density_m_s_inverse"]*weights
+            logits=np.log(np.maximum(masses[:-1],1e-12)/max(masses[-1],1e-12))
+            if inversion_method!="regularized" or regularization_strength<=0:
+                raise ValueError("infer_tabulated_1d fast-ion VDF requires regularized inversion with positive regularization_strength")
+            fast={"species_index":idx,"kind":"infer_tabulated_1d","vdf":vdf}
+            p0=np.r_[p0,fi,logits]; lo=np.r_[lo,flo,np.full(logits.size,-20.0)]; hi=np.r_[hi,fhi,np.full(logits.size,20.0)]
         else:
             tlo,thi=map(float,fast_ion.get("temperature_bounds_eV",(1e3,1e6)))
             ft=float(fast_ion.get("temperature_initial_eV",max(2e3,3*ion_temperature_initial_eV)))
@@ -318,10 +344,16 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     def decode(p):
         d={"electron_density_m3":10**p[0],"electron_temperature_eV":10**p[1],"ion_temperature_eV":10**p[2],"ion_velocity_projection_m_s":p[3]*us}
         if fast:
-            if fast["kind"]=="tabulated_1d":
+            if fast["kind"] in {"tabulated_1d","infer_tabulated_1d"}:
+                if fast["kind"]=="infer_tabulated_1d":
+                    masses=_softmax(np.r_[p[5:],0.0])
+                    weights=_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
+                    pdf=masses/weights
+                else:
+                    pdf=fast["vdf"]["probability_density_m_s_inverse"]
                 d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"kind":"tabulated_1d",
                     "velocity_m_s":fast["vdf"]["velocity_m_s"],
-                    "probability_density_m_s_inverse":fast["vdf"]["probability_density_m_s_inverse"],
+                    "probability_density_m_s_inverse":pdf,
                     "smoothness":fast["vdf"]["smoothness_parameter"]}
             else:
                 d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
@@ -346,7 +378,15 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     prior_scale=np.maximum(hi-lo,1e-12)
     def residual(p):
         data=data_residual(p)
-        return np.r_[data,np.sqrt(regularization_strength)*(p-p0)/prior_scale] if inversion_method=="regularized" else data
+        if inversion_method!="regularized": return data
+        penalties=[np.sqrt(regularization_strength)*(p-p0)/prior_scale]
+        if fast and fast["kind"]=="infer_tabulated_1d":
+            masses=_softmax(np.r_[p[5:],0.0])
+            pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
+            d2=np.diff(np.eye(pdf.size),n=2,axis=0)
+            scale=max(float(np.max(pdf)),np.finfo(float).tiny)
+            penalties.append(np.sqrt(regularization_strength)*np.sqrt(max(fast["vdf"]["smoothness_parameter"],1e-12))*(d2@pdf)/scale)
+        return np.r_[data,*penalties]
     score=None; genetic_history=None
     if global_search and inversion_method=="improved_genetic":
         start,score,genetic_history=_improved_genetic_search(
@@ -403,9 +443,15 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         names += ["fast_ion_fraction"]
         if fast["kind"]=="maxwellian":
             names += ["fast_ion_temperature_eV"]
-        else:
+        elif fast["kind"]=="tabulated_1d":
             out["fast_ion_vdf_provenance"]="externally supplied normalized tabulated 1-D velocity distribution; only its density fraction is inferred"
             out["fast_ion_vdf_regularization"]=fast["vdf"]
+        else:
+            names += [f"fast_ion_vdf_logit_{i}" for i in range(fast["vdf"]["velocity_m_s"].size-1)]
+            out["fast_ion_vdf_provenance"]="non-negative tabulated 1-D fast-ion VDF inferred from the CTS spectrum with a second-difference smoothness penalty"
+            out["fast_ion_vdf_velocity_m_s"]=fast["vdf"]["velocity_m_s"]
+            out["fast_ion_vdf_probability_density_m_s_inverse"]=d["fast_ion"]["probability_density_m_s_inverse"]
+            out["fast_ion_vdf_smoothness_parameter"]=fast["vdf"]["smoothness_parameter"]
         out["parameter_names"]=names
         out["fast_ion_fraction_uncertainty"]=float(total_sigma[4] if out.get("model_discrepancy_scale") is not None else su[4])
         if fast["kind"]=="maxwellian":
