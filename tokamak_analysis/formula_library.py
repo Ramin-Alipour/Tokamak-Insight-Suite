@@ -685,7 +685,7 @@ def langmuir_ion_density_from_saturation_current(
         coefficient * E_CHARGE * area * charge_state**1.5
         * math.sqrt(E_CHARGE * temperature / mass)
     )
-    out = {"ion_density_m3": density}
+    out = {"ion_density_m3": density, "ion_charge_state": int(charge_state)}
     sigmas = (
         sigma_ion_saturation_current_A, sigma_electron_temperature_eV,
         sigma_probe_area_m2, sigma_ion_mass_kg, sigma_sheath_coefficient,
