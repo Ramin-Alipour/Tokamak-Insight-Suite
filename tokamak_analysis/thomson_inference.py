@@ -1310,6 +1310,10 @@ def analyze_thomson_spectra(
                 channel_result["electron_density_joint_covariance_diagonal_m6"] = float(
                     density_joint_covariance_output[channel_index, channel_index]
                 )
+    density_cross_channel_covariance_available = bool(
+        density_joint_covariance_output is not None
+        and sum(result.get("electron_density_m3") is not None for result in results) >= 2
+    )
     output = {
         "model": model, "channel_count": len(results), "channels": results,
         "joint_inference": joint_summary,
@@ -1319,7 +1323,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
-        "electron_density_cross_channel_covariance_available": density_joint_covariance_output is not None,
+        "electron_density_cross_channel_covariance_available": density_cross_channel_covariance_available,
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
