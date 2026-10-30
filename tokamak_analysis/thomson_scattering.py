@@ -264,6 +264,7 @@ def reconstruct_thomson_profile(
     points=200,
     density_covariance_m3_2=None,
     temperature_covariance_eV2=None,
+    joint_density_temperature_covariance=None,
     uncertainty_mc_samples=200,
 ):
     """Reconstruct smooth radial ne/Te curves from spatially resolved measurements.
@@ -303,6 +304,27 @@ def reconstruct_thomson_profile(
 
     density_covariance_input = validate_covariance(density_covariance_m3_2, "density_covariance_m3_2")
     temperature_covariance_input = validate_covariance(temperature_covariance_eV2, "temperature_covariance_eV2")
+    joint_covariance_input = None
+    if joint_density_temperature_covariance is not None:
+        joint_covariance_input = np.asarray(joint_density_temperature_covariance, dtype=float)
+        expected_joint_shape = (2 * radius_original.size, 2 * radius_original.size)
+        if joint_covariance_input.shape != expected_joint_shape or not np.all(np.isfinite(joint_covariance_input)):
+            raise ValueError("joint_density_temperature_covariance must be a finite (2N x 2N) matrix ordered [density_0..N-1, temperature_0..N-1]")
+        if not np.allclose(joint_covariance_input, joint_covariance_input.T, rtol=1e-10, atol=1e-14):
+            raise ValueError("joint_density_temperature_covariance must be symmetric")
+        eigenvalues = np.linalg.eigvalsh(joint_covariance_input)
+        scale = max(1.0, float(np.max(np.abs(eigenvalues))))
+        if float(np.min(eigenvalues)) < -1e-10 * scale:
+            raise ValueError("joint_density_temperature_covariance must be positive semidefinite")
+        n_profile = radius_original.size
+        joint_density_block = joint_covariance_input[:n_profile, :n_profile]
+        joint_temperature_block = joint_covariance_input[n_profile:, n_profile:]
+        if density_covariance_input is not None and not np.allclose(density_covariance_input, joint_density_block, rtol=1e-6, atol=1e-24):
+            raise ValueError("density_covariance_m3_2 must match the density block of joint_density_temperature_covariance")
+        if temperature_covariance_input is not None and not np.allclose(temperature_covariance_input, joint_temperature_block, rtol=1e-6, atol=1e-24):
+            raise ValueError("temperature_covariance_eV2 must match the temperature block of joint_density_temperature_covariance")
+        density_covariance_input = joint_density_block
+        temperature_covariance_input = joint_temperature_block
     if density_covariance_input is not None:
         if density_uncertainty_m3 is None:
             density_uncertainty_m3 = np.sqrt(np.maximum(np.diag(density_covariance_input), 0.0))
@@ -320,6 +342,11 @@ def reconstruct_thomson_profile(
                           else np.diag(np.square(np.asarray(density_uncertainty_m3, dtype=float)[order])) if density_uncertainty_m3 is not None else None)
     temperature_covariance = (temperature_covariance_input[np.ix_(order, order)] if temperature_covariance_input is not None
                                else np.diag(np.square(np.asarray(temperature_uncertainty_ev, dtype=float)[order])) if temperature_uncertainty_ev is not None else None)
+    joint_covariance = None
+    if joint_covariance_input is not None:
+        n_profile = radius_original.size
+        joint_order = np.r_[order, n_profile + order]
+        joint_covariance = joint_covariance_input[np.ix_(joint_order, joint_order)]
 
     profile = build_profile(
         radius_original,
@@ -415,10 +442,57 @@ def reconstruct_thomson_profile(
             "upper_95": np.quantile(matrix, 0.975, axis=0),
         }
 
-    density_mc = profile_monte_carlo(profile.density_m3, density_covariance,
-                                     profile.density_uncertainty_m3, "density")
-    temperature_mc = profile_monte_carlo(profile.temperature_ev, temperature_covariance,
-                                         profile.temperature_uncertainty_ev, "temperature")
+    joint_mc = None
+    if joint_covariance is not None:
+        joint_samples = []
+        joint_values = np.r_[profile.density_m3, profile.temperature_ev]
+        for _ in range(int(uncertainty_mc_samples)):
+            try:
+                draw = rng.multivariate_normal(joint_values, joint_covariance, check_valid="raise")
+                density_draw, temperature_draw = draw[:r.size], draw[r.size:]
+                if np.any(density_draw < 0) or np.any(temperature_draw < 0):
+                    continue
+                density_reconstructed, _ = fit_channel(density_draw, profile.density_uncertainty_m3, "density")
+                temperature_reconstructed, _ = fit_channel(temperature_draw, profile.temperature_uncertainty_ev, "temperature")
+                if (not np.all(np.isfinite(density_reconstructed)) or
+                        not np.all(np.isfinite(temperature_reconstructed)) or
+                        np.any(density_reconstructed < 0) or np.any(temperature_reconstructed < 0)):
+                    continue
+                joint_samples.append(np.r_[density_reconstructed, temperature_reconstructed])
+            except (ValueError, RuntimeError, np.linalg.LinAlgError):
+                continue
+        if len(joint_samples) >= minimum_draws:
+            joint_matrix = np.asarray(joint_samples, dtype=float)
+            joint_reconstructed_covariance = np.cov(joint_matrix, rowvar=False, ddof=1)
+            density_matrix = joint_matrix[:, :grid.size]
+            temperature_matrix = joint_matrix[:, grid.size:]
+            joint_mc = {
+                "successful_draws": len(joint_samples),
+                "uncertainty_available": True,
+                "density_standard_uncertainty": np.std(density_matrix, axis=0, ddof=1),
+                "density_lower_95": np.quantile(density_matrix, 0.025, axis=0),
+                "density_upper_95": np.quantile(density_matrix, 0.975, axis=0),
+                "temperature_standard_uncertainty": np.std(temperature_matrix, axis=0, ddof=1),
+                "temperature_lower_95": np.quantile(temperature_matrix, 0.025, axis=0),
+                "temperature_upper_95": np.quantile(temperature_matrix, 0.975, axis=0),
+                "reconstructed_joint_covariance": joint_reconstructed_covariance,
+                "reconstructed_density_temperature_cross_covariance": joint_reconstructed_covariance[:grid.size, grid.size:],
+            }
+            density_mc = {"successful_draws": len(joint_samples), "uncertainty_available": True,
+                          "standard_uncertainty": joint_mc["density_standard_uncertainty"],
+                          "lower_95": joint_mc["density_lower_95"], "upper_95": joint_mc["density_upper_95"]}
+            temperature_mc = {"successful_draws": len(joint_samples), "uncertainty_available": True,
+                              "standard_uncertainty": joint_mc["temperature_standard_uncertainty"],
+                              "lower_95": joint_mc["temperature_lower_95"], "upper_95": joint_mc["temperature_upper_95"]}
+        else:
+            joint_mc = {"successful_draws": len(joint_samples), "uncertainty_available": False}
+            density_mc = {"successful_draws": len(joint_samples), "uncertainty_available": False}
+            temperature_mc = {"successful_draws": len(joint_samples), "uncertainty_available": False}
+    else:
+        density_mc = profile_monte_carlo(profile.density_m3, density_covariance,
+                                         profile.density_uncertainty_m3, "density")
+        temperature_mc = profile_monte_carlo(profile.temperature_ev, temperature_covariance,
+                                             profile.temperature_uncertainty_ev, "temperature")
 
     uncertainty_channels = {
         "density": (
@@ -464,16 +538,27 @@ def reconstruct_thomson_profile(
         "input_point_count": int(r.size),
         "reconstruction_point_count": int(grid.size),
         "radial_domain_m": (float(r[0]), float(r[-1])),
+        "reconstructed_joint_density_temperature_covariance": (
+            None if joint_mc is None or not joint_mc.get("uncertainty_available")
+            else joint_mc["reconstructed_joint_covariance"]
+        ),
+        "reconstructed_density_temperature_cross_covariance": (
+            None if joint_mc is None or not joint_mc.get("uncertainty_available")
+            else joint_mc["reconstructed_density_temperature_cross_covariance"]
+        ),
         "uncertainty_model": {
-            "assumption": "Supplied pointwise uncertainties are independent 1-sigma values.",
+            "assumption": ("Full joint density-temperature covariance is sampled together." if joint_covariance is not None
+                           else "Supplied pointwise uncertainties are independent 1-sigma values unless a channel-specific covariance is supplied."),
             "density_channel": uncertainty_channels["density"],
             "temperature_channel": uncertainty_channels["temperature"],
             "fit_confidence_intervals_estimated": bool((density_mc and density_mc.get("uncertainty_available")) or (temperature_mc and temperature_mc.get("uncertainty_available"))),
             "reconstructed_profile_uncertainty_available": bool((density_mc and density_mc.get("uncertainty_available")) or (temperature_mc and temperature_mc.get("uncertainty_available"))),
             "density_covariance_model": "full_correlated_covariance" if density_covariance_input is not None else "diagonal_independent" if density_covariance is not None else "not_supplied",
             "temperature_covariance_model": "full_correlated_covariance" if temperature_covariance_input is not None else "diagonal_independent" if temperature_covariance is not None else "not_supplied",
+            "joint_density_temperature_covariance_model": "full_joint_correlated_covariance" if joint_covariance_input is not None else "not_supplied",
             "density_mc_successful_draws": 0 if density_mc is None else density_mc["successful_draws"],
             "temperature_mc_successful_draws": 0 if temperature_mc is None else temperature_mc["successful_draws"],
+            "joint_density_temperature_mc_successful_draws": 0 if joint_mc is None else joint_mc["successful_draws"],
             "fit_weights_are_not_output_uncertainties": True,
             "systematic_and_model_uncertainties_estimated": False,
         },
@@ -483,7 +568,7 @@ def reconstruct_thomson_profile(
             "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
             "Negative spline overshoot is rejected rather than clipped; clipping would alter the fitted profile and its derivative. PCHIP is available when shape preservation is preferred.",
             "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
-            "When smoothing_factor is omitted, the smoothing spline selects its regularization parameter by generalized cross-validation. Supplied uncertainties determine fit weights; output uncertainty bands are estimated separately by Monte Carlo from the supplied pointwise or full covariance model.",
+            "When smoothing_factor is omitted, the smoothing spline selects its regularization parameter by generalized cross-validation. Supplied uncertainties determine fit weights; output uncertainty bands are estimated separately by Monte Carlo from the supplied pointwise, channel covariance or full joint density-temperature covariance model.",
         ],
     }
 
