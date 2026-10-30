@@ -892,6 +892,11 @@
           "name": "plasma_potential_d2IdV2_zero_crossing_uncertainty_status",
           "unit": "text",
           "description": "Explains whether current-noise uncertainty for second-derivative zero-crossing candidates was propagated, unresolved or not supplied."
+        },
+        {
+          "name": "numerical_fit_screen_thresholds",
+          "unit": "structured object",
+          "description": "The exact configurable R², normalized-RMSE and ion-flatness thresholds applied to this analysis; numerical screening only, not physical-regime criteria."
         }
       ],
       "assumptions": [
