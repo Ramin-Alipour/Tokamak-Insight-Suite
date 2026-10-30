@@ -126,3 +126,40 @@ def test_primary_analysis_family_lookup_rejects_invalid_ids():
         get_analysis_family(True)
     with pytest.raises(KeyError, match="Unknown primary-analysis family ID: 21"):
         get_analysis_family(21)
+
+
+def test_thomson_subanalysis_registry_links_are_semantically_correct():
+    from tokamak_analysis.analysis_registry import get_analysis, get_analysis_family
+
+    distribution = get_analysis(7)
+    cts = get_analysis(30)
+    profile = get_analysis(46)
+    assert (distribution["module"], distribution["function"]) == (
+        "thomson_distribution", "analyze_thomson_spectral_distribution_inference"
+    )
+    assert (cts["module"], cts["function"]) == ("cts_analysis", "analyze_cts_spectrum")
+    assert (profile["module"], profile["function"]) == (
+        "thomson_scattering", "reconstruct_thomson_profile"
+    )
+    assert get_analysis_family(1)["entry_ids"] == [1, 7, 30, 46]
+    assert callable(resolve_analysis(7))
+    assert callable(resolve_analysis(30))
+    assert callable(resolve_analysis(46))
+
+
+def test_thomson_formula_registry_contains_traceable_physical_relations():
+    import json
+    from pathlib import Path
+
+    registry = json.loads((Path(__file__).resolve().parents[1] / "FORMULA_REGISTRY.json").read_text())
+    thomson = [item for item in registry if "thomson" in item["name"].lower()]
+    keys = {item["execution_contract"]["formula_key"] for item in thomson}
+    assert {
+        "thomson_electron_temperature_from_spectral_width",
+        "thomson_velocity_projection",
+        "thomson_density_from_scattered_power",
+    } <= keys
+    for item in thomson:
+        contract = item["execution_contract"]
+        assert contract["implementation_link_status"] == "mapped"
+        assert contract["function_link"].startswith("tokamak_analysis.")
