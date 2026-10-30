@@ -13,7 +13,7 @@ ANALYSES = [{
     "execution_contract": {
         "schema_version": "1.0",
         "execution_level": "analysis_pipeline",
-        "completeness": "implemented_with_declared_model_limits",
+        "completeness": "complete_with_declared_scope",
         "input_specs":             [
                 {
                     "name": "wavelength_nm",
