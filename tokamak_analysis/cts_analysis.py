@@ -236,7 +236,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=0.,
     fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
-    regularization_strength=0.0):
+    regularization_strength=0.0, external_parameter_uncertainties=None):
     """Infer ne, Te, Ti and ion-flow projection with DE global initialization and bounded least squares."""
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); y=_array(spectrum,"spectrum",1)
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
@@ -298,6 +298,21 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     response_sigma=None if instrument_response_uncertainty is None else _array(instrument_response_uncertainty,"instrument_response_uncertainty",2)
     if response_sigma is not None and (response_sigma.shape!=response.shape or np.any(response_sigma<0)):
         raise ValueError("instrument_response_uncertainty must match the response matrix and be non-negative")
+    ext_unc=external_parameter_uncertainties or {}
+    if not isinstance(ext_unc,Mapping):
+        raise ValueError("external_parameter_uncertainties must be a mapping")
+    allowed_external={"probe_frequency_Hz","electron_velocity_projection_m_s","scattering_angle_rad","ion_fractions"}
+    if set(ext_unc)-allowed_external:
+        raise ValueError(f"unsupported external uncertainty keys: {sorted(set(ext_unc)-allowed_external)}")
+    for key,value in ext_unc.items():
+        if key=="ion_fractions":
+            arr=_array(value,"ion_fractions uncertainty",1)
+            if arr.shape!=(len(ions),) or np.any(arr<0):
+                raise ValueError("ion_fractions uncertainty must be a non-negative vector matching ion species")
+        else:
+            _positive(value,key+" uncertainty")
+    if "scattering_angle_rad" in ext_unc and ("incident_direction" in scattering_geometry or "scattered_direction" in scattering_geometry):
+        raise ValueError("scattering_angle_rad uncertainty requires scalar-angle geometry, not fixed beam-direction vectors")
     if isinstance(response_mc_samples,bool) or not isinstance(response_mc_samples,(int,np.integer)) or response_mc_samples<20:
         raise ValueError("response_mc_samples must be an integer >= 20")
     def decode(p):
@@ -311,19 +326,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             else:
                 d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
         return d
-    def forward(p, response_matrix=None):
-        d=decode(p); z=cts_spectral_density(f,f0,scattering_geometry,electron_density_m3=d["electron_density_m3"],
+    def forward(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
+        d=decode(p); z=cts_spectral_density(f,f0 if probe_frequency is None else probe_frequency,
+          scattering_geometry if geometry_override is None else geometry_override,electron_density_m3=d["electron_density_m3"],
           electron_temperature_eV=d["electron_temperature_eV"],ion_temperature_eV=d["ion_temperature_eV"],
-          ion_species=ion_species,ion_fractions=ion_fractions,ion_velocity_projection_m_s=d["ion_velocity_projection_m_s"],
-          electron_velocity_projection_m_s=electron_velocity_projection_m_s,fast_ion=d.get("fast_ion"))
+          ion_species=ion_species,ion_fractions=ion_fractions if fractions_override is None else fractions_override,
+          ion_velocity_projection_m_s=d["ion_velocity_projection_m_s"],
+          electron_velocity_projection_m_s=electron_velocity_projection_m_s if electron_flow is None else electron_flow,
+          fast_ion=d.get("fast_ion"))
         return _convolve(response if response_matrix is None else response_matrix,z,f)
     def profile_amplitude(z):
         A=whiten(np.column_stack((z,np.ones_like(z))))
         amp,off=np.linalg.lstsq(A,whiten(y),rcond=None)[0]
         if amp<0: amp,off=0.,float(np.mean(y))
         return amp,off
-    def data_residual(p, response_matrix=None):
-        z=forward(p,response_matrix); amp,off=profile_amplitude(z)
+    def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
+        z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override); amp,off=profile_amplitude(z)
         return whiten(amp*z+off-y)
     prior_scale=np.maximum(hi-lo,1e-12)
     def residual(p):
@@ -376,19 +394,34 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["fast_ion_fraction_uncertainty"]=float(su[4])
         if fast["kind"]=="maxwellian":
             out["fast_ion_temperature_uncertainty_eV"]=float(su[5])
-    if response_sigma is not None:
+    if response_sigma is not None or ext_unc:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
         for _ in range(int(response_mc_samples)):
-            sampled=np.maximum(response+rng.normal(0.0,response_sigma),0.0)
-            sums=sampled.sum(axis=0)
-            if np.any(sums<=0): continue
-            sampled/=sums[None,:]
+            sampled=response
+            if response_sigma is not None:
+                sampled=np.maximum(response+rng.normal(0.0,response_sigma),0.0)
+                sums=sampled.sum(axis=0)
+                if np.any(sums<=0): continue
+                sampled=sampled/sums[None,:]
+            sampled_f0=f0+rng.normal(0.0,float(ext_unc.get("probe_frequency_Hz",0.0)))
+            sampled_electron_flow=electron_velocity_projection_m_s+rng.normal(0.0,float(ext_unc.get("electron_velocity_projection_m_s",0.0)))
+            sampled_geometry=scattering_geometry
+            if "scattering_angle_rad" in ext_unc:
+                sampled_geometry=dict(scattering_geometry)
+                sampled_geometry["scattering_angle_rad"]=float(scattering_geometry["scattering_angle_rad"])+rng.normal(0.0,float(ext_unc["scattering_angle_rad"]))
+                if not 0<sampled_geometry["scattering_angle_rad"]<=np.pi: continue
+            sampled_fractions=ion_fractions
+            if "ion_fractions" in ext_unc:
+                sampled_fractions=np.maximum(np.asarray(ion_fractions,dtype=float)+rng.normal(0.0,np.asarray(ext_unc["ion_fractions"],dtype=float)),1e-12)
+                sampled_fractions=sampled_fractions/sampled_fractions.sum()
+            if sampled_f0<=0 or abs(sampled_electron_flow)>=C: continue
             try:
-                draw=least_squares(lambda p: data_residual(p,sampled),fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
+                draw=least_squares(lambda p: data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions),
+                    fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
                 if draw.success and np.all(np.isfinite(draw.x)): draws.append(draw.x)
             except (ValueError,RuntimeError,np.linalg.LinAlgError):
                 continue
-        out["response_mc_successes"]=len(draws); out["response_mc_requested"]=int(response_mc_samples)
+        out["response_external_mc_successes"]=len(draws); out["response_external_mc_requested"]=int(response_mc_samples)
         if len(draws)>=max(12,int(np.ceil(.7*response_mc_samples))):
             response_cov=np.cov(np.asarray(draws),rowvar=False,ddof=1)
             out["response_parameter_covariance"]=trans@response_cov@trans.T
@@ -402,10 +435,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 out["fast_ion_fraction_uncertainty"]=float(total[4])
                 if fast["kind"]=="maxwellian":
                     out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
-            out["response_uncertainty_propagated"]=True
+            out["response_uncertainty_propagated"]=response_sigma is not None
+            out["external_parameter_uncertainty_propagated"]=bool(ext_unc)
         else:
             out["response_uncertainty_propagated"]=False
-            out["response_uncertainty_warning"]="Too few successful response-perturbation refits; no Monte Carlo contribution was added."
+            out["external_parameter_uncertainty_propagated"]=False
+            out["response_uncertainty_warning"]="Too few successful response/external perturbation refits; no Monte Carlo contribution was added."
     else:
         out["response_uncertainty_propagated"]=False
+        out["external_parameter_uncertainty_propagated"]=False
     return out
