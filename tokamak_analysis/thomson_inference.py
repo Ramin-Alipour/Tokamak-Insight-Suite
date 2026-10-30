@@ -1154,7 +1154,9 @@ def analyze_thomson_spectra(
             )
             physical_indices = [te_index, velocity_index]
             fit["physical_parameter_covariance"] = physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
-            fit["model_discrepancy_covariance"] = discrepancy_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["model_discrepancy_covariance"] = (discrepancy_scale * block).copy()
+            fit["model_discrepancy_physical_parameter_covariance"] = discrepancy_covariance[np.ix_(physical_indices, physical_indices)].copy()
+            fit["total_fit_covariance_including_discrepancy"] = block + discrepancy_scale * block
             fit["total_physical_parameter_covariance"] = total_physical_covariance[np.ix_(physical_indices, physical_indices)].copy()
             fit["model_discrepancy_scale"] = float(discrepancy_scale)
             fit["model_discrepancy_diagnostics"] = {
