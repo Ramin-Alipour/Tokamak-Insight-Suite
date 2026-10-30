@@ -2,258 +2,244 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "Calibrated electron-density and electron-temperature profiles; profile minima and maxima with locations; measured-interval line averages; radial gradients; normalized gradients; local scale lengths; optional independent-error uncertainty propagation; within-domain profile reconstruction.",
+    "quantities": "Per-channel electron temperature and electron-flow projection with uncertainties from measured full Thomson spectra; absolute electron density and uncertainty where spectral intensity and optical geometry identify it; multi-channel radial profiles; fit residuals and model diagnostics.",
     "status": "D",
-    "method": "Analyze already-calibrated electron-density and electron-temperature profiles on supplied calibrated spatial coordinates. Compute extrema, measured-interval line averages, numerical gradients, normalized gradients, local scale lengths and optional independent-error uncertainties; optionally reconstruct profiles only inside the measured coordinate interval.",
-    "caveat": "Inputs are assumed calibrated and correctly organized. The supplied coordinate is a data coordinate, not an inferred machine dimension. No optical-geometry inversion, geometry-weighted volume average, raw-spectrum fitting, or absolute density inversion is part of Analysis 1. Numerical derivatives can amplify noise; uncertainty propagation assumes independent pointwise errors. No independent experimental validation is claimed.",
+    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa, projected relativistic Maxwell-Juttner and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
+    "caveat": "Input spectra and wavelength axes are assumed measured and calibrated; detector calibration is outside scope. Absolute density cannot be inferred from spectral shape alone. Missing ion temperatures are not silently assumed in collective mode. The relativistic option is a 1-D projected Maxwell-Juttner approximation, not full 3-D relativistic photon-geometry integration. No independent experimental validation is claimed.",
     "implementation_functions": [
+      "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+      "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Complete within the declared geometry-independent scope: calibrated profile analysis and within-domain reconstruction. Raw-spectrum fitting and scattered-power density inversion are excluded from Analysis 1. Software completeness does not imply experimental validation.",
+    "implementation_status": "Primary multi-channel spectral inference engine and UI are connected through the registered Thomson workflow. Non-collective Maxwellian/kappa/projected-relativistic models, optional PlasmaPy collective Maxwellian model, measured LSF convolution, LSF uncertainty propagation, polarization-aware absolute density and downstream profile utilities are implemented with explicit limitations. Automated tests are software regression tests, not experimental validation.",
     "execution_contract": {
-      "schema_version": "1.0",
-      "execution_level": "analysis_pipeline",
-      "completeness": "complete_with_declared_scope",
+      "schema_version": "2.0",
+      "execution_level": "multi_channel_spectral_inference",
+      "completeness": "implemented_with_declared_model_limits",
       "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true,
+          "description": "Calibrated wavelength axis shared across channels or supplied per channel."
+        },
+        {
+          "name": "spectra",
+          "unit": "calibrated spectral intensity",
+          "required": true,
+          "description": "Measured full spectra with shape (channel,wavelength); not pre-extracted ne/Te profiles."
+        },
         {
           "name": "radius_m",
           "unit": "m",
-          "description": "Mode-specific: unique radial coordinate for calibrated_profile.",
+          "required": true,
+          "description": "Calibrated spatial coordinate for each spectral channel."
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
           "required": true
         },
         {
-          "name": "density_m3",
-          "unit": "m^-3",
-          "description": "Mode-specific: calibrated electron-density profile for calibrated_profile.",
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "normalized response matrix",
           "required": true,
-          "minimum": 0
+          "description": "Required measured response: callable, 1-D kernel, 2-D matrix or channel-specific 3-D matrix; identity matrix must be explicitly justified."
         },
         {
-          "name": "temperature_ev",
-          "unit": "eV",
-          "description": "Mode-specific: calibrated electron-temperature profile for calibrated_profile.",
-          "required": true,
-          "minimum": 0
-        },
-        {
-          "name": "density_uncertainty_m3",
-          "unit": "m^-3",
-          "description": "Mode-specific: optional pointwise 1-sigma calibrated electron-density uncertainty for profile analysis or spatial reconstruction.",
-          "required": false,
-          "minimum": 0
-        },
-        {
-          "name": "temperature_uncertainty_ev",
-          "unit": "eV",
-          "description": "Mode-specific: optional pointwise 1-sigma calibrated electron-temperature uncertainty for profile analysis or spatial reconstruction.",
-          "required": false,
-          "minimum": 0
-        },
-        {
-          "name": "reconstruction_method",
-          "unit": "text",
-          "description": "Mode-specific: spatial profile reconstruction method; smoothing_spline or pchip.",
+          "name": "signal_uncertainty",
+          "unit": "same as spectra",
           "required": false
         },
         {
-          "name": "smoothing_factor",
-          "unit": "dimensionless",
-          "description": "Mode-specific: non-negative smoothing-spline residual target factor; ignored by PCHIP.",
+          "name": "model",
+          "unit": "text",
           "required": false,
-          "minimum": 0
+          "description": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian."
         },
         {
-          "name": "reconstruction_points",
-          "unit": "integer",
-          "description": "Mode-specific: number of radial grid points for spatial profile reconstruction, from 20 through 5000.",
+          "name": "ion_species",
+          "unit": "species list",
           "required": false,
-          "minimum": 20,
-          "maximum": 5000
+          "description": "Explicit species list for collective inference."
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Explicit ion number fractions; required for multiple ion species and must sum to one."
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "required": false,
+          "description": "Independent ion-temperature measurements; required by the current collective backend."
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s^-1",
+          "required": false,
+          "description": "Required in collective mode: independently measured ion flow vectors or explicit zero vectors declaring stationary ions."
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1",
+          "required": false,
+          "description": "Required in collective mode: independently measured electron-fluid flow vector or explicit zero vector declaring stationary electrons."
+        },
+        {
+          "name": "absolute_density_geometry",
+          "unit": "structured",
+          "required": false,
+          "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident beam direction, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density."
+        },
+        {
+          "name": "instrument_response_uncertainty",
+          "unit": "response-matrix 1-sigma",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad",
+          "required": false
+        },
+        {
+          "name": "laser_power_uncertainty_W",
+          "unit": "W",
+          "required": false
+        },
+        {
+          "name": "interaction_length_uncertainty_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_uncertainty_sr",
+          "unit": "sr",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency_uncertainty",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "polarization_factor_uncertainty",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Incident beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Scattered beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
         }
       ],
       "output_specs": [
         {
-          "name": "radius_m",
-          "unit": "m",
-          "description": "Supplied calibrated spatial coordinate for the measured profile; not inferred from machine geometry."
+          "name": "electron_temperature_profile_eV",
+          "unit": "eV"
         },
         {
-          "name": "density_m3",
+          "name": "electron_density_profile_m3",
           "unit": "m^-3",
-          "description": "Calibrated electron-density profile supplied by the user."
+          "description": "Only where identifiable from selected model and supplied calibration/geometry."
         },
         {
-          "name": "temperature_eV",
-          "unit": "eV",
-          "description": "Calibrated electron-temperature profile supplied by the user."
+          "name": "electron_velocity_projection_profile_m_s",
+          "unit": "m s^-1"
         },
         {
-          "name": "density_gradient_m-4",
-          "unit": "m^-4",
-          "description": "Numerical radial derivative of electron density."
-        },
-        {
-          "name": "temperature_gradient_eV_m-1",
-          "unit": "eV m^-1",
-          "description": "Numerical radial derivative of electron temperature."
-        },
-        {
-          "name": "density_scale_length_m",
-          "unit": "m",
-          "description": "Local -n_e/(dn_e/dr); undefined values are NaN."
-        },
-        {
-          "name": "temperature_scale_length_m",
-          "unit": "m",
-          "description": "Local -T_e/(dT_e/dr); undefined values are NaN."
-        },
-        {
-          "name": "summary",
+          "name": "channels",
           "unit": "structured",
-          "description": "Minimum and maximum density and temperature values with their supplied-coordinate locations, radial range, and measured-interval line averages; no geometry-weighted volume averages."
+          "description": "Per-channel fit, residuals, covariance, assumptions and provenance."
         },
         {
-          "name": "density_gradient_uncertainty_m-4",
-          "unit": "m^-4",
-          "description": "First-order uncertainty of the numerical density gradient from independent pointwise density uncertainties."
+          "name": "electron_temperature_uncertainty_profile_eV",
+          "unit": "eV"
         },
         {
-          "name": "temperature_gradient_uncertainty_eV_m-1",
-          "unit": "eV m^-1",
-          "description": "First-order uncertainty of the numerical temperature gradient from independent pointwise temperature uncertainties."
+          "name": "electron_density_uncertainty_profile_m3",
+          "unit": "m^-3"
         },
         {
-          "name": "density_scale_length_uncertainty_m",
-          "unit": "m",
-          "description": "First-order uncertainty of local density scale length; NaN where the scale length is undefined."
-        },
-        {
-          "name": "temperature_scale_length_uncertainty_m",
-          "unit": "m",
-          "description": "First-order uncertainty of local temperature scale length; NaN where the scale length is undefined."
-        },
-        {
-          "name": "density_normalized_gradient_uncertainty_m-1",
-          "unit": "m^-1",
-          "description": "First-order uncertainty of the normalized density gradient under independent pointwise measurement errors."
-        },
-        {
-          "name": "temperature_normalized_gradient_uncertainty_m-1",
-          "unit": "m^-1",
-          "description": "First-order uncertainty of the normalized temperature gradient under independent pointwise measurement errors."
-        },
-        {
-          "name": "density_normalized_gradient_m-1",
-          "unit": "m^-1",
-          "description": "Radial density gradient normalized by density; NaN where density is zero."
-        },
-        {
-          "name": "temperature_normalized_gradient_m-1",
-          "unit": "m^-1",
-          "description": "Radial temperature gradient normalized by temperature; NaN where temperature is zero."
-        },
-        {
-          "name": "reconstructed_radius_m",
-          "unit": "m",
-          "description": "Radial grid spanning only the measured input interval."
-        },
-        {
-          "name": "reconstructed_density_m3",
-          "unit": "m^-3",
-          "description": "Non-negative reconstructed electron-density profile on the output radial grid."
-        },
-        {
-          "name": "reconstructed_temperature_eV",
-          "unit": "eV",
-          "description": "Non-negative reconstructed electron-temperature profile on the output radial grid."
-        },
-        {
-          "name": "reconstruction_method",
-          "unit": "text",
-          "description": "Method used for spatial profile reconstruction: smoothing_spline or pchip."
-        },
-        {
-          "name": "reconstruction_gradients",
-          "unit": "structured",
-          "description": "Radial derivatives of the reconstructed density and temperature profiles."
-        },
-        {
-          "name": "reconstruction_domain_m",
-          "unit": "pair of m",
-          "description": "Minimum and maximum measured radius; no extrapolation is performed."
+          "name": "electron_velocity_projection_uncertainty_profile_m_s",
+          "unit": "m s^-1"
         }
       ],
       "assumptions": [
-        "Electron-density and electron-temperature profile values are already calibrated and expressed in the declared units.",
-        "The supplied one-dimensional spatial coordinate is calibrated, finite, unique, and expressed in metres; it is not inferred from device dimensions or geometry.",
-        "Pointwise uncertainty propagation assumes independent samples and is performed only when corresponding uncertainties are supplied."
+        "Input spectra and wavelength axes are measured and calibrated; calibration is not performed by Analysis 1.",
+        "Spatial coordinates are supplied for each measured channel.",
+        "Non-collective Maxwellian model assumes isotropic non-relativistic Maxwellian electrons.",
+        "Collective Maxwellian model requires explicit ion species and ion temperatures; missing values are not silently inferred.",
+        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
+        "Collective-mode flow vectors and incident/scattered beam directions are expressed in one explicitly supplied coordinate frame; no canonical beam orientation is assumed."
       ],
       "preprocessing": [
-        "Validate finite values, matching lengths, unique coordinates, non-negative density/temperature and optional uncertainties; sort all profile channels consistently."
+        "Validate channel-by-wavelength arrays and strictly increasing wavelength axes.",
+        "Convolve the physical spectrum with the supplied instrument-response matrix."
       ],
-      "algorithm": "Core analysis: validate calibrated density/temperature profiles and supplied calibrated coordinates; calculate profile extrema, measured-interval line averages, finite-difference gradients, normalized gradients, local scale lengths and optional independent-error uncertainty propagation. Optional reconstruction is restricted to the measured coordinate interval with no extrapolation.",
-      "uncertainty_model": "Optional pointwise profile uncertainties are propagated through line averages, finite-difference gradients, normalized gradients and local scale lengths assuming independent samples. Peak-location uncertainty, covariance between samples, calibration uncertainty, and model discrepancy are not estimated.",
+      "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported velocity projection; infer absolute density only when calibrated spectral power and optical geometry are supplied.",
+      "uncertainty_model": "Non-collective fit covariance and supplied LSF uncertainty are propagated; absolute-density uncertainty includes only supplied independent uncertainty terms. Collective parameter covariance and correlated spectral/geometry uncertainties remain limitations.",
       "limitations": [
-        "All input profiles and coordinates must already be calibrated; Analysis 1 does not perform instrument calibration.",
-        "The analysis uses only the supplied coordinate and profile values; it does not infer machine dimensions, optical geometry, or geometry-weighted volume averages.",
-        "Line averages and derivatives apply only to the measured coordinate interval and do not imply full-plasma coverage or extrapolate to unmeasured regions.",
-        "Numerical gradients can amplify measurement noise.",
-        "Uncertainty propagation assumes independent pointwise errors and excludes covariance, calibration uncertainty, and model discrepancy.",
-        "No independent experimental validation is claimed."
+        "Full 3-D relativistic photon-geometry integration is not implemented; the relativistic option uses a 1-D projected Maxwell-Juttner approximation.",
+        "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
+        "The kappa model is a parameterized isotropic non-Maxwellian approximation, not arbitrary VDF inversion.",
+        "Absolute density is not identifiable from spectral shape alone.",
+        "No independent experimental validation is claimed.",
+        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
+        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle."
       ],
       "function_links": [
+        "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
         "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
       ],
-      "raw_data_to_physics": false,
-      "note": "Analysis 1 accepts already-calibrated density and temperature profiles plus their supplied calibrated spatial coordinate. Raw-spectrum fitting and scattered-power density inversion are outside this analysis contract. No independent experimental validation is claimed.",
+      "raw_data_to_physics": true,
+      "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Calibrated-profile routines remain downstream utilities. No detector calibration or independent experimental validation is performed.",
       "workflow_modes": [
         {
-          "name": "calibrated_profile",
-          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+          "name": "multi_channel_spectral_inference",
+          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
           "inputs": [
-            "radius_m (m)",
-            "density_m3 (m^-3)",
-            "temperature_ev (eV)"
+            "wavelength_nm",
+            "spectra (channel × wavelength)",
+            "radius_m",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "instrument_response",
+            "optional signal uncertainties",
+            "optional ion species/temperature/velocity inputs",
+            "optional absolute-density geometry"
           ],
           "outputs": [
-            "density and temperature profiles",
-            "radial gradients",
-            "normalized gradients",
-            "local scale lengths",
-            "profile summary"
+            "electron_temperature_profile_eV",
+            "electron_density_profile_m3 where identifiable",
+            "electron_velocity_projection_profile_m_s",
+            "per-channel fit diagnostics"
           ],
-          "scope": "Core mode: processes already-calibrated density and temperature profiles on supplied calibrated coordinates; no machine dimensions, optical geometry, or geometry-weighted averages are inferred."
-        },
-        {
-          "name": "spatial_profile_reconstruction",
-          "function": "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile",
-          "inputs": [
-            "radius_m (m)",
-            "density_m3 (m^-3; calibrated)",
-            "temperature_ev (eV; calibrated)",
-            "optional pointwise 1-sigma uncertainties",
-            "method: smoothing_spline or pchip",
-            "smoothing_factor and output grid size"
-          ],
-          "outputs": [
-            "reconstructed_radius_m (m)",
-            "reconstructed_density_m3 (m^-3)",
-            "reconstructed_temperature_eV (eV)",
-            "radial gradients",
-            "method metadata",
-            "measured radial domain",
-            "limitations"
-          ],
-          "scope": "Core mode: reconstructs already-calibrated profiles only within the measured coordinate interval; no extrapolation or device geometry model."
+          "scope": "Primary end-to-end physical inference from measured calibrated spectra; no detector calibration or experimental validation."
         }
       ],
-      "test_links": [
-        "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients",
-        "tests/test_thomson_workflow.py::test_thomson_workflow_preserves_sorted_uncertainties"
-      ],
-      "completion_scope": "Calibrated profile analysis and within-domain reconstruction only. No machine dimensions, optical collection geometry, geometry-weighted volume averages, raw-spectrum fitting, scattered-power density inversion, or independent experimental validation."
+      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
     }
   },
   {
