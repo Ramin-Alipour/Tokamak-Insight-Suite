@@ -2635,7 +2635,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.langmuir_advanced.estimate_multispecies_ion_density",
+      "function_link": "tokamak_analysis.formula_library.langmuir_multispecies_ion_density",
       "formula_key": "langmuir_multispecies_ion_density",
       "input_specs": [
         {
@@ -2700,49 +2700,54 @@
       ],
       "output_specs": [
         {
-          "name": "ion_density_estimate_m-3",
+          "name": "ion_density_m3",
           "unit": "m^-3",
           "description": "Species-summed model-based total ion density."
         },
         {
-          "name": "ion_density_standard_uncertainty_m-3",
-          "unit": "m^-3",
-          "description": "Partial independent-input propagated standard uncertainty when explicit components are supplied; otherwise null."
-        },
-        {
-          "name": "ion_density_relative_standard_uncertainty",
-          "unit": "fraction",
-          "description": "Relative partial standard uncertainty."
-        },
-        {
-          "name": "ion_density_uncertainty_components_relative",
-          "unit": "structured",
-          "description": "Relative uncertainty components explicitly included in propagation."
-        },
-        {
-          "name": "ion_density_uncertainty_omitted_components",
-          "unit": "list",
-          "description": "Components not propagated, including species number-density fraction covariance."
-        },
-        {
-          "name": "ion_density_uncertainty_scope",
-          "unit": "text",
-          "description": "Partial independent-input propagation scope; species fractions are held fixed."
-        },
-        {
           "name": "ion_species",
           "unit": "structured",
-          "description": "Normalized species parameters and number-density fractions."
+          "description": "Normalized species parameters, including supplied mass and sheath-coefficient uncertainty inputs."
+        },
+        {
+          "name": "ion_species_fraction_sum",
+          "unit": "fraction",
+          "description": "Validated sum of number-density fractions."
+        },
+        {
+          "name": "uncertainty_ion_density_m3",
+          "unit": "m^-3",
+          "description": "Partial first-order independent-input standard uncertainty when explicit components are supplied; otherwise null."
+        },
+        {
+          "name": "uncertainty_relative_ion_density",
+          "unit": "fraction",
+          "description": "Relative partial standard uncertainty; null when no uncertainty inputs are supplied."
+        },
+        {
+          "name": "uncertainty_components_relative",
+          "unit": "structured",
+          "description": "Relative uncertainty components included in the propagation."
+        },
+        {
+          "name": "uncertainty_omitted_components",
+          "unit": "list",
+          "description": "Uncertainty terms not propagated, including species number-density fraction covariance."
+        },
+        {
+          "name": "uncertainty_species_weights",
+          "unit": "structured",
+          "description": "Species denominator weight fractions used to propagate species mass and sheath-coefficient uncertainties."
         },
         {
           "name": "uncertainty_propagation_performed",
           "unit": "boolean",
-          "description": "Whether any explicit independent uncertainty components were propagated."
+          "description": "Whether at least one explicit independent uncertainty component was propagated."
         },
         {
           "name": "uncertainty_status",
           "unit": "text",
-          "description": "Explicit status distinguishing partial propagation from no supplied uncertainties."
+          "description": "Explicit status distinguishing partial propagation from no supplied uncertainty inputs."
         }
       ],
       "prerequisites": [
