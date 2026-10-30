@@ -1809,9 +1809,11 @@ elif page=='Probe Analysis':
         if needs_electron_window and not advanced_window_valid:
             st.info(f'Select a valid electron-retarding interval containing at least {advanced_min_points} distinct calibrated voltage values before running this model.')
         if advanced_method=='Smoothed derivative candidates':
+            max_sg_window=int(min(101,distinct_paired_voltage.size-(1 if distinct_paired_voltage.size%2==0 else 0)))
             sg1,sg2=st.columns(2)
-            with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
-            with sg2: sg_order=st.number_input('Polynomial order (at least 2 for d²I/dV²)',min_value=2,max_value=6,value=2,key='probe_sg_order')
+            with sg1: sg_window=st.number_input('Local-polynomial window (odd distinct samples)',min_value=5,max_value=max_sg_window,value=min(7,max_sg_window),step=2,key='probe_sg_window')
+            max_sg_order=min(6,int(sg_window)-1)
+            with sg2: sg_order=st.number_input('Polynomial order (at least 2 for d²I/dV²)',min_value=2,max_value=max_sg_order,value=min(2,max_sg_order),key='probe_sg_order')
         if st.button('Run selected advanced analysis',key='probe_run_advanced',disabled=bool(needs_electron_window and not advanced_window_valid)):
             try:
                 if advanced_model=='two_temperature':
