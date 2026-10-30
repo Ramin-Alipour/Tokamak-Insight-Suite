@@ -2771,9 +2771,11 @@ elif page=='Advanced Analysis':
                     )
                     summary=profile['summary']
                     st.success('Calibrated Thomson profile analysis completed.')
-                    metric_cols=st.columns(2)
-                    metric_cols[0].metric('Peak electron density',f"{summary.density_peak_m3:.4g} m⁻³")
-                    metric_cols[1].metric('Peak electron temperature',f"{summary.temperature_peak_ev:.4g} eV")
+                    metric_cols=st.columns(4)
+                    metric_cols[0].metric('Minimum electron density',f"{summary.density_min_m3:.4g} m⁻³")
+                    metric_cols[1].metric('Maximum electron density',f"{summary.density_peak_m3:.4g} m⁻³")
+                    metric_cols[2].metric('Minimum electron temperature',f"{summary.temperature_min_ev:.4g} eV")
+                    metric_cols[3].metric('Maximum electron temperature',f"{summary.temperature_peak_ev:.4g} eV")
                     profile_frame=pd.DataFrame({
                         'Radius (m)':profile['radius_m'],
                         'Electron density (m⁻³)':profile['density_m3'],
