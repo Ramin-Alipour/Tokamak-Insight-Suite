@@ -286,13 +286,13 @@
         {
           "name": "voltage_V",
           "unit": "V",
-          "description": "One-dimensional calibrated voltage sweep; at least eight distinct finite values are required across all public Langmuir entry points.",
+          "description": "Calibrated voltage data: (samples,) for one sweep; (samples,) shared with (channels,samples) currents; matching (channels,samples) matrices; or shared (samples,) / matching (time,channels,samples) voltage for series. See input_modes for the complete shape contract.",
           "required": true
         },
         {
           "name": "current_A",
           "unit": "A",
-          "description": "Current samples aligned with voltage_V. The routine filters non-finite pairs and averages duplicate voltage values.",
+          "description": "Calibrated current data: (samples,), (channels,samples), or (time,channels,samples) according to the selected input mode; duplicate voltages are averaged independently per sweep.",
           "required": true
         },
         {
@@ -458,6 +458,13 @@
           "unit": "mapping",
           "description": "Optional keyword options forwarded independently to the canonical calibrated single-sweep analysis for each channel/time slice.",
           "required": false
+        },
+        {
+          "name": "allow_density_when_numerical_screen_fails",
+          "unit": "boolean",
+          "description": "Explicit opt-in to calculate a provisional density when one or more configurable numerical review screens fail; never confirms a physical regime.",
+          "required": false,
+          "default": false
         }
       ],
       "output_specs": [
@@ -915,6 +922,31 @@
           "name": "numerical_fit_screen_thresholds",
           "unit": "structured object",
           "description": "The exact configurable R², normalized-RMSE and ion-flatness thresholds applied to this analysis; numerical screening only, not physical-regime criteria."
+        },
+        {
+          "name": "ion_density_numerical_screen_override_used",
+          "unit": "boolean",
+          "description": "True only when the caller explicitly bypasses a failed numerical review screen to obtain a provisional model-based density."
+        },
+        {
+          "name": "time_count",
+          "unit": "count",
+          "description": "Number of time slices in a (time,channels,samples) series."
+        },
+        {
+          "name": "sample_count_per_sweep",
+          "unit": "count",
+          "description": "Number of raw samples in each independent sweep before canonical finite filtering and duplicate aggregation."
+        },
+        {
+          "name": "time_slices",
+          "unit": "structured",
+          "description": "Ordered list of time_label plus per-channel canonical result mappings."
+        },
+        {
+          "name": "temporal_trend_analysis_performed",
+          "unit": "boolean",
+          "description": "False: the series API does not infer trends or temporal derivatives."
         }
       ],
       "assumptions": [
@@ -934,7 +966,7 @@
         "When a scalar per-sample current standard uncertainty is supplied, propagate it through duplicate-voltage averaging using independent-error averaging; no uncertainty is assumed when omitted."
       ],
       "algorithm": "Normalize the selected current polarity to electron_positive; clean calibrated I–V pairs; aggregate duplicate voltages with corresponding uncertainty reduction; compute floating-potential crossings; compute dI/dV and d²I/dV²; report maximum dI/dV as a proxy, zero crossings of d²I/dV² as inflection candidates, and maximum d²I/dV² only as a separate extremum. Require disjoint analyst-selected fit windows; apply identical numerical fit screens in the engine and UI; gate density inversion on both electron and ion numerical fit quality and ion flatness; retain all physical-regime flags as unconfirmed. Advanced functions use explicitly declared published models and independent channel/time batching. Advanced fits share canonical finite-pair filtering, polarity normalization, sorting and duplicate-voltage averaging. Smoothed derivatives use local polynomial least squares in actual voltage coordinates, not a uniform-sample Savitzky-Golay assumption.",
-      "uncertainty_model": "Electron-temperature covariance is used only when finite and valid; invalid covariance yields null uncertainty, not zero. Optional current standard uncertainty is propagated to the unique floating-potential crossing by first-order interpolation and to the maximum-dI/dV proxy by reproducible Monte Carlo, conditional on independent sample errors. Density uncertainty is not calculated if the electron-temperature statistical covariance is unavailable. Other uncertainty components are included only when explicitly supplied. The same reproducible Monte Carlo draws are also used to estimate conditional location spread for each second-derivative zero-crossing candidate by nearest-root matching; unresolved candidate tracks remain null. Advanced electron-density helper propagates current, temperature and area uncertainties only when all three are supplied; ion-flux helper propagates density, temperature, mass and sheath-factor relative uncertainties only when all four are supplied. Stretched-exponential covariance errors are conditional on the empirical fit. Multispecies density does not propagate composition covariance and explicitly returns a not-calculated status.",
+      "uncertainty_model": "Canonical Te and single-species density uncertainties use only valid fit covariance and explicitly supplied independent components. Electron-density and Bohm-flux helpers propagate only when all required uncertainties are supplied. Multispecies density now supports partial independent propagation from explicitly supplied ion-current, Te, area, species-mass and species-sheath-coefficient uncertainties; omitted terms, especially constrained number-fraction covariance, are listed and never silently set to zero. Stretched-exponential errors are conditional empirical-fit covariance errors. Invalid covariance yields null.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
         "Density requires an explicitly justified sheath coefficient, collection area, ion mass, and both physically selected fit windows.",
@@ -1011,10 +1043,11 @@
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
-          "input_contract": "Ion saturation current, positive Te and area, and per-species masses, positive integer charge states Z_s, number-density fractions and sheath coefficients; fractions sum to one. Uses species-summed Bohm/sheath current with Z_s^(3/2); composition covariance uncertainty is explicitly not propagated.",
-          "outputs": "Model-based total ion density; fractions must sum to one; uncertainty propagation is not performed.",
+          "input_contract": "Ion saturation current, positive Te and area, and per-species masses, positive integer charge states Z_s, number-density fractions and sheath coefficients; fractions sum to one. Optional absolute current sigma, relative Te/area sigma, and per-species relative mass/sheath-coefficient sigmas are accepted. Fractions are treated as fixed; fraction uncertainty is rejected unless a future composition covariance model is implemented.",
+          "outputs": "Model-based total ion density and partial uncertainty from explicitly supplied independent components; omitted terms and the exclusion of composition covariance are reported.",
           "reference": "Species-summed extension of the species-resolved Bohm/sheath current balance described by Hutchinson (2002), Chapter 3, Section 3.2.5. The Z_s^(3/2) dependence follows from multiplying species charge Z_s e by the species Bohm speed sqrt(Z_s e T_e/m_s); applicability of each sheath coefficient remains an explicit user assumption.",
-          "output_contract": "ion_density_estimate_m-3; normalized species definitions including mass, number-density fraction, charge_state and sheath_coefficient; ion_density_standard_uncertainty_m-3 and relative uncertainty are null with an explicit not-propagated status."
+          "output_contract": "ion_density_estimate_m-3; partial ion_density_standard_uncertainty_m-3 and relative uncertainty only when at least one explicit independent uncertainty is supplied; uncertainty components and omitted components are listed; species fraction covariance is excluded; no uncertainty inputs yields null uncertainty and explicit status.",
+          "uncertainty_model": "Independent first-order propagation: current, area and temperature terms plus species-weighted sheath-coefficient and mass terms. Species number fractions are held fixed because their sum constraint requires a composition covariance model; missing terms are reported as omitted, not zero-filled."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_electron_density_from_saturation",
@@ -1033,7 +1066,7 @@
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
           "input_contract": "Calibrated voltage/current arrays and explicit odd local window point count and polynomial order. Local polynomial least squares uses actual voltage coordinates and supports nonuniform grids; raw and smoothed candidates remain separate.",
-          "outputs": "Raw and Savitzky-Golay-smoothed maximum-dI/dV proxies, separate maximum-d²I/dV² extrema, and second-derivative zero-crossing inflection candidates; current polarity is normalized consistently.",
+          "outputs": "Raw-gradient and local-polynomial-smoothed derivative candidates, separate maximum-d²I/dV² extrema and zero-crossing inflection candidates; local fits use actual voltage coordinates, including nonuniform grids.",
           "reference": "Fan and Gijbels (1996), Local Polynomial Modelling and Its Applications, for local polynomial smoothing in actual voltage coordinates.",
           "output_contract": "raw and locally smoothed dI/dV and d2I/dV2 candidates, zero crossings, smoothing metadata and input-quality metadata; local polynomial method uses actual nonuniform voltage coordinates; no physical plasma potential is certified."
         },
@@ -1088,7 +1121,7 @@
           "mode": "time_channel_series_shared_voltage",
           "voltage_shape": "(samples,) or (time,channels,samples)",
           "current_shape": "(time,channels,samples)",
-          "description": "Independent time/channel sweeps; no temporal trend or cross-channel inference."
+          "description": "current_A shape is (time,channels,samples); voltage_V is either a shared (samples,) grid broadcast over time and channels or a matching (time,channels,samples) array. Each sweep is processed independently."
         },
         {
           "mode": "time_channel_series_labels",
@@ -1109,7 +1142,7 @@
           "ion_flatness_max_relative_change"
         ],
         "meaning": "Numerical fit-quality and flatness screens only. Defaults are software review settings, not universal physical criteria, not plasma constants and never certify a Maxwellian electron-retarding or ion-saturation regime.",
-        "density_gate": "Density inversion requires selected electron and ion intervals to pass configured numerical screens. A pass remains numerical screening only; regime selection and applicability remain the researcher's responsibility."
+        "density_gate": "By default density inversion requires electron and ion fits to pass configured numerical review screens. These screens are not physical-regime criteria. The caller may explicitly set allow_density_when_numerical_screen_fails=true to obtain a provisional calculation from available fitted values; the output marks ion_density_numerical_screen_override_used=true and physical_regime_confirmed remains false. A missing or invalid Te/current still prevents calculation."
       },
       "output_modes": [
         {
@@ -1145,7 +1178,7 @@
             "temporal_trend_analysis_performed",
             "cross_channel_inference_performed"
           ],
-          "description": "One result mapping per time/channel sweep; labels preserve supplied metadata and no temporal trend or cross-channel inference is performed."
+          "description": "Mapping containing counts and ordered time_slices; each slice preserves the supplied time label and maps channel names to canonical single-sweep results. No temporal interpolation, derivatives, trends, or cross-channel inference are performed."
         }
       ],
       "formula_registry_keys": [
