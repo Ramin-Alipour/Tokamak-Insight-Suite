@@ -3,7 +3,7 @@ import pytest
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum, cts_spectral_density
 
 def _case():
-    f0=140e9; f=np.linspace(-8e6,8e6,121); g={"scattering_angle_rad":np.deg2rad(110.)}
+    f0=140e9; f=np.unique(np.r_[np.linspace(-7e9,-.8e9,60),np.linspace(-.8e9,.8e9,401),np.linspace(.8e9,7e9,60)]); g={"scattering_angle_rad":np.deg2rad(110.)}
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 

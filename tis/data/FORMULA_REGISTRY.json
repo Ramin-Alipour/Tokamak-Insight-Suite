@@ -3022,5 +3022,99 @@
         "doi": "10.1088/1748-0221/20/07/P07014"
       }
     ]
+  },
+  {
+    "name": "Microwave collective Thomson spectral density",
+    "equation": "S(k,ω)=(2π/k){|1−χ_e/ε|² f_e(ω/k)+Σ_j[Z_j² n_j/n_e]|χ_j/ε|² f_j(ω/k)}; ε=1+χ_e+Σ_jχ_j",
+    "inputs": "Probe frequency [Hz], frequency shift [Hz], scattering wave vector [m^-1], electron density/temperature, ion composition, ion temperature and flow",
+    "output": "Model spectral-density units",
+    "assumptions": "Unmagnetized electrostatic longitudinal dielectric response; Maxwellian bulk species; quasi-neutrality; fixed ion composition",
+    "status": "P",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_analysis.cts_spectral_density",
+      "formula_key": "microwave_cts_spectral_density",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "scattering_geometry",
+          "unit": "structured",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "charge-density fraction",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density",
+          "unit": "model spectral-density units"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated frequency-shift axis",
+        "Known probe frequency and scattering geometry",
+        "Fixed ion composition"
+      ],
+      "uncertainty_model": "Forward relation is deterministic; inverse parameter uncertainties are local Jacobian estimates and exclude model discrepancy and response-matrix uncertainty.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
+      ],
+      "note": "Scoped electrostatic microwave CTS model; not full magnetized electromagnetic ray-tracing or power-transfer modelling."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "doi": "10.1016/j.fusengdes.2026.115845"
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "journal": "Journal of Fusion Energy",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7"
+      }
+    ]
   }
 ]
