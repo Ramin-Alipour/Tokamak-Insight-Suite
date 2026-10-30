@@ -310,6 +310,26 @@
           "name": "electron_density_external_parameter_covariance_m6",
           "unit": "n_channels x n_channels; m^-6",
           "description": "Collective external-parameter Monte Carlo contribution to cross-channel absolute-density covariance; distinct from per-channel spectral-fit uncertainty."
+        },
+        {
+          "name": "density_input_covariance_m3_2",
+          "unit": "N x N; m^-6",
+          "description": "Full density input covariance used by the downstream radial profile summary."
+        },
+        {
+          "name": "temperature_input_covariance_eV2",
+          "unit": "N x N; eV^2",
+          "description": "Full temperature input covariance used by the downstream radial profile summary."
+        },
+        {
+          "name": "density_gradient_covariance_m-8",
+          "unit": "N x N; m^-8",
+          "description": "Full covariance of the radial density gradient, propagated from density input covariance."
+        },
+        {
+          "name": "temperature_gradient_covariance_eV2_m-2",
+          "unit": "N x N; eV^2 m^-2",
+          "description": "Full covariance of the radial temperature gradient, propagated from temperature input covariance."
         }
       ],
       "assumptions": [
