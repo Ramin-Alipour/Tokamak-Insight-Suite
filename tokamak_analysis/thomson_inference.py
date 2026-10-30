@@ -195,6 +195,7 @@ def _density_from_power(power_w, laser_power_w, interaction_length_m, collection
 
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
+    laser_wavelength_uncertainty_nm=0.0, scattering_angle_uncertainty_rad=0.0,
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
     optical_efficiency=None, incident_polarization=None, scattered_direction=None,
