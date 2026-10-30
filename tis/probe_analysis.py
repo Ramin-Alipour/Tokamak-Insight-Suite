@@ -443,7 +443,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             isinstance(covariance, np.ndarray) and covariance.shape == (3, 3)
             and np.all(np.isfinite(covariance))
             and np.all(np.diag(covariance) >= 0.0)
-            and np.all(np.linalg.eigvalsh(0.5 * (covariance + covariance.T)) >= -1e-12 * max(float(np.max(np.abs(covariance))), 1.0))
+            and float(np.min(np.linalg.eigvalsh(0.5 * (covariance + covariance.T)))) > 1e-12 * max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
         )
         out["electron_retarding_covariance_valid"] = covariance_valid
         slope_se = (float(np.sqrt(covariance[2, 2])) if covariance_valid else None)
