@@ -1,0 +1,248 @@
+{
+  "schema_version": "1.0",
+  "primary_analysis_count": 20,
+  "underlying_entry_point_count": 80,
+  "policy": "The 20 primary analyses are navigation/grouping families. The 80 underlying entry points remain intact as subanalyses/workflows; no computational implementation is removed by this grouping.",
+  "families": [
+    {
+      "id": 1,
+      "name": "Thomson Scattering",
+      "category": "physical_diagnostic",
+      "description": "All Thomson-scattering spectral and collective/coherent-scattering workflows, including profile utilities, are presented under one analysis.",
+      "entry_ids": [
+        1,
+        7,
+        30,
+        46
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Langmuir & Electrostatic Probes",
+      "category": "physical_diagnostic",
+      "description": "Langmuir I–V, ball-pen, Gundestrup/compound probes, ion-saturation current, potential arrays and probe-derived density fluctuations.",
+      "entry_ids": [
+        2,
+        16,
+        17,
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Electron Cyclotron Emission (ECE)",
+      "category": "physical_diagnostic",
+      "description": "ECE spectral inference, resonance mapping and temperature-profile workflows.",
+      "entry_ids": [
+        3
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Doppler & Charge-Exchange Spectroscopy",
+      "category": "physical_diagnostic",
+      "description": "Doppler line-width inference, CXRS and related charge-exchange spectroscopy.",
+      "entry_ids": [
+        4,
+        5,
+        24
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Molecular Spectroscopy",
+      "category": "physical_diagnostic",
+      "description": "Molecular-band spectral analysis and molecular population/temperature fitting.",
+      "entry_ids": [
+        6
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Magnetic Diagnostics & Equilibrium",
+      "category": "physical_diagnostic",
+      "description": "Magnetic coils and probes, flux loops, Rogowski coils, polarimetry, poloidal flux and equilibrium reconstruction; includes Mirnov-based mode analysis.",
+      "entry_ids": [
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        55
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Emission Spectroscopy",
+      "category": "physical_diagnostic",
+      "description": "Visible/optical, VUV and hydrogen Balmer emission spectroscopy.",
+      "entry_ids": [
+        21,
+        22,
+        25
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Interferometry & Reflectometry",
+      "category": "physical_diagnostic",
+      "description": "Laser/microwave interferometry, reflectometry and refractive-index/ray-tracing support.",
+      "entry_ids": [
+        28,
+        29,
+        31
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Bolometry & Radiation Tomography",
+      "category": "physical_diagnostic",
+      "description": "Bolometry, fast bolometry and bolometric/Abel tomography workflows.",
+      "entry_ids": [
+        32,
+        33,
+        39
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Imaging & IR Thermography",
+      "category": "physical_diagnostic",
+      "description": "Visible and fast imaging, infrared thermography and strike-point/hot-spot tracking.",
+      "entry_ids": [
+        36,
+        37,
+        38,
+        75
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Neutron Diagnostics",
+      "category": "physical_diagnostic",
+      "description": "Neutron yield monitoring, neutron spectrometry and neutron imaging/tomography.",
+      "entry_ids": [
+        40,
+        41,
+        42
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Gamma-Ray Spectroscopy",
+      "category": "physical_diagnostic",
+      "description": "Gamma-ray spectral diagnostics.",
+      "entry_ids": [
+        43
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Fast-Particle Diagnostics",
+      "category": "physical_diagnostic",
+      "description": "Neutral-particle analysis, FIDA, fast-ion loss and runaway-electron diagnostics.",
+      "entry_ids": [
+        44,
+        45,
+        47,
+        48
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Gas, Pressure & Fueling Diagnostics",
+      "category": "physical_diagnostic",
+      "description": "Pressure gauges, residual-gas analysis, gas flow, neutral pressure/recycling and effective pumping speed.",
+      "entry_ids": [
+        49,
+        50,
+        51,
+        52,
+        53
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Fluctuation, MHD & Transient Analysis",
+      "category": "physical_diagnostic",
+      "description": "Multi-channel fluctuations, ELMs, sawteeth, disruptions, correlations and spectral transfer/coherence.",
+      "entry_ids": [
+        54,
+        56,
+        57,
+        58,
+        59,
+        60
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Transport, Confinement & Plasma Parameters",
+      "category": "physical_diagnostic",
+      "description": "Particle transport/diffusion, energy confinement and balance, Greenwald reference and pressure/beta quantities.",
+      "entry_ids": [
+        61,
+        62,
+        63,
+        64,
+        65
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Heating & Power Analysis",
+      "category": "physical_diagnostic",
+      "description": "NBI, ECRH, ICRH, lower-hybrid and electron/ion heating-power analysis.",
+      "entry_ids": [
+        66,
+        67,
+        68,
+        69,
+        70
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Plasma-Facing Components & Thermal Analysis",
+      "category": "physical_diagnostic",
+      "description": "Embedded sensors, divertor heat flux, erosion/deposition, wall impurity/dust and thermal response.",
+      "entry_ids": [
+        71,
+        72,
+        73,
+        74,
+        76
+      ]
+    },
+    {
+      "id": 19,
+      "name": "X-Ray Diagnostics",
+      "category": "physical_diagnostic",
+      "description": "X-ray spectroscopy, soft X-ray arrays and hard X-ray detector workflows.",
+      "entry_ids": [
+        23,
+        34,
+        35
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Instrumentation & Measurement Support",
+      "category": "instrumentation_support",
+      "description": "A shared toolkit for wavelength calibration, calibration curves and uncertainty, instrumental line-shape/response characterization, noise floor and detection limits, sampling/aliasing audits, and channel synchronization. These are presented together as supporting tools, not as additional physical diagnostic families.",
+      "entry_ids": [
+        26,
+        27,
+        77,
+        78,
+        79,
+        80
+      ]
+    }
+  ]
+}
