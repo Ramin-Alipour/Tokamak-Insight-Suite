@@ -978,6 +978,8 @@ def analyze_thomson_spectra(
         dof_joint = max(1, measured_flat.size-initial.size)
         standardized = joint_residual(joint_fit.x)
         reduced_chi2_joint = float(standardized @ standardized / dof_joint)
+        if not np.isfinite(reduced_chi2_joint) or reduced_chi2_joint>10.0:
+            raise ValueError("Joint Thomson GLS fit rejected: reduced chi-square exceeds the default acceptance ceiling of 10")
         # Transform the full parameter covariance to all channel Te and flow values.
         def physical_vector(parameters):
             values=[]
@@ -990,6 +992,13 @@ def analyze_thomson_spectra(
                 values.extend([te,velocity])
             return np.asarray(values,dtype=float)
         base_physical=physical_vector(joint_fit.x)
+        for channel in range(nchan):
+            te_value=base_physical[2*channel]
+            velocity_value=base_physical[2*channel+1]
+            if te_value/ELECTRON_REST_ENERGY_EV>=0.01:
+                raise ValueError("Joint Thomson GLS fit rejected: non-relativistic electron-temperature limit exceeded")
+            if abs(velocity_value)>=0.1*C_M_S:
+                raise ValueError("Joint Thomson GLS fit rejected: non-relativistic flow-projection limit exceeded")
         transform=np.zeros((2*nchan,joint_parameter_count*nchan))
         for j in range(joint_parameter_count*nchan):
             step=np.cbrt(np.finfo(float).eps)*max(abs(float(joint_fit.x[j])),1.0)
