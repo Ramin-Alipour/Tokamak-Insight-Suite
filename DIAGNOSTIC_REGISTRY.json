@@ -12,7 +12,7 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Canonical measured-spectrum physical inference supports non-collective Maxwellian, Kappa, projected Maxwell-Juttner and optional PlasmaPy collective Maxwellian models; joint full-covariance GLS for Maxwellian/Kappa; per-channel and collective external/response Monte Carlo uncertainty propagation when supplied; and separate residual-based model-discrepancy covariance diagnostics.",
+    "implementation_status": "Canonical measured-calibrated-spectrum physical inference supports non-collective Maxwellian, Kappa, projected Maxwell-Juttner and optional PlasmaPy collective Maxwellian models; full channel-major GLS for Maxwellian/Kappa; Monte Carlo propagation of supplied collective beam-geometry, flow, ion-temperature, laser-wavelength and response uncertainties; absolute-density recomputation after joint fitting; and separate model-discrepancy diagnostics.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -176,6 +176,34 @@
           "name": "collective_external_parameter_mc_samples",
           "unit": "count",
           "required": false
+        },
+        {
+          "name": "density_relative_covariance",
+          "unit": "6x6 relative covariance",
+          "required": false,
+          "description": "Full covariance for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor; mutually exclusive with separate scalar optical-factor uncertainties."
+        },
+        {
+          "name": "incident_direction_uncertainty",
+          "unit": "component-wise 1-sigma dimensionless 3-vector",
+          "required": false,
+          "description": "Collective mode only; component uncertainties for the incident beam direction, propagated by Monte Carlo after vector normalization."
+        },
+        {
+          "name": "scattered_direction_uncertainty",
+          "unit": "component-wise 1-sigma dimensionless 3-vector",
+          "required": false,
+          "description": "Collective mode only; component uncertainties for the scattered beam direction, propagated by Monte Carlo after vector normalization."
+        },
+        {
+          "name": "instrument_response_mc_samples",
+          "unit": "count",
+          "required": false
+        },
+        {
+          "name": "collective_external_parameter_mc_samples",
+          "unit": "count",
+          "required": false
         }
       ],
       "output_specs": [
@@ -223,7 +251,7 @@
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
       "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported flow projection; infer collective-mode density only where the collective spectral shape resolves it, and non-collective absolute density only when calibrated spectral power and complete optical geometry are supplied.",
-      "uncertainty_model": "Non-collective channel fits use local covariance; when a full channel-major spectral covariance is supplied, a joint generalized least-squares fit propagates cross-channel and cross-wavelength covariance for Maxwellian and Kappa models. Supplied LSF uncertainty is propagated by Monte Carlo for non-collective fits. Collective LSF, ion-temperature, ion-velocity, electron-velocity and laser-wavelength uncertainties are propagated by Monte Carlo refits when supplied. Excess reduced chi-square above unity is exposed as a separate model-discrepancy covariance component. Optical-factor covariance for absolute density remains conditional on the supplied covariance/uncertainty model.",
+      "uncertainty_model": "Non-collective fits use local fit covariance and optional Monte Carlo LSF uncertainty. A full channel-major covariance is handled by joint GLS for Maxwellian/Kappa and final physical parameters, integrated powers and absolute densities are recomputed from the joint fit. Collective external-parameter Monte Carlo includes supplied ion-temperature, ion/electron flow-vector, laser-wavelength, scattering-angle or beam-direction component, and measured response-matrix uncertainties; the returned covariance includes channel density, temperature and projected flow parameters. A supplied 6x6 relative optical-input covariance is authoritative and mutually exclusive with separate scalar uncertainty inputs. Excess reduced chi-square is exposed as a separate model-adequacy covariance diagnostic, not experimental validation.",
       "limitations": [
         "Full 3-D relativistic photon-geometry integration is not implemented; the relativistic option uses a 1-D projected Maxwell-Juttner approximation.",
         "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
@@ -233,8 +261,9 @@
         "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
         "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle.",
         "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; other models require dedicated joint forward models.",
-        "Collective scattering-angle uncertainty for vector beam geometry and correlations between external parameter uncertainty sources are not yet represented.",
-        "Model-discrepancy covariance uses excess reduced chi-square as a conditional diagnostic and is not a substitute for independent model validation."
+        "Model-discrepancy covariance uses excess reduced chi-square as a conditional diagnostic and is not a substitute for independent model validation.",
+        "Collective beam-direction component uncertainties are propagated as independent component-wise Gaussian perturbations; correlations among beam-vector components and correlations with other external inputs are not represented.",
+        "A supplied density_relative_covariance is authoritative for all six optical inversion inputs, including the scattered-power uncertainty; do not also supply separate scalar uncertainties."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -242,7 +271,7 @@
         "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
       ],
-      "raw_data_to_physics": true,
+      "raw_data_to_physics": false,
       "note": "Primary Analysis 1 accepts measured calibrated multi-channel spectra. It now supports optional joint GLS for non-collective Maxwellian/Kappa, plus Monte Carlo propagation of supplied collective external/response uncertainties. Detector calibration and independent experimental validation remain outside scope.",
       "workflow_modes": [
         {
@@ -268,7 +297,8 @@
           "scope": "Primary end-to-end physical inference from measured calibrated spectra; no detector calibration or experimental validation."
         }
       ],
-      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
+      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
+      "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
       {
@@ -301,7 +331,9 @@
         "doi": "10.1063/5.0350497",
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "note": "Primary Analysis 1 accepts measured, wavelength- and intensity-calibrated multi-channel Thomson spectra. Detector calibration and independent experimental validation remain outside scope; downstream profile summaries consume derived calibrated ne/Te profiles."
   },
   {
     "family": "Plasma parameters",
@@ -2323,7 +2355,7 @@
         "Use a user-supplied background-only mask when available; otherwise apply the documented spectral-edge fallback.",
         "Do not clip negative background-subtracted residuals when calculating signed spectral moments."
       ],
-      "algorithm": "Infer physical parameters from measured multi-channel spectra using the canonical forward model.",
+      "algorithm": "The physical-inference entry point delegates to the canonical measured-spectrum Thomson forward model. The companion spectral-moment routine is a separate descriptive characterization and does not independently infer ne, Te or a unique electron velocity distribution.",
       "uncertainty_model": "The physical-inference path delegates to the canonical Thomson uncertainty model. Descriptive moment uncertainties are estimated by parametric Monte Carlo from pointwise signal uncertainty and optional Gaussian instrument-width uncertainty; correlated wavelength-bin and shared systematic errors are not included.",
       "limitations": [
         "Spectral moments characterize the measured wavelength distribution and are not a unique electron velocity distribution.",
@@ -2331,14 +2363,17 @@
         "The spectral-edge background fallback can remove real signal when the physical spectrum extends into the selected edge samples; a background-only mask is preferred.",
         "A general measured response matrix is used for the Gaussian forward-fit diagnostic, but scalar Gaussian variance deconvolution is not claimed for a general non-Gaussian response.",
         "Monte Carlo moment uncertainty excludes correlated wavelength-bin noise and shared calibration/systematic uncertainty.",
-        "Kappa is a parameterized projection rather than arbitrary VDF inversion; projected Maxwell-Juttner is a 1-D approximation; collective Maxwellian requires external ion parameters."
+        "Kappa is a parameterized projection rather than arbitrary VDF inversion; projected Maxwell-Juttner is a 1-D approximation; collective Maxwellian requires external ion parameters.",
+        "Moment uncertainties are descriptive spectral-moment uncertainties only and must not be interpreted as complete physical-parameter uncertainties."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
       ],
       "raw_data_to_physics": true,
-      "note": "This entry delegates measured-spectrum physical inference to the canonical Thomson engine. The standalone moment helper is supplementary and descriptive; it does not itself infer Te, ne or a unique electron velocity distribution."
-    }
+      "note": "This entry delegates measured-spectrum physical inference to the canonical Thomson engine. The standalone moment helper is supplementary and descriptive; it does not itself infer Te, ne or a unique electron velocity distribution.",
+      "calibrated_measurements_to_physics": true
+    },
+    "note": "The canonical inference wrapper extracts physical parameters from calibrated measured spectra. The companion moment helper reports descriptive wavelength-distribution statistics only; it is not a velocity distribution or an independent Te/ne estimator."
   },
   {
     "family": "Magnetic and equilibrium",
@@ -4034,7 +4069,7 @@
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
     ],
-    "implementation_status": "Microwave frequency-domain CTS forward model and inverse fit include differential evolution, adaptive real-coded genetic search, full spectral covariance whitening, response-matrix/external-input Monte Carlo propagation, residual-based model-discrepancy covariance, hot-Maxwellian approximation, fixed tabulated VDF and regularized inferred tabulated 1-D fast-ion VDF. Full electromagnetic CTS remains outside scope.",
+    "implementation_status": "Microwave frequency-domain CTS forward model and inverse fit include differential evolution, adaptive real-coded genetic search, full spectral covariance whitening, response-matrix/external-input Monte Carlo propagation, residual-based model-discrepancy covariance, hot-Maxwellian approximation, fixed tabulated VDF and regularized inferred tabulated 1-D fast-ion VDF. Full electromagnetic CTS remains outside scope. Electron-flow projection and ion composition no longer receive silent stationary/default species values.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4121,6 +4156,12 @@
           "unit": "m s^-1 and s m^-1",
           "required": false,
           "description": "For infer_tabulated_1d, initial velocity grid and non-negative normalized seed distribution; shape is inferred with a second-difference penalty."
+        },
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1",
+          "required": true,
+          "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed."
         }
       ],
       "output_specs": [
@@ -4177,7 +4218,8 @@
         "Unmagnetized electrostatic longitudinal dielectric response.",
         "Maxwellian bulk electrons and ions; optional hot-Maxwellian ion component.",
         "Quasi-neutral plasma and supplied fixed ion composition.",
-        "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate."
+        "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate.",
+        "Electron-flow projection is an explicit external input; no zero-flow default is imposed."
       ],
       "preprocessing": [
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
@@ -4192,14 +4234,17 @@
         "A tabulated fast-ion VDF is a 1-D projected distribution. Its reconstruction is ill-posed and depends on velocity grid, initial distribution and regularization strength; it is not a unique unrestricted 3-D VDF measurement.",
         "The hot-Maxwellian option remains a two-population parameterization.",
         "The electrostatic longitudinal susceptibility omits magnetized electromagnetic tensor response, ray tracing, polarization coupling, beam overlap and absolute received-power calibration.",
-        "Model-discrepancy covariance is a residual-based conditional diagnostic, not independent experimental validation."
+        "Model-discrepancy covariance is a residual-based conditional diagnostic, not independent experimental validation.",
+        "One common ion temperature and one common projected ion flow are shared across all background ion species; species-specific Ti and flow inference is not implemented.",
+        "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.cts_spectral_density",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
       "raw_data_to_physics": true,
-      "note": "Microwave CTS frequency-domain spectral inversion, explicitly scoped to unmagnetized electrostatic longitudinal response. The model must not be described as a complete electromagnetic CTS simulator."
+      "note": "Microwave CTS frequency-domain spectral inversion, explicitly scoped to unmagnetized electrostatic longitudinal response. The model must not be described as a complete electromagnetic CTS simulator.",
+      "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
       {
@@ -4654,7 +4699,7 @@
     "implementation_functions": [
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Dedicated downstream profile reconstruction with automatic GCV smoothing selection, shape-preserving PCHIP, pointwise/full-covariance Monte Carlo uncertainty propagation, and explicit rejection of negative spline overshoot.",
+    "implementation_status": "Downstream reconstruction from already-derived calibrated ne/Te radial profiles; supports separate density/temperature covariance and full joint density-temperature covariance with correlated Monte Carlo output.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "limited_calculation",
@@ -4711,6 +4756,12 @@
           "name": "temperature_covariance_eV2",
           "unit": "eV^2",
           "required": false
+        },
+        {
+          "name": "joint_density_temperature_covariance",
+          "unit": "(2N x 2N) covariance",
+          "required": false,
+          "description": "Full joint covariance ordered [density_0..N-1, temperature_0..N-1], propagated jointly through the downstream profile fit."
         }
       ],
       "output_specs": [
@@ -4754,7 +4805,7 @@
         "Select smoothing by generalized cross-validation when smoothing_factor is omitted; use PCHIP when shape preservation is preferred."
       ],
       "algorithm": "Reconstruct within-domain one-dimensional density and temperature profiles using the selected spline/interpolation method.",
-      "uncertainty_model": "Pointwise independent uncertainties or full input covariance matrices are propagated by parametric Monte Carlo through the selected reconstruction method. Confidence bands and successful-draw counts are returned when enough valid draws remain; model discrepancy and shared calibration errors not represented in the supplied covariance are excluded.",
+      "uncertainty_model": "Separate density and temperature covariance matrices or a full joint density-temperature covariance can be sampled by Monte Carlo; the joint route preserves cross-covariance in reconstructed profiles.",
       "limitations": [
         "This is a downstream utility for previously inferred density and temperature samples, not a raw-spectrum inversion.",
         "No geometry-weighted line-of-sight average or volume average is inferred; the profile summary is a radial-coordinate average.",
@@ -4765,7 +4816,8 @@
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
       ],
       "raw_data_to_physics": false,
-      "note": "Downstream profile reconstruction only. Use Analysis 1 or the registered physical-inference subanalysis to infer plasma parameters from measured spectra."
+      "note": "Downstream profile reconstruction only. Use Analysis 1 or the registered physical-inference subanalysis to infer plasma parameters from measured spectra.",
+      "calibrated_measurements_to_physics": false
     }
   },
   {
