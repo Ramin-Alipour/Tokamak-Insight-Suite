@@ -84,12 +84,14 @@
         {
           "name": "ion_velocity_m_s",
           "unit": "m s^-1",
-          "required": false
+          "required": false,
+          "description": "Required in collective mode: independently measured ion flow vectors or explicit zero vectors declaring stationary ions."
         },
         {
           "name": "electron_velocity_m_s",
           "unit": "m s^-1",
-          "required": false
+          "required": false,
+          "description": "Required in collective mode: independently measured electron-fluid flow vector or explicit zero vector declaring stationary electrons."
         },
         {
           "name": "absolute_density_geometry",
@@ -100,6 +102,41 @@
         {
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
+          "required": false
+        },
+        {
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad",
+          "required": false
+        },
+        {
+          "name": "laser_power_uncertainty_W",
+          "unit": "W",
+          "required": false
+        },
+        {
+          "name": "interaction_length_uncertainty_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_uncertainty_sr",
+          "unit": "sr",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency_uncertainty",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "polarization_factor_uncertainty",
+          "unit": "dimensionless",
           "required": false
         }
       ],
@@ -121,6 +158,18 @@
           "name": "channels",
           "unit": "structured",
           "description": "Per-channel fit, residuals, covariance, assumptions and provenance."
+        },
+        {
+          "name": "electron_temperature_uncertainty_profile_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "electron_density_uncertainty_profile_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "electron_velocity_projection_uncertainty_profile_m_s",
+          "unit": "m s^-1"
         }
       ],
       "assumptions": [
