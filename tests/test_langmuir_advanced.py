@@ -130,3 +130,75 @@ def test_electron_density_is_separate_model_helper_not_canonical_sweep_output():
     assert estimate["electron_density_estimate_m-3"] > 0
     assert estimate["physical_regime_confirmed"] is False
     assert estimate["uncertainty_propagation_performed"] is False
+
+def test_advanced_electron_fits_normalize_both_current_conventions():
+    v = np.linspace(-5.0, 5.0, 81)
+    i = -2e-3 + 3e-4 * np.exp((v + 5.0) / 2.5)
+    positive = fit_langmuir_electron_models(v, i, (-4.0, 2.0), current_convention="electron_positive")
+    negative = fit_langmuir_electron_models(v, -i, (-4.0, 2.0), current_convention="ion_positive")
+    assert negative["electron_temperature_components_eV"] == pytest.approx(positive["electron_temperature_components_eV"], rel=1e-8)
+    assert negative["current_convention_normalized"] == "electron_positive"
+    assert negative["current_convention_input"] == "ion_positive"
+
+
+def test_two_temperature_fit_exposes_component_uncertainty_and_identifiability_diagnostics():
+    v = np.linspace(-6.0, 4.0, 121)
+    i = -1e-3 + 1e-4 * np.exp((v + 6.0) / 1.5) + 2e-4 * np.exp((v + 6.0) / 4.0)
+    result = fit_langmuir_electron_models(v, i, (-5.5, 2.0), model="two_temperature")
+    assert len(result["electron_temperature_components_eV"]) == 2
+    assert "parameter_correlation_matrix" in result
+    assert "covariance_condition_number" in result
+    assert "temperature_component_standard_uncertainties_eV" in result
+    if result["covariance_valid"]:
+        assert len(result["temperature_component_standard_uncertainties_eV"]) == 2
+    else:
+        assert result["temperature_component_standard_uncertainties_eV"] is None
+        assert result["temperature_component_uncertainty_status"] == "unavailable_invalid_or_singular_fit_covariance"
+
+
+def test_stretched_exponential_and_smoothed_derivatives_share_current_polarity_contract():
+    from tokamak_analysis.langmuir_advanced import (
+        estimate_smoothed_plasma_potential_candidates,
+        fit_langmuir_stretched_exponential,
+    )
+    v = np.linspace(-5.0, 5.0, 81)
+    i = -2e-3 + 3e-4 * np.exp(np.maximum((v + 5.0) / 2.5, 0.0) ** 1.2)
+    stretched_a = fit_langmuir_stretched_exponential(v, i, (-4.0, 3.0), current_convention="electron_positive")
+    stretched_b = fit_langmuir_stretched_exponential(v, -i, (-4.0, 3.0), current_convention="ion_positive")
+    assert stretched_a["shape_exponent"] == pytest.approx(stretched_b["shape_exponent"], rel=1e-8)
+    smooth_a = estimate_smoothed_plasma_potential_candidates(v, i, current_convention="electron_positive")
+    smooth_b = estimate_smoothed_plasma_potential_candidates(v, -i, current_convention="ion_positive")
+    assert smooth_a["raw_max_dIdV_candidate_V"] == pytest.approx(smooth_b["raw_max_dIdV_candidate_V"])
+    assert smooth_a["smoothed_max_dIdV_candidate_V"] == pytest.approx(smooth_b["smoothed_max_dIdV_candidate_V"])
+
+
+def test_multispecies_fraction_basis_and_current_polarity_are_explicit():
+    species = [
+        {"mass_kg": 3.3e-27, "fraction": 0.7, "sheath_coefficient": 0.61},
+        {"mass_kg": 6.6e-27, "fraction": 0.3, "sheath_coefficient": 0.61},
+    ]
+    electron_positive = estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species)
+    ion_positive = estimate_multispecies_ion_density(1e-3, 5.0, 1e-4, species, current_convention="ion_positive")
+    assert ion_positive["ion_density_estimate_m-3"] == pytest.approx(electron_positive["ion_density_estimate_m-3"])
+    assert ion_positive["ion_species_fraction_basis"] == "number_density_fraction"
+    with pytest.raises(ValueError, match="number_density"):
+        estimate_multispecies_ion_density(-1e-3, 5.0, 1e-4, species, fraction_basis="mass")
+
+
+def test_electron_density_helper_normalizes_current_polarity():
+    from tokamak_analysis.langmuir_advanced import estimate_electron_density_from_saturation
+    a = estimate_electron_density_from_saturation(1e-3, 5.0, 1e-4, current_convention="electron_positive")
+    b = estimate_electron_density_from_saturation(-1e-3, 5.0, 1e-4, current_convention="ion_positive")
+    assert a["electron_density_estimate_m-3"] == pytest.approx(b["electron_density_estimate_m-3"])
+    assert b["current_convention_normalized"] == "electron_positive"
+
+
+def test_public_wrapper_forwards_current_uncertainty_and_current_convention():
+    from tokamak_analysis.langmuir_probe import analyze_langmuir_probe
+    v = np.linspace(-1.0, 1.0, 9)
+    i = 1e-3 * v
+    result = analyze_langmuir_probe(v, -i, current_convention="ion_positive", current_uncertainty_A=1e-5)
+    assert result["current_convention_input"] == "ion_positive"
+    assert result["current_convention"] == "electron_positive"
+    assert result["floating_potential_standard_uncertainty_V"] is not None
+
