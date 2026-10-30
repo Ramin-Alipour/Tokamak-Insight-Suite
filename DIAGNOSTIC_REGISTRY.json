@@ -976,7 +976,11 @@
         "tis.core.langmuir_iv_analysis",
         "tis.core.probe_iv_summary",
         "tokamak_analysis.langmuir_advanced._prepare_advanced_iv",
-        "tokamak_analysis.langmuir_advanced._local_polynomial_smooth_nonuniform"
+        "tokamak_analysis.langmuir_advanced._local_polynomial_smooth_nonuniform",
+        "tokamak_analysis.formula_library.langmuir_electron_density_from_saturation_current",
+        "tokamak_analysis.formula_library.langmuir_bohm_particle_flux",
+        "tokamak_analysis.formula_library.langmuir_multispecies_ion_density",
+        "tokamak_analysis.formula_library.langmuir_ion_density_from_saturation_current"
       ],
       "advanced_entry_points": [
         {
@@ -1143,6 +1147,13 @@
           ],
           "description": "One result mapping per time/channel sweep; labels preserve supplied metadata and no temporal trend or cross-channel inference is performed."
         }
+      ],
+      "formula_registry_keys": [
+        "langmuir_electron_temperature_from_slope",
+        "langmuir_ion_density_from_saturation_current",
+        "langmuir_electron_density_from_saturation_current",
+        "langmuir_bohm_particle_flux",
+        "langmuir_multispecies_ion_density"
       ]
     },
     "note": "Canonical calibrated single-sweep I–V analysis with consistent public entry points and optional explicit sheath-model ion-density inversion. No geometry or sheath coefficient is silently inferred. Completion is scoped to the documented software contract and does not imply independent experimental validation.",
