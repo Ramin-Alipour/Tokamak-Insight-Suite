@@ -443,7 +443,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "ion_temperature":"inferred from measured ion-feature shape","ion_velocity_projection":"inferred from ion-feature Doppler shift","ion_composition":"externally supplied fixed composition"},
       "uncertainty_model":"Local Jacobian covariance with optional full spectral covariance whitening; response-matrix uncertainty is propagated by Monte Carlo when supplied.",
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
-       "Ion composition is fixed externally.","Fast-ion shape can be an externally supplied tabulated 1-D VDF; the supplied shape is not independently reconstructed by this parameter fit.",
+       "Ion composition is fixed externally.","Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if out["reduced_chi_square"] is not None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
