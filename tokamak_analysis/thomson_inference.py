@@ -413,7 +413,7 @@ def analyze_thomson_spectra(
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
-        if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
+        if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, incident_direction, scattered_direction
         )):
