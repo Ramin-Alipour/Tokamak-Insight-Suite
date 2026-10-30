@@ -67,6 +67,14 @@ def test_instrument_response_conserves_spectral_power_on_nonuniform_wavelength_g
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
 
 
+def test_index_space_response_kernel_is_rejected_for_nonuniform_wavelength_grid():
+    from tokamak_analysis.thomson_inference import _response_for_channel
+
+    x = np.array([500.0, 501.0, 502.2, 503.8, 506.0])
+    with pytest.raises(ValueError, match="requires a uniform wavelength grid"):
+        _response_for_channel(np.array([0.2, 0.6, 0.2]), 0, 1, x.size, x)
+
+
 def test_absolute_density_requires_explicit_watt_per_nm_calibration():
     x, y, _ = _spectral_case(100.0)
     with pytest.raises(ValueError, match="spectral_power_density_calibrated"):
