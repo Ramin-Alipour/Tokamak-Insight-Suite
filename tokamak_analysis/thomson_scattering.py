@@ -304,7 +304,33 @@ def reconstruct_thomson_profile(
     density_gradient = np.where(density_negative, 0.0, density_gradient)
     temperature_gradient = np.where(temperature_negative, 0.0, temperature_gradient)
 
+    uncertainty_channels = {
+        "density": (
+            "inverse_sigma_weighted" if method == "smoothing_spline"
+            and profile.density_uncertainty_m3 is not None else
+            "not_used_by_fit" if profile.density_uncertainty_m3 is not None else
+            "not_supplied"
+        ),
+        "temperature": (
+            "inverse_sigma_weighted" if method == "smoothing_spline"
+            and profile.temperature_uncertainty_ev is not None else
+            "not_used_by_fit" if profile.temperature_uncertainty_ev is not None else
+            "not_supplied"
+        ),
+    }
+    gradients = {
+        "density_gradient_m-4": density_gradient,
+        "temperature_gradient_eV_m-1": temperature_gradient,
+    }
     return {
+        # Canonical names follow DIAGNOSTIC_REGISTRY.json.
+        "reconstructed_radius_m": grid,
+        "reconstructed_density_m3": density_fit,
+        "reconstructed_temperature_eV": temperature_fit,
+        "reconstruction_method": method,
+        "reconstruction_gradients": gradients,
+        "reconstruction_domain_m": (float(r[0]), float(r[-1])),
+        # Legacy aliases are retained to avoid breaking existing callers.
         "radius_m": grid,
         "density_m3": density_fit,
         "temperature_eV": temperature_fit,
@@ -315,12 +341,13 @@ def reconstruct_thomson_profile(
         "input_point_count": int(r.size),
         "reconstruction_point_count": int(grid.size),
         "radial_domain_m": (float(r[0]), float(r[-1])),
-        "uncertainty_model": (
-            "Supplied pointwise uncertainties used as independent inverse-sigma fit weights; "
-            "fit confidence intervals and systematic/model uncertainties are not estimated."
-            if profile.density_uncertainty_m3 is not None or profile.temperature_uncertainty_ev is not None
-            else "No measurement uncertainties supplied; fit confidence intervals are not estimated."
-        ),
+        "uncertainty_model": {
+            "assumption": "Supplied pointwise uncertainties are independent 1-sigma values.",
+            "density_channel": uncertainty_channels["density"],
+            "temperature_channel": uncertainty_channels["temperature"],
+            "fit_confidence_intervals_estimated": False,
+            "systematic_and_model_uncertainties_estimated": False,
+        },
         "limitations": [
             "Only calibrated spatial measurements are accepted; no detector or wavelength calibration is performed.",
             "No extrapolation beyond the measured radial interval is performed.",
