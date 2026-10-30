@@ -19,3 +19,17 @@ def test_thomson_density_formula_reference():
 def test_thomson_formulas_reject_invalid_physics():
     with pytest.raises(ValueError): thomson_electron_temperature_from_spectral_width(0.2,532.0,0.0)
     with pytest.raises(ValueError,match="superluminal"): thomson_velocity_projection(1500.0,500.0,math.pi/2)
+
+
+def test_thomson_density_correlated_input_covariance():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+    covariance = np.eye(6) * 1e-4
+    out = density_from_thomson_scattered_power(
+        1e-9, 1.0, 0.1, math.pi/2, 1e-3,
+        optical_efficiency=0.5,
+        relative_input_covariance=covariance,
+    )
+    assert out["electron_density_uncertainty_m3"] == pytest.approx(
+        out["electron_density_m3"] * math.sqrt(6e-4), rel=1e-12
+    )
+    assert out["density_interpretation"] == "interaction_length_averaged_effective_density"

@@ -241,7 +241,39 @@
         }
       ],
       "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
-    }
+    },
+    "scientific_references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Optical Thomson diagnostic forward/instrument model and parameter inference."
+      },
+      {
+        "title": "Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm",
+        "authors": "Zhang et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "95",
+        "article": "093542",
+        "year": 2024,
+        "doi": "10.1063/5.0215734",
+        "scope": "CTS spectral decomposition and ion-temperature extraction method; not yet implemented in this repository."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
+      }
+    ]
   },
   {
     "family": "Plasma parameters",

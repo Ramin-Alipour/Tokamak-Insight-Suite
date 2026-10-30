@@ -2827,7 +2827,25 @@
         "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation."
-    }
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ]
   },
   {
     "name": "Thomson electron-flow projection from spectral centroid",
@@ -2893,7 +2911,25 @@
         "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation."
-    }
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ]
   },
   {
     "name": "Thomson electron density from calibrated scattered power",
@@ -2938,6 +2974,12 @@
           "name": "optical_efficiency",
           "unit": "dimensionless",
           "required": false
+        },
+        {
+          "name": "relative_input_covariance",
+          "unit": "6x6 relative covariance matrix",
+          "required": false,
+          "description": "Optional covariance of relative inputs ordered as scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor. Mutually exclusive with the corresponding scalar uncertainty inputs."
         }
       ],
       "output_specs": [
@@ -2956,11 +2998,29 @@
         "uniform density over interaction length",
         "supplied collection and polarization geometry"
       ],
-      "uncertainty_model": "Existing first-order independent-input propagation; input covariance is excluded.",
+      "uncertainty_model": "First-order propagation using either independent supplied standard uncertainties or a 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor; do not supply both. Scattering-angle uncertainty is handled separately. Unprovided covariance and model discrepancy are excluded.",
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference"
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation."
-    }
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014"
+      }
+    ]
   }
 ]
