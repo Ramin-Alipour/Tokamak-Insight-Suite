@@ -132,65 +132,77 @@ ANALYSES = [{
          "algorithm": "Fit measured multi-channel Thomson spectra with a forward model convolved by the supplied instrument response; infer per-channel electron temperature and supported flow projection, and infer absolute density only when calibrated power and complete optical geometry are supplied.",
          "uncertainty_model": "Fit covariance is reported for non-collective spectral parameters; supplied LSF matrix uncertainty is propagated by Monte Carlo. Absolute-density uncertainty uses first-order independent propagation of only supplied uncertainties. Collective fit covariance and correlated spectral/geometry uncertainties remain limitations.",
         "limitations":             [
-                "Relativistic and arbitrary non-Maxwellian kinetic models are not yet implemented.",
+                "Relativistic kinetic corrections and arbitrary non-Maxwellian VDF inversion are not yet implemented; a parameterized kappa model is available for non-collective spectra.",
                 "Collective inference uses the optional PlasmaPy Maxwellian dielectric model and requires explicit ion species and ion temperatures.",
                 "Absolute density is not identifiable from spectral shape alone; it requires absolute W/nm intensity and all stated optical geometry and polarization factors.",
                 "Non-collective LSF uncertainty is propagated by Monte Carlo only when its matrix uncertainty is supplied; covariance between spectral bins is not modeled.",
                 "Absolute-density uncertainty propagation includes only the independently supplied uncertainty terms.",
                 "No independent experimental validation is claimed."
             ],
-        "function_links": [
-            "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-            "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
-        ],
+        "function_links":             [
+                "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+                "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+                "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+            ],
         "raw_data_to_physics": True,
-        "note": "Analysis 1 accepts already-calibrated density and temperature profiles plus their supplied calibrated spatial coordinate. Raw-spectrum fitting and scattered-power density inversion are outside this analysis contract. No independent experimental validation is claimed.",
-        "workflow_modes": [
-            {
-                "name": "calibrated_profile",
-                "function": "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-                "inputs": [
-                    "radius_m (m)",
-                    "density_m3 (m^-3)",
-                    "temperature_ev (eV)"
-                ],
-                "outputs": [
-                    "density and temperature profiles",
-                    "radial gradients",
-                    "normalized gradients",
-                    "local scale lengths",
-                    "profile summary"
-                ],
-                "scope": "Core mode: processes already-calibrated density and temperature profiles on supplied calibrated coordinates; no machine dimensions, optical geometry, or geometry-weighted averages are inferred."
-            },
-            {
-                "name": "spatial_profile_reconstruction",
-                "function": "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile",
-                "inputs": [
-                    "radius_m (m)",
-                    "density_m3 (m^-3; calibrated)",
-                    "temperature_ev (eV; calibrated)",
-                    "optional pointwise 1-sigma uncertainties",
-                    "method: smoothing_spline or pchip",
-                    "smoothing_factor and output grid size"
-                ],
-                "outputs": [
-                    "reconstructed_radius_m (m)",
-                    "reconstructed_density_m3 (m^-3)",
-                    "reconstructed_temperature_eV (eV)",
-                    "radial gradients",
-                    "method metadata",
-                    "measured radial domain",
-                    "limitations"
-                ],
-                "scope": "Core mode: reconstructs already-calibrated profiles only within the measured coordinate interval; no extrapolation or device geometry model."
-            }
-        ],
+        "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Calibrated-profile routines remain downstream utilities. No detector calibration or independent experimental validation is performed.",
+        "workflow_modes":             [
+                {
+                    "name": "multi_channel_spectral_inference",
+                    "function": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+                    "inputs": [
+                        "wavelength_nm",
+                        "spectra (channel × wavelength)",
+                        "radius_m",
+                        "laser_wavelength_nm",
+                        "scattering_angle_rad",
+                        "instrument_response",
+                        "optional signal uncertainty",
+                        "optional ion species and independently measured ion temperature/flow",
+                        "optional absolute-density optical geometry"
+                    ],
+                    "outputs": [
+                        "electron_temperature_profile_eV",
+                        "electron_density_profile_m3 where identifiable",
+                        "electron_velocity_projection_profile_m_s",
+                        "per-channel fit diagnostics"
+                    ],
+                    "scope": "Primary Analysis 1 path: infer physical parameters from measured calibrated multi-channel Thomson spectra."
+                },
+                {
+                    "name": "calibrated_profile_summary",
+                    "function": "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
+                    "inputs": [
+                        "radius_m",
+                        "density_m3",
+                        "temperature_ev"
+                    ],
+                    "outputs": [
+                        "profile gradients",
+                        "scale lengths",
+                        "profile summary"
+                    ],
+                    "scope": "Downstream utility only for independently obtained calibrated profiles; not the primary Analysis 1 input contract."
+                },
+                {
+                    "name": "spatial_profile_reconstruction",
+                    "function": "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile",
+                    "inputs": [
+                        "radius_m",
+                        "density_m3",
+                        "temperature_ev"
+                    ],
+                    "outputs": [
+                        "within-domain reconstructed profiles"
+                    ],
+                    "scope": "Downstream utility only for independently obtained calibrated profiles."
+                }
+            ],
         "test_links": [
             "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients",
             "tests/test_thomson_workflow.py::test_thomson_workflow_preserves_sorted_uncertainties"
         ],
-        "completion_scope": "Calibrated profile analysis and within-domain reconstruction only. No machine dimensions, optical collection geometry, geometry-weighted volume averages, raw-spectrum fitting, scattered-power density inversion, or independent experimental validation."
+        "completion_scope": "Multi-channel spectral inference with declared Maxwellian/kappa model limits, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
     }
 },
     {"id":2,"name":"Langmuir Probe","module":"langmuir_probe","function":"analyze_langmuir_probe","execution_contract":{"schema_version":"1.0","execution_level":"analysis_pipeline","completeness":"complete_with_declared_scope","input_specs":[{"name":"voltage_V","unit":"V","required": True,"description":"One-dimensional real-numeric voltage sweep; at least eight finite paired samples and eight distinct voltage values after non-finite pair removal and duplicate-voltage averaging."},{"name":"current_A","unit":"A","required": True,"description":"One-dimensional real-numeric current samples aligned one-to-one with voltage_V; non-finite voltage/current pairs are discarded together."},{"name":"electron_fit_range","unit":"V","required": False,"description":"Physically selected electron-retarding interval for exponential-fit Te estimate."},{"name":"ion_fit_range","unit":"V","required": False,"description":"Physically selected ion-branch interval; required for density inversion."},{"name":"current_convention","unit":"text","required":False,"description":"Input polarity convention: electron_positive or ion_positive; default electron_positive."},{"name":"probe_area_m2","unit":"m^2","required":False,"description":"Positive effective ion-collection area for the declared probe geometry; required for density inversion."},{"name":"ion_mass_kg","unit":"kg","required":False,"description":"Positive mass of the assumed dominant ion species; required for density inversion."},{"name":"ion_saturation_coefficient","unit":"dimensionless","required":False,"description":"Positive coefficient from the explicitly selected sheath/Bohm model; no default is applied."},{"name":"sheath_model","unit":"text","required":False,"description":"Non-empty label documenting the source and validity of the selected sheath-model coefficient."}],"output_specs":[{"name":"processed_voltage_V","unit":"V","description":"Voltage samples after finite-pair filtering and duplicate-voltage aggregation, strictly ascending and used downstream."},{"name":"processed_current_A","unit":"A","description":"Current samples aligned with processed_voltage_V after polarity normalization and duplicate aggregation."},{"name":"dIdV_A_per_V","unit":"A V^-1","description":"Numerical gradient of processed current with respect to processed voltage."},{"name":"n_points","unit":"count","description":"Number of finite distinct voltage samples after cleaning."},{"name":"floating_potential_V","unit":"V","description":"Unique interpolated zero-current crossing; null if absent or ambiguous."},{"name":"floating_potential_candidates_V","unit":"V","description":"All distinct zero-current crossing candidates."},{"name":"floating_potential_status","unit":"text","description":"Explicit status for unique, absent, or ambiguous crossing."},{"name":"plasma_potential_proxy_V","unit":"V","description":"Voltage at maximum dI/dV; proxy only."},{"name":"ion_saturation_current_A","unit":"A","description":"Selected ion-window median or descriptive low-voltage-tail fallback."},{"name":"ion_saturation_current_method","unit":"text","description":"Method used to obtain ion saturation current."},{"name":"ion_density_estimate_m-3","unit":"m^-3","description":"Optional model-based density from fitted Te, selected ion current, collection area, ion mass and explicit sheath coefficient."},{"name":"ion_density_status","unit":"text","description":"Status of optional model-based ion-density inversion."},{"name":"ion_density_model","unit":"structured","description":"Records selected sheath model, coefficient, area, ion mass, equation and uncertainty limitations."},{"name":"electron_saturation_current_A","unit":"A","description":"Descriptive high-voltage-tail median."},{"name":"electron_temperature_eV","unit":"eV","description":"Optional electron-retarding exponential-fit temperature."},{"name":"electron_temperature_standard_error_eV","unit":"eV","description":"Optional covariance-based statistical standard error."},{"name":"electron_retarding_fit_R2","unit":"dimensionless","description":"Optional electron-fit R-squared."},{"name":"ion_saturation_linear_slope_A_per_V","unit":"A V^-1","description":"Optional ion-window linear-fit slope."},{"name":"ion_saturation_intercept_A","unit":"A","description":"Optional ion-window linear-fit intercept."},{"name":"ion_saturation_fit_R2","unit":"dimensionless","description":"Optional ion-window linear-fit R-squared."},{"name":"input_quality","unit":"structured","description":"Counts of input, finite, discarded and duplicate voltage samples plus voltage span and normalized current convention."},{"name":"electron_retarding_fit_residual_rms_A","unit":"A","description":"Optional RMS residual of the electron-retarding joint baseline-plus-exponential fit."},{"name":"electron_retarding_fit_normalized_rmse","unit":"dimensionless","description":"Optional residual RMS divided by the measured fit-window current span."},{"name":"electron_retarding_fit_status","unit":"text","description":"Explicit electron-fit status; inspect R-squared and residual metrics."},{"name":"sign_warning","unit":"text","description":"Optional warning when reported ion-saturation current sign conflicts with electron-positive convention."},{"name":"current_convention","unit":"text","description":"Normalized convention used by all returned current values: electron_positive."},{"name":"current_convention_input","unit":"text","description":"Original input current polarity convention before normalization."},{"name":"interpretation_warning","unit":"text","description":"Device-specific physical limitations and interpretation caveats."}],"assumptions":["Quasi-static I-V sweep with valid voltage/current calibration and known current polarity.","Electron temperature fit assumes an appropriate Maxwellian electron-retarding branch after ion-current baseline subtraction.","Fit intervals must be selected and justified for the experiment. Density inversion requires an explicit sheath coefficient, collection area, ion mass and both fit windows."],"preprocessing":["Reject mismatched and non-1D arrays; reject non-real numeric types; remove non-finite paired samples; average duplicate voltage points; require at least eight finite points and eight unique voltage values; sort paired samples consistently."],"algorithm":"Normalize polarity, validate and clean calibrated I-V pairs, aggregate duplicate voltages, compute zero crossings and dI/dV indicators, report labelled tail summaries, optionally fit selected electron and ion branches, and optionally invert ion density only from explicit sheath-model and geometry inputs.","uncertainty_model":"Input/calibration uncertainty is not automatically propagated; fit interval sensitivity and instrument calibration must be assessed externally.","limitations":["Does not replace probe-specific sheath theory or experimental calibration.","The dI/dV result is only a plasma-potential proxy. Ion density is a model-based estimate only when all required geometry and sheath-model inputs are supplied; particle flux is outside scope.","Automated fit-region selection is intentionally not performed."],"function_links":["tokamak_analysis.langmuir_probe.analyze_langmuir_probe","tis.core.langmuir_iv_analysis"],"raw_data_to_physics": False}},
