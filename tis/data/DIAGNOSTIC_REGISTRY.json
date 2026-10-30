@@ -20,21 +20,18 @@
       "input_specs": [
         {
           "name": "wavelength_nm",
-          "unit": "nm",
-          "required": true,
-          "description": "Calibrated wavelength axis shared across channels or supplied per channel."
+          "unit": "nm; 1-D shared or channel x wavelength 2-D",
+          "required": true
         },
         {
           "name": "spectra",
-          "unit": "calibrated spectral intensity",
-          "required": true,
-          "description": "Measured full spectra with shape (channel,wavelength); not pre-extracted ne/Te profiles."
+          "unit": "calibrated spectral intensity; channel x wavelength",
+          "required": true
         },
         {
           "name": "radius_m",
-          "unit": "m",
-          "required": true,
-          "description": "Calibrated spatial coordinate for each spectral channel."
+          "unit": "m; one per channel",
+          "required": true
         },
         {
           "name": "laser_wavelength_nm",
@@ -48,56 +45,44 @@
         },
         {
           "name": "instrument_response",
-          "unit": "normalized response matrix",
-          "required": true,
-          "description": "Required measured response: callable, 1-D kernel, 2-D matrix or channel-specific 3-D matrix; identity matrix must be explicitly justified."
+          "unit": "measured normalized response matrix/kernel/callable",
+          "required": true
         },
         {
           "name": "signal_uncertainty",
-          "unit": "same as spectra",
+          "unit": "spectral intensity; pointwise 1-sigma",
           "required": false
         },
         {
+          "name": "joint_spectral_covariance",
+          "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
+          "required": false,
+          "description": "Full positive-definite covariance in channel-major order; cannot be combined with signal_uncertainty."
+        },
+        {
           "name": "model",
-          "unit": "text",
-          "required": false,
-          "description": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian."
+          "unit": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian",
+          "required": false
         },
         {
-          "name": "ion_species",
-          "unit": "species list",
-          "required": false,
-          "description": "Explicit species list for collective inference."
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma",
+          "required": false
         },
         {
-          "name": "ion_fractions",
-          "unit": "dimensionless",
-          "required": false,
-          "description": "Explicit ion number fractions; required for multiple ion species and must sum to one."
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma; collective scalar geometry MC or non-collective analytic propagation",
+          "required": false
         },
         {
-          "name": "ion_temperature_eV",
-          "unit": "eV",
-          "required": false,
-          "description": "Independent ion-temperature measurements; required by the current collective backend."
+          "name": "incident_direction_uncertainty",
+          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
+          "required": false
         },
         {
-          "name": "ion_velocity_m_s",
-          "unit": "m s^-1",
-          "required": false,
-          "description": "Required in collective mode: independently measured ion flow vectors or explicit zero vectors declaring stationary ions."
-        },
-        {
-          "name": "electron_velocity_m_s",
-          "unit": "m s^-1",
-          "required": false,
-          "description": "Required in collective mode: independently measured electron-fluid flow vector or explicit zero vector declaring stationary electrons."
-        },
-        {
-          "name": "absolute_density_geometry",
-          "unit": "structured",
-          "required": false,
-          "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident beam direction, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density."
+          "name": "scattered_direction_uncertainty",
+          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
+          "required": false
         },
         {
           "name": "instrument_response_uncertainty",
@@ -105,104 +90,157 @@
           "required": false
         },
         {
-          "name": "laser_wavelength_uncertainty_nm",
-          "unit": "nm",
-          "required": false
-        },
-        {
-          "name": "scattering_angle_uncertainty_rad",
-          "unit": "rad",
-          "required": false
-        },
-        {
-          "name": "laser_power_uncertainty_W",
-          "unit": "W",
-          "required": false
-        },
-        {
-          "name": "interaction_length_uncertainty_m",
-          "unit": "m",
-          "required": false
-        },
-        {
-          "name": "collection_solid_angle_uncertainty_sr",
-          "unit": "sr",
-          "required": false
-        },
-        {
-          "name": "optical_efficiency_uncertainty",
-          "unit": "dimensionless",
-          "required": false
-        },
-        {
-          "name": "polarization_factor_uncertainty",
-          "unit": "dimensionless",
-          "required": false
-        },
-        {
-          "name": "incident_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false,
-          "description": "Incident beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
-        },
-        {
-          "name": "scattered_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false,
-          "description": "Scattered beam propagation unit vector in the same laboratory coordinate frame as collective-mode ion/electron flow vectors; required for collective Maxwellian inference."
-        },
-        {
-          "name": "joint_spectral_covariance",
-          "unit": "(channel*wavelength)^2 covariance matrix, channel-major order",
-          "required": false,
-          "description": "Full positive-definite cross-wavelength and cross-channel covariance; currently supported for non-collective Maxwellian and Kappa joint GLS."
-        },
-        {
-          "name": "ion_temperature_uncertainty_eV",
-          "unit": "eV, one 1-sigma value per ion species",
-          "required": false
-        },
-        {
-          "name": "ion_velocity_uncertainty_m_s",
-          "unit": "m s^-1, one 3-vector of component uncertainties per species",
-          "required": false
-        },
-        {
-          "name": "electron_velocity_uncertainty_m_s",
-          "unit": "m s^-1, 3-vector of component uncertainties",
-          "required": false
-        },
-        {
-          "name": "collective_external_parameter_mc_samples",
-          "unit": "count",
-          "required": false
-        },
-        {
-          "name": "density_relative_covariance",
-          "unit": "6x6 relative covariance",
-          "required": false,
-          "description": "Full covariance for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor; mutually exclusive with separate scalar optical-factor uncertainties."
-        },
-        {
-          "name": "incident_direction_uncertainty",
-          "unit": "component-wise 1-sigma dimensionless 3-vector",
-          "required": false,
-          "description": "Collective mode only; component uncertainties for the incident beam direction, propagated by Monte Carlo after vector normalization."
-        },
-        {
-          "name": "scattered_direction_uncertainty",
-          "unit": "component-wise 1-sigma dimensionless 3-vector",
-          "required": false,
-          "description": "Collective mode only; component uncertainties for the scattered beam direction, propagated by Monte Carlo after vector normalization."
-        },
-        {
           "name": "instrument_response_mc_samples",
           "unit": "count",
           "required": false
         },
         {
+          "name": "instrument_response_mc_min_success_fraction",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "laser_power_w",
+          "unit": "W; incident power at scattering volume",
+          "required": false
+        },
+        {
+          "name": "interaction_length_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_sr",
+          "unit": "sr",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "spectral_power_density_calibrated",
+          "unit": "boolean; must be true to identify absolute density from W/nm spectra",
+          "required": false,
+          "description": "Explicit declaration that measured spectral density is calibrated in W/nm; false by default."
+        },
+        {
+          "name": "laser_power_uncertainty_W",
+          "unit": "W; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "interaction_length_uncertainty_m",
+          "unit": "m; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_uncertainty_sr",
+          "unit": "sr; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency_uncertainty",
+          "unit": "dimensionless; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "polarization_factor_uncertainty",
+          "unit": "dimensionless; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "density_relative_covariance",
+          "unit": "6x6 relative covariance for scattered power and five optical inputs; sole uncertainty model for these factors",
+          "required": false,
+          "description": "Complete relative covariance for the six density inversion inputs; do not also provide scalar uncertainty inputs for those factors."
+        },
+        {
+          "name": "ion_species",
+          "unit": "explicit collective ion species list",
+          "required": false
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "one charge-density fraction per ion species; sum to one",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one fixed external value per ion species",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s^-1; species x 3 fixed external flow vectors",
+          "required": false
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1; fixed external 3-vector",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV; per species 1-sigma",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_uncertainty_m_s",
+          "unit": "m s^-1; species x 3 component-wise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "electron_velocity_uncertainty_m_s",
+          "unit": "m s^-1; 3-vector component-wise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "collective_initial_density_m3",
+          "unit": "m^-3; optimizer initial estimate, not fixed inferred value",
+          "required": false,
+          "description": "Numerical optimizer seed only; not a fixed physical input."
+        },
+        {
+          "name": "collective_initial_temperature_eV",
+          "unit": "eV; optimizer initial estimate, not fixed inferred value",
+          "required": false,
+          "description": "Numerical optimizer seed only; not a fixed physical input."
+        },
+        {
+          "name": "collective_density_bounds_m3",
+          "unit": "m^-3; optional positive optimizer bounds",
+          "required": false
+        },
+        {
+          "name": "collective_temperature_bounds_eV",
+          "unit": "eV; optional positive optimizer bounds",
+          "required": false
+        },
+        {
           "name": "collective_external_parameter_mc_samples",
           "unit": "count",
+          "required": false
+        },
+        {
+          "name": "absolute_density_geometry",
+          "unit": "structured convenience grouping for the optical power, geometry and polarization inputs above",
           "required": false
         }
       ],
@@ -236,6 +274,26 @@
         {
           "name": "electron_velocity_projection_uncertainty_profile_m_s",
           "unit": "m s^-1"
+        },
+        {
+          "name": "joint_inference",
+          "unit": "structured",
+          "description": "Joint GLS parameters, covariance and fit diagnostics when joint_spectral_covariance is supplied."
+        },
+        {
+          "name": "collective_external_parameter_covariance",
+          "unit": "parameter covariance",
+          "description": "Cross-channel covariance of density, temperature and projected electron/ion flows from collective external-input Monte Carlo."
+        },
+        {
+          "name": "collective_external_parameter_covariance_order",
+          "unit": "ordered labels",
+          "description": "Names corresponding to the collective external-parameter covariance rows and columns."
+        },
+        {
+          "name": "model_discrepancy_covariance",
+          "unit": "parameter covariance",
+          "description": "Residual-based model-adequacy covariance, only when a supported reduced chi-square and fit covariance are available."
         }
       ],
       "assumptions": [
@@ -4161,6 +4219,41 @@
           "unit": "m s^-1",
           "required": true,
           "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed."
+        },
+        {
+          "name": "electron_density_initial_m3",
+          "unit": "m^-3; optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "electron_temperature_initial_eV",
+          "unit": "eV; optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_initial_eV",
+          "unit": "eV; common ion-temperature optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_initial_m_s",
+          "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
+          "required": false
+        },
+        {
+          "name": "global_search",
+          "unit": "boolean; enables differential-evolution global initialization",
+          "required": false
+        },
+        {
+          "name": "random_seed",
+          "unit": "integer; deterministic search seed",
+          "required": false
+        },
+        {
+          "name": "response_mc_samples",
+          "unit": "count",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4761,6 +4854,11 @@
           "unit": "(2N x 2N) covariance",
           "required": false,
           "description": "Full joint covariance ordered [density_0..N-1, temperature_0..N-1], propagated jointly through the downstream profile fit."
+        },
+        {
+          "name": "uncertainty_mc_samples",
+          "unit": "count; minimum 20",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4799,6 +4897,14 @@
         {
           "name": "reconstructed_density_temperature_cross_covariance",
           "unit": "N_grid x N_grid covariance"
+        },
+        {
+          "name": "reconstructed_temperature_lower_95_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "reconstructed_temperature_upper_95_eV",
+          "unit": "eV"
         }
       ],
       "assumptions": [
