@@ -209,10 +209,16 @@ def test_generic_probe_entry_point_uses_canonical_langmuir_contract():
     assert generic["electron_temperature_estimate_eV"] == canonical["electron_temperature_eV"]
 
 
-def test_generic_probe_entry_point_enforces_canonical_minimum_sample_count():
+def test_generic_probe_entry_point_preserves_documented_short_sweep_compatibility():
     from tokamak_analysis.probe_analysis import analyze_probe_voltage_current
-    with pytest.raises(ValueError, match="At least 8 valid voltage points"):
-        analyze_probe_voltage_current(np.arange(7.0), np.arange(7.0))
+    # The canonical Langmuir workflow requires eight distinct samples. The
+    # generic compatibility adapter intentionally retains descriptive-only
+    # behavior for 5–7 point legacy sweeps; it does not perform canonical fits.
+    result = analyze_probe_voltage_current(np.arange(7.0), np.arange(7.0))
+    assert result["sample_count"] == 7
+    assert result["floating_potential_V"] == 0.0
+    assert result["electron_temperature_eV"] is None
+    assert result["analysis_scope"] == "descriptive_short_sweep_compatibility_only"
 
 
 def test_public_langmuir_contract_omits_optional_estimates_when_not_requested():
