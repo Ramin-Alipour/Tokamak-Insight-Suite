@@ -202,3 +202,13 @@ def test_public_wrapper_forwards_current_uncertainty_and_current_convention():
     assert result["current_convention"] == "electron_positive"
     assert result["floating_potential_standard_uncertainty_V"] is not None
 
+def test_smoothed_derivative_helper_reports_second_derivative_zero_crossings_separately():
+    from tokamak_analysis.langmuir_advanced import estimate_smoothed_plasma_potential_candidates
+    v = np.linspace(-2.0, 2.0, 81)
+    i = v**3 + 0.01 * v
+    result = estimate_smoothed_plasma_potential_candidates(v, i, window_length=9, polynomial_order=3)
+    assert "raw_d2IdV2_zero_crossing_candidates_V" in result
+    assert "smoothed_d2IdV2_zero_crossing_candidates_V" in result
+    assert result["second_derivative_inflection_method"].startswith("zero_crossings_of_d2IdV2")
+    assert "raw_max_d2IdV2_extremum_V" in result
+
