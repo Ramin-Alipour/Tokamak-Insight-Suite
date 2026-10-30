@@ -24,6 +24,10 @@ def analyze_langmuir_probe(
     electron_temperature_calibration_relative_uncertainty=None,
     electron_temperature_fit_window_relative_uncertainty=None,
     density_model_relative_uncertainty=None,
+    ion_charge_state=1,
+    fit_quality_min_r2=0.98,
+    fit_quality_max_nrmse=0.1,
+    ion_flatness_max_relative_change=0.1,
 ):
     """Analyze one calibrated Langmuir I–V sweep with explicit physical assumptions.
 
@@ -51,6 +55,10 @@ def analyze_langmuir_probe(
         electron_temperature_calibration_relative_uncertainty=electron_temperature_calibration_relative_uncertainty,
         electron_temperature_fit_window_relative_uncertainty=electron_temperature_fit_window_relative_uncertainty,
         density_model_relative_uncertainty=density_model_relative_uncertainty,
+        ion_charge_state=ion_charge_state,
+        fit_quality_min_r2=fit_quality_min_r2,
+        fit_quality_max_nrmse=fit_quality_max_nrmse,
+        ion_flatness_max_relative_change=ion_flatness_max_relative_change,
     )
 
 
