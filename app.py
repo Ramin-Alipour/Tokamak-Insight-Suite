@@ -2751,7 +2751,9 @@ elif page=='Advanced Analysis':
             uncertainty_options=['(none)']+numeric
             signal_unc_col=st.selectbox('Optional spectral 1-sigma uncertainty',uncertainty_options,key='tis_ts_unc')
             laser_nm=st.number_input('Incident laser wavelength (nm)',min_value=1e-9,value=532.0,key='tis_ts_laser')
+            laser_nm_unc=st.number_input('Laser-wavelength 1-sigma uncertainty (nm)',min_value=0.0,value=0.0,key='tis_ts_laser_unc')
             angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
+            angle_deg_unc=st.number_input('Scattering-angle 1-sigma uncertainty (degrees)',min_value=0.0,value=0.0,key='tis_ts_angle_unc')
             model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
             response_file=st.file_uploader('Instrument line-spread response matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf')
             response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
@@ -2760,8 +2762,10 @@ elif page=='Advanced Analysis':
                 st.caption('Collective mode requires explicit ion species and independently measured/supplied ion temperatures. No missing ion temperature is assumed.')
                 ion_species_text=st.text_input('Ion species (comma-separated PlasmaPy names, e.g. H+, He-4 2+)',value='H+',key='tis_ts_ions')
                 ion_temperature_text=st.text_input('Ion temperature(s), eV (comma-separated; one per species)',value='',key='tis_ts_ti')
-                ion_velocity_text=st.text_input('Ion velocity vector (vx,vy,vz) in m/s; optional common vector',value='0,0,0',key='tis_ts_vi')
-                electron_velocity_text=st.text_input('Electron fluid velocity vector (vx,vy,vz) in m/s; optional',value='0,0,0',key='tis_ts_ve')
+                ion_velocity_text=st.text_input('Measured ion velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_vi')
+                assume_ion_stationary=st.checkbox('Explicitly assume zero ion flow when no ion velocity is supplied',value=False,key='tis_ts_vi_zero')
+                electron_velocity_text=st.text_input('Measured electron-fluid velocity vector (vx,vy,vz) in m/s; blank if unavailable',value='',key='tis_ts_ve')
+                assume_electron_stationary=st.checkbox('Explicitly assume zero electron-fluid flow when no velocity is supplied',value=False,key='tis_ts_ve_zero')
             with st.expander('Optional absolute-density inference (requires spectral intensity in W/nm)'):
                 power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
                 laser_power=st.number_input('Incident laser power at scattering volume (W)',min_value=0.0,value=0.0,key='tis_ts_power')
@@ -2806,10 +2810,10 @@ elif page=='Advanced Analysis':
                         ion_t=[float(v.strip()) for v in ion_temperature_text.split(',') if v.strip()]
                         if len(ion_t)!=len(species):
                             raise ValueError('Provide one independently measured ion temperature for each ion species.')
-                        iv=np.array([float(v.strip()) for v in ion_velocity_text.split(',')])
-                        ev=np.array([float(v.strip()) for v in electron_velocity_text.split(',')])
+                        iv=np.array([float(v.strip()) for v in ion_velocity_text.split(',')]) if ion_velocity_text.strip() else (np.zeros(3) if assume_ion_stationary else np.array([]))
+                        ev=np.array([float(v.strip()) for v in electron_velocity_text.split(',')]) if electron_velocity_text.strip() else (np.zeros(3) if assume_electron_stationary else np.array([]))
                         if iv.size!=3 or ev.size!=3:
-                            raise ValueError('Ion and electron velocity inputs must each contain three components.')
+                            raise ValueError('Supply each measured velocity vector, or explicitly check the corresponding stationary-flow assumption.')
                         kwargs.update(ion_species=species,ion_temperature_eV=ion_t,
                                      ion_velocity_m_s=np.tile(iv,(len(species),1)),electron_velocity_m_s=ev)
                     if power_calibrated:
@@ -2830,6 +2834,8 @@ elif page=='Advanced Analysis':
                     result=analyze_thomson_spectra(
                         np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
                         laser_wavelength_nm=float(laser_nm),scattering_angle_rad=float(np.deg2rad(angle_deg)),
+                        laser_wavelength_uncertainty_nm=float(laser_nm_unc),
+                        scattering_angle_uncertainty_rad=float(np.deg2rad(angle_deg_unc)),
                         instrument_response=response,instrument_response_uncertainty=response_unc,
                         signal_uncertainty=None if not uncertainties else np.asarray(uncertainties),
                         model=('collective_maxwellian' if model_label.startswith('Collective') else ('non_collective_kappa' if model_label.startswith('Non-collective kappa') else 'non_collective_maxwellian')),
@@ -2838,7 +2844,9 @@ elif page=='Advanced Analysis':
                     result_frame=pd.DataFrame({
                         'Channel':result['channel_ids'],'Radius (m)':result['radius_m'],
                         'Electron temperature (eV)':result['electron_temperature_profile_eV'],
+                        'Electron temperature uncertainty (eV)':result['electron_temperature_uncertainty_profile_eV'],
                         'Electron density (m^-3)':result['electron_density_profile_m3'],
+                        'Electron density uncertainty (m^-3)':result['electron_density_uncertainty_profile_m3'],
                         'Electron velocity projection (m/s)':result['electron_velocity_projection_profile_m_s']})
                     st.session_state['tis_thomson_spectral_inference']={'data_sha':sha,'result':result,'frame':result_frame}
                 except Exception as e:
