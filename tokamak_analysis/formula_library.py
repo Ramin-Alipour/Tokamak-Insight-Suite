@@ -243,7 +243,10 @@ def langmuir_bohm_particle_flux(
 
 
 def langmuir_multispecies_ion_density(
-    ion_saturation_current_A, electron_temperature_eV, probe_area_m2, species,
+    ion_saturation_current_A, electron_temperature_eV, probe_area_m2, species, *,
+    current_standard_uncertainty_A=None,
+    temperature_relative_standard_uncertainty=None,
+    area_relative_standard_uncertainty=None,
 ):
     """Species-summed Bohm/sheath density; species require mass, Z, number fraction and C_s."""
     current = abs(_finite("ion_saturation_current_A", ion_saturation_current_A))
@@ -261,18 +264,74 @@ def langmuir_multispecies_ion_density(
         charge = item["charge_state"]
         if isinstance(charge, bool) or not isinstance(charge, (int, np.integer)) or charge < 1:
             raise ValueError("Each species charge_state must be a positive integer.")
-        normalized.append({"mass_kg": mass, "fraction": fraction, "charge_state": int(charge),
-                           "sheath_coefficient": coefficient})
+        item_out = {"mass_kg": mass, "fraction": fraction, "charge_state": int(charge),
+                    "sheath_coefficient": coefficient}
+        for key in ("mass_relative_standard_uncertainty", "sheath_coefficient_relative_standard_uncertainty"):
+            if key in item:
+                item_out[key] = _nonnegative(key, item[key])
+        if "fraction_relative_standard_uncertainty" in item:
+            raise ValueError(
+                "Independent fraction uncertainty is not supported: number-density fractions are constrained "
+                "to sum to one and require a composition covariance model."
+            )
+        normalized.append(item_out)
     fraction_sum = sum(item["fraction"] for item in normalized)
     if not math.isclose(fraction_sum, 1.0, rel_tol=1e-6, abs_tol=1e-8):
         raise ValueError("Ion species number-density fractions must sum to 1.")
     factor = sum(item["fraction"] * item["sheath_coefficient"] * item["charge_state"]**1.5
                  / math.sqrt(item["mass_kg"]) for item in normalized)
     density = current / (E_CHARGE * area * math.sqrt(E_CHARGE * temperature) * factor)
-    return {"ion_density_m3": density, "ion_species": normalized,
-            "ion_species_fraction_sum": fraction_sum,
-            "uncertainty_ion_density_m3": None,
-            "uncertainty_status": "not_propagated_species_fraction_covariance_and_species_model_uncertainties_not_supplied"}
+    scalar_sigmas = {
+        "ion_saturation_current": (current_standard_uncertainty_A, current),
+        "electron_temperature": (temperature_relative_standard_uncertainty, temperature),
+        "probe_area": (area_relative_standard_uncertainty, area),
+    }
+    variance_terms = {}
+    omitted = ["species_number_density_fraction_covariance"]
+    for label, (sigma, nominal) in scalar_sigmas.items():
+        if sigma is None:
+            omitted.append(label)
+            continue
+        sigma = _nonnegative(label + "_standard_uncertainty", sigma)
+        relative = sigma / nominal if label == "ion_saturation_current" else sigma
+        if label == "electron_temperature":
+            relative *= 0.5
+        variance_terms[label] = relative ** 2
+    species_weights = []
+    for index, item in enumerate(normalized):
+        weight = (item["fraction"] * item["sheath_coefficient"] * item["charge_state"] ** 1.5
+                  / math.sqrt(item["mass_kg"])) / factor
+        entry = {"species_index": index, "denominator_weight_fraction": weight}
+        for label, key, multiplier in (
+            ("mass", "mass_relative_standard_uncertainty", 0.5 * weight),
+            ("sheath_coefficient", "sheath_coefficient_relative_standard_uncertainty", weight),
+        ):
+            sigma = item.get(key)
+            if sigma is None:
+                omitted.append(f"species_{index}_{label}")
+            else:
+                variance_terms[f"species_{index}_{label}"] = (multiplier * sigma) ** 2
+                entry[key] = sigma
+        species_weights.append(entry)
+    propagated = bool(variance_terms)
+    relative_sigma = math.sqrt(sum(variance_terms.values())) if propagated else None
+    return {
+        "ion_density_m3": density,
+        "ion_species": normalized,
+        "ion_species_fraction_sum": fraction_sum,
+        "uncertainty_ion_density_m3": density * relative_sigma if relative_sigma is not None else None,
+        "uncertainty_relative_ion_density": relative_sigma,
+        "uncertainty_components_relative": {
+            key: math.sqrt(value) for key, value in variance_terms.items()
+        },
+        "uncertainty_omitted_components": omitted,
+        "uncertainty_species_weights": species_weights,
+        "uncertainty_propagation_performed": propagated,
+        "uncertainty_status": (
+            "partial_independent_input_propagation_composition_covariance_excluded"
+            if propagated else "not_propagated_no_uncertainty_inputs_supplied"
+        ),
+    }
 
 def ion_temperature_from_doppler_sigma(sigma_lambda, lambda0, ion_mass_kg, *,
                                         sigma_sigma_lambda=None, sigma_lambda0=None, sigma_ion_mass_kg=None):
