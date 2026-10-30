@@ -405,6 +405,7 @@ def analyze_thomson_spectra(
     spectral_power_density_calibrated=False, laser_power_uncertainty_W=None,
     interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
+    density_relative_covariance=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
@@ -705,7 +706,7 @@ def analyze_thomson_spectra(
             if lsf_unc is not None:
                 missing_uncertainties.append("instrument_response_uncertainty_not_propagated_for_collective_model")
                 fit["instrument_response_uncertainty_propagated"] = False
-        if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)):
+        if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)) and density_relative_covariance is None:
             for key,value in (("laser_power_uncertainty_W",laser_power_uncertainty_W),
                               ("interaction_length_uncertainty_m",interaction_length_uncertainty_m),
                               ("collection_solid_angle_uncertainty_sr",collection_solid_angle_uncertainty_sr),
