@@ -399,7 +399,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if fast and fast["kind"]=="infer_tabulated_1d":
             masses=_softmax(np.r_[p[5:],0.0])
             pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
-            d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])
+            d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])*float(np.ptp(fast["vdf"]["velocity_m_s"]))**2
             scale=max(float(np.max(pdf)),np.finfo(float).tiny)
             penalties.append(np.sqrt(regularization_strength)*np.sqrt(max(fast["vdf"]["smoothness_parameter"],1e-12))*(d2@pdf)/scale)
         return np.r_[data,*penalties]
