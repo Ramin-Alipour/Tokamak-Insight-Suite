@@ -293,6 +293,8 @@ def analyze_thomson_spectra(
     when all optical-power/geometry/polarization factors are supplied.
     """
     y = _finite_array(spectra, "spectra", 2)
+    if y.shape[1] < 7:
+        raise ValueError("Each Thomson spectrum must contain at least seven wavelength samples")
     radii = _finite_array(radius_m, "radius_m", 1)
     if y.shape[0] != radii.size:
         raise ValueError("radius_m length must equal the number of spectral channels")
@@ -307,6 +309,8 @@ def analyze_thomson_spectra(
         raise ValueError("wavelength_nm must be shared 1-D or channel-shaped 2-D")
     if np.any(np.diff(xs, axis=1) <= 0):
         raise ValueError("Each channel wavelength axis must be strictly increasing")
+    if np.any(xs <= 0):
+        raise ValueError("Wavelength samples must be positive")
     if instrument_response is None:
         raise ValueError("A measured instrument-response matrix is required; supply an identity matrix only when a delta-like response is explicitly justified.")
     if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0:
