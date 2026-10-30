@@ -182,6 +182,36 @@ def test_projected_relativistic_maxwell_juttner_model_is_available():
     assert "Maxwell-Juttner" in out["channels"][0]["model"]
 
 
+def test_relativistic_maxwell_juttner_flow_uses_relativistic_doppler_inversion():
+    x = np.linspace(430.0, 680.0, 2001)
+    laser = 532.0
+    angle = np.pi / 2
+    beta_bulk = 0.02
+    sine = np.sin(angle / 2.0)
+    center = laser * (1.0 + beta_bulk * sine) / (1.0 - beta_bulk * sine)
+    te = 300.0
+    theta = te / 510998.95069
+    ratio = x / center
+    beta = (ratio - 1.0) / (sine * (ratio + 1.0))
+    valid = np.abs(beta) < 1.0
+    gamma = 1.0 / np.sqrt(1.0 - beta[valid]**2)
+    marginal = np.exp(-(gamma - 1.0) / theta) * (
+        gamma**2 + 2.0 * theta * gamma + 2.0 * theta**2
+    )
+    jacobian = 2.0 / (sine * center * (ratio[valid] + 1.0)**2)
+    signal = np.full_like(x, 20.0)
+    signal[valid] += 900.0 * marginal * jacobian
+
+    out = analyze_thomson_spectra(
+        x, signal[None, :], [0.18], laser_wavelength_nm=laser,
+        scattering_angle_rad=angle, instrument_response=np.eye(x.size),
+        model="relativistic_maxwell_juttner",
+    )
+    assert out["channels"][0]["electron_velocity_projection_m_s"] == pytest.approx(
+        beta_bulk * 299792458.0, rel=0.005
+    )
+
+
 def test_registry_resolves_primary_thomson_spectral_workflow():
     from tokamak_analysis.analysis_registry import resolve_analysis
     entrypoint=resolve_analysis(1)
