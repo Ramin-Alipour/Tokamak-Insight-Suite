@@ -188,3 +188,10 @@ For a single ion species with charge state Z_i, the Bohm speed used by the decla
 
 
 For the local polynomial smoothing method, see Fan, J. and Gijbels, I., *Local Polynomial Modelling and Its Applications*, Chapman & Hall (1996). This is a numerical smoothing/derivative-estimation method in the supplied voltage coordinate, not a new plasma constitutive relation.
+
+
+The stretched-exponential helper uses the mirrored increasing-branch KWW form
+
+\[I(V)=I_0+A\exp\left[-\left(s(V_{\rm ref}-V)\right)^\beta\right],\qquad V\leq V_{\rm ref}.\]
+
+Here V_ref is exactly the upper endpoint of the selected fit window; it is not inferred as the plasma potential. The KWW exponent and scale are empirical curve-shape parameters only. This is not a Langmuir-probe constitutive law, not an EEDF model and not a kinetic kappa parameterization. The KWW literature is cited only for the generic empirical function form.
