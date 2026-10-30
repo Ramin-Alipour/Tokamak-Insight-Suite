@@ -115,7 +115,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                          ion_charge_state: int = 1,
                          fit_quality_min_r2: float = 0.98,
                          fit_quality_max_nrmse: float = 0.1,
-                         ion_flatness_max_relative_change: float = 0.1) -> dict[str, Any]:
+                         ion_flatness_max_relative_change: float = 0.1,
+                         allow_density_when_numerical_screen_fails: bool = False) -> dict[str, Any]:
     """Analyze a calibrated Langmuir I-V sweep with optional explicit sheath-model density.
 
     Density requires explicit collection area, ion mass, sheath-model coefficient and
@@ -133,6 +134,8 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             raise ValueError(f"{name} must be a finite real scalar.")
     if not (0.0 <= fit_quality_min_r2 <= 1.0 and fit_quality_max_nrmse > 0.0 and ion_flatness_max_relative_change >= 0.0):
         raise ValueError("Numerical screening thresholds must satisfy 0<=R2<=1, NRMSE>0 and flatness>=0.")
+    if not isinstance(allow_density_when_numerical_screen_fails, bool):
+        raise ValueError("allow_density_when_numerical_screen_fails must be a boolean explicit override.")
     if current_uncertainty_A is not None and (not _is_finite_real_scalar(current_uncertainty_A) or current_uncertainty_A < 0):
         raise ValueError("current_uncertainty_A must be a finite non-negative real scalar.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
@@ -566,12 +569,15 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         electron_numerical_fit_pass = (
             out.get("electron_retarding_fit_status") == "numerical_fit_review_pass_not_physical_validation"
         )
-        if not electron_numerical_fit_pass:
-            raise ValueError("Ion-density inversion requires an electron-retarding fit that passes the numerical R-squared and normalized-RMSE screen; a positive Te from a weak fit is not sufficient.")
-        if not ion_numerical_fit_pass or not ion_flatness_pass:
+        numerical_screen_pass = bool(
+            electron_numerical_fit_pass and ion_numerical_fit_pass and ion_flatness_pass
+        )
+        if not numerical_screen_pass and not allow_density_when_numerical_screen_fails:
             raise ValueError(
-                "Ion-density inversion requires an ion-branch fit that passes numerical fit-quality "
-                "and numerically flat ion-branch screening; revise ion_fit_range and inspect the I-V curve."
+                "Ion-density inversion is blocked because one or more configurable numerical review "
+                "screens failed. These screens are not physical-regime criteria. Review the I-V fit "
+                "and thresholds; set allow_density_when_numerical_screen_fails=True only to explicitly "
+                "request a provisional calculation from the available fitted values."
             )
         if not _is_finite_real_scalar(te) or te <= 0:
             raise ValueError("A positive fitted electron temperature is required for ion-density inversion.")
@@ -589,11 +595,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         out["ion_density_estimate_m-3"] = float(density)
         out["ion_density_status"] = (
             "model_based_estimate_review_assumptions"
-            if ion_numerical_fit_pass and ion_flatness_pass
-            else "provisional_model_based_estimate_ion_branch_screening_not_passed"
+            if numerical_screen_pass
+            else "provisional_model_based_estimate_numerical_screen_override_used"
         )
-        out["ion_density_numerical_fit_screen_passed"] = bool(ion_numerical_fit_pass)
+        out["ion_density_numerical_fit_screen_passed"] = bool(electron_numerical_fit_pass and ion_numerical_fit_pass)
         out["ion_density_current_flatness_screen_passed"] = bool(ion_flatness_pass)
+        out["ion_density_numerical_screen_override_used"] = bool(
+            allow_density_when_numerical_screen_fails and not numerical_screen_pass
+        )
         out["ion_density_physical_regime_confirmed"] = False
         uncertainty_inputs = {
             **density_uncertainty_inputs,
