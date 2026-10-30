@@ -929,17 +929,28 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
             if len(area_samples) >= required_successes:
-                fit_area_uncertainty = density_inputs["scattered_power_uncertainty_W"]
-                fit_area_uncertainty = 0.0 if fit_area_uncertainty is None else float(fit_area_uncertainty)
+                fit_area_uncertainty = float(fit.get("integrated_scattered_power_uncertainty_W") or 0.0)
                 lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
-                combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
                 if density_inputs.get("relative_input_covariance") is None:
+                    combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
                     density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
                 else:
-                    # The supplied relative covariance is authoritative. Its
-                    # scattered-power variance must already include the spectral
-                    # fit and response contributions; never mix it with scalars.
+                    # Preserve the caller's full optical-input correlation model,
+                    # while adding the independently sampled response contribution
+                    # to its scattered-power marginal. The covariance remains the
+                    # sole uncertainty input to the density inversion.
+                    covariance = np.asarray(density_inputs["relative_input_covariance"], dtype=float).copy()
+                    base_relative_sigma = float(np.sqrt(max(covariance[0, 0], 0.0)))
+                    lsf_relative_sigma = 0.0 if area == 0.0 else lsf_area_uncertainty / abs(area)
+                    combined_relative_sigma = float(np.hypot(base_relative_sigma, lsf_relative_sigma))
+                    if base_relative_sigma > 0.0:
+                        scale_covariance = combined_relative_sigma / base_relative_sigma
+                        covariance[0, :] *= scale_covariance
+                        covariance[:, 0] *= scale_covariance
+                    covariance[0, 0] = combined_relative_sigma**2
+                    density_inputs["relative_input_covariance"] = covariance
                     density_inputs["scattered_power_uncertainty_W"] = None
+                    combined_area_uncertainty = float(abs(area) * combined_relative_sigma)
                 density_result = density_from_thomson_scattered_power(**density_inputs)
                 fit["electron_density_m3"] = density_result["electron_density_m3"]
                 fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
