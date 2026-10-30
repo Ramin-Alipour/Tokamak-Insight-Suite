@@ -854,3 +854,37 @@ def langmuir_ion_density_from_saturation_current(
         out["uncertainty_ion_density_m3"] = density * relative
     return out
 
+
+
+def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad, *, sigma_intrinsic_sigma_nm=None, sigma_laser_wavelength_nm=None, sigma_scattering_angle_rad=None):
+    """Non-relativistic Maxwellian Te from instrument-corrected Thomson width."""
+    sigma=_positive("intrinsic_sigma_nm",intrinsic_sigma_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
+    if not 0 < angle <= math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi].")
+    supplied=(sigma_intrinsic_sigma_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
+    if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
+    sine=math.sin(angle/2); te=(sigma/laser)**2*510998.95069/(4*sine**2); out={"electron_temperature_eV":te}
+    if all(v is not None for v in supplied):
+        ss,sl,sa=[_nonnegative(n,v) for n,v in zip(("sigma_intrinsic_sigma_nm","sigma_laser_wavelength_nm","sigma_scattering_angle_rad"),supplied)]
+        out["uncertainty_electron_temperature_eV"]=te*math.sqrt((2*ss/sigma)**2+(2*sl/laser)**2+(math.cos(angle/2)/sine*sa)**2)
+    return out
+
+
+def thomson_velocity_projection(fitted_center_nm, laser_wavelength_nm, scattering_angle_rad, *, sigma_fitted_center_nm=None, sigma_laser_wavelength_nm=None, sigma_scattering_angle_rad=None):
+    """Non-relativistic Doppler projection from the fitted Thomson centroid."""
+    center=_positive("fitted_center_nm",fitted_center_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
+    if not 0 < angle <= math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi].")
+    supplied=(sigma_fitted_center_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
+    if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
+    sine=math.sin(angle/2); velocity=-C_LIGHT*(center-laser)/(2*laser*sine)
+    if abs(velocity)>=C_LIGHT: raise ValueError("Fitted centroid implies a superluminal non-relativistic flow projection.")
+    out={"electron_velocity_projection_m_s":velocity}
+    if all(v is not None for v in supplied):
+        sc,sl,sa=[_nonnegative(n,v) for n,v in zip(("sigma_fitted_center_nm","sigma_laser_wavelength_nm","sigma_scattering_angle_rad"),supplied)]
+        out["uncertainty_electron_velocity_projection_m_s"]=math.sqrt((C_LIGHT*sc/(2*laser*sine))**2+(C_LIGHT*center*sl/(2*laser**2*sine))**2+(0.5*velocity*math.cos(angle/2)/sine*sa)**2)
+    return out
+
+
+def thomson_density_from_scattered_power(*args, **kwargs):
+    """Expose the shared polarization-aware absolute Thomson-density inversion."""
+    from .thomson_scattering import density_from_thomson_scattered_power
+    return density_from_thomson_scattered_power(*args, **kwargs)

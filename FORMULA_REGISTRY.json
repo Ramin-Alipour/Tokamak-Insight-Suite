@@ -2760,5 +2760,207 @@
       ],
       "note": "Species-summed extension of published Bohm/sheath current balance; analytic/software verification only, not empirical validation."
     }
+  },
+  {
+    "name": "Thomson electron temperature from intrinsic spectral width",
+    "equation": "T_e = (σ_λ/λ_0)^2 (m_e c²/4) / sin²(θ/2)",
+    "inputs": "Intrinsic instrument-corrected width [nm], laser wavelength [nm], scattering angle [rad]",
+    "output": "eV",
+    "assumptions": "Single scattering; isotropic non-relativistic Maxwellian electrons; instrument-corrected width; known geometry",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_electron_temperature_from_spectral_width",
+      "formula_key": "thomson_electron_temperature_from_spectral_width",
+      "input_specs": [
+        {
+          "name": "intrinsic_sigma_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "sigma_intrinsic_sigma_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "sigma_laser_wavelength_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "sigma_scattering_angle_rad",
+          "unit": "rad",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "uncertainty_electron_temperature_eV",
+          "unit": "eV"
+        }
+      ],
+      "prerequisites": [
+        "Single scattering",
+        "isotropic non-relativistic Maxwellian electrons",
+        "instrument-corrected width",
+        "known geometry"
+      ],
+      "uncertainty_model": "Independent first-order propagation of width, laser-wavelength and angle uncertainties.",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
+      ],
+      "note": "Analytic software calculation with numerical tests; not empirical validation."
+    }
+  },
+  {
+    "name": "Thomson electron-flow projection from spectral centroid",
+    "equation": "v_q = -c(λ_c-λ_0)/(2 λ_0 sin(θ/2))",
+    "inputs": "Fitted centroid [nm], laser wavelength [nm], scattering angle [rad]",
+    "output": "m s^-1",
+    "assumptions": "Non-relativistic Doppler mapping; known geometry",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "formula_key": "thomson_velocity_projection",
+      "input_specs": [
+        {
+          "name": "fitted_center_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "sigma_fitted_center_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "sigma_laser_wavelength_nm",
+          "unit": "nm",
+          "required": false
+        },
+        {
+          "name": "sigma_scattering_angle_rad",
+          "unit": "rad",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_velocity_projection_m_s",
+          "unit": "m s^-1"
+        },
+        {
+          "name": "uncertainty_electron_velocity_projection_m_s",
+          "unit": "m s^-1"
+        }
+      ],
+      "prerequisites": [
+        "Non-relativistic Doppler mapping",
+        "known geometry"
+      ],
+      "uncertainty_model": "Independent first-order propagation of centroid, laser-wavelength and angle uncertainties.",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
+      ],
+      "note": "Analytic software calculation with numerical tests; not empirical validation."
+    }
+  },
+  {
+    "name": "Thomson electron density from calibrated scattered power",
+    "equation": "n_e = P_s/[P_i L (dσ_T/dΩ) ΔΩ η]",
+    "inputs": "Scattered power [W], incident power [W], interaction length [m], scattering angle and polarization geometry, solid angle [sr], efficiency",
+    "output": "m^-3",
+    "assumptions": "Optically thin single scattering; absolute power calibration; uniform density over interaction length; supplied collection and polarization geometry",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.formula_library.thomson_density_from_scattered_power",
+      "formula_key": "thomson_density_from_scattered_power",
+      "input_specs": [
+        {
+          "name": "scattered_power_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "incident_power_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "interaction_length_m",
+          "unit": "m",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "collection_solid_angle_sr",
+          "unit": "sr",
+          "required": true
+        },
+        {
+          "name": "optical_efficiency",
+          "unit": "dimensionless",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3"
+        }
+      ],
+      "prerequisites": [
+        "Optically thin single scattering",
+        "absolute power calibration",
+        "uniform density over interaction length",
+        "supplied collection and polarization geometry"
+      ],
+      "uncertainty_model": "Existing first-order independent-input propagation; input covariance is excluded.",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference"
+      ],
+      "note": "Analytic software calculation with numerical tests; not empirical validation."
+    }
   }
 ]
