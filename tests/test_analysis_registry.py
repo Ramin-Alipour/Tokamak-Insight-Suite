@@ -133,3 +133,13 @@ def test_analysis_id_81_is_not_part_of_the_canonical_80_analysis_registry():
 
     with pytest.raises(KeyError, match="Unknown analysis ID: 81"):
         get_analysis(81)
+
+
+def test_primary_analysis_family_lookup_rejects_invalid_ids():
+    import pytest
+    from tokamak_analysis.analysis_registry import get_analysis_family
+
+    with pytest.raises(ValueError, match="family_id must be an integer"):
+        get_analysis_family(True)
+    with pytest.raises(KeyError, match="Unknown primary-analysis family ID: 21"):
+        get_analysis_family(21)
