@@ -332,7 +332,6 @@
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
       }
     ],
-    "raw_data_to_physics": false,
     "note": "Primary Analysis 1 accepts measured, wavelength- and intensity-calibrated multi-channel Thomson spectra. Detector calibration and independent experimental validation remain outside scope; downstream profile summaries consume derived calibrated ne/Te profiles."
   },
   {
@@ -2369,7 +2368,7 @@
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
       ],
-      "raw_data_to_physics": true,
+      "raw_data_to_physics": false,
       "note": "This entry delegates measured-spectrum physical inference to the canonical Thomson engine. The standalone moment helper is supplementary and descriptive; it does not itself infer Te, ne or a unique electron velocity distribution.",
       "calibrated_measurements_to_physics": true
     },
@@ -4242,7 +4241,7 @@
         "tokamak_analysis.cts_analysis.cts_spectral_density",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
-      "raw_data_to_physics": true,
+      "raw_data_to_physics": false,
       "note": "Microwave CTS frequency-domain spectral inversion, explicitly scoped to unmagnetized electrostatic longitudinal response. The model must not be described as a complete electromagnetic CTS simulator.",
       "calibrated_measurements_to_physics": true
     },
