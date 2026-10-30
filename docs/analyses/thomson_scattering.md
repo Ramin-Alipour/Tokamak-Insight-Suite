@@ -22,7 +22,7 @@ The primary execution path is:
 | radius_m | m; (channel,) | Required supplied coordinate for each channel |
 | laser_wavelength_nm | nm | Required |
 | scattering_angle_rad | rad | Required |
-| instrument_response | normalized matrix (wavelength,wavelength) or (channel,wavelength,wavelength) | Optional only when no response matrix is available; never replaced by a Gaussian-width assumption |
+| instrument_response | normalized matrix (wavelength,wavelength) or (channel,wavelength,wavelength) | Required measured response; use an explicit identity matrix only when a delta-like response is justified |
 | signal_uncertainty | same unit/shape as spectra | Optional 1-sigma spectral uncertainty |
 | instrument_response_uncertainty | same shape as response | Optional 1-sigma response-matrix uncertainty |
 | ion_species | explicit species list | Required for collective Maxwellian mode |
@@ -60,7 +60,7 @@ The collective model can cover both collective and non-collective scattering reg
 
 ## Instrument response
 
-The instrument response is represented by a non-negative matrix whose columns are normalized probability distributions for detected wavelength bins conditional on each true wavelength bin. The same matrix can be used for all channels, or a separate matrix can be supplied per channel. This supports asymmetric and wavelength-dependent line-spread functions; a Gaussian response is not imposed.
+The instrument response is represented by a non-negative matrix whose columns are normalized probability distributions for detected wavelength bins conditional on each true wavelength bin. The measured matrix is mandatory. The same matrix can be used for all channels, or a separate matrix can be supplied per channel. An identity matrix is accepted only when explicitly supplied and physically justified. This supports asymmetric and wavelength-dependent line-spread functions; a Gaussian response is not imposed.
 
 For the non-collective Maxwellian and kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation of the response matrix, followed by refitting. The reported temperature and velocity uncertainties combine fit covariance and the Monte Carlo response contribution when enough valid perturbation fits are obtained. The collective backend currently does not marginalize response uncertainty into its parameter covariance.
 
