@@ -70,6 +70,12 @@
           "description": "Explicit species list for collective inference."
         },
         {
+          "name": "ion_fractions",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Explicit ion number fractions; required for multiple ion species and must sum to one."
+        },
+        {
           "name": "ion_temperature_eV",
           "unit": "eV",
           "required": false,
@@ -89,7 +95,7 @@
           "name": "absolute_density_geometry",
           "unit": "structured",
           "required": false,
-          "description": "Laser power, interaction length, solid angle, efficiency and polarization geometry; required with W/nm spectra for absolute density."
+          "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident beam direction, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density."
         },
         {
           "name": "instrument_response_uncertainty",
@@ -135,7 +141,8 @@
         "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
         "The kappa model is a parameterized isotropic non-Maxwellian approximation, not arbitrary VDF inversion.",
         "Absolute density is not identifiable from spectral shape alone.",
-        "No independent experimental validation is claimed."
+        "No independent experimental validation is claimed.",
+        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
