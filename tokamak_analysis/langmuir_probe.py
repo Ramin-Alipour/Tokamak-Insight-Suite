@@ -28,6 +28,7 @@ def analyze_langmuir_probe(
     fit_quality_min_r2=0.98,
     fit_quality_max_nrmse=0.1,
     ion_flatness_max_relative_change=0.1,
+    allow_density_when_numerical_screen_fails=False,
 ):
     """Analyze one calibrated Langmuir I–V sweep with explicit physical assumptions.
 
@@ -59,6 +60,7 @@ def analyze_langmuir_probe(
         fit_quality_min_r2=fit_quality_min_r2,
         fit_quality_max_nrmse=fit_quality_max_nrmse,
         ion_flatness_max_relative_change=ion_flatness_max_relative_change,
+        allow_density_when_numerical_screen_fails=allow_density_when_numerical_screen_fails,
     )
 
 
