@@ -2431,6 +2431,11 @@
           "name": "uncertainty_ion_density_m3",
           "unit": "m^-3",
           "description": "First-order propagated standard uncertainty when all five independent input uncertainties are supplied."
+        },
+        {
+          "name": "ion_charge_state",
+          "unit": "integer",
+          "description": "The explicit positive integer charge state used in the density relation."
         }
       ],
       "prerequisites": [
