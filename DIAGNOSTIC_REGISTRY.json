@@ -167,7 +167,7 @@
         },
         {
           "name": "density_relative_covariance",
-          "unit": "6x6 relative covariance for scattered power and five optical inputs; sole uncertainty model for these factors",
+          "unit": "6x6 relative covariance; mutually exclusive with all scalar uncertainty inputs for those six factors, including scattered power",
           "required": false,
           "description": "Complete relative covariance for the six density inversion inputs; do not also provide scalar uncertainty inputs for those factors."
         },
