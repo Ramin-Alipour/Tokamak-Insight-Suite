@@ -318,12 +318,15 @@ def test_floating_and_plasma_proxy_uncertainties_are_conditional_and_not_grid_sp
     assert no_sigma["floating_potential_standard_uncertainty_V"] is None
     assert no_sigma["floating_potential_uncertainty_status"] == "not_quantified_current_uncertainty_not_supplied"
     assert no_sigma["plasma_potential_proxy_standard_uncertainty_V"] is None
+    assert no_sigma["plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V"] is None
     assert no_sigma["plasma_potential_voltage_grid_spacing_median_V"] == pytest.approx(0.25)
     with_sigma = langmuir_iv_analysis(voltage, current, current_uncertainty_A=1e-5)
     assert with_sigma["floating_potential_standard_uncertainty_V"] is not None
     assert with_sigma["floating_potential_standard_uncertainty_V"] > 0
     assert with_sigma["plasma_potential_proxy_standard_uncertainty_V"] is not None
     assert with_sigma["plasma_potential_proxy_uncertainty_status"] == "monte_carlo_current_noise_only_not_physical_validation"
+    assert with_sigma["plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V"] is not None
+    assert with_sigma["plasma_potential_d2IdV2_zero_crossing_uncertainty_status"] in {"monte_carlo_current_noise_only_not_physical_validation", "partially_unresolved_under_supplied_current_noise"}
 
 
 def test_current_uncertainty_validation_and_zero_is_explicit():
@@ -419,6 +422,9 @@ def test_registry_declares_corrected_langmuir_output_contract_fields():
         "floating_potential_uncertainty_status",
         "plasma_potential_proxy_standard_uncertainty_V",
         "plasma_potential_proxy_uncertainty_status",
+        "plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V",
+        "plasma_potential_d2IdV2_zero_crossing_95pct_intervals_V",
+        "plasma_potential_d2IdV2_zero_crossing_uncertainty_status",
     }
     assert required <= declared
 
