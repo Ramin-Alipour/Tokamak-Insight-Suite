@@ -552,6 +552,12 @@ def analyze_thomson_spectra(
     if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
+    if joint_spectral_covariance is not None and signal_uncertainty is not None:
+        raise ValueError(
+            "Supply either signal_uncertainty (independent pointwise 1-sigma errors) "
+            "or joint_spectral_covariance (the complete channel-major covariance), not both. "
+            "The full covariance is authoritative and must not be silently combined with pointwise errors."
+        )
     joint_covariance = None
     if joint_spectral_covariance is not None:
         if model not in {"non_collective_maxwellian","non_collective_kappa"}:
@@ -787,7 +793,8 @@ def analyze_thomson_spectra(
         fit["model_discrepancy_diagnostics"] = {
             "residual_rms": fit.get("fit_residual_rms"),
             "reduced_chi_square": fit.get("fit_reduced_chi_square"),
-            "interpretation": "goodness-of-fit diagnostics only; model discrepancy is not converted into a parameter uncertainty",
+            "covariance_included": False,
+            "interpretation": "Per-channel fits report goodness-of-fit diagnostics only; no per-channel model-discrepancy covariance is estimated. Joint GLS, when requested, reports a separate covariance component.",
         }
         density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
@@ -804,16 +811,20 @@ def analyze_thomson_spectra(
                 "scattering_angle_rad": scattering_angle_rad,
                 "collection_solid_angle_sr": _channel_value(collection_solid_angle_sr, i, y.shape[0], "collection_solid_angle_sr"),
                 "optical_efficiency": _channel_value(optical_efficiency, i, y.shape[0], "optical_efficiency"),
-                "scattered_power_uncertainty_W": area_sigma,
-                "incident_power_uncertainty_W": _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W"),
-                "interaction_length_uncertainty_m": _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m"),
-                "scattering_angle_uncertainty_rad": (None if incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
-                "collection_solid_angle_uncertainty_sr": _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr"),
-                "optical_efficiency_uncertainty": _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty"),
+                # A supplied relative covariance is the complete uncertainty model
+                # for the six multiplicative density inputs. Do not also pass the
+                # fitted area sigma or independent scalar terms: the density helper
+                # correctly rejects mixed covariance/scalar uncertainty inputs.
+                "scattered_power_uncertainty_W": (None if density_relative_covariance is not None else area_sigma),
+                "incident_power_uncertainty_W": (None if density_relative_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
+                "interaction_length_uncertainty_m": (None if density_relative_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
+                "scattering_angle_uncertainty_rad": (None if density_relative_covariance is not None or incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
+                "collection_solid_angle_uncertainty_sr": (None if density_relative_covariance is not None else _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr")),
+                "optical_efficiency_uncertainty": (None if density_relative_covariance is not None else _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty")),
                 "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
                 "incident_direction_vector": _channel_value(incident_direction, i, y.shape[0], "incident_direction", vector_length=3),
                 "scattered_direction_vector": _channel_value(scattered_direction, i, y.shape[0], "scattered_direction", vector_length=3),
-                "polarization_factor_uncertainty": _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty"),
+                "polarization_factor_uncertainty": (None if density_relative_covariance is not None else _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty")),
                 "relative_input_covariance": _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance"),
             }
             density_result = density_from_thomson_scattered_power(**density_inputs)
@@ -840,7 +851,8 @@ def analyze_thomson_spectra(
         if model == "collective_maxwellian":
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
             if lsf_unc is not None:
-                missing_uncertainties.append("instrument_response_uncertainty_not_propagated_for_collective_model")
+                # Collective LSF uncertainty is propagated in the external-parameter
+                # Monte Carlo below; do not mark it missing here.
                 fit["instrument_response_uncertainty_propagated"] = False
         if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)) and density_relative_covariance is None:
             for key,value in (("laser_power_uncertainty_W",laser_power_uncertainty_W),
@@ -879,9 +891,15 @@ def analyze_thomson_spectra(
                     fit["electron_velocity_projection_uncertainty_m_s"], np.std(velocity_samples, ddof=1)))
                 fit["instrument_response_uncertainty_propagated"] = True
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
+                fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_samples, ddof=1))
+                fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_samples, ddof=1))
+                fit["integrated_scattered_power_lsf_uncertainty_W"] = (
+                    float(np.std(area_samples, ddof=1)) if len(area_samples) >= required_successes else None
+                )
             else:
                 fit["instrument_response_uncertainty_propagated"] = False
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
+                fit["integrated_scattered_power_lsf_uncertainty_W"] = None
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
             if len(area_samples) >= required_successes:
@@ -1035,6 +1053,8 @@ def analyze_thomson_spectra(
                 "residual":(y[channel]-joint_fitted[channel]).copy(),
                 "joint_fit_used":True,
                 "joint_channel_parameter_covariance":parameter_covariance.copy(),
+                "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
+                "model_discrepancy_covariance_included": bool(discrepancy_scale > 0.0),
             })
             if model=="non_collective_maxwellian":
                 area=float(amp*sigma*np.sqrt(2.0*np.pi))
@@ -1052,8 +1072,40 @@ def analyze_thomson_spectra(
                 step=1e-5*max(abs(float(p[j])),1.0)
                 plus=p.copy(); minus=p.copy(); plus[j]+=step; minus[j]-=step
                 grad[j]=(area_function(plus)-area_function(minus))/(2.0*step)
+            joint_area_sigma=float(np.sqrt(max(grad@block@grad,0.0)))
+            lsf_area_sigma=fit.get("integrated_scattered_power_lsf_uncertainty_W")
+            if lsf_area_sigma is not None:
+                joint_area_sigma=float(np.hypot(joint_area_sigma,float(lsf_area_sigma)))
             fit["integrated_scattered_power_W"]=area
-            fit["integrated_scattered_power_uncertainty_W"]=float(np.sqrt(max(grad@block@grad,0.0)))
+            fit["integrated_scattered_power_fit_uncertainty_W"]=float(np.sqrt(max(grad@block@grad,0.0)))
+            fit["integrated_scattered_power_uncertainty_W"]=joint_area_sigma
+            # The absolute density belongs to the final joint-GLS spectrum, not
+            # to the superseded independent-channel fit. Re-run the same physical
+            # inversion with the final joint area and its uncertainty.
+            if fit.get("density_method") and fit.get("density_status") != "not_identifiable_from_spectral_shape_alone":
+                density_inputs = fit.get("_density_inputs_for_joint_refit")
+                if density_inputs is not None:
+                    density_inputs = dict(density_inputs)
+                    density_inputs["scattered_power_W"] = area
+                    if density_inputs.get("relative_input_covariance") is None:
+                        density_inputs["scattered_power_uncertainty_W"] = joint_area_sigma
+                    else:
+                        covariance = np.asarray(density_inputs["relative_input_covariance"], dtype=float).copy()
+                        old_sigma = float(np.sqrt(max(covariance[0, 0], 0.0))) * float(
+                            results[channel]["integrated_scattered_power_W"]
+                        )
+                        new_relative_sigma = 0.0 if area == 0.0 else joint_area_sigma / abs(area)
+                        old_relative_sigma = 0.0 if results[channel]["integrated_scattered_power_W"] == 0.0 else old_sigma / abs(float(results[channel]["integrated_scattered_power_W"]))
+                        if old_relative_sigma > 0.0:
+                            scale_cov = new_relative_sigma / old_relative_sigma
+                            covariance[0, :] *= scale_cov
+                            covariance[:, 0] *= scale_cov
+                        covariance[0, 0] = new_relative_sigma**2
+                        density_inputs["relative_input_covariance"] = covariance
+                    density_result = density_from_thomson_scattered_power(**density_inputs)
+                    fit["electron_density_m3"] = density_result["electron_density_m3"]
+                    fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
+                    fit["density_uncertainty_model"] = density_result["uncertainty_model"]
         joint_summary={
             "method":"joint generalized least squares across all channels",
             "channel_major_covariance_order":True,
@@ -1062,6 +1114,7 @@ def analyze_thomson_spectra(
             "joint_parameter_count_per_channel":joint_parameter_count,
             "physical_parameter_covariance":physical_covariance,
             "model_discrepancy_covariance":discrepancy_covariance,
+            "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
             "total_physical_parameter_covariance":total_physical_covariance,
             "reduced_chi_square":reduced_chi2_joint,
             "jacobian_rank":joint_rank,"jacobian_condition_number":joint_condition,
