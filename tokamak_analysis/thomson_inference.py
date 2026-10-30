@@ -28,6 +28,19 @@ def _finite_array(value, name, ndim=None):
     return a
 
 
+def _finite_scalar(value, name, *, minimum=None, maximum=None):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)):
+        raise ValueError(f"{name} must be a finite real scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be a finite real scalar")
+    if minimum is not None and result < minimum:
+        raise ValueError(f"{name} must be greater than or equal to {minimum}")
+    if maximum is not None and result > maximum:
+        raise ValueError(f"{name} must be less than or equal to {maximum}")
+    return result
+
+
 def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     if callable(response):
         if wavelength is None:
@@ -336,16 +349,14 @@ def analyze_thomson_spectra(
         raise ValueError("Wavelength samples must be positive")
     if instrument_response is None:
         raise ValueError("A measured instrument-response matrix is required; supply an identity matrix only when a delta-like response is explicitly justified.")
-    if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0:
-        raise ValueError("laser_wavelength_nm must be positive")
-    if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
-        raise ValueError("scattering_angle_rad must lie in (0, pi]")
+    laser_wavelength_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
+    scattering_angle_rad = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
     for uncertainty_value, uncertainty_name in (
         (laser_wavelength_uncertainty_nm,"laser_wavelength_uncertainty_nm"),
         (scattering_angle_uncertainty_rad,"scattering_angle_uncertainty_rad"),
     ):
-        if uncertainty_value is not None and (not np.isfinite(uncertainty_value) or uncertainty_value < 0):
-            raise ValueError(f"{uncertainty_name} must be finite and non-negative when supplied")
+        if uncertainty_value is not None:
+            _finite_scalar(uncertainty_value, uncertainty_name, minimum=0.0)
     laser_wavelength_unc = 0.0 if laser_wavelength_uncertainty_nm is None else float(laser_wavelength_uncertainty_nm)
     scattering_angle_unc = 0.0 if scattering_angle_uncertainty_rad is None else float(scattering_angle_uncertainty_rad)
     if model not in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner", "collective_maxwellian"}:
