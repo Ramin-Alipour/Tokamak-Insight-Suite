@@ -23,7 +23,7 @@ A Python module existing somewhere in the repository does not by itself promote 
 
 ## Formula coverage: 37/37 callable mappings
 
-The canonical `FORMULA_REGISTRY.json` now maps all 37 formula entries to a named callable in `tokamak_analysis.formula_library`. Every entry declares its input and output quantities/units, preconditions, uncertainty policy and a linked analytic reference test. The packaged copy at `tis/data/FORMULA_REGISTRY.json` is kept byte-for-byte semantically synchronized with the root registry.
+The canonical `FORMULA_REGISTRY.json` now maps all 39 formula entries to a named callable in `tokamak_analysis.formula_library`. Every entry declares its input and output quantities/units, preconditions, uncertainty policy and a linked analytic reference test. The packaged copy at `tis/data/FORMULA_REGISTRY.json` is kept byte-for-byte semantically synchronized with the root registry.
 
 This mapping is a contract-level milestone, **not a claim that all 37 formulas have been empirically validated on tokamak measurements**. Analytic unit/reference tests establish software-level correctness for the stated mathematical model. They do not establish that the model's assumptions, calibration, geometry, instrument response, time window or data provenance are valid for a particular experiment.
 
