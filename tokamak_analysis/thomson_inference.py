@@ -492,6 +492,9 @@ def analyze_thomson_spectra(
         if scattering_angle_uncertainty_rad is None: missing_uncertainties.append("scattering_angle_uncertainty_rad")
         if model == "collective_maxwellian":
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
+            if lsf_unc is not None:
+                missing_uncertainties.append("instrument_response_uncertainty_not_propagated_for_collective_model")
+                fit["instrument_response_uncertainty_propagated"] = False
         if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)):
             for key,value in (("laser_power_uncertainty_W",laser_power_uncertainty_W),
                               ("interaction_length_uncertainty_m",interaction_length_uncertainty_m),
