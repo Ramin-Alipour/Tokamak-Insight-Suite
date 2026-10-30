@@ -190,3 +190,23 @@ def test_instrument_response_accepts_kernel_array_and_callable():
         instrument_response=lambda wavelength: np.eye(len(wavelength)),
     )
     assert callable_out["electron_temperature_profile_eV"][0] == pytest.approx(100.0,rel=0.05)
+
+
+def test_measured_instrument_response_is_mandatory():
+    x,y,_=_spectral_case(100.0)
+    with pytest.raises(ValueError,match="instrument-response matrix is required"):
+        analyze_thomson_spectra(
+            x,y[None,:],[0.1],laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi/2,
+        )
+
+
+def test_descriptive_moments_report_negative_residual_clipping_caveat():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+    x=np.linspace(500.0,564.0,401)
+    y=100.0*np.exp(-0.5*((x-532.0)/8.0)**2)+10.0
+    y[0]=0.0
+    y[-1]=0.0
+    out=analyze_thomson_spectral_distribution(x,y,instrument_sigma_nm=0.2)
+    assert "negative_area_fraction_removed_by_clipping" in out
+    assert "clipping" in out["moment_clipping_bias_warning"].lower()
