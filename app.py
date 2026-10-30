@@ -159,7 +159,7 @@ with st.sidebar:
             st.error(f"Import failed; no dataset is active. {e}")
     if 'tis_df' in st.session_state:
         st.success(f"Loaded: {st.session_state.get('tis_filename','data')}")
-        st.button('Clear loaded data',use_container_width=True,on_click=_clear_loaded_data)
+        st.button('Clear loaded data',width="stretch",on_click=_clear_loaded_data)
     st.divider()
     pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Project Manager','Reports & Export']
     requested=st.session_state.pop('jump','Home')
@@ -345,7 +345,7 @@ if page=='Home':
         st.write(f'**Shot / discharge:** {shot or "Not specified"}')
         st.write(f'**Input:** {filename or "No data loaded"}')
         st.write('**Data integrity:** '+(sha[:16]+'…' if sha else 'Not available'))
-        if st.button('Open Data Import & QC',use_container_width=True): st.session_state['jump']='Data Import & QC'; st.rerun()
+        if st.button('Open Data Import & QC',width="stretch"): st.session_state['jump']='Data Import & QC'; st.rerun()
     with b:
         st.metric('Diagnostic entries',len(DIAGNOSTICS)); st.metric('Formula references',len(FORMULAS))
     with c:
@@ -357,7 +357,7 @@ if page=='Home':
         if df is not None and numeric:
             pcol=st.selectbox('Preview channel',numeric,key='home_preview_col')
             if len(df)>1: plot_line(np.arange(len(df)),pd.to_numeric(df[pcol],errors='coerce'),'Sample index',pcol,'Loaded data preview')
-            st.dataframe(df.head(8),use_container_width=True)
+            st.dataframe(df.head(8),width="stretch")
         else:
             st.info('Upload a CSV, TXT, Excel or Parquet file from the left panel to activate quick preview and analysis tools.')
             st.markdown('#### Quick tools')
@@ -365,7 +365,7 @@ if page=='Home':
     with right:
         st.markdown('### Quick tools')
         for label,dest in [('Load Data','Data Import & QC'),('Quick Analysis','Time Series & MHD'),('Calculate Plasma Parameters','Plasma Parameters'),('Open Diagnostic Catalog','Diagnostic Catalog')]:
-            if st.button(label,use_container_width=True,key='quick_'+dest): st.session_state['jump']=dest; st.rerun()
+            if st.button(label,width="stretch",key='quick_'+dest): st.session_state['jump']=dest; st.rerun()
         st.markdown('### Recent activity')
         for item in st.session_state.get('tis_activity',[])[:5]: st.caption('• '+item)
     st.markdown('### Diagnostic categories')
@@ -398,7 +398,7 @@ elif page=='Public Data Access':
         inventory_frame = st.session_state['tis_signal_inventory']
         inventory_manifest = st.session_state['tis_signal_inventory_manifest']
         st.success(f"{inventory_manifest['variable_count']} variables found · {inventory_manifest['one_dimensional_numeric_time_traces']} numeric 1-D time traces supported by the current importer")
-        st.dataframe(inventory_frame, use_container_width=True, hide_index=True)
+        st.dataframe(inventory_frame, width="stretch", hide_index=True)
         st.download_button('Download signal inventory CSV', data=inventory_frame.to_csv(index=False).encode('utf-8'), file_name=f"mast_{inventory_manifest['shot']}_{inventory_manifest['source_group']}_signal_inventory.csv", mime='text/csv')
         with st.expander('Inventory provenance and limitations'):
             st.json(inventory_manifest)
@@ -442,7 +442,7 @@ elif page=='Public Data Access':
         manifest = st.session_state['tis_source_manifest']
         st.success(f"Loaded shot {manifest['shot']} · {manifest['source_group']} / {manifest['signal']} · {manifest['exported_samples']:,} samples")
         st.caption(f"Source class: {manifest['source_signal_class']} · Quality: {manifest['source_quality']} · Units: {manifest['source_units']}")
-        st.dataframe(st.session_state['tis_df'].head(30), use_container_width=True)
+        st.dataframe(st.session_state['tis_df'].head(30), width="stretch")
         st.json(manifest)
         st.download_button('Download CSV', data=st.session_state['tis_raw'], file_name=st.session_state['tis_filename'], mime='text/csv')
         st.download_button('Download provenance manifest', data=json.dumps(manifest, indent=2), file_name='mast_source_manifest.json', mime='application/json')
@@ -540,7 +540,7 @@ elif page=='Public Data Access':
             fig.tight_layout(); st.pyplot(fig)
         except Exception as e:
             st.warning(f'Grid table loaded, but plot could not be rendered: {e}')
-        st.dataframe(efit_frame.head(12), use_container_width=True)
+        st.dataframe(efit_frame.head(12), width="stretch")
         st.download_button('Download EFIT grid CSV', data=efit_frame.to_csv(index=False).encode('utf-8'), file_name=f"mast_{efit_manifest['shot']}_efit_grid.csv", mime='text/csv')
         st.download_button('Download EFIT manifest', data=json.dumps(efit_manifest, indent=2), file_name='mast_efit_manifest.json', mime='application/json')
         st.caption(efit_manifest['scientific_limit'])
@@ -550,12 +550,12 @@ elif page=='Data Import & QC':
     if df is None: st.info('Use the upload control in the left panel. Raw input is preserved and never overwritten.'); st.stop()
     st.success(f'{filename}: {len(df):,} rows × {len(df.columns)} columns')
     m1,m2,m3,m4=st.columns(4); m1.metric('Rows',f'{len(df):,}'); m2.metric('Columns',len(df.columns)); m3.metric('Numeric columns',len(numeric)); m4.metric('SHA-256',sha[:12]+'…')
-    st.dataframe(df.head(50),use_container_width=True)
+    st.dataframe(df.head(50),width="stretch")
     st.markdown('### Quality audit')
     qcol=col_select('Signal / column',numeric,'qc_col')
     q=signal_quality(pd.to_numeric(df[qcol],errors='coerce').to_numpy()); st.json(q)
     missing=pd.DataFrame({'column':df.columns.astype(str),'dtype':[str(t) for t in df.dtypes],'missing_count':df.isna().sum().values,'missing_fraction':df.isna().mean().values})
-    st.dataframe(missing,use_container_width=True)
+    st.dataframe(missing,width="stretch")
     plot_line(np.arange(len(df)),pd.to_numeric(df[qcol],errors='coerce'),'Sample index',qcol,'Quality preview')
     json_download('Export QC report JSON',{'file':filename,'sha256':sha,'quality':q,'columns':missing.to_dict(orient='records')},'tis_qc_report.json')
     download_df('Export imported table CSV',df,'tis_imported_data.csv')
@@ -885,9 +885,9 @@ elif page=='Spectral Analysis':
                         if np.any(radiance<0): raise ValueError('Calibrated spectral radiance cannot be negative.')
                         result=analyze_ece(rad_freq,harmonic=int(rad_harmonic),spectral_radiance_W_m2_sr_Hz=radiance,mode='brightness_temperature',**({'major_radius_m':float(rad_r0),'B_axis_T':float(rad_b0)} if rad_map else {}))
                         st.success('Brightness temperature calculated from the supplied calibrated radiance.')
-                        st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'brightness_temperature_K_mean':np.mean(result['brightness_temperature_K'],axis=0),'brightness_temperature_eV_mean':np.mean(result['brightness_temperature_eV'],axis=0)}),use_container_width=True)
+                        st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'brightness_temperature_K_mean':np.mean(result['brightness_temperature_K'],axis=0),'brightness_temperature_eV_mean':np.mean(result['brightness_temperature_eV'],axis=0)}),width="stretch")
                         st.caption(result['temperature_interpretation'])
-                        if 'resonance_radius_m' in result: st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'resonance_field_T':result['resonance_field_T'],'approximate_resonance_radius_m':result['resonance_radius_m']}),use_container_width=True)
+                        if 'resonance_radius_m' in result: st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'resonance_field_T':result['resonance_field_T'],'approximate_resonance_radius_m':result['resonance_radius_m']}),width="stretch")
                         export={k:v for k,v in result.items()}
                         json_download('Export brightness-temperature JSON',export,'tis_ece_brightness_temperature.json')
                         add_report_section('ECE brightness temperature',export)
@@ -910,7 +910,7 @@ elif page=='Spectral Analysis':
                         result=analyze_ece(map_freq,harmonic=int(map_harmonic),mode='resonance_mapping',**({'major_radius_m':float(map_r0),'B_axis_T':float(map_b0)} if map_radius else {}))
                         frame={'frequency_Hz':result['frequency_Hz'],'resonance_field_T':result['resonance_field_T']}
                         if 'resonance_radius_m' in result: frame['approximate_resonance_radius_m']=result['resonance_radius_m']
-                        st.dataframe(pd.DataFrame(frame),use_container_width=True)
+                        st.dataframe(pd.DataFrame(frame),width="stretch")
                         st.caption('Cold, non-relativistic mapping only. Radius is a one-dimensional toroidal-field estimate, not a flux-surface coordinate.')
                         json_download('Export resonance mapping JSON',result,'tis_ece_resonance_mapping.json')
                         add_report_section('ECE resonance mapping',result)
@@ -949,7 +949,7 @@ elif page=='Spectral Analysis':
                             else: raise ValueError('Enter one noise RMS value or one per channel.')
                         result=analyze_ece(fluct_freq,harmonic=int(fluct_harmonic),signal=signals,time_s=time_values,noise_std=noise,psd_confidence_level=float(psd_confidence),mode='channel_fluctuations')
                         st.success('ECE fluctuation and spectral analysis completed.')
-                        st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'fluctuation_rms':result['fluctuation_rms']}),use_container_width=True)
+                        st.dataframe(pd.DataFrame({'frequency_Hz':result['frequency_Hz'],'fluctuation_rms':result['fluctuation_rms']}),width="stretch")
                         psd_frame=pd.DataFrame(result['fluctuation_psd'],index=result['fluctuation_psd_frequency_Hz'],columns=[str(c) for c in fluct_cols])
                         psd_frame.index.name='frequency_Hz'
                         st.markdown('**Full-record periodogram**')
@@ -966,7 +966,7 @@ elif page=='Spectral Analysis':
                         with st.expander('Welch PSD confidence limits and diagnostics'):
                             st.caption(f"Approximate {100*result['welch_psd_confidence_level']:.0f}% confidence interval; effective degrees of freedom ≈ {result['welch_psd_degrees_of_freedom_approx']:.3g}, segments = {result['welch_psd_segment_count']}. Bounds account approximately for overlap correlation; interpret cautiously for short or non-stationary records.")
                             st.line_chart(ci_frame)
-                            st.dataframe(pd.DataFrame({'frequency_Hz':result['welch_psd_frequency_Hz'],**{f'{c} PSD':result['welch_psd'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} lower CI':result['welch_psd_confidence_lower'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} upper CI':result['welch_psd_confidence_upper'][:,i] for i,c in enumerate(fluct_cols)}}),use_container_width=True)
+                            st.dataframe(pd.DataFrame({'frequency_Hz':result['welch_psd_frequency_Hz'],**{f'{c} PSD':result['welch_psd'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} lower CI':result['welch_psd_confidence_lower'][:,i] for i,c in enumerate(fluct_cols)},**{f'{c} upper CI':result['welch_psd_confidence_upper'][:,i] for i,c in enumerate(fluct_cols)}}),width="stretch")
                             if 'white_noise_psd_expected' in result:
                                 noise_frame=pd.DataFrame(result['white_noise_psd_expected'],index=result['welch_psd_frequency_Hz'],columns=[str(c) for c in fluct_cols])
                                 noise_frame.index.name='frequency_Hz'
@@ -1081,7 +1081,7 @@ elif page=='Spectral Analysis':
                         if result['resonance_radius_bandwidth_lower_m'] is not None:
                             profile_frame['bandwidth_radius_lower_m']=result['resonance_radius_bandwidth_lower_m']
                             profile_frame['bandwidth_radius_upper_m']=result['resonance_radius_bandwidth_upper_m']
-                        st.dataframe(pd.DataFrame(profile_frame),use_container_width=True)
+                        st.dataframe(pd.DataFrame(profile_frame),width="stretch")
                         plot_line(result['resonance_radius_m'],result['electron_temperature_channel_eV'],'Resonance major radius (m)','Te (eV)','ECE channel electron-temperature estimate')
                         plot_line(result['profile_radius_m'],result['electron_temperature_profile_eV'],'Major radius R (m)','Te (eV)','ECE reconstructed radial Te profile')
                         if result['electron_temperature_profile_uncertainty_eV'] is not None:
@@ -1187,8 +1187,8 @@ elif page=='Spectral Analysis':
                     m2.metric('Nyquist frequency',f"{result['nyquist_frequency_Hz']:.6g} Hz")
                     m3.metric('AC RMS',f"{result['ac_rms_voltage_V']:.6g} V")
                     m4.metric('Peak-to-peak',f"{result['peak_to_peak_voltage_V']:.6g} V")
-                    st.dataframe(pd.DataFrame({'Frequency (Hz)':result['frequency_Hz'],'PSD (V²/Hz)':result['power_spectral_density_V2_per_Hz']}),use_container_width=True)
-                    if len(result['dominant_peaks_Hz']): st.dataframe(pd.DataFrame({'Peak frequency (Hz)':result['dominant_peaks_Hz'],'Peak PSD (V²/Hz)':result['dominant_peak_psd_V2_per_Hz']}),use_container_width=True)
+                    st.dataframe(pd.DataFrame({'Frequency (Hz)':result['frequency_Hz'],'PSD (V²/Hz)':result['power_spectral_density_V2_per_Hz']}),width="stretch")
+                    if len(result['dominant_peaks_Hz']): st.dataframe(pd.DataFrame({'Peak frequency (Hz)':result['dominant_peaks_Hz'],'Peak PSD (V²/Hz)':result['dominant_peak_psd_V2_per_Hz']}),width="stretch")
                     else: st.info('No local spectral peaks passed the selected in-band threshold.')
                     if integrate and use_geometry:
                         result['relative_magnetic_perturbation']=magnetic_perturbation_from_mirnov_voltage(tt,vv,int(turns),float(area),initial_delta_B_T=float(initial_db),baseline_voltage_V=float(baseline),polarity_sign=int(polarity))
@@ -1920,7 +1920,7 @@ elif page=='Plasma Parameters':
                         ece_kwargs['channel_bandwidth_Hz']=ece_bandwidth_GHz*1e9
                     result=analyze_ece(ece_freq_Hz,harmonic=int(harm),spectral_radiance_W_m2_sr_Hz=ece_rad,mode='brightness_temperature',**ece_kwargs)
                     st.success('ECE brightness-temperature analysis completed.')
-                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Brightness temperature (K)':result['brightness_temperature_K'],'Brightness temperature (eV)':result['brightness_temperature_eV']}),use_container_width=True,hide_index=True)
+                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Brightness temperature (K)':result['brightness_temperature_K'],'Brightness temperature (eV)':result['brightness_temperature_eV']}),width="stretch",hide_index=True)
                     st.line_chart(pd.DataFrame({'Brightness temperature (K)':np.asarray(result['brightness_temperature_K']).reshape(-1),'Brightness temperature (eV)':np.asarray(result['brightness_temperature_eV']).reshape(-1)},index=ece_freq_GHz))
                     st.json(result)
                     json_download('Export ECE brightness-temperature result',result,'tis_ece_brightness_temperature.json')
@@ -1949,7 +1949,7 @@ elif page=='Plasma Parameters':
                         st.metric('Nyquist frequency',f"{result['nyquist_frequency_Hz']:.6g} Hz")
                         rms_frame=pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Fluctuation RMS':result['fluctuation_rms']})
                         st.markdown('**Per-channel fluctuation RMS**')
-                        st.dataframe(rms_frame,use_container_width=True,hide_index=True)
+                        st.dataframe(rms_frame,width="stretch",hide_index=True)
                         st.bar_chart(rms_frame.set_index('Frequency (GHz)')['Fluctuation RMS'])
                         psd_frame=pd.DataFrame(result['fluctuation_psd'],index=result['fluctuation_psd_frequency_Hz'],columns=[f'{v:g} GHz' for v in ece_freq_GHz])
                         psd_frame.index.name='Frequency (Hz)'
@@ -1977,10 +1977,10 @@ elif page=='Plasma Parameters':
                             st.caption(f"Estimated relative delay: {pair['estimated_relative_delay_s']} s. This phase-slope estimate is not hardware synchronization calibration.")
                         if result.get('spectral_peak_candidates'):
                             st.markdown('**Candidate spectral peaks (not automatic MHD-mode identification)**')
-                            st.dataframe(pd.DataFrame(result['spectral_peak_candidates']),use_container_width=True,hide_index=True)
+                            st.dataframe(pd.DataFrame(result['spectral_peak_candidates']),width="stretch",hide_index=True)
                             st.caption(result['spectral_peak_note'])
                         if 'above_noise_rms' in result:
-                            st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),use_container_width=True,hide_index=True)
+                            st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'RMS above noise':result['above_noise_rms']}),width="stretch",hide_index=True)
                         st.json({k:v for k,v in result.items() if k not in {'fluctuation_psd','fluctuation_psd_frequency_Hz','welch_psd','welch_psd_frequency_Hz','time_s'}})
                         json_download('Export ECE fluctuation / PSD result',result,'tis_ece_fluctuations.json')
             elif ece_mode=='Resonance mapping':
@@ -1992,7 +1992,7 @@ elif page=='Plasma Parameters':
                 if st.button('Map ECE resonance radii',type='primary',key='ece_run_mapping'):
                     result=analyze_ece(ece_freq_Hz,harmonic=int(harm),major_radius_m=ece_r0,B_axis_T=ece_b0,mode='resonance_mapping',electron_energy_eV=ece_map_energy,parallel_beta=ece_map_beta)
                     st.success('ECE resonance mapping completed using the declared circular toroidal-field approximation.')
-                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Approximate major radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
+                    st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Resonance field (T)':result['resonance_field_T'],'Approximate major radius (m)':result['resonance_radius_m']}),width="stretch",hide_index=True)
                     st.line_chart(pd.DataFrame({'Approximate major radius (m)':result['resonance_radius_m']},index=ece_freq_GHz))
                     st.warning('This is a 1-D circular-field estimate, not EFIT/ray tracing. A monoenergetic relativistic/Doppler correction is only a sensitivity estimate; distribution effects, line-of-sight geometry and instrument response remain unmodeled.')
                     st.json(result)
@@ -2015,7 +2015,7 @@ elif page=='Plasma Parameters':
                         result['channel_brightness_temperature_K']=brightness_temperature_K(result['channel_spectral_radiance_W_m2_sr_Hz'],result['effective_center_frequency_Hz'])
                         st.success('ECE receiver-response convolution completed using the supplied kernel.')
                         st.caption('Brightness temperature evaluated at the response-weighted center frequency is approximate for broad channels.')
-                        st.dataframe(pd.DataFrame({'Channel':np.arange(response_w.shape[0]),'Effective spectral radiance (W m⁻² sr⁻¹ Hz⁻¹)':result['channel_spectral_radiance_W_m2_sr_Hz'],'Brightness temperature (K)':result['channel_brightness_temperature_K']}),use_container_width=True,hide_index=True)
+                        st.dataframe(pd.DataFrame({'Channel':np.arange(response_w.shape[0]),'Effective spectral radiance (W m⁻² sr⁻¹ Hz⁻¹)':result['channel_spectral_radiance_W_m2_sr_Hz'],'Brightness temperature (K)':result['channel_brightness_temperature_K']}),width="stretch",hide_index=True)
                         st.json(result)
                         json_download('Export ECE receiver-response convolution',result,'tis_ece_receiver_response.json')
                     except Exception as e:
@@ -2115,7 +2115,7 @@ elif page=='Plasma Parameters':
                             model_discrepancy_fraction=float(ece_model_floor),
                         )
                         st.success(f'ECE time-window-averaged electron-temperature profile completed ({result["selected_sample_count"]} samples; {ece_window_start:g}–{ece_window_end:g} s) within the declared model.')
-                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['mean_calibrated_brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),use_container_width=True,hide_index=True)
+                        st.dataframe(pd.DataFrame({'Frequency (GHz)':ece_freq_GHz,'Mean calibrated brightness temperature (eV)':result['mean_calibrated_brightness_temperature_eV'],'Inferred Te (eV)':result['electron_temperature_channel_eV'],'Approximate resonance radius (m)':result['resonance_radius_m']}),width="stretch",hide_index=True)
                         st.line_chart(pd.DataFrame({'Inferred Te profile (eV)':result['electron_temperature_profile_eV']},index=result['profile_radius_m']))
                         st.line_chart(pd.DataFrame({'dTe/dR (eV/m)':result['profile_gradient_eV_per_m']},index=result['profile_radius_m']))
                         if result['electron_temperature_profile_uncertainty_eV'] is not None:
@@ -2279,7 +2279,7 @@ elif page=='Equilibrium & Reconstruction':
         else:
             st.info('q(ψ) is not calculated: enter an independently known edge F = R·Bφ value to constrain the toroidal field function.')
         profile_table = pd.DataFrame(profile_table_data)
-        st.dataframe(profile_table, use_container_width=True)
+        st.dataframe(profile_table, width="stretch")
         profile_fig = Figure(figsize=(9, 5))
         profile_ax = profile_fig.subplots()
         profile_ax.plot(profile_table_data['psi_normalized_axis_to_edge'],
@@ -2366,7 +2366,7 @@ elif page=='Equilibrium & Reconstruction':
                                      'B_R_T': gs_result['B_R_T'].ravel(),
                                      'B_Z_T': gs_result['B_Z_T'].ravel(),
                                      'B_poloidal_T': gs_result['B_poloidal_T'].ravel()})
-            st.dataframe(gs_table.head(30), use_container_width=True)
+            st.dataframe(gs_table.head(30), width="stretch")
             # Render the actual R-Z flux and poloidal-field structure, not only a table.
             gs_fig = Figure(figsize=(8, 5))
             gs_ax = gs_fig.subplots()
@@ -2402,7 +2402,7 @@ elif page=='Equilibrium & Reconstruction':
                     st.metric('Estimated q95', f"{gs_profiles['q95']:.5g}")
                 else:
                     st.info('q95 unavailable: no sufficient closed interior flux contours around the inferred magnetic axis.')
-            st.dataframe(gs_profile_table, use_container_width=True)
+            st.dataframe(gs_profile_table, width="stretch")
             download_df('Download Grad–Shafranov equilibrium profiles', gs_profile_table, 'tis_grad_shafranov_profiles.csv')
             gs_jtor_table = pd.DataFrame({
                 'Z_m': np.repeat(gs_Z, gs_R.size), 'R_m': np.tile(gs_R, gs_Z.size),
@@ -2510,7 +2510,7 @@ elif page=='Equilibrium & Reconstruction':
                 'psi_normalized': inverse_result['psi_normalized'].ravel(),
                 'boundary_mask': inverse_result['boundary_mask'].ravel(),
             })
-            st.dataframe(inverse_grid.head(30), use_container_width=True)
+            st.dataframe(inverse_grid.head(30), width="stretch")
             download_df('Download inverse equilibrium grid and uncertainty', inverse_grid, 'tis_inverse_equilibrium_grid.csv')
             st.markdown('**Derived equilibrium profiles from fitted flux**')
             st.caption(
@@ -2529,7 +2529,7 @@ elif page=='Equilibrium & Reconstruction':
                 inv_profile_table['F_Tm'] = inverse_profiles['F_Tm']
                 inv_profile_table['q_profile'] = inverse_profiles['q_profile']
             st.metric('Joint p′ / FF′ fit', 'Identifiable' if inverse_profiles['joint_pressure_ffprime_identifiable'] else 'Underdetermined')
-            st.dataframe(inv_profile_table, use_container_width=True)
+            st.dataframe(inv_profile_table, width="stretch")
             download_df('Download inverse-fit equilibrium profiles', inv_profile_table, 'tis_inverse_equilibrium_profiles.csv')
             inv_jtor_table = pd.DataFrame({
                 'Z_m': np.repeat(inverse_result['Z_m'], inverse_result['R_m'].size),
@@ -2625,7 +2625,7 @@ elif page=='Tomography & Bolometry':
                 matrix=build_tomography_matrix_2d(starts,ends,x_edges,z_edges)
                 out=pd.DataFrame(matrix,columns=[f'pixel_{i}' for i in range(matrix.shape[1])])
                 st.success(f'Built {matrix.shape[0]} rays × {matrix.shape[1]} pixels; entries are path lengths in metres.')
-                st.dataframe(out,use_container_width=True)
+                st.dataframe(out,width="stretch")
                 download_df('Download geometry response matrix A',out,'tis_tomography_geometry_matrix.csv')
                 json_download('Export geometry matrix metadata',{'matrix_shape':list(matrix.shape),'x_edges_m':x_edges,'z_edges_m':z_edges,'column_order':'iz * nx + ix','entry_units':'m path length','model_limit':'Straight rays through rectangular pixels only; detector response, attenuation, toroidal geometry and equilibrium mapping are not included.'},'tis_tomography_geometry_manifest.json')
             except Exception as e: st.error(str(e))
@@ -2728,7 +2728,7 @@ elif page=='Advanced Analysis':
                     st.line_chart(profile_frame.set_index('Radius (m)')[['Electron density (m⁻³)']])
                     st.line_chart(profile_frame.set_index('Radius (m)')[['Electron temperature (eV)']])
                     st.markdown('**Gradients and local scale lengths**')
-                    st.dataframe(profile_frame,use_container_width=True,hide_index=True)
+                    st.dataframe(profile_frame,width="stretch",hide_index=True)
                     download_df('Download Thomson profile results',profile_frame,'tis_thomson_profile_results.csv')
                     profile_json={k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in profile.items() if k!='summary'}
                     profile_json['summary']=dict(vars(summary))
@@ -2788,7 +2788,7 @@ elif page=='Advanced Analysis':
                     st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron density (m⁻³)']])
                     st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron temperature (eV)']])
                     st.markdown('**Reconstructed profiles and derivatives**')
-                    st.dataframe(frame,use_container_width=True,hide_index=True)
+                    st.dataframe(frame,width="stretch",hide_index=True)
                     download_df('Download reconstructed Thomson profiles (CSV)',frame,'tis_thomson_reconstructed_profiles.csv')
                     json_download('Export reconstruction, method and limitations (JSON)',result,'tis_thomson_profile_reconstruction.json')
                     with st.expander('Assumptions and limitations'):
@@ -2916,7 +2916,7 @@ elif page=='Advanced Analysis':
                     flux_frame=pd.DataFrame(result['poloidal_flux_Wb'],index=Z,columns=R)
                     flux_frame.index.name='Z_m'
                     flux_frame.columns.name='R_m'
-                    st.dataframe(flux_frame,use_container_width=True)
+                    st.dataframe(flux_frame,width="stretch")
                     st.line_chart(flux_frame.T)
                     csv_frame=flux_frame.stack().rename('poloidal_flux_Wb').reset_index()
                     download_df('Export poloidal flux map (CSV)',csv_frame,'tis_poloidal_flux.csv')
@@ -2944,13 +2944,13 @@ elif page=='Advanced Analysis':
             st.write(contract.get('algorithm', 'No algorithm description declared.'))
             if contract.get('input_specs'):
                 st.markdown('**Required and optional inputs**')
-                st.dataframe(pd.DataFrame(contract['input_specs']), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(contract['input_specs']), width="stretch", hide_index=True)
             if contract.get('output_specs'):
                 st.markdown('**Outputs**')
-                st.dataframe(pd.DataFrame(contract['output_specs']), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(contract['output_specs']), width="stretch", hide_index=True)
             if contract.get('workflow_modes'):
                 st.markdown('**Available execution paths**')
-                st.dataframe(pd.DataFrame(contract['workflow_modes']), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(contract['workflow_modes']), width="stretch", hide_index=True)
             if contract.get('assumptions'):
                 st.markdown('**Assumptions**')
                 for item in contract['assumptions']: st.markdown(f'- {item}')
@@ -2986,7 +2986,7 @@ elif page=='Advanced Analysis':
                     if 'density_gradient_m-4' in result:
                         st.markdown('**Radial gradients**')
                         gradients = pd.DataFrame({'Radius (m)': result['radius_m'], 'Density gradient (m^-4)': result['density_gradient_m-4'], 'Temperature gradient (eV/m)': result['temperature_gradient_eV_m-1']})
-                        st.dataframe(gradients, use_container_width=True, hide_index=True)
+                        st.dataframe(gradients, width="stretch", hide_index=True)
                 contribution = build_contribution_bundle(
                     analysis_id=int(entry['id']),
                     analysis_name=str(entry['name']),
@@ -3059,12 +3059,12 @@ elif page=='Reports & Export':
         quality[str(col)]={k:v for k,v in metrics.items() if k!="n_total"}
     quality_frame=pd.DataFrame(quality).T if quality else pd.DataFrame()
     st.markdown("### Input data quality summary")
-    if not quality_frame.empty: st.dataframe(quality_frame,use_container_width=True)
+    if not quality_frame.empty: st.dataframe(quality_frame,width="stretch")
     history=st.session_state.get("tis_analysis_history",[])
     record={'software':'Tokamak Insight Suite','version':__version__,'project':project,'shot_id':shot,'analyst':analyst,'input_filename':filename,'input_size_bytes':len(raw),'input_sha256':sha,'imported_at_utc':st.session_state.get('tis_imported_at_utc'),'source_manifest':st.session_state.get('tis_source_manifest'),'import_parameters':st.session_state.get('tis_import_parameters'),'analysis_history':history,'data_quality':quality,'rows':int(len(df)),'columns':[str(x) for x in df.columns],'numeric_columns':numeric,'diagnostic_count':len(DIAGNOSTICS),'formula_count':len(FORMULAS),'diagnostic_maturity_counts':maturity_counts(DIAGNOSTICS),'analysis_maturity_counts':maturity_counts(ANALYSES),'analysis_maturity_registry':[{'id':item['id'],'name':item['name'],'maturity_level':maturity_label(item)} for item in ANALYSES],'research_release_model':'Open research beta; independent scientific validation is not a prerequisite for use or contribution.','python_version':sys.version,'platform':platform.platform(),'numpy_version':np.__version__,'pandas_version':pd.__version__,'scipy_version':__import__('scipy').__version__,'status':'Software provenance and data-quality report. Researchers are responsible for confirming units, calibration, geometry, uncertainty and model assumptions for their use case.'}
     st.markdown("### Analysis history")
     if history:
-        st.dataframe(pd.DataFrame([{"analysis":h["name"],"created_at_utc":h["created_at_utc"]} for h in history]),use_container_width=True)
+        st.dataframe(pd.DataFrame([{"analysis":h["name"],"created_at_utc":h["created_at_utc"]} for h in history]),width="stretch")
     else:
         st.info("No analysis export has been generated in this session yet.")
     st.json(record); json_download('Download provenance JSON',record,'tis_provenance.json'); download_df('Export imported data CSV',df,'tis_imported_data.csv')

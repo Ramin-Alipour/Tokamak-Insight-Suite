@@ -147,7 +147,7 @@ def render_project_page(st: Any, *, session_state: Any, project_title: str, shot
                 "analysis": run.analysis_name, "status": run.status,
                 "algorithm_version": run.algorithm_version, "created_at": run.created_at,
                 "warnings": "; ".join(run.warnings)
-            } for run in active_project.analysis_runs]), use_container_width=True)
+            } for run in active_project.analysis_runs]), width="stretch")
 
     st.markdown("### Save current workspace")
     st.caption("The project records source references and SHA-256 metadata; large raw files are not embedded.")
