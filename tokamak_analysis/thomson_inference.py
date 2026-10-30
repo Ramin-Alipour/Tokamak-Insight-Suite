@@ -399,7 +399,8 @@ def analyze_thomson_spectra(
                 return response @ z
             residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
             def fit_nuisance(shape):
-                design=np.column_stack((shape,np.ones_like(shape),xi-float(laser_wavelength_nm)))
+                shape_scale=max(float(np.max(np.abs(shape))),np.finfo(float).tiny)
+                design=np.column_stack((shape/shape_scale,np.ones_like(shape),xi-float(laser_wavelength_nm)))
                 weighted_design=design/residual_scale[:,None]
                 weighted_signal=y[i]/residual_scale
                 coefficients=np.linalg.lstsq(weighted_design,weighted_signal,rcond=None)[0]
@@ -407,6 +408,7 @@ def analyze_thomson_spectra(
                     background_design=design[:,1:]/residual_scale[:,None]
                     background=np.linalg.lstsq(background_design,weighted_signal,rcond=None)[0]
                     coefficients=np.array([0.0,background[0],background[1]])
+                coefficients[0] /= shape_scale
                 return coefficients
             def objective(params):
                 shape = collective_shape(params)
