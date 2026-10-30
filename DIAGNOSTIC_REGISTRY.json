@@ -7,6 +7,7 @@
     "method": "Forward-fit the measured, calibrated multi-channel Thomson spectra with the supplied instrument line-spread response. Supports non-collective non-relativistic Maxwellian inference and an optional PlasmaPy collective Maxwellian dielectric model with explicit ion species and independently supplied ion temperatures. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and polarization geometry.",
     "caveat": "Input spectra and wavelength axes are assumed measured and calibrated; detector calibration is outside scope. Absolute density cannot be inferred from spectral shape alone. Missing ion temperatures are not silently assumed in collective mode. Relativistic and arbitrary non-Maxwellian kinetic models are not yet implemented. No independent experimental validation is claimed.",
     "implementation_functions": [
+      "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
       "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
@@ -60,7 +61,7 @@
           "name": "model",
           "unit": "text",
           "required": false,
-          "description": "non_collective_maxwellian or collective_maxwellian."
+          "description": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian."
         },
         {
           "name": "ion_species",
@@ -137,16 +138,17 @@
         "No independent experimental validation is claimed."
       ],
       "function_links": [
+        "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
         "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
       ],
       "raw_data_to_physics": true,
-      "note": "The primary Analysis 1 contract is measured, calibrated, multi-channel Thomson spectra to physical parameters. Legacy calibrated-profile processing remains a separate downstream utility.",
+      "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Calibrated-profile routines remain downstream utilities. No detector calibration or independent experimental validation is performed.",
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
-          "function": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
           "inputs": [
             "wavelength_nm",
             "spectra (channel × wavelength)",
