@@ -3025,7 +3025,7 @@ elif page=='Advanced Analysis':
                 cts_fast_vdf_upload=st.file_uploader('Fast-ion VDF CSV (velocity_m_s, probability_density_m_s_inverse)',type=['csv','txt'],key='cts_fast_vdf')
             if cts_fast_mode!='None':
                 cts_fast_species=st.number_input('Fast-ion species index',min_value=0,value=0,step=1,key='cts_fast_species')
-                cts_fast_fraction=st.number_input('Initial fast-ion fraction',min_value=0.001,max_value=0.95,value=0.05,key='cts_fast_fraction')
+                cts_fast_fraction=st.number_input('Initial fast-ion fraction',min_value=0.001,max_value=0.9,value=0.05,key='cts_fast_fraction')
             else:
                 cts_fast_species=0; cts_fast_fraction=0.05
             if cts_fast_mode=='Hot Maxwellian component':
