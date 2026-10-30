@@ -281,8 +281,12 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     amp,center,temperature,offset,slope=map(float,p)
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
-    q_projection=2.0*sine
-    velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
+    ratio_center = center / laser_nm
+    beta_center = (ratio_center - 1.0) / (sine * (ratio_center + 1.0))
+    if not np.isfinite(beta_center) or abs(beta_center) >= 1.0:
+        raise ValueError("Fitted relativistic centroid implies a superluminal bulk-flow projection")
+    velocity = C_M_S * beta_center
+    velocity_center_derivative = 2.0 / (sine * laser_nm * (ratio_center + 1.0)**2)
     def area_from_params(values):
         a,cen,temp,off,sl=values
         theta_local=max(float(temp)/ELECTRON_REST_ENERGY_EV,1e-12)
@@ -302,7 +306,7 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     return {"electron_temperature_eV":temperature,
             "electron_temperature_uncertainty_eV":float(np.sqrt(max(cov[2,2],0.0))),
             "electron_velocity_projection_m_s":float(velocity),
-            "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
+            "electron_velocity_projection_uncertainty_m_s":float(C_M_S*velocity_center_derivative*np.sqrt(max(cov[1,1],0.0))),
             "fitted_center_nm":center,"amplitude":amp,"background_intercept":offset,
             "background_slope_per_nm":slope,"fit_covariance":np.asarray(cov,dtype=float),
             "residual":residual,"reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
@@ -660,11 +664,19 @@ def analyze_thomson_spectra(
             fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                 fit["electron_temperature_uncertainty_eV"], te*np.sqrt(te_rel_var)))
             velocity = fit["electron_velocity_projection_m_s"]
-            velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*laser_wavelength_unc
-                                    /(float(laser_wavelength_nm)**2*2.0*np.sin(float(scattering_angle_rad)/2.0)))
-            velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
-                                        /np.sin(float(scattering_angle_rad)/2.0)
-                                        *scattering_angle_unc)
+            if model == "relativistic_maxwell_juttner":
+                center_ratio = float(fit["fitted_center_nm"]) / float(laser_wavelength_nm)
+                sine_half = np.sin(float(scattering_angle_rad)/2.0)
+                velocity_laser_sigma = (C_M_S * 2.0 * center_ratio * laser_wavelength_unc
+                                        /(sine_half * float(laser_wavelength_nm) * (center_ratio+1.0)**2))
+                velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
+                                            /sine_half*scattering_angle_unc)
+            else:
+                velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*laser_wavelength_unc
+                                        /(float(laser_wavelength_nm)**2*2.0*np.sin(float(scattering_angle_rad)/2.0)))
+                velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
+                                            /np.sin(float(scattering_angle_rad)/2.0)
+                                            *scattering_angle_unc)
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.sqrt(
                 fit["electron_velocity_projection_uncertainty_m_s"]**2
                 + velocity_laser_sigma**2 + velocity_angle_sigma**2))
