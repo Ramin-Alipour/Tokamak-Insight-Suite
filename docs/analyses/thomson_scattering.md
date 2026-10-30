@@ -28,9 +28,11 @@ The primary execution path is:
 | ion_species | explicit species list | Required for collective Maxwellian mode |
 | ion_fractions | dimensionless; one per species | Required for multiple ion species; fractions must sum to one |
 | ion_temperature_eV | eV, one value per species | Required for the current collective backend; supply from an independent diagnostic when available |
-| ion_velocity_m_s | m/s, one 3-vector per species | Optional externally measured ion-flow vectors |
-| electron_velocity_m_s | m/s, 3-vector | Optional externally measured electron-fluid velocity |
-| Absolute-density geometry | W, m, sr, dimensionless efficiency, polarization and direction vectors | Required with spectral intensity in W/nm to infer absolute density in the non-collective mode |
+| ion_velocity_m_s | m/s, one 3-vector per species | Required in collective mode; measured vectors or explicit zero vectors declaring stationary ions |
+| electron_velocity_m_s | m/s, 3-vector | Required in collective mode; measured vector or explicit zero vector declaring stationary electrons |
+| Absolute-density geometry | W, m, sr, dimensionless efficiency, incident direction, polarization and scattered direction vectors | Required with spectral intensity in W/nm to infer absolute density in the non-collective mode |
+| Laser/angle uncertainty | nm / rad | Optional; missing uncertainty inputs are explicitly flagged |
+| Optical-factor uncertainty | W, m, sr, dimensionless | Optional; only supplied uncertainty terms are propagated |
 
 The measured spectra are assumed to be calibrated intensity data. No wavelength calibration, detector calibration, background correction of the measurement system, or instrument-response measurement is performed by this analysis. The physical fit may include a local background nuisance term, which is part of spectral inference rather than detector calibration.
 
