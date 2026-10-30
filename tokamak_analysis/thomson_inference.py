@@ -246,7 +246,7 @@ def analyze_thomson_spectra(
     interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
-    ion_species=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
+    ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -288,6 +288,10 @@ def analyze_thomson_spectra(
             raise ValueError("Collective inference requires measured ion/electron flow vectors or explicit zero vectors to declare a stationary-flow assumption")
         if ion_temperature_eV is None:
             raise ValueError("Collective Maxwellian inference requires independently supplied ion temperature(s); no ion temperature is assumed")
+        if ion_fractions is None:
+            if len(ion_species) > 1:
+                raise ValueError("Collective multi-species inference requires explicit ion_fractions summing to one")
+            ion_fractions = [1.0]
         try:
             from astropy import units as u
             from plasmapy.diagnostics import thomson
@@ -320,6 +324,9 @@ def analyze_thomson_spectra(
             # collective and non-collective regimes from the same dielectric
             # response; ion species/temperature are never silently defaulted.
             ion_t = np.atleast_1d(ion_temperature_eV)
+            ion_fract = _finite_array(ion_fractions, "ion_fractions", 1)
+            if ion_fract.size != len(ion_species) or np.any(ion_fract <= 0) or not np.isclose(np.sum(ion_fract),1.0,rtol=1e-6,atol=1e-8):
+                raise ValueError("ion_fractions must contain one positive fraction per species and sum to one")
             ion_v = _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
             electron_v = _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
             if ion_v.shape == (3,) and len(ion_species) == 1:
@@ -341,7 +348,7 @@ def analyze_thomson_spectra(
                 ne, te = params
                 _, spec = thomson.spectral_density(
                     xi*u.nm, float(laser_wavelength_nm)*u.nm, ne/u.m**3,
-                    T_e=te*u.eV, T_i=ion_t*u.eV, ions=ion_species,
+                    T_e=te*u.eV, T_i=ion_t*u.eV, ions=ion_species, ifract=ion_fract,
                     ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
                     probe_vec=probe_vec, scatter_vec=scatter_vec)
                 z = np.asarray(spec.value, dtype=float)
@@ -361,6 +368,12 @@ def analyze_thomson_spectra(
                 parameter_covariance = None
                 parameter_uncertainties = np.array([np.nan,np.nan])
             model_spec = collective_shape(fitopt.x)
+            alpha_fit, _ = thomson.spectral_density(
+                xi*u.nm, float(laser_wavelength_nm)*u.nm, ne_fit/u.m**3,
+                T_e=te_fit*u.eV, T_i=ion_t*u.eV, ions=ion_species, ifract=ion_fract,
+                ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
+                probe_vec=probe_vec, scatter_vec=scatter_vec)
+            alpha_value=float(np.asarray(getattr(alpha_fit,"value",alpha_fit)))
             amp_fit = float(np.dot(y[i], model_spec)/max(np.dot(model_spec,model_spec),1e-300))
             fit = {"electron_density_m3": ne_fit, "electron_temperature_eV": te_fit,
                    "fitted_spectrum": amp_fit*model_spec, "residual": y[i]-amp_fit*model_spec,
@@ -369,7 +382,10 @@ def analyze_thomson_spectra(
                    "electron_temperature_uncertainty_eV": float(parameter_uncertainties[1]),
                    "fit_covariance": parameter_covariance,
                    "optimizer_success": bool(fitopt.success), "optimizer_message": str(fitopt.message),
-                   "ion_species": list(ion_species), "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
+                   "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
+                   "scattering_parameter_alpha": alpha_value,
+                   "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
+                   "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
         if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
