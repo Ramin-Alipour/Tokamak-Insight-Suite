@@ -171,3 +171,22 @@ def test_polarized_thomson_cross_section_uses_full_consistent_geometry():
             np.pi/2,incident_polarization_vector=[1,0,0],
             incident_direction_vector=[1,0,0],scattered_direction_vector=[0,1,0],
         )
+
+
+def test_instrument_response_accepts_kernel_array_and_callable():
+    from tokamak_analysis.thomson_inference import _response_for_channel
+    x,y,_=_spectral_case(100.0)
+    kernel=np.array([0.2,0.6,0.2])
+    matrix=_response_for_channel(kernel,0,1,x.size,x)
+    measured=matrix@(y-25.0)+25.0
+    out=analyze_thomson_spectra(
+        x,measured[None,:],[0.1],laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,instrument_response=kernel,
+    )
+    assert out["electron_temperature_profile_eV"][0] == pytest.approx(100.0,rel=0.05)
+    callable_out=analyze_thomson_spectra(
+        x,y[None,:],[0.1],laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,
+        instrument_response=lambda wavelength: np.eye(len(wavelength)),
+    )
+    assert callable_out["electron_temperature_profile_eV"][0] == pytest.approx(100.0,rel=0.05)
