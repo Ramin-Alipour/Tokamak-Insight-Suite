@@ -200,6 +200,10 @@ def analyze_thomson_profile(
             density_covariance.copy() if density_covariance is not None else np.diag(sne**2)
         )
         result["density_gradient_uncertainty_m-4"] = grad_unc
+        density_input_covariance = density_covariance if density_covariance is not None else np.diag(sne**2)
+        result["density_gradient_covariance_m-8"] = (
+            derivative_matrix @ density_input_covariance @ derivative_matrix.T
+        )
         result["density_normalized_gradient_uncertainty_m-1"] = _normalized_gradient_uncertainty(
             ne, dne_dr, sne, grad_unc, cov
         )
@@ -214,6 +218,10 @@ def analyze_thomson_profile(
             temperature_covariance.copy() if temperature_covariance is not None else np.diag(ste**2)
         )
         result["temperature_gradient_uncertainty_eV_m-1"] = grad_unc
+        temperature_input_covariance = temperature_covariance if temperature_covariance is not None else np.diag(ste**2)
+        result["temperature_gradient_covariance_eV2_m-2"] = (
+            derivative_matrix @ temperature_input_covariance @ derivative_matrix.T
+        )
         result["temperature_normalized_gradient_uncertainty_m-1"] = _normalized_gradient_uncertainty(
             te, dte_dr, ste, grad_unc, cov
         )
