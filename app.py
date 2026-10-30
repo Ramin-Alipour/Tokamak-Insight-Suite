@@ -873,12 +873,17 @@ elif page=='Spectral Analysis':
                     electron_velocity_unc_text=st.text_input('Electron-velocity component 1σ uncertainties (m/s; x,y,z; optional)',key='ts_infer_electron_velocity_unc')
                     incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_incident_direction')
                     scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_scattered_direction')
+                    st.caption('Use either the scalar scattering-angle uncertainty above or component-wise beam-direction uncertainties below, not both.')
+                    incident_direction_unc_text=st.text_input('Incident-direction component 1σ uncertainties (x,y,z; optional)',value='',key='ts_infer_incident_direction_unc')
+                    scattered_direction_unc_text=st.text_input('Scattered-direction component 1σ uncertainties (x,y,z; optional)',value='',key='ts_infer_scattered_direction_unc')
             absolute_density=False
             if model!='collective_maxwellian':
                 absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
             else:
                 st.caption('Collective-mode density is inferred from the resolved dielectric spectral shape; the non-collective absolute-power inversion is not used.')
             density_kwargs={}
+            density_covariance_upload=None
+            joint_density_covariance_upload=None
             if absolute_density:
                 st.markdown('**Absolute Thomson-power geometry**')
                 d1,d2,d3=st.columns(3)
@@ -897,6 +902,9 @@ elif page=='Spectral Analysis':
                     incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
                     scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
                     polarization_unc_text=st.text_input('Polarization-factor 1σ uncertainty (optional)',value='',key='ts_infer_polarization_unc')
+                    density_covariance_upload=st.file_uploader('Optional within-channel 6×6 density-input relative covariance CSV',type=['csv','txt'],key='ts_infer_density_covariance')
+                    joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
+                    st.caption('A density covariance file is a complete uncertainty model for its factors. Do not also enter scalar optical uncertainties; the full cross-channel matrix also cannot be combined with joint spectral covariance or response-matrix uncertainty.')
                 density_kwargs={}
             def _parse_ts_vector(raw,label):
                 try:
@@ -997,6 +1005,10 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
+                    if density_covariance_upload is not None:
+                        kwargs['density_relative_covariance']=pd.read_csv(density_covariance_upload,header=None).to_numpy(dtype=float)
+                    if joint_density_covariance_upload is not None:
+                        kwargs['joint_density_relative_covariance']=pd.read_csv(joint_density_covariance_upload,header=None).to_numpy(dtype=float)
                     if absolute_density:
                         kwargs.update({
                             'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
@@ -1027,6 +1039,10 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
+                        if incident_direction_unc_text.strip():
+                            kwargs['incident_direction_uncertainty']=_parse_ts_vector(incident_direction_unc_text,'Incident-direction uncertainties')
+                        if scattered_direction_unc_text.strip():
+                            kwargs['scattered_direction_uncertainty']=_parse_ts_vector(scattered_direction_unc_text,'Scattered-direction uncertainties')
                         if ion_temperature_unc_text.strip():
                             kwargs['ion_temperature_uncertainty_eV']=_parse_ts_float_list(ion_temperature_unc_text,'Ion-temperature uncertainties')
                         if ion_velocity_unc_text.strip():
