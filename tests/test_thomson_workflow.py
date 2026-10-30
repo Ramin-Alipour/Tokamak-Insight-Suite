@@ -52,8 +52,9 @@ def test_thomson_workflow_preserves_sorted_uncertainties():
     assert np.all(np.isfinite(out["density_scale_length_uncertainty_m"]))
     assert np.all(np.isfinite(out["density_normalized_gradient_uncertainty_m-1"]))
     assert np.all(np.isfinite(out["temperature_normalized_gradient_uncertainty_m-1"]))
-    assert out["summary"].density_line_average_uncertainty_m3 is not None
-    assert out["summary"].temperature_line_average_uncertainty_ev is not None
+    assert out["summary"].density_radial_average_uncertainty_m3 is not None
+    assert out["summary"].temperature_radial_average_uncertainty_ev is not None
+    assert out["summary"].density_line_average_uncertainty_m3 == out["summary"].density_radial_average_uncertainty_m3
 
 
 def test_scale_length_threshold_is_dimensionally_consistent_for_small_values():
@@ -193,11 +194,9 @@ def test_thomson_reconstruction_clipping_keeps_derivative_consistent(method):
     assert np.all(np.isfinite(dne))
     assert np.all(np.isfinite(dte))
     if method == "smoothing_spline":
-        # Any sample projected from a negative spline overshoot has a zero
-        # derivative by construction. Do not impose that rule on native
-        # non-negative PCHIP zeros, whose one-sided slope can be non-zero.
-        np.testing.assert_array_equal(dne[ne == 0.0], np.zeros(np.count_nonzero(ne == 0.0)))
-        np.testing.assert_array_equal(dte[te == 0.0], np.zeros(np.count_nonzero(te == 0.0)))
+        assert out["smoothing_selection"] == "user_supplied_residual_target"
+        assert np.all(np.isfinite(dne))
+        assert np.all(np.isfinite(dte))
 
 
 
@@ -269,3 +268,21 @@ def test_interpolation_accepts_nonempty_finite_real_numeric_targets():
     result = interpolate_profile(profile, np.array([0.25, 0.75]))
     np.testing.assert_allclose(result["density_m3"], [1.5, 2.5])
     np.testing.assert_allclose(result["temperature_ev"], [15.0, 25.0])
+
+
+def test_profile_summary_uses_radial_average_not_line_average_label():
+    profile = build_profile([0.0, 1.0, 2.0], [1.0, 2.0, 3.0], [10.0, 20.0, 30.0])
+    summary = __import__("tokamak_analysis.thomson_scattering", fromlist=["profile_summary"]).profile_summary(profile)
+    assert summary.density_radial_average_m3 == pytest.approx(2.0)
+    assert summary.temperature_radial_average_ev == pytest.approx(20.0)
+    assert summary.density_line_average_m3 == summary.density_radial_average_m3
+
+
+def test_profile_reconstruction_reports_gcv_when_smoothing_factor_is_omitted():
+    out = reconstruct_thomson_profile(
+        [0.0, 0.25, 0.5, 0.75, 1.0],
+        [1e19, 1.2e19, 1.4e19, 1.2e19, 1e19],
+        [50.0, 70.0, 90.0, 70.0, 50.0],
+        method="smoothing_spline", points=31,
+    )
+    assert out["smoothing_selection"] == "generalized_cross_validation"

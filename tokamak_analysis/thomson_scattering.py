@@ -34,10 +34,28 @@ class ThomsonSummary:
     temperature_min_radius_m: float
     temperature_peak_ev: float
     temperature_peak_radius_m: float
-    density_line_average_m3: float
-    temperature_line_average_ev: float
-    density_line_average_uncertainty_m3: float | None = None
-    temperature_line_average_uncertainty_ev: float | None = None
+    density_radial_average_m3: float
+    temperature_radial_average_ev: float
+    density_radial_average_uncertainty_m3: float | None = None
+    temperature_radial_average_uncertainty_ev: float | None = None
+
+    @property
+    def density_line_average_m3(self):
+        """Deprecated alias; this is a radial-coordinate average, not a line average."""
+        return self.density_radial_average_m3
+
+    @property
+    def temperature_line_average_ev(self):
+        """Deprecated alias; this is a radial-coordinate average, not a line average."""
+        return self.temperature_radial_average_ev
+
+    @property
+    def density_line_average_uncertainty_m3(self):
+        return self.density_radial_average_uncertainty_m3
+
+    @property
+    def temperature_line_average_uncertainty_ev(self):
+        return self.temperature_radial_average_uncertainty_ev
 
 
 def _is_finite_real_scalar(value) -> bool:
@@ -158,11 +176,11 @@ def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
     r, ne, te = profile.radius_m, profile.density_m3, profile.temperature_ev
     radial_span = float(r[-1] - r[0])
     trap_weights = _trapezoid_weights(r)
-    line_weights = trap_weights / radial_span
-    ne_line = float(_trapezoid(ne, r) / radial_span)
-    te_line = float(_trapezoid(te, r) / radial_span)
-    ne_line_unc = _weighted_standard_uncertainty(line_weights, profile.density_uncertainty_m3)
-    te_line_unc = _weighted_standard_uncertainty(line_weights, profile.temperature_uncertainty_ev)
+    radial_weights = trap_weights / radial_span
+    ne_radial = float(_trapezoid(ne, r) / radial_span)
+    te_radial = float(_trapezoid(te, r) / radial_span)
+    ne_radial_unc = _weighted_standard_uncertainty(radial_weights, profile.density_uncertainty_m3)
+    te_radial_unc = _weighted_standard_uncertainty(radial_weights, profile.temperature_uncertainty_ev)
 
     ine_min, ine_max = int(np.argmin(ne)), int(np.argmax(ne))
     ite_min, ite_max = int(np.argmin(te)), int(np.argmax(te))
@@ -178,10 +196,10 @@ def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
         temperature_min_radius_m=float(r[ite_min]),
         temperature_peak_ev=float(te[ite_max]),
         temperature_peak_radius_m=float(r[ite_max]),
-        density_line_average_m3=ne_line,
-        temperature_line_average_ev=te_line,
-        density_line_average_uncertainty_m3=ne_line_unc,
-        temperature_line_average_uncertainty_ev=te_line_unc,
+        density_radial_average_m3=ne_radial,
+        temperature_radial_average_ev=te_radial,
+        density_radial_average_uncertainty_m3=ne_radial_unc,
+        temperature_radial_average_uncertainty_ev=te_radial_unc,
     )
 
 def _interpolate_independent_uncertainty(target, radius, uncertainty):
@@ -242,7 +260,7 @@ def reconstruct_thomson_profile(
     density_uncertainty_m3=None,
     temperature_uncertainty_ev=None,
     method="smoothing_spline",
-    smoothing_factor=1.0,
+    smoothing_factor=None,
     points=200,
 ):
     """Reconstruct smooth radial ne/Te curves from spatially resolved measurements.
@@ -258,7 +276,7 @@ def reconstruct_thomson_profile(
     one-dimensional profile fit, not an equilibrium or transport reconstruction;
     it does not estimate fit confidence intervals or systematic uncertainties.
     """
-    from scipy.interpolate import PchipInterpolator, UnivariateSpline
+    from scipy.interpolate import PchipInterpolator, UnivariateSpline, make_smoothing_spline
 
     profile = build_profile(
         radius_m,
@@ -269,8 +287,8 @@ def reconstruct_thomson_profile(
     )
     if method not in {"smoothing_spline", "pchip"}:
         raise ValueError("method must be 'smoothing_spline' or 'pchip'")
-    if not _is_finite_real_scalar(smoothing_factor) or smoothing_factor < 0:
-        raise ValueError("smoothing_factor must be finite and non-negative")
+    if smoothing_factor is not None and (not _is_finite_real_scalar(smoothing_factor) or smoothing_factor < 0):
+        raise ValueError("smoothing_factor must be None (automatic GCV selection) or finite and non-negative")
     if isinstance(points, (bool, np.bool_)) or not isinstance(points, (int, np.integer)) or not 20 <= points <= 5000:
         raise ValueError("points must be an integer between 20 and 5000")
 
@@ -286,19 +304,29 @@ def reconstruct_thomson_profile(
             if np.any(uncertainty <= 0):
                 raise ValueError(f"{label} uncertainties must be strictly positive for weighted spline fitting")
             weights = 1.0 / uncertainty
-            fitted = UnivariateSpline(r, y, w=weights, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1))
-            return np.asarray(fitted(grid), dtype=float), np.asarray(fitted.derivative()(grid), dtype=float)
+            if smoothing_factor is None:
+                if r.size < 5:
+                    raise ValueError("Automatic GCV smoothing requires at least five radial samples; use PCHIP or supply smoothing_factor.")
+                fitted = make_smoothing_spline(r, y, w=weights, lam=None)
+            else:
+                fitted = UnivariateSpline(r, y, w=weights, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1))
+            derivative = fitted.derivative() if hasattr(fitted, "derivative") else fitted.derivative
+            return np.asarray(fitted(grid), dtype=float), np.asarray(derivative()(grid), dtype=float)
 
         scale = float(np.max(np.abs(y)))
         if scale == 0:
             return np.zeros_like(grid), np.zeros_like(grid)
         normalized = y / scale
-        fitted = UnivariateSpline(
-            r, normalized, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1)
-        )
+        if smoothing_factor is None:
+            if r.size < 5:
+                raise ValueError("Automatic GCV smoothing requires at least five radial samples; use PCHIP or supply smoothing_factor.")
+            fitted = make_smoothing_spline(r, normalized, lam=None)
+        else:
+            fitted = UnivariateSpline(r, normalized, s=float(smoothing_factor) * r.size, k=min(3, r.size - 1))
+        derivative = fitted.derivative() if hasattr(fitted, "derivative") else fitted.derivative
         return (
             np.asarray(fitted(grid), dtype=float) * scale,
-            np.asarray(fitted.derivative()(grid), dtype=float) * scale,
+            np.asarray(derivative()(grid), dtype=float) * scale,
         )
 
     density_fit, density_gradient = fit_channel(
@@ -308,17 +336,10 @@ def reconstruct_thomson_profile(
         profile.temperature_ev, profile.temperature_uncertainty_ev, "temperature"
     )
 
-    # Unconstrained cubic smoothing splines can overshoot below zero even when
-    # every measured value is physical. Project the reconstructed profiles onto
-    # the physical non-negative domain and make the derivative consistent with
-    # the projected (flat) segment. PCHIP is shape-preserving, but this guard
-    # also protects the smoothing-spline path from returning negative ne or Te.
-    density_negative = density_fit < 0.0
-    temperature_negative = temperature_fit < 0.0
-    density_fit = np.maximum(density_fit, 0.0)
-    temperature_fit = np.maximum(temperature_fit, 0.0)
-    density_gradient = np.where(density_negative, 0.0, density_gradient)
-    temperature_gradient = np.where(temperature_negative, 0.0, temperature_gradient)
+    # Never clip an unconstrained spline: clipping changes both the fitted
+    # profile and its derivative. Reject a non-physical reconstruction explicitly.
+    if np.any(density_fit < 0.0) or np.any(temperature_fit < 0.0):
+        raise ValueError("Reconstruction produced negative density or temperature overshoot; no clipping is applied. Select PCHIP or change the explicitly supplied smoothing_factor.")
 
     uncertainty_channels = {
         "density": (
@@ -353,7 +374,8 @@ def reconstruct_thomson_profile(
         "density_gradient_m-4": density_gradient,
         "temperature_gradient_eV_m-1": temperature_gradient,
         "method": method,
-        "smoothing_factor": float(smoothing_factor) if method == "smoothing_spline" else None,
+        "smoothing_factor": float(smoothing_factor) if method == "smoothing_spline" and smoothing_factor is not None else None,
+        "smoothing_selection": ("generalized_cross_validation" if method == "smoothing_spline" and smoothing_factor is None else "user_supplied_residual_target" if method == "smoothing_spline" else "shape_preserving_pchip"),
         "input_point_count": int(r.size),
         "reconstruction_point_count": int(grid.size),
         "radial_domain_m": (float(r[0]), float(r[-1])),
@@ -370,9 +392,9 @@ def reconstruct_thomson_profile(
             "Only calibrated spatial measurements are accepted; no detector or wavelength calibration is performed.",
             "No extrapolation beyond the measured radial interval is performed.",
             "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
-            "Negative spline overshoot is projected to zero; derivatives are set to zero on clipped segments. This enforces non-negativity but is not a substitute for a physically constrained fit.",
+            "Negative spline overshoot is rejected rather than clipped; clipping would alter the fitted profile and its derivative. PCHIP is available when shape preservation is preferred.",
             "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
-            "Supplied uncertainties used as smoothing-spline weights are not propagated to reconstructed profile values; reconstructed-profile uncertainties and fit confidence intervals are not estimated.",
+            "When smoothing_factor is omitted, the smoothing spline selects its regularization parameter by generalized cross-validation. Supplied uncertainties are fit weights only; reconstructed-profile uncertainties and confidence intervals are not yet estimated.",
         ],
     }
 

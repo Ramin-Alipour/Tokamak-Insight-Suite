@@ -105,6 +105,12 @@ def analyze_thomson_profile(
     dte_dr = derivative_matrix @ te
     density_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, ne)
     temperature_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, te)
+    if p.density_uncertainty_m3 is not None:
+        density_gradient_sigma, _ = _gradient_uncertainty(derivative_matrix, p.density_uncertainty_m3)
+        density_gradient_threshold = np.maximum(density_gradient_threshold, 2.0 * density_gradient_sigma)
+    if p.temperature_uncertainty_ev is not None:
+        temperature_gradient_sigma, _ = _gradient_uncertainty(derivative_matrix, p.temperature_uncertainty_ev)
+        temperature_gradient_threshold = np.maximum(temperature_gradient_threshold, 2.0 * temperature_gradient_sigma)
     density_normalized_gradient = np.divide(
         dne_dr, ne, out=np.full_like(dne_dr, np.nan), where=ne > 0
     )
@@ -122,10 +128,12 @@ def analyze_thomson_profile(
         "density_scale_length_m": _scale_length(ne, dne_dr, density_gradient_threshold),
         "temperature_scale_length_m": _scale_length(te, dte_dr, temperature_gradient_threshold),
         "summary": profile_summary(p),
+        "scale_length_gradient_significance_threshold_sigma": 2.0,
         "notes": [
             "Input must be calibrated Thomson-scattering profile data.",
-            "Gradient and derived uncertainty propagation assumes independent pointwise errors.",
-            "NaN scale lengths mark zero/near-zero gradients or profile values.",
+            "When pointwise uncertainties are supplied, a scale length is reported only where the local gradient exceeds twice its propagated 1-sigma uncertainty; otherwise the numerical round-off threshold is used.",
+            "The current gradient-uncertainty propagation assumes independent pointwise errors; full covariance input is not yet supported.",
+            "NaN scale lengths mark zero, unresolved or statistically insignificant gradients or profile values.",
             "Peak-location uncertainty is not estimated by this workflow.",
         ],
     }
