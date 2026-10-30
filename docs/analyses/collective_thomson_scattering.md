@@ -23,7 +23,7 @@ It does not include a full magnetized electromagnetic scattering tensor, ray tra
 - Optional uncertainties for probe frequency, scalar scattering angle, electron-flow projection and ion fractions.
 - Optional fast-ion model.
 
-The current background-ion model uses one common ion temperature and one common projected ion flow for all supplied ion species. Species-specific ion temperatures and species-specific flow inference are not implemented. Ion species, charge states, masses and fractions must be supplied explicitly; the interface does not prefill D+ or a unit fraction.
+The current background-ion model uses one common ion temperature and one common projected ion flow for all supplied ion species. Species-specific ion temperatures and species-specific flow inference are not implemented. Ion species, charge states, masses and fractions must be supplied explicitly; the interface does not prefill D+ or a unit fraction. The result returns the exact externally supplied electron-flow projection and its optional input uncertainty, explicitly marked as not fitted; inferred ion-flow uncertainty remains a separate fitted-parameter result.
 
 ## Inversion strategies
 
