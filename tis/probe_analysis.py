@@ -273,17 +273,48 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         "The optional Monte Carlo uncertainty quantifies only the maximum-dI/dV numerical proxy under the supplied independent per-sample current standard uncertainty; it does not certify physical Vp.")
     out["plasma_potential_proxy_standard_uncertainty_V"] = None
     out["plasma_potential_proxy_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
+    out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = None
+    d2_candidates = out["plasma_potential_d2IdV2_zero_crossing_candidates_V"]
+    out["plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V"] = None
+    out["plasma_potential_d2IdV2_zero_crossing_95pct_intervals_V"] = None
+    out["plasma_potential_d2IdV2_zero_crossing_uncertainty_status"] = (
+        "no_inflection_candidates_found" if not d2_candidates
+        else "not_quantified_current_uncertainty_not_supplied"
+    )
     if processed_current_sigma is not None:
         rng = np.random.default_rng(20261030)
         proxy_draws = np.empty(500, dtype=float)
+        d2_candidate_draws = [[] for _ in d2_candidates]
         for draw_index in range(proxy_draws.size):
             perturbed = i + rng.normal(0.0, processed_current_sigma)
-            proxy_draws[draw_index] = v[int(np.argmax(np.gradient(perturbed, v)))]
+            draw_didv = np.gradient(perturbed, v)
+            proxy_draws[draw_index] = v[int(np.argmax(draw_didv))]
+            draw_d2 = np.gradient(draw_didv, v)
+            draw_roots = _zero_crossing_candidates(v, draw_d2)
+            for candidate_index, nominal_candidate in enumerate(d2_candidates):
+                if draw_roots:
+                    nearest = min(draw_roots, key=lambda value: abs(value - nominal_candidate))
+                    d2_candidate_draws[candidate_index].append(float(nearest))
         out["plasma_potential_proxy_standard_uncertainty_V"] = float(np.std(proxy_draws, ddof=1))
         out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = [float(x) for x in np.quantile(proxy_draws, [0.025, 0.975])]
         out["plasma_potential_proxy_uncertainty_status"] = "monte_carlo_current_noise_only_not_physical_validation"
-    else:
-        out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = None
+        if d2_candidate_draws:
+            standard_uncertainties = []
+            intervals = []
+            for draws in d2_candidate_draws:
+                if len(draws) >= 2:
+                    standard_uncertainties.append(float(np.std(draws, ddof=1)))
+                    intervals.append([float(x) for x in np.quantile(draws, [0.025, 0.975])])
+                else:
+                    standard_uncertainties.append(None)
+                    intervals.append(None)
+            out["plasma_potential_d2IdV2_zero_crossing_standard_uncertainties_V"] = standard_uncertainties
+            out["plasma_potential_d2IdV2_zero_crossing_95pct_intervals_V"] = intervals
+            out["plasma_potential_d2IdV2_zero_crossing_uncertainty_status"] = (
+                "monte_carlo_current_noise_only_not_physical_validation"
+                if all(value is not None for value in standard_uncertainties)
+                else "partially_unresolved_under_supplied_current_noise"
+            )
     out["floating_potential_standard_uncertainty_V"] = None
     out["floating_potential_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
     if processed_current_sigma is not None:
