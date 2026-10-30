@@ -237,7 +237,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None):
-    """Infer ne, Te, Ti and ion-flow projection with DE global initialization and bounded least squares."""
+    """Infer CTS plasma parameters with selectable genetic, differential-evolution or regularized inversion."""
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); y=_array(spectrum,"spectrum",1)
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
     if np.any(y<0): raise ValueError("calibrated CTS power spectrum must be non-negative")
@@ -381,7 +381,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "ion_temperature":"inferred from measured ion-feature shape","ion_velocity_projection":"inferred from ion-feature Doppler shift","ion_composition":"externally supplied fixed composition"},
       "uncertainty_model":"Local Jacobian covariance with optional full spectral covariance whitening; response-matrix uncertainty is propagated by Monte Carlo when supplied.",
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
-       "Ion composition is fixed externally.","Optional fast-ion component is a two-Maxwellian approximation, not arbitrary VDF reconstruction.",
+       "Ion composition is fixed externally.","Fast-ion shape can be an externally supplied tabulated 1-D VDF; the supplied shape is not independently reconstructed by this parameter fit.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if out["reduced_chi_square"] is not None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
@@ -407,9 +407,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["fast_ion_vdf_provenance"]="externally supplied normalized tabulated 1-D velocity distribution; only its density fraction is inferred"
             out["fast_ion_vdf_regularization"]=fast["vdf"]
         out["parameter_names"]=names
-        out["fast_ion_fraction_uncertainty"]=float(su[4])
+        out["fast_ion_fraction_uncertainty"]=float(total_sigma[4] if out.get("model_discrepancy_scale") is not None else su[4])
         if fast["kind"]=="maxwellian":
-            out["fast_ion_temperature_uncertainty_eV"]=float(su[5])
+            out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[5] if out.get("model_discrepancy_scale") is not None else su[5])
     if response_sigma is not None or ext_unc:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
         for _ in range(int(response_mc_samples)):
