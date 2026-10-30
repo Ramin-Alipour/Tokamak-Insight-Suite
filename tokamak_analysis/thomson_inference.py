@@ -1066,7 +1066,8 @@ def analyze_thomson_spectra(
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
             "For non-collective fits, supplied LSF uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied independent optical-factor uncertainties, with correlations and model discrepancy excluded.",
-
+        ],
+    }
     if model=="collective_maxwellian" and any(v is not None for v in (
         ion_t_unc,ion_v_unc,electron_v_unc,lsf_unc,laser_wavelength_uncertainty_nm
     )):
