@@ -56,8 +56,8 @@ def test_absolute_density_requires_explicit_watt_per_nm_calibration():
             x, (y*1e-18)[None,:], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi/2, laser_power_w=2.0,
             interaction_length_m=0.1, collection_solid_angle_sr=1e-3,
-            optical_efficiency=0.5, incident_polarization=[1,0,0],
-            scattered_direction=[0,1,0],
+            optical_efficiency=0.5, incident_polarization=[0,0,1],
+            incident_direction=[1,0,0], scattered_direction=[0,1,0],
         )
 
 
@@ -69,8 +69,8 @@ def test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_sup
         laser_power_uncertainty_W=0.02, interaction_length_m=0.1,
         interaction_length_uncertainty_m=0.001, collection_solid_angle_sr=1e-3,
         collection_solid_angle_uncertainty_sr=1e-5, optical_efficiency=0.5,
-        optical_efficiency_uncertainty=0.01, incident_polarization=[1,0,0],
-        scattered_direction=[0,1,0], spectral_power_density_calibrated=True,
+        optical_efficiency_uncertainty=0.01, incident_polarization=[0,0,1],
+        incident_direction=[1,0,0], scattered_direction=[0,1,0], spectral_power_density_calibrated=True,
     )
     channel = out["channels"][0]
     assert channel["electron_density_m3"] > 0
