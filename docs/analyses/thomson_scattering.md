@@ -26,6 +26,7 @@ The primary execution path is:
 | signal_uncertainty | same unit/shape as spectra | Optional 1-sigma spectral uncertainty |
 | instrument_response_uncertainty | same shape as response | Optional 1-sigma response-matrix uncertainty |
 | ion_species | explicit species list | Required for collective Maxwellian mode |
+| ion_fractions | dimensionless; one per species | Required for multiple ion species; fractions must sum to one |
 | ion_temperature_eV | eV, one value per species | Required for the current collective backend; supply from an independent diagnostic when available |
 | ion_velocity_m_s | m/s, one 3-vector per species | Optional externally measured ion-flow vectors |
 | electron_velocity_m_s | m/s, 3-vector | Optional externally measured electron-fluid velocity |
@@ -53,7 +54,7 @@ A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-
 
 ### 3. Collective Maxwellian
 
-The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion temperatures and optional species flow vectors, and an optional electron-fluid flow vector. Missing ion temperatures are not silently replaced with electron temperature. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
+The optional collective backend uses the PlasmaPy kinetic dielectric/spectral-density implementation. The model accepts explicit ion species, ion composition fractions, ion temperatures and species flow vectors, and an electron-fluid flow vector. Missing ion temperatures are not silently replaced with electron temperature; multi-ion fractions are not silently assumed. If a required collective input is absent, the workflow stops with an explicit error. PlasmaPy and Astropy are optional dependencies installed with the plasma extra.
 
 The collective model can cover both collective and non-collective scattering regimes through the dielectric spectral-density calculation. The scattering parameter and spectral shape depend on the supplied plasma parameters and geometry.
 
