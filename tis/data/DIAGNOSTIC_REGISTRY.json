@@ -982,48 +982,56 @@
         {
           "function": "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
           "input_contract": "Calibrated shared or channel-specific voltage/current sweeps; explicit optional fit and polarity options.",
-          "outputs": "Independent per-channel canonical results; no cross-channel inference, spatial reconstruction or geometry inference."
+          "outputs": "Independent per-channel canonical results; no cross-channel inference, spatial reconstruction or geometry inference.",
+          "output_contract": "analysis_scope, channel_count, channels mapping each channel name to a canonical single-sweep result, cross_channel_inference_performed=false."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_series",
           "input_contract": "Calibrated current array shaped (time, channel, sample), with shared or matching calibrated voltage data and optional time/channel labels.",
-          "outputs": "Independent per-time/per-channel sweep results; no temporal trend or cross-channel inference."
+          "outputs": "Independent per-time/per-channel sweep results; no temporal trend or cross-channel inference.",
+          "output_contract": "analysis_scope, time_count, channel_count, sample_count_per_sweep, ordered time_slices with time_label and per-channel canonical result; temporal_trend_analysis_performed=false and cross_channel_inference_performed=false."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.fit_langmuir_electron_models",
           "input_contract": "Calibrated voltage/current arrays, explicit fit range, model choice and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive. Shared canonical preprocessing filters non-finite pairs, sorts and averages duplicate voltages; requires at least eight distinct voltages globally and model-specific distinct points in fit interval. Two-temperature mode is an empirical two-exponential decomposition, not proof of two populations.",
           "outputs": "Temperature component estimates and fit diagnostics; physical distribution is not confirmed.",
-          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, DOI: 10.1119/1.2772282, Appendix Problem 1; Stangeby (1984), Journal of Nuclear Materials 128-129, 969-973, DOI: 10.1016/0022-3115(84)90496-3. Two-temperature decomposition is conditional on two Maxwellian components and fit identifiability."
+          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, DOI: 10.1119/1.2772282, Appendix Problem 1; Stangeby (1984), Journal of Nuclear Materials 128-129, 969-973, DOI: 10.1016/0022-3115(84)90496-3. Two-temperature decomposition is conditional on two Maxwellian components and fit identifiability.",
+          "output_contract": "model_class and physical_interpretation_status; electron_temperature_components_eV; covariance validity, parameter standard errors and component temperature standard uncertainties when covariance is valid; all uncertainty outputs null with explicit status when covariance is invalid; physical_distribution_confirmed is always false."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.fit_langmuir_stretched_exponential",
           "input_contract": "Calibrated voltage/current arrays, explicit fit range and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive. Shared canonical preprocessing filters non-finite pairs, sorts and averages duplicate voltages; covariance-derived parameter errors are conditional on empirical curve-shape model and fit window.",
           "outputs": "Empirical shape exponent and fit diagnostics; not a kinetic kappa distribution.",
-          "reference": "Williams and Watts (1970), Transactions of the Faraday Society 66, 80-85, DOI: 10.1039/TF9706600080, for the generic empirical KWW shape only. This implementation is a mirrored empirical curve-shape fit, not a Langmuir-probe theory relation or a physical EEDF model."
+          "reference": "Williams and Watts (1970), Transactions of the Faraday Society 66, 80-85, DOI: 10.1039/TF9706600080, for the generic empirical KWW shape only. This implementation is a mirrored empirical curve-shape fit, not a Langmuir-probe theory relation or a physical EEDF model.",
+          "output_contract": "empirical model_class; fit parameters and fit quality; covariance-derived parameter_standard_errors and shape_exponent_standard_uncertainty only when covariance is valid, otherwise null with parameter_uncertainty_status; kinetic_distribution_identified is false."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
           "input_contract": "Ion saturation current, positive Te and area, and per-species masses, positive integer charge states Z_s, number-density fractions and sheath coefficients; fractions sum to one. Uses species-summed Bohm/sheath current with Z_s^(3/2); composition covariance uncertainty is explicitly not propagated.",
           "outputs": "Model-based total ion density; fractions must sum to one; uncertainty propagation is not performed.",
-          "reference": "Species-summed extension of the species-resolved Bohm/sheath current balance described by Hutchinson (2002), Chapter 3, Section 3.2.5. The Z_s^(3/2) dependence follows from multiplying species charge Z_s e by the species Bohm speed sqrt(Z_s e T_e/m_s); applicability of each sheath coefficient remains an explicit user assumption."
+          "reference": "Species-summed extension of the species-resolved Bohm/sheath current balance described by Hutchinson (2002), Chapter 3, Section 3.2.5. The Z_s^(3/2) dependence follows from multiplying species charge Z_s e by the species Bohm speed sqrt(Z_s e T_e/m_s); applicability of each sheath coefficient remains an explicit user assumption.",
+          "output_contract": "ion_density_estimate_m-3; normalized species definitions including mass, number-density fraction, charge_state and sheath_coefficient; ion_density_standard_uncertainty_m-3 and relative uncertainty are null with an explicit not-propagated status."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_electron_density_from_saturation",
           "input_contract": "Positive electron-saturation current, electron temperature, and effective collection area. Optional uncertainty propagation requires absolute current σ and relative Te/area σ; otherwise uncertainty is null with explicit status. Reference: Hutchinson (2002), Ch. 3, §3.2.5.",
           "outputs": "Separate helper result: electron_density_estimate_m-3, explicit Maxwellian collection formula and assumptions, physical_regime_confirmed=false, uncertainty_propagation_performed=false. Not a field automatically generated by analyze_langmuir_probe.",
-          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (6), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5."
+          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (6), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5.",
+          "output_contract": "electron_density_estimate_m-3; standard uncertainty only when absolute current sigma and relative Te and area sigmas are all supplied, otherwise null with status; physical_regime_confirmed is false."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_ion_particle_flux",
           "input_contract": "Ion density, electron temperature, ion mass, and explicitly supplied sheath factor. Explicit positive integer charge state Z_i; optional uncertainty propagation requires all four relative input uncertainties (density, Te, mass, sheath factor). Bohm speed sqrt(Z_i e T_e/m_i).",
           "outputs": "Separate helper result: Bohm-like sound speed and particle-flux estimate under supplied inputs; uncertainty_propagation_performed=false. Not inferred from multi-channel or time-series batching.",
-          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (3), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5."
+          "reference": "Merlino (2007), American Journal of Physics 75, 1078-1085, Eq. (3), DOI: 10.1119/1.2772282; Hutchinson (2002), Chapter 3, Section 3.2.5.",
+          "output_contract": "ion_sound_speed_m_s, ion_particle_flux_m-2_s-1 and explicit integer charge_state; flux standard uncertainty only when all four relative uncertainties are supplied, otherwise null with status."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
           "input_contract": "Calibrated voltage/current arrays and explicit odd local window point count and polynomial order. Local polynomial least squares uses actual voltage coordinates and supports nonuniform grids; raw and smoothed candidates remain separate.",
           "outputs": "Raw and Savitzky-Golay-smoothed maximum-dI/dV proxies, separate maximum-d²I/dV² extrema, and second-derivative zero-crossing inflection candidates; current polarity is normalized consistently.",
-          "reference": "Fan and Gijbels (1996), Local Polynomial Modelling and Its Applications, for local polynomial smoothing in actual voltage coordinates."
+          "reference": "Fan and Gijbels (1996), Local Polynomial Modelling and Its Applications, for local polynomial smoothing in actual voltage coordinates.",
+          "output_contract": "raw and locally smoothed dI/dV and d2I/dV2 candidates, zero crossings, smoothing metadata and input-quality metadata; local polynomial method uses actual nonuniform voltage coordinates; no physical plasma potential is certified."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
