@@ -10,6 +10,10 @@ from scipy.optimize import curve_fit
 from scipy.special import gammaln
 
 from .thomson_scattering import density_from_thomson_scattered_power
+from .formula_library import (
+    thomson_electron_temperature_from_spectral_width,
+    thomson_velocity_projection,
+)
 
 ELECTRON_REST_ENERGY_EV = 510_998.95069
 C_M_S = 299_792_458.0
@@ -226,10 +230,12 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         raise ValueError("Wavelength coverage must include at least ±3 fitted intrinsic widths")
     # Non-collective, non-relativistic, isotropic Maxwellian electron model.
     thermal_sigma = sigma
-    te = (thermal_sigma/laser_nm)**2 * (ELECTRON_REST_ENERGY_EV/4.0) / np.sin(angle/2.0)**2
-    # The fitted spectral shift measures the velocity projection along q.
+    te = thomson_electron_temperature_from_spectral_width(
+        thermal_sigma, laser_nm, angle
+    )["electron_temperature_eV"]
+    # The canonical formula-library helper defines the Doppler sign convention.
+    velocity = thomson_velocity_projection(center, laser_nm, angle)["electron_velocity_projection_m_s"]
     q_projection = 2.0*np.sin(angle/2.0)
-    velocity = -C_M_S * (center-laser_nm)/(laser_nm*q_projection)
     if te / ELECTRON_REST_ENERGY_EV >= 0.01:
         raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is not safely small relative to the electron rest energy; select the relativistic Maxwell-Juttner model.")
     if abs(velocity) >= 0.1 * C_M_S:
@@ -295,9 +301,13 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     amp,center,sigma,kappa,offset,slope=map(float,p)
     if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
         raise ValueError("Wavelength coverage must include at least ±3 fitted RMS widths")
-    te=(sigma/laser_nm)**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(angle/2.0)**2
+    te=thomson_electron_temperature_from_spectral_width(
+        sigma, laser_nm, angle
+    )["electron_temperature_eV"]
+    velocity=thomson_velocity_projection(
+        center, laser_nm, angle
+    )["electron_velocity_projection_m_s"]
     q_projection=2.0*np.sin(angle/2.0)
-    velocity=-C_M_S*(center-laser_nm)/(laser_nm*q_projection)
     if te / ELECTRON_REST_ENERGY_EV >= 0.01:
         raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; select the relativistic Maxwell-Juttner model.")
     if abs(velocity) >= 0.1 * C_M_S:
@@ -947,10 +957,12 @@ def analyze_thomson_spectra(
 
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             te = fit["electron_temperature_eV"]
-            te_rel_var = (2.0*laser_wavelength_unc/float(laser_wavelength_nm))**2
-            te_rel_var += (np.cos(float(scattering_angle_rad)/2.0)/np.sin(float(scattering_angle_rad)/2.0)
-                           * scattering_angle_unc)**2
-            external_te_sigma = float(te*np.sqrt(te_rel_var))
+            external_te_sigma = thomson_electron_temperature_from_spectral_width(
+                float(fit["intrinsic_sigma_nm"]), float(laser_wavelength_nm),
+                float(scattering_angle_rad), sigma_intrinsic_sigma_nm=0.0,
+                sigma_laser_wavelength_nm=laser_wavelength_unc,
+                sigma_scattering_angle_rad=scattering_angle_unc,
+            )["uncertainty_electron_temperature_eV"]
             fit["electron_temperature_external_uncertainty_eV"] = external_te_sigma
             fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                 fit["electron_temperature_uncertainty_eV"], external_te_sigma))
@@ -963,11 +975,15 @@ def analyze_thomson_spectra(
                 velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
                                             /sine_half*scattering_angle_unc)
             else:
-                velocity_laser_sigma = (C_M_S*abs(fit["fitted_center_nm"])*laser_wavelength_unc
-                                        /(float(laser_wavelength_nm)**2*2.0*np.sin(float(scattering_angle_rad)/2.0)))
-                velocity_angle_sigma = abs(0.5*velocity*np.cos(float(scattering_angle_rad)/2.0)
-                                            /np.sin(float(scattering_angle_rad)/2.0)
-                                            *scattering_angle_unc)
+                velocity_external = thomson_velocity_projection(
+                    float(fit["fitted_center_nm"]),float(laser_wavelength_nm),
+                    float(scattering_angle_rad),sigma_fitted_center_nm=0.0,
+                    sigma_laser_wavelength_nm=laser_wavelength_unc,
+                    sigma_scattering_angle_rad=scattering_angle_unc,
+                )
+                velocity_laser_angle_sigma = velocity_external["uncertainty_electron_velocity_projection_m_s"]
+                velocity_laser_sigma = 0.0
+                velocity_angle_sigma = float(velocity_laser_angle_sigma)
             external_velocity_sigma = float(np.hypot(velocity_laser_sigma, velocity_angle_sigma))
             fit["electron_velocity_projection_external_uncertainty_m_s"] = external_velocity_sigma
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
@@ -1029,9 +1045,12 @@ def analyze_thomson_spectra(
             for channel in range(nchan):
                 p=parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
                 center=float(p[1]); sigma=float(p[2])
-                te=(sigma/float(laser_wavelength_nm))**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(float(scattering_angle_rad)/2.0)**2
-                qproj=2.0*np.sin(float(scattering_angle_rad)/2.0)
-                velocity=-C_M_S*(center-float(laser_wavelength_nm))/(float(laser_wavelength_nm)*qproj)
+                te=thomson_electron_temperature_from_spectral_width(
+                    sigma,float(laser_wavelength_nm),float(scattering_angle_rad)
+                )["electron_temperature_eV"]
+                velocity=thomson_velocity_projection(
+                    center,float(laser_wavelength_nm),float(scattering_angle_rad)
+                )["electron_velocity_projection_m_s"]
                 values.extend([te,velocity])
             return np.asarray(values,dtype=float)
         base_physical=physical_vector(joint_fit.x)
