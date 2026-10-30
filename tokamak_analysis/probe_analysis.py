@@ -69,6 +69,12 @@ def analyze_probe_voltage_current(
             "n_points": int(len(v)),
             "voltage_span_V": float(v[-1] - v[0]),
             "current_span_A": float(np.ptp(i)),
+            # Short sweeps expose endpoint-tail values as descriptive only.
+            "ion_saturation_current_A": float(np.median(i[:max(1, int(np.ceil(0.1 * len(i))))])),
+            "ion_saturation_current_method": "median_lowest_voltage_tail_descriptive_only",
+            "ion_saturation_current_status": "descriptive_short_sweep_not_physical_saturation",
+            "electron_saturation_current_A": float(np.median(i[-max(1, int(np.ceil(0.1 * len(i)))):])),
+            "electron_saturation_current_method": "median_highest_voltage_tail_descriptive_only",
             "electron_temperature_eV": None,
             "electron_temperature_estimate_eV": None,
             "electron_fit_status": "not_requested",
