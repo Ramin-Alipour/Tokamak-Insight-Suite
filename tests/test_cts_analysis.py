@@ -9,8 +9,8 @@ def _case():
 
 def test_cts_forward_model_is_finite_positive_and_geometry_sensitive():
     f0,f,g,ions,frac,_=_case()
-    a=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac)
-    b=cts_spectral_density(f,f0,{"scattering_angle_rad":np.deg2rad(70.)},electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac)
+    a=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
+    b=cts_spectral_density(f,f0,{"scattering_angle_rad":np.deg2rad(70.)},electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
     assert a.shape==f.shape and np.all(np.isfinite(a)) and np.all(a>=0) and not np.allclose(a,b)
 
 def test_cts_inversion_recovers_controlled_synthetic_parameters():
@@ -35,7 +35,7 @@ def test_cts_hot_ion_component_forward_model():
 def test_cts_rejects_invalid_geometry(g):
     f0,f,_,ions,frac,_=_case()
     with pytest.raises(ValueError):
-        cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac)
+        cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
 
 
 def test_cts_tabulated_non_maxwellian_fast_ion_forward_model():
