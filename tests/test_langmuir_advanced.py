@@ -293,3 +293,10 @@ def test_single_species_core_density_includes_charge_state():
     b = langmuir_iv_analysis(v,i,ion_charge_state=2,**common)
     assert b["ion_density_estimate_m-3"] == pytest.approx(a["ion_density_estimate_m-3"]/(2.0**1.5))
     assert b["ion_density_model"]["ion_charge_state"] == 2
+
+
+def test_advanced_model_run_button_requires_a_valid_electron_window():
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "advanced_window_valid=(efit is not None and advanced_window_points>=advanced_min_points)" in source
+    assert "disabled=bool(needs_electron_window and not advanced_window_valid)" in source
