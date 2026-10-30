@@ -55,7 +55,7 @@ Assumptions: non-collective scattering, isotropic kappa distribution, kappa inde
 
 ### 3. Relativistic Maxwell-Juttner (projected)
 
-A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
+A relativistic option uses the one-dimensional marginal of an isotropic Maxwell-Juttner velocity distribution and a relativistic Doppler mapping along the scattering wavevector. Its fitted centroid is converted to bulk-flow projection with the inverse relativistic Doppler relation β = (λc/λL − 1) / [sin(θ/2)(λc/λL + 1)], rather than the non-relativistic linearized shift used by the Maxwellian and kappa fits; superluminal centroid solutions are rejected. This retains relativistic effects in the projected electron velocity distribution and the corresponding one-dimensional frequency shift. It is an explicitly reduced 1-D model: it does not integrate the full 3-D incident/scattered photon geometry and must not be interpreted as a complete relativistic Thomson-scattering solver.
 
 ### 4. Collective Maxwellian
 
