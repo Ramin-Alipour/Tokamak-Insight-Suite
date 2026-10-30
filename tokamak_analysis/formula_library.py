@@ -766,7 +766,7 @@ def langmuir_ion_density_from_saturation_current(
     area = _positive("probe_area_m2", probe_area_m2)
     mass = _positive("ion_mass_kg", ion_mass_kg)
     coefficient = _positive("sheath_coefficient", sheath_coefficient)
-    if isinstance(charge_state, bool) or not isinstance(charge_state, int) or charge_state < 1:
+    if isinstance(charge_state, (bool, np.bool_)) or not isinstance(charge_state, (int, np.integer)) or charge_state < 1:
         raise ValueError("charge_state must be a positive integer.")
     density = current / (
         coefficient * E_CHARGE * area * charge_state**1.5
