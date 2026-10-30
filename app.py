@@ -2736,7 +2736,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference','Thomson calibrated profile analysis','Thomson spatial profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson multi-channel spectral inference':
         st.markdown('Infer electron parameters from calibrated, spatially resolved Thomson spectra. The input table must be long-form: one row per channel and wavelength sample.')
         st.caption('Required columns: channel identifier, calibrated radius (m), calibrated wavelength (nm), calibrated spectral intensity. No detector calibration or data repair is performed here.')
@@ -2877,7 +2877,7 @@ elif page=='Advanced Analysis':
                     st.line_chart(density_frame.set_index('Radius (m)')[['Electron density (m^-3)']])
                 json_download('Export multi-channel Thomson inference',saved['result'],'thomson_spectral_inference.json')
                 st.caption('NaN density values mean absolute density was not identifiable from the supplied spectral shape and optical calibration inputs. The model and limitations are included in the JSON export.')
-    elif workflow=='Thomson calibrated profile analysis':
+    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
         if df is None or len(numeric) < 3:
@@ -2955,7 +2955,7 @@ elif page=='Advanced Analysis':
                     st.caption('Independent pointwise uncertainties are propagated through gradients, normalized gradients, scale lengths, and averages. Peak-location uncertainty is not estimated; model and calibration uncertainties are separate.')
                 except Exception as e:
                     st.error(str(e))
-    elif workflow=='Thomson spatial profile reconstruction':
+    elif workflow=='Thomson downstream profile reconstruction (pre-derived ne/Te)':
         st.markdown('Reconstruct smooth radial electron-density and electron-temperature profiles from multiple spatially resolved Thomson measurements.')
         st.caption('Use already-calibrated measurements. This fit reconstructs profiles only within the measured radial interval; it does not calibrate raw data, infer equilibrium, or extrapolate beyond measured points. Input uncertainties may weight smoothing-spline fits but are not propagated into reconstructed-profile uncertainties or confidence intervals.')
         if df is None or len(numeric) < 3:
