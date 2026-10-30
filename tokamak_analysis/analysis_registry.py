@@ -227,10 +227,12 @@ ANALYSES = [{
                     "inputs": [
                         "radius_m",
                         "density_m3",
-                        "temperature_ev"
+                        "temperature_ev",
+                        "optional density_covariance_m3_2",
+                        "optional temperature_covariance_eV2"
                     ],
                     "outputs": [
-                        "profile gradients",
+                        "profile gradients and full gradient covariance when supplied",
                         "scale lengths",
                         "profile summary"
                     ],
