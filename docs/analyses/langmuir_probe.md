@@ -145,3 +145,36 @@ Both relations are documented in I. H. Hutchinson, *Principles of Plasma Diagnos
 ## UI execution scope
 
 The Probe Analysis page exposes the canonical single-sweep workflow, optional model-based ion-density inversion, separate electron-density and ion-flux calculations, single-/two-temperature and stretched-exponential fits, smoothed derivative candidates, fit-window sensitivity, multi-channel independent sweeps, and long-form time-by-channel independent sweeps. Batch processing does not infer spatial structure, temporal trends, or cross-channel physics. All input remains assumed calibrated; no empirical validation or calibration is performed.
+
+
+## Canonical preprocessing for every advanced fit
+
+Single- and two-temperature exponential fits and the stretched-exponential empirical fit use the same preprocessing contract as the canonical single-sweep engine: paired finite-value filtering, polarity normalization, stable voltage sorting, duplicate-voltage current averaging, and a minimum of eight distinct voltage values in the full sweep. Model-specific minimum counts inside the selected fit window are also applied to distinct voltage values. Duplicate measurements therefore do not receive unintended extra statistical weight in nonlinear fits or covariance estimates.
+
+## Nonuniform-grid smoothing
+
+The smoothed derivative helper performs local polynomial least-squares fits using the actual voltage coordinate centered at each output sample. The odd window length is a number of neighboring distinct samples; the local polynomial is scaled by the actual local voltage span. First and second derivatives are obtained from fitted polynomial coefficients. Nonuniform voltage spacing is supported without treating sample index as a uniformly spaced voltage coordinate. Rank-deficient local windows are rejected.
+
+## Numerical fit-screen thresholds
+
+Default numerical review settings are minimum R² = 0.98, maximum normalized RMSE = 0.1, and maximum relative ion-branch current change = 0.1. These values are configurable through the public API and application UI and are returned in numerical_fit_screen_thresholds. They are numerical screening defaults, not universal physical acceptance criteria or plasma constants. They cannot certify electron-retarding Maxwellian behavior or physical ion saturation. Density inversion remains gated by configured numerical screens; a pass does not establish the physical regime.
+
+## Ion charge-state dependence
+
+For a single ion species with charge state Z_i, the Bohm speed used by the declared sheath-current model is c_s,i = sqrt(Z_i e T_e/m_i). The collected ion current scales as Z_i e n_i C_s c_s,i, giving n_i = |I_i,sat|/[C_s e A_p Z_i^(3/2) sqrt(e T_e/m_i)]. The API defaults to Z_i=1 for backward compatibility, but reports that assumption explicitly. For a mixture with number-density fractions f_s, the implemented species-summed current relation is n_i = |I_i,sat|/[e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]. Each species must provide a positive integer charge state. Sheath coefficients remain user-supplied and must be appropriate to species, geometry and regime. These are model-based estimates, not physical-regime certification.
+
+## Scientific references and model classification
+
+- Maxwellian electron-retarding slope, Maxwellian electron collection, Bohm speed and sheath-current balance: Hutchinson, I. H., Principles of Plasma Diagnostics, 2nd ed., Cambridge University Press (2002), Chapter 3, Section 3.2.5.
+- Plasma-potential derivative/inflection candidates: Bernatskiy et al., Vacuum 225 (2024), 113279, DOI: 10.1016/j.vacuum.2024.113279.
+- Single-Maxwellian exponential fit is a published diagnostic relation under its stated assumptions.
+- Two-temperature fit is explicitly an empirical two-exponential decomposition. Its components are not proof of two physical electron populations.
+- Stretched-exponential fit is explicitly an empirical curve-shape ansatz. Its exponent is not a kinetic kappa parameter and does not identify a unique distribution. No unsupported physical-distribution claim or citation is assigned to this empirical model.
+
+## Advanced uncertainty contracts
+
+- Stretched-exponential parameters expose covariance-derived standard errors only when fitted covariance is finite, positive-definite and numerically valid; otherwise uncertainty fields are null with explicit status.
+- Electron-density uncertainty is propagated only when absolute current standard uncertainty and relative temperature and area standard uncertainties are all supplied.
+- Bohm-like ion particle-flux uncertainty is propagated only when relative uncertainties for density, temperature, mass and sheath factor are all supplied. The explicit integer charge state is treated as a fixed species identity.
+- Multispecies density does not propagate uncertainty in species fractions, species-resolved sheath coefficients or composition covariance. It returns an explicit not-propagated status rather than zero uncertainty.
+- No omitted uncertainty component is silently treated as a measured zero; propagated values remain conditional on the supplied independent-input model.
