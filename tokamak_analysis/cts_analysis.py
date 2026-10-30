@@ -111,6 +111,82 @@ def _convolve(response,spectrum,axis):
     return (r@(spectrum*w))/w
 
 
+
+
+def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=48, generations=100):
+    """Bounded real-coded GA: tournament selection, blend crossover, elitism and adaptive mutation."""
+    rng = np.random.default_rng(seed)
+    bounds = np.asarray(bounds, dtype=float)
+    lower, upper = bounds[:, 0], bounds[:, 1]
+    if bounds.ndim != 2 or bounds.shape[1] != 2 or np.any(~np.isfinite(bounds)) or np.any(lower >= upper):
+        raise ValueError("genetic-search bounds must be finite increasing pairs")
+    dimension = lower.size
+    population = rng.uniform(lower, upper, size=(population_size, dimension))
+    scores = np.asarray([objective(p) for p in population], dtype=float)
+    if np.any(~np.isfinite(scores)):
+        scores = np.where(np.isfinite(scores), scores, np.inf)
+    best_history = []
+    for generation in range(generations):
+        order = np.argsort(scores)
+        population, scores = population[order], scores[order]
+        best_history.append(float(scores[0]))
+        elite_count = max(2, population_size // 10)
+        next_population = [p.copy() for p in population[:elite_count]]
+        mutation_scale = 0.18 * (1.0 - generation / max(generations, 1)) + 0.015
+        def tournament():
+            candidates = rng.integers(0, population_size, size=3)
+            return population[candidates[np.argmin(scores[candidates])]]
+        while len(next_population) < population_size:
+            p1, p2 = tournament(), tournament()
+            alpha = rng.uniform(-0.15, 1.15, size=dimension)
+            child = alpha * p1 + (1.0 - alpha) * p2
+            mutate = rng.random(dimension) < (1.0 / dimension)
+            child += mutate * rng.normal(0.0, mutation_scale, size=dimension) * (upper - lower)
+            next_population.append(np.clip(child, lower, upper))
+        population = np.asarray(next_population)
+        scores = np.asarray([objective(p) for p in population], dtype=float)
+        scores = np.where(np.isfinite(scores), scores, np.inf)
+    best = int(np.argmin(scores))
+    return population[best].copy(), float(scores[best]), np.asarray(best_history, dtype=float)
+
+
+def _whitener(covariance, n, uncertainty):
+    if covariance is not None:
+        cov = _array(covariance, "spectral_covariance", 2)
+        if cov.shape != (n, n) or not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("spectral_covariance must be a symmetric n_frequency x n_frequency matrix")
+        try:
+            chol = np.linalg.cholesky(cov)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
+        return lambda residual: np.linalg.solve(chol, residual), cov
+    noise = uncertainty if uncertainty is not None else None
+    if noise is None:
+        raise ValueError("internal uncertainty scale is required")
+    return lambda residual: residual / noise, np.diag(noise ** 2)
+
+
+def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness=1e-2):
+    """Validate and regularize a non-negative tabulated 1-D fast-ion VDF."""
+    v = _array(velocity_m_s, "fast-ion velocity grid", 1)
+    p = _array(pdf_m_s_inverse, "fast-ion probability density", 1)
+    if v.size != p.size or v.size < 7 or np.any(np.diff(v) <= 0) or np.any(p < 0):
+        raise ValueError("tabulated fast-ion VDF needs >=7 increasing velocity nodes and non-negative density")
+    smoothness = float(smoothness)
+    if not np.isfinite(smoothness) or smoothness < 0:
+        raise ValueError("fast-ion smoothness must be finite and non-negative")
+    area = float(np.trapz(p, v))
+    if area <= 0:
+        raise ValueError("tabulated fast-ion VDF must have positive integral")
+    p = p / area
+    second_difference = np.diff(np.eye(v.size), n=2, axis=0)
+    roughness = float(np.linalg.norm(second_difference @ p) ** 2)
+    return {"velocity_m_s": v, "probability_density_m_s_inverse": p,
+            "normalization_integral": 1.0, "second_difference_roughness": roughness,
+            "smoothness_parameter": smoothness,
+            "regularization_note": "Input VDF is normalized; roughness is reported, not silently subtracted from the physical distribution."}
+
+
 def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scattering_geometry,
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=1e19,electron_temperature_initial_eV=1000.,ion_temperature_initial_eV=500.,
