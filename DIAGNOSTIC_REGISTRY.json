@@ -858,15 +858,17 @@
         "The electron-retarding branch is adequately described by an exponential current after fitting its offset.",
         "Fit intervals are selected and justified by the analyst for the experimental regime.",
         "Density inversion assumes one dominant ion species and requires a supplied coefficient appropriate to the stated sheath model, probe geometry and plasma regime.",
-        "Multi-channel batch mode treats each calibrated channel independently and does not infer spatial relationships or shared physical regimes."
+        "Multi-channel batch mode treats each calibrated channel independently and does not infer spatial relationships or shared physical regimes.",
+        "Current standard uncertainty, when supplied, represents independent per-original-sample 1-sigma errors; Monte Carlo proxy uncertainty is conditional on that model."
       ],
       "preprocessing": [
         "Require matching one-dimensional voltage/current arrays and at least eight valid distinct voltage points across all public Langmuir entry points.",
         "Discard non-finite pairs; sort voltage-current pairs together; average currents at duplicate voltages.",
         "Use explicit analyst-selected fit windows; no automatic physical regime selection.",
-        "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention."
+        "Report input pair count, finite-pair count, discarded non-finite pairs, duplicate-voltage pairs aggregated, processed unique voltages, voltage span and normalized current convention.",
+        "When a scalar per-sample current standard uncertainty is supplied, propagate it through duplicate-voltage averaging using independent-error averaging; no uncertainty is assumed when omitted."
       ],
-      "algorithm": "Normalize polarity, clean calibrated I-V pairs, aggregate duplicate voltages, compute zero crossings and derivatives, use maximum dI/dV as the explicitly labelled plasma-potential proxy while retaining maximum d2I/dV2 separately, label ion-current estimates and physical-regime caveats, optionally fit selected electron and ion branches and estimate single-species ion density with explicit inputs. Multi-channel wrapper processes each channel independently.",
+      "algorithm": "Normalize the selected current polarity to electron_positive; clean calibrated I–V pairs; aggregate duplicate voltages with corresponding uncertainty reduction; compute floating-potential crossings; compute dI/dV and d²I/dV²; report maximum dI/dV as a proxy, zero crossings of d²I/dV² as inflection candidates, and maximum d²I/dV² only as a separate extremum. Require disjoint analyst-selected fit windows; apply identical numerical fit screens in the engine and UI; gate density inversion on both electron and ion numerical fit quality and ion flatness; retain all physical-regime flags as unconfirmed. Advanced functions use explicitly declared published models and independent channel/time batching.",
       "uncertainty_model": "Electron-temperature covariance is used only when finite and valid; invalid covariance yields null uncertainty, not zero. Optional current standard uncertainty is propagated to the unique floating-potential crossing by first-order interpolation and to the maximum-dI/dV proxy by reproducible Monte Carlo, conditional on independent sample errors. Density uncertainty is not calculated if the electron-temperature statistical covariance is unavailable. Other uncertainty components are included only when explicitly supplied.",
       "limitations": [
         "Saturation-tail estimates are descriptive fallbacks and cannot be used for density inversion.",
@@ -891,7 +893,9 @@
         "Two-temperature fitting is an empirical two-exponential decomposition and does not confirm a physical bi-Maxwellian distribution.",
         "Time-series batching processes each time/channel sweep independently and does not infer temporal trends or cross-channel physics.",
         "Fit-window sensitivity is a diagnostic spread, not a statistical confidence interval.",
-        "Electron-density estimation is available only through the separate estimate_electron_density_from_saturation helper and is not part of the canonical single-sweep output contract."
+        "Electron-density estimation is available only through the separate estimate_electron_density_from_saturation helper and is not part of the canonical single-sweep output contract.",
+        "The second-derivative zero-crossing method is noise-sensitive; candidate locations depend on differentiation, smoothing choice and voltage sampling.",
+        "Monte Carlo uncertainty for the maximum-dI/dV proxy is conditional on supplied independent current errors and is not an uncertainty for the true physical plasma potential."
       ],
       "function_links": [
         "tokamak_analysis.langmuir_probe.analyze_langmuir_probe",
@@ -905,23 +909,28 @@
       ],
       "advanced_entry_points": [
         {
+          "function": "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_array",
+          "input_contract": "Calibrated shared or channel-specific voltage/current sweeps; explicit optional fit and polarity options.",
+          "outputs": "Independent per-channel canonical results; no cross-channel inference, spatial reconstruction or geometry inference."
+        },
+        {
           "function": "tokamak_analysis.langmuir_probe.analyze_langmuir_probe_series",
           "input_contract": "Calibrated current array shaped (time, channel, sample), with shared or matching calibrated voltage data and optional time/channel labels.",
           "outputs": "Independent per-time/per-channel sweep results; no temporal trend or cross-channel inference."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.fit_langmuir_electron_models",
-          "input_contract": "Calibrated voltage/current arrays, explicit fit range, and single_maxwellian or two_temperature model.",
+          "input_contract": "Calibrated voltage/current arrays, explicit fit range, model choice and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive.",
           "outputs": "Temperature component estimates and fit diagnostics; physical distribution is not confirmed."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.fit_langmuir_stretched_exponential",
-          "input_contract": "Calibrated voltage/current arrays and explicit fit range.",
+          "input_contract": "Calibrated voltage/current arrays, explicit fit range and current_convention (electron_positive or ion_positive); current is normalized internally to electron_positive.",
           "outputs": "Empirical shape exponent and fit diagnostics; not a kinetic kappa distribution."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_multispecies_ion_density",
-          "input_contract": "Negative ion current in electron-positive convention, positive temperature and area, and explicit species masses, fractions, and sheath coefficients.",
+          "input_contract": "Ion saturation current with explicit current_convention, positive Te and area, and per-species masses, number-density fractions and sheath coefficients; fraction_basis must be number_density.",
           "outputs": "Model-based total ion density; fractions must sum to one; uncertainty propagation is not performed."
         },
         {
@@ -937,7 +946,7 @@
         {
           "function": "tokamak_analysis.langmuir_probe.estimate_smoothed_plasma_potential_candidates",
           "input_contract": "Calibrated voltage/current arrays and explicit Savitzky-Golay window length and polynomial order.",
-          "outputs": "Raw and smoothed derivative candidates; no physical certification."
+          "outputs": "Raw and Savitzky-Golay-smoothed maximum-dI/dV proxies, separate maximum-d²I/dV² extrema, and second-derivative zero-crossing inflection candidates; current polarity is normalized consistently."
         },
         {
           "function": "tokamak_analysis.langmuir_probe.langmuir_fit_window_sensitivity",
