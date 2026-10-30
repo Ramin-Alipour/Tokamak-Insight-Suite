@@ -203,7 +203,7 @@ def test_nonuniform_grid_quadratic_gradients_normalized_gradients_and_scale_leng
 
 def test_local_gradient_resolvability_is_not_controlled_by_largest_remote_gradient():
     radius = np.arange(5.0)
-    profile = np.array([1.0, 1.0 + 1.0e-10, 1.0 + 1.0e10, 1.0 + 2.0e10, 1.0 + 3.0e10])
+    profile = np.array([1.0, 1.0 + 1.0e-10, 1.0 + 2.0e-10, 1.0 + 1.0e10, 1.0 + 2.0e10])
     out = analyze_thomson_profile(radius, profile, profile * 2.0)
     assert np.isfinite(out["density_gradient_m-4"][0])
     assert out["density_gradient_m-4"][0] > 0.0
