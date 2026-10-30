@@ -443,7 +443,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
     names=["electron_density_m3","electron_temperature_eV","ion_temperature_eV","ion_velocity_projection_m_s"]
-    out={**d,"electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
+    out={**d,"electron_velocity_projection_m_s":float(electron_velocity_projection_m_s),
+      "electron_velocity_projection_is_fitted":False,
+      "electron_velocity_projection_input_uncertainty_m_s":(
+          float(ext_unc["electron_velocity_projection_m_s"])
+          if "electron_velocity_projection_m_s" in ext_unc else None
+      ),
+      "electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
       "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[3]),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
       "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if (unc is not None or spectral_covariance is not None) else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
