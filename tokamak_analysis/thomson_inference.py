@@ -653,6 +653,28 @@ def analyze_thomson_spectra(
         fit.update(quality)
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
+        if model == "collective_maxwellian":
+            fit["parameter_provenance"] = {
+                "electron_density": "inferred from the measured collective spectrum",
+                "electron_temperature": "inferred from the measured collective spectrum",
+                "ion_temperature": "externally supplied fixed input; not inferred",
+                "ion_velocity": "externally supplied fixed input; not inferred",
+                "electron_velocity": "externally supplied fixed input; not inferred",
+                "ion_species_and_fractions": "externally supplied fixed composition",
+            }
+        else:
+            fit["parameter_provenance"] = {
+                "electron_temperature": "inferred from measured spectral shape under the selected non-collective model",
+                "electron_velocity_projection": "inferred from measured spectral centroid under the selected Doppler model",
+                "electron_density": "not identifiable from normalized spectral shape; requires absolute calibrated scattered power and optical geometry",
+                "ion_parameters": "not inferred by this non-collective electron feature model",
+            }
+        fit["model_discrepancy_uncertainty_available"] = False
+        fit["model_discrepancy_diagnostics"] = {
+            "residual_rms": fit.get("fit_residual_rms"),
+            "reduced_chi_square": fit.get("fit_reduced_chi_square"),
+            "interpretation": "goodness-of-fit diagnostics only; model discrepancy is not converted into a parameter uncertainty",
+        }
         density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,

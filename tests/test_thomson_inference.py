@@ -433,3 +433,40 @@ def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkey
     expected_chi_square = np.sum((channel["residual"] / 0.02) ** 2) / expected_dof
     assert channel["reduced_chi_square"] == pytest.approx(expected_chi_square, rel=1e-8)
 
+
+
+def test_nonrelativistic_maxwellian_rejects_temperature_outside_declared_regime():
+    laser = 532.0
+    angle = np.pi / 2
+    te = 6000.0
+    sigma = 2.0 * laser * np.sqrt(te / 510998.95069) * np.sin(angle / 2)
+    x = np.linspace(laser - 350.0, laser + 350.0, 1401)
+    y = 1200.0 * np.exp(-0.5 * ((x - laser) / sigma) ** 2) + 25.0
+    with pytest.raises(ValueError, match="not safely small relative to the electron rest energy"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=laser,
+            scattering_angle_rad=angle, instrument_response=np.eye(x.size),
+        )
+
+
+def test_nonrelativistic_maxwellian_rejects_large_flow_projection():
+    laser = 532.0
+    angle = np.pi / 2
+    velocity = 0.2 * 299792458.0
+    center = laser - velocity / 299792458.0 * laser * 2.0 * np.sin(angle / 2)
+    x = np.linspace(laser - 250.0, laser + 250.0, 1401)
+    sigma = 2.0 * laser * np.sqrt(100.0 / 510998.95069) * np.sin(angle / 2)
+    y = 1200.0 * np.exp(-0.5 * ((x - center) / sigma) ** 2) + 25.0
+    with pytest.raises(ValueError, match="outside the declared"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=laser,
+            scattering_angle_rad=angle, instrument_response=np.eye(x.size),
+        )
+
+
+def test_fit_identifiability_gate_rejects_singular_covariance():
+    from tokamak_analysis.thomson_inference import _fit_identifiability
+    covariance = np.array([[1.0, 1.0], [1.0, 1.0]])
+    result = _fit_identifiability(covariance, np.array([0.1, -0.1, 0.0]), None, 2)
+    assert result["fit_accepted"] is False
+    assert result["fit_quality_status"] == "rejected_unidentifiable_or_invalid"
