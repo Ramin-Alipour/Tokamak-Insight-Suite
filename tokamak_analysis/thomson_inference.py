@@ -390,7 +390,14 @@ def analyze_thomson_spectra(
                 probe_vec=probe_vec, scatter_vec=scatter_vec)
             alpha_value=float(np.asarray(getattr(alpha_fit,"value",alpha_fit)))
             amp_fit = float(np.dot(y[i], model_spec)/max(np.dot(model_spec,model_spec),1e-300))
+            q_vector = scatter_vec-probe_vec
+            q_hat = q_vector/np.linalg.norm(q_vector)
+            electron_flow_projection = float(np.dot(electron_v[0],q_hat))
+            ion_flow_projections = np.asarray(ion_v @ q_hat,dtype=float)
             fit = {"electron_density_m3": ne_fit, "electron_temperature_eV": te_fit,
+                   "electron_velocity_projection_m_s": electron_flow_projection,
+                   "ion_velocity_projection_m_s": ion_flow_projections.tolist(),
+                   "electron_flow_source": "explicitly supplied electron velocity vector",
                    "fitted_spectrum": amp_fit*model_spec, "residual": y[i]-amp_fit*model_spec,
                    "model": "PlasmaPy Maxwellian kinetic dielectric spectral-density model",
                    "electron_density_uncertainty_m3": float(parameter_uncertainties[0]),
@@ -402,6 +409,10 @@ def analyze_thomson_spectra(
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
                    "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
+            if alpha_value <= 1.0:
+                fit["electron_density_m3"] = None
+                fit["electron_density_uncertainty_m3"] = None
+                fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
         if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, incident_direction, scattered_direction
@@ -436,7 +447,8 @@ def analyze_thomson_spectra(
             fit["density_uncertainty_model"] = density_result["uncertainty_model"]
         else:
             fit["electron_density_m3"] = fit.get("electron_density_m3")
-            fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
+            if "density_status" not in fit:
+                fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
         fit["channel_index"] = int(i)
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
