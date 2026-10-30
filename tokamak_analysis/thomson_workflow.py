@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from .thomson_scattering import build_profile, profile_summary
+from .thomson_scattering import (
+    build_profile,
+    profile_summary,
+    _covariance_is_positive_semidefinite,
+)
 
 
 def _gradient_roundoff_threshold(derivative_matrix, values):
@@ -120,11 +124,9 @@ def analyze_thomson_profile(
         expected = (radius_input.size, radius_input.size)
         if covariance.shape != expected or not np.all(np.isfinite(covariance)):
             raise ValueError(f"{name} must be a finite square covariance matrix matching the profile length")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-14):
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
             raise ValueError(f"{name} must be symmetric")
-        eigenvalues = np.linalg.eigvalsh(covariance)
-        scale = max(1.0, float(np.max(np.abs(eigenvalues))))
-        if float(np.min(eigenvalues)) < -1e-10 * scale:
+        if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError(f"{name} must be positive semidefinite")
         diagonal_sigma = np.sqrt(np.maximum(np.diag(covariance), 0.0))
         if supplied_uncertainty is not None:
