@@ -254,8 +254,18 @@ def estimate_multispecies_ion_density(
     ion_saturation_current_A: float, electron_temperature_eV: float, probe_area_m2: float,
     species: Sequence[Mapping[str, float]], *, current_convention: str = "electron_positive",
     fraction_basis: str = "number_density",
+    current_standard_uncertainty_A: float | None = None,
+    temperature_relative_standard_uncertainty: float | None = None,
+    area_relative_standard_uncertainty: float | None = None,
 ) -> dict[str, Any]:
-    """Use the registered species-summed Bohm/sheath density relation."""
+    """Estimate multispecies Bohm/sheath density with explicit partial uncertainty.
+
+    Optional scalar uncertainties apply to |I_isat|, Te and effective area.
+    Each species may additionally provide mass_relative_standard_uncertainty and
+    sheath_coefficient_relative_standard_uncertainty. Only supplied components
+    are propagated; number-fraction covariance is not inferred and is explicitly
+    excluded because fractions are composition-constrained and generally correlated.
+    """
     from tokamak_analysis.formula_library import langmuir_multispecies_ion_density
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
@@ -265,16 +275,96 @@ def estimate_multispecies_ion_density(
             or isinstance(ion_saturation_current_A, (bool, np.bool_))
             or not math.isfinite(float(ion_saturation_current_A))):
         raise ValueError("Ion saturation current must be a finite real scalar.")
+    scalar_uncertainties = {
+        "current": current_standard_uncertainty_A,
+        "electron_temperature": temperature_relative_standard_uncertainty,
+        "probe_area": area_relative_standard_uncertainty,
+    }
+    for name, value in scalar_uncertainties.items():
+        if value is not None and (
+            not isinstance(value, (int, float, np.integer, np.floating))
+            or isinstance(value, (bool, np.bool_)) or not math.isfinite(float(value))
+            or float(value) < 0
+        ):
+            raise ValueError(f"{name} uncertainty must be a finite non-negative real scalar.")
     normalized_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
     if normalized_current >= 0:
         raise ValueError("Ion current must be negative after normalization to electron_positive.")
     result = langmuir_multispecies_ion_density(
         abs(normalized_current), electron_temperature_eV, probe_area_m2, species
     )
+
+    # The species-summed denominator is F=sum(w_s), where each normalized
+    # contribution w_s=f_s C_s Z_s^(3/2)/sqrt(m_s). Independent uncertainty
+    # propagation uses d ln(F)/d ln(C_s)=w_s/F and
+    # d ln(F)/d ln(m_s)=-0.5*w_s/F. Fractions are held fixed.
+    factor = sum(
+        item["fraction"] * item["sheath_coefficient"] * item["charge_state"] ** 1.5
+        / math.sqrt(item["mass_kg"]) for item in result["ion_species"]
+    )
+    variance_terms: dict[str, float] = {}
+    omitted: list[str] = ["species_number_density_fraction_covariance"]
+    if current_standard_uncertainty_A is not None:
+        variance_terms["ion_saturation_current"] = (
+            float(current_standard_uncertainty_A) / abs(normalized_current)
+        ) ** 2
+    else:
+        omitted.append("ion_saturation_current")
+    if temperature_relative_standard_uncertainty is not None:
+        variance_terms["electron_temperature"] = (
+            0.5 * float(temperature_relative_standard_uncertainty)
+        ) ** 2
+    else:
+        omitted.append("electron_temperature")
+    if area_relative_standard_uncertainty is not None:
+        variance_terms["probe_area"] = float(area_relative_standard_uncertainty) ** 2
+    else:
+        omitted.append("probe_area")
+
+    species_terms: list[dict[str, Any]] = []
+    for index, item in enumerate(species):
+        contribution = (
+            float(item["fraction"]) * float(item["sheath_coefficient"])
+            * int(item["charge_state"]) ** 1.5 / math.sqrt(float(item["mass_kg"]))
+        ) / factor
+        entry: dict[str, Any] = {"species_index": index, "denominator_weight_fraction": contribution}
+        mass_sigma = item.get("mass_relative_standard_uncertainty")
+        coefficient_sigma = item.get("sheath_coefficient_relative_standard_uncertainty")
+        for label, value, multiplier in (
+            ("mass", mass_sigma, 0.5 * contribution),
+            ("sheath_coefficient", coefficient_sigma, contribution),
+        ):
+            if value is not None:
+                if (not isinstance(value, (int, float, np.integer, np.floating))
+                        or isinstance(value, (bool, np.bool_)) or not math.isfinite(float(value))
+                        or float(value) < 0):
+                    raise ValueError(f"Species {index} {label} relative uncertainty must be finite and non-negative.")
+                term = (multiplier * float(value)) ** 2
+                variance_terms[f"species_{index}_{label}"] = term
+                entry[f"{label}_relative_standard_uncertainty"] = float(value)
+            else:
+                omitted.append(f"species_{index}_{label}")
+        if "fraction_relative_standard_uncertainty" in item:
+            raise ValueError(
+                "Independent fraction uncertainty is not supported: number-density fractions are constrained "
+                "to sum to one and require a composition covariance model."
+            )
+        species_terms.append(entry)
+
+    propagated = bool(variance_terms)
+    relative_sigma = math.sqrt(sum(variance_terms.values())) if propagated else None
+    density = float(result["ion_density_m3"])
+    sigma_density = density * relative_sigma if relative_sigma is not None else None
     return {
-        "ion_density_estimate_m-3": result["ion_density_m3"],
-        "ion_density_standard_uncertainty_m-3": result["uncertainty_ion_density_m3"],
-        "ion_density_relative_standard_uncertainty": None,
+        "ion_density_estimate_m-3": density,
+        "ion_density_standard_uncertainty_m-3": sigma_density,
+        "ion_density_relative_standard_uncertainty": relative_sigma,
+        "ion_density_uncertainty_components_relative": {
+            key: math.sqrt(value) for key, value in variance_terms.items()
+        },
+        "ion_density_uncertainty_omitted_components": omitted,
+        "ion_density_uncertainty_scope": "partial_independent_input_propagation_fractions_held_fixed",
+        "ion_species_uncertainty_weights": species_terms,
         "ion_species": result["ion_species"],
         "ion_species_fraction_sum": result["ion_species_fraction_sum"],
         "ion_species_fraction_basis": "number_density_fraction",
@@ -284,9 +374,13 @@ def estimate_multispecies_ion_density(
         "formula": "n_i = |I_i,sat| / [e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]",
         "assumptions": ["common electron temperature", "number-density fractions sum to one",
                         "species Bohm speed sqrt(Z_s e T_e/m_s)", "species sheath coefficients appropriate to geometry and regime",
-                        "single effective collection area"],
-        "physical_regime_confirmed": False, "uncertainty_propagation_performed": False,
-        "uncertainty_status": result["uncertainty_status"],
+                        "single effective collection area", "species fractions treated as fixed in uncertainty propagation"],
+        "physical_regime_confirmed": False,
+        "uncertainty_propagation_performed": propagated,
+        "uncertainty_status": (
+            "partial_explicit_independent_input_components_propagated_composition_covariance_excluded"
+            if propagated else "not_calculated_no_uncertainty_inputs_supplied"
+        ),
     }
 
 def langmuir_fit_window_sensitivity(
