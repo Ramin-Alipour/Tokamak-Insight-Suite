@@ -824,7 +824,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True)
     if mode=='ECE channel/profile analysis':
         st.caption('ECE tools use already-calibrated radiance or brightness-temperature inputs. TIS never calibrates detector data. Cold resonance and circular-field radius estimates are approximate, not EFIT/ray-tracing results.')
         numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
@@ -1200,14 +1200,14 @@ elif page=='Spectral Analysis':
                     json_download('Export Mirnov analysis JSON',result,'tis_mirnov_analysis.json')
                     add_report_section('Mirnov / pickup-coil analysis',result)
                 except Exception as e: st.error(f'Mirnov analysis failed: {e}')
-    elif mode=='Thomson spectral distribution':
+    elif mode=='Thomson spectral-shape diagnostics (descriptive only)':
         st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
         xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
         ycol=col_select('Thomson spectral signal',numeric,'tsd_y')
         sigma_col=st.selectbox('Signal uncertainty σ (optional)', ['<none>']+numeric, key='tsd_sigma')
         inst_sigma=st.number_input('Gaussian instrument standard deviation σ (nm; independently calibrated)',min_value=1e-12,value=0.05,format='%.8g',key='tsd_instrument_sigma')
         background_fraction=st.slider('Fraction of each spectral edge used for background estimation',0.02,0.40,0.10,0.01,key='tsd_background_fraction')
-        if st.button('Analyze Thomson spectral distribution'):
+        if st.button('Analyze Thomson spectral-shape diagnostics (descriptive only)'):
             try:
                 _x=pd.to_numeric(df[xcol],errors='coerce').to_numpy(dtype=float)
                 _y=pd.to_numeric(df[ycol],errors='coerce').to_numpy(dtype=float)
