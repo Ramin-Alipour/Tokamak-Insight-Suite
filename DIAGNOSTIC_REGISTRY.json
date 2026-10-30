@@ -4444,11 +4444,11 @@
     "quantities": "Within-domain reconstructed electron-density and electron-temperature radial curves and their gradients from already inferred spatial profile points.",
     "status": "D",
     "method": "Weighted smoothing spline or shape-preserving PCHIP interpolation of previously inferred density and temperature samples; no spectral inversion is performed by this downstream utility.",
-    "caveat": "This is a downstream reconstruction utility, not raw measured-spectrum physical inference. Current pointwise uncertainties are fit weights only; reconstructed confidence bands and correlated covariance are not yet propagated.",
+    "caveat": "Downstream reconstruction only; pointwise or full covariance uncertainties propagate by Monte Carlo to confidence bands when enough physical draws succeed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
     ],
-    "implementation_status": "Dedicated downstream profile reconstruction callable; physical parameters must first be inferred from measured spectra. Uncertainty bands and full covariance propagation remain unavailable.",
+    "implementation_status": "Dedicated downstream profile reconstruction callable with pointwise and correlated input covariance propagation.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "limited_calculation",
@@ -4495,6 +4495,16 @@
           "name": "points",
           "unit": "count",
           "required": false
+        },
+        {
+          "name": "density_covariance_m3_2",
+          "unit": "m^-6",
+          "required": false
+        },
+        {
+          "name": "temperature_covariance_eV2",
+          "unit": "eV^2",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4509,6 +4519,22 @@
         {
           "name": "reconstruction_gradients",
           "unit": "derivative units"
+        },
+        {
+          "name": "reconstructed_density_uncertainty_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "reconstructed_temperature_uncertainty_eV",
+          "unit": "eV"
+        },
+        {
+          "name": "reconstructed_density_lower_95_m3",
+          "unit": "m^-3"
+        },
+        {
+          "name": "reconstructed_density_upper_95_m3",
+          "unit": "m^-3"
         }
       ],
       "assumptions": [
@@ -4519,12 +4545,13 @@
         "Validate finite profile arrays and uncertainty inputs; no source data are calibrated or repaired."
       ],
       "algorithm": "Reconstruct within-domain one-dimensional density and temperature profiles using the selected spline/interpolation method.",
-      "uncertainty_model": "Pointwise uncertainties are currently used as smoothing weights only; reconstructed covariance and confidence bands are not computed.",
+      "uncertainty_model": "Pointwise independent uncertainties or full input covariance matrices are propagated by parametric Monte Carlo through the selected interpolation/spline model; negative physical draws and non-physical reconstructions are rejected. Confidence bands are returned when enough draws succeed.",
       "limitations": [
         "Not a raw-spectrum inference workflow.",
         "No geometry-weighted line average or volume average is inferred.",
         "Negative spline overshoot is currently clipped; this can affect gradients.",
-        "Correlated point uncertainties are not modeled."
+        "Correlated point uncertainties are not modeled.",
+        "Monte Carlo output uncertainty depends on supplied input covariance and the selected reconstruction model; model discrepancy is not estimated."
       ],
       "function_links": [
         "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
