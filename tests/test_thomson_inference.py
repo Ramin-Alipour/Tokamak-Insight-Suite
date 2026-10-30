@@ -96,3 +96,19 @@ def test_channel_specific_wavelength_axes_are_supported():
     )
     assert out["channel_count"] == 2
     assert out["channels"][1]["fitted_center_nm"] == pytest.approx(532.02, abs=0.02)
+
+
+def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
+    x = np.linspace(492.0,572.0,801)
+    te = 120.0
+    sigma = 2.0*532.0*np.sqrt(te/510998.95069)*np.sin(np.pi/4)
+    kappa = 4.0
+    df = 2.0*kappa-1.0
+    scale = sigma*np.sqrt((df-2.0)/df)
+    y = 900.0*(1.0+((x-532.0)/scale)**2/df)**(-kappa)+20.0
+    out = analyze_thomson_spectra(
+        x,y[None,:],[0.15],laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,model="non_collective_kappa",
+    )
+    assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.05)
+    assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
