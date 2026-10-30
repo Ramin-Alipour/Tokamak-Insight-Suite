@@ -191,10 +191,34 @@ def fit_custom_spectral_model(
         mapped = spec.physical_parameter_mapper(dict(parameter_map))
         if not isinstance(mapped, Mapping) or not mapped:
             raise ValueError("physical_parameter_mapper must return a non-empty mapping")
+        numeric_outputs={k:float(v) for k,v in mapped.items()
+                        if isinstance(v,(int,float,np.integer,np.floating)) and np.isfinite(v)}
+        physical_uncertainties={}
+        physical_covariance=None
+        output_order=list(numeric_outputs)
+        if output_order:
+            mapper_jacobian=np.zeros((len(output_order),len(parameters)))
+            for j in range(len(parameters)):
+                step=np.cbrt(np.finfo(float).eps)*max(abs(float(parameters[j])),1.0)
+                plus=np.asarray(parameters,dtype=float).copy()
+                minus=np.asarray(parameters,dtype=float).copy()
+                plus[j]+=step; minus[j]-=step
+                plus_map={n:float(v) for n,v in zip(spec.parameter_names,plus)}
+                minus_map={n:float(v) for n,v in zip(spec.parameter_names,minus)}
+                plus_values=spec.physical_parameter_mapper(plus_map)
+                minus_values=spec.physical_parameter_mapper(minus_map)
+                for row,key in enumerate(output_order):
+                    mapper_jacobian[row,j]=(float(plus_values[key])-float(minus_values[key]))/(2.0*step)
+            physical_covariance=mapper_jacobian@covariance@mapper_jacobian.T
+            physical_uncertainties={key:float(np.sqrt(max(physical_covariance[i,i],0.0)))
+                                    for i,key in enumerate(output_order)}
         physical_inference = {
             "values": dict(mapped),
+            "uncertainties": physical_uncertainties,
+            "covariance": physical_covariance,
+            "covariance_output_order": output_order,
             "contract": dict(spec.physical_contract),
-            "status": "model_contract_mapped_not_independently_validated",
+            "status": "model_contract_mapped_with_local_covariance_not_independently_validated",
         }
     return {
         "model_name": spec.name,
