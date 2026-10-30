@@ -236,30 +236,6 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
                            "relativistic 1-D projected-velocity approximation along the scattering wavevector",
                            "full 3-D relativistic photon-geometry integration is not included"]}
 
-def _density_from_power(power_w, laser_power_w, interaction_length_m, collection_solid_angle_sr,
-                        optical_efficiency, scattering_angle_rad, incident_polarization,
-                        scattered_direction):
-    vals = [laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency]
-    if any(not np.isfinite(v) or v <= 0 for v in vals):
-        raise ValueError("Absolute density inference requires positive laser power, interaction length, solid angle and optical efficiency")
-    eps = _finite_array(incident_polarization, "incident_polarization", 1)
-    direction = _finite_array(scattered_direction, "scattered_direction", 1)
-    if eps.size != 3 or direction.size != 3:
-        raise ValueError("polarization and scattered_direction must be 3-vectors")
-    en = np.linalg.norm(eps); dn = np.linalg.norm(direction)
-    if en == 0 or dn == 0:
-        raise ValueError("polarization and scattered_direction vectors must be nonzero")
-    eps = eps/en; direction = direction/dn
-    # Sum over unanalysed outgoing polarization states for a linearly polarized
-    # incident beam: dσ/dΩ = r_e² [1 - |n_s · ε_i|²].
-    polarization_factor = max(0.0, 1.0-float(np.dot(direction, eps))**2)
-    dsigma = R_E_M**2 * polarization_factor
-    if dsigma <= 0:
-        raise ValueError("The specified polarization/collection geometry has zero Thomson differential cross-section")
-    denominator = laser_power_w*interaction_length_m*collection_solid_angle_sr*optical_efficiency*dsigma
-    return float(power_w/denominator), float(polarization_factor)
-
-
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
     laser_wavelength_uncertainty_nm=0.0, scattering_angle_uncertainty_rad=0.0,
