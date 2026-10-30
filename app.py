@@ -2799,8 +2799,8 @@ elif page=='Advanced Analysis':
                         yvals=pd.to_numeric(part[signal_col],errors='raise').to_numpy(float)
                         if len(xvals)<7 or np.any(np.diff(xvals)<=0):
                             raise ValueError(f'Channel {channel_id} requires at least seven unique, increasing wavelength samples.')
-                        if wavelengths and (len(xvals)!=len(wavelengths[0]) or not np.allclose(xvals,wavelengths[0],rtol=0,atol=1e-10)):
-                            raise ValueError('All channels must share the same wavelength grid in this table.')
+                        if wavelengths and len(xvals)!=len(wavelengths[0]):
+                            raise ValueError('All channels must have the same number of wavelength samples; their calibrated wavelength values may differ by channel.')
                         wavelengths.append(xvals); spectra.append(yvals); radii.append(float(rvals[0]))
                         if signal_unc_col!='(none)':
                             uncertainties.append(pd.to_numeric(part[signal_unc_col],errors='raise').to_numpy(float))
