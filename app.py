@@ -3232,9 +3232,11 @@ elif page=='Advanced Analysis':
             density_unc_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_recon_density_unc')
             temperature_unc_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_recon_temperature_unc')
             method=st.selectbox('Reconstruction method',['Smoothing spline','Shape-preserving PCHIP'],key='tis_thomson_recon_method')
-            smoothing_factor=1.0
+            smoothing_factor=None
             if method=='Smoothing spline':
-                smoothing_factor=st.number_input('Smoothing factor (0 = exact interpolation; larger = smoother fit)',min_value=0.0,value=1.0,step=0.25,format='%.3f',key='tis_thomson_recon_smoothing')
+                smoothing_selection=st.selectbox('Smoothing-parameter selection',['Automatic generalized cross-validation','Manual residual target'],key='tis_thomson_recon_smoothing_selection')
+                if smoothing_selection=='Manual residual target':
+                    smoothing_factor=st.number_input('Smoothing factor (0 = exact interpolation; larger = smoother fit)',min_value=0.0,value=1.0,step=0.25,format='%.3f',key='tis_thomson_recon_smoothing')
             points=int(st.number_input('Output radial grid points',min_value=20,max_value=5000,value=200,step=10,key='tis_thomson_recon_points'))
             if st.button('Reconstruct Thomson profiles',type='primary',key='run_thomson_profile_reconstruction'):
                 try:
