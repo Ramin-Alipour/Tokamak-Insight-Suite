@@ -1326,7 +1326,21 @@ def analyze_thomson_spectra(
             output["collective_external_uncertainty_propagated"]=True
             output["electron_temperature_uncertainty_profile_eV"]=np.array([r.get("electron_temperature_uncertainty_eV",np.nan) for r in results])
             output["electron_density_uncertainty_profile_m3"]=np.array([r.get("electron_density_uncertainty_m3",np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results])
+            output["electron_velocity_projection_uncertainty_profile_m_s"]=np.array([
+                np.nan if r.get("electron_velocity_projection_uncertainty_m_s") is None
+                else r["electron_velocity_projection_uncertainty_m_s"] for r in results])
+            for channel_result in results:
+                channel_result["collective_external_parameter_uncertainty_propagated"]=True
+                if lsf_unc is not None:
+                    channel_result["instrument_response_uncertainty_propagated"]=True
+                    channel_result["instrument_response_uncertainty_mc_successful_samples"]=len(draws)
+                channel_result["collective_external_parameter_covariance_order"]=covariance_order
         else:
             output["collective_external_uncertainty_propagated"]=False
             output["collective_external_uncertainty_warning"]="Too few successful external-parameter/response perturbation refits."
+            for channel_result in results:
+                channel_result["collective_external_parameter_uncertainty_propagated"]=False
+                if lsf_unc is not None:
+                    channel_result["instrument_response_uncertainty_propagated"]=False
+                    channel_result["instrument_response_uncertainty_warning"]=output["collective_external_uncertainty_warning"]
     return output
