@@ -1796,6 +1796,10 @@ elif page=='Probe Analysis':
         advanced_model='two_temperature' if advanced_method=='Single-/two-temperature exponential fit' else 'stretched' if advanced_method=='Stretched-exponential shape fit' else 'smoothed' if advanced_method=='Smoothed derivative candidates' else 'sensitivity'
         if advanced_method=='Single-/two-temperature exponential fit':
             model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
+            if model_choice=='two_temperature':
+                st.caption('Empirical two-exponential decomposition; it does not establish two physical electron populations.')
+        if advanced_method=='Stretched-exponential shape fit':
+            st.caption('Empirical curve-shape comparison only; the fitted exponent is not an EEDF or kinetic-distribution parameter.')
         needs_electron_window=advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'}
         advanced_min_points=(8 if advanced_model=='two_temperature' and model_choice=='two_temperature'
                              else 5 if advanced_model=='stretched' else 4)
