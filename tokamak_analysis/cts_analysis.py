@@ -383,6 +383,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
        "Ion composition is fixed externally.","Optional fast-ion component is a two-Maxwellian approximation, not arbitrary VDF reconstruction.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
+    if out["reduced_chi_square"] is not None:
+        discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
+        discrepancy_covariance=discrepancy_scale*cov
+        out["model_discrepancy_scale"]=discrepancy_scale
+        out["model_discrepancy_covariance"]=discrepancy_covariance
+        out["total_fit_covariance_including_discrepancy"]=cov+discrepancy_covariance
+        total_sigma=np.sqrt(np.maximum(np.diag(cov+discrepancy_covariance),0.0))
+        out["electron_density_uncertainty_m3"]=float(total_sigma[0])
+        out["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
+        out["ion_temperature_uncertainty_eV"]=float(total_sigma[2])
+        out["ion_velocity_projection_uncertainty_m_s"]=float(total_sigma[3])
+        out["model_discrepancy_diagnostics"]={
+            "whitened_residual_lag1_correlation":float(np.corrcoef(data_fit_residual[:-1],data_fit_residual[1:])[0,1])
+                if data_fit_residual.size>2 and np.std(data_fit_residual[:-1])>0 and np.std(data_fit_residual[1:])>0 else None,
+            "interpretation":"Excess reduced chi-square above unity is treated as a model-discrepancy covariance component; it is conditional on supplied noise covariance and is not experimental validation.",
+        }
     if fast:
         names += ["fast_ion_fraction"]
         if fast["kind"]=="maxwellian":
