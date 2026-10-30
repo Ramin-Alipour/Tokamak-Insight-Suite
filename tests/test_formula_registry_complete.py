@@ -421,3 +421,26 @@ def test_langmuir_multispecies_density_reference():
     expected = 1e-3/(E_CHARGE*1e-4*math.sqrt(E_CHARGE*5.0)*factor)
     assert result["ion_density_m3"] == pytest.approx(expected, rel=1e-12)
     assert result["uncertainty_ion_density_m3"] is None
+
+
+
+def test_langmuir_multispecies_density_uncertainty_wrapper_reference():
+    from tokamak_analysis.langmuir_advanced import estimate_multispecies_ion_density
+
+    species = [
+        {"mass_kg": 3.34e-27, "fraction": 0.7, "charge_state": 1,
+         "sheath_coefficient": 0.61, "mass_relative_standard_uncertainty": 0.02,
+         "sheath_coefficient_relative_standard_uncertainty": 0.03},
+        {"mass_kg": 6.68e-27, "fraction": 0.3, "charge_state": 2,
+         "sheath_coefficient": 0.58, "mass_relative_standard_uncertainty": 0.01,
+         "sheath_coefficient_relative_standard_uncertainty": 0.04},
+    ]
+    result = estimate_multispecies_ion_density(
+        -1e-3, 5.0, 1e-4, species,
+        current_standard_uncertainty_A=1e-5,
+        temperature_relative_standard_uncertainty=0.02,
+        area_relative_standard_uncertainty=0.01,
+    )
+    assert result["ion_density_standard_uncertainty_m-3"] > 0
+    assert result["uncertainty_propagation_performed"] is True
+    assert "species_number_density_fraction_covariance" in result["ion_density_uncertainty_omitted_components"]
