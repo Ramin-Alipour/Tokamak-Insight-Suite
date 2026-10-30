@@ -1,9 +1,10 @@
-"""Raw-spectrum Thomson-scattering fit for a non-relativistic Maxwellian model.
+"""Legacy single-channel Gaussian Thomson-spectrum approximation.
 
-This module fits a Gaussian Doppler-broadened spectrum plus a linear background.
-It is an explicitly scoped approximation for non-collective Thomson scattering;
-it is not a general relativistic or collective-scattering spectral solver.
-Wavelengths and instrumental Gaussian sigma are expressed in nm.
+This compatibility module is restricted to a non-collective, non-relativistic
+Maxwellian model with a Gaussian instrument width. The primary Analysis 1
+multi-channel inference engine is tokamak_analysis.thomson_inference, which
+supports measured response kernels/matrices and additional physical models.
+Wavelengths and the legacy Gaussian instrument sigma are expressed in nm.
 """
 from __future__ import annotations
 
