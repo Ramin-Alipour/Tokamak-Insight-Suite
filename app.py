@@ -1843,6 +1843,8 @@ elif page=='Probe Analysis':
                         i_channels.append(group[sicol].to_numpy(dtype=float))
                     if len({len(x) for x in v_channels})!=1: raise ValueError(f'All channels at time {time_value} must have the same sample count.')
                     voltage_rows.append(v_channels); current_rows.append(i_channels)
+                if len({len(samples) for time_row in voltage_rows for samples in time_row})!=1:
+                    raise ValueError('Every time/channel sweep must have the same sample count to form a rectangular time × channel × sample array.')
                 series_v=np.asarray(voltage_rows,dtype=float); series_i=np.asarray(current_rows,dtype=float)
                 series_result=analyze_langmuir_probe_series(series_v,series_i,time_labels=times,channel_names=channel_labels,
                     analysis_options={'current_convention':cur_conv})
