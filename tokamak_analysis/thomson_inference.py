@@ -101,42 +101,53 @@ def _gaussian(x, amp, center, sigma, offset, slope):
 
 
 
-def _fit_identifiability(covariance, residual, uncertainty, parameter_count):
-    """Assess covariance identifiability without equating optimizer success with validity."""
+def _fit_identifiability(
+    covariance, residual, uncertainty, parameter_count, *,
+    optimizer_success=True, jacobian_rank=None, jacobian_condition_number=None,
+):
+    """Reject failed optimizers and non-identifiable fits, not merely malformed arrays."""
     cov = np.asarray(covariance, dtype=float)
     residual = np.asarray(residual, dtype=float)
     reasons = []
+    if not optimizer_success:
+        reasons.append("nonlinear optimizer did not report successful convergence")
     if cov.shape != (parameter_count, parameter_count) or not np.all(np.isfinite(cov)):
-        return {"fit_accepted": False, "fit_quality_status": "rejected_invalid_covariance",
-                "fit_quality_reasons": ["covariance is missing, non-finite or has an invalid shape"],
-                "covariance_correlation_condition_number": None}
-    diagonal = np.diag(cov)
-    if np.any(diagonal <= 0):
-        reasons.append("one or more fitted parameter variances are non-positive")
+        reasons.append("covariance is missing, non-finite or has an invalid shape")
+        condition = None
+    else:
+        diagonal = np.diag(cov)
+        if np.any(diagonal <= 0):
+            reasons.append("one or more fitted parameter variances are non-positive")
+        condition = None
+        if np.all(diagonal > 0):
+            scale = np.sqrt(diagonal)
+            correlation = cov / np.outer(scale, scale)
+            condition = float(np.linalg.cond(correlation))
+            if np.linalg.matrix_rank(correlation) < parameter_count:
+                reasons.append("parameter covariance correlation matrix is rank deficient")
+            if not np.isfinite(condition) or condition > 1e14:
+                reasons.append("parameter covariance correlation matrix is ill-conditioned")
     if not np.all(np.isfinite(residual)):
         reasons.append("residual contains non-finite values")
-    condition = None
-    if not reasons:
-        scale = np.sqrt(diagonal)
-        correlation = cov / np.outer(scale, scale)
-        condition = float(np.linalg.cond(correlation))
-        if np.linalg.matrix_rank(correlation) < parameter_count:
-            reasons.append("parameter covariance correlation matrix is rank deficient")
-        if not np.isfinite(condition) or condition > 1e14:
-            reasons.append("parameter covariance correlation matrix is ill-conditioned")
+    if jacobian_rank is not None and int(jacobian_rank) < parameter_count:
+        reasons.append("fit Jacobian is rank deficient; fitted parameters are not jointly identifiable")
+    if jacobian_condition_number is not None and (
+        not np.isfinite(jacobian_condition_number) or float(jacobian_condition_number) > 1e12
+    ):
+        reasons.append("fit Jacobian is ill-conditioned")
     dof = max(1, residual.size - parameter_count)
     chi2 = None
-    if uncertainty is not None:
+    if uncertainty is not None and np.all(np.isfinite(residual)):
         u = np.asarray(uncertainty, dtype=float)
         chi2 = float(np.sum((residual / u) ** 2) / dof)
         if not np.isfinite(chi2):
             reasons.append("reduced chi-square is non-finite")
     return {
         "fit_accepted": not reasons,
-        "fit_quality_status": "accepted_with_covariance_diagnostics" if not reasons else "rejected_unidentifiable_or_invalid",
+        "fit_quality_status": "accepted_with_identifiability_diagnostics" if not reasons else "rejected_unidentifiable_or_invalid",
         "fit_quality_reasons": reasons,
         "covariance_correlation_condition_number": condition,
-        "fit_residual_rms": float(np.sqrt(np.mean(residual ** 2))),
+        "fit_residual_rms": float(np.sqrt(np.mean(residual ** 2))) if residual.size else None,
         "fit_reduced_chi_square": chi2,
         "fit_degrees_of_freedom": int(dof),
     }
@@ -665,8 +676,14 @@ def analyze_thomson_spectra(
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
         expected_parameter_count = (2 if model == "collective_maxwellian" else
                                     6 if model == "non_collective_kappa" else 5)
-        quality = _fit_identifiability(fit.get("fit_covariance"), fit.get("residual"), ui,
-                                       expected_parameter_count)
+        quality = _fit_identifiability(
+            fit.get("fit_covariance"), fit.get("residual"), ui, expected_parameter_count,
+            optimizer_success=fit.get("optimizer_success", True),
+            jacobian_rank=(fit.get("collective_parameter_jacobian_rank")
+                           if model == "collective_maxwellian" else None),
+            jacobian_condition_number=(fit.get("collective_parameter_jacobian_condition_number")
+                                       if model == "collective_maxwellian" else None),
+        )
         fit.update(quality)
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
@@ -787,7 +804,7 @@ def analyze_thomson_spectra(
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
-            if len(area_samples) >= 8:
+            if len(area_samples) >= required_successes:
                 fit_area_uncertainty = density_inputs["scattered_power_uncertainty_W"]
                 fit_area_uncertainty = 0.0 if fit_area_uncertainty is None else float(fit_area_uncertainty)
                 lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
