@@ -3221,7 +3221,7 @@ elif page=='Advanced Analysis':
                     st.error(str(e))
     elif workflow=='Thomson downstream profile reconstruction (pre-derived ne/Te)':
         st.markdown('Reconstruct smooth radial electron-density and electron-temperature profiles from multiple spatially resolved Thomson measurements.')
-        st.caption('Use already-calibrated measurements. This fit reconstructs profiles only within the measured radial interval; it does not calibrate raw data, infer equilibrium, or extrapolate beyond measured points. Input uncertainties may weight smoothing-spline fits but are not propagated into reconstructed-profile uncertainties or confidence intervals.')
+        st.caption('Use already-inferred, calibrated ne/Te profile points. Reconstruction is limited to the measured radial interval. Pointwise uncertainties are propagated by Monte Carlo into profile uncertainty bands; this does not calibrate raw spectra or infer equilibrium.')
         if df is None or len(numeric) < 3:
             st.info('Load a table with radius (m), electron density (m⁻³), and electron temperature (eV) columns.')
         else:
@@ -3266,8 +3266,18 @@ elif page=='Advanced Analysis':
                         'Density gradient (m⁻⁴)':result['density_gradient_m-4'],
                         'Temperature gradient (eV/m)':result['temperature_gradient_eV_m-1'],
                     })
+                    if result.get('reconstructed_density_uncertainty_m3') is not None:
+                        frame['Density uncertainty (m⁻³)']=result['reconstructed_density_uncertainty_m3']
+                        frame['Density lower 95% (m⁻³)']=result['reconstructed_density_lower_95_m3']
+                        frame['Density upper 95% (m⁻³)']=result['reconstructed_density_upper_95_m3']
+                    if result.get('reconstructed_temperature_uncertainty_eV') is not None:
+                        frame['Temperature uncertainty (eV)']=result['reconstructed_temperature_uncertainty_eV']
+                        frame['Temperature lower 95% (eV)']=result['reconstructed_temperature_lower_95_eV']
+                        frame['Temperature upper 95% (eV)']=result['reconstructed_temperature_upper_95_eV']
                     st.success('Spatial Thomson profile reconstruction completed within the measured radial interval.')
-                    st.caption(f"Method: {result['method']} · Input points: {result['input_point_count']} · Output points: {result['reconstruction_point_count']} · Radius range: {result['radial_domain_m'][0]:.6g}–{result['radial_domain_m'][1]:.6g} m")
+                    st.caption(f"Method: {result['method']} · Smoothing selection: {result['smoothing_selection']} · Input points: {result['input_point_count']} · Output points: {result['reconstruction_point_count']} · Radius range: {result['radial_domain_m'][0]:.6g}–{result['radial_domain_m'][1]:.6g} m")
+                    if result['uncertainty_model']['reconstructed_profile_uncertainty_available']:
+                        st.info(f"Monte Carlo uncertainty bands available; successful density draws: {result['uncertainty_model']['density_mc_successful_draws']}, temperature draws: {result['uncertainty_model']['temperature_mc_successful_draws']}.")
                     st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron density (m⁻³)']])
                     st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron temperature (eV)']])
                     st.markdown('**Reconstructed profiles and derivatives**')
