@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 import numpy as np
 from scipy.optimize import differential_evolution, least_squares
-from scipy.special import wofz
+from scipy.special import wofz\nfrom scipy.integrate import quad\nfrom scipy.interpolate import PchipInterpolator
 
 E=1.602176634e-19
 EPS0=8.8541878128e-12
@@ -68,6 +68,36 @@ def _component(omega,k,n,T,m,Z,u):
     return chi,f
 
 
+def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, pdf):
+    """Longitudinal susceptibility for a supplied normalized 1-D VDF (Landau contour)."""
+    velocity_grid=_array(velocity_grid,"fast-ion velocity grid",1)
+    pdf=_array(pdf,"fast-ion probability density",1)
+    if velocity_grid.size!=pdf.size or velocity_grid.size<9 or np.any(np.diff(velocity_grid)<=0) or np.any(pdf<0):
+        raise ValueError("tabulated fast-ion VDF needs >=9 increasing velocity nodes and non-negative values")
+    area=float(np.trapz(pdf,velocity_grid))
+    if area<=0: raise ValueError("tabulated fast-ion VDF must have positive integral")
+    pdf=pdf/area
+    interpolator=PchipInterpolator(velocity_grid,pdf,extrapolate=False)
+    derivative=interpolator.derivative()
+    plasma_frequency_squared=density*(charge*E)**2/(EPS0*mass)
+    susceptibility=np.empty(np.asarray(omega).shape,dtype=complex)
+    resonant_density=np.empty(np.asarray(omega).shape,dtype=float)
+    for index,frequency in np.ndenumerate(np.asarray(omega,dtype=float)):
+        resonance=float(frequency/k-flow)
+        if resonance<=velocity_grid[0] or resonance>=velocity_grid[-1]:
+            pv=quad(lambda v: float(derivative(v)),float(velocity_grid[0]),float(velocity_grid[-1]),
+                    weight="cauchy",wvar=resonance,limit=150)[0]
+            f_res=0.0
+        else:
+            pv=quad(lambda v: float(derivative(v)),float(velocity_grid[0]),float(velocity_grid[-1]),
+                    weight="cauchy",wvar=resonance,limit=150)[0]
+            f_res=max(float(interpolator(resonance)),0.0)
+        landau_integral=pv+1j*np.pi*float(derivative(resonance)) if velocity_grid[0]<resonance<velocity_grid[-1] else pv
+        susceptibility[index]=-(plasma_frequency_squared/(k*k))*landau_integral
+        resonant_density[index]=f_res
+    return susceptibility,resonant_density
+
+
 def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geometry,*,electron_density_m3,
     electron_temperature_eV,ion_temperature_eV,ion_species,ion_fractions,
     ion_velocity_projection_m_s=0.,electron_velocity_projection_m_s=0.,fast_ion=None):
@@ -85,15 +115,26 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
         idx=fast_ion.get("species_index")
         if isinstance(idx,bool) or not isinstance(idx,int) or not 0<=idx<len(ions): raise ValueError("invalid fast_ion.species_index")
-        hf=float(fast_ion.get("fraction",0.)); ht=_positive(fast_ion.get("temperature_eV"),"fast_ion.temperature_eV")
+        hf=float(fast_ion.get("fraction",0.))
         if not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
-        hot=(idx,hf,ht)
+        if fast_ion.get("kind","maxwellian")=="tabulated_1d":
+            vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
+                                                smoothness=fast_ion.get("smoothness",0.0))
+            hot=(idx,hf,"tabulated",vdf)
+        else:
+            ht=_positive(fast_ion.get("temperature_eV"),"fast_ion.temperature_eV")
+            hot=(idx,hf,"maxwellian",ht)
     for i,s in enumerate(ions):
         ni=s["fraction"]*ne/s["Z"]; hf=hot[1] if hot and hot[0]==i else 0.
         cb,fb=_component(om,k,ni*(1-hf),ti,s["mass"],s["Z"],ui); total+=cb
         if ni*(1-hf)>0: terms.append((s["Z"]**2*ni*(1-hf)/ne,cb,fb))
         if hf:
-            ch,fh=_component(om,k,ni*hf,hot[2],s["mass"],s["Z"],ui); total+=ch
+            if hot[2]=="tabulated":
+                ch,fh=_component_tabulated(om,k,ni*hf,s["mass"],s["Z"],ui,
+                    hot[3]["velocity_m_s"],hot[3]["probability_density_m_s_inverse"])
+            else:
+                ch,fh=_component(om,k,ni*hf,hot[3],s["mass"],s["Z"],ui)
+            total+=ch
             terms.append((s["Z"]**2*ni*hf/ne,ch,fh))
     eps=1+total
     se=np.abs(1-ce/eps)**2*fe; si=np.zeros_like(fe)
