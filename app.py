@@ -2992,6 +2992,7 @@ elif page=='Advanced Analysis':
     elif workflow=='Microwave CTS spectral inversion (frequency-domain)':
         st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
         st.caption('This workflow implements an unmagnetized electrostatic longitudinal CTS model; it is not a full magnetized electromagnetic CTS simulator.')
+        st.caption('Enter the electron-flow projection explicitly; zero is a deliberate stationary-flow assumption. One common ion temperature and projected ion flow are fitted across all supplied background ion species.')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
         else:
