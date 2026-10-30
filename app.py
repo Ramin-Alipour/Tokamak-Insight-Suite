@@ -20,6 +20,7 @@ from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distr
 from tokamak_analysis.thomson_inference import analyze_thomson_spectra
 from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
+from tokamak_analysis.cts_analysis import analyze_cts_spectrum
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
 from tokamak_analysis.poloidal_flux import reconstruct_poloidal_flux
@@ -2981,14 +2982,114 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Microwave CTS spectral inversion (frequency-domain)','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson multi-channel spectral inference (canonical Analysis 1)':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
-    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
+    elif workflow=='Microwave CTS spectral inversion (frequency-domain)':
+        st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
+        st.caption('This workflow implements an unmagnetized electrostatic longitudinal CTS model; it is not a full magnetized electromagnetic CTS simulator.')
+        if df is None or len(numeric)<2:
+            st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
+        else:
+            c1,c2=st.columns(2)
+            with c1:
+                cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_frequency_col')
+                cts_spectrum_col=col_select('Calibrated CTS spectral power', [x for x in numeric if x!=cts_frequency_col] or numeric,'cts_spectrum_col')
+                cts_uncertainty_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_uncertainty_col')
+                cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_probe_frequency')
+                cts_angle=st.text_input('Scattering angle (rad)',key='cts_scattering_angle')
+            with c2:
+                cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_response_upload')
+                cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
+                cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
+                cts_method=st.selectbox('Inversion method',['differential_evolution','improved_genetic','regularized'],key='cts_inversion_method')
+                cts_regularization=st.number_input('Regularization strength (used by regularized mode)',min_value=0.0,value=0.1,format='%.6g',key='cts_regularization')
+            st.markdown('**Ion composition (externally supplied)**')
+            s1,s2,s3=st.columns(3)
+            with s1: cts_species_text=st.text_input('Ion species names (comma-separated)',value='D+',key='cts_species')
+            with s2: cts_charge_text=st.text_input('Charge states (comma-separated)',value='1',key='cts_charges')
+            with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated)',value='2.014',key='cts_masses')
+            cts_fraction_text=st.text_input('Charge-density fractions (comma-separated)',value='1.0',key='cts_fractions')
+            cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'],key='cts_fast_mode')
+            cts_fast_vdf_upload=None
+            if cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
+                cts_fast_vdf_upload=st.file_uploader('Fast-ion VDF CSV (velocity_m_s, probability_density_m_s_inverse)',type=['csv','txt'],key='cts_fast_vdf')
+            if cts_fast_mode!='None':
+                cts_fast_species=st.number_input('Fast-ion species index',min_value=0,value=0,step=1,key='cts_fast_species')
+                cts_fast_fraction=st.number_input('Initial fast-ion fraction',min_value=0.001,max_value=0.95,value=0.05,key='cts_fast_fraction')
+            else:
+                cts_fast_species=0; cts_fast_fraction=0.05
+            if cts_fast_mode=='Hot Maxwellian component':
+                cts_fast_temperature=st.number_input('Fast-ion temperature (eV)',min_value=1.0,value=10000.0,key='cts_fast_temperature')
+            if st.button('Run microwave CTS inversion',type='primary',key='run_cts_inversion'):
+                try:
+                    frequency=pd.to_numeric(df[cts_frequency_col],errors='coerce').to_numpy(dtype=float)
+                    spectrum=pd.to_numeric(df[cts_spectrum_col],errors='coerce').to_numpy(dtype=float)
+                    if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(spectrum)):
+                        raise ValueError('CTS frequency and spectrum columns must contain only finite numeric values.')
+                    if cts_uncertainty_col!='<none>':
+                        cts_uncertainty=pd.to_numeric(df[cts_uncertainty_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(cts_uncertainty)) or np.any(cts_uncertainty<=0):
+                            raise ValueError('CTS spectral uncertainties must be finite and positive.')
+                    else: cts_uncertainty=None
+                    if cts_response_upload is None:
+                        raise ValueError('Upload the measured frequency-response matrix.')
+                    cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
+                    cts_response_unc=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
+                    cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
+                    charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
+                    masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
+                    fractions=[float(v.strip()) for v in cts_fraction_text.split(',') if v.strip()]
+                    if not (len(species_names)==len(charges)==len(masses)==len(fractions)):
+                        raise ValueError('Ion names, charge states, masses and fractions must have equal lengths.')
+                    ion_species=[{'name':name,'charge_state':charge,'mass_amu':mass} for name,charge,mass in zip(species_names,charges,masses)]
+                    fast_ion=None
+                    if cts_fast_mode=='Hot Maxwellian component':
+                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),'temperature_eV':float(cts_fast_temperature)}
+                    elif cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
+                        if cts_fast_vdf_upload is None:
+                            raise ValueError('Upload a two-column fast-ion VDF CSV.')
+                        vdf=pd.read_csv(cts_fast_vdf_upload,header=None).to_numpy(dtype=float)
+                        if vdf.ndim!=2 or vdf.shape[1]!=2:
+                            raise ValueError('Fast-ion VDF CSV must contain exactly two columns: velocity and probability density.')
+                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),
+                            'velocity_m_s':vdf[:,0],'probability_density_m_s_inverse':vdf[:,1]}
+                        if cts_fast_mode=='Fixed tabulated 1-D VDF':
+                            fast_ion['kind']='tabulated_1d'
+                        else:
+                            fast_ion['kind']='infer_tabulated_1d'
+                            fast_ion['initial_probability_density_m_s_inverse']=vdf[:,1]
+                            fast_ion.pop('probability_density_m_s_inverse',None)
+                            fast_ion['fraction_initial']=float(cts_fast_fraction)
+                            fast_ion['fraction_bounds']=(0.001,0.95)
+                            fast_ion['smoothness']=1.0
+                    kwargs_cts={
+                        'probe_frequency_Hz':float(cts_probe_frequency),
+                        'scattering_geometry':{'scattering_angle_rad':float(cts_angle)},
+                        'ion_species':ion_species,'ion_fractions':fractions,
+                        'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
+                        'spectral_covariance':cts_spectral_cov,
+                        'instrument_response_uncertainty':cts_response_unc,
+                        'fast_ion':fast_ion,'inversion_method':cts_method,
+                    }
+                    if cts_method=='regularized':
+                        kwargs_cts['regularization_strength']=float(cts_regularization)
+                    result_cts=analyze_cts_spectrum(frequency,spectrum,**kwargs_cts)
+                    st.success('CTS spectral inversion completed within the declared model scope.')
+                    st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
+                    st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
+                    st.metric('Ion temperature',f"{result_cts['ion_temperature_eV']:.5g} eV")
+                    st.json(result_cts)
+                    json_download('Export CTS inversion and uncertainty diagnostics',result_cts,'tis_cts_inversion.json')
+                    add_report_section('Microwave CTS spectral inversion',result_cts)
+                except Exception as e:
+                    st.error(f'CTS inversion failed: {e}')
+\n    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
         st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
         st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
         if df is None or len(numeric) < 3:
