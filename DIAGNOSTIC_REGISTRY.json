@@ -4791,6 +4791,14 @@
         {
           "name": "reconstructed_density_upper_95_m3",
           "unit": "m^-3"
+        },
+        {
+          "name": "reconstructed_joint_density_temperature_covariance",
+          "unit": "(2N_grid x 2N_grid) covariance"
+        },
+        {
+          "name": "reconstructed_density_temperature_cross_covariance",
+          "unit": "N_grid x N_grid covariance"
         }
       ],
       "assumptions": [
