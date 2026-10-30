@@ -265,10 +265,19 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
         idx=fast_ion.get("species_index")
         if isinstance(idx,bool) or not isinstance(idx,int) or not 0<=idx<len(ions): raise ValueError("invalid fast-ion species_index")
-        flo,fhi=map(float,fast_ion.get("fraction_bounds",(.001,.5))); tlo,thi=map(float,fast_ion.get("temperature_bounds_eV",(1e3,1e6)))
-        fi=float(fast_ion.get("fraction_initial",.05)); ft=float(fast_ion.get("temperature_initial_eV",max(2e3,3*ion_temperature_initial_eV)))
-        if not 0<flo<fi<fhi<1 or not 0<tlo<ft<thi: raise ValueError("invalid fast-ion initial values or bounds")
-        fast={"species_index":idx}; p0=np.r_[p0,fi,np.log10(ft)]; lo=np.r_[lo,flo,np.log10(tlo)]; hi=np.r_[hi,fhi,np.log10(thi)]
+        flo,fhi=map(float,fast_ion.get("fraction_bounds",(.001,.5)))
+        fi=float(fast_ion.get("fraction_initial",.05))
+        if not 0<flo<fi<fhi<1: raise ValueError("invalid fast-ion fraction initial value or bounds")
+        if fast_ion.get("kind","maxwellian")=="tabulated_1d":
+            vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
+                                                smoothness=fast_ion.get("smoothness",0.0))
+            fast={"species_index":idx,"kind":"tabulated_1d","vdf":vdf}
+            p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
+        else:
+            tlo,thi=map(float,fast_ion.get("temperature_bounds_eV",(1e3,1e6)))
+            ft=float(fast_ion.get("temperature_initial_eV",max(2e3,3*ion_temperature_initial_eV)))
+            if not 0<tlo<ft<thi: raise ValueError("invalid fast-ion temperature initial value or bounds")
+            fast={"species_index":idx,"kind":"maxwellian"}; p0=np.r_[p0,fi,np.log10(ft)]; lo=np.r_[lo,flo,np.log10(tlo)]; hi=np.r_[hi,fhi,np.log10(thi)]
     noise=unc if unc is not None else np.full_like(y,max(float(np.std(y)),float(np.max(y))*1e-6,np.finfo(float).tiny))
     if inversion_method not in {"differential_evolution", "improved_genetic", "regularized"}:
         raise ValueError("inversion_method must be differential_evolution, improved_genetic or regularized")
@@ -293,7 +302,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("response_mc_samples must be an integer >= 20")
     def decode(p):
         d={"electron_density_m3":10**p[0],"electron_temperature_eV":10**p[1],"ion_temperature_eV":10**p[2],"ion_velocity_projection_m_s":p[3]*us}
-        if fast: d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
+        if fast:
+            if fast["kind"]=="tabulated_1d":
+                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"kind":"tabulated_1d",
+                    "velocity_m_s":fast["vdf"]["velocity_m_s"],
+                    "probability_density_m_s_inverse":fast["vdf"]["probability_density_m_s_inverse"],
+                    "smoothness":fast["vdf"]["smoothness_parameter"]}
+            else:
+                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
         return d
     def forward(p, response_matrix=None):
         d=decode(p); z=cts_spectral_density(f,f0,scattering_geometry,electron_density_m3=d["electron_density_m3"],
@@ -330,7 +346,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
     trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]
-    if fast: trans[5,5]=np.log(10)*d["fast_ion"]["temperature_eV"]
+    if fast and fast["kind"]=="maxwellian": trans[5,5]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
     names=["electron_density_m3","electron_temperature_eV","ion_temperature_eV","ion_velocity_projection_m_s"]
