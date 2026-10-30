@@ -2635,7 +2635,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.formula_library.langmuir_multispecies_ion_density",
+      "function_link": "tokamak_analysis.langmuir_advanced.estimate_multispecies_ion_density",
       "formula_key": "langmuir_multispecies_ion_density",
       "input_specs": [
         {
@@ -2663,21 +2663,21 @@
           "required": true
         },
         {
-          "name": "sigma_ion_saturation_current_A",
+          "name": "current_standard_uncertainty_A",
           "unit": "A",
           "description": "Optional absolute 1-sigma uncertainty of ion-saturation current.",
           "required": false,
           "minimum": 0
         },
         {
-          "name": "relative_sigma_electron_temperature",
+          "name": "temperature_relative_standard_uncertainty",
           "unit": "fraction",
           "description": "Optional relative 1-sigma uncertainty of electron temperature.",
           "required": false,
           "minimum": 0
         },
         {
-          "name": "relative_sigma_probe_area",
+          "name": "area_relative_standard_uncertainty",
           "unit": "fraction",
           "description": "Optional relative 1-sigma uncertainty of effective probe area.",
           "required": false,
