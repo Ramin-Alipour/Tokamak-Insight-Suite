@@ -91,6 +91,18 @@ ANALYSES = [{
                     "required": False
                 },
                 {
+                    "name": "incident_direction",
+                    "unit": "dimensionless 3-vector",
+                    "description": "Required for collective inference; incident beam direction in the same coordinate frame as supplied flow vectors.",
+                    "required": False
+                },
+                {
+                    "name": "scattered_direction",
+                    "unit": "dimensionless 3-vector",
+                    "description": "Required for collective inference; scattered beam direction in the same coordinate frame as supplied flow vectors.",
+                    "required": False
+                },
+                {
                     "name": "absolute_density_geometry",
                     "unit": "structured",
                     "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident beam direction, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density.",
