@@ -232,7 +232,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=1e19,electron_temperature_initial_eV=1000.,ion_temperature_initial_eV=500.,
     ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=0.,
-    fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",\n    spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,\n    regularization_strength=0.0):
+    fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",
+    spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
+    regularization_strength=0.0):
     """Infer ne, Te, Ti and ion-flow projection with DE global initialization and bounded least squares."""
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); y=_array(spectrum,"spectrum",1)
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
