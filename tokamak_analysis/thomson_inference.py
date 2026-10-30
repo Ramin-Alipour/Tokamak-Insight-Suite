@@ -532,6 +532,7 @@ def analyze_thomson_spectra(
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
+        density_inputs = None
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, incident_direction, scattered_direction
@@ -540,23 +541,24 @@ def analyze_thomson_spectra(
                 raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
             area = float(fit["integrated_scattered_power_W"])
             area_sigma = fit.get("integrated_scattered_power_uncertainty_W")
-            density_result = density_from_thomson_scattered_power(
-                scattered_power_W=area, incident_power_W=laser_power_w,
-                interaction_length_m=interaction_length_m,
-                scattering_angle_rad=scattering_angle_rad,
-                collection_solid_angle_sr=collection_solid_angle_sr,
-                optical_efficiency=optical_efficiency,
-                scattered_power_uncertainty_W=area_sigma,
-                incident_power_uncertainty_W=laser_power_uncertainty_W,
-                interaction_length_uncertainty_m=interaction_length_uncertainty_m,
-                scattering_angle_uncertainty_rad=(None if incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
-                collection_solid_angle_uncertainty_sr=collection_solid_angle_uncertainty_sr,
-                optical_efficiency_uncertainty=optical_efficiency_uncertainty,
-                incident_polarization_vector=incident_polarization,
-                incident_direction_vector=incident_direction,
-                scattered_direction_vector=scattered_direction,
-                polarization_factor_uncertainty=polarization_factor_uncertainty,
-            )
+            density_inputs = {
+                "scattered_power_W": area, "incident_power_W": laser_power_w,
+                "interaction_length_m": interaction_length_m,
+                "scattering_angle_rad": scattering_angle_rad,
+                "collection_solid_angle_sr": collection_solid_angle_sr,
+                "optical_efficiency": optical_efficiency,
+                "scattered_power_uncertainty_W": area_sigma,
+                "incident_power_uncertainty_W": laser_power_uncertainty_W,
+                "interaction_length_uncertainty_m": interaction_length_uncertainty_m,
+                "scattering_angle_uncertainty_rad": (None if incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
+                "collection_solid_angle_uncertainty_sr": collection_solid_angle_uncertainty_sr,
+                "optical_efficiency_uncertainty": optical_efficiency_uncertainty,
+                "incident_polarization_vector": incident_polarization,
+                "incident_direction_vector": incident_direction,
+                "scattered_direction_vector": scattered_direction,
+                "polarization_factor_uncertainty": polarization_factor_uncertainty,
+            }
+            density_result = density_from_thomson_scattered_power(**density_inputs)
             fit["electron_density_m3"] = density_result["electron_density_m3"]
             fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
             fit["integrated_scattered_power_W"] = area
@@ -594,7 +596,7 @@ def analyze_thomson_spectra(
         if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
-            te_samples, velocity_samples = [], []
+            te_samples, velocity_samples, area_samples = [], [], []
             for _ in range(24):
                 sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
@@ -607,6 +609,8 @@ def analyze_thomson_spectra(
                                   float(scattering_angle_rad), sampled, ui)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
+                    if "integrated_scattered_power_W" in draw and np.isfinite(draw["integrated_scattered_power_W"]):
+                        area_samples.append(float(draw["integrated_scattered_power_W"]))
                 except (ValueError, RuntimeError):
                     continue
             if len(te_samples) >= 8:
@@ -620,6 +624,28 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_propagated"] = False
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
+        if density_inputs is not None and lsf_unc is not None:
+            if len(area_samples) >= 8:
+                fit_area_uncertainty = density_inputs["scattered_power_uncertainty_W"]
+                fit_area_uncertainty = 0.0 if fit_area_uncertainty is None else float(fit_area_uncertainty)
+                lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
+                combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
+                density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
+                density_result = density_from_thomson_scattered_power(**density_inputs)
+                fit["electron_density_m3"] = density_result["electron_density_m3"]
+                fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
+                fit["integrated_scattered_power_fit_uncertainty_W"] = fit_area_uncertainty
+                fit["integrated_scattered_power_lsf_uncertainty_W"] = lsf_area_uncertainty
+                fit["integrated_scattered_power_uncertainty_W"] = combined_area_uncertainty
+                fit["density_uncertainty_model"] = density_result["uncertainty_model"]
+                fit["instrument_response_density_uncertainty_propagated"] = True
+            else:
+                fit["instrument_response_density_uncertainty_propagated"] = False
+                fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_not_propagated_to_absolute_density")
+                fit["uncertainty_completeness"] = "partial"
+        elif density_inputs is not None:
+            fit["instrument_response_density_uncertainty_propagated"] = False
+
         if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             te = fit["electron_temperature_eV"]
             te_rel_var = (2.0*laser_wavelength_unc/float(laser_wavelength_nm))**2
