@@ -13,7 +13,7 @@ E_CHARGE = 1.602176634e-19  # exact SI value
 MU0 = 1.25663706212e-6  # CODATA 2018 reference
 M_E = 9.1093837139e-31  # CODATA 2022 reference
 from tokamak_analysis.formula_library import (
-    plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity, ion_sound_speed,
+    plasma_frequency_from_density_cm3, doppler_line_of_sight_velocity, ion_sound_speed, langmuir_electron_temperature_from_slope, langmuir_ion_density_from_saturation_current,
     ion_temperature_from_doppler_sigma, gaussian_fwhm_from_sigma,
     magnetic_energy_density, toroidal_beta, safety_factor_large_aspect_ratio,
     faraday_induction, plasma_loop_resistance_proxy, ohmic_power_approximation,
@@ -226,8 +226,8 @@ def test_particle_balance_reference():
 
 def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(rows) == 37
-    assert len({row["name"] for row in rows}) == 37
+    assert len(rows) == 39
+    assert len({row["name"] for row in rows}) == 39
     for row in rows:
         contract = row["execution_contract"]
         assert contract["implementation_link_status"] == "mapped", row["name"]
@@ -356,3 +356,24 @@ def test_registry_output_specs_cover_all_statically_returned_keys():
                         returned.add(key.value)
         declared = {item["name"] for item in row["execution_contract"]["output_specs"]}
         assert returned <= declared, (row["name"], sorted(returned - declared))
+
+
+def test_langmuir_electron_temperature_slope_reference():
+    result = langmuir_electron_temperature_from_slope(0.4, sigma_slope_per_V=0.02)
+    assert result["electron_temperature_eV"] == pytest.approx(2.5)
+    assert result["uncertainty_electron_temperature_eV"] == pytest.approx(0.125)
+
+
+def test_langmuir_ion_density_from_saturation_reference():
+    current, temperature, area, mass, coefficient = 2.0e-3, 5.0, 1.0e-4, 3.34e-27, 0.61
+    result = langmuir_ion_density_from_saturation_current(
+        -current, temperature, area, mass, coefficient,
+        sigma_ion_saturation_current_A=2.0e-5,
+        sigma_electron_temperature_eV=0.1,
+        sigma_probe_area_m2=1.0e-6,
+        sigma_ion_mass_kg=1.0e-29,
+        sigma_sheath_coefficient=0.01,
+    )
+    expected = current / (coefficient * E_CHARGE * area * math.sqrt(E_CHARGE * temperature / mass))
+    assert result["ion_density_m3"] == pytest.approx(expected, rel=1e-12)
+    assert result["uncertainty_ion_density_m3"] > 0
