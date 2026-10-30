@@ -84,7 +84,7 @@
           "description": "Supplied calibrated coordinate at the minimum electron-density value."
         },
         {
-          "name": "temperature_min_eV",
+          "name": "temperature_min_ev",
           "unit": "eV",
           "description": "Minimum calibrated electron-temperature value on the measured profile."
         },
