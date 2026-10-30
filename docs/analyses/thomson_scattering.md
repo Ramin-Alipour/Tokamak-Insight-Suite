@@ -103,13 +103,13 @@ The implementation uses a small set of model families rather than an unbounded l
 
 1. The Maxwellian collective/non-collective spectral-density formulation follows the kinetic dielectric treatment documented by PlasmaPy. Its spectral-density function explicitly supports one or more ion species, ion temperatures and drift velocities.
 2. Recent experimental CTS work demonstrates the importance of robust spectral/background treatment for thermal- and fast-ion monitoring (Verdier et al., Review of Scientific Instruments 96, 043513, 2025, DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948)).
-3. Recent non-Maxwellian Thomson forward-model work motivates retaining a non-Maxwellian option rather than treating a Gaussian as a universal spectrum (Skolar, Longley & Goodwin, ICEAA 2025, DOI: [10.1109/ICEAA65662.2025.11306000](https://doi.org/10.1109/ICEAA65662.2025.11306000)). The kappa implementation here is a bounded parameterized approximation and is not claimed to reproduce that paper's general arbitrary-distribution solver.
+3. Recent non-Maxwellian Thomson forward-model work motivates retaining a non-Maxwellian option rather than treating a Gaussian as a universal spectrum (Skolar, Longley & Goodwin, Physics of Plasmas 32, 043907 (2025), DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966)). The kappa implementation here is a bounded parameterized approximation and is not claimed to reproduce that paper's general arbitrary-distribution solver.
 4. Recent multi-regime analysis of Thomson spectra reports inference in both collective and non-collective regimes using physical spectral models (Eisenbach et al., Journal of Physics D: Applied Physics 58, 035202, 2025, DOI: [10.1088/1361-6463/ad89d6](https://doi.org/10.1088/1361-6463/ad89d6)).
 
 References:
 - PlasmaPy, “Thomson Scattering: Spectral Density,” https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html
 - Verdier, T. et al. (2025), DOI: 10.1063/5.0238948.
-- Skolar, C. R., Longley, W. J. & Goodwin, L. V. (2025), DOI: 10.1109/ICEAA65662.2025.11306000.
+- Skolar, C. R., Longley, W. J. & Goodwin, L. V. (2025), Physics of Plasmas 32, 043907, DOI: 10.1063/5.0261966.
 - Suazo Betancourt, J. L. et al. (2024), DOI: 10.1063/5.0158749.
 - Eisenbach, S. et al. (2025), DOI: 10.1088/1361-6463/ad89d6.
 
