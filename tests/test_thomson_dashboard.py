@@ -39,6 +39,19 @@ def test_thomson_geometry_dependent_workflows_are_not_in_analysis_1_ui():
 
 
 
+def test_primary_multi_channel_spectral_inference_is_exposed_in_spectral_workspace():
+    frame = pd.DataFrame({
+        "channel_id": ["ch0", "ch0", "ch1", "ch1"],
+        "radius_m": [0.1, 0.1, 0.2, 0.2],
+        "wavelength_nm": [530.0, 531.0, 530.0, 531.0],
+        "intensity": [1.0, 2.0, 1.5, 2.5],
+    })
+    app = _app_with_table(frame)
+    app.radio[0].set_value("Spectral Analysis").run()
+    workflow = next(item for item in app.radio if item.label == "Workflow")
+    assert "Thomson multi-channel spectral inference" in workflow.options
+
+
 def test_thomson_calibrated_profile_dashboard_executes_and_exports():
     radius = np.linspace(0.0, 0.4, 9)
     frame = pd.DataFrame({
