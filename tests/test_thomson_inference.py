@@ -296,3 +296,71 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
     out=analyze_thomson_spectral_distribution(x,y,instrument_sigma_nm=0.2)
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
+
+def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkeypatch):
+    import sys
+    import types
+
+    class _Spectrum:
+        def __init__(self, value):
+            self.value = np.asarray(value, dtype=float)
+
+    class _FakeThomson:
+        @staticmethod
+        def spectral_density(wavelength, laser_wavelength, density, **kwargs):
+            x = np.asarray(wavelength, dtype=float)
+            te = float(kwargs["T_e"])
+            ne = float(density)
+            sigma = 2.0 * np.sqrt(te / 100.0)
+            broad_fraction = 0.10 * (ne / 1e18) ** 0.30
+            spectrum = (
+                np.exp(-0.5 * ((x - 532.0) / sigma) ** 2)
+                + broad_fraction * np.exp(-0.5 * ((x - 532.0) / (4.0 * sigma)) ** 2)
+            )
+            return 2.0, _Spectrum(spectrum)
+
+    fake_astropy = types.ModuleType("astropy")
+    fake_astropy.units = types.SimpleNamespace(nm=1.0, eV=1.0, m=1.0, s=1.0)
+    fake_plasmapy = types.ModuleType("plasmapy")
+    fake_diagnostics = types.ModuleType("plasmapy.diagnostics")
+    fake_diagnostics.thomson = _FakeThomson
+    fake_plasmapy.diagnostics = fake_diagnostics
+    monkeypatch.setitem(sys.modules, "astropy", fake_astropy)
+    monkeypatch.setitem(sys.modules, "plasmapy", fake_plasmapy)
+    monkeypatch.setitem(sys.modules, "plasmapy.diagnostics", fake_diagnostics)
+
+    x = np.linspace(490.0, 574.0, 421)
+    true_density = 4.0e18
+    true_temperature = 160.0
+    _, physical_shape = _FakeThomson.spectral_density(
+        x, 532.0, true_density, T_e=true_temperature
+    )
+    y = 2400.0 * physical_shape.value + 18.0 + 0.015 * (x - 532.0)
+    y += 0.015 * np.sin(np.linspace(0.0, 18.0 * np.pi, x.size))
+
+    result = analyze_thomson_spectra(
+        x, y[None, :], [0.2],
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response=np.eye(x.size),
+        model="collective_maxwellian",
+        ion_species=["H+"],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[20.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+    )
+
+    channel = result["channels"][0]
+    assert channel["optimizer_success"] is True
+    assert channel["electron_density_m3"] == pytest.approx(true_density, rel=0.08)
+    assert channel["electron_temperature_eV"] == pytest.approx(true_temperature, rel=0.05)
+    assert np.allclose(channel["fitted_spectrum"], y, rtol=0.02, atol=0.03)
+    expected_dof = max(1, x.size - 5)
+    expected_chi_square = np.sum(channel["residual"] ** 2) / (
+        max(float(np.max(np.abs(y))), np.finfo(float).tiny) ** 2 * expected_dof
+    )
+    assert channel["reduced_chi_square"] == pytest.approx(expected_chi_square, rel=1e-8)
+
