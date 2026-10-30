@@ -130,12 +130,12 @@ ANALYSES = [{
                 {
                     "name": "electron_density_profile_m3",
                     "unit": "m^-3",
-                    "description": "Per-channel density only where the selected model and supplied intensity/geometry identify it."
+                    "description": "Per-channel density only where the selected model and spectral shape or supplied absolute-intensity geometry identify it."
                 },
                 {
                     "name": "electron_velocity_projection_profile_m_s",
                     "unit": "m s^-1",
-                    "description": "Per-channel electron-flow projection along the scattering wavevector, where supported."
+                    "description": "Non-collective: fitted centroid projection; collective: projection calculated from the supplied electron-flow vector, not fitted from the Thomson spectrum."
                 },
                 {
                     "name": "electron_temperature_uncertainty_profile_eV",
@@ -150,7 +150,7 @@ ANALYSES = [{
                 {
                     "name": "electron_velocity_projection_uncertainty_profile_m_s",
                     "unit": "m s^-1",
-                    "description": "Per-channel uncertainty of the electron-flow projection where supported."
+                    "description": "Per-channel uncertainty of the fitted non-collective electron-flow projection; unavailable for the externally supplied collective flow projection."
                 },
                 {
                     "name": "channels",
@@ -162,7 +162,7 @@ ANALYSES = [{
                 "Input spectra and wavelength axes are measured and calibrated; this analysis does not calibrate the diagnostic.",
                 "Spatial coordinates are supplied for each measured spectral channel.",
                 "Non-collective Maxwellian inference assumes an isotropic, non-relativistic Maxwellian electron population.",
-                "Collective Maxwellian inference requires explicitly supplied ion species and ion temperatures; missing ion parameters are not silently inferred.",
+                "Collective Maxwellian inference requires explicitly supplied ion species, ion temperatures and ion/electron flow vectors; these remain fixed external inputs and are not inferred from the Thomson spectrum.",
                 "Absolute non-collective density requires spectral intensity in W/nm and the complete optical-power, geometry and polarization factors."
             ],
         "preprocessing":             [
