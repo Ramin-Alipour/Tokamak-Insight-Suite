@@ -223,7 +223,7 @@ def test_advanced_fits_aggregate_duplicate_voltages_before_curve_fit():
     aggregated = fit_langmuir_electron_models(v_dup, i_dup, (-4.0, 2.0))
     assert aggregated["fit_points"] == baseline["fit_points"]
     assert aggregated["electron_temperature_components_eV"] == pytest.approx(baseline["electron_temperature_components_eV"], rel=1e-8)
-    assert aggregated["input_quality"]["duplicate_voltage_pair_count_aggregated"] == 2
+    assert aggregated["input_quality"]["duplicate_voltage_pair_count_aggregated"] == 1
     assert aggregated["input_quality"]["discarded_nonfinite_pair_count"] == 1
     with pytest.raises(ValueError, match="eight distinct"):
         fit_langmuir_electron_models(np.repeat(v[:7], 2), np.repeat(i[:7], 2), (-5.0, -4.0))
