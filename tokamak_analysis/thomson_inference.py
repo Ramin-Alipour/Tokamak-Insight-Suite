@@ -9,7 +9,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.special import gammaln
 
-from .thomson_scattering import density_from_thomson_scattered_power
+from .thomson_scattering import density_from_thomson_scattered_power, _covariance_is_positive_semidefinite
 from .formula_library import (
     thomson_electron_temperature_from_spectral_width,
     thomson_velocity_projection,
@@ -448,7 +448,7 @@ def analyze_thomson_spectra(
     spectral_power_density_calibrated=False, laser_power_uncertainty_W=None,
     interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
-    density_relative_covariance=None,
+    density_relative_covariance=None, joint_density_relative_covariance=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
@@ -574,6 +574,31 @@ def analyze_thomson_spectra(
     lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
     if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
+
+    if joint_density_relative_covariance is not None:
+        if density_relative_covariance is not None:
+            raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
+        if joint_spectral_covariance is not None:
+            raise ValueError("joint_density_relative_covariance already contains the full scattered-power covariance; do not combine it with joint_spectral_covariance.")
+        scalar_density_uncertainties = (
+            laser_power_uncertainty_W, interaction_length_uncertainty_m,
+            collection_solid_angle_uncertainty_sr, optical_efficiency_uncertainty,
+            polarization_factor_uncertainty,
+        )
+        if any(value is not None for value in scalar_density_uncertainties):
+            raise ValueError("joint_density_relative_covariance is the complete cross-channel density-input uncertainty model; do not also supply scalar optical-factor uncertainties.")
+        joint_density_covariance = _finite_array(
+            joint_density_relative_covariance, "joint_density_relative_covariance", 2
+        )
+        expected_density_covariance_shape = (6 * y.shape[0], 6 * y.shape[0])
+        if joint_density_covariance.shape != expected_density_covariance_shape:
+            raise ValueError("joint_density_relative_covariance must have shape (6*n_channels, 6*n_channels), ordered as six density-inversion inputs per channel.")
+        if not np.allclose(joint_density_covariance, joint_density_covariance.T, rtol=1e-9, atol=0.0):
+            raise ValueError("joint_density_relative_covariance must be symmetric")
+        if not _covariance_is_positive_semidefinite(joint_density_covariance):
+            raise ValueError("joint_density_relative_covariance must be positive semidefinite")
+    else:
+        joint_density_covariance = None
 
     if joint_spectral_covariance is not None and signal_uncertainty is not None:
         raise ValueError(
@@ -844,17 +869,21 @@ def analyze_thomson_spectra(
                 # for the six multiplicative density inputs. Do not also pass the
                 # fitted area sigma or independent scalar terms: the density helper
                 # correctly rejects mixed covariance/scalar uncertainty inputs.
-                "scattered_power_uncertainty_W": (None if density_relative_covariance is not None else area_sigma),
-                "incident_power_uncertainty_W": (None if density_relative_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
-                "interaction_length_uncertainty_m": (None if density_relative_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
-                "scattering_angle_uncertainty_rad": (None if density_relative_covariance is not None or incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
-                "collection_solid_angle_uncertainty_sr": (None if density_relative_covariance is not None else _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr")),
-                "optical_efficiency_uncertainty": (None if density_relative_covariance is not None else _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty")),
+                "scattered_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else area_sigma),
+                "incident_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
+                "interaction_length_uncertainty_m": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
+                "scattering_angle_uncertainty_rad": (None if density_relative_covariance is not None or joint_density_covariance is not None or incident_polarization is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
+                "collection_solid_angle_uncertainty_sr": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr")),
+                "optical_efficiency_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty")),
                 "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
                 "incident_direction_vector": _channel_value(incident_direction, i, y.shape[0], "incident_direction", vector_length=3),
                 "scattered_direction_vector": _channel_value(scattered_direction, i, y.shape[0], "scattered_direction", vector_length=3),
-                "polarization_factor_uncertainty": (None if density_relative_covariance is not None else _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty")),
-                "relative_input_covariance": _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance"),
+                "polarization_factor_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty")),
+                "relative_input_covariance": (
+                    joint_density_covariance[6*i:6*(i+1), 6*i:6*(i+1)].copy()
+                    if joint_density_covariance is not None
+                    else _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance")
+                ),
             }
             density_result = density_from_thomson_scattered_power(**density_inputs)
             fit["electron_density_m3"] = density_result["electron_density_m3"]
@@ -1250,6 +1279,31 @@ def analyze_thomson_spectra(
         }
     for channel_result in results:
         channel_result.pop("_density_inputs_for_joint_refit", None)
+    density_joint_covariance_output = None
+    if joint_density_covariance is not None:
+        channel_count = len(results)
+        density_joint_covariance_output = np.full((channel_count, channel_count), np.nan, dtype=float)
+        relative_density_gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+        for row_index, row_result in enumerate(results):
+            density_row = row_result.get("electron_density_m3")
+            if density_row is None:
+                continue
+            row_slice = slice(6*row_index, 6*(row_index+1))
+            for column_index, column_result in enumerate(results):
+                density_column = column_result.get("electron_density_m3")
+                if density_column is None:
+                    continue
+                column_slice = slice(6*column_index, 6*(column_index+1))
+                relative_block = joint_density_covariance[row_slice, column_slice]
+                density_joint_covariance_output[row_index, column_index] = (
+                    float(density_row) * float(density_column)
+                    * float(relative_density_gradient @ relative_block @ relative_density_gradient)
+                )
+        for channel_index, channel_result in enumerate(results):
+            if channel_result.get("electron_density_m3") is not None:
+                channel_result["electron_density_joint_covariance_diagonal_m6"] = float(
+                    density_joint_covariance_output[channel_index, channel_index]
+                )
     output = {
         "model": model, "channel_count": len(results), "channels": results,
         "joint_inference": joint_summary,
@@ -1258,6 +1312,8 @@ def analyze_thomson_spectra(
         "electron_temperature_uncertainty_profile_eV": np.array([r.get("electron_temperature_uncertainty_eV", np.nan) for r in results]),
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
+        "electron_density_joint_covariance_m6": density_joint_covariance_output,
+        "electron_density_cross_channel_covariance_available": density_joint_covariance_output is not None,
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
