@@ -654,3 +654,54 @@ def particle_balance_rate(input_rate_s, output_rate_s, source_rate_s, loss_rate_
             ("sigma_input_rate_s", "sigma_output_rate_s", "sigma_source_rate_s", "sigma_loss_rate_s"), sigmas)]
         out["uncertainty_particle_balance_rate_s"] = math.sqrt(sum(v**2 for v in s))
     return out
+
+def langmuir_electron_temperature_from_slope(slope_per_V, *, sigma_slope_per_V=None):
+    """Maxwellian electron-retarding branch: Te[eV] = 1 / slope[V^-1]."""
+    slope = _positive("slope_per_V", slope_per_V)
+    temperature = 1.0 / slope
+    out = {"electron_temperature_eV": temperature}
+    if sigma_slope_per_V is not None:
+        sigma_slope = _nonnegative("sigma_slope_per_V", sigma_slope_per_V)
+        out["uncertainty_electron_temperature_eV"] = sigma_slope / slope**2
+    return out
+
+
+def langmuir_ion_density_from_saturation_current(
+    ion_saturation_current_A, electron_temperature_eV, probe_area_m2,
+    ion_mass_kg, sheath_coefficient, *,
+    sigma_ion_saturation_current_A=None, sigma_electron_temperature_eV=None,
+    sigma_probe_area_m2=None, sigma_ion_mass_kg=None,
+    sigma_sheath_coefficient=None,
+):
+    """Single-ion Bohm/sheath-model density inversion from calibrated ion-saturation current."""
+    current = abs(_finite("ion_saturation_current_A", ion_saturation_current_A))
+    temperature = _positive("electron_temperature_eV", electron_temperature_eV)
+    area = _positive("probe_area_m2", probe_area_m2)
+    mass = _positive("ion_mass_kg", ion_mass_kg)
+    coefficient = _positive("sheath_coefficient", sheath_coefficient)
+    density = current / (
+        coefficient * E_CHARGE * area * math.sqrt(E_CHARGE * temperature / mass)
+    )
+    out = {"ion_density_m3": density}
+    sigmas = (
+        sigma_ion_saturation_current_A, sigma_electron_temperature_eV,
+        sigma_probe_area_m2, sigma_ion_mass_kg, sigma_sheath_coefficient,
+    )
+    if any(value is not None for value in sigmas) and not all(value is not None for value in sigmas):
+        raise ValueError("Provide all five independent input uncertainties, or none.")
+    if sigma_ion_saturation_current_A is not None:
+        si, sT, sA, sm, sC = [
+            _nonnegative(name, value) for name, value in zip(
+                ("sigma_ion_saturation_current_A", "sigma_electron_temperature_eV",
+                 "sigma_probe_area_m2", "sigma_ion_mass_kg",
+                 "sigma_sheath_coefficient"), sigmas
+            )
+        ]
+        relative = math.sqrt(
+            (si / current)**2 + (sT / (2.0 * temperature))**2
+            + (sA / area)**2 + (sm / (2.0 * mass))**2
+            + (sC / coefficient)**2
+        )
+        out["uncertainty_ion_density_m3"] = density * relative
+    return out
+
