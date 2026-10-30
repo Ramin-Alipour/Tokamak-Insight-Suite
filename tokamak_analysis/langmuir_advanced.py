@@ -417,13 +417,17 @@ def estimate_smoothed_plasma_potential_candidates(
     smooth_i = savgol_filter(i, window_length=window_length, polyorder=polynomial_order, mode="interp")
     smooth_didv = np.gradient(smooth_i, v)
     smooth_d2 = np.gradient(smooth_didv, v)
+    from tis.probe_analysis import _zero_crossing_candidates
     return {
         "current_convention_input": current_convention,
         "current_convention_normalized": "electron_positive",
         "raw_max_dIdV_candidate_V": float(v[int(np.argmax(raw_didv))]),
-        "raw_max_d2IdV2_candidate_V": float(v[int(np.argmax(raw_d2))]),
+        "raw_max_d2IdV2_extremum_V": float(v[int(np.argmax(raw_d2))]),
+        "raw_d2IdV2_zero_crossing_candidates_V": _zero_crossing_candidates(v, raw_d2),
         "smoothed_max_dIdV_candidate_V": float(v[int(np.argmax(smooth_didv))]),
-        "smoothed_max_d2IdV2_candidate_V": float(v[int(np.argmax(smooth_d2))]),
+        "smoothed_max_d2IdV2_extremum_V": float(v[int(np.argmax(smooth_d2))]),
+        "smoothed_d2IdV2_zero_crossing_candidates_V": _zero_crossing_candidates(v, smooth_d2),
+        "second_derivative_inflection_method": "zero_crossings_of_d2IdV2; maxima_are_reported_as_separate_extrema",
         "smoothing_method": "Savitzky-Golay",
         "window_length_samples": window_length,
         "polynomial_order": polynomial_order,
