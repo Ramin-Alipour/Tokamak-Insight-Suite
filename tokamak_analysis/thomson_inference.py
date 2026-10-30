@@ -277,6 +277,10 @@ def analyze_thomson_spectra(
             ion_t = np.atleast_1d(ion_temperature_eV)
             ion_v = _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
             electron_v = _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
+            if ion_v.shape == (3,) and len(ion_species) == 1:
+                ion_v = ion_v.reshape(1,3)
+            if electron_v.shape == (3,):
+                electron_v = electron_v.reshape(1,3)
             if electron_v.shape != (1, 3):
                 raise ValueError("electron_velocity_m_s must be a 3-vector")
             if ion_v.shape != (len(ion_species), 3):
