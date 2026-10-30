@@ -575,6 +575,8 @@ def analyze_thomson_spectra(
     if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
+    if density_relative_covariance is not None and joint_spectral_covariance is not None:
+        raise ValueError("density_relative_covariance already contains the scattered-power uncertainty; do not combine it with joint_spectral_covariance. Use scalar optical-factor uncertainties with joint GLS, or use density_relative_covariance without joint GLS.")
     if joint_density_relative_covariance is not None:
         if model == "collective_maxwellian":
             raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective mode returns cross-channel density covariance from its external-parameter Monte Carlo.")
