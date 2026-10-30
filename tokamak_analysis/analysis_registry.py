@@ -67,6 +67,12 @@ ANALYSES = [{
                     "required": False
                 },
                 {
+                    "name": "ion_fractions",
+                    "unit": "dimensionless",
+                    "description": "Explicit ion number fractions; required for multiple ion species and must sum to one.",
+                    "required": False
+                },
+                {
                     "name": "ion_temperature_eV",
                     "unit": "eV",
                     "description": "Independently supplied ion temperature(s); required for the current collective Maxwellian backend.",
@@ -87,7 +93,7 @@ ANALYSES = [{
                 {
                     "name": "absolute_density_geometry",
                     "unit": "structured",
-                    "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density.",
+                    "description": "Laser power, interaction length, collection solid angle, optical efficiency, incident beam direction, incident polarization and scattered direction; required with W/nm spectra for absolute non-collective density.",
                     "required": False
                 },
                 {
