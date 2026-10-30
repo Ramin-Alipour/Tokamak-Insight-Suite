@@ -142,6 +142,17 @@ def _fit_identifiability(covariance, residual, uncertainty, parameter_count):
     }
 
 
+def _channel_covariance(value, channel, n_channels, name):
+    if value is None:
+        return None
+    raw = np.asarray(value, dtype=float)
+    if raw.shape == (6, 6):
+        return raw
+    if raw.shape == (n_channels, 6, 6):
+        return raw[channel]
+    raise ValueError(f"{name} must be a shared 6x6 covariance matrix or one 6x6 matrix per channel")
+
+
 def _channel_value(value, channel, n_channels, name, *, vector_length=None):
     """Accept a scalar shared by channels or a channel-specific value."""
     if value is None:
@@ -665,7 +676,8 @@ def analyze_thomson_spectra(
                 "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
                 "incident_direction_vector": _channel_value(incident_direction, i, y.shape[0], "incident_direction", vector_length=3),
                 "scattered_direction_vector": _channel_value(scattered_direction, i, y.shape[0], "scattered_direction", vector_length=3),
-                "polarization_factor_uncertainty": polarization_factor_uncertainty,
+                "polarization_factor_uncertainty": _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty"),
+                "relative_input_covariance": _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance"),
             }
             density_result = density_from_thomson_scattered_power(**density_inputs)
             fit["electron_density_m3"] = density_result["electron_density_m3"]
