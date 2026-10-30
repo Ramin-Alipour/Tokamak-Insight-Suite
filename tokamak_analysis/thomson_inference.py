@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import curve_fit
+from scipy.special import gammaln
 
 from .thomson_scattering import density_from_thomson_scattered_power
 
@@ -16,9 +17,12 @@ R_E_M = 2.8179403262e-15
 
 
 def _finite_array(value, name, ndim=None):
-    a = np.asarray(value, dtype=float)
-    if ndim is not None and a.ndim != ndim:
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans, strings or complex values")
+    if ndim is not None and raw.ndim != ndim:
         raise ValueError(f"{name} must be {ndim}-dimensional")
+    a = raw.astype(float, copy=False)
     if a.size == 0 or not np.all(np.isfinite(a)):
         raise ValueError(f"{name} must contain finite numeric values")
     return a
@@ -103,18 +107,12 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     residual = signal-observed(wavelength, *p)
     fit_cov = np.asarray(cov, dtype=float)
     te_unc = float(te*2*np.sqrt(max(fit_cov[2,2], 0.0))/sigma)
-    def area_from_params(values):
-        a, cen, sig, off, sl = values
-        component = response @ (a*np.exp(-0.5*((wavelength-cen)/sig)**2))
-        return float(np.trapz(component, wavelength))
-    area = area_from_params(p)
-    area_gradient = np.zeros(len(p))
-    for j in range(len(p)):
-        step = np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
-        plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
-        plus[j]+=step; minus[j]-=step
-        area_gradient[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
-    area_unc=float(np.sqrt(max(float(area_gradient@fit_cov@area_gradient),0.0)))
+    # A normalized instrument-response operator redistributes power without
+    # changing the full-domain integral of the fitted intrinsic Gaussian.
+    area = float(amp * sigma * np.sqrt(2.0*np.pi))
+    area_gradient = np.array([sigma*np.sqrt(2.0*np.pi), 0.0,
+                              amp*np.sqrt(2.0*np.pi), 0.0, 0.0])
+    area_unc = float(np.sqrt(max(float(area_gradient @ fit_cov @ area_gradient), 0.0)))
     return {
         "electron_temperature_eV": float(te),
         "electron_temperature_uncertainty_eV": te_unc,
@@ -145,7 +143,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     edge = max(2, wavelength.size // 10)
     baseline = float(np.median(np.r_[signal_scaled[:edge], signal_scaled[-edge:]]))
     peak = int(np.argmax(signal_scaled))
-    amp0 = max(float(signal[peak] - baseline), np.finfo(float).eps)
+    amp0 = max(float(signal_scaled[peak] - baseline), np.finfo(float).eps)
     p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), 3.0, baseline, 0.0]
     lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51, -np.inf, -np.inf]
     upper = [np.inf, wavelength[-1], span, 100.0, np.inf, np.inf]
@@ -173,12 +171,12 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         a, cen, sig, kap, off, sl = values
         df_local=2.0*kap-1.0
         scale_local=sig*np.sqrt((df_local-2.0)/df_local)
-        component=a*(1.0+((wavelength-cen)/scale_local)**2/df_local)**(-kap)
-        return float(np.trapz(response @ component,wavelength))
+        return float(a*scale_local*np.sqrt(df_local*np.pi)
+                     * np.exp(gammaln(kap-0.5)-gammaln(kap)))
     area=area_from_params(p)
     area_gradient=np.zeros(len(p))
     for j in range(len(p)):
-        step=np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
+        step=np.cbrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
         plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
         plus[j]+=step; minus[j]-=step
         area_gradient[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
@@ -250,11 +248,16 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
     def area_from_params(values):
         a,cen,temp,off,sl=values
-        return float(np.trapz(response@component(wavelength,a,cen,temp,0.0,0.0),wavelength))
+        theta_local=max(float(temp)/ELECTRON_REST_ENERGY_EV,1e-12)
+        beta_grid=np.linspace(-1.0+1e-9,1.0-1e-9,20001)
+        gamma_grid=1.0/np.sqrt(1.0-beta_grid**2)
+        marginal_grid=np.exp(-(gamma_grid-1.0)/theta_local)*(
+            gamma_grid**2+2.0*theta_local*gamma_grid+2.0*theta_local**2)
+        return float(a*np.trapz(marginal_grid,beta_grid))
     area=area_from_params(p)
     grad=np.zeros(len(p))
     for j in range(len(p)):
-        step=np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
+        step=np.cbrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
         plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
         plus[j]+=step; minus[j]-=step
         grad[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
@@ -330,8 +333,8 @@ def analyze_thomson_spectra(
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if model == "collective_maxwellian":
-        if not ion_species:
-            raise ValueError("Collective Thomson inference requires at least one explicitly specified ion species")
+        if not ion_species or isinstance(ion_species, (str, bytes)):
+            raise ValueError("Collective Thomson inference requires an explicit non-empty ion-species list")
         if ion_velocity_m_s is None or electron_velocity_m_s is None:
             raise ValueError("Collective inference requires measured ion/electron flow vectors or explicit zero vectors to declare a stationary-flow assumption")
         if ion_temperature_eV is None:
@@ -389,9 +392,21 @@ def analyze_thomson_spectra(
                 raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
             if np.any(np.linalg.norm(ion_v,axis=1) >= C_M_S) or np.linalg.norm(electron_v[0]) >= C_M_S:
                 raise ValueError("Collective ion/electron flow speeds must be subluminal")
-            probe_vec = np.array([1.0, 0.0, 0.0])
-            theta = float(scattering_angle_rad)
-            scatter_vec = np.array([np.cos(theta), np.sin(theta), 0.0])
+            if incident_direction is None or scattered_direction is None:
+                raise ValueError("Collective Thomson inference requires explicit incident_direction and scattered_direction 3-vectors in the same coordinate frame as the supplied flow vectors")
+            probe_vec = _finite_array(incident_direction, "incident_direction", 1)
+            scatter_vec = _finite_array(scattered_direction, "scattered_direction", 1)
+            if probe_vec.shape != (3,) or scatter_vec.shape != (3,):
+                raise ValueError("incident_direction and scattered_direction must each be 3-vectors")
+            probe_norm = float(np.linalg.norm(probe_vec))
+            scatter_norm = float(np.linalg.norm(scatter_vec))
+            if probe_norm <= 0 or scatter_norm <= 0:
+                raise ValueError("incident_direction and scattered_direction must be non-zero")
+            probe_vec = probe_vec / probe_norm
+            scatter_vec = scatter_vec / scatter_norm
+            geometry_angle = float(np.arccos(np.clip(np.dot(probe_vec, scatter_vec), -1.0, 1.0)))
+            if not np.isclose(geometry_angle, float(scattering_angle_rad), rtol=0.0, atol=1e-5):
+                raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
             # Fit ne and Te against the full PlasmaPy spectrum. Absolute signal
             # scaling is a nuisance amplitude; density is identifiable from
             # the collective spectral shape when the spectrum resolves it.
@@ -423,11 +438,20 @@ def analyze_thomson_spectra(
                 coefficients=fit_nuisance(shape)
                 model_signal=coefficients[0]*shape+coefficients[1]+coefficients[2]*(xi-float(laser_wavelength_nm))
                 return (model_signal-y[i])/residual_scale
-            fitopt = least_squares(objective, [1e18, 100.0], bounds=([1e12, 0.01],[1e25, 1e7]), max_nfev=5000)
-            ne_fit, te_fit = map(float, fitopt.x)
+            fitopt = least_squares(
+                lambda log_params: objective(10.0**log_params),
+                np.log10([1e18, 100.0]),
+                bounds=(np.log10([1e12, 0.01]), np.log10([1e25, 1e7])),
+                x_scale="jac", max_nfev=5000,
+            )
+            ne_fit, te_fit = map(float, 10.0**fitopt.x)
             dof = max(1, y[i].size-fitopt.x.size)
             try:
-                parameter_covariance = np.linalg.pinv(fitopt.jac.T @ fitopt.jac) * (2.0*fitopt.cost/dof)
+                covariance_log = np.linalg.pinv(fitopt.jac.T @ fitopt.jac)
+                if ui is None:
+                    covariance_log *= (2.0*fitopt.cost/dof)
+                transform = np.diag(np.log(10.0)*np.array([ne_fit, te_fit]))
+                parameter_covariance = transform @ covariance_log @ transform.T
                 parameter_uncertainties = np.sqrt(np.maximum(np.diag(parameter_covariance),0.0))
             except np.linalg.LinAlgError:
                 parameter_covariance = None
