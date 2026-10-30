@@ -169,6 +169,73 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
                            "non-relativistic velocities","finite-variance kappa index > 1.5",
                            "known scattering geometry"]}
 
+
+def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, response, uncertainty):
+    """Fit a 1-D projected Maxwell-Juttner VDF with relativistic Doppler mapping.
+
+    This is a projected-velocity approximation: it retains the relativistic
+    Maxwell-Juttner marginal and relativistic Doppler kinematics along q, but
+    does not integrate the full 3-D incident/scattered photon geometry.
+    """
+    spacing=float(np.median(np.diff(wavelength)))
+    span=float(wavelength[-1]-wavelength[0])
+    edge=max(2,wavelength.size//10)
+    baseline=float(np.median(np.r_[signal[:edge],signal[-edge:]]))
+    peak=int(np.argmax(signal))
+    amp0=max(float(signal[peak]-baseline),np.finfo(float).eps)
+    p0=[amp0,float(wavelength[peak]),100.0,baseline,0.0]
+    lower=[0.0,wavelength[0],1e-4,-np.inf,-np.inf]
+    upper=[np.inf,wavelength[-1],1e7,np.inf,np.inf]
+    sine=float(np.sin(angle/2.0))
+    def component(x, amp, center, temperature, offset=0.0, slope=0.0):
+        ratio=x/center
+        beta=(ratio-1.0)/(sine*(ratio+1.0))
+        valid=np.abs(beta)<1.0
+        profile=np.zeros_like(x,dtype=float)
+        if np.any(valid):
+            b=beta[valid]
+            gamma=1.0/np.sqrt(1.0-b*b)
+            theta=max(float(temperature)/ELECTRON_REST_ENERGY_EV,1e-12)
+            # The common exp(-1/theta) normalization cancels with free amplitude.
+            marginal=np.exp(-(gamma-1.0)/theta)*(gamma*gamma+2.0*theta*gamma+2.0*theta*theta)
+            jacobian=2.0/(sine*center*(ratio[valid]+1.0)**2)
+            profile[valid]=amp*marginal*jacobian
+        return profile+offset+slope*(x-center)
+    def observed(x,amp,center,temperature,offset,slope):
+        physical=component(x,amp,center,temperature,0.0,0.0)
+        return response@physical+offset+slope*(x-center)
+    p,cov=curve_fit(observed,wavelength,signal,p0=p0,bounds=(lower,upper),
+                    sigma=uncertainty,absolute_sigma=uncertainty is not None,maxfev=100000)
+    amp,center,temperature,offset,slope=map(float,p)
+    residual=signal-observed(wavelength,*p)
+    dof=max(1,wavelength.size-len(p))
+    q_projection=2.0*sine
+    velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
+    def area_from_params(values):
+        a,cen,temp,off,sl=values
+        return float(np.trapz(response@component(wavelength,a,cen,temp,0.0,0.0),wavelength))
+    area=area_from_params(p)
+    grad=np.zeros(len(p))
+    for j in range(len(p)):
+        step=np.sqrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
+        plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
+        plus[j]+=step; minus[j]-=step
+        grad[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
+    area_unc=float(np.sqrt(max(float(grad@cov@grad),0.0)))
+    return {"electron_temperature_eV":temperature,
+            "electron_temperature_uncertainty_eV":float(np.sqrt(max(cov[2,2],0.0))),
+            "electron_velocity_projection_m_s":float(velocity),
+            "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
+            "fitted_center_nm":center,"amplitude":amp,"background_intercept":offset,
+            "background_slope_per_nm":slope,"fit_covariance":np.asarray(cov,dtype=float),
+            "residual":residual,"reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
+            "fitted_spectrum":observed(wavelength,*p),
+            "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
+            "model":"projected relativistic Maxwell-Juttner electron VDF with relativistic Doppler mapping",
+            "assumptions":["non-collective scattering","isotropic Maxwell-Juttner electron distribution",
+                           "relativistic 1-D projected-velocity approximation along the scattering wavevector",
+                           "full 3-D relativistic photon-geometry integration is not included"]}
+
 def _density_from_power(power_w, laser_power_w, interaction_length_m, collection_solid_angle_sr,
                         optical_efficiency, scattering_angle_rad, incident_polarization,
                         scattered_direction):
@@ -234,8 +301,8 @@ def analyze_thomson_spectra(
     if (not np.isfinite(laser_wavelength_uncertainty_nm) or laser_wavelength_uncertainty_nm < 0
             or not np.isfinite(scattering_angle_uncertainty_rad) or scattering_angle_uncertainty_rad < 0):
         raise ValueError("laser-wavelength and scattering-angle uncertainties must be finite and non-negative")
-    if model not in {"non_collective_maxwellian", "non_collective_kappa", "collective_maxwellian"}:
-        raise ValueError("model must be non_collective_maxwellian, non_collective_kappa or collective_maxwellian")
+    if model not in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner", "collective_maxwellian"}:
+        raise ValueError("model must be non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if model == "collective_maxwellian":
@@ -270,6 +337,8 @@ def analyze_thomson_spectra(
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
+        elif model == "relativistic_maxwell_juttner":
+            fit = _fit_relativistic_maxwell_juttner(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         else:
             # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
             # collective and non-collective regimes from the same dielectric
@@ -364,7 +433,7 @@ def analyze_thomson_spectra(
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
         fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
-        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa"}:
+        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples = [], []
@@ -375,7 +444,7 @@ def analyze_thomson_spectra(
                     continue
                 sampled /= colsum[None, :]
                 try:
-                    fitter = _fit_kappa if model == "non_collective_kappa" else _fit_noncollective
+                    fitter = (_fit_kappa if model == "non_collective_kappa" else (_fit_relativistic_maxwell_juttner if model == "relativistic_maxwell_juttner" else _fit_noncollective))
                     draw = fitter(xi, y[i], float(laser_wavelength_nm),
                                   float(scattering_angle_rad), sampled, ui)
                     te_samples.append(draw["electron_temperature_eV"])
@@ -393,7 +462,7 @@ def analyze_thomson_spectra(
                 fit["instrument_response_uncertainty_propagated"] = False
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
-        if model in {"non_collective_maxwellian", "non_collective_kappa"}:
+        if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
             te = fit["electron_temperature_eV"]
             te_rel_var = (2.0*float(laser_wavelength_uncertainty_nm)/float(laser_wavelength_nm))**2
             te_rel_var += (np.cos(float(scattering_angle_rad)/2.0)/np.sin(float(scattering_angle_rad)/2.0)
@@ -420,7 +489,7 @@ def analyze_thomson_spectra(
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
-            "Non-collective Maxwellian and kappa models are non-relativistic; relativistic kinetic corrections are not implemented.",
+            "The relativistic Maxwell-Juttner option uses a 1-D projected-velocity approximation; full 3-D relativistic photon-geometry integration is not implemented.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
             "For non-collective fits, supplied instrument-response uncertainty is propagated by Monte Carlo perturbation of the LSF matrix; uncertainty in the optical power/geometry inputs must be supplied separately in future extensions.",
