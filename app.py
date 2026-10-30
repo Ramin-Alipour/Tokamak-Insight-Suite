@@ -2751,9 +2751,9 @@ elif page=='Advanced Analysis':
             uncertainty_options=['(none)']+numeric
             signal_unc_col=st.selectbox('Optional spectral 1-sigma uncertainty',uncertainty_options,key='tis_ts_unc')
             laser_nm=st.number_input('Incident laser wavelength (nm)',min_value=1e-9,value=532.0,key='tis_ts_laser')
-            laser_nm_unc=st.number_input('Laser-wavelength 1-sigma uncertainty (nm)',min_value=0.0,value=0.0,key='tis_ts_laser_unc')
+            laser_nm_unc=st.text_input('Laser-wavelength 1-sigma uncertainty (nm; blank if unavailable)',value='',key='tis_ts_laser_unc')
             angle_deg=st.number_input('Scattering angle (degrees)',min_value=0.001,max_value=180.0,value=90.0,key='tis_ts_angle')
-            angle_deg_unc=st.number_input('Scattering-angle 1-sigma uncertainty (degrees)',min_value=0.0,value=0.0,key='tis_ts_angle_unc')
+            angle_deg_unc=st.text_input('Scattering-angle 1-sigma uncertainty (degrees; blank if unavailable)',value='',key='tis_ts_angle_unc')
             model_label=st.selectbox('Physical model',['Non-collective Maxwellian','Non-collective kappa (non-Maxwellian)','Relativistic Maxwell-Juttner (projected)','Collective Maxwellian (PlasmaPy)'],key='tis_ts_model')
             response_file=st.file_uploader('Instrument line-spread response kernel or matrix (CSV; required)',type=['csv'],key='tis_ts_lsf')
             response_unc_file=st.file_uploader('Instrument-response 1-sigma matrix (CSV; optional)',type=['csv'],key='tis_ts_lsf_unc')
@@ -2770,17 +2770,17 @@ elif page=='Advanced Analysis':
             with st.expander('Optional absolute-density inference (requires spectral intensity in W/nm)'):
                 power_calibrated=st.checkbox('Spectral intensity is calibrated in W/nm',value=False,key='tis_ts_power_cal')
                 laser_power=st.number_input('Incident laser power at scattering volume (W)',min_value=0.0,value=0.0,key='tis_ts_power')
-                laser_power_unc=st.number_input('Laser-power 1-sigma uncertainty (W)',min_value=0.0,value=0.0,key='tis_ts_power_unc')
+                laser_power_unc=st.text_input('Laser-power 1-sigma uncertainty (W; blank if unavailable)',value='',key='tis_ts_power_unc')
                 interaction_length=st.number_input('Interaction length (m)',min_value=0.0,value=0.0,key='tis_ts_length')
-                interaction_length_unc=st.number_input('Interaction-length 1-sigma uncertainty (m)',min_value=0.0,value=0.0,key='tis_ts_length_unc')
+                interaction_length_unc=st.text_input('Interaction-length 1-sigma uncertainty (m; blank if unavailable)',value='',key='tis_ts_length_unc')
                 solid_angle=st.number_input('Collection solid angle (sr)',min_value=0.0,value=0.0,key='tis_ts_solid')
-                solid_angle_unc=st.number_input('Solid-angle 1-sigma uncertainty (sr)',min_value=0.0,value=0.0,key='tis_ts_solid_unc')
+                solid_angle_unc=st.text_input('Solid-angle 1-sigma uncertainty (sr; blank if unavailable)',value='',key='tis_ts_solid_unc')
                 efficiency=st.number_input('Optical efficiency (0–1)',min_value=0.0,max_value=1.0,value=0.0,key='tis_ts_eff')
-                efficiency_unc=st.number_input('Optical-efficiency 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_eff_unc')
+                efficiency_unc=st.text_input('Optical-efficiency 1-sigma uncertainty (blank if unavailable)',value='',key='tis_ts_eff_unc')
                 incident_direction_text=st.text_input('Incident laser propagation unit vector (x,y,z)',value='1,0,0',key='tis_ts_inc_dir')
                 polarization_text=st.text_input('Incident polarization unit vector (x,y,z)',value='0,0,1',key='tis_ts_pol')
                 direction_text=st.text_input('Scattered-light unit direction (x,y,z)',value='0,1,0',key='tis_ts_dir')
-                polarization_unc=st.number_input('Polarization-factor 1-sigma uncertainty',min_value=0.0,value=0.0,key='tis_ts_pol_unc')
+                polarization_unc=st.text_input('Polarization-factor 1-sigma uncertainty (blank if unavailable)',value='',key='tis_ts_pol_unc')
             if st.button('Run multi-channel Thomson spectral inference',type='primary',key='run_thomson_spectral_inference'):
                 try:
                     selected=[channel_col,radius_col,wavelength_col,signal_col]
@@ -2840,18 +2840,18 @@ elif page=='Advanced Analysis':
                         if incident_direction.size!=3 or pol.size!=3 or direction.size!=3:
                             raise ValueError('Polarization and scattered direction must each have three components.')
                         kwargs.update(spectral_power_density_calibrated=True,laser_power_w=laser_power,
-                            laser_power_uncertainty_W=laser_power_unc,interaction_length_m=interaction_length,
-                            interaction_length_uncertainty_m=interaction_length_unc,
+                            laser_power_uncertainty_W=(float(laser_power_unc) if laser_power_unc.strip() else None),interaction_length_m=interaction_length,
+                            interaction_length_uncertainty_m=(float(interaction_length_unc) if interaction_length_unc.strip() else None),
                             collection_solid_angle_sr=solid_angle,
-                            collection_solid_angle_uncertainty_sr=solid_angle_unc,
-                            optical_efficiency=efficiency,optical_efficiency_uncertainty=efficiency_unc,
+                            collection_solid_angle_uncertainty_sr=(float(solid_angle_unc) if solid_angle_unc.strip() else None),
+                            optical_efficiency=efficiency,optical_efficiency_uncertainty=(float(efficiency_unc) if efficiency_unc.strip() else None),
                             incident_polarization=pol,incident_direction=incident_direction,scattered_direction=direction,
-                            polarization_factor_uncertainty=polarization_unc)
+                            polarization_factor_uncertainty=(float(polarization_unc) if polarization_unc.strip() else None))
                     result=analyze_thomson_spectra(
                         np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
                         laser_wavelength_nm=float(laser_nm),scattering_angle_rad=float(np.deg2rad(angle_deg)),
-                        laser_wavelength_uncertainty_nm=float(laser_nm_unc),
-                        scattering_angle_uncertainty_rad=float(np.deg2rad(angle_deg_unc)),
+                        laser_wavelength_uncertainty_nm=(float(laser_nm_unc) if laser_nm_unc.strip() else None),
+                        scattering_angle_uncertainty_rad=(float(np.deg2rad(float(angle_deg_unc))) if angle_deg_unc.strip() else None),
                         instrument_response=response,instrument_response_uncertainty=response_unc,
                         signal_uncertainty=None if not uncertainties else np.asarray(uncertainties),
                         model=('collective_maxwellian' if model_label.startswith('Collective') else ('non_collective_kappa' if model_label.startswith('Non-collective kappa') else ('relativistic_maxwell_juttner' if model_label.startswith('Relativistic') else 'non_collective_maxwellian'))),
