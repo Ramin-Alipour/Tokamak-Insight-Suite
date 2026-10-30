@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased — 2026-10-30
+
+### Thomson Scattering / Analysis 1
+- Added full-covariance joint generalized least-squares inference for non-collective Maxwellian and Kappa spectra, including cross-channel physical-parameter covariance.
+- Added residual-based model-discrepancy covariance diagnostics and stricter joint-fit acceptance / physical-validity checks.
+- Added Monte Carlo refitting for supplied Collective ion-temperature, ion/electron-flow, laser-wavelength and instrument-response uncertainties.
+- Routed Advanced Analysis to the canonical Thomson inference interface and converted the legacy single-channel Gaussian API into a compatibility adapter.
+- Added explicit physical-parameter mapper contracts for custom spectral models.
+- Extended the Thomson dashboard to accept channel-major spectral covariance and Collective external-parameter uncertainty inputs.
+
+### Microwave Collective Thomson Scattering
+- Added covariance-aware CTS residual whitening, response/external-parameter Monte Carlo propagation and separate model-discrepancy covariance reporting.
+- Added differential-evolution, adaptive real-coded genetic and regularized inversion modes. The genetic implementation is informed by Zhang et al. (2024), not an exact reproduction of the paper-specific fitness function.
+- Added tabulated 1-D fast-ion susceptibility and regularized non-negative tabulated VDF inversion with softmax parameterization, second-difference regularization and propagated VDF-node covariance.
+- Added a dedicated microwave CTS dashboard workflow and scientific-scope documentation. The implementation remains an unmagnetized electrostatic longitudinal model, not a full magnetized electromagnetic CTS simulator.
+
+### Tests and scientific traceability
+- Added synthetic tests for joint channel covariance, Kappa joint inference, Collective external uncertainty, CTS genetic/regularized inversion, tabulated fast-ion VDFs, response uncertainty and custom-model physical contracts.
+- Expanded FORMULA_REGISTRY.json and DIAGNOSTIC_REGISTRY.json with explicit equations, units, uncertainty models, assumptions, limitations and scientific references.
+- No independent experimental validation is claimed; all new regression coverage is mathematical/software testing with controlled synthetic data.
+
 ## 0.5.0 — 2026-10-15
 
 ### Bugs fixed
