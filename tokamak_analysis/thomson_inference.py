@@ -288,8 +288,8 @@ def analyze_thomson_spectra(
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
     Spectra have shape (channel, wavelength); wavelength may be shared (1-D) or
-    channel-specific (2-D). A response matrix maps true spectral bins to detector
-    bins; its columns are normalized internally. Absolute density is emitted only
+    channel-specific (2-D). A measured response callable, kernel or matrix maps true
+    spectral bins to detector bins; matrix columns are normalized internally. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
     y = _finite_array(spectra, "spectra", 2)
@@ -563,6 +563,6 @@ def analyze_thomson_spectra(
             "The relativistic Maxwell-Juttner option uses a 1-D projected-velocity approximation; full 3-D relativistic photon-geometry integration is not implemented.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
             "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
-            "For non-collective fits, supplied instrument-response uncertainty is propagated by Monte Carlo perturbation of the LSF matrix; uncertainty in the optical power/geometry inputs must be supplied separately in future extensions.",
+            "For non-collective fits, supplied LSF uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied independent optical-factor uncertainties, with correlations and model discrepancy excluded.",
         ],
     }
