@@ -9,7 +9,7 @@ import streamlit as st
 from tis import __version__
 from tis.ui.catalog_page import render_catalog_page
 from tis.ui.project_page import render_project_page
-from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
+from tokamak_analysis.analysis_registry import ANALYSES, ANALYSIS_FAMILIES, resolve_analysis
 from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, fit_custom_molecular_model, fit_molecular_boltzmann_temperature
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectrum
@@ -3411,9 +3411,23 @@ elif page=='Advanced Analysis':
                 except Exception as exc:
                     st.error(f'Poloidal-flux reconstruction failed: {exc}')
     elif workflow=='Registered analysis modules':
-        selected_id=st.selectbox('Analysis',options=[x['id'] for x in ANALYSES],format_func=lambda i: f"{i}. {next(x['name'] for x in ANALYSES if x['id']==i)}")
-        entry=next(x for x in ANALYSES if x['id']==selected_id)
-        st.caption(f"Selected analysis: {entry['name']}")
+        selected_family_id=st.selectbox(
+            'Primary analysis (20)',
+            options=[item['id'] for item in ANALYSIS_FAMILIES],
+            format_func=lambda i: f"{i}. {next(item['name'] for item in ANALYSIS_FAMILIES if item['id']==i)}",
+            key='tis_primary_analysis_family',
+        )
+        selected_family=next(item for item in ANALYSIS_FAMILIES if item['id']==selected_family_id)
+        family_entries=[item for item in ANALYSES if item['id'] in selected_family['entry_ids']]
+        st.caption(selected_family['description'])
+        selected_id=st.selectbox(
+            'Subanalysis / workflow',
+            options=[item['id'] for item in family_entries],
+            format_func=lambda i: f"{i}. {next(item['name'] for item in family_entries if item['id']==i)}",
+            key='tis_primary_analysis_subanalysis',
+        )
+        entry=next(x for x in family_entries if x['id']==selected_id)
+        st.caption(f"Primary analysis: {selected_family['name']} · Subanalysis: {entry['name']}")
         fn=resolve_analysis(selected_id)
         import inspect
         st.caption(f"Callable: tokamak_analysis.{entry['module']}.{entry['function']}")
