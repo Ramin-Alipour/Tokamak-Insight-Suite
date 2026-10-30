@@ -68,3 +68,20 @@ def test_registry_loader_falls_back_to_packaged_data_when_root_copy_is_absent(tm
         assert rows[0]["diagnostic"] == "Thomson scattering"
     finally:
         contracts.clear_registry_cache()
+
+
+def test_root_and_packaged_diagnostic_and_formula_registries_are_synchronized():
+    root = Path(__file__).resolve().parents[1]
+    assert (root / "DIAGNOSTIC_REGISTRY.json").read_bytes() == (
+        root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json"
+    ).read_bytes()
+    assert (root / "FORMULA_REGISTRY.json").read_bytes() == (
+        root / "tis" / "data" / "FORMULA_REGISTRY.json"
+    ).read_bytes()
+
+
+def test_collective_thomson_contract_declares_calibrated_measurements():
+    contract = get_diagnostic_contract("Collective Thomson / coherent scattering (CTS)")
+    assert contract.supports_calibrated_measurements
+    assert not contract.supports_raw_data
+    assert "electron_velocity_projection_m_s" in {spec.name for spec in contract.input_specs}
