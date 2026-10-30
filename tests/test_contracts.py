@@ -29,6 +29,8 @@ def test_thomson_contract_is_limited_to_calibrated_profiles():
     assert contract.completeness == "complete_with_declared_scope"
     assert not contract.raw_data_to_physics
     assert not contract.supports_raw_data
+    assert contract.calibrated_measurements_to_physics
+    assert contract.supports_calibrated_measurements
 
 
 def test_input_validation_checks_required_names_unknown_names_and_bounds():
