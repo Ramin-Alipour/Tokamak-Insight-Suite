@@ -612,3 +612,56 @@ def test_thomson_fit_reports_separate_model_discrepancy_covariance():
     assert "model_discrepancy_covariance" in channel
     assert channel["model_discrepancy_scale"] >= 0
     assert channel["total_fit_covariance_including_discrepancy"].shape==(5,5)
+
+
+def test_joint_spectral_covariance_is_mutually_exclusive_with_pointwise_uncertainty():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="not both"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            signal_uncertainty=np.ones((1, x.size)),
+            joint_spectral_covariance=np.eye(x.size),
+        )
+
+
+def test_density_relative_covariance_does_not_conflict_with_area_uncertainty():
+    x, y, _ = _spectral_case(100.0)
+    out = analyze_thomson_spectra(
+        x, (y * 1e-18)[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+        density_relative_covariance=np.zeros((6, 6)),
+    )
+    assert out["channels"][0]["electron_density_m3"] > 0.0
+    assert out["channels"][0]["electron_density_uncertainty_m3"] == pytest.approx(0.0)
+
+
+def test_joint_gls_recomputes_absolute_density_from_joint_integrated_power():
+    x, y1, _ = _spectral_case(100.0)
+    _, y2, _ = _spectral_case(150.0)
+    spectra = np.vstack([y1, y2]) * 1e-18
+    n = spectra.size
+    out = analyze_thomson_spectra(
+        x, spectra, [0.1, 0.2], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=np.eye(n) * (1e-18)**2,
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+    )
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+    for channel in out["channels"]:
+        expected = density_from_thomson_scattered_power(
+            channel["integrated_scattered_power_W"], 2.0, 0.1, np.pi / 2,
+            1e-3, optical_efficiency=0.5,
+            incident_polarization_vector=[0, 0, 1],
+            incident_direction_vector=[1, 0, 0],
+            scattered_direction_vector=[0, 1, 0],
+            scattered_power_uncertainty_W=channel["integrated_scattered_power_uncertainty_W"],
+        )
+        assert channel["electron_density_m3"] == pytest.approx(expected["electron_density_m3"], rel=1e-10)
