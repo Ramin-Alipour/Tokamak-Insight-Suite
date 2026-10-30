@@ -17,41 +17,39 @@ def test_all_registered_analyses_resolve_to_callables():
         assert callable(resolve_analysis(entry["id"])), entry
 
 
-def test_thomson_entry_declares_real_inputs_outputs_and_scope():
+def test_thomson_entry_declares_only_calibrated_profile_workflows():
     entry = ANALYSES[0]
     assert entry["name"] == "Thomson scattering"
     contract = entry["execution_contract"]
-    assert "electron distribution constraints" not in contract["algorithm"].lower()
     output_names = {item["name"] for item in contract["output_specs"]}
     assert {
         "density_normalized_gradient_m-1",
         "temperature_normalized_gradient_m-1",
+        "reconstructed_density_m3",
+        "reconstructed_temperature_eV",
     } <= output_names
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is True
+    assert contract["raw_data_to_physics"] is False
     inputs = {item["name"]: item for item in contract["input_specs"]}
-    assert {"radius_m", "density_m3", "temperature_ev"} <= set(inputs)
+    assert {
+        "radius_m", "density_m3", "temperature_ev",
+        "density_uncertainty_m3", "temperature_uncertainty_ev",
+        "reconstruction_method", "smoothing_factor", "reconstruction_points",
+    } == set(inputs)
     assert inputs["radius_m"]["unit"] == "m"
     assert inputs["density_m3"]["unit"] == "m^-3"
     assert inputs["temperature_ev"]["unit"] == "eV"
     assert "major_radius_m" not in inputs
     assert "geometry-weighted volume averages" in " ".join(contract["limitations"]).lower()
-    outputs = {item["name"]: item for item in contract["output_specs"]}
-    assert {
-        "density_m3", "temperature_eV", "density_gradient_m-4",
-        "temperature_gradient_eV_m-1", "density_normalized_gradient_m-1",
-        "temperature_normalized_gradient_m-1", "density_scale_length_m",
-        "temperature_scale_length_m", "summary",
-    } <= set(outputs)
-    assert "radius_m" not in outputs or outputs["radius_m"]["unit"] == "m"
-    assert any("Gaussian" in item for item in contract["limitations"])
-    assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" in contract["function_links"]
+    assert "raw-spectrum fitting" in " ".join(contract["limitations"]).lower()
+    assert "scattered-power density inversion" in " ".join(contract["limitations"]).lower()
+    assert "tokamak_analysis.thomson_spectrum.fit_thomson_spectrum" not in contract["function_links"]
     assert {mode["name"] for mode in contract["workflow_modes"]} == {
         "calibrated_profile",
-        "raw_spectrum_temperature_fit",
         "spatial_profile_reconstruction",
     }
+    assert "raw-spectrum" not in contract["algorithm"].lower()
     assert callable(resolve_analysis(1))
 
 
