@@ -12,6 +12,64 @@ import numpy as np
 from scipy.optimize import curve_fit
 
 
+def _prepare_advanced_iv(voltage_V: Any, current_A: Any, current_convention: str) -> tuple[np.ndarray, np.ndarray, dict[str, int]]:
+    """Apply the canonical calibrated-I/V preprocessing contract to advanced fits."""
+    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
+    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
+        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
+    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
+        raise ValueError("Voltage and current must be real numeric arrays.")
+    if current_convention not in {"electron_positive", "ion_positive"}:
+        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
+    v, i = v0.astype(float), i0.astype(float)
+    if current_convention == "ion_positive":
+        i = -i
+    finite = np.isfinite(v) & np.isfinite(i)
+    input_count = int(v.size)
+    v, i = v[finite], i[finite]
+    if v.size < 8:
+        raise ValueError("At least eight finite paired samples are required.")
+    order = np.argsort(v, kind="mergesort")
+    v, i = v[order], i[order]
+    unique, inverse, counts = np.unique(v, return_inverse=True, return_counts=True)
+    if unique.size < 8:
+        raise ValueError("At least eight distinct finite voltage values are required.")
+    if unique.size != v.size:
+        i = np.bincount(inverse, weights=i) / counts
+        v = unique
+    return v, i, {
+        "input_pair_count": input_count,
+        "finite_pair_count": int(np.count_nonzero(finite)),
+        "discarded_nonfinite_pair_count": int(input_count - np.count_nonzero(finite)),
+        "duplicate_voltage_pair_count_aggregated": int(np.count_nonzero(counts - 1)),
+        "processed_unique_voltage_count": int(v.size),
+    }
+
+
+def _local_polynomial_smooth_nonuniform(voltage: np.ndarray, current: np.ndarray,
+                                        window_points: int, polynomial_order: int):
+    """Local polynomial smoothing and derivatives in the actual voltage coordinate."""
+    smoothed = np.empty_like(current, dtype=float)
+    first = np.empty_like(current, dtype=float)
+    second = np.empty_like(current, dtype=float)
+    half = window_points // 2
+    for center in range(voltage.size):
+        start = max(0, min(center - half, voltage.size - window_points))
+        stop = start + window_points
+        dx = voltage[start:stop] - voltage[center]
+        scale = float(np.max(np.abs(dx)))
+        if not math.isfinite(scale) or scale <= 0:
+            raise ValueError("Local polynomial window has a degenerate voltage span.")
+        design = np.vander(dx / scale, N=polynomial_order + 1, increasing=True)
+        coeff, _, rank, _ = np.linalg.lstsq(design, current[start:stop], rcond=None)
+        if rank < polynomial_order + 1:
+            raise ValueError("Local polynomial smoothing is rank-deficient on the supplied voltage grid.")
+        smoothed[center] = coeff[0]
+        first[center] = coeff[1] / scale
+        second[center] = 2.0 * coeff[2] / scale**2 if polynomial_order >= 2 else np.nan
+    return smoothed, first, second
+
+
 def fit_langmuir_electron_models(
     voltage_V: Any,
     current_A: Any,
@@ -26,22 +84,7 @@ def fit_langmuir_electron_models(
     not proof of a physical bi-Maxwellian distribution; component identifiability
     must be assessed from residuals, covariance, and the selected voltage range.
     """
-    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
-    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
-        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
-    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
-        raise ValueError("Voltage and current must be real numeric arrays.")
-    if current_convention not in {"electron_positive", "ion_positive"}:
-        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
-    v, i = v0.astype(float), i0.astype(float)
-    if current_convention == "ion_positive":
-        i = -i
-    finite = np.isfinite(v) & np.isfinite(i)
-    v, i = v[finite], i[finite]
-    if len(v) < 8:
-        raise ValueError("At least eight finite paired samples are required.")
-    order = np.argsort(v)
-    v, i = v[order], i[order]
+    v, i, input_quality = _prepare_advanced_iv(voltage_V, current_A, current_convention)
     if not isinstance(fit_range_V, (tuple, list)) or len(fit_range_V) != 2:
         raise ValueError("fit_range_V must contain two increasing voltage bounds.")
     lo, hi = map(float, fit_range_V)
@@ -49,11 +92,11 @@ def fit_langmuir_electron_models(
         raise ValueError("fit_range_V must be finite, increasing, and inside the measured voltage range.")
     mask = (v >= lo) & (v <= hi)
     x, y = v[mask], i[mask]
-    min_count = 4 if model == "single_maxwellian" else 8
     if model not in {"single_maxwellian", "two_temperature"}:
         raise ValueError("model must be 'single_maxwellian' or 'two_temperature'.")
-    if len(x) < min_count:
-        raise ValueError(f"The selected model requires at least {min_count} samples in the fit window.")
+    min_count = 4 if model == "single_maxwellian" else 8
+    if np.unique(x).size < min_count:
+        raise ValueError(f"The selected model requires at least {min_count} distinct voltage values in the fit window.")
     xref = float(x[0])
     scale = max(float(np.ptp(y)), float(np.max(np.abs(y))), np.finfo(float).tiny)
     ys = y / scale
@@ -126,8 +169,14 @@ def fit_langmuir_electron_models(
         covariance_condition_number = float(np.linalg.cond(cov))
     return {
         "model": model,
+        "model_class": ("published_single_maxwellian_exponential_relation" if model == "single_maxwellian"
+                        else "empirical_two_exponential_mixture_not_physical_population_identification"),
+        "physical_interpretation_status": ("conditional_single_maxwellian_fit_requires_regime_review" if model == "single_maxwellian"
+                                           else "empirical_decomposition_only_not_evidence_of_two_physical_populations"),
         "fit_range_V": [lo, hi],
         "fit_points": int(len(x)),
+        "input_quality": input_quality,
+        "preprocessing_contract": "finite_pair_filter_sort_duplicate_voltage_current_mean",
         "electron_temperature_components_eV": temperatures,
         "component_amplitudes_A": amps,
         "fit_R2": r2,
@@ -202,64 +251,54 @@ def analyze_langmuir_probe_series(
 
 
 def estimate_multispecies_ion_density(
-    ion_saturation_current_A: float,
-    electron_temperature_eV: float,
-    probe_area_m2: float,
-    species: Sequence[Mapping[str, float]],
-    *,
-    current_convention: str = "electron_positive",
+    ion_saturation_current_A: float, electron_temperature_eV: float, probe_area_m2: float,
+    species: Sequence[Mapping[str, float]], *, current_convention: str = "electron_positive",
     fraction_basis: str = "number_density",
 ) -> dict[str, Any]:
-    """Estimate total ion density from supplied species fractions and sheath coefficients.
-
-    Each species item must contain mass_kg, number-density fraction, and sheath_coefficient.
-    Fractions must sum to one; mass and current fractions are not interchangeable.
-    The formula assumes a common electron temperature and an explicitly supplied
-    species-resolved ion-saturation current model.
-    """
+    """Sum species-resolved Bohm/sheath ion currents using explicit charge states."""
     from tis.constants import E_CHARGE
-
-    vals = [ion_saturation_current_A, electron_temperature_eV, probe_area_m2]
-    if not all(isinstance(x, (int, float, np.integer, np.floating)) and not isinstance(x, (bool, np.bool_)) and math.isfinite(float(x)) for x in vals):
+    vals = (ion_saturation_current_A, electron_temperature_eV, probe_area_m2)
+    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
         raise ValueError("Current, temperature, and area must be finite real scalars.")
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
     if fraction_basis != "number_density":
         raise ValueError("fraction_basis must be 'number_density'; mass and current fractions are not interchangeable.")
-    normalized_ion_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
-    if normalized_ion_current >= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
-        raise ValueError("Ion current must be negative after normalization to electron-positive convention; temperature and area must be positive.")
+    ion_current = -float(ion_saturation_current_A) if current_convention == "ion_positive" else float(ion_saturation_current_A)
+    if ion_current >= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
+        raise ValueError("Ion current must be negative after normalization; temperature and area must be positive.")
     if not species:
         raise ValueError("At least one ion species is required.")
     normalized = []
     for item in species:
-        if not all(k in item for k in ("mass_kg", "fraction", "sheath_coefficient")):
-            raise ValueError("Each species requires mass_kg, fraction, and sheath_coefficient.")
-        mass, fraction, coeff = (float(item[k]) for k in ("mass_kg", "fraction", "sheath_coefficient"))
-        if not all(math.isfinite(z) and z > 0 for z in (mass, fraction, coeff)):
-            raise ValueError("Species mass, fraction, and sheath coefficient must be positive and finite.")
-        normalized.append({"mass_kg": mass, "fraction": fraction, "sheath_coefficient": coeff})
-    total_fraction = sum(x["fraction"] for x in normalized)
+        required = ("mass_kg", "fraction", "charge_state", "sheath_coefficient")
+        if not all(k in item for k in required):
+            raise ValueError("Each species requires mass_kg, fraction, charge_state Z_s, and sheath_coefficient.")
+        mass, fraction, charge, coeff = (float(item[k]) for k in required)
+        if not all(math.isfinite(z) and z > 0 for z in (mass, fraction, charge, coeff)):
+            raise ValueError("Species mass, fraction, charge_state and sheath coefficient must be positive and finite.")
+        if not charge.is_integer():
+            raise ValueError("charge_state must be a positive integer ion charge state.")
+        normalized.append({"mass_kg": mass, "fraction": fraction, "charge_state": int(charge), "sheath_coefficient": coeff})
+    total_fraction = sum(z["fraction"] for z in normalized)
     if not math.isclose(total_fraction, 1.0, rel_tol=1e-6, abs_tol=1e-8):
         raise ValueError("Ion species fractions must sum to 1.")
-    factor = sum(x["fraction"] * x["sheath_coefficient"] / math.sqrt(x["mass_kg"]) for x in normalized)
-    denominator = E_CHARGE * probe_area_m2 * math.sqrt(E_CHARGE * electron_temperature_eV) * factor
-    density = abs(normalized_ion_current) / denominator
+    factor = sum(z["fraction"] * z["sheath_coefficient"] * z["charge_state"]**1.5 / math.sqrt(z["mass_kg"]) for z in normalized)
+    density = abs(ion_current) / (E_CHARGE * probe_area_m2 * math.sqrt(E_CHARGE * electron_temperature_eV) * factor)
     if not math.isfinite(density) or density <= 0:
         raise ValueError("Multispecies density estimate is not finite and positive.")
     return {
-        "ion_density_estimate_m-3": density,
-        "ion_species": normalized,
-        "ion_species_fraction_sum": total_fraction,
-        "ion_species_fraction_basis": "number_density_fraction",
-        "current_convention_input": current_convention,
-        "current_convention_normalized": "electron_positive",
-        "model": "fraction-weighted_multi-species_sheath_current",
-        "assumptions": ["common electron temperature", "supplied species fractions and sheath coefficients are appropriate", "single effective collection area"],
-        "physical_regime_confirmed": False,
-        "uncertainty_propagation_performed": False,
+        "ion_density_estimate_m-3": density, "ion_species": normalized,
+        "ion_species_fraction_sum": total_fraction, "ion_species_fraction_basis": "number_density_fraction",
+        "current_convention_input": current_convention, "current_convention_normalized": "electron_positive",
+        "model": "species_summed_bohm_sheath_current",
+        "formula": "n_i = |I_i,sat| / [e A_p sqrt(e T_e) sum_s(f_s C_s Z_s^(3/2)/sqrt(m_s))]",
+        "assumptions": ["common electron temperature", "number-density fractions sum to one",
+                        "species Bohm speed sqrt(Z_s e T_e/m_s)", "species sheath coefficients appropriate to geometry and regime",
+                        "single effective collection area"],
+        "physical_regime_confirmed": False, "uncertainty_propagation_performed": False,
+        "uncertainty_status": "not_propagated_species_fraction_covariance_and_species_model_uncertainties_not_supplied",
     }
-
 
 def langmuir_fit_window_sensitivity(
     voltage_V: Any,
@@ -317,68 +356,84 @@ def langmuir_fit_window_sensitivity(
 
 
 def estimate_electron_density_from_saturation(
-    electron_saturation_current_A: float,
-    electron_temperature_eV: float,
-    probe_area_m2: float,
-    *,
+    electron_saturation_current_A: float, electron_temperature_eV: float, probe_area_m2: float, *,
     current_convention: str = "electron_positive",
+    current_standard_uncertainty_A: float | None = None,
+    temperature_relative_standard_uncertainty: float | None = None,
+    area_relative_standard_uncertainty: float | None = None,
 ) -> dict[str, Any]:
-    """Estimate electron density from positive electron saturation current.
-
-    Uses I_e,sat = e A n_e sqrt(e T_e / (2 pi m_e)); the user must supply an
-    effective collection area appropriate to the probe regime and geometry.
-    """
+    """Estimate Maxwellian electron density; propagate only complete supplied independent uncertainties."""
     from tis.constants import E_CHARGE, M_E
-
     vals = (electron_saturation_current_A, electron_temperature_eV, probe_area_m2)
-    if not all(isinstance(x, (int, float, np.integer, np.floating)) and not isinstance(x, (bool, np.bool_)) and math.isfinite(float(x)) for x in vals):
+    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
         raise ValueError("Current, temperature, and area must be finite real scalars.")
     if current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
-    normalized_electron_current = (-float(electron_saturation_current_A)
-                                   if current_convention == "ion_positive"
-                                   else float(electron_saturation_current_A))
-    if normalized_electron_current <= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
-        raise ValueError("Electron saturation current must be positive after normalization to electron-positive convention; temperature and area must be positive.")
-    thermal_speed_factor = math.sqrt(E_CHARGE * electron_temperature_eV / (2.0 * math.pi * M_E))
-    density = normalized_electron_current / (E_CHARGE * probe_area_m2 * thermal_speed_factor)
+    sigmas = (current_standard_uncertainty_A, temperature_relative_standard_uncertainty, area_relative_standard_uncertainty)
+    if any(z is not None and (not isinstance(z, (int, float, np.integer, np.floating)) or isinstance(z, (bool, np.bool_)) or not math.isfinite(float(z)) or z < 0) for z in sigmas):
+        raise ValueError("Optional uncertainty inputs must be finite non-negative real scalars.")
+    current = -float(electron_saturation_current_A) if current_convention == "ion_positive" else float(electron_saturation_current_A)
+    if current <= 0 or electron_temperature_eV <= 0 or probe_area_m2 <= 0:
+        raise ValueError("Electron saturation current must be positive after normalization; temperature and area must be positive.")
+    speed = math.sqrt(E_CHARGE * electron_temperature_eV / (2.0 * math.pi * M_E))
+    density = current / (E_CHARGE * probe_area_m2 * speed)
+    supplied = all(z is not None for z in sigmas)
+    sigma_density = None
+    if supplied:
+        rel = math.sqrt((float(current_standard_uncertainty_A)/current)**2
+                        + float(area_relative_standard_uncertainty)**2
+                        + (0.5*float(temperature_relative_standard_uncertainty))**2)
+        sigma_density = density * rel
     return {
-        "electron_density_estimate_m-3": density,
-        "current_convention_input": current_convention,
-        "current_convention_normalized": "electron_positive",
+        "electron_density_estimate_m-3": density, "electron_density_standard_uncertainty_m-3": sigma_density,
+        "electron_density_uncertainty_status": "conditional_independent_input_uncertainties_propagated" if supplied else "not_calculated_all_three_independent_uncertainties_required",
+        "current_convention_input": current_convention, "current_convention_normalized": "electron_positive",
         "formula": "n_e = I_e,sat / (e A_p sqrt(e T_e / (2 pi m_e)))",
-        "assumption": "Maxwellian electron collection with the supplied effective area and applicable electron-saturation regime.",
-        "physical_regime_confirmed": False,
-        "uncertainty_propagation_performed": False,
+        "reference": "Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Chapter 3, Section 3.2.5.",
+        "assumption": "Maxwellian electron collection with supplied effective area and applicable electron-saturation regime.",
+        "physical_regime_confirmed": False, "uncertainty_propagation_performed": supplied,
     }
-
 
 def estimate_ion_particle_flux(
-    ion_density_m3: float,
-    electron_temperature_eV: float,
-    ion_mass_kg: float,
-    *,
-    sheath_factor: float,
+    ion_density_m3: float, electron_temperature_eV: float, ion_mass_kg: float, *,
+    sheath_factor: float, charge_state: int = 1,
+    density_relative_standard_uncertainty: float | None = None,
+    temperature_relative_standard_uncertainty: float | None = None,
+    mass_relative_standard_uncertainty: float | None = None,
+    sheath_factor_relative_standard_uncertainty: float | None = None,
 ) -> dict[str, Any]:
-    """Estimate Bohm-like ion particle flux from supplied density and Te."""
+    """Estimate species Bohm particle flux Gamma_i = C_s n_i sqrt(Z_i e T_e/m_i)."""
     from tis.constants import E_CHARGE
-
     vals = (ion_density_m3, electron_temperature_eV, ion_mass_kg, sheath_factor)
-    if not all(isinstance(x, (int, float, np.integer, np.floating)) and not isinstance(x, (bool, np.bool_)) and math.isfinite(float(x)) for x in vals):
+    if not all(isinstance(z, (int, float, np.integer, np.floating)) and not isinstance(z, (bool, np.bool_)) and math.isfinite(float(z)) for z in vals):
         raise ValueError("Density, temperature, mass, and sheath_factor must be finite real scalars.")
-    if ion_density_m3 <= 0 or electron_temperature_eV <= 0 or ion_mass_kg <= 0 or sheath_factor <= 0:
+    if isinstance(charge_state, bool) or not isinstance(charge_state, (int, np.integer)) or charge_state < 1:
+        raise ValueError("charge_state must be a positive integer.")
+    sigmas = (density_relative_standard_uncertainty, temperature_relative_standard_uncertainty,
+              mass_relative_standard_uncertainty, sheath_factor_relative_standard_uncertainty)
+    if any(z is not None and (not isinstance(z, (int, float, np.integer, np.floating)) or isinstance(z, (bool, np.bool_)) or not math.isfinite(float(z)) or z < 0) for z in sigmas):
+        raise ValueError("Optional relative uncertainty inputs must be finite non-negative real scalars.")
+    if any(z <= 0 for z in vals):
         raise ValueError("Density, temperature, mass, and sheath_factor must be positive.")
-    sound_speed = math.sqrt(E_CHARGE * electron_temperature_eV / ion_mass_kg)
-    flux = float(sheath_factor) * float(ion_density_m3) * sound_speed
+    speed = math.sqrt(charge_state * E_CHARGE * electron_temperature_eV / ion_mass_kg)
+    flux = float(sheath_factor) * float(ion_density_m3) * speed
+    supplied = all(z is not None for z in sigmas)
+    sigma_flux = None
+    if supplied:
+        rel = math.sqrt(float(density_relative_standard_uncertainty)**2
+                        + (0.5*float(temperature_relative_standard_uncertainty))**2
+                        + (0.5*float(mass_relative_standard_uncertainty))**2
+                        + float(sheath_factor_relative_standard_uncertainty)**2)
+        sigma_flux = flux * rel
     return {
-        "ion_sound_speed_m_s": sound_speed,
-        "ion_particle_flux_m-2_s-1": flux,
-        "formula": "Gamma_i = sheath_factor * n_i * sqrt(e T_e / m_i)",
-        "assumption": "Bohm-like flux estimate; sheath_factor and the applicability of the selected edge/sheath model are supplied by the user.",
-        "physical_regime_confirmed": False,
-        "uncertainty_propagation_performed": False,
+        "ion_sound_speed_m_s": speed, "ion_particle_flux_m-2_s-1": flux,
+        "ion_particle_flux_standard_uncertainty_m-2_s-1": sigma_flux,
+        "uncertainty_status": "conditional_independent_input_uncertainties_propagated" if supplied else "not_calculated_all_four_independent_uncertainties_required",
+        "formula": "Gamma_i = C_s n_i sqrt(Z_i e T_e / m_i)",
+        "reference": "Hutchinson, Principles of Plasma Diagnostics, 2nd ed. (2002), Chapter 3, Section 3.2.5.",
+        "assumption": "Bohm-like species flux; charge state and sheath factor are explicit and model applicability is supplied by the user.",
+        "physical_regime_confirmed": False, "uncertainty_propagation_performed": supplied,
     }
-
 
 def estimate_smoothed_plasma_potential_candidates(
     voltage_V: Any,
@@ -389,35 +444,16 @@ def estimate_smoothed_plasma_potential_candidates(
     current_convention: str = "electron_positive",
 ) -> dict[str, Any]:
     """Compare raw-gradient and explicitly Savitzky-Golay-smoothed derivative candidates."""
-    from scipy.signal import savgol_filter
-
-    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
-    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
-        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
-    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
-        raise ValueError("Voltage and current must be real numeric arrays.")
-    if current_convention not in {"electron_positive", "ion_positive"}:
-        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
-    normalized_i = -i0 if current_convention == "ion_positive" else i0
-    finite = np.isfinite(v0) & np.isfinite(normalized_i)
-    v, i = v0[finite].astype(float), normalized_i[finite].astype(float)
-    order = np.argsort(v)
-    v, i = v[order], i[order]
-    unique, inv = np.unique(v, return_inverse=True)
-    if len(unique) != len(v):
-        sums, counts = np.bincount(inv, weights=i), np.bincount(inv)
-        v, i = unique, sums / counts
-    if len(v) < 5 or not np.all(np.diff(v) > 0):
-        raise ValueError("At least five distinct finite voltage values are required.")
+    v, i, input_quality = _prepare_advanced_iv(voltage_V, current_A, current_convention)
     if isinstance(window_length, bool) or not isinstance(window_length, int) or window_length < 5 or window_length % 2 == 0 or window_length > len(v):
         raise ValueError("window_length must be an odd integer between 5 and the number of samples.")
     if isinstance(polynomial_order, bool) or not isinstance(polynomial_order, int) or polynomial_order < 1 or polynomial_order >= window_length:
         raise ValueError("polynomial_order must be an integer in [1, window_length).")
     raw_didv = np.gradient(i, v)
     raw_d2 = np.gradient(raw_didv, v)
-    smooth_i = savgol_filter(i, window_length=window_length, polyorder=polynomial_order, mode="interp")
-    smooth_didv = np.gradient(smooth_i, v)
-    smooth_d2 = np.gradient(smooth_didv, v)
+    smooth_i, smooth_didv, smooth_d2 = _local_polynomial_smooth_nonuniform(
+        v, i, window_length, polynomial_order
+    )
     from tis.probe_analysis import _zero_crossing_candidates
     return {
         "current_convention_input": current_convention,
@@ -431,8 +467,10 @@ def estimate_smoothed_plasma_potential_candidates(
         "smoothed_max_d2IdV2_candidate_V": float(v[int(np.argmax(smooth_d2))]),
         "smoothed_d2IdV2_zero_crossing_candidates_V": _zero_crossing_candidates(v, smooth_d2),
         "second_derivative_inflection_method": "zero_crossings_of_d2IdV2; maxima_are_reported_as_separate_extrema",
-        "smoothing_method": "Savitzky-Golay",
+        "smoothing_method": "local_polynomial_least_squares_on_actual_voltage_coordinates",
         "window_length_samples": window_length,
+        "input_quality": input_quality,
+        "voltage_grid_uniformity": "not_required_local_fit_uses_actual_voltage_coordinates",
         "polynomial_order": polynomial_order,
         "smoothed_current_A": smooth_i.tolist(),
         "physical_plasma_potential_confirmed": False,
@@ -452,27 +490,14 @@ def fit_langmuir_stretched_exponential(
     The shape exponent is empirical; this is not a kinetic kappa-distribution model
     and must not be interpreted as a unique non-Maxwellian electron distribution.
     """
-    v0, i0 = np.asarray(voltage_V), np.asarray(current_A)
-    if v0.ndim != 1 or i0.ndim != 1 or v0.shape != i0.shape:
-        raise ValueError("Voltage and current must be equal-length one-dimensional arrays.")
-    if v0.dtype.kind not in "iuf" or i0.dtype.kind not in "iuf":
-        raise ValueError("Voltage and current must be real numeric arrays.")
-    if current_convention not in {"electron_positive", "ion_positive"}:
-        raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
-    normalized_i = -i0 if current_convention == "ion_positive" else i0
-    finite = np.isfinite(v0) & np.isfinite(normalized_i)
-    v, i = v0[finite].astype(float), normalized_i[finite].astype(float)
-    order = np.argsort(v)
-    v, i = v[order], i[order]
-    if len(v) < 8:
-        raise ValueError("At least eight finite paired samples are required.")
+    v, i, input_quality = _prepare_advanced_iv(voltage_V, current_A, current_convention)
     lo, hi = map(float, fit_range_V)
     if not (math.isfinite(lo) and math.isfinite(hi) and lo < hi and lo >= v[0] and hi <= v[-1]):
         raise ValueError("fit_range_V must be finite, increasing, and inside the measured voltage range.")
     mask = (v >= lo) & (v <= hi)
     x, y = v[mask], i[mask]
-    if len(x) < 5:
-        raise ValueError("Stretched-exponential fit requires at least five samples.")
+    if np.unique(x).size < 5:
+        raise ValueError("Stretched-exponential fit requires at least five distinct voltage values in the selected window.")
     xref = float(x[0])
     scale = max(float(np.ptp(y)), float(np.max(np.abs(y))), np.finfo(float).tiny)
     def fn(xx, offset, amplitude, slope, shape):
@@ -488,8 +513,17 @@ def fit_langmuir_stretched_exponential(
     residual = y - fitted
     ss_tot = float(np.sum((y - np.mean(y)) ** 2))
     ss_res = float(np.sum(residual ** 2))
+    covariance_valid = bool(
+        np.asarray(cov).shape == (4, 4) and np.all(np.isfinite(cov))
+        and np.all(np.diag(cov) >= 0.0)
+        and float(np.min(np.linalg.eigvalsh(0.5 * (cov + cov.T)))) > 1e-12 * max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+    )
+    parameter_se = (np.sqrt(np.maximum(np.diag(cov), 0.0)) * np.asarray([scale, scale, 1.0, 1.0])).tolist() if covariance_valid else None
     return {
         "model": "stretched_exponential_empirical_shape",
+        "model_class": "empirical_curve_shape_not_a_physical_distribution_model",
+        "input_quality": input_quality,
+        "preprocessing_contract": "finite_pair_filter_sort_duplicate_voltage_current_mean",
         "current_convention_input": current_convention,
         "current_convention_normalized": "electron_positive",
         "fit_range_V": [lo, hi],
@@ -499,6 +533,12 @@ def fit_langmuir_stretched_exponential(
         "fit_R2": (1.0 - ss_res / ss_tot if ss_tot > 0 else None),
         "fit_residual_rms_A": float(np.sqrt(np.mean(residual ** 2))),
         "covariance_finite": bool(np.all(np.isfinite(cov))),
+        "covariance_valid": covariance_valid,
+        "parameter_names": ["offset_scaled", "amplitude_scaled", "scale_slope_per_V", "shape_exponent"],
+        "parameter_standard_errors": parameter_se,
+        "shape_exponent_standard_uncertainty": parameter_se[3] if parameter_se is not None else None,
+        "scale_slope_standard_uncertainty_per_V": parameter_se[2] if parameter_se is not None else None,
+        "parameter_uncertainty_status": "conditional_covariance_standard_errors_available" if parameter_se is not None else "unavailable_invalid_or_singular_fit_covariance",
         "kinetic_distribution_identified": False,
-        "interpretation": "Empirical curve-shape alternative only; not a kappa model or proof of a physical non-Maxwellian distribution.",
+        "interpretation": "Empirical curve-shape alternative only; no unique physical distribution is identified; covariance errors are conditional on this empirical model and selected window.",
     }
