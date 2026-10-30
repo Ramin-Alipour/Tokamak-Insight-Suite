@@ -231,6 +231,9 @@ ANALYSES = [{
             "tests/test_thomson_inference.py::test_multi_channel_spectra_recover_channel_resolved_temperature_and_radius",
             "tests/test_thomson_inference.py::test_non_gaussian_instrument_response_matrix_is_used_in_forward_fit",
             "tests/test_thomson_inference.py::test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_supplied",
+            "tests/test_thomson_inference.py::test_projected_relativistic_maxwell_juttner_model_is_available",
+            "tests/test_thomson_inference.py::test_instrument_response_accepts_kernel_array_and_callable",
+            "tests/test_thomson_inference.py::test_instrument_response_is_mandatory",
             "tests/test_thomson_workflow.py::test_thomson_workflow_sorts_and_calculates_linear_gradients"
         ],
         "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models, optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation."
