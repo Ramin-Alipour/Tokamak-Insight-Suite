@@ -398,8 +398,6 @@ def analyze_thomson_spectra(
                 z = np.asarray(spec.value, dtype=float)
                 return response @ z
             residual_scale = ui if ui is not None else np.full_like(y[i],max(float(np.max(np.abs(y[i]))),np.finfo(float).tiny))
-            weights = 1.0/np.square(residual_scale)
-            weights = weights/np.max(weights)
             def fit_nuisance(shape):
                 design=np.column_stack((shape,np.ones_like(shape),xi-float(laser_wavelength_nm)))
                 weighted_design=design/residual_scale[:,None]
