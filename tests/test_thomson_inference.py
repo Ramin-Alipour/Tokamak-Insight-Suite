@@ -65,7 +65,7 @@ def test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_sup
     x, y, _ = _spectral_case(100.0)
     out = analyze_thomson_spectra(
         x, (y*1e-18)[None,:], [0.1], laser_wavelength_nm=532.0,
-        scattering_angle_rad=np.pi/2, laser_power_w=2.0,
+        scattering_angle_rad=np.pi/2, signal_uncertainty=np.full((1,x.size),0.8e-18), laser_power_w=2.0,
         laser_power_uncertainty_W=0.02, interaction_length_m=0.1,
         interaction_length_uncertainty_m=0.001, collection_solid_angle_sr=1e-3,
         collection_solid_angle_uncertainty_sr=1e-5, optical_efficiency=0.5,
@@ -135,3 +135,24 @@ def test_projected_relativistic_maxwell_juttner_model_is_available():
     )
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.08)
     assert "Maxwell-Juttner" in out["channels"][0]["model"]
+
+
+def test_registry_resolves_primary_thomson_spectral_workflow():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+    entrypoint=resolve_analysis(1)
+    assert callable(entrypoint)
+    assert entrypoint.__name__ == "analyze_thomson_spectra"
+
+
+def test_instrument_response_uncertainty_is_monte_carlo_propagated():
+    x,y,_=_spectral_case(100.0)
+    response=np.eye(x.size)
+    response_unc=np.full_like(response,1e-7)
+    out=analyze_thomson_spectra(
+        x,y[None,:],[0.1],laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2,instrument_response=response,
+        instrument_response_uncertainty=response_unc,
+    )
+    assert out["channels"][0]["instrument_response_uncertainty_supplied"] is True
+    assert out["channels"][0]["instrument_response_uncertainty_propagated"] is True
+    assert out["channels"][0]["electron_temperature_uncertainty_eV"] > 0
