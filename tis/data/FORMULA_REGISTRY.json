@@ -2700,14 +2700,14 @@
       ],
       "output_specs": [
         {
-          "name": "ion_density_m3",
+          "name": "ion_density_estimate_m-3",
           "unit": "m^-3",
           "description": "Species-summed model-based total ion density."
         },
         {
-          "name": "uncertainty_ion_density_m3",
+          "name": "ion_density_standard_uncertainty_m-3",
           "unit": "m^-3",
-          "description": "Partial independent-input propagated standard uncertainty when explicit uncertainty components are supplied; otherwise absent/null."
+          "description": "Partial independent-input propagated standard uncertainty when explicit components are supplied; otherwise null."
         },
         {
           "name": "ion_density_relative_standard_uncertainty",
@@ -2717,17 +2717,32 @@
         {
           "name": "ion_density_uncertainty_components_relative",
           "unit": "structured",
-          "description": "Explicit relative uncertainty components included in propagation."
+          "description": "Relative uncertainty components explicitly included in propagation."
         },
         {
           "name": "ion_density_uncertainty_omitted_components",
           "unit": "list",
-          "description": "Uncertainty terms not propagated, including species number-fraction covariance."
+          "description": "Components not propagated, including species number-density fraction covariance."
+        },
+        {
+          "name": "ion_density_uncertainty_scope",
+          "unit": "text",
+          "description": "Partial independent-input propagation scope; species fractions are held fixed."
         },
         {
           "name": "ion_species",
           "unit": "structured",
           "description": "Normalized species parameters and number-density fractions."
+        },
+        {
+          "name": "uncertainty_propagation_performed",
+          "unit": "boolean",
+          "description": "Whether any explicit independent uncertainty components were propagated."
+        },
+        {
+          "name": "uncertainty_status",
+          "unit": "text",
+          "description": "Explicit status distinguishing partial propagation from no supplied uncertainties."
         }
       ],
       "prerequisites": [
