@@ -367,6 +367,9 @@ def test_thomson_profile_gradients_propagate_full_correlated_covariance():
         rtol=2e-12,
     )
     np.testing.assert_allclose(out["density_input_covariance_m3_2"], sorted_covariance)
+    np.testing.assert_allclose(
+        out["density_gradient_covariance_m-8"], expected_gradient_covariance
+    )
 
 
 def test_thomson_profile_covariance_rejects_mismatched_pointwise_uncertainty():
