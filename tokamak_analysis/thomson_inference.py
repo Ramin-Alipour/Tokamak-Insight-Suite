@@ -125,6 +125,9 @@ def analyze_thomson_spectra(
     instrument_response=None, signal_uncertainty=None,
     laser_power_w=None, interaction_length_m=None, collection_solid_angle_sr=None,
     optical_efficiency=None, incident_polarization=None, scattered_direction=None,
+    spectral_power_density_calibrated=False, laser_power_uncertainty_W=None,
+    interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
+    optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
 ):
@@ -156,6 +159,8 @@ def analyze_thomson_spectra(
         raise ValueError("scattering_angle_rad must lie in (0, pi]")
     if model not in {"non_collective_maxwellian", "collective_maxwellian"}:
         raise ValueError("model must be non_collective_maxwellian or collective_maxwellian")
+    if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
+        raise ValueError("spectral_power_density_calibrated must be boolean")
     if model == "collective_maxwellian":
         if not ion_species:
             raise ValueError("Collective Thomson inference requires at least one explicitly specified ion species")
@@ -230,13 +235,43 @@ def analyze_thomson_spectra(
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, scattered_direction
         )):
+            if not spectral_power_density_calibrated:
+                raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
             area = float(np.trapz(np.maximum(fit["fitted_spectrum"]-fit["background_intercept"], 0.0), xi))
+            area_sigma = None
+            cov = fit.get("fit_covariance")
+            if cov is not None:
+                amp = float(fit["amplitude"]); sig = float(fit["intrinsic_sigma_nm"])
+                area_var = 2.0*np.pi*(sig**2*cov[0,0] + amp**2*cov[2,2] + 2*amp*sig*cov[0,2])
+                area_sigma = float(np.sqrt(max(area_var, 0.0)))
             ne, pol = _density_from_power(area, laser_power_w, interaction_length_m,
                 collection_solid_angle_sr, optical_efficiency, scattering_angle_rad,
                 incident_polarization, scattered_direction)
+            rel_var = 0.0
+            for value, sigma_value, label in (
+                (area, area_sigma, "scattered_power"),
+                (laser_power_w, laser_power_uncertainty_W, "laser_power"),
+                (interaction_length_m, interaction_length_uncertainty_m, "interaction_length"),
+                (collection_solid_angle_sr, collection_solid_angle_uncertainty_sr, "collection_solid_angle"),
+                (optical_efficiency, optical_efficiency_uncertainty, "optical_efficiency"),
+            ):
+                if sigma_value is not None:
+                    if not np.isfinite(sigma_value) or sigma_value < 0:
+                        raise ValueError(f"{label} uncertainty must be finite and non-negative")
+                    if value <= 0:
+                        raise ValueError(f"{label} must be positive")
+                    rel_var += (float(sigma_value)/float(value))**2
+            if polarization_factor_uncertainty is not None:
+                if not np.isfinite(polarization_factor_uncertainty) or polarization_factor_uncertainty < 0 or pol <= 0:
+                    raise ValueError("polarization_factor_uncertainty must be finite and non-negative")
+                rel_var += (float(polarization_factor_uncertainty)/pol)**2
             fit["electron_density_m3"] = ne
+            fit["electron_density_uncertainty_m3"] = float(ne*np.sqrt(rel_var)) if rel_var > 0 else None
+            fit["integrated_scattered_power_W"] = area
+            fit["integrated_scattered_power_uncertainty_W"] = area_sigma
             fit["polarization_factor"] = pol
-            fit["density_method"] = "absolute integrated Thomson power with supplied optical geometry"
+            fit["density_method"] = "absolute integrated Thomson power with supplied optical geometry and polarization"
+            fit["density_uncertainty_model"] = "first-order independent-input propagation; only supplied uncertainty terms are included"
         else:
             fit["electron_density_m3"] = fit.get("electron_density_m3")
             fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
@@ -282,7 +317,7 @@ def analyze_thomson_spectra(
         "limitations": [
             "Non-collective model assumes non-relativistic isotropic Maxwellian electrons.",
             "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; non-Maxwellian and relativistic kinetic models are not included.",
-            "Absolute density in the non-collective model requires absolute spectral power and all listed optical geometry/polarization factors.",
+            "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
             "For non-collective fits, supplied instrument-response uncertainty is propagated by Monte Carlo perturbation of the LSF matrix; uncertainty in the optical power/geometry inputs must be supplied separately in future extensions.",
         ],
     }
