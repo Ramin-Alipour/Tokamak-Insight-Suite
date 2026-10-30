@@ -421,7 +421,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])*float(np.ptp(fast["vdf"]["velocity_m_s"]))**2
             scale=max(float(np.max(pdf)),np.finfo(float).tiny)
             penalties.append(np.sqrt(regularization_strength)*np.sqrt(max(fast["vdf"]["smoothness_parameter"],1e-12))*(d2@pdf)/scale)
-        return np.r_[data,*penalties]
+        return np.concatenate([data, *penalties])
     score=None; genetic_history=None
     if global_search and inversion_method=="improved_genetic":
         start,score,genetic_history=_improved_genetic_search(
