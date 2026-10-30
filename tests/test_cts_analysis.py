@@ -147,3 +147,31 @@ def test_cts_analysis_can_fit_fraction_of_fixed_tabulated_fast_ion_vdf():
     assert out["fast_ion"]["fraction"]==pytest.approx(0.08,rel=0.15)
     assert out["fast_ion_vdf_provenance"].startswith("externally supplied")
     assert "fast_ion_temperature_eV" not in out["parameter_names"]
+
+
+def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normalized_shape():
+    f0,f,g,ions,frac,response=_case()
+    velocity=np.linspace(-8e5,8e5,9)
+    initial_pdf=np.exp(-0.5*(velocity/2.8e5)**2)*(1.0+0.2*np.exp(-0.5*((velocity-3e5)/1.5e5)**2))
+    truth={"species_index":0,"fraction":0.06,"kind":"tabulated_1d",
+           "velocity_m_s":velocity,"probability_density_m_s_inverse":initial_pdf}
+    z=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
+        ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,
+        ion_velocity_projection_m_s=1.5e4,fast_ion=truth)
+    y=2.4e4*z+3.
+    out=analyze_cts_spectrum(
+        f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,instrument_response=response,
+        electron_density_initial_m3=2e19,electron_temperature_initial_eV=1200,
+        ion_temperature_initial_eV=800,ion_velocity_initial_m_s=1.5e4,
+        fast_ion={"species_index":0,"kind":"infer_tabulated_1d",
+                  "velocity_m_s":velocity,"initial_probability_density_m_s_inverse":initial_pdf,
+                  "fraction_initial":0.06,"fraction_bounds":(0.01,0.15),"smoothness":0.5},
+        inversion_method="regularized",regularization_strength=0.01,global_search=False,
+    )
+    pdf=out["fast_ion_vdf_probability_density_m_s_inverse"]
+    assert np.all(pdf>=0)
+    assert np.trapz(pdf,velocity)==pytest.approx(1.0,rel=1e-6)
+    assert out["fast_ion_vdf_covariance"].shape==(velocity.size,velocity.size)
+    assert out["fast_ion_vdf_uncertainty_m_s_inverse"].shape==velocity.shape
+    assert "fast_ion_vdf_logit_0" in out["parameter_names"]
