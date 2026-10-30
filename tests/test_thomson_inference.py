@@ -156,3 +156,18 @@ def test_instrument_response_uncertainty_is_monte_carlo_propagated():
     assert out["channels"][0]["instrument_response_uncertainty_supplied"] is True
     assert out["channels"][0]["instrument_response_uncertainty_propagated"] is True
     assert out["channels"][0]["electron_temperature_uncertainty_eV"] > 0
+
+
+def test_polarized_thomson_cross_section_uses_full_consistent_geometry():
+    from tokamak_analysis.thomson_scattering import thomson_differential_cross_section_m2_sr
+    from tokamak_analysis.thomson_scattering import _ELECTRON_CLASSICAL_RADIUS_M
+    sigma=thomson_differential_cross_section_m2_sr(
+        np.pi/2,incident_polarization_vector=[0,0,1],
+        incident_direction_vector=[1,0,0],scattered_direction_vector=[0,1,0],
+    )
+    assert sigma == pytest.approx(_ELECTRON_CLASSICAL_RADIUS_M**2,rel=1e-12)
+    with pytest.raises(ValueError,match="perpendicular"):
+        thomson_differential_cross_section_m2_sr(
+            np.pi/2,incident_polarization_vector=[1,0,0],
+            incident_direction_vector=[1,0,0],scattered_direction_vector=[0,1,0],
+        )
