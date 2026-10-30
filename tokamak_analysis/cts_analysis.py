@@ -475,6 +475,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["fast_ion_vdf_probability_density_m_s_inverse"]=d["fast_ion"]["probability_density_m_s_inverse"]
             out["fast_ion_vdf_smoothness_parameter"]=fast["vdf"]["smoothness_parameter"]
         out["parameter_names"]=names
+        if fast["kind"]=="maxwellian":
+            out["parameter_provenance"]["fast_ion_fraction"]="inferred from CTS spectral shape under a two-Maxwellian population model"
+            out["parameter_provenance"]["fast_ion_temperature_eV"]="inferred from CTS spectral shape under a two-Maxwellian population model"
+        elif fast["kind"]=="tabulated_1d":
+            out["parameter_provenance"]["fast_ion_fraction"]="inferred; tabulated 1-D fast-ion VDF shape supplied externally"
+        else:
+            out["parameter_provenance"]["fast_ion_fraction"]="inferred jointly with a regularized tabulated 1-D fast-ion VDF shape"
+            out["parameter_provenance"]["fast_ion_vdf"]="inferred from CTS spectrum with non-negative softmax representation and second-difference regularization"
         out["fast_ion_fraction_uncertainty"]=float(total_sigma[4] if out.get("model_discrepancy_scale") is not None else su[4])
         if fast["kind"]=="maxwellian":
             out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[5] if out.get("model_discrepancy_scale") is not None else su[5])
