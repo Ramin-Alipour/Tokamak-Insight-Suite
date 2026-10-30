@@ -273,7 +273,8 @@
         },
         {
           "name": "electron_velocity_projection_uncertainty_profile_m_s",
-          "unit": "m s^-1"
+          "unit": "m s^-1",
+          "description": "Per-channel uncertainty of the fitted non-collective projection; in collective mode available when supplied flow-vector and/or beam-geometry uncertainties are propagated by Monte Carlo."
         },
         {
           "name": "joint_inference",
