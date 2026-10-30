@@ -242,7 +242,7 @@
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+          "description": "Non-collective models only. Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties. Collective mode exposes its external-parameter covariance separately."
         }
       ],
       "output_specs": [
