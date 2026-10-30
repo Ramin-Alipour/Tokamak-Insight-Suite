@@ -111,7 +111,11 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
                          electron_temperature_relative_uncertainty: float | None = None,
                          electron_temperature_calibration_relative_uncertainty: float | None = None,
                          electron_temperature_fit_window_relative_uncertainty: float | None = None,
-                         density_model_relative_uncertainty: float | None = None) -> dict[str, Any]:
+                         density_model_relative_uncertainty: float | None = None,
+                         ion_charge_state: int = 1,
+                         fit_quality_min_r2: float = 0.98,
+                         fit_quality_max_nrmse: float = 0.1,
+                         ion_flatness_max_relative_change: float = 0.1) -> dict[str, Any]:
     """Analyze a calibrated Langmuir I-V sweep with optional explicit sheath-model density.
 
     Density requires explicit collection area, ion mass, sheath-model coefficient and
@@ -120,6 +124,15 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     """
     if not isinstance(current_convention, str) or current_convention not in {"electron_positive", "ion_positive"}:
         raise ValueError("current_convention must be 'electron_positive' or 'ion_positive'.")
+    if isinstance(ion_charge_state, bool) or not isinstance(ion_charge_state, (int, np.integer)) or ion_charge_state < 1:
+        raise ValueError("ion_charge_state must be a positive integer; default 1 is an explicit singly charged-ion assumption.")
+    for name, value in (("fit_quality_min_r2", fit_quality_min_r2),
+                        ("fit_quality_max_nrmse", fit_quality_max_nrmse),
+                        ("ion_flatness_max_relative_change", ion_flatness_max_relative_change)):
+        if not _is_finite_real_scalar(value):
+            raise ValueError(f"{name} must be a finite real scalar.")
+    if not (0.0 <= fit_quality_min_r2 <= 1.0 and fit_quality_max_nrmse > 0.0 and ion_flatness_max_relative_change >= 0.0):
+        raise ValueError("Numerical screening thresholds must satisfy 0<=R2<=1, NRMSE>0 and flatness>=0.")
     if current_uncertainty_A is not None and (not _is_finite_real_scalar(current_uncertainty_A) or current_uncertainty_A < 0):
         raise ValueError("current_uncertainty_A must be a finite non-negative real scalar.")
     for name, fit_range in (("electron_fit_range", electron_fit_range), ("ion_fit_range", ion_fit_range)):
@@ -162,6 +175,14 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         if value is not None and (not _is_finite_real_scalar(value) or value < 0):
             raise ValueError(f"{name} must be finite and non-negative.")
 
+    out_thresholds = {
+        "electron_fit_minimum_R2": float(fit_quality_min_r2),
+        "electron_fit_maximum_normalized_RMSE": float(fit_quality_max_nrmse),
+        "ion_fit_minimum_R2": float(fit_quality_min_r2),
+        "ion_fit_maximum_normalized_RMSE": float(fit_quality_max_nrmse),
+        "ion_maximum_relative_current_change": float(ion_flatness_max_relative_change),
+        "interpretation": "User-configurable numerical review thresholds only; not universal physical-regime criteria."
+    }
     raw_v=np.asarray(voltage); raw_i=np.asarray(current)
     if raw_v.ndim != 1 or raw_i.ndim != 1:
         raise ValueError("Voltage and current inputs must be one-dimensional arrays.")
@@ -188,6 +209,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
     processed_current_sigma = (None if current_uncertainty_A is None else
                                float(current_uncertainty_A) / np.sqrt(counts.astype(float)))
     out=probe_iv_summary(v,i)
+    out["numerical_fit_screen_thresholds"] = out_thresholds
     # Preserve the exact calibrated samples used by every downstream calculation.
     # These are processed values only: non-finite pairs are removed, duplicate
     # voltages are averaged, polarity is normalized, and rows are voltage-sorted.
@@ -371,7 +393,7 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         out['ion_saturation_fit_points'] = int(np.count_nonzero(m))
         ion_nrmse = out['ion_saturation_fit_normalized_rmse']
         ion_relative_slope = abs(float(p[0])) * float(np.ptp(v[m])) / max(abs(float(np.median(i[m]))), np.finfo(float).tiny)
-        ion_numerically_flat = bool(np.isfinite(ion_relative_slope) and ion_relative_slope <= 0.1)
+        ion_numerically_flat = bool(np.isfinite(ion_relative_slope) and ion_relative_slope <= ion_flatness_max_relative_change)
         # For a genuinely flat branch, R-squared and range-normalized RMSE are
         # undefined because the observed current range is zero. In that case,
         # screen the residual against the absolute current level instead of
@@ -379,9 +401,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         ion_level_scale = max(abs(float(np.median(i[m]))), np.finfo(float).tiny)
         ion_level_nrmse = ion_rms / ion_level_scale
         ion_fit_good = bool(
-            (ion_r2 is not None and np.isfinite(ion_r2) and ion_r2 >= 0.98
-             and ion_nrmse is not None and np.isfinite(ion_nrmse) and ion_nrmse <= 0.1)
-            or (ion_numerically_flat and np.isfinite(ion_level_nrmse) and ion_level_nrmse <= 0.1)
+            (ion_r2 is not None and np.isfinite(ion_r2) and ion_r2 >= fit_quality_min_r2
+             and ion_nrmse is not None and np.isfinite(ion_nrmse) and ion_nrmse <= fit_quality_max_nrmse)
+            or (ion_numerically_flat and np.isfinite(ion_level_nrmse) and ion_level_nrmse <= fit_quality_max_nrmse)
         )
         out['ion_saturation_fit_status'] = (
             'numerical_fit_review_pass_not_physical_validation' if ion_fit_good
@@ -454,9 +476,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         electron_nrmse = out["electron_retarding_fit_normalized_rmse"]
         electron_fit_good = bool(
             np.isfinite(out["electron_retarding_fit_R2"])
-            and out["electron_retarding_fit_R2"] >= 0.98
+            and out["electron_retarding_fit_R2"] >= fit_quality_min_r2
             and electron_nrmse is not None and np.isfinite(electron_nrmse)
-            and electron_nrmse <= 0.1
+            and electron_nrmse <= fit_quality_max_nrmse
         )
         out["electron_retarding_fit_status"] = (
             "numerical_fit_review_pass_not_physical_validation" if electron_fit_good
@@ -556,7 +578,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         if not _is_finite_real_scalar(ion_current) or ion_current >= 0:
             raise ValueError("Ion-density inversion requires a negative ion-saturation current after normalization to the electron-positive convention; inspect polarity and ion_fit_range.")
         from .constants import E_CHARGE
-        denominator = float(ion_saturation_coefficient) * E_CHARGE * float(probe_area_m2) * math.sqrt(E_CHARGE * float(te) / float(ion_mass_kg))
+        denominator = (float(ion_saturation_coefficient) * E_CHARGE * float(probe_area_m2)
+                       * float(ion_charge_state) ** 1.5
+                       * math.sqrt(E_CHARGE * float(te) / float(ion_mass_kg)))
         if not math.isfinite(denominator) or denominator <= 0:
             raise ValueError("The selected density model produced an invalid denominator.")
         density = abs(float(ion_current)) / denominator
@@ -582,8 +606,9 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
             "ion_saturation_coefficient": float(ion_saturation_coefficient),
             "probe_area_m2": float(probe_area_m2),
             "ion_mass_kg": float(ion_mass_kg),
-            "formula": "n_i = |I_i,sat| / (C_s e A_p sqrt(e T_e / m_i)); T_e in eV",
-            "assumption": "Single-ion species; supplied coefficient is appropriate for the declared sheath model, probe geometry and plasma regime.",
+            "ion_charge_state": int(ion_charge_state),
+            "formula": "n_i = |I_i,sat| / (C_s e A_p Z_i^(3/2) sqrt(e T_e / m_i)); T_e in eV",
+            "assumption": "Single ion species with explicitly supplied integer charge state; Bohm speed is sqrt(Z_i e T_e/m_i), and the sheath coefficient is appropriate for the declared model, geometry and regime.",
             "uncertainty_note": "Only supplied uncertainty components are propagated; unprovided systematic/model uncertainties remain excluded.",
         }
         if any(value is not None for value in uncertainty_inputs.values()):
