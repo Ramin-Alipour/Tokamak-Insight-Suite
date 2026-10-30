@@ -656,6 +656,14 @@ def test_joint_gls_recomputes_absolute_density_from_joint_integrated_power():
     )
     from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
     for channel in out["channels"]:
+        assert channel["fit_quality_status"] == "accepted_joint_gls_with_channel_marginal_diagnostics"
+        assert channel["fit_accepted"] is True
+        assert channel["joint_fit_reduced_chi_square"] == pytest.approx(
+            out["joint_inference"]["reduced_chi_square"]
+        )
+        assert channel["fit_residual_rms"] == pytest.approx(
+            np.sqrt(np.mean(channel["residual"]**2))
+        )
         expected = density_from_thomson_scattered_power(
             channel["integrated_scattered_power_W"], 2.0, 0.1, np.pi / 2,
             1e-3, optical_efficiency=0.5,
