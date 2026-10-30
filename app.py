@@ -2545,6 +2545,8 @@ elif page=='Advanced Analysis':
                     for optional_col in (density_uncertainty_col,temperature_uncertainty_col):
                         if optional_col!='(none)' and optional_col in required_cols:
                             raise ValueError('Uncertainty columns must differ from radius, density, and temperature columns.')
+                    if density_uncertainty_col!='(none)' and density_uncertainty_col==temperature_uncertainty_col:
+                        raise ValueError('Density and temperature uncertainty must use different columns because they have different physical units.')
                     radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
                     density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
                     temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)
@@ -2600,7 +2602,7 @@ elif page=='Advanced Analysis':
                     st.error(str(e))
     elif workflow=='Thomson spatial profile reconstruction':
         st.markdown('Reconstruct smooth radial electron-density and electron-temperature profiles from multiple spatially resolved Thomson measurements.')
-        st.caption('Use already-calibrated measurements. This fit reconstructs profiles only within the measured radial interval; it does not calibrate raw data, infer equilibrium, or extrapolate beyond measured points.')
+        st.caption('Use already-calibrated measurements. This fit reconstructs profiles only within the measured radial interval; it does not calibrate raw data, infer equilibrium, or extrapolate beyond measured points. Input uncertainties may weight smoothing-spline fits but are not propagated into reconstructed-profile uncertainties or confidence intervals.')
         if df is None or len(numeric) < 3:
             st.info('Load a table with radius (m), electron density (m⁻³), and electron temperature (eV) columns.')
         else:
@@ -2623,6 +2625,8 @@ elif page=='Advanced Analysis':
                     for optional_col in (density_unc_col,temperature_unc_col):
                         if optional_col!='(none)' and optional_col in required:
                             raise ValueError('Uncertainty columns must differ from radius, density and temperature columns.')
+                    if density_unc_col!='(none)' and density_unc_col==temperature_unc_col:
+                        raise ValueError('Density and temperature uncertainty must use different columns because they have different physical units.')
                     radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
                     density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
                     temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)

@@ -70,3 +70,30 @@ def test_weighted_spline_rejects_zero_uncertainty():
             [0, 1, 2], [1, 2, 1], [10, 20, 10],
             density_uncertainty_m3=[0, 1, 1],
         )
+
+
+
+@pytest.mark.parametrize("method", ["smoothing_spline", "pchip"])
+def test_reconstruction_independently_recovers_linear_profiles_on_nonuniform_input_grid(method):
+    radius = np.array([0.0, 0.1, 0.45, 0.7, 1.0])
+    density = 3.0e19 - 1.0e19 * radius
+    temperature = 100.0 - 20.0 * radius
+    result = reconstruct_thomson_profile(radius, density, temperature,
+        method=method, smoothing_factor=0.0, points=101)
+    grid = result["reconstructed_radius_m"]
+    np.testing.assert_allclose(result["reconstructed_density_m3"], 3.0e19 - 1.0e19 * grid, rtol=2e-12, atol=1e5)
+    np.testing.assert_allclose(result["reconstructed_temperature_eV"], 100.0 - 20.0 * grid, rtol=2e-12, atol=1e-10)
+    np.testing.assert_allclose(result["reconstruction_gradients"]["density_gradient_m-4"], -1.0e19, rtol=2e-12, atol=1e5)
+    np.testing.assert_allclose(result["reconstruction_gradients"]["temperature_gradient_eV_m-1"], -20.0, rtol=2e-12, atol=1e-10)
+    assert result["uncertainty_model"]["reconstructed_profile_uncertainty_available"] is False
+
+
+def test_reconstruction_metadata_distinguishes_fit_weights_from_output_uncertainty():
+    result = reconstruct_thomson_profile([0.0, 0.25, 0.5, 0.75, 1.0],
+        [1e19, 1.2e19, 1.4e19, 1.2e19, 1e19], [50.0, 70.0, 90.0, 70.0, 50.0],
+        density_uncertainty_m3=[1e17] * 5, temperature_uncertainty_ev=[2.0] * 5,
+        method="smoothing_spline", smoothing_factor=0.5, points=31)
+    model = result["uncertainty_model"]
+    assert model["fit_weights_are_not_output_uncertainties"] is True
+    assert model["reconstructed_profile_uncertainty_available"] is False
+    assert model["fit_confidence_intervals_estimated"] is False

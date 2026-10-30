@@ -12,16 +12,29 @@ import numpy as np
 from .thomson_scattering import build_profile, profile_summary
 
 
-def _scale_length(value, gradient):
-    """Return -value/gradient where the gradient is numerically resolvable.
+def _gradient_roundoff_threshold(derivative_matrix, values):
+    """Estimate a pointwise floating-point cancellation bound for each derivative.
 
-    The zero-gradient threshold is scaled to the gradient itself, so values
-    with different physical units are never compared in the validity test.
+    The bound follows the absolute terms in the local finite-difference dot
+    product. It is therefore local to each coordinate and profile scale, rather
+    than being controlled by the largest gradient elsewhere in the profile.
     """
+    absolute_terms = np.abs(derivative_matrix) @ np.abs(values)
+    eps = np.finfo(float).eps
+    sample_count = values.size
+    gamma = (sample_count * eps) / (1.0 - sample_count * eps)
+    return gamma * absolute_terms
+
+
+def _scale_length(value, gradient, gradient_threshold):
+    """Return -value/gradient where the local derivative exceeds round-off."""
     out = np.full(value.shape, np.nan, dtype=float)
-    gradient_scale = float(np.max(np.abs(gradient))) if gradient.size else 0.0
-    threshold = np.finfo(float).eps * gradient_scale
-    valid = (value > 0) & np.isfinite(gradient) & (np.abs(gradient) > threshold)
+    valid = (
+        (value > 0)
+        & np.isfinite(gradient)
+        & np.isfinite(gradient_threshold)
+        & (np.abs(gradient) > gradient_threshold)
+    )
     out[valid] = -value[valid] / gradient[valid]
     return out
 
@@ -50,13 +63,17 @@ def _normalized_gradient_uncertainty(value, gradient, value_uncertainty, gradien
     return out
 
 
-def _scale_length_uncertainty(value, gradient, value_uncertainty, gradient_uncertainty, covariance):
+def _scale_length_uncertainty(
+    value, gradient, value_uncertainty, gradient_uncertainty, covariance,
+    gradient_threshold,
+):
     out = np.full(value.shape, np.nan, dtype=float)
-    # Use the same gradient-relative, dimensionally consistent resolvability
-    # threshold as _scale_length; never compare a gradient to the profile value.
-    gradient_scale = float(np.max(np.abs(gradient))) if gradient.size else 0.0
-    threshold = np.finfo(float).eps * gradient_scale
-    valid = (value > 0) & np.isfinite(gradient) & (np.abs(gradient) > threshold)
+    valid = (
+        (value > 0)
+        & np.isfinite(gradient)
+        & np.isfinite(gradient_threshold)
+        & (np.abs(gradient) > gradient_threshold)
+    )
     if not np.any(valid):
         return out
     with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
@@ -87,6 +104,8 @@ def analyze_thomson_profile(
     derivative_matrix = np.gradient(np.eye(r.size), r, axis=0, edge_order=edge_order)
     dne_dr = derivative_matrix @ ne
     dte_dr = derivative_matrix @ te
+    density_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, ne)
+    temperature_gradient_threshold = _gradient_roundoff_threshold(derivative_matrix, te)
     density_normalized_gradient = np.divide(
         dne_dr, ne, out=np.full_like(dne_dr, np.nan), where=ne > 0
     )
@@ -101,8 +120,8 @@ def analyze_thomson_profile(
         "temperature_gradient_eV_m-1": dte_dr,
         "density_normalized_gradient_m-1": density_normalized_gradient,
         "temperature_normalized_gradient_m-1": temperature_normalized_gradient,
-        "density_scale_length_m": _scale_length(ne, dne_dr),
-        "temperature_scale_length_m": _scale_length(te, dte_dr),
+        "density_scale_length_m": _scale_length(ne, dne_dr, density_gradient_threshold),
+        "temperature_scale_length_m": _scale_length(te, dte_dr, temperature_gradient_threshold),
         "summary": profile_summary(p),
         "notes": [
             "Input must be calibrated Thomson-scattering profile data.",
@@ -120,7 +139,7 @@ def analyze_thomson_profile(
             ne, dne_dr, sne, grad_unc, cov
         )
         result["density_scale_length_uncertainty_m"] = _scale_length_uncertainty(
-            ne, dne_dr, sne, grad_unc, cov
+            ne, dne_dr, sne, grad_unc, cov, density_gradient_threshold
         )
     if p.temperature_uncertainty_ev is not None:
         ste = p.temperature_uncertainty_ev
@@ -131,6 +150,6 @@ def analyze_thomson_profile(
             te, dte_dr, ste, grad_unc, cov
         )
         result["temperature_scale_length_uncertainty_m"] = _scale_length_uncertainty(
-            te, dte_dr, ste, grad_unc, cov
+            te, dte_dr, ste, grad_unc, cov, temperature_gradient_threshold
         )
     return result

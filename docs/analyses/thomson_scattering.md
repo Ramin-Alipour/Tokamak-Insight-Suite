@@ -23,7 +23,7 @@ No independent experimental validation is claimed. Automated tests check softwar
 | `density_uncertainty_m3` | m⁻³ | Optional pointwise 1-sigma uncertainty, finite and non-negative |
 | `temperature_uncertainty_ev` | eV | Optional pointwise 1-sigma uncertainty, finite and non-negative |
 
-The three required arrays must have equal lengths and at least two samples. Samples are sorted by the supplied coordinate, and all associated profile and uncertainty arrays are reordered consistently. The coordinate is a supplied data axis, not a machine dimension inferred by TIS. The measured interval need not cover the entire plasma.
+The three required arrays must have equal lengths and at least two samples. Samples are sorted by the supplied coordinate, and all associated profile and uncertainty arrays are reordered consistently. Interpolation targets must be a non-empty, one-dimensional array of finite real numeric values; Boolean and string values are rejected. The coordinate is a supplied data axis, not a machine dimension inferred by TIS. The measured interval need not cover the entire plasma.
 
 ## Calculations and equations
 
@@ -47,7 +47,7 @@ L_{n_e}=-\frac{n_e}{dn_e/dr}, \qquad
 L_{T_e}=-\frac{T_e}{dT_e/dr}.
 \]
 
-A normalized gradient is undefined where its corresponding profile value is zero. A local scale length is reported as undefined (NaN) where the profile value is zero or the numerical gradient is unresolved. Derivatives use numerical finite differences on the supplied coordinate.
+A normalized gradient is undefined where its corresponding profile value is zero. A local scale length is reported as undefined (NaN) where the profile value is zero or the numerical gradient is unresolved. Gradient resolvability is assessed pointwise against a floating-point round-off bound derived from the absolute terms in that location's finite-difference calculation; a large gradient elsewhere in the profile does not set the local threshold. Derivatives use numerical finite differences on the supplied coordinate.
 
 The line average for a profile \(f(r)\) over the measured interval \([r_0,r_N]\) is calculated by trapezoidal integration:
 
@@ -67,12 +67,13 @@ This is an average over the measured coordinate interval, not a geometry-weighte
 - Normalized density and temperature gradients.
 - Local density and temperature scale lengths.
 - When corresponding pointwise uncertainties are provided: propagated uncertainties for line averages, gradients, normalized gradients and scale lengths.
-- For the optional reconstruction workflow: reconstructed profiles and gradients only within the measured coordinate interval, with method and domain metadata.
+- For the optional reconstruction workflow: reconstructed profiles and gradients only within the measured coordinate interval, with method and domain metadata. The output explicitly reports that reconstructed-profile uncertainty and fit confidence intervals are not estimated; input uncertainties used as spline weights are not output uncertainties.
 
 ## Uncertainty assumptions and limitations
 
 - Input profiles and coordinates are assumed calibrated; TIS does not perform calibration in this analysis.
 - Optional uncertainty propagation assumes independent pointwise measurement errors.
+- For smoothing-spline reconstruction, supplied pointwise uncertainties are used only as inverse-sigma fit weights. They are not propagated to the reconstructed profile values; reconstructed-profile uncertainties and fit confidence intervals are explicitly unavailable. Weighting a fit must not be interpreted as an uncertainty estimate for its output.
 - Covariance between samples, calibration uncertainty, model discrepancy, and peak-location uncertainty are not estimated.
 - Numerical derivatives can amplify noise, especially for sparse or noisy profiles.
 - No extrapolation beyond the measured coordinate interval is performed.

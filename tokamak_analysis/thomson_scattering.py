@@ -195,9 +195,16 @@ def interpolate_profile(profile: ThomsonProfile, target_radius_m: Iterable[float
     uncertainties are propagated using the squared interpolation coefficients.
     Extrapolation is deliberately forbidden to avoid inventing edge/core data.
     """
-    target = np.asarray(target_radius_m, dtype=float)
-    if target.ndim != 1 or not np.all(np.isfinite(target)):
-        raise ValueError("target_radius_m must be a finite one-dimensional array")
+    raw_target = np.asarray(target_radius_m)
+    if raw_target.ndim != 1:
+        raise ValueError("target_radius_m must be a one-dimensional array")
+    if raw_target.dtype.kind not in "iuf":
+        raise ValueError("target_radius_m must contain real numeric values, not booleans or strings")
+    if raw_target.size == 0:
+        raise ValueError("target_radius_m must contain at least one interpolation point")
+    target = raw_target.astype(float, copy=False)
+    if not np.all(np.isfinite(target)):
+        raise ValueError("target_radius_m must contain only finite values")
     r = profile.radius_m
     if np.any(target < r[0]) or np.any(target > r[-1]):
         raise ValueError("interpolation targets must lie inside the measured radius range")
@@ -346,6 +353,8 @@ def reconstruct_thomson_profile(
             "density_channel": uncertainty_channels["density"],
             "temperature_channel": uncertainty_channels["temperature"],
             "fit_confidence_intervals_estimated": False,
+            "reconstructed_profile_uncertainty_available": False,
+            "fit_weights_are_not_output_uncertainties": True,
             "systematic_and_model_uncertainties_estimated": False,
         },
         "limitations": [
@@ -354,6 +363,7 @@ def reconstruct_thomson_profile(
             "This is a one-dimensional radial profile fit, not an equilibrium reconstruction or a transport inversion.",
             "Negative spline overshoot is projected to zero; derivatives are set to zero on clipped segments. This enforces non-negativity but is not a substitute for a physically constrained fit.",
             "Smoothing-spline fitting requires strictly positive uncertainties when uncertainty arrays are supplied; PCHIP accepts non-negative uncertainties because it does not use them as fit weights.",
+            "Supplied uncertainties used as smoothing-spline weights are not propagated to reconstructed profile values; reconstructed-profile uncertainties and fit confidence intervals are not estimated.",
         ],
     }
 

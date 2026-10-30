@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from tokamak_analysis.thomson_workflow import analyze_thomson_profile
+from tokamak_analysis.thomson_scattering import build_profile, interpolate_profile
 
 
 def test_thomson_workflow_sorts_and_calculates_linear_gradients():
@@ -180,3 +181,74 @@ def test_thomson_reconstruction_clipping_keeps_derivative_consistent(method):
         # non-negative PCHIP zeros, whose one-sided slope can be non-zero.
         np.testing.assert_array_equal(dne[ne == 0.0], np.zeros(np.count_nonzero(ne == 0.0)))
         np.testing.assert_array_equal(dte[te == 0.0], np.zeros(np.count_nonzero(te == 0.0)))
+
+
+
+def test_nonuniform_grid_quadratic_gradients_normalized_gradients_and_scale_lengths():
+    radius = np.array([0.0, 0.4, 1.3, 2.7, 4.0])
+    density = 2.0e19 + 3.0e18 * radius + 2.0e18 * radius**2
+    temperature = 100.0 + 20.0 * radius + 5.0 * radius**2
+    density_gradient = 3.0e18 + 4.0e18 * radius
+    temperature_gradient = 20.0 + 10.0 * radius
+
+    out = analyze_thomson_profile(radius, density, temperature)
+
+    np.testing.assert_allclose(out["density_gradient_m-4"], density_gradient, rtol=2e-14)
+    np.testing.assert_allclose(out["temperature_gradient_eV_m-1"], temperature_gradient, rtol=2e-14)
+    np.testing.assert_allclose(out["density_normalized_gradient_m-1"], density_gradient / density, rtol=2e-14)
+    np.testing.assert_allclose(out["temperature_normalized_gradient_m-1"], temperature_gradient / temperature, rtol=2e-14)
+    np.testing.assert_allclose(out["density_scale_length_m"], -density / density_gradient, rtol=2e-14)
+    np.testing.assert_allclose(out["temperature_scale_length_m"], -temperature / temperature_gradient, rtol=2e-14)
+
+
+def test_local_gradient_resolvability_is_not_controlled_by_largest_remote_gradient():
+    radius = np.arange(5.0)
+    profile = np.array([1.0, 1.0 + 1.0e-10, 1.0 + 1.0e10, 1.0 + 2.0e10, 1.0 + 3.0e10])
+    out = analyze_thomson_profile(radius, profile, profile * 2.0)
+    assert np.isfinite(out["density_gradient_m-4"][0])
+    assert out["density_gradient_m-4"][0] > 0.0
+    assert np.isfinite(out["density_scale_length_m"][0])
+    assert np.isfinite(out["temperature_scale_length_m"][0])
+    assert out["density_scale_length_m"][0] == pytest.approx(-profile[0] / out["density_gradient_m-4"][0])
+
+
+def test_gradient_and_scale_length_uncertainties_match_independent_matrix_formula():
+    radius = np.array([0.0, 0.5, 1.7, 3.0])
+    density = 5.0 + 2.0 * radius + 0.3 * radius**2
+    sigma = np.array([0.1, 0.2, 0.15, 0.12])
+    out = analyze_thomson_profile(radius, density, 2.0 * density,
+        density_uncertainty_m3=sigma, temperature_uncertainty_ev=2.0 * sigma)
+    derivative_matrix = np.gradient(np.eye(radius.size), radius, axis=0, edge_order=2)
+    gradient = derivative_matrix @ density
+    gradient_sigma = np.sqrt((derivative_matrix**2) @ (sigma**2))
+    covariance = np.diag(derivative_matrix) * sigma**2
+    expected_scale_sigma = np.sqrt(np.maximum(
+        sigma**2 / gradient**2 + density**2 * gradient_sigma**2 / gradient**4
+        - 2.0 * density * covariance / gradient**3, 0.0))
+    np.testing.assert_allclose(out["density_gradient_uncertainty_m-4"], gradient_sigma, rtol=2e-14, atol=1e-15)
+    np.testing.assert_allclose(out["density_scale_length_uncertainty_m"], expected_scale_sigma, rtol=2e-13, atol=1e-14)
+    assert np.all(np.isfinite(out["density_gradient_uncertainty_m-4"][[0, 1, -1]]))
+
+
+def test_nonuniform_trapezoidal_line_average_uncertainty_uses_correct_weights():
+    radius = np.array([0.0, 0.5, 2.0, 3.0])
+    density = np.array([2.0, 3.0, 5.0, 7.0])
+    sigma = np.array([0.1, 0.2, 0.3, 0.4])
+    out = analyze_thomson_profile(radius, density, density * 10.0, density_uncertainty_m3=sigma)
+    weights = np.array([0.25, 1.0, 1.25, 0.5]) / 3.0
+    assert out["summary"].density_line_average_m3 == pytest.approx(np.sum(weights * density))
+    assert out["summary"].density_line_average_uncertainty_m3 == pytest.approx(np.sqrt(np.sum((weights * sigma)**2)))
+
+
+@pytest.mark.parametrize("targets", [[], [True], ["0.5"], [np.nan], [np.inf]])
+def test_interpolation_rejects_empty_boolean_string_or_nonfinite_targets(targets):
+    profile = build_profile([0.0, 1.0], [1.0, 2.0], [10.0, 20.0])
+    with pytest.raises(ValueError):
+        interpolate_profile(profile, targets)
+
+
+def test_interpolation_accepts_nonempty_finite_real_numeric_targets():
+    profile = build_profile([0.0, 1.0], [1.0, 3.0], [10.0, 30.0])
+    result = interpolate_profile(profile, np.array([0.25, 0.75]))
+    np.testing.assert_allclose(result["density_m3"], [1.5, 2.5])
+    np.testing.assert_allclose(result["temperature_ev"], [15.0, 25.0])
