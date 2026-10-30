@@ -1,9 +1,8 @@
-"""Computational workflow for calibrated Thomson-scattering profiles.
+"""Thomson spectral-inference entry point and downstream calibrated-profile utilities.
 
-Input arrays are already calibrated profiles, not raw detector counts. Optional
-pointwise uncertainties are propagated through linear finite-difference gradients,
-normalized gradients, local scale lengths, and profile averages assuming independent
-input samples.
+The primary Analysis 1 input is measured, calibrated multi-channel Thomson spectra.
+The legacy profile-summary function remains available only for downstream use when
+profiles have been obtained independently.
 """
 from __future__ import annotations
 
@@ -153,3 +152,14 @@ def analyze_thomson_profile(
             te, dte_dr, ste, grad_unc, cov, temperature_gradient_threshold
         )
     return result
+
+
+def analyze_thomson_spectra(*args, **kwargs):
+    """Primary Analysis 1 entry point: infer plasma parameters from measured spectra.
+
+    The spectral forward model is maintained in thomson_inference to keep the
+    legacy calibrated-profile summary utilities below available as downstream
+    operations without confusing their input contract with the primary analysis.
+    """
+    from .thomson_inference import analyze_thomson_spectra as _infer
+    return _infer(*args, **kwargs)
