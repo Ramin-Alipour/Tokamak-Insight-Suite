@@ -14,6 +14,7 @@ from tokamak_analysis.molecular_spectroscopy import analyze_molecular_spectrum, 
 from tokamak_analysis.cxrs import analyze_cxrs_line
 from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectrum
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
+from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
@@ -1694,12 +1695,27 @@ elif page=='Probe Analysis':
             st.error('The selected voltage column must contain a finite, nonzero voltage range.')
         else:
             ifit=st.slider('Ion-branch fit range (V)',min_value=float(vmin),max_value=float(vmax),value=(float(vmin),float(vmin+(vmax-vmin)*.2)),key='probe_ion_fit_range')
-    st.caption('Geometry-dependent density/flux inversion is intentionally outside this geometry-independent analysis.')
     cur_conv=st.radio('Current sign convention',['electron_positive','ion_positive'],horizontal=True,key='probe_current_convention',
-        help='electron_positive: ion-saturation current is negative (default). ion_positive: collected ion current is positive; it is flipped internally.')
+        help='All calculations normalize internally to electron_positive; advanced fits use the same convention.')
+    sigma_current=st.number_input('Current standard uncertainty per processed sample (A; 0 = not supplied)',min_value=0.0,value=0.0,format='%.6g',key='probe_current_sigma')
+    density_enabled=st.checkbox('Enable model-based ion-density estimate',value=False,key='probe_enable_density')
+    density_options={}
+    if density_enabled:
+        with st.container(border=True):
+            st.caption('Density inversion uses the published sheath/Bohm current-balance relation. Supply the effective collection area, ion mass, coefficient and model label; no defaults are inferred.')
+            dc1,dc2,dc3=st.columns(3)
+            with dc1: density_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_density_area')
+            with dc2: density_mass=st.number_input('Assumed ion mass (kg)',min_value=1e-30,value=3.34e-27,format='%.6g',key='probe_density_mass')
+            with dc3: density_coeff=st.number_input('Sheath/Bohm coefficient',min_value=1e-6,value=0.61,format='%.6g',key='probe_density_coeff')
+            density_model=st.text_input('Sheath model/source label',value='',key='probe_density_model')
+            density_options={'probe_area_m2':density_area,'ion_mass_kg':density_mass,
+                             'ion_saturation_coefficient':density_coeff,'sheath_model':density_model}
+            st.caption('The estimate is produced only when both non-overlapping fit windows pass their numerical screens. Physical regime validity remains the researcher’s responsibility.')
     if st.button('Analyze probe I–V',type='primary'):
         try:
-            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,current_convention=cur_conv)
+            result=langmuir_iv_analysis(df[vcol],df[icol],efit,ifit,current_convention=cur_conv,
+                                        current_uncertainty_A=(sigma_current if sigma_current>0 else None),
+                                        **density_options)
             st.subheader('Langmuir analysis results')
             r1,r2=st.columns(2)
             vf=result.get('floating_potential_V')
@@ -1708,28 +1724,120 @@ elif page=='Probe Analysis':
             with r2: st.metric('Electron temperature Te',f'{te_result:.5g} eV' if te_result is not None else 'Not fitted')
             st.caption('Floating-potential status: '+str(result.get('floating_potential_status','not reported'))+
                        ' · Current convention: '+str(result.get('current_convention',cur_conv)))
+            st.write({'Vf standard uncertainty (V)':result.get('floating_potential_standard_uncertainty_V'),
+                      'Vf uncertainty status':result.get('floating_potential_uncertainty_status'),
+                      'Maximum-dI/dV Vp proxy (V)':result.get('plasma_potential_proxy_V'),
+                      'Vp proxy standard uncertainty (V)':result.get('plasma_potential_proxy_standard_uncertainty_V'),
+                      'Vp proxy uncertainty status':result.get('plasma_potential_proxy_uncertainty_status'),
+                      'd²I/dV² zero-crossing candidates (V)':result.get('plasma_potential_d2IdV2_zero_crossing_candidates_V')})
             quality=result.get('input_quality',{})
             if quality.get('discarded_nonfinite_pair_count',0):
                 st.warning(f"Discarded {quality['discarded_nonfinite_pair_count']} paired samples containing non-finite voltage/current values.")
             if quality.get('duplicate_voltage_pair_count_aggregated',0):
                 st.info(f"Aggregated {quality['duplicate_voltage_pair_count_aggregated']} duplicate-voltage samples by averaging their currents.")
             if efit is not None:
-                fit_r2=result.get('electron_retarding_fit_R2')
-                fit_rmse=result.get('electron_retarding_fit_normalized_rmse')
-                fit_residual_rms=result.get('electron_retarding_fit_residual_rms_A')
-                te_uncertainty=result.get('electron_temperature_standard_error_eV')
-                fit_quality=('strong empirical fit' if fit_r2 is not None and fit_r2 >= 0.95 else
-                             'weak empirical fit' if fit_r2 is not None else 'not available')
-                st.write({'Electron-fit R²':fit_r2,'Electron-fit normalized RMSE':fit_rmse,
-                          'Electron-fit residual RMS (A)':fit_residual_rms,
-                          'Te local standard uncertainty (eV)':te_uncertainty,
-                          'Fit quality screening':fit_quality,
-                          'Electron-fit status':result.get('electron_retarding_fit_status')})
+                st.write({'Electron-fit R²':result.get('electron_retarding_fit_R2'),
+                          'Electron-fit normalized RMSE':result.get('electron_retarding_fit_normalized_rmse'),
+                          'Electron-fit residual RMS (A)':result.get('electron_retarding_fit_residual_rms_A'),
+                          'Te standard uncertainty (eV)':result.get('electron_temperature_standard_error_eV'),
+                          'Te uncertainty status':result.get('electron_temperature_uncertainty_status'),
+                          'Fit quality screening':result.get('electron_retarding_fit_status')})
+            if density_enabled:
+                st.write({'Ion density estimate (m⁻³)':result.get('ion_density_estimate_m-3'),
+                          'Density status':result.get('ion_density_status'),
+                          'Density uncertainty (m⁻³)':result.get('ion_density_standard_uncertainty_m-3'),
+                          'Density uncertainty status':result.get('ion_density_uncertainty_status')})
             st.json(result)
-            plot_line(df[vcol],df[icol],vcol,icol,'Measured probe I–V')
+            plot_line(result['processed_voltage_V'],result['processed_current_A'],'Probe voltage (V)','Normalized current (A)','Processed calibrated probe I–V')
             json_download('Export probe analysis JSON',result,'tis_probe_analysis.json')
         except Exception as e: st.error(str(e))
-    st.warning('All supplied voltage/current inputs are treated as already calibrated; this workflow performs no calibration. Default output is descriptive. Suggested intervals are not physical validation. Te is fitted only after a candidate/selected electron branch is reviewed; density additionally requires a physically justified ion branch, collection area, ion mass, and valid Te. Review fit residuals, sweep polarity, saturation regions, magnetic-field effects, and probe/sheath assumptions before interpreting estimates.')
+    with st.expander('Advanced electron-branch and plasma-potential models'):
+        advanced_method=st.selectbox('Advanced analysis',['Single-/two-temperature exponential fit','Stretched-exponential shape fit','Smoothed derivative candidates','Fit-window sensitivity'],key='probe_advanced_method')
+        advanced_model='two_temperature' if advanced_method=='Single-/two-temperature exponential fit' else 'stretched' if advanced_method=='Stretched-exponential shape fit' else 'smoothed' if advanced_method=='Smoothed derivative candidates' else 'sensitivity'
+        if advanced_method in {'Single-/two-temperature exponential fit','Stretched-exponential shape fit','Fit-window sensitivity'} and efit is None:
+            st.info('Enable and select an electron-retarding fit interval above before running this analysis.')
+        if advanced_method=='Single-/two-temperature exponential fit':
+            model_choice=st.selectbox('Electron model',['single_maxwellian','two_temperature'],index=1,key='probe_advanced_electron_model')
+        if advanced_method=='Smoothed derivative candidates':
+            sg1,sg2=st.columns(2)
+            with sg1: sg_window=st.number_input('Savitzky–Golay window (odd samples)',min_value=5,max_value=101,value=7,step=2,key='probe_sg_window')
+            with sg2: sg_order=st.number_input('Polynomial order',min_value=1,max_value=6,value=2,key='probe_sg_order')
+        if st.button('Run selected advanced analysis',key='probe_run_advanced'):
+            try:
+                if advanced_model=='two_temperature':
+                    advanced_result=fit_langmuir_electron_models(df[vcol],df[icol],efit,model=model_choice,current_convention=cur_conv)
+                elif advanced_model=='stretched':
+                    advanced_result=fit_langmuir_stretched_exponential(df[vcol],df[icol],efit,current_convention=cur_conv)
+                elif advanced_model=='smoothed':
+                    advanced_result=estimate_smoothed_plasma_potential_candidates(df[vcol],df[icol],window_length=int(sg_window),polynomial_order=int(sg_order),current_convention=cur_conv)
+                else:
+                    advanced_result=langmuir_fit_window_sensitivity(df[vcol],df[icol],efit,analysis_options={'current_convention':cur_conv})
+                st.json(advanced_result)
+            except Exception as exc: st.error(f'Advanced Langmuir analysis failed: {exc}')
+    with st.expander('Separate electron-density and ion-flux estimates'):
+        st.caption('These are separate model calculations, not automatic direct measurements from the canonical I–V fit.')
+        estimate_kind=st.selectbox('Estimate',['Electron density from electron-saturation current','Ion particle flux from supplied density'],key='probe_estimate_kind')
+        if estimate_kind=='Electron density from electron-saturation current':
+            ec1,ec2,ec3=st.columns(3)
+            with ec1: electron_sat_current=st.number_input('Electron saturation current (A)',value=1e-3,format='%.6g',key='probe_e_sat_current')
+            with ec2: electron_sat_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_e_sat_te')
+            with ec3: electron_sat_area=st.number_input('Effective collection area (m²)',min_value=1e-20,value=1e-4,format='%.6g',key='probe_e_sat_area')
+            if st.button('Estimate electron density',key='probe_estimate_ne'):
+                try: st.json(estimate_electron_density_from_saturation(electron_sat_current,electron_sat_te,electron_sat_area,current_convention=cur_conv))
+                except Exception as exc: st.error(str(exc))
+        else:
+            fc1,fc2,fc3,fc4=st.columns(4)
+            with fc1: flux_density=st.number_input('Ion density (m⁻³)',min_value=1e-6,value=1e18,format='%.6g',key='probe_flux_density')
+            with fc2: flux_te=st.number_input('Electron temperature (eV)',min_value=1e-6,value=5.0,key='probe_flux_te')
+            with fc3: flux_mass=st.number_input('Ion mass (kg)',min_value=1e-30,value=3.34e-27,format='%.6g',key='probe_flux_mass')
+            with fc4: flux_factor=st.number_input('Sheath factor',min_value=1e-6,value=1.0,key='probe_flux_factor')
+            if st.button('Estimate ion particle flux',key='probe_estimate_flux'):
+                try: st.json(estimate_ion_particle_flux(flux_density,flux_te,flux_mass,sheath_factor=flux_factor))
+                except Exception as exc: st.error(str(exc))
+    with st.expander('Multi-channel independent I–V batch'):
+        st.caption('Select multiple calibrated current columns sharing the selected voltage grid. Each channel is analyzed independently.')
+        batch_current_cols=st.multiselect('Current columns (one per channel)',[c for c in numeric if c!=vcol],default=[icol],key='probe_batch_current_cols')
+        if st.button('Analyze selected channels',key='probe_run_channel_batch'):
+            try:
+                if not batch_current_cols: raise ValueError('Select at least one current channel.')
+                batch_currents=df[batch_current_cols].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float).T
+                batch_result=analyze_langmuir_probe_array(df[vcol],batch_currents,channel_names=[str(x) for x in batch_current_cols],
+                    current_convention=cur_conv,electron_fit_range=efit,ion_fit_range=ifit)
+                st.json(batch_result)
+                json_download('Export multi-channel Langmuir JSON',batch_result,'tis_langmuir_multichannel.json')
+            except Exception as exc: st.error(f'Multi-channel Langmuir analysis failed: {exc}')
+    with st.expander('Time × channel independent sweep series'):
+        st.caption('Long-form input schema: one row per sample, with time, channel, calibrated voltage and calibrated current columns. Every time/channel group must contain the same number of samples; no temporal trend or cross-channel inference is performed.')
+        tcol=col_select('Time label column',numeric,'probe_series_time_col')
+        ccol=st.selectbox('Channel label column',[c for c in df.columns if c not in {tcol,vcol,icol}],key='probe_series_channel_col')
+        svcol=col_select('Series voltage column',numeric,'probe_series_voltage_col',default=vcol)
+        sicol=col_select('Series current column',numeric,'probe_series_current_col',default=icol)
+        if st.button('Analyze time × channel series',key='probe_run_series'):
+            try:
+                frame=df[[tcol,ccol,svcol,sicol]].copy()
+                frame[tcol]=pd.to_numeric(frame[tcol],errors='coerce')
+                frame[svcol]=pd.to_numeric(frame[svcol],errors='coerce')
+                frame[sicol]=pd.to_numeric(frame[sicol],errors='coerce')
+                if frame.isna().any().any(): raise ValueError('Time, channel, voltage and current values must be complete and numeric.')
+                times=sorted(frame[tcol].unique().tolist())
+                channel_labels=sorted(frame[ccol].astype(str).unique().tolist())
+                voltage_rows=[]; current_rows=[]
+                for time_value in times:
+                    v_channels=[]; i_channels=[]
+                    for channel_label in channel_labels:
+                        group=frame[(frame[tcol]==time_value)&(frame[ccol].astype(str)==channel_label)].sort_values(svcol)
+                        if len(group)<8: raise ValueError(f'Time {time_value}, channel {channel_label} has fewer than eight samples.')
+                        v_channels.append(group[svcol].to_numpy(dtype=float))
+                        i_channels.append(group[sicol].to_numpy(dtype=float))
+                    if len({len(x) for x in v_channels})!=1: raise ValueError(f'All channels at time {time_value} must have the same sample count.')
+                    voltage_rows.append(v_channels); current_rows.append(i_channels)
+                series_v=np.asarray(voltage_rows,dtype=float); series_i=np.asarray(current_rows,dtype=float)
+                series_result=analyze_langmuir_probe_series(series_v,series_i,time_labels=times,channel_names=channel_labels,
+                    analysis_options={'current_convention':cur_conv})
+                st.json(series_result)
+                json_download('Export Langmuir time-series JSON',series_result,'tis_langmuir_series.json')
+            except Exception as exc: st.error(f'Langmuir time-series analysis failed: {exc}')
+    st.warning('All inputs are treated as already calibrated. The software does not calibrate data or perform empirical validation. Numerical fit screens and model estimates do not certify physical probe regimes; missing uncertainty inputs remain unquantified.')
 
 elif page=='Plasma Parameters':
     st.title('Plasma Parameters & Diagnostic Conversions')
