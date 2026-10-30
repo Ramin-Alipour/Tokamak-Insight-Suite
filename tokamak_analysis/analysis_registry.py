@@ -8,7 +8,7 @@ from copy import deepcopy
 ANALYSES = [{
     "id": 1,
     "name": "Thomson scattering",
-    "module": "thomson_inference",
+    "module": "thomson_workflow",
     "function": "analyze_thomson_spectra",
     "execution_contract": {
         "schema_version": "1.0",
@@ -149,7 +149,7 @@ ANALYSES = [{
         "workflow_modes":             [
                 {
                     "name": "multi_channel_spectral_inference",
-                    "function": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+                    "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
                     "inputs": [
                         "wavelength_nm",
                         "spectra (channel × wavelength)",
