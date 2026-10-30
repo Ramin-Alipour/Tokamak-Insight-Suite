@@ -270,6 +270,8 @@ def analyze_thomson_spectra(
         raise ValueError("wavelength_nm must be shared 1-D or channel-shaped 2-D")
     if np.any(np.diff(xs, axis=1) <= 0):
         raise ValueError("Each channel wavelength axis must be strictly increasing")
+    if instrument_response is None:
+        raise ValueError("A measured instrument-response matrix is required; supply an identity matrix only when a delta-like response is explicitly justified.")
     if not np.isfinite(laser_wavelength_nm) or laser_wavelength_nm <= 0:
         raise ValueError("laser_wavelength_nm must be positive")
     if not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad <= np.pi:
