@@ -67,7 +67,8 @@ jobs:
           diagnostics = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text())
           formulas = json.loads((root / "FORMULA_REGISTRY.json").read_text())
           assert len(diagnostics) == 80, f"Expected 80 diagnostic entries, got {len(diagnostics)}"
-          assert len(formulas) == 37, f"Expected 37 formula entries, got {len(formulas)}"
+          expected_formulas = json.loads(pathlib.Path("FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+          assert formulas == expected_formulas, "Exported formulas differ from the canonical formula registry"
           assert all(item.get("execution_contract") for item in formulas), "Formula contract missing"
           (temp / "tis-cli-smoke.csv").write_text(
               "t,b1\n" + "".join(f"{i * 0.001},{(i % 4) - 1.5}\n" for i in range(64)),
@@ -245,12 +246,16 @@ jobs:
           python -m pip install --no-deps --target "$RUNNER_TEMP/tis-installed" dist/*.whl
           cd "$RUNNER_TEMP"
           PYTHONPATH="$RUNNER_TEMP/tis-installed" python - <<'PY'
+          import json
+          from pathlib import Path
+          import tis
           from tis.catalog import DIAGNOSTICS, FORMULAS
           from tis.contracts import get_diagnostic_contracts
           from tis import __version__
-          assert len(DIAGNOSTICS) == 80
-          assert len(FORMULAS) == 37
-          assert len(get_diagnostic_contracts()) == 80
+          package_data = Path(tis.__file__).resolve().parent / 'data'
+          assert DIAGNOSTICS == json.loads((package_data / 'DIAGNOSTIC_REGISTRY.json').read_text(encoding='utf-8'))
+          assert FORMULAS == json.loads((package_data / 'FORMULA_REGISTRY.json').read_text(encoding='utf-8'))
+          assert len(get_diagnostic_contracts()) == len(DIAGNOSTICS)
           assert __version__
           print(f"Wheel import and registry checks passed for TIS {__version__}.")
           PY

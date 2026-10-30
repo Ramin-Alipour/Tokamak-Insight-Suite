@@ -1651,7 +1651,15 @@ elif page=='Probe Analysis':
         st.info('Interpretation limits: probe transfer function, bandwidth, geometry, timing uncertainty and correlated drift are not automatically inferred. Numerical differentiation can amplify noise; sampling diagnostics alone do not rule out aliasing.')
     st.divider()
     st.markdown('### Langmuir probe I–V analysis')
-    vcol=col_select('Probe voltage (V)',numeric,'probe_v'); icol=col_select('Probe current (A)',numeric,'probe_i')
+    vcol=col_select('Probe voltage (V)',numeric,'probe_v')
+    current_options=[c for c in numeric if c != vcol]
+    if not current_options:
+        st.error('Langmuir analysis requires separate numeric voltage and current columns.')
+        st.stop()
+    default_current=next((c for c in current_options if str(c).casefold() in {'current_a','current','probe_current_a','i_a'}),current_options[0])
+    if st.session_state.get('probe_i') not in current_options:
+        st.session_state['probe_i']=default_current
+    icol=col_select('Probe current (A)',current_options,'probe_i',default=default_current)
     voltage_values=pd.to_numeric(df[vcol],errors='coerce').to_numpy(dtype=float)
     current_values=pd.to_numeric(df[icol],errors='coerce').to_numpy(dtype=float)
     finite_pairs=np.isfinite(voltage_values)&np.isfinite(current_values)

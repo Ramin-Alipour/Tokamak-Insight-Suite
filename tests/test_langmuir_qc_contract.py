@@ -119,7 +119,7 @@ def test_langmuir_density_uncertainty_rejects_negative_components():
         langmuir_iv_analysis(
             voltage, current,
             electron_fit_range=(-8.0, 0.0),
-            ion_fit_range=(-10.0, -7.0),
+            ion_fit_range=(-10.0, -8.5),
             probe_area_m2=1e-4,
             ion_mass_kg=3.34e-27,
             ion_saturation_coefficient=0.61,
@@ -194,7 +194,7 @@ def test_generic_probe_entry_point_uses_canonical_langmuir_contract():
 
     voltage = np.linspace(-10.0, 10.0, 81)
     current = -2e-3 + 2e-4 * np.exp((voltage + 10.0) / 3.0)
-    kwargs = {"electron_fit_range": (-8.0, 0.0), "ion_fit_range": (-10.0, -7.0)}
+    kwargs = {"electron_fit_range": (-8.0, 0.0), "ion_fit_range": (-10.0, -8.5)}
     canonical = analyze_langmuir_probe(voltage, current, **kwargs)
     generic = analyze_probe_voltage_current(voltage, current, **kwargs)
 

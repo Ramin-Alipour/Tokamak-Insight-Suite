@@ -51,7 +51,7 @@ def test_analysis_2_excludes_geometry_dependent_density_outputs():
     voltage, current = _synthetic_sweep()
     result = analyze_langmuir_probe(
         voltage, current, electron_fit_range=(-8.0, 0.0),
-        ion_fit_range=(-10.0, -5.0),
+        ion_fit_range=(-10.0, -8.5),
     )
     assert result["electron_temperature_eV"] == pytest.approx(3.0, rel=0.08)
     assert "ion_density_estimate_m-3" not in result

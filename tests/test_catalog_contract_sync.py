@@ -12,11 +12,11 @@ def test_ui_catalogue_is_loaded_from_canonical_diagnostic_registry():
 
 def test_formula_catalogue_is_loaded_from_canonical_formula_registry():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(FORMULAS) == 37
+    assert len(FORMULAS) == len(rows)
     assert FORMULAS == rows
     from importlib import import_module
     mapped = [row for row in FORMULAS if row["execution_contract"]["implementation_link_status"] == "mapped"]
-    assert len(mapped) == 37
+    assert len(mapped) == len(rows)
     assert sum(row["execution_contract"]["implementation_link_status"] == "not_mapped" for row in FORMULAS) == 0
     for row in mapped:
         contract = row["execution_contract"]

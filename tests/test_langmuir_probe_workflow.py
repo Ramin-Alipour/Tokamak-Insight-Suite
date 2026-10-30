@@ -281,7 +281,7 @@ def test_langmuir_probe_rejects_density_uncertainty_without_density_parameters()
 
 
 def test_langmuir_probe_density_requires_numerically_flat_ion_branch():
-    voltage, current, kwargs = density_case(ion_fit_range=(15.0, 20.0))
+    voltage, current, kwargs = density_case(electron_fit_range=(10.0, 14.0), ion_fit_range=(15.0, 20.0))
     with pytest.raises(ValueError, match="ion-branch fit that passes|numerically flat ion-branch"):
         analyze_langmuir_probe(voltage, current, **kwargs)
 

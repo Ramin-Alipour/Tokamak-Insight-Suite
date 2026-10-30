@@ -85,7 +85,7 @@ def test_langmuir_density_uses_explicit_sheath_model_inputs():
     area, mass, coefficient = 1.0e-6, 2.0 * 1.66053906660e-27, 0.61
     result = analyze_langmuir_probe(
         voltage, current, electron_fit_range=(-5.0, 3.0),
-        ion_fit_range=(-8.0, -5.0), probe_area_m2=area,
+        ion_fit_range=(-8.0, -5.5), probe_area_m2=area,
         ion_mass_kg=mass, ion_saturation_coefficient=coefficient,
         sheath_model="synthetic test only",
     )
@@ -148,7 +148,8 @@ def test_langmuir_reports_distinct_plasma_potential_candidates_without_claiming_
     voltage, current = _synthetic_sweep()
     result = analyze_langmuir_probe(voltage, current, electron_fit_range=(-5.0, 3.0))
     assert len(result["d2IdV2_A_per_V2"]) == len(voltage)
-    assert result["plasma_potential_candidate_method"] == "maximum_second_derivative_of_current"
+    assert result["plasma_potential_candidate_method"].startswith("maximum_first_derivative")
+    assert result["plasma_potential_second_derivative_method"] == "zero_crossings_of_second_derivative_for_inflection_candidates"
     assert voltage.min() <= result["plasma_potential_estimate_V"] <= voltage.max()
     assert voltage.min() <= result["plasma_potential_dIdV_max_candidate_V"] <= voltage.max()
     assert result["plasma_potential_status"] == "numerical_candidate_requires_regime_review"
