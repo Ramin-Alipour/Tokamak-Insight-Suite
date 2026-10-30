@@ -196,3 +196,35 @@ def test_spectral_distribution_reports_optimizer_failure_as_actionable_value_err
     monkeypatch.setattr(module, "curve_fit", fail_fit)
     with pytest.raises(ValueError, match="Gaussian spectral-shape fit failed"):
         module.analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
+
+
+def test_moments_use_signed_residuals_and_propagate_uncertainty():
+    x, y = _spectrum()
+    y = y.copy()
+    y[0] -= 2.0
+    out = analyze_thomson_spectral_distribution(
+        x, y, instrument_sigma_nm=0.06,
+        signal_uncertainty=np.full(x.size, 0.5),
+        background_mask=(x < 499.2) | (x > 500.8),
+        moment_mc_samples=40,
+    )
+    assert out["moment_weighting_method"] == "signed_background_subtracted_spectral_measure"
+    assert out["negative_area_fraction"] > 0
+    assert out["negative_area_fraction_removed_by_clipping"] == 0.0
+    assert out["spectral_centroid_uncertainty_nm"] > 0
+    assert out["observed_variance_uncertainty_nm2"] > 0
+    assert out["spectral_skewness_uncertainty"] > 0
+    assert out["instrument_corrected_sigma_uncertainty_nm"] > 0
+    assert out["background_estimation_method"] == "user_supplied_background_mask"
+
+
+def test_distribution_uses_general_instrument_response_matrix_without_gaussian_deconvolution():
+    x, y = _spectrum()
+    response = np.eye(x.size)
+    out = analyze_thomson_spectral_distribution(
+        x, y, instrument_response_matrix=response,
+        background_mask=(x < 499.2) | (x > 500.8),
+    )
+    assert out["instrument_response_model"] == "general_measured_response_matrix"
+    assert out["instrument_corrected_sigma_nm"] is None
+    assert out["instrument_width_resolved"] is None

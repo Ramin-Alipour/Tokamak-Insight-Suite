@@ -56,7 +56,7 @@ def _moment_statistics(x, y, instrument_sigma_nm, background_fraction, backgroun
     signal_scale = float(np.max(np.abs(y)))
     area_tolerance = 100.0 * np.finfo(float).eps * signal_scale * float(x[-1] - x[0])
     if not np.isfinite(signed_area) or signed_area <= area_tolerance:
-        raise ValueError("No positive signed spectral area remains after background subtraction")
+        raise ValueError("No positive spectral area (signed integral) remains after background subtraction")
     quadrature = np.empty_like(x)
     quadrature[0] = 0.5 * (x[1] - x[0])
     quadrature[-1] = 0.5 * (x[-1] - x[-2])
