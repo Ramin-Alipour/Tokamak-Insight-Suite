@@ -367,7 +367,9 @@ def analyze_thomson_spectra(
             # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
             # collective and non-collective regimes from the same dielectric
             # response; ion species/temperature are never silently defaulted.
-            ion_t = np.atleast_1d(ion_temperature_eV)
+            ion_t = _finite_array(np.atleast_1d(ion_temperature_eV), "ion_temperature_eV", 1)
+            if ion_t.size != len(ion_species) or np.any(ion_t <= 0):
+                raise ValueError("ion_temperature_eV must contain one positive temperature per ion species")
             ion_fract = _finite_array(ion_fractions, "ion_fractions", 1)
             if ion_fract.size != len(ion_species) or np.any(ion_fract <= 0) or not np.isclose(np.sum(ion_fract),1.0,rtol=1e-6,atol=1e-8):
                 raise ValueError("ion_fractions must contain one positive fraction per species and sum to one")
@@ -381,6 +383,8 @@ def analyze_thomson_spectra(
                 raise ValueError("electron_velocity_m_s must be a 3-vector")
             if ion_v.shape != (len(ion_species), 3):
                 raise ValueError("ion_velocity_m_s must have shape (number_of_ion_species, 3)")
+            if np.any(np.linalg.norm(ion_v,axis=1) >= C_M_S) or np.linalg.norm(electron_v[0]) >= C_M_S:
+                raise ValueError("Collective ion/electron flow speeds must be subluminal")
             probe_vec = np.array([1.0, 0.0, 0.0])
             theta = float(scattering_angle_rad)
             scatter_vec = np.array([np.cos(theta), np.sin(theta), 0.0])
