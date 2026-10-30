@@ -505,3 +505,29 @@ def test_fit_identifiability_rejects_rank_deficient_or_ill_conditioned_jacobian(
     )
     assert ill_conditioned["fit_accepted"] is False
     assert any("Jacobian is ill-conditioned" in reason for reason in ill_conditioned["fit_quality_reasons"])
+
+
+def test_fit_identifiability_rejects_optimizer_convergence_with_poor_reduced_chi_square():
+    from tokamak_analysis.thomson_inference import _fit_identifiability
+
+    result = _fit_identifiability(
+        np.eye(2),
+        np.array([10.0, -10.0, 8.0, -8.0]),
+        np.ones(4),
+        2,
+    )
+    assert result["fit_accepted"] is False
+    assert result["fit_reduced_chi_square"] > 10.0
+    assert any("does not adequately explain the data" in reason
+               for reason in result["fit_quality_reasons"])
+
+
+def test_fit_identifiability_rejects_mismatched_uncertainty_shape():
+    from tokamak_analysis.thomson_inference import _fit_identifiability
+
+    result = _fit_identifiability(
+        np.eye(2), np.array([0.1, -0.1, 0.0]), np.ones(2), 2
+    )
+    assert result["fit_accepted"] is False
+    assert any("does not match the residual" in reason
+               for reason in result["fit_quality_reasons"])
