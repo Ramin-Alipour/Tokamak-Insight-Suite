@@ -49,6 +49,24 @@ def test_non_gaussian_instrument_response_matrix_is_used_in_forward_fit():
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
 
 
+def test_instrument_response_conserves_spectral_power_on_nonuniform_wavelength_grid():
+    from tokamak_analysis.thomson_inference import _apply_response
+
+    u = np.linspace(-40.0, 40.0, 801)
+    x = 532.0 + u + 0.002 * u**2
+    sigma = 2.0 * 532.0 * np.sqrt(100.0 / 510998.95069) * np.sin(np.pi / 4)
+    intrinsic = 1200.0 * np.exp(-0.5 * ((x - 532.0) / sigma) ** 2)
+    background = 25.0 + 0.1 * (x - 532.0)
+    response = _asymmetric_lsf(x.size)
+    measured = _apply_response(response, intrinsic, x) + background
+
+    out = analyze_thomson_spectra(
+        x, measured[None, :], [0.2], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=response,
+    )
+    assert out["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
+
+
 def test_absolute_density_requires_explicit_watt_per_nm_calibration():
     x, y, _ = _spectral_case(100.0)
     with pytest.raises(ValueError, match="spectral_power_density_calibrated"):
