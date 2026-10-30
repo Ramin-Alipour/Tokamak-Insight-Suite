@@ -36,7 +36,7 @@ The Spectral Analysis workspace exposes this primary multi-channel spectral-infe
 | Absolute-density geometry | W, m, sr, dimensionless efficiency, incident direction, polarization and scattered direction vectors | Required with spectral intensity in W/nm to infer absolute density in the non-collective mode |
 | Laser/angle uncertainty | nm / rad | Optional; missing uncertainty inputs are explicitly flagged |
 | Optical-factor uncertainty | W, m, sr, dimensionless | Optional; only supplied uncertainty terms are propagated |
-| density_relative_covariance | 6×6 relative covariance | Optional complete covariance for scattered power and the five multiplicative optical inputs; mutually exclusive with scalar optical uncertainties |
+| density_relative_covariance | 6×6 relative covariance | Optional complete covariance for scattered power and the five multiplicative optical inputs; mutually exclusive with all separate scalar uncertainty inputs for the six density factors, including scattered-power uncertainty |
 | joint_spectral_covariance | (channels × wavelengths)² | Optional full positive-definite channel-major covariance for joint Maxwellian/Kappa GLS; mutually exclusive with signal_uncertainty |
 | ion_temperature_uncertainty_eV / ion_velocity_uncertainty_m_s / electron_velocity_uncertainty_m_s | eV / m s⁻¹ | Optional collective external-input 1-sigma uncertainties, propagated by Monte Carlo |
 | incident_direction_uncertainty / scattered_direction_uncertainty | component-wise 1-sigma 3-vectors | Optional collective beam-direction uncertainties; use instead of scalar scattering_angle_uncertainty_rad, not together |
