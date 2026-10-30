@@ -757,3 +757,40 @@ def test_beam_direction_component_uncertainty_is_rejected_outside_collective_mod
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
             incident_direction_uncertainty=[1e-4, 1e-4, 1e-4],
         )
+
+
+def test_joint_density_relative_covariance_preserves_cross_channel_density_covariance():
+    x, y1, _ = _spectral_case(100.0)
+    _, y2, _ = _spectral_case(140.0)
+    spectra = np.vstack([y1, y2]) * 1e-18
+    marginal = np.eye(6) * 1e-4
+    cross = np.eye(6) * 0.5e-4
+    joint_density_covariance = np.block([[marginal, cross], [cross, marginal]])
+    out = analyze_thomson_spectra(
+        x, spectra, [0.1, 0.2], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+        joint_density_relative_covariance=joint_density_covariance,
+    )
+    density_covariance = out["electron_density_joint_covariance_m6"]
+    assert out["electron_density_cross_channel_covariance_available"] is True
+    assert density_covariance.shape == (2, 2)
+    assert density_covariance[0, 1] > 0.0
+    for index, channel in enumerate(out["channels"]):
+        assert density_covariance[index, index] == pytest.approx(
+            channel["electron_density_uncertainty_m3"]**2, rel=1e-10
+        )
+
+
+def test_joint_density_covariance_rejects_incompatible_spectral_covariance():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="do not combine it with joint_spectral_covariance"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            joint_spectral_covariance=np.eye(x.size),
+            joint_density_relative_covariance=np.eye(6),
+        )
