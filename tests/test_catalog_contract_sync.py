@@ -93,7 +93,7 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
 
 
 def test_packaged_registry_data_matches_repository_registries():
-    for name in ("DIAGNOSTIC_REGISTRY.json", "FORMULA_REGISTRY.json"):
+    for name in ("DIAGNOSTIC_REGISTRY.json", "FORMULA_REGISTRY.json", "ANALYSIS_FAMILIES.json"):
         repository_copy = json.loads((ROOT / name).read_text(encoding="utf-8"))
         packaged_copy = json.loads((ROOT / "tis" / "data" / name).read_text(encoding="utf-8"))
         assert packaged_copy == repository_copy
@@ -154,3 +154,19 @@ def test_thomson_spatial_reconstruction_is_in_analysis_contract():
     assert "No extrapolation" in reconstruction["scope"]
     module = importlib.import_module("tokamak_analysis.thomson_scattering")
     assert callable(module.reconstruct_thomson_profile)
+
+
+def test_primary_analysis_registry_groups_all_80_entry_points_into_20_families():
+    from tokamak_analysis.analysis_registry import ANALYSIS_FAMILIES, get_analysis_family, get_family_entry_points
+
+    assert len(ANALYSIS_FAMILIES) == 20
+    assert [family["id"] for family in ANALYSIS_FAMILIES] == list(range(1, 21))
+    mapped_ids = [entry_id for family in ANALYSIS_FAMILIES for entry_id in family["entry_ids"]]
+    assert sorted(mapped_ids) == list(range(1, 81))
+    assert len(set(mapped_ids)) == 80
+    thomson = get_analysis_family(1)
+    assert {1, 7, 30, 46} <= set(thomson["entry_ids"])
+    support = get_analysis_family(20)
+    assert support["category"] == "instrumentation_support"
+    assert set(support["entry_ids"]) == {26, 27, 77, 78, 79, 80}
+    assert len(get_family_entry_points(1)) == len(thomson["entry_ids"])
