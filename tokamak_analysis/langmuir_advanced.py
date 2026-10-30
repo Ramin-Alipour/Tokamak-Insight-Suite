@@ -443,12 +443,12 @@ def estimate_smoothed_plasma_potential_candidates(
     polynomial_order: int = 2,
     current_convention: str = "electron_positive",
 ) -> dict[str, Any]:
-    """Compare raw-gradient and explicitly Savitzky-Golay-smoothed derivative candidates."""
+    """Compare raw gradients with local-polynomial derivatives on actual voltage coordinates."""
     v, i, input_quality = _prepare_advanced_iv(voltage_V, current_A, current_convention)
     if isinstance(window_length, bool) or not isinstance(window_length, int) or window_length < 5 or window_length % 2 == 0 or window_length > len(v):
         raise ValueError("window_length must be an odd integer between 5 and the number of samples.")
-    if isinstance(polynomial_order, bool) or not isinstance(polynomial_order, int) or polynomial_order < 1 or polynomial_order >= window_length:
-        raise ValueError("polynomial_order must be an integer in [1, window_length).")
+    if isinstance(polynomial_order, bool) or not isinstance(polynomial_order, int) or polynomial_order < 2 or polynomial_order >= window_length:
+        raise ValueError("polynomial_order must be an integer in [2, window_length) to calculate second derivatives.")
     raw_didv = np.gradient(i, v)
     raw_d2 = np.gradient(raw_didv, v)
     smooth_i, smooth_didv, smooth_d2 = _local_polynomial_smooth_nonuniform(
