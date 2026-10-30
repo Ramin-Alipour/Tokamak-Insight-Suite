@@ -225,6 +225,20 @@ def _softmax(values):
     return e/e.sum()
 
 
+def _second_derivative_matrix(axis):
+    axis=np.asarray(axis,dtype=float)
+    if axis.ndim!=1 or axis.size<3 or np.any(np.diff(axis)<=0):
+        raise ValueError("second-derivative grid must be strictly increasing with at least three nodes")
+    matrix=np.zeros((axis.size-2,axis.size),dtype=float)
+    for i in range(1,axis.size-1):
+        h0=axis[i]-axis[i-1]
+        h1=axis[i+1]-axis[i]
+        matrix[i-1,i-1]=2.0/(h0*(h0+h1))
+        matrix[i-1,i]=-2.0/(h0*h1)
+        matrix[i-1,i+1]=2.0/(h1*(h0+h1))
+    return matrix
+
+
 def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness=1e-2):
     """Validate and regularize a non-negative tabulated 1-D fast-ion VDF."""
     v = _array(velocity_m_s, "fast-ion velocity grid", 1)
@@ -238,7 +252,7 @@ def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness
     if area <= 0:
         raise ValueError("tabulated fast-ion VDF must have positive integral")
     p = p / area
-    second_difference = np.diff(np.eye(v.size), n=2, axis=0)
+    second_difference = _second_derivative_matrix(v)
     roughness = float(np.linalg.norm(second_difference @ p) ** 2)
     return {"velocity_m_s": v, "probability_density_m_s_inverse": p,
             "normalization_integral": 1.0, "second_difference_roughness": roughness,
@@ -385,7 +399,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if fast and fast["kind"]=="infer_tabulated_1d":
             masses=_softmax(np.r_[p[5:],0.0])
             pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
-            d2=np.diff(np.eye(pdf.size),n=2,axis=0)
+            d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])
             scale=max(float(np.max(pdf)),np.finfo(float).tiny)
             penalties.append(np.sqrt(regularization_strength)*np.sqrt(max(fast["vdf"]["smoothness_parameter"],1e-12))*(d2@pdf)/scale)
         return np.r_[data,*penalties]
