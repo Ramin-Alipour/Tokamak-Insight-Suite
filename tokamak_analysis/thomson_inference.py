@@ -835,6 +835,9 @@ def analyze_thomson_spectra(
             fit["differential_cross_section_m2_sr"] = density_result["differential_cross_section_m2_sr"]
             fit["density_method"] = "absolute integrated Thomson power using shared polarization-aware density inversion"
             fit["density_uncertainty_model"] = density_result["uncertainty_model"]
+            # Retain the exact, already validated physical inputs so a later
+            # joint spectral fit can recompute density from its own final area.
+            fit["_density_inputs_for_joint_refit"] = dict(density_inputs)
         else:
             fit["electron_density_m3"] = fit.get("electron_density_m3")
             if "density_status" not in fit:
