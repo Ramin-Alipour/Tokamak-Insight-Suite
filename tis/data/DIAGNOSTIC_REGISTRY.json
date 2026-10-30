@@ -305,6 +305,11 @@
         {
           "name": "electron_density_cross_channel_covariance_available",
           "unit": "boolean"
+        },
+        {
+          "name": "electron_density_external_parameter_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Collective external-parameter Monte Carlo contribution to cross-channel absolute-density covariance; distinct from per-channel spectral-fit uncertainty."
         }
       ],
       "assumptions": [
