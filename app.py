@@ -3009,6 +3009,24 @@ elif page=='Advanced Analysis':
                     polarization_text=st.text_input('Incident polarization unit vector (x,y,z; required)',value='',key='tis_ts_pol')
                     direction_text=st.text_input('Scattered-light unit direction (x,y,z; required)',value='',key='tis_ts_dir')
                     polarization_unc=st.text_input('Polarization-factor 1-sigma uncertainty (optional)',value='',key='tis_ts_pol_unc')
+            def _parse_advanced_scalar(raw,label,minimum=None,maximum=None):
+                try:
+                    value=float(raw)
+                except (TypeError,ValueError) as exc:
+                    raise ValueError(f'{label} must be supplied as a numeric value.') from exc
+                if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
+                    raise ValueError(f'{label} is outside its permitted finite range.')
+                return value
+            def _parse_advanced_optional_scalar(raw,label):
+                return None if raw is None or not raw.strip() else _parse_advanced_scalar(raw,label,minimum=0.0)
+            def _parse_advanced_vector(raw,label):
+                try:
+                    values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
+                except ValueError as exc:
+                    raise ValueError(f'{label} must contain three comma-separated numeric values.') from exc
+                if values.shape!=(3,) or not np.all(np.isfinite(values)):
+                    raise ValueError(f'{label} must contain exactly three finite values.')
+                return values
             if st.button('Run multi-channel Thomson spectral inference',type='primary',key='run_thomson_spectral_inference'):
                 try:
                     selected=[channel_col,radius_col,wavelength_col,signal_col]
@@ -3050,14 +3068,6 @@ elif page=='Advanced Analysis':
                         species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
                         fractions=None if not ion_fractions_text.strip() else [float(v.strip()) for v in ion_fractions_text.split(',') if v.strip()]
                         ion_t=[float(v.strip()) for v in ion_temperature_text.split(',') if v.strip()]
-                        def _parse_advanced_vector(raw,label):
-                            try:
-                                values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
-                            except ValueError as exc:
-                                raise ValueError(f'{label} must contain three comma-separated numeric values.') from exc
-                            if values.shape!=(3,) or not np.all(np.isfinite(values)):
-                                raise ValueError(f'{label} must contain exactly three finite values.')
-                            return values
                         if ion_velocity_text.strip():
                             ion_vectors=np.asarray([_parse_advanced_vector(v,'Ion velocity vector') for v in ion_velocity_text.split(';') if v.strip()],dtype=float)
                         elif assume_ion_stationary:
@@ -3079,16 +3089,6 @@ elif page=='Advanced Analysis':
                                      incident_direction=_parse_advanced_vector(incident_direction_text,'Incident direction'),
                                      scattered_direction=_parse_advanced_vector(direction_text,'Scattered direction'))
                     if power_calibrated:
-                        def _parse_advanced_scalar(raw,label,minimum=None,maximum=None):
-                            try:
-                                value=float(raw)
-                            except (TypeError,ValueError) as exc:
-                                raise ValueError(f'{label} must be supplied as a numeric value.') from exc
-                            if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
-                                raise ValueError(f'{label} is outside its permitted finite range.')
-                            return value
-                        def _parse_advanced_optional_scalar(raw,label):
-                            return None if not raw.strip() else _parse_advanced_scalar(raw,label,minimum=0.0)
                         laser_power=_parse_advanced_scalar(laser_power_text,'Laser power',minimum=1e-30)
                         interaction_length=_parse_advanced_scalar(interaction_length_text,'Interaction length',minimum=1e-12)
                         solid_angle=_parse_advanced_scalar(solid_angle_text,'Collection solid angle',minimum=1e-12)
@@ -3104,22 +3104,8 @@ elif page=='Advanced Analysis':
                             optical_efficiency=efficiency,optical_efficiency_uncertainty=_parse_advanced_optional_scalar(efficiency_unc,'Optical-efficiency uncertainty'),
                             incident_polarization=pol,incident_direction=incident_direction,scattered_direction=direction,
                             polarization_factor_uncertainty=_parse_advanced_optional_scalar(polarization_unc,'Polarization-factor uncertainty'))
-                    try:
-                        laser_nm=_parse_advanced_scalar(laser_nm_text,'Incident laser wavelength',minimum=1e-9)
-                        angle_deg=_parse_advanced_scalar(angle_deg_text,'Scattering angle',minimum=0.001,maximum=180.0)
-                    except NameError:
-                        # The scalar parser is also defined in the absolute-density branch;
-                        # keep these required acquisition parameters independent of that option.
-                        def _parse_advanced_scalar(raw,label,minimum=None,maximum=None):
-                            try:
-                                value=float(raw)
-                            except (TypeError,ValueError) as exc:
-                                raise ValueError(f'{label} must be supplied as a numeric value.') from exc
-                            if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
-                                raise ValueError(f'{label} is outside its permitted finite range.')
-                            return value
-                        laser_nm=_parse_advanced_scalar(laser_nm_text,'Incident laser wavelength',minimum=1e-9)
-                        angle_deg=_parse_advanced_scalar(angle_deg_text,'Scattering angle',minimum=0.001,maximum=180.0)
+                    laser_nm=_parse_advanced_scalar(laser_nm_text,'Incident laser wavelength',minimum=1e-9)
+                    angle_deg=_parse_advanced_scalar(angle_deg_text,'Scattering angle',minimum=0.001,maximum=180.0)
                     result=analyze_thomson_spectra(
                         np.asarray(wavelengths),np.asarray(spectra),np.asarray(radii),
                         laser_wavelength_nm=laser_nm,scattering_angle_rad=float(np.deg2rad(angle_deg)),
