@@ -139,7 +139,7 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     te = (thermal_sigma/laser_nm)**2 * (ELECTRON_REST_ENERGY_EV/4.0) / np.sin(angle/2.0)**2
     # The fitted spectral shift measures the velocity projection along q.
     q_projection = 2.0*np.sin(angle/2.0)
-    velocity = C_M_S * (center-laser_nm)/(laser_nm*q_projection)
+    velocity = -C_M_S * (center-laser_nm)/(laser_nm*q_projection)
     dof = max(1, wavelength.size-len(p))
     residual = signal-observed(wavelength, *p)
     fit_cov = np.asarray(cov, dtype=float)
@@ -201,7 +201,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         raise ValueError("Wavelength coverage must include at least ±3 fitted RMS widths")
     te=(sigma/laser_nm)**2*(ELECTRON_REST_ENERGY_EV/4.0)/np.sin(angle/2.0)**2
     q_projection=2.0*np.sin(angle/2.0)
-    velocity=C_M_S*(center-laser_nm)/(laser_nm*q_projection)
+    velocity=-C_M_S*(center-laser_nm)/(laser_nm*q_projection)
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
@@ -282,7 +282,7 @@ def _fit_relativistic_maxwell_juttner(wavelength, signal, laser_nm, angle, respo
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
     ratio_center = center / laser_nm
-    beta_center = (ratio_center - 1.0) / (sine * (ratio_center + 1.0))
+    beta_center = (1.0 - ratio_center) / (sine * (ratio_center + 1.0))
     if not np.isfinite(beta_center) or abs(beta_center) >= 1.0:
         raise ValueError("Fitted relativistic centroid implies a superluminal bulk-flow projection")
     velocity = C_M_S * beta_center
