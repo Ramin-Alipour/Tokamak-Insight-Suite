@@ -286,6 +286,12 @@ def langmuir_iv_analysis(voltage: Any, current: Any,
         out["plasma_potential_proxy_uncertainty_95pct_interval_V"] = None
     out["floating_potential_standard_uncertainty_V"] = None
     out["floating_potential_uncertainty_status"] = "not_quantified_current_uncertainty_not_supplied"
+    if processed_current_sigma is not None:
+        out["floating_potential_uncertainty_status"] = (
+            "not_calculated_no_unique_floating_potential"
+            if len(unique_candidates) != 1
+            else "not_calculated_zero_plateau_or_nonisolated_crossing"
+        )
     if processed_current_sigma is not None and len(unique_candidates) == 1:
         fp_value = float(unique_candidates[0])
         crossing_pairs = [k for k in range(len(v)-1)
