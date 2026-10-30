@@ -97,3 +97,17 @@ def test_reconstruction_metadata_distinguishes_fit_weights_from_output_uncertain
     assert model["fit_weights_are_not_output_uncertainties"] is True
     assert model["reconstructed_profile_uncertainty_available"] is True
     assert model["fit_confidence_intervals_estimated"] is True
+
+
+def test_line_average_compatibility_aliases_warn_and_return_radial_average():
+    from tokamak_analysis.thomson_scattering import profile_summary
+
+    profile = profile_summary(
+        np.array([0.0, 1.0, 2.0]),
+        np.array([1.0, 2.0, 3.0]),
+        np.array([10.0, 20.0, 30.0]),
+    )
+    with pytest.warns(DeprecationWarning, match="use density_radial_average_m3"):
+        assert profile.density_line_average_m3 == profile.density_radial_average_m3
+    with pytest.warns(DeprecationWarning, match="use temperature_radial_average_ev"):
+        assert profile.temperature_line_average_ev == profile.temperature_radial_average_ev
