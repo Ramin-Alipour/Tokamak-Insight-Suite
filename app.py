@@ -845,10 +845,12 @@ elif page=='Spectral Analysis':
             g1,g2,g3=st.columns(3)
             with g1:
                 laser_nm=st.number_input('Laser wavelength (nm)',min_value=1e-9,value=532.0,format='%.10g',key='ts_infer_laser')
-                laser_unc=st.number_input('Laser wavelength 1σ uncertainty (nm)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_laser_unc')
+                use_laser_unc=st.checkbox('Supply laser-wavelength uncertainty',value=False,key='ts_infer_use_laser_unc')
+                laser_unc=st.number_input('Laser wavelength 1σ uncertainty (nm)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_laser_unc') if use_laser_unc else None
             with g2:
                 angle_rad=st.number_input('Scattering angle (rad)',min_value=1e-9,max_value=float(np.pi),value=float(np.pi/2),format='%.9g',key='ts_infer_angle')
-                angle_unc=st.number_input('Scattering angle 1σ uncertainty (rad)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_angle_unc')
+                use_angle_unc=st.checkbox('Supply scattering-angle uncertainty',value=False,key='ts_infer_use_angle_unc')
+                angle_unc=st.number_input('Scattering angle 1σ uncertainty (rad)',min_value=0.0,value=0.0,format='%.8g',key='ts_infer_angle_unc') if use_angle_unc else None
             with g3:
                 response_upload=st.file_uploader('Measured instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
                 response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
@@ -866,7 +868,11 @@ elif page=='Spectral Analysis':
                     electron_velocity_text=st.text_input('Electron velocity vector (m/s; x,y,z)',key='ts_infer_electron_velocity')
                     incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_incident_direction')
                     scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_scattered_direction')
-            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
+            absolute_density=False
+            if model!='collective_maxwellian':
+                absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
+            else:
+                st.caption('Collective-mode density is inferred from the resolved dielectric spectral shape; the non-collective absolute-power inversion is not used.')
             density_kwargs={}
             if absolute_density:
                 st.markdown('**Absolute Thomson-power geometry**')
@@ -910,6 +916,8 @@ elif page=='Spectral Analysis':
                     required_cols=[channel_col,radius_col,wavelength_col,signal_col]
                     if len(set(required_cols))!=4:
                         raise ValueError('Channel ID, radius, wavelength and intensity must use four distinct columns.')
+                    if uncertainty_col!='<none>' and uncertainty_col in required_cols:
+                        raise ValueError('The uncertainty column must be distinct from channel, radius, wavelength and intensity columns.')
                     work=df[required_cols+([] if uncertainty_col=='<none>' else [uncertainty_col])].copy()
                     for column in [radius_col,wavelength_col,signal_col]+([] if uncertainty_col=='<none>' else [uncertainty_col]):
                         work[column]=pd.to_numeric(work[column],errors='coerce')
@@ -944,8 +952,8 @@ elif page=='Spectral Analysis':
                     if response_upload is not None:
                         response_frame=pd.read_csv(response_upload,header=None)
                         instrument_response=response_frame.to_numpy(dtype=float)
-                        if instrument_response.ndim==2 and instrument_response.shape[1]==1:
-                            instrument_response=instrument_response[:,0]
+                        if instrument_response.ndim==2 and 1 in instrument_response.shape:
+                            instrument_response=instrument_response.reshape(-1)
                     elif identity_response:
                         instrument_response=np.eye(expected_samples)
                     else:
@@ -956,8 +964,8 @@ elif page=='Spectral Analysis':
                     kwargs={
                         'laser_wavelength_nm':float(laser_nm),
                         'scattering_angle_rad':float(angle_rad),
-                        'laser_wavelength_uncertainty_nm':float(laser_unc),
-                        'scattering_angle_uncertainty_rad':float(angle_unc),
+                        'laser_wavelength_uncertainty_nm':None if laser_unc is None else float(laser_unc),
+                        'scattering_angle_uncertainty_rad':None if angle_unc is None else float(angle_unc),
                         'instrument_response':instrument_response,
                         'signal_uncertainty':signal_uncertainty,
                         'instrument_response_uncertainty':response_uncertainty,
