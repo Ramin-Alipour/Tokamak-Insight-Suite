@@ -1816,7 +1816,8 @@ elif page=='Probe Analysis':
                 if not batch_current_cols: raise ValueError('Select at least one current channel.')
                 batch_currents=df[batch_current_cols].apply(pd.to_numeric,errors='coerce').to_numpy(dtype=float).T
                 batch_result=analyze_langmuir_probe_array(df[vcol],batch_currents,channel_names=[str(x) for x in batch_current_cols],
-                    current_convention=cur_conv,electron_fit_range=efit,ion_fit_range=ifit)
+                    current_convention=cur_conv,current_uncertainty_A=(sigma_current if sigma_current>0 else None),
+                    electron_fit_range=efit,ion_fit_range=ifit)
                 st.json(batch_result)
                 json_download('Export multi-channel Langmuir JSON',batch_result,'tis_langmuir_multichannel.json')
             except Exception as exc: st.error(f'Multi-channel Langmuir analysis failed: {exc}')
@@ -1851,7 +1852,8 @@ elif page=='Probe Analysis':
                     raise ValueError('Every time/channel sweep must have the same sample count to form a rectangular time × channel × sample array.')
                 series_v=np.asarray(voltage_rows,dtype=float); series_i=np.asarray(current_rows,dtype=float)
                 series_result=analyze_langmuir_probe_series(series_v,series_i,time_labels=times,channel_names=channel_labels,
-                    analysis_options={'current_convention':cur_conv})
+                    analysis_options={'current_convention':cur_conv,'current_uncertainty_A':(sigma_current if sigma_current>0 else None),
+                                      'electron_fit_range':efit,'ion_fit_range':ifit})
                 st.json(series_result)
                 json_download('Export Langmuir time-series JSON',series_result,'tis_langmuir_series.json')
             except Exception as exc: st.error(f'Langmuir time-series analysis failed: {exc}')
