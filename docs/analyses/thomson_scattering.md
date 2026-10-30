@@ -98,7 +98,7 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
-- The collective fit uses a log-parameterized least-squares inversion for positive density and temperature. When per-sample 1σ uncertainties are supplied, their weighted covariance is retained as an absolute covariance; without them, the residual variance scales the local covariance. It does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
+- The collective fit uses a log-parameterized least-squares inversion for positive density and temperature, with only numerical floating-point bounds rather than user-independent physical range limits. When per-sample 1σ uncertainties are supplied, their weighted covariance is retained as an absolute covariance; without them, the residual variance scales the local covariance. It does not marginalize uncertainty in ion temperatures, ion flows, electron flows or the instrument response.
 - Correlated uncertainty between wavelength bins, calibration factors and channels is not modeled.
 - No independent experimental validation is claimed. Automated tests verify software behavior and mathematical consistency only.
 
