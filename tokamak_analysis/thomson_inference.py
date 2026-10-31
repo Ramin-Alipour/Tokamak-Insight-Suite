@@ -2317,8 +2317,8 @@ def analyze_thomson_spectra(
                 "background nuisance component from the selected Thomson physical forward fit"
             )
             distribution["interpretation"] = (
-                "Physical electron temperature, scattering-vector flow projection and identifiable electron density "
-                "are exposed from the selected physical forward fit of this same calibrated measured spectrum. "
+                "Physical electron temperature and identifiable density are exposed from the selected physical forward fit of this same calibrated measured spectrum; "
+                "electron flow is reported only when identifiable in the selected model. "
                 "Wavelength-space moments and the Gaussian shape fit remain complementary spectral-shape descriptors, "
                 "not a unique arbitrary electron velocity-distribution inversion."
             )
