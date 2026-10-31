@@ -536,9 +536,34 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     fit=least_squares(residual,start,bounds=(lo,hi),x_scale="jac",max_nfev=6000)
     d=decode(fit.x); z=forward(fit.x); amp,off=profile_amplitude(z)
     fitted=amp*z+off; res=y-fitted; data_fit_residual=data_residual(fit.x); dof=max(1,y.size-len(fit.x)-2)
-    rank=int(np.linalg.matrix_rank(fit.jac)); cond=float(np.linalg.cond(fit.jac))
+    # Identifiability must be assessed after column scaling.  The optimizer
+    # parameters mix logarithms, a dimensional flow projection and (for an
+    # inferred VDF) dimensionless logits; a raw condition number is therefore
+    # dominated by arbitrary parameter units rather than independent spectral
+    # information.
+    jacobian = np.asarray(fit.jac, dtype=float)
+    column_norms = np.linalg.norm(jacobian, axis=0)
+    scaled_jacobian = np.divide(
+        jacobian, column_norms[None, :],
+        out=np.zeros_like(jacobian),
+        where=column_norms[None, :] > np.finfo(float).tiny,
+    )
+    singular_values = np.linalg.svd(scaled_jacobian, compute_uv=False)
+    rank_tolerance = (
+        np.finfo(float).eps * max(scaled_jacobian.shape)
+        * (singular_values[0] if singular_values.size else 0.0)
+    )
+    rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    cond = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values.size and singular_values[-1] > 0.0 else float("inf")
+    )
     if not fit.success: raise ValueError(f"CTS refinement failed: {fit.message}")
-    if rank<len(fit.x) or not np.isfinite(cond) or cond>1e12: raise ValueError("CTS fit rejected: plasma parameters are not jointly identifiable")
+    if rank<len(fit.x) or not np.isfinite(cond) or cond>1e12:
+        raise ValueError(
+            "CTS fit rejected: plasma parameters are not jointly identifiable "
+            f"(scaled Jacobian rank {rank}/{len(fit.x)}, condition number {cond:.6g})"
+        )
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
     trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]
