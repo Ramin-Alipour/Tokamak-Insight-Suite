@@ -275,3 +275,9 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
             x, y, instrument_response_matrix=np.eye(x.size),
             signal_covariance=singular,
         )
+
+
+def test_spectral_distribution_requires_explicit_background_selection():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="Background is not inferred automatically"):
+        analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
