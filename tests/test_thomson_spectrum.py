@@ -260,11 +260,11 @@ def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_
     wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
     response = np.zeros((wavelength.size, wavelength.size), dtype=float)
     for column in range(wavelength.size):
-        response[column, column] = 0.70
+        response[column, column] = 0.40
         if column > 0:
             response[column - 1, column] = 0.10
         if column + 1 < wavelength.size:
-            response[column + 1, column] = 0.20
+            response[column + 1, column] = 0.50
     response /= response.sum(axis=0, keepdims=True)
     out = fit_thomson_spectrum(
         wavelength, signal, laser_wavelength_nm=laser_nm,
@@ -278,10 +278,12 @@ def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_
         + out["background_slope_per_nm"] * (wavelength - out["center_wavelength_nm"])
     )
     component = np.maximum(fitted - background, 0.0)
-    area = np.trapezoid(component, wavelength)
-    center = np.trapezoid(wavelength * component, wavelength) / area
+    integrate = getattr(np, "trapezoid", None)
+    integrate = integrate if integrate is not None else np.trapz
+    area = integrate(component, wavelength)
+    center = integrate(wavelength * component, wavelength) / area
     expected_sigma = np.sqrt(
-        np.trapezoid((wavelength - center) ** 2 * component, wavelength) / area
+        integrate((wavelength - center) ** 2 * component, wavelength) / area
     )
     assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
     assert out["fitted_sigma_nm"] != pytest.approx(
