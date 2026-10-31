@@ -328,8 +328,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     nb=positive_bounds("electron_density_m3")
     tb=positive_bounds("electron_temperature_eV")
     ib=positive_bounds("ion_temperature_eV")
-    ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-C,C))))
-    if len(ub)!=2 or not np.all(np.isfinite(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>C:
+    physical_flow_limit=float(np.nextafter(C,0.0))
+    ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-physical_flow_limit,physical_flow_limit))))
+    if len(ub)!=2 or not np.all(np.isfinite(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>=C:
         raise ValueError("ion-flow bounds must be finite, increasing and within the physical subluminal domain")
     if any(value is None for value in (
         electron_density_initial_m3,electron_temperature_initial_eV,
