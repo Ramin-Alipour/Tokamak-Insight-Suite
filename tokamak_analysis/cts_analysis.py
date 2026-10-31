@@ -290,7 +290,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=None,electron_temperature_initial_eV=None,ion_temperature_initial_eV=None,
     ion_velocity_initial_m_s=None,parameter_bounds=None,electron_velocity_projection_m_s=None,
-    fast_ion=None,global_search=False,random_seed=1729, inversion_method="differential_evolution",
+    fast_ion=None,global_search=False,random_seed=1729, inversion_method=None,
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None):
     """Infer CTS plasma parameters with selectable genetic, differential-evolution or regularized inversion."""
@@ -418,8 +418,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             lo=np.r_[lo,flo,tlo_log]
             hi=np.r_[hi,fhi,thi_log]
     noise=unc if unc is not None else np.full_like(y,max(float(np.std(y)),float(np.max(y))*1e-6,np.finfo(float).tiny))
-    if inversion_method not in {"differential_evolution", "improved_genetic", "regularized"}:
-        raise ValueError("inversion_method must be differential_evolution, improved_genetic or regularized")
+    if inversion_method not in {"local_least_squares", "differential_evolution", "improved_genetic", "regularized"}:
+        raise ValueError("Select inversion_method explicitly: local_least_squares, differential_evolution, improved_genetic or regularized")
+    if inversion_method in {"differential_evolution","improved_genetic"} and not global_search:
+        raise ValueError("differential_evolution and improved_genetic require global_search=True")
+    if inversion_method in {"local_least_squares","regularized"} and global_search:
+        raise ValueError("global_search must be disabled for local_least_squares and regularized inversion")
     regularization_strength=float(regularization_strength)
     if not np.isfinite(regularization_strength) or regularization_strength<0:
         raise ValueError("regularization_strength must be finite and non-negative")
