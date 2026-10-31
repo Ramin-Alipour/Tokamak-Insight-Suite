@@ -5,7 +5,7 @@
     "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated optical Thomson spectra; absolute electron density only where identifiable from calibrated spectral power and complete optical geometry.",
     "status": "D",
     "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Collective microwave CTS is a separate registered workflow.",
-    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; recoil/Compton corrections are neglected and the Thomson limit must be respected. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is a separate workflow. No independent experimental validation is claimed.",
+    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it screens the maximum represented electron-rest-frame Compton correction and rejects cases exceeding the configured 1% default limit. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is a separate workflow. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
@@ -56,7 +56,7 @@
           "name": "joint_spectral_covariance",
           "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
           "required": false,
-          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit."
+          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit. May be combined with density_relative_covariance or joint_density_relative_covariance when the scattered-power rows/columns of the optical covariance are zero."
         },
         {
           "name": "model",
@@ -79,7 +79,8 @@
         {
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Non-negative 2-D common response-matrix uncertainty (same instrument realization across all channels) or 3-D channel-specific uncertainty. Propagated by Monte Carlo; may be combined with density covariance when its scattered-power rows/columns are zero."
         },
         {
           "name": "instrument_response_mc_samples",
@@ -164,13 +165,31 @@
           "name": "density_relative_covariance",
           "unit": "6x6 relative covariance",
           "required": false,
-          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. Mutually exclusive with scalar optical uncertainties and joint_spectral_covariance."
+          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when its scattered-power row/column is zero; measured-power uncertainty is then supplied by the spectral/response propagation. Other duplicate scalar optical uncertainties remain prohibited."
         },
         {
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when all scattered-power rows/columns are zero; otherwise those sources would be double-counted. Mutually exclusive with density_relative_covariance and scalar optical-factor uncertainties."
+        },
+        {
+          "name": "incident_direction_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ direction uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; mutually exclusive with scalar scattering_angle_uncertainty_rad."
+        },
+        {
+          "name": "scattered_direction_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ direction uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; mutually exclusive with scalar scattering_angle_uncertainty_rad."
+        },
+        {
+          "name": "incident_polarization_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ polarization uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; polarization is reprojected transverse to each sampled incident direction."
         }
       ],
       "output_specs": [
@@ -218,11 +237,12 @@
         {
           "name": "electron_density_joint_covariance_m6",
           "unit": "n_channels x n_channels; m^-6",
-          "description": "Full cross-channel absolute-density covariance propagated from joint_density_relative_covariance."
+          "description": "Full cross-channel absolute-density covariance including joint optical-factor covariance, common scattering-angle covariance, and spectral/response-derived scattered-power covariance where available."
         },
         {
           "name": "electron_density_cross_channel_covariance_available",
-          "unit": "boolean"
+          "unit": "boolean",
+          "description": "True when cross-channel density covariance is available from joint optical inputs, common geometry uncertainty, joint spectral GLS or shared instrument-response uncertainty."
         },
         {
           "name": "kappa_index",
@@ -239,6 +259,42 @@
         {
           "name": "captured_spectral_probability",
           "unit": "dimensionless; fraction of quadrature spectrum inside the supplied wavelength range"
+        },
+        {
+          "name": "shared_instrument_response_parameter_covariance",
+          "unit": "covariance of channel-major temperature, flow projection and integrated spectral power",
+          "required": false
+        },
+        {
+          "name": "shared_instrument_response_parameter_covariance_order",
+          "unit": "ordered parameter-name vector",
+          "required": false
+        },
+        {
+          "name": "shared_instrument_response_cross_channel_covariance_available",
+          "unit": "boolean",
+          "required": true
+        },
+        {
+          "name": "validity_screening",
+          "unit": "per-channel dimensionless validity parameters and screening limits",
+          "required": false,
+          "description": "Non-relativistic Maxwellian/Kappa: theta_e < 0.01 and |v_flow|/c < 0.1. Conservative asymptotic error-budget screens (thermal corrections scale with theta_e; leading bulk-flow corrections scale with beta^2), not universal validity boundaries."
+        },
+        {
+          "name": "electron_density_angle_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Common scalar scattering-angle uncertainty contribution to cross-channel absolute-density covariance."
+        },
+        {
+          "name": "electron_density_shared_response_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Absolute-density covariance contribution propagated from measured-response Monte Carlo, including shared 2-D or channel-specific 3-D response uncertainty."
+        },
+        {
+          "name": "integrated_scattered_power_joint_covariance",
+          "unit": "n_channels x n_channels; integrated power squared",
+          "description": "Cross-channel covariance of fitted integrated spectral power from joint spectral GLS and measured-response Monte Carlo."
         }
       ],
       "assumptions": [
@@ -254,14 +310,15 @@
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
       "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry.",
-      "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance and measured-response Monte Carlo; full channel-major spectral GLS and external laser-wavelength/scattering-angle/polarization uncertainty propagation are not implemented. Supplied unsupported relativistic geometry uncertainties are rejected rather than silently ignored. Absolute-density uncertainty uses the supplied optical-factor uncertainty model; unprovided covariance and model discrepancy are excluded.",
+      "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance, measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties; full channel-major spectral GLS remains outside its scope. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines the supplied optical-factor covariance with spectral GLS and response Monte Carlo when the scattered-power covariance rows/columns are zero; scalar angle uncertainty is propagated separately as a common geometry source.",
       "limitations": [
         "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
-        "Relativistic optical model neglects photon recoil and Compton corrections and is limited to the Thomson regime.",
+        "Relativistic optical model does not include recoil/Compton physics; it screens the maximum represented rest-frame Compton correction and rejects spectra above the configured 1% default fractional-correction limit.",
         "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
-        "A supplied density_relative_covariance is authoritative for all six optical inversion inputs and cannot be combined with separate scalar uncertainty inputs.",
-        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow."
+        "A supplied density_relative_covariance or joint_density_relative_covariance describes the six optical inversion inputs. It can be combined with joint spectral covariance and/or response-matrix uncertainty when the scattered-power row and column are zero; measured-power uncertainty is then propagated separately. Scalar scattering-angle uncertainty is an additional common geometry contribution, while duplicate scalar optical-factor uncertainties remain prohibited.",
+        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow.",
+        "Non-relativistic Maxwellian and Kappa use explicit conservative screening limits theta_e < 0.01 and |v_flow|/c < 0.1; these are asymptotic error-budget screens, not universal physical validity boundaries."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -290,7 +347,8 @@
             "electron_density_profile_m3 where identifiable",
             "electron_velocity_projection_profile_m_s",
             "kappa_index_profile where applicable",
-            "per-channel fit diagnostics and covariance"
+            "per-channel fit diagnostics and covariance",
+            "shared instrument-response cross-channel parameter covariance where available"
           ],
           "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
         }
@@ -4251,6 +4309,20 @@
           "required": false,
           "description": "Number of incident-ray samples used for path-integrated Gaussian scattering-volume quadrature.",
           "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bindslev_validity_theta_e_limit",
+          "unit": "dimensionless positive limit on theta_e = T_e/(m_e c^2), below 1",
+          "required": false,
+          "description": "Full-EM only and only when electron_distribution is omitted. If supplied, the fitted theta_e above this researcher-selected asymptotic Bindslev screening limit is rejected. If omitted, validity is explicitly marked not_quantitatively_screened.",
+          "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer cold-plasma propagation branch index",
+          "required": false,
+          "description": "Required explicitly when generating frequency_resolved_geometry with trace_cts_frequency_resolved_beams and selected again in the Full-EM UI to verify the uploaded geometry. Select branch 0, 1 or 2; no default branch is assumed.",
+          "required_when_model": "full_electromagnetic"
         }
       ],
       "output_specs": [
@@ -4440,6 +4512,27 @@
           "name": "relativistic_electron_distribution",
           "unit": "explicit relativistic electron VDF metadata",
           "description": "Actual relativistic Maxwell-Juttner, bi-Gaussian or tabulated electron distribution used by the kinetic response."
+        },
+        {
+          "name": "electron_thermal_relativistic_parameter",
+          "unit": "dimensionless theta_e = T_e/(m_e c^2)",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bulk_electron_closure_validity_status",
+          "unit": "validity-screen status",
+          "description": "not_quantitatively_screened, within_researcher_supplied_asymptotic_screening_limit, or not_applicable_explicit_relativistic_electron_distribution.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bulk_electron_closure_validity_theta_e_limit",
+          "unit": "dimensionless researcher-selected theta_e limit",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer cold-plasma propagation branch index",
+          "available_when_model": "full_electromagnetic_ray_geometry"
         }
       ],
       "assumptions": [
@@ -4470,7 +4563,8 @@
         "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
         "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model.",
         "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
-        "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided."
+        "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided.",
+        "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -4537,7 +4631,8 @@
           ],
           "scope": "Cold-plasma geometrical-optics ray tracing with caller-supplied local Gaussian beam covariance; no diffraction."
         }
-      ]
+      ],
+      "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened."
     },
     "scientific_references": [
       {
