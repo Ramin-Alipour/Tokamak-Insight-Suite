@@ -471,6 +471,11 @@ def analyze_thomson_spectral_distribution(
         "instrument_corrected_variance_nm2": float(variance_physical) if variance_physical is not None and resolved else None,
         "instrument_width_resolved": resolved,
         "instrument_response_model": "general_measured_response_matrix" if response is not None else "gaussian_scalar_width",
+        "gaussian_fit_uncertainty_scope": (
+            "conditional_on_fixed_supplied_response_matrix"
+            if response is not None else
+            "signal_fit_covariance_with_optional_scalar_instrument_width_uncertainty"
+        ),
         "spectral_skewness": float(skewness),
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
