@@ -87,3 +87,21 @@ def test_analysis_1_dashboard_exposes_only_three_selected_optical_models():
         "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
     ]
+
+
+def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_renders():
+    wavelength = np.linspace(531.0, 533.0, 41)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 0.18) ** 2) + 0.02
+    background = np.full_like(wavelength, 0.02)
+    frame = pd.DataFrame({
+        "wavelength_nm": wavelength,
+        "measured_spectrum": signal,
+        "measured_background": background,
+    })
+    app = _app_with_table(frame)
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    assert "Thomson spectral distribution (independent)" in workflow.options
+    workflow.set_value("Thomson spectral distribution (independent)").run()
+    assert not app.exception, [str(error.value) for error in app.exception]
+    assert any(item.label == "Background definition" for item in app.selectbox)
+    assert any(item.label == "Run independent Thomson spectral-distribution analysis" for item in app.button)
