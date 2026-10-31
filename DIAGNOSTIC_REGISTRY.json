@@ -4231,15 +4231,15 @@
         },
         {
           "name": "incident_polarization",
-          "unit": "complex dimensionless transverse 3-vector",
+          "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "Mandatory for full_electromagnetic."
+          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed."
         },
         {
           "name": "scattered_polarization",
-          "unit": "complex dimensionless transverse 3-vector",
+          "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "Mandatory for full_electromagnetic."
+          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed."
         },
         {
           "name": "harmonic_order",
