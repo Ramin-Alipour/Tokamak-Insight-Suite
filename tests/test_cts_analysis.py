@@ -230,6 +230,16 @@ def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normal
     assert out["regularization_scope"] == "fast-ion VDF smoothness only; no plasma-parameter prior"
 
 
+def test_cts_forward_model_requires_explicit_ion_flow_projection():
+    f0,f,g,ions,frac,_=_case()
+    with pytest.raises(ValueError, match="ion_velocity_projection_m_s must be supplied explicitly"):
+        cts_spectral_density(
+            f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
+            ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,
+            electron_velocity_projection_m_s=0.0,
+        )
+
+
 def test_cts_requires_an_explicit_electron_flow_projection():
     f0, f, g, ions, frac, _ = _case()
     with pytest.raises(ValueError, match="electron_velocity_projection_m_s must be supplied explicitly"):
