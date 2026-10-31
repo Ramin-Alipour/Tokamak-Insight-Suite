@@ -332,10 +332,28 @@ def fit_relativistic_maxwell_juttner(
     fit = least_squares(objective, p0, x_scale="jac", max_nfev=1200)
     if not fit.success:
         raise ValueError(f"relativistic Maxwell-Juttner Thomson fit failed: {fit.message}")
-    rank = int(np.linalg.matrix_rank(fit.jac))
-    condition = float(np.linalg.cond(fit.jac))
+    jacobian = np.asarray(fit.jac, dtype=float)
+    column_norms = np.linalg.norm(jacobian, axis=0)
+    scaled_jacobian = np.divide(
+        jacobian, column_norms[None, :],
+        out=np.zeros_like(jacobian),
+        where=column_norms[None, :] > np.finfo(float).tiny,
+    )
+    singular_values = np.linalg.svd(scaled_jacobian, compute_uv=False)
+    rank_tolerance = (
+        np.finfo(float).eps * max(scaled_jacobian.shape)
+        * (singular_values[0] if singular_values.size else 0.0)
+    )
+    rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    condition = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values.size and singular_values[-1] > 0.0 else float("inf")
+    )
     if rank < 5 or not np.isfinite(condition) or condition > 1e12:
-        raise ValueError("relativistic Maxwell-Juttner Thomson fit is not jointly identifiable")
+        raise ValueError(
+            "relativistic Maxwell-Juttner Thomson fit is not jointly identifiable "
+            f"(scaled Jacobian rank {rank}/5, condition number {condition:.6g})"
+        )
     predicted_scaled, physical, shape = evaluate(
         fit.x, return_parts=True, require_full_spectrum=True
     )
