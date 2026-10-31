@@ -116,14 +116,21 @@ def analyze_thomson_spectral_distribution(
     background_fraction: float | None = None,
     background_mask=None,
     background_signal=None,
+    physical_parameters: dict | None = None,
     moment_mc_samples: int = 200,
 ) -> dict:
-    """Return signed spectral moments and instrument-aware Gaussian-fit diagnostics.
+    """Return spectral-shape diagnostics and physical parameters from the selected fit.
+
+    The canonical Thomson inference pipeline supplies physical_parameters from
+    its forward fit of this same calibrated measured spectrum. This subanalysis
+    exposes those fitted plasma quantities alongside wavelength-space moments; it
+    does not independently refit a second physical model or infer a unique electron
+    velocity distribution from moments. Direct callers may omit physical_parameters
+    for shape-only use, but the primary Analysis 1 pipeline always supplies it.
 
     Supply either a scalar Gaussian instrument sigma or a general measured response
     matrix. A general response matrix is used in the Gaussian forward fit; no scalar
-    Gaussian deconvolution is then claimed. A caller-supplied background mask can
-    replace the edge-background assumption. Signed, background-subtracted samples
+    Gaussian deconvolution is then claimed. Signed, background-subtracted samples
     (including negative noise residuals) are used for moments; clipping is forbidden.
     """
     x = _vector(wavelength_nm, "wavelength_nm")
@@ -212,6 +219,20 @@ def analyze_thomson_spectral_distribution(
             covariance_cholesky = np.linalg.cholesky(signal_covariance_matrix)
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
+
+    if physical_parameters is not None:
+        if not isinstance(physical_parameters, dict):
+            raise ValueError("physical_parameters must be a mapping from the canonical Thomson physical fit")
+        required_physical_keys = ("model", "electron_temperature_eV", "electron_velocity_projection_m_s")
+        missing_physical_keys = [key for key in required_physical_keys if key not in physical_parameters]
+        if missing_physical_keys:
+            raise ValueError("physical_parameters is missing canonical fit fields: " + ", ".join(missing_physical_keys))
+        if not isinstance(physical_parameters["model"], str) or not physical_parameters["model"].strip():
+            raise ValueError("physical_parameters.model must identify the selected physical forward model")
+        for key in required_physical_keys[1:]:
+            value = physical_parameters[key]
+            if value is not None and (isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)) or not np.isfinite(value)):
+                raise ValueError(f"physical_parameters.{key} must be a finite real scalar or None")
 
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
@@ -408,7 +429,28 @@ def analyze_thomson_spectral_distribution(
         "fitted_spectrum": fitted, "residual": residual,
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square, "r_squared": r_squared,
-        "model": "signed spectral moments after background subtraction; Gaussian forward fit for shape diagnostics",
+        "physical_parameter_extraction": (
+            {
+                "status": "completed" if physical_parameters.get("electron_temperature_eV") is not None and physical_parameters.get("electron_velocity_projection_m_s") is not None else "partial",
+                "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
+                "model": physical_parameters["model"],
+                "electron_temperature_eV": physical_parameters.get("electron_temperature_eV"),
+                "electron_temperature_uncertainty_eV": physical_parameters.get("electron_temperature_uncertainty_eV"),
+                "electron_velocity_projection_m_s": physical_parameters.get("electron_velocity_projection_m_s"),
+                "electron_velocity_projection_uncertainty_m_s": physical_parameters.get("electron_velocity_projection_uncertainty_m_s"),
+                "electron_density_m3": physical_parameters.get("electron_density_m3"),
+                "electron_density_uncertainty_m3": physical_parameters.get("electron_density_uncertainty_m3"),
+                "electron_density_status": "available" if physical_parameters.get("electron_density_m3") is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
+            }
+            if physical_parameters is not None else {
+                "status": "not_requested", "source": None, "model": None,
+                "electron_temperature_eV": None, "electron_temperature_uncertainty_eV": None,
+                "electron_velocity_projection_m_s": None, "electron_velocity_projection_uncertainty_m_s": None,
+                "electron_density_m3": None, "electron_density_uncertainty_m3": None,
+                "electron_density_status": "not_requested",
+            }
+        ),
+        "model": "canonical physical Thomson forward-fit parameters plus signed spectral moments and response-convolved Gaussian shape diagnostics",
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
             "A supplied Gaussian width or measured instrument-response matrix describes the spectral response",
@@ -420,7 +462,7 @@ def analyze_thomson_spectral_distribution(
             "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive",
             "A scalar Gaussian deconvolution is not applied to a general response matrix",
             "The edge-background fallback can remove real signal if the physical spectrum extends into both edges; supply background_mask to identify background-only samples",
-            "No electron temperature or density is inferred by this generic descriptive helper",
+            "Physical plasma parameters are taken from the canonical selected Thomson forward fit of the same calibrated measured spectrum; moments are not used as a surrogate electron velocity distribution",
             "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in the fitted background nuisance parameters is not jointly sampled.",
         ],
     }
