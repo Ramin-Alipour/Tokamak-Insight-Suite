@@ -277,10 +277,13 @@ def analyze_thomson_spectral_distribution(
             fit_model, x, fit_y, p0=fit_p0, bounds=(fit_lower, fit_upper),
             sigma=fit_sigma, absolute_sigma=(uncertainty is not None or signal_covariance_matrix is not None), maxfev=50000,
         )
+        # fit_model is evaluated in normalized-intensity space. Keep the
+        # optimizer parameters for model evaluation and expose the converted
+        # measured-unit parameters/covariance separately.
         parameter_scales = np.array([fit_scale, 1.0, 1.0, fit_scale, fit_scale])
         params = scaled_params * parameter_scales
         covariance = scaled_covariance * np.outer(parameter_scales, parameter_scales)
-        fitted = fit_model(x, *params)
+        fitted = fit_scale * fit_model(x, *scaled_params)
     except (ValueError, RuntimeError, FloatingPointError, OverflowError) as exc:
         raise ValueError(f"Gaussian spectral-shape fit failed: {exc}") from exc
     if not np.all(np.isfinite(params)) or not np.all(np.isfinite(fitted)):
