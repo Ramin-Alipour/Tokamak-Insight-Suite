@@ -1948,7 +1948,7 @@ def analyze_thomson_spectra(
                 if model == "collective_maxwellian" else
                 ["Collective kappa inference uses the implemented unmagnetized longitudinal dielectric response with projected isotropic kappa electrons and Maxwellian ions; supplied external-input and response-matrix 1-sigma uncertainties are propagated by Monte Carlo, but cross-correlations among distinct external inputs and full channel-major GLS are not implemented."]
                 if model == "collective_kappa" else
-                ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector; supplied response-matrix uncertainty is propagated by Monte Carlo, but laser/angle/beam-direction and incident-polarization uncertainty propagation is not yet complete."]
+                ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector. Supplied laser-wavelength, scalar-angle or beam-direction-component, incident-polarization-component, and response-matrix uncertainties are propagated by separate Monte Carlo refits when provided; correlations among these distinct external inputs are not modelled."]
                 if model == "non_collective_relativistic_maxwell_juttner" else
                 []
             ),

@@ -102,7 +102,27 @@ def fit_thomson_spectrum(
         raise ValueError("Fitted physical width is not positive and finite.")
     if instrument_sigma_nm is not None and intrinsic_sigma <= intrinsic_uncertainty:
         raise ValueError("Fitted physical width is not resolved relative to its fit uncertainty.")
-    fitted_sigma = (float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2)) if instrument_sigma_nm is not None else intrinsic_sigma)
+    # The canonical fit has already convolved the intrinsic physical spectrum
+    # with the supplied measured response matrix. Derive the observed width from
+    # that convolved fitted component; do not approximate an arbitrary response
+    # matrix by adding an optional scalar width in quadrature.
+    fitted_center = float(result["fitted_center_nm"])
+    fitted_background = (
+        float(result["background_intercept"])
+        + float(result["background_slope_per_nm"]) * (x - fitted_center)
+    )
+    fitted_component = np.asarray(result["fitted_spectrum"], dtype=float) - fitted_background
+    fitted_component = np.maximum(fitted_component, 0.0)
+    integrate = getattr(np, "trapezoid", None)
+    integrate = integrate if integrate is not None else np.trapz
+    fitted_area = float(integrate(fitted_component, x))
+    if not np.isfinite(fitted_area) or fitted_area <= 0.0:
+        raise ValueError("Response-convolved fitted Thomson feature has no positive finite integrated area.")
+    fitted_mean = float(integrate(x * fitted_component, x) / fitted_area)
+    fitted_variance = float(integrate((x - fitted_mean) ** 2 * fitted_component, x) / fitted_area)
+    if not np.isfinite(fitted_variance) or fitted_variance <= 0.0:
+        raise ValueError("Response-convolved fitted Thomson feature has no positive finite spectral variance.")
+    fitted_sigma = float(np.sqrt(fitted_variance))
     residual = np.asarray(result["residual"], dtype=float)
     dof = max(1, y.size - 5)
     reduced_chi_square = result.get("fit_reduced_chi_square")
@@ -115,6 +135,7 @@ def fit_thomson_spectrum(
         "amplitude": result["amplitude"],
         "center_wavelength_nm": result["fitted_center_nm"],
         "fitted_sigma_nm": fitted_sigma,
+        "response_convolved_sigma_nm": fitted_sigma,
         "instrument_sigma_nm": None if instrument_sigma_nm is None else float(instrument_sigma_nm),
         "physical_sigma_nm": intrinsic_sigma,
         "background_intercept": result["background_intercept"],
@@ -132,7 +153,7 @@ def fit_thomson_spectrum(
         "integrated_scattered_power_W": result.get("integrated_scattered_power_W"),
         "integrated_scattered_power_uncertainty_W": result.get("integrated_scattered_power_uncertainty_W"),
         "model": "Canonical Thomson inference: non-collective Maxwellian convolved with the supplied measured response matrix",
-        "assumptions": result["assumptions"] + ["Measured instrument-response matrix supplied by the caller; no synthetic Gaussian response is generated"],
+        "assumptions": result["assumptions"] + ["Measured instrument-response matrix supplied by the caller; response-convolved width is computed from the fitted spectrum without adding a second Gaussian width"],
         "limitations": [
             "Does not infer electron density from spectral shape; all fitting and physical inference are delegated to Analysis 1's canonical engine.",
             "Absolute electron density still requires separately calibrated optical power and geometry.",

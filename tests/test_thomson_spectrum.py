@@ -123,8 +123,12 @@ def test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area():
         signal_uncertainty=np.full(signal.size, 0.8e-18),
         spectral_power_density_calibrated=True,
     )
-    expected_power = out["amplitude"] * out["fitted_sigma_nm"] * np.sqrt(2.0 * np.pi)
+    # Absolute power is the intrinsic fitted feature integral. The observed
+    # response-convolved width is broader and must not be used to inflate it.
+    expected_power = out["amplitude"] * out["physical_sigma_nm"] * np.sqrt(2.0 * np.pi)
     assert out["integrated_scattered_power_W"] == pytest.approx(expected_power, rel=1e-12)
+    assert out["response_convolved_sigma_nm"] == out["fitted_sigma_nm"]
+    assert out["fitted_sigma_nm"] > out["physical_sigma_nm"]
     assert out["integrated_scattered_power_uncertainty_W"] > 0
     assert out["spectral_power_density_calibrated"] is True
     assert out["electron_temperature_eV"] == pytest.approx(100.0, rel=0.03)
@@ -249,3 +253,37 @@ def test_legacy_adapter_rejects_synthetic_response_from_scalar_width():
             wavelength, signal, laser_wavelength_nm=laser_nm,
             scattering_angle_rad=angle, instrument_sigma_nm=0.05,
         )
+
+
+
+def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_quadrature():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    response = np.zeros((wavelength.size, wavelength.size), dtype=float)
+    for column in range(wavelength.size):
+        response[column, column] = 0.70
+        if column > 0:
+            response[column - 1, column] = 0.10
+        if column + 1 < wavelength.size:
+            response[column + 1, column] = 0.20
+    response /= response.sum(axis=0, keepdims=True)
+    out = fit_thomson_spectrum(
+        wavelength, signal, laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle, instrument_sigma_nm=0.05,
+        instrument_response_matrix=response,
+        signal_uncertainty=np.full(signal.size, 0.8),
+    )
+    fitted = np.asarray(out["fitted_spectrum"], dtype=float)
+    background = (
+        out["background_intercept"]
+        + out["background_slope_per_nm"] * (wavelength - out["center_wavelength_nm"])
+    )
+    component = np.maximum(fitted - background, 0.0)
+    area = np.trapezoid(component, wavelength)
+    center = np.trapezoid(wavelength * component, wavelength) / area
+    expected_sigma = np.sqrt(
+        np.trapezoid((wavelength - center) ** 2 * component, wavelength) / area
+    )
+    assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
+    assert out["fitted_sigma_nm"] != pytest.approx(
+        np.sqrt(out["physical_sigma_nm"] ** 2 + 0.05 ** 2), rel=1e-3
+    )
