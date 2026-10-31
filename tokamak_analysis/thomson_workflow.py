@@ -176,6 +176,8 @@ def reconstruct_thomson_profile_from_spectra(
     n_channels = radii.size
     external_covariance = result.get("collective_external_parameter_covariance")
     external_order = result.get("collective_external_parameter_covariance_order") or []
+    shared_response_covariance = result.get("shared_instrument_response_parameter_covariance")
+    shared_response_order = result.get("shared_instrument_response_parameter_covariance_order") or []
     joint_summary = result.get("joint_inference") or {}
     joint_physical_covariance = joint_summary.get(
         "total_physical_parameter_covariance",
@@ -192,6 +194,35 @@ def reconstruct_thomson_profile_from_spectra(
                 matrix = np.asarray(external_covariance, dtype=float)
                 return matrix[np.ix_(indices, indices)]
         return fallback
+
+    def shared_response_covariance_for(labels):
+        if shared_response_covariance is None or not shared_response_order:
+            return None
+        indices = [
+            shared_response_order.index(label) if label in shared_response_order else None
+            for label in labels
+        ]
+        if not all(index is not None for index in indices):
+            return None
+        matrix = np.asarray(shared_response_covariance, dtype=float)
+        return matrix[np.ix_(indices, indices)]
+
+    def merge_shared_response_covariance(covariance, labels, marginal_uncertainty):
+        block = shared_response_covariance_for(labels)
+        if block is None:
+            return covariance
+        if covariance is None:
+            sigma = np.asarray(marginal_uncertainty, dtype=float)
+            if sigma.shape != (n_channels,) or not np.all(np.isfinite(sigma)):
+                return None
+            combined = np.diag(np.square(sigma))
+            off_diagonal = block.copy()
+            np.fill_diagonal(off_diagonal, 0.0)
+            return combined + off_diagonal
+        combined = np.asarray(covariance, dtype=float).copy()
+        if combined.shape != (n_channels, n_channels):
+            raise ValueError("Shared-response covariance does not match the number of Thomson channels.")
+        return combined + block
 
     def add_collective_local_fit_covariance(covariance, parameter_index):
         """Combine external-input MC covariance with each channel's local fit covariance.
@@ -243,12 +274,30 @@ def reconstruct_thomson_profile_from_spectra(
     flow_labels = [f"channel_{i}_electron_velocity_projection_m_s" for i in range(n_channels)]
     te_covariance = covariance_for(te_labels, te_covariance)
     flow_covariance = covariance_for(flow_labels, flow_covariance)
+    te_covariance = merge_shared_response_covariance(
+        te_covariance, te_labels, result.get("electron_temperature_uncertainty_profile_eV")
+    )
+    flow_covariance = merge_shared_response_covariance(
+        flow_covariance, flow_labels, result.get("electron_velocity_projection_uncertainty_profile_m_s")
+    )
     if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         te_covariance = add_collective_local_fit_covariance(te_covariance, 1)
     if density_covariance is None:
         density_covariance = covariance_for(
             [f"channel_{i}_electron_density_m3" for i in range(n_channels)]
         )
+    density_uncertainty_profile = result.get("electron_density_uncertainty_profile_m3")
+    shared_density_covariance = result.get("electron_density_shared_response_covariance_m6")
+    if shared_density_covariance is not None and density_uncertainty_profile is not None:
+        shared_density_covariance = np.asarray(shared_density_covariance, dtype=float)
+        if shared_density_covariance.shape == (n_channels, n_channels):
+            if density_covariance is None:
+                density_covariance = np.diag(np.square(np.asarray(density_uncertainty_profile, dtype=float)))
+            else:
+                density_covariance = np.asarray(density_covariance, dtype=float).copy()
+            off_diagonal = shared_density_covariance.copy()
+            np.fill_diagonal(off_diagonal, 0.0)
+            density_covariance += np.nan_to_num(off_diagonal, nan=0.0)
     if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         density_covariance = add_collective_local_fit_covariance(density_covariance, 0)
 
@@ -318,10 +367,20 @@ def reconstruct_thomson_profile_from_spectra(
             if result.get("absolute_scattered_power_available")
             else "integrated_spectral_signal_input_units_nm"
         )
+        power_profile_covariance = (
+            np.diag(power_sigma**2) if np.all(np.isfinite(power_sigma)) else None
+        )
+        if power_profile_covariance is not None:
+            area_labels = [
+                f"channel_{i}_integrated_scattered_power_W" for i in range(n_channels)
+            ]
+            shared_area_covariance = shared_response_covariance_for(area_labels)
+            if shared_area_covariance is not None:
+                off_diagonal = shared_area_covariance.copy()
+                np.fill_diagonal(off_diagonal, 0.0)
+                power_profile_covariance += off_diagonal
         candidates.append((
-            power_profile_name, None, None,
-            np.diag(power_sigma**2) if np.all(np.isfinite(power_sigma)) else None,
-            True,
+            power_profile_name, None, None, power_profile_covariance, True,
         ))
     # Spatially resolved spectral-shape descriptors are also useful outputs.
     # They remain explicitly wavelength-space diagnostics, not substitutes for
