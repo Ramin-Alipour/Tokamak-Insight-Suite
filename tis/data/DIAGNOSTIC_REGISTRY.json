@@ -399,6 +399,28 @@
       "note": "Primary Analysis 1 now includes a relativistic Maxwell-Juttner single-particle model and an unmagnetized collective kappa-electron dielectric model, in addition to the established Maxwellian/Kappa and collective Maxwellian paths. Declared model limits and unsupported uncertainty paths remain explicit.",
       "workflow_modes": [
         {
+          "name": "multi_channel_spectral_inference",
+          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+          "inputs": [
+            "wavelength_nm",
+            "spectra (channel × wavelength)",
+            "radius_m",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "instrument_response",
+            "model (non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner or collective Maxwellian/Kappa)",
+            "model-specific external geometry and ion inputs"
+          ],
+          "outputs": [
+            "electron_temperature_profile_eV",
+            "electron_density_profile_m3 where identifiable",
+            "electron_velocity_projection_profile_m_s",
+            "kappa_index_profile where applicable",
+            "per-channel fit diagnostics and covariance"
+          ],
+          "scope": "Canonical physical inference from measured calibrated multi-channel spectra using the explicitly selected physical forward model; no pre-derived ne/Te profile input."
+        },
+        {
           "name": "non_collective_relativistic_maxwell_juttner",
           "function": "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
           "inputs": [
@@ -436,7 +458,7 @@
           "scope": "Unmagnetized longitudinal dielectric model with projected isotropic kappa electrons and Maxwellian ions."
         }
       ],
-      "completion_scope": "Measured calibrated multi-channel spectrum-to-physics inference using non-collective Maxwellian/Kappa, relativistic Maxwell-Juttner, collective Maxwellian and collective kappa-electron dielectric models. Joint GLS remains limited to non-collective Maxwellian/Kappa. No detector calibration or independent experimental validation is performed.",
+      "completion_scope": "Measured calibrated multi-channel spectrum-to-physics inference using non-collective Maxwellian/Kappa, relativistic Maxwell-Juttner, collective Maxwellian and collective kappa-electron dielectric models. The separate registered spatial subanalysis reconstructs identifiable radial profiles from these measured spectra. Joint GLS remains limited to non-collective Maxwellian/Kappa. No detector calibration or independent experimental validation is performed.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
@@ -469,16 +491,6 @@
         "year": 2026,
         "doi": "10.1063/5.0350497",
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
-      },
-      {
-        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
-        "authors": "Carole et al.",
-        "journal": "Journal of Instrumentation",
-        "volume": "20",
-        "article": "P07014",
-        "year": 2025,
-        "doi": "10.1088/1748-0221/20/07/P07014",
-        "scope": "Recent optical Thomson diagnostic modelling and instrument-aware spectral inference context."
       },
       {
         "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
