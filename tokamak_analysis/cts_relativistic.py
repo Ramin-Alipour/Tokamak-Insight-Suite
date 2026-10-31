@@ -178,7 +178,6 @@ def relativistic_gyrotropic_three_wave_vertex(
                 store_force[ip, ia] = force
                 store_rhs[ip, ia] = -np.sum(force*grad0, axis=1)
                 detuning = omega-np.einsum("j,ij->i", kval, velocity)
-                operator = np.diag(width-1j*detuning)-omega_c*np.diag(harmonics*0+1) @ np.zeros((nphi,nphi))
                 # Fourier differentiation in gyroangle is assembled explicitly.
                 dphi = np.fft.ifft(np.diag(1j*harmonics) @ np.fft.fft(np.eye(nphi), axis=0), axis=0)
                 operator = np.diag(width-1j*detuning)-omega_c*dphi
@@ -228,7 +227,7 @@ def relativistic_gyrotropic_three_wave_vertex(
     for ip in range(npp):
         for ia in range(npa):
             rhs2 = -np.einsum("pi,pji->pj", force_i[ip, ia], grad_f[ip, ia])
-            rhs2 -= np.einsum("pji,pi->pj", force_f[ip, ia], grad_i[ip, ia])
+            rhs2 -= np.einsum("pij,pi->pj", force_f[ip, ia], grad_i[ip, ia])
             try:
                 delta2 = np.linalg.solve(operator_s[ip, ia], rhs2)
             except np.linalg.LinAlgError as exc:
