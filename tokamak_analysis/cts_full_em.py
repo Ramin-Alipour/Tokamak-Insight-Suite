@@ -824,6 +824,26 @@ def full_em_cts_spectral_density(
 
 
 
+def _apply_frequency_response(response, spectrum, frequency):
+    """Apply a bin-probability response while conserving integrated spectral power."""
+    f = _real_array(frequency, "frequency_shift_Hz", 1)
+    y = _real_array(spectrum, "spectral_density", 1)
+    r = _real_array(response, "instrument_response", 2)
+    if f.size < 2 or y.shape != f.shape or r.shape != (f.size, f.size):
+        raise ValueError("response, spectrum and frequency axis must share a square frequency grid")
+    if np.any(r < 0.0) or np.any(r.sum(axis=0) <= 0.0):
+        raise ValueError("instrument_response must be non-negative with non-zero columns")
+    r = r/r.sum(axis=0, keepdims=True)
+    edges = np.empty(f.size + 1, dtype=float)
+    edges[1:-1] = 0.5*(f[:-1] + f[1:])
+    edges[0] = f[0] - 0.5*(f[1]-f[0])
+    edges[-1] = f[-1] + 0.5*(f[-1]-f[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("frequency axis must define positive bin widths")
+    return (r @ (y*widths))/widths
+
+
 def analyze_full_em_cts_spectrum(
     frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
     scattering_geometry, electron_density_initial_m3,
@@ -946,11 +966,7 @@ def analyze_full_em_cts_spectrum(
             electron_distribution=electron_distribution,
             bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
         )["spectral_density"]
-        widths = np.empty_like(f)
-        widths[0] = 0.5 * (f[1] - f[0])
-        widths[-1] = 0.5 * (f[-1] - f[-2])
-        widths[1:-1] = 0.5 * (f[2:] - f[:-2])
-        return (response @ (result * widths)) / widths
+        return _apply_frequency_response(response, result, f)
 
     def residual(p, return_profile=False):
         z = model(p)
