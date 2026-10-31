@@ -231,6 +231,28 @@ def test_registry_resolves_primary_thomson_spectral_workflow():
     assert entrypoint.__name__ == "analyze_thomson_spectra"
 
 
+def test_collective_external_covariance_indices_use_full_channel_stride():
+    from tokamak_analysis.thomson_inference import _collective_external_parameter_indices
+
+    assert _collective_external_parameter_indices(0, 2) == (0, 1, 2, (3, 4))
+    assert _collective_external_parameter_indices(1, 2) == (5, 6, 7, (8, 9))
+
+
+def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
+    from tokamak_analysis.analysis_registry import resolve_analysis
+
+    entrypoint = resolve_analysis(46)
+    assert callable(entrypoint)
+    assert entrypoint.__name__ == "reconstruct_thomson_profile_from_spectra"
+    x, y, _ = _spectral_case(100.0)
+    result = entrypoint(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+    )
+    assert result["registered_subanalysis"] == "Thomson spatial profile reconstruction from calibrated spectra"
+    assert result["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
+
+
 def test_instrument_response_uncertainty_is_monte_carlo_propagated():
     x,y,_=_spectral_case(100.0)
     response=np.eye(x.size)

@@ -85,7 +85,7 @@ def test_reconstruction_independently_recovers_linear_profiles_on_nonuniform_inp
     np.testing.assert_allclose(result["reconstructed_temperature_eV"], 100.0 - 20.0 * grid, rtol=2e-12, atol=1e-10)
     np.testing.assert_allclose(result["reconstruction_gradients"]["density_gradient_m-4"], -1.0e19, rtol=2e-12, atol=1e5)
     np.testing.assert_allclose(result["reconstruction_gradients"]["temperature_gradient_eV_m-1"], -20.0, rtol=2e-12, atol=1e-10)
-    assert result["uncertainty_model"]["reconstructed_profile_uncertainty_available"] is True
+    assert result["uncertainty_model"]["reconstructed_profile_uncertainty_available"] is False
 
 
 def test_reconstruction_metadata_distinguishes_fit_weights_from_output_uncertainty():

@@ -32,10 +32,9 @@ def test_thomson_geometry_dependent_workflows_are_not_in_analysis_1_ui():
     })
     app = _app_with_table(frame)
     workflow = next(item for item in app.selectbox if item.label == "Select workflow")
-    assert "Thomson calibrated profile analysis" in workflow.options
-    assert "Thomson spatial profile reconstruction" in workflow.options
-    assert "Thomson raw-spectrum temperature fit" not in workflow.options
-    assert "Thomson calibrated scattered-power density" not in workflow.options
+    assert "Thomson downstream profile summary (pre-derived ne/Te)" not in workflow.options
+    assert "Thomson downstream profile reconstruction (pre-derived ne/Te)" not in workflow.options
+    assert "Thomson spatial profile reconstruction from calibrated spectra" in workflow.options
 
 
 
@@ -52,67 +51,24 @@ def test_primary_multi_channel_spectral_inference_is_exposed_in_spectral_workspa
     assert "Thomson multi-channel spectral inference" in workflow.options
 
 
-def test_thomson_calibrated_profile_dashboard_executes_and_exports():
-    radius = np.linspace(0.0, 0.4, 9)
+def test_thomson_profile_subanalysis_routes_to_canonical_spectral_inference():
+    wavelength = np.linspace(531.0, 533.0, 9)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 0.2) ** 2)
     frame = pd.DataFrame({
-        "radius_m": radius,
-        "density_m3": 2.0e19 * (1.0 - 0.5 * radius),
-        "temperature_eV": 120.0 * (1.0 - 0.25 * radius),
-        "density_sigma_m3": np.full(radius.size, 1.0e17),
-        "temperature_sigma_eV": np.full(radius.size, 1.0),
+        "channel_id": ["ch0"] * wavelength.size + ["ch1"] * wavelength.size,
+        "radius_m": [0.1] * wavelength.size + [0.2] * wavelength.size,
+        "wavelength_nm": np.tile(wavelength, 2),
+        "intensity": np.tile(signal, 2),
     })
     app = _app_with_table(frame)
-    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
-        "Thomson calibrated profile analysis"
-    ).run()
-
-    selectors = {item.label: item for item in app.selectbox}
-    selectors["Radius / minor-radius coordinate (m)"].set_value("radius_m")
-    selectors["Electron density (m⁻³)"].set_value("density_m3")
-    selectors["Electron temperature (eV)"].set_value("temperature_eV")
-    selectors["Optional density 1-sigma uncertainty column (m⁻³)"].set_value(
-        "density_sigma_m3"
-    )
-    selectors["Optional temperature 1-sigma uncertainty column (eV)"].set_value(
-        "temperature_sigma_eV"
-    )
-    app.run()
-    next(item for item in app.button if item.label == "Analyze calibrated Thomson profiles").click().run()
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    workflow.set_value("Thomson spatial profile reconstruction from calibrated spectra").run()
+    next(item for item in app.button if item.label == "Open canonical Thomson profile-inference workflow").click().run()
 
     assert not app.exception, [str(error.value) for error in app.exception]
-    assert any("Calibrated Thomson profile analysis completed." in str(item.value) for item in app.success)
-    assert any(item.label == "Download Thomson profile results" for item in app.get("download_button"))
-    assert any(item.label == "Export Thomson profile summary" for item in app.get("download_button"))
-
-
-def test_thomson_spatial_profile_reconstruction_dashboard_executes_and_exports():
-    radius = np.linspace(0.0, 0.4, 9)
-    frame = pd.DataFrame({
-        "radius_m": radius,
-        "density_m3": 2.0e19 * (1.0 - 0.5 * radius),
-        "temperature_eV": 120.0 * (1.0 - 0.25 * radius),
-    })
-    app = _app_with_table(frame)
-    next(item for item in app.selectbox if item.label == "Select workflow").set_value(
-        "Thomson spatial profile reconstruction"
-    ).run()
-
-    selectors = {item.label: item for item in app.selectbox}
-    selectors["Measurement radius (m)"].set_value("radius_m")
-    selectors["Calibrated electron density (m⁻³)"].set_value("density_m3")
-    selectors["Calibrated electron temperature (eV)"].set_value("temperature_eV")
-    selectors["Reconstruction method"].set_value("Shape-preserving PCHIP")
-    app.run()
-    next(item for item in app.button if item.label == "Reconstruct Thomson profiles").click().run()
-
-    assert not app.exception, [str(error.value) for error in app.exception]
-    assert any(
-        "Spatial Thomson profile reconstruction completed" in str(item.value)
-        for item in app.success
-    )
-    assert any(item.label == "Download reconstructed Thomson profiles (CSV)" for item in app.get("download_button"))
-    assert any(item.label == "Export reconstruction, method and limitations (JSON)" for item in app.get("download_button"))
-
+    assert app.radio[0].value == "Spectral Analysis"
+    spectral_workflow = next(item for item in app.radio if item.label == "Workflow")
+    assert spectral_workflow.value == "Thomson multi-channel spectral inference"
 
 
 def test_thomson_spatial_reconstruction_never_returns_negative_profiles():
