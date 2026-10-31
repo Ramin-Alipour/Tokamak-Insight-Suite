@@ -690,6 +690,8 @@ def analyze_thomson_spectra(
             )
         return matrix
 
+    if density_relative_covariance is not None and joint_spectral_covariance is not None:
+        raise ValueError("Per-channel density_relative_covariance is not compatible with joint_spectral_covariance; do not combine it with joint_spectral_covariance.")
     if density_relative_covariance is not None and (
         joint_spectral_covariance is not None or lsf_unc is not None
     ):
@@ -701,6 +703,10 @@ def analyze_thomson_spectra(
             raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective models infer density from the dielectric spectral shape.")
         if density_relative_covariance is not None:
             raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
+        if joint_spectral_covariance is not None or lsf_unc is not None:
+            require_zero_scattered_power_covariance(
+                joint_density_relative_covariance, "joint_density_relative_covariance"
+            )
         if not spectral_power_density_calibrated or any(value is None for value in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency
         )):
