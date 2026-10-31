@@ -526,7 +526,12 @@ def full_em_cts_spectral_density(
             total_source_operator += fast_operator
             relativistic_vertex_at_frequency.append({
                 "name": fast_species["name"],
-                "population_role": ("non-Maxwellian electron" if fast_species.get("nonthermal_electron") else "fast ion"),
+                "population_role": (
+                    "relativistic Maxwell-Juttner electron"
+                    if fast_species.get("nonthermal_electron") and fast_species["distribution"].get("kind") == "relativistic_maxwell_juttner"
+                    else "non-Maxwellian electron" if fast_species.get("nonthermal_electron")
+                    else "fast ion"
+                ),
                 "current_vertex_A_m2_per_V_m": vertex["current_vertex_A_m2_per_V_m"],
                 "distribution_kind": vertex["distribution_kind"],
                 "second_order_vlasov": vertex["second_order_vlasov"],
@@ -580,7 +585,7 @@ def full_em_cts_spectral_density(
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
         "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
         "three_wave_coupling": (
-            "Relativistic second-order gyrotropic Vlasov vertices for supplied non-Maxwellian electrons/fast ions; Maxwellian bulk-electron Bindslev vertex replaced"
+            "Relativistic second-order gyrotropic Vlasov vertices for supplied relativistic electrons/fast ions; Maxwellian bulk-electron Bindslev vertex replaced"
             if electron_distribution is not None
             else "Bindslev low-temperature bulk-electron source-current tensor plus relativistic second-order gyrotropic Vlasov vertices for supplied fast-ion populations"
             if any(relativistic_three_wave_vertex_diagnostics)
@@ -594,10 +599,10 @@ def full_em_cts_spectral_density(
                                    if frequency_geometry is not None and all("scattering_location_m" in item for item in frequency_geometry)
                                    else None),
         "fast_ion_populations": fast_ion_populations or [],
-        "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic non-Maxwellian electron/fast-ion response and second-order kinetic vertices"
+        "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic electron/fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-electromagnetic CTS with Bindslev low-temperature bulk-electron coupling and optional relativistic gyrotropic fast-ion kinetics"),
-        "kinetic_response": "Maxwellian thermal species: magnetized Vlasov gyro-harmonics; explicitly supplied non-Maxwellian electrons/fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
+        "kinetic_response": "Maxwellian thermal species: magnetized Vlasov gyro-harmonics; explicitly supplied relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic electrons/fast ions: relativistic momentum-space Vlasov Fourier collocation",
         "fluctuation_source": "Maxwellian thermal species: classical FDT; explicitly supplied non-Maxwellian electron/fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
@@ -605,7 +610,7 @@ def full_em_cts_spectral_density(
             "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping},
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
-            "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied non-Maxwellian electron/fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
+            "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied electron distributions may use relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum distributions, and fast ions use bi-Gaussian or tabulated distributions.",
             "When electron_distribution is supplied, the Maxwellian electron response and Bindslev electron nonlinear source are replaced by a relativistic gyrotropic electron Vlasov response and second-order kinetic vertex; supplied fast-ion populations add their own relativistic vertices.",
             "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
         ],
