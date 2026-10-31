@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "primary_analysis_count": 20,
-  "underlying_entry_point_count": 79,
-  "policy": "The 20 primary analyses are navigation/grouping families. The 79 registered underlying entry points remain intact as subanalyses/workflows; retired duplicate entry ID 7 is not registered.",
+  "underlying_entry_point_count": 80,
+  "policy": "The 20 primary analyses are navigation/grouping families. The 80 registered underlying entry points remain intact as subanalyses/workflows; retired duplicate entry ID 7 is not registered.",
   "families": [
     {
       "id": 1,
