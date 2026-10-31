@@ -278,12 +278,15 @@ def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_
         + out["background_slope_per_nm"] * (wavelength - out["center_wavelength_nm"])
     )
     component = np.maximum(fitted - background, 0.0)
-    integrate = getattr(np, "trapezoid", None)
-    integrate = integrate if integrate is not None else np.trapz
-    area = integrate(component, wavelength)
-    center = integrate(wavelength * component, wavelength) / area
+    edges = np.empty(wavelength.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    widths = np.diff(edges)
+    area = np.sum(component * widths)
+    center = np.sum(wavelength * component * widths) / area
     expected_sigma = np.sqrt(
-        integrate((wavelength - center) ** 2 * component, wavelength) / area
+        np.sum((wavelength - center) ** 2 * component * widths) / area
     )
     assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
     assert out["fitted_sigma_nm"] != pytest.approx(
