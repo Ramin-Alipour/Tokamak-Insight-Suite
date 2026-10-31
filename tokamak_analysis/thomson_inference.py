@@ -959,7 +959,7 @@ def analyze_thomson_spectra(
                 "scattered_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else area_sigma),
                 "incident_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
                 "interaction_length_uncertainty_m": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
-                "scattering_angle_uncertainty_rad": (None if density_relative_covariance is not None or joint_density_covariance is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
+                "scattering_angle_uncertainty_rad": (None if joint_density_covariance is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
                 "collection_solid_angle_uncertainty_sr": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr")),
                 "optical_efficiency_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty")),
                 "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
@@ -1028,12 +1028,18 @@ def analyze_thomson_spectra(
         fit["uncertainty_completeness"] = "partial" if missing_uncertainties else "all_supported_inputs_supplied"
         if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "non_collective_relativistic_maxwell_juttner"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
-            rng = np.random.default_rng(7319 + i)
+            # A shared 2-D response matrix represents one common instrument
+            # realization for every channel. Reuse the same random stream and
+            # retain failed draw slots so cross-channel samples stay aligned.
+            rng = np.random.default_rng(7319 if lsf_unc.ndim == 2 else 7319 + i)
             te_samples, velocity_samples, area_samples = [], [], []
             for _ in range(int(instrument_response_mc_samples)):
                 sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
                 if np.any(colsum <= 0):
+                    te_samples.append(np.nan)
+                    velocity_samples.append(np.nan)
+                    area_samples.append(np.nan)
                     continue
                 sampled /= colsum[None, :]
                 try:
@@ -1049,20 +1055,29 @@ def analyze_thomson_spectra(
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
-                    if "integrated_scattered_power_W" in draw and np.isfinite(draw["integrated_scattered_power_W"]):
-                        area_samples.append(float(draw["integrated_scattered_power_W"]))
+                    area_samples.append(float(draw["integrated_scattered_power_W"])
+                                        if "integrated_scattered_power_W" in draw
+                                        and np.isfinite(draw["integrated_scattered_power_W"]) else np.nan)
                 except (ValueError, RuntimeError):
-                    continue
+                    te_samples.append(np.nan)
+                    velocity_samples.append(np.nan)
+                    area_samples.append(np.nan)
             required_successes = max(8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples)))
-            if len(te_samples) >= required_successes:
+            te_valid = np.asarray(te_samples, dtype=float)
+            velocity_valid = np.asarray(velocity_samples, dtype=float)
+            area_valid = np.asarray(area_samples, dtype=float)
+            te_valid = te_valid[np.isfinite(te_valid)]
+            velocity_valid = velocity_valid[np.isfinite(velocity_valid)]
+            area_valid = area_valid[np.isfinite(area_valid)]
+            if te_valid.size >= required_successes:
                 fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
-                    fit["electron_temperature_uncertainty_eV"], np.std(te_samples, ddof=1)))
+                    fit["electron_temperature_uncertainty_eV"], np.std(te_valid, ddof=1)))
                 fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
-                    fit["electron_velocity_projection_uncertainty_m_s"], np.std(velocity_samples, ddof=1)))
+                    fit["electron_velocity_projection_uncertainty_m_s"], np.std(velocity_valid, ddof=1)))
                 fit["instrument_response_uncertainty_propagated"] = True
-                fit["instrument_response_mc_successful_samples"] = len(te_samples)
-                fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_samples, ddof=1))
-                fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_samples, ddof=1))
+                fit["instrument_response_mc_successful_samples"] = int(te_valid.size)
+                fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_valid, ddof=1))
+                fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_valid, ddof=1))
                 if lsf_unc.ndim == 2:
                     fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
                     fit["_shared_lsf_velocity_draws"] = np.asarray(velocity_samples, dtype=float)
@@ -1071,7 +1086,7 @@ def analyze_thomson_spectra(
                     fit.get("integrated_scattered_power_uncertainty_W") or 0.0
                 )
                 fit["integrated_scattered_power_lsf_uncertainty_W"] = (
-                    float(np.std(area_samples, ddof=1)) if len(area_samples) >= required_successes else None
+                    float(np.std(area_valid, ddof=1)) if area_valid.size >= required_successes else None
                 )
                 if fit["integrated_scattered_power_lsf_uncertainty_W"] is not None:
                     fit["integrated_scattered_power_uncertainty_W"] = float(np.hypot(
@@ -1080,16 +1095,16 @@ def analyze_thomson_spectra(
                     ))
             else:
                 fit["instrument_response_uncertainty_propagated"] = False
-                fit["instrument_response_mc_successful_samples"] = len(te_samples)
+                fit["instrument_response_mc_successful_samples"] = int(te_valid.size)
                 fit["integrated_scattered_power_lsf_uncertainty_W"] = None
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
-            if len(area_samples) >= required_successes:
+            if area_valid.size >= required_successes:
                 fit_area_uncertainty = float(
                     fit.get("integrated_scattered_power_fit_uncertainty_W",
                             fit.get("integrated_scattered_power_uncertainty_W")) or 0.0
                 )
-                lsf_area_uncertainty = float(np.std(area_samples, ddof=1))
+                lsf_area_uncertainty = float(np.std(area_valid, ddof=1))
                 if density_inputs.get("relative_input_covariance") is None:
                     combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
                     density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
