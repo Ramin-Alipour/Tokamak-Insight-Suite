@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 import numpy as np
-from scipy.special import roots_laguerre, roots_hermitenorm
+from scipy.special import roots_laguerre, roots_hermite
 
 E_CHARGE = 1.602176634e-19
 EPS0 = 8.8541878128e-12
@@ -125,7 +125,7 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
     harmonics = np.arange(-n_h, n_h + 1)
     nh = harmonics.size
     xperp, wperp = roots_laguerre(int(quadrature_order))
-    xpar, wpar = roots_hermitenorm(int(quadrature_order))
+    xpar, wpar = roots_hermite(int(quadrature_order))
     sigma = np.zeros((3, 3), dtype=complex)
     eye = np.eye(nh, dtype=complex)
     coupling = np.zeros((nh, nh), dtype=complex)
