@@ -161,6 +161,25 @@ ANALYSES = [{
 ]
 
 
+def _synchronize_execution_contracts():
+    """Keep callable contracts byte-for-byte aligned with the canonical diagnostic registry."""
+    try:
+        from tis.contracts import load_diagnostic_registry
+        canonical_rows = load_diagnostic_registry()
+    except Exception:
+        # Keep the conservative in-module contracts if packaged registry loading
+        # is unavailable; never prevent numerical callables from importing.
+        return
+    canonical = {row["diagnostic"]: row["execution_contract"] for row in canonical_rows}
+    for entry in ANALYSES:
+        contract = canonical.get(entry["name"])
+        if contract is not None:
+            entry["execution_contract"] = deepcopy(contract)
+
+
+_synchronize_execution_contracts()
+
+
 def get_analysis(analysis_id: int) -> dict:
     """Return a copy of a registered analysis entry by ordered list ID."""
     if isinstance(analysis_id, bool) or not isinstance(analysis_id, int):
