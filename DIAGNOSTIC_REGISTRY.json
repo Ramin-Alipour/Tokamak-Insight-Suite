@@ -6610,7 +6610,7 @@
           "name": "background_fraction",
           "unit": "fraction of wavelength span at each edge; explicit user selection only",
           "required": false,
-          "description": "Explicit user-selected fraction of the wavelength span at each edge (0.02–0.4); exactly one background specification must be supplied."
+          "description": "Researcher-selected fraction of the wavelength span used at each edge for a linear background fit; must be strictly between 0 and 0.5, with enough samples selected by the actual wavelength grid."
         },
         {
           "name": "signal_uncertainty",
