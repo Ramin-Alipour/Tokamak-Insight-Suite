@@ -622,3 +622,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
 
 # Separate magnetized electromagnetic CTS path; the electrostatic API remains unchanged.
 from .cts_full_em import full_em_cts_spectral_density, analyze_full_em_cts_spectrum
+
+
+def analyze_cts_spectrum_model(model="electrostatic", **kwargs):
+    """Explicit dispatcher for the independent electrostatic and magnetized full-EM CTS inversions."""
+    if model == "electrostatic":
+        return analyze_cts_spectrum(**kwargs)
+    if model == "full_electromagnetic":
+        return analyze_full_em_cts_spectrum(**kwargs)
+    raise ValueError("model must be 'electrostatic' or 'full_electromagnetic'; no automatic model substitution is performed")
