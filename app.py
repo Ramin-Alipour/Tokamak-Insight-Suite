@@ -1131,6 +1131,7 @@ elif page=='Spectral Analysis':
                 })
                 if model in {'non_collective_kappa','collective_kappa'}:
                     profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
+                    profile['electron_kappa_index_uncertainty']=[channel.get('kappa_index_uncertainty',np.nan) for channel in result['channels']]
                 if model in {'collective_maxwellian','collective_kappa'}:
                     profile['scattering_parameter_alpha']=[channel.get('scattering_parameter_alpha',np.nan) for channel in result['channels']]
                 if result.get('absolute_scattered_power_available'):
