@@ -955,8 +955,12 @@ def analyze_thomson_spectra(
             ])
         if model in {"collective_maxwellian", "collective_kappa"}:
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
-            if lsf_unc is not None and model == "collective_kappa":
-                missing_uncertainties.append("instrument_response_uncertainty_propagation_not_implemented_for_collective_kappa")
+            if model == "collective_kappa":
+                missing_uncertainties.extend([
+                    "instrument_response_uncertainty_propagation_not_implemented_for_collective_kappa",
+                    "laser_wavelength_uncertainty_propagation_not_implemented_for_collective_kappa",
+                    "scattering_angle_uncertainty_propagation_not_implemented_for_collective_kappa",
+                ])
             if incident_direction_unc is not None or scattered_direction_unc is not None:
                 missing_uncertainties.append("beam_direction_uncertainty_propagation_not_implemented_for_collective_kappa")
             if lsf_unc is not None:
