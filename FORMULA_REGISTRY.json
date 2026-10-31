@@ -3184,6 +3184,36 @@
         "year": 2026,
         "url": "https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html",
         "type": "software documentation"
+      },
+      {
+        "title": "Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation",
+        "authors": "T. Verdier, J. Rasmussen, J. Stober, S. K. Nielsen, ASDEX Upgrade Team, EUROfusion Team",
+        "journal": "Review of Scientific Instruments",
+        "volume": "96",
+        "issue": "4",
+        "article": "043513",
+        "year": 2025,
+        "doi": "10.1063/5.0238948",
+        "scope": "Recent CTS spectral-background treatment and thermal/fast-ion inference context; not a replacement for the dielectric susceptibility derivation."
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "authors": "M. Nishiura et al.",
+        "journal": "Journal of Fusion Energy",
+        "volume": "45",
+        "article": "55",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7",
+        "scope": "Recent CTS diagnostic implementation and energetic/bulk-ion measurement context."
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "Authors as listed by Fusion Engineering and Design",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent integration of ray tracing, CTS forward modelling and Bayesian spectral inversion; diagnostic design and inference context."
       }
     ]
   },
