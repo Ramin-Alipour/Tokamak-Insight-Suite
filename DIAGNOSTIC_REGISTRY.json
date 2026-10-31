@@ -4230,8 +4230,8 @@
         {
           "name": "inversion_method",
           "unit": "text",
-          "required": false,
-          "description": "differential_evolution, improved_genetic or regularized."
+          "required": true,
+          "description": "Explicit selection: local_least_squares, differential_evolution, improved_genetic or regularized. Global-search methods require global_search=true and finite explicit bounds; regularized is only for inferred tabulated fast-ion VDF."
         },
         {
           "name": "regularization_strength",
@@ -4271,7 +4271,8 @@
         {
           "name": "global_search",
           "unit": "boolean; enables differential-evolution global initialization",
-          "required": false
+          "required": false,
+          "description": "Boolean. True only for differential_evolution or improved_genetic; local_least_squares and regularized require false."
         },
         {
           "name": "random_seed",
