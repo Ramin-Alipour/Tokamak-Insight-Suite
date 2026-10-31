@@ -34,3 +34,20 @@ def test_thomson_density_correlated_input_covariance():
         out["electron_density_m3"] * math.sqrt(6e-4), rel=1e-12
     )
     assert out["density_interpretation"] == "interaction_length_averaged_effective_density"
+
+
+def test_thomson_density_uses_supplied_effective_relativistic_cross_section():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    effective_cross_section = 1.7e-29
+    cross_section_uncertainty = 0.1*effective_cross_section
+    result = density_from_thomson_scattered_power(
+        1e-12, 2.0, 0.2, math.pi/2, 0.01,
+        optical_efficiency=0.5,
+        effective_differential_cross_section_m2_sr=effective_cross_section,
+        effective_differential_cross_section_uncertainty_m2_sr=cross_section_uncertainty,
+    )
+    expected = 1e-12/(2.0*0.2*effective_cross_section*0.01*0.5)
+    assert result["electron_density_m3"] == pytest.approx(expected, rel=1e-12)
+    assert result["differential_cross_section_m2_sr"] == pytest.approx(effective_cross_section)
+    assert result["electron_density_uncertainty_m3"] == pytest.approx(0.1*expected, rel=1e-12)
