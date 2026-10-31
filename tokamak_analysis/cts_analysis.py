@@ -422,7 +422,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             p0=np.r_[p0,fi,np.log10(ft)]
             lo=np.r_[lo,flo,tlo_log]
             hi=np.r_[hi,fhi,thi_log]
-    noise=unc if unc is not None else np.full_like(y,max(float(np.std(y)),float(np.max(y))*1e-6,np.finfo(float).tiny))
+    noise=unc if unc is not None else np.ones_like(y)
+    weighting_status="measured_pointwise_uncertainty" if unc is not None else "unweighted_no_measurement_uncertainty_supplied"
     if inversion_method not in {"local_least_squares", "differential_evolution", "improved_genetic", "regularized"}:
         raise ValueError("Select inversion_method explicitly: local_least_squares, differential_evolution, improved_genetic or regularized")
     if inversion_method in {"differential_evolution","improved_genetic"} and not global_search:
