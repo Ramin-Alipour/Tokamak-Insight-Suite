@@ -126,6 +126,7 @@ def density_from_thomson_scattered_power(
 
     rel_variance = 0.0
     uncertainty_supplied = False
+    scattering_angle_relative_sensitivity = None
     if relative_input_covariance is not None:
         covariance_raw = np.asarray(relative_input_covariance)
         if covariance_raw.dtype.kind not in "iuf":
@@ -179,7 +180,7 @@ def density_from_thomson_scattered_power(
         )
         uncertainty_supplied = True
         if incident_polarization_vector is None:
-            relative_sensitivity = abs(
+            scattering_angle_relative_sensitivity = (
                 2.0 * np.sin(theta) * np.cos(theta) / (1.0 + np.cos(theta) ** 2)
             )
         else:
@@ -197,21 +198,25 @@ def density_from_thomson_scattered_power(
             sine = float(np.sqrt(max(0.0, 1.0 - cosine * cosine)))
             factor = dsigma / (_ELECTRON_CLASSICAL_RADIUS_M ** 2)
             if sine <= 1e-12:
-                relative_sensitivity = 0.0
+                scattering_angle_relative_sensitivity = 0.0
             else:
                 tangent = (scattered - cosine * incident) / sine
                 direction_derivative = -sine * incident + cosine * tangent
                 polarization_projection = float(np.dot(scattered, eps))
                 projection_derivative = float(np.dot(direction_derivative, eps))
                 factor_derivative = -2.0 * polarization_projection * projection_derivative
-                relative_sensitivity = abs(factor_derivative / factor)
-        rel_variance += (relative_sensitivity * sigma_theta) ** 2
+                scattering_angle_relative_sensitivity = -factor_derivative / factor
+        rel_variance += (scattering_angle_relative_sensitivity * sigma_theta) ** 2
 
     return {
         "electron_density_m3": float(density),
         "electron_density_uncertainty_m3": float(density * np.sqrt(rel_variance)) if uncertainty_supplied else None,
         "model_scattered_power_W": float(model_power),
         "differential_cross_section_m2_sr": float(dsigma),
+        "scattering_angle_relative_sensitivity": (
+            None if scattering_angle_relative_sensitivity is None
+            else float(scattering_angle_relative_sensitivity)
+        ),
         "assumptions": [
             "Absolutely calibrated scattered and incident laser power.",
             "Optically thin, single-scattering Thomson relation; polarization dependence is included when incident polarization and scattered direction vectors are supplied, otherwise the unpolarized cross-section is used.",
