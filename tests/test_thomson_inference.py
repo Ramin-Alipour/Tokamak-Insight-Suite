@@ -129,6 +129,8 @@ def test_collective_mode_never_runs_without_explicit_ion_species():
         analyze_thomson_spectra(
             x, y[None,:], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), model="collective_maxwellian",
+            collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
+            collective_density_bounds_m3=[1e17,1e20], collective_temperature_bounds_eV=[1.0,1e4],
         )
 
 
@@ -332,6 +334,8 @@ def test_collective_mode_requires_explicit_beam_geometry_before_optional_backend
             x, y[None, :], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
             model="collective_maxwellian", ion_species=["D+"],
+            collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
+            collective_density_bounds_m3=[1e17,1e20], collective_temperature_bounds_eV=[1.0,1e4],
             ion_temperature_eV=[100.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
             electron_velocity_m_s=[0.0, 0.0, 0.0],
         )
@@ -394,6 +398,8 @@ def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkey
         scattering_angle_rad=np.pi / 2,
         instrument_response=np.eye(x.size),
         model="collective_maxwellian",
+        collective_initial_density_m3=true_density, collective_initial_temperature_eV=true_temperature,
+        collective_density_bounds_m3=[1e18,1e19], collective_temperature_bounds_eV=[50.0,300.0],
         ion_species=["H+"],
         ion_fractions=[1.0],
         ion_temperature_eV=[20.0],
