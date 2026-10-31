@@ -195,17 +195,29 @@ def bindslev_correlated_transfer_spectrum(
 ):
     """Contract all n,v,E,B auto- and cross-spectra with the Bindslev source.
 
-    covariance is a 10x10 Hermitian PSD matrix in [n,v,E,B] ordering.
+    covariance is a 10x10 Hermitian positive-semidefinite matrix in [n,v,E,B]
+    ordering. A materially negative eigenvalue is rejected rather than hidden
+    by clipping the final received power.
     """
     covariance = np.asarray(fluctuation_covariance, dtype=complex)
     operator = np.asarray(source_current_operator, dtype=complex)
     receiver = np.asarray(receiver_polarization, dtype=complex)
     if covariance.shape != (10, 10) or operator.shape != (3, 10) or receiver.shape != (3,):
         raise ValueError("expected covariance (10,10), source operator (3,10), receiver (3,)")
-    if not np.all(np.isfinite(covariance)) or not np.all(np.isfinite(operator)):
-        raise ValueError("covariance and source-current operator must be finite")
+    if (not np.all(np.isfinite(covariance)) or not np.all(np.isfinite(operator))
+            or not np.all(np.isfinite(receiver))):
+        raise ValueError("covariance, source-current operator and receiver polarization must be finite")
+    if np.linalg.norm(receiver) == 0.0:
+        raise ValueError("receiver_polarization must be non-zero")
     if not np.allclose(covariance, covariance.conj().T, rtol=1e-8, atol=1e-20):
         raise ValueError("fluctuation covariance must be Hermitian")
+    covariance = 0.5 * (covariance + covariance.conj().T)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+    if float(np.min(eigenvalues)) < -1e-10 * scale:
+        raise ValueError("fluctuation covariance must be positive semidefinite")
+    if np.min(eigenvalues) < 0.0:
+        covariance = (eigenvectors * np.maximum(eigenvalues, 0.0)) @ eigenvectors.conj().T
     effective = receiver.conj() @ operator
     power = effective @ covariance @ effective.conj().T
     return {
