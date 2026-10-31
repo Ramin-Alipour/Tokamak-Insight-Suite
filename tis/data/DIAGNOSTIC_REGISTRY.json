@@ -4120,9 +4120,9 @@
   {
     "family": "Density and refractive diagnostics",
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
-    "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
+    "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with Gaussian beam-overlap weighting.",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with Gaussian beam-overlap weighting.",
     "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and uses caller-supplied local Gaussian covariance matrices; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. The optical Thomson model is a separate workflow.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -4137,7 +4137,7 @@
       "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
       "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
     ],
-    "implementation_status": "Electrostatic CTS path retained. Full-EM CTS now supports species-resolved thermal-ion temperatures in the inversion; relativistic gyrotropic non-Maxwellian electron and fast-ion linear response with Klimontovich noise; second-order relativistic Vlasov three-wave vertices for supplied non-Maxwellian populations; and frequency-resolved cold-plasma ray paths with Gaussian overlap weights applied to the spectral transfer. The Maxwellian bulk-electron nonlinear source remains the low-temperature Bindslev closure. The geometry path remains geometrical-optics/local-Gaussian and is not a quasi-optical diffraction solver.",
+    "implementation_status": "Electrostatic CTS path retained. Full-EM CTS now supports species-resolved thermal-ion temperatures in the inversion; relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion linear response with Klimontovich noise; second-order relativistic Vlasov three-wave vertices for supplied non-Maxwellian populations; and frequency-resolved cold-plasma ray paths with Gaussian overlap weights applied to the spectral transfer. The Maxwellian bulk-electron nonlinear source remains the low-temperature Bindslev closure. The geometry path remains geometrical-optics/local-Gaussian and is not a quasi-optical diffraction solver.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4336,7 +4336,7 @@
           "name": "electron_distribution",
           "unit": "relativistic gyrotropic momentum-space distribution",
           "required": false,
-          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_bigaussian or tabulated_gyrotropic."
+          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_maxwell_juttner (temperature follows fitted electron_temperature_eV unless explicitly matched), relativistic_bigaussian or tabulated_gyrotropic."
         },
         {
           "name": "ion_temperature_eV",
