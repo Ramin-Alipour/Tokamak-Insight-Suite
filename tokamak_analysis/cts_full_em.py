@@ -1,16 +1,17 @@
 """Magnetized full-electromagnetic CTS fluctuation and transfer solver.
 
-Bulk thermal species use the existing non-relativistic Maxwellian magnetized
-Vlasov response. Optional fast-ion populations use a relativistic gyrotropic
-momentum-space response and Klimontovich orbit shot-noise covariance. The
-screened joint density/current/E/B covariance is contracted with the
-low-temperature magnetized Bindslev Gamma/X three-wave source-current tensor.
+Thermal Maxwellian species use the magnetized kinetic response. Explicitly
+supplied relativistic gyrotropic non-Maxwellian electron/fast-ion populations
+use momentum-space Vlasov response, Klimontovich orbit noise and a second-order
+relativistic Vlasov three-wave current vertex. Maxwellian bulk-electron
+scattering retains the low-temperature Bindslev Gamma/X source-current
+closure. Species-resolved ion temperatures are fitted independently.
 
-This remains a homogeneous local model: ray tracing and Gaussian beam-overlap
-primitives exist in cts_em_geometry but are not yet integrated into the
-frequency-resolved transfer/inversion. The Bindslev nonlinear vertex remains
-the low-temperature closure; a fully relativistic second-order vertex is not
-claimed.
+Optional frequency-resolved cold-plasma ray tracing and local Gaussian beam
+overlap are connected to the spectral transfer. The ray path is geometrical
+optics with caller-supplied equilibrium and local beam covariance; it does
+not include diffraction, mode conversion or propagated quasi-optical beams.
+No empirical validation is performed by this solver.
 """
 from __future__ import annotations
 
