@@ -1031,6 +1031,15 @@ def analyze_thomson_spectra(
                 raise ValueError("Absolute density requires spectral_power_density_calibrated=True and signal units W/nm")
             area = float(fit["integrated_scattered_power_W"])
             area_sigma = fit.get("integrated_scattered_power_uncertainty_W")
+            relative_input_covariance = (
+                joint_density_covariance[6*i:6*(i+1), 6*i:6*(i+1)].copy()
+                if joint_density_covariance is not None
+                else _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance")
+            )
+            power_uncertainty_in_covariance = (
+                relative_input_covariance is not None
+                and not np.allclose(relative_input_covariance[0, :], 0.0, rtol=0.0, atol=1e-14)
+            )
             density_inputs = {
                 "scattered_power_W": area, "incident_power_W": _channel_value(laser_power_w, i, y.shape[0], "laser_power_w"),
                 "interaction_length_m": _channel_value(interaction_length_m, i, y.shape[0], "interaction_length_m"),
@@ -1041,7 +1050,7 @@ def analyze_thomson_spectra(
                 # for the six multiplicative density inputs. Do not also pass the
                 # fitted area sigma or independent scalar terms: the density helper
                 # correctly rejects mixed covariance/scalar uncertainty inputs.
-                "scattered_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else area_sigma),
+                "scattered_power_uncertainty_W": (None if power_uncertainty_in_covariance else area_sigma),
                 "incident_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
                 "interaction_length_uncertainty_m": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
                 "scattering_angle_uncertainty_rad": (None if scattering_angle_uncertainty_rad is None else scattering_angle_unc),
@@ -1051,11 +1060,7 @@ def analyze_thomson_spectra(
                 "incident_direction_vector": _channel_value(incident_direction, i, y.shape[0], "incident_direction", vector_length=3),
                 "scattered_direction_vector": _channel_value(scattered_direction, i, y.shape[0], "scattered_direction", vector_length=3),
                 "polarization_factor_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty")),
-                "relative_input_covariance": (
-                    joint_density_covariance[6*i:6*(i+1), 6*i:6*(i+1)].copy()
-                    if joint_density_covariance is not None
-                    else _channel_covariance(density_relative_covariance, i, y.shape[0], "density_relative_covariance")
-                ),
+                "relative_input_covariance": relative_input_covariance,
             }
             density_result = density_from_thomson_scattered_power(**density_inputs)
             fit["electron_density_m3"] = density_result["electron_density_m3"]
