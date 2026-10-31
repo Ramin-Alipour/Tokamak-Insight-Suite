@@ -761,7 +761,11 @@ def full_em_cts_spectral_density(
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
         "numerical_controls": {"harmonic_order": int(harmonic_order),
-            "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping},
+            "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping,
+            "damping_rate_source": ("caller_supplied" if damping_rate_rad_s is not None else "documented_numerical_default_max_2pi_probe_frequency_times_1e-7_or_1_rad_per_s")},
+        "electron_thermal_relativistic_parameter": float(te / 510998.95069),
+        "bulk_electron_closure": ("explicit_relativistic_gyrotropic_distribution" if electron_distribution is not None else "Maxwellian_Bindslev_low_temperature_closure"),
+        "bulk_electron_closure_validity_note": ("Bindslev closure is an asymptotic low-temperature approximation; assess theta_e = T_e/(m_e c^2) << 1. The returned theta_e is not a universal acceptance cutoff." if electron_distribution is None else "The explicit electron distribution replaces the Maxwellian Bindslev closure."),
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied electron distributions may use relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum distributions, and fast ions use bi-Gaussian or tabulated distributions.",
