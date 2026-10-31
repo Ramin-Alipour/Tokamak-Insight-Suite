@@ -162,6 +162,43 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
     return rotation @ sigma @ rotation.T
 
 
+
+def _select_flux_normalized_cold_mode(omega, direction, magnetic_field, species, requested_polarization):
+    """Select the propagating cold-plasma branch matching a supplied polarization."""
+    from .cts_em_geometry import solve_cold_plasma_propagating_modes
+
+    candidates=[]
+    requested=np.asarray(requested_polarization,dtype=complex)
+    requested=requested/np.linalg.norm(requested)
+    for branch in (0,1):
+        try:
+            mode=solve_cold_plasma_propagating_modes(
+                omega,direction,magnetic_field,species,mode_index=branch
+            )
+        except ValueError:
+            continue
+        field=np.asarray(mode["electric_polarization_unit_flux"],dtype=complex)
+        unit=field/np.linalg.norm(field)
+        overlap=np.vdot(unit,requested)
+        candidates.append((abs(overlap),branch,mode,overlap))
+    if not candidates:
+        raise ValueError("no real propagating cold-plasma mode exists for the supplied beam direction")
+    candidates.sort(key=lambda item:item[0],reverse=True)
+    overlap,branch,mode,phase=candidates[0]
+    if overlap<0.95:
+        raise ValueError(
+            "supplied beam polarization is not a cold-plasma eigenmode for this direction; "
+            "provide the physical O/X or extraordinary-mode polarization"
+        )
+    field=np.asarray(mode["electric_polarization_unit_flux"],dtype=complex)
+    field=field*np.exp(-1j*np.angle(phase))
+    return mode["wavevector_rad_m"],field,{
+        "mode_index":branch,"refractive_index":mode["refractive_index"],
+        "polarization_overlap":float(overlap),
+        "normalized_longitudinal_poynting_flux_W_m2":float(np.dot(mode["poynting_vector_unit_flux"],np.asarray(direction,dtype=float))),
+    }
+
+
 def full_em_cts_spectral_density(
     frequency_shift_Hz, probe_frequency_Hz, scattering_geometry, *,
     electron_density_m3, electron_temperature_eV, ion_temperature_eV,
@@ -225,6 +262,13 @@ def full_em_cts_spectral_density(
     es /= np.linalg.norm(es)
     if abs(np.vdot(ei, ki_hat)) > 1e-6 or abs(np.vdot(es, ks_hat)) > 1e-6:
         raise ValueError("incident and scattered polarization vectors must be transverse to their beam directions")
+    cold_wave_species = [{
+        "density_m3": sp["density"], "charge_C": sp["charge"], "mass_kg": sp["mass"]
+    } for sp in species]
+    incident_wavevector, incident_mode_field, incident_mode_diagnostics = _select_flux_normalized_cold_mode(
+        2.0*np.pi*f0, ki_hat, b, cold_wave_species, ei
+    )
+    ei = incident_mode_field
     if isinstance(harmonic_order, bool) or not isinstance(harmonic_order, (int, np.integer)) or harmonic_order < 2:
         raise ValueError("harmonic_order must be an integer >= 2")
     if isinstance(quadrature_order, bool) or not isinstance(quadrature_order, (int, np.integer)) or quadrature_order < 4:
@@ -247,10 +291,19 @@ def full_em_cts_spectral_density(
     bindslev_x_tensors = []
     bindslev_gamma_inverse = []
     fast_ion_kinetic_diagnostics = []
+    cold_mode_diagnostics = []
     for index, shift in enumerate(shifts):
         fs = f0 + shift
-        ki = (2.0 * np.pi * f0 / C) * ki_hat
-        ks = (2.0 * np.pi * fs / C) * ks_hat
+        ki = incident_wavevector
+        scattered_wavevector, scattered_mode_field, scattered_mode_diagnostics = _select_flux_normalized_cold_mode(
+            2.0*np.pi*fs, ks_hat, b, cold_wave_species, es
+        )
+        ks = scattered_wavevector
+        es_local = scattered_mode_field
+        cold_mode_diagnostics.append({
+            "incident": incident_mode_diagnostics,
+            "scattered": scattered_mode_diagnostics,
+        })
         kvec = ks - ki
         omega = 2.0 * np.pi * shift
         if abs(omega) < damping:
