@@ -471,6 +471,8 @@ def analyze_thomson_spectra(
     if model in collective_models or model == "non_collective_relativistic_maxwell_juttner":
         if incident_direction is None or scattered_direction is None:
             raise ValueError("The selected Thomson model requires explicit incident_direction and scattered_direction 3-vectors.")
+        if model == "non_collective_relativistic_maxwell_juttner" and incident_polarization is None:
+            raise ValueError("The relativistic Maxwell-Juttner Thomson model requires an explicit incident_polarization vector.")
         probe_vec = _finite_array(incident_direction, "incident_direction", 1)
         scatter_vec = _finite_array(scattered_direction, "scattered_direction", 1)
         if probe_vec.shape != (3,) or scatter_vec.shape != (3,):
@@ -634,6 +636,7 @@ def analyze_thomson_spectra(
             fit = fit_relativistic_maxwell_juttner(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
                 response, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+                incident_polarization=incident_polarization,
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
@@ -980,6 +983,7 @@ def analyze_thomson_spectra(
                         draw = fit_relativistic_maxwell_juttner(
                             xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
                             sampled, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+                            incident_polarization=incident_polarization,
                         )
                     else:
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
