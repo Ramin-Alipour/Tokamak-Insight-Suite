@@ -3570,7 +3570,8 @@
       "limitations": [
         "Raw instrument calibration and device-specific calibration are out of scope",
         "Refraction and additional birefringence are not modeled"
-      ]
+      ],
+      "raw_data_to_physics": false
     }
   },
   {
