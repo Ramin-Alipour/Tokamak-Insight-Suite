@@ -52,7 +52,7 @@ Implemented in \`tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_b
 - Path-length quadrature along the incident ray, with normalized weights proportional to local Gaussian overlap times path length.
 - Full-EM spectral evaluation at each returned scattering-volume sample and weighted summation of the local spectra.
 
-The equilibrium callback must supply the local magnetic field and all species density profiles. The ray geometry JSON must preserve the exact measured \`frequency_shift_Hz\` axis and contain one \`frequency_resolved_geometry\` record per measured bin, with \`scattering_samples\` and non-negative \`sample_weight\` values summing to one.
+The equilibrium callback must supply the local magnetic field and all species density profiles. The ray geometry JSON must preserve the exact measured \`frequency_shift_Hz\` axis, record the explicitly selected \`mode_index\` (0, 1 or 2), and contain one \`frequency_resolved_geometry\` record per measured bin, with \`scattering_samples\` and non-negative \`sample_weight\` values summing to one. The ray helper has no default propagation branch.
 
 **Declared geometry limitations:** this is cold-plasma geometrical optics, not diffraction-resolved quasi-optical propagation. Beam covariance matrices are supplied along the rays; the software does not propagate them. The fitted electron density, electron temperature and thermal-ion temperatures are assumed uniform across the sampled scattering volume, while local magnetic field and ray directions may vary. Absolute beam-overlap path integrals are used as relative frequency-bin weights; absolute launcher/receiver power coupling is not calibrated or inferred. Mode conversion and branch tracking through degeneracies are not implemented.
 
