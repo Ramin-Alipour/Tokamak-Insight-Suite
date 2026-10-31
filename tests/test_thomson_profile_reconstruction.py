@@ -149,3 +149,22 @@ def test_noncollective_kappa_profile_uses_joint_gls_covariance(monkeypatch):
     )
     actual = result["spatial_profile_reconstruction"]["profiles"]["electron_kappa_index"]["covariance"]
     np.testing.assert_allclose(actual, kappa_covariance)
+
+
+def test_positive_thomson_profiles_remain_positive_under_gcv_smoothing_spline():
+    from tokamak_analysis.thomson_workflow import _reconstruct_inferred_parameter_profile
+
+    radius = np.linspace(0.0, 0.4, 7)
+    temperature = np.array([8.0, 180.0, 12.0, 240.0, 9.0, 160.0, 11.0])
+    result = _reconstruct_inferred_parameter_profile(
+        radius,
+        temperature,
+        positive=True,
+        method="smoothing_spline",
+        points=301,
+    )
+    profile = result["methods"]["smoothing_spline"]
+    assert profile["status"] == "completed"
+    assert np.all(np.isfinite(profile["values"]))
+    assert np.all(profile["values"] > 0.0)
+    assert np.all(np.isfinite(profile["gradient_per_m"]))
