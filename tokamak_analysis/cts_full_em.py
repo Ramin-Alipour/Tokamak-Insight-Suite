@@ -225,6 +225,7 @@ def full_em_cts_spectral_density(
     incident_polarization, scattered_polarization,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
     fast_ion_populations=None, electron_distribution=None,
+    bindslev_validity_theta_e_limit=None,
 ):
     """Return a local full-EM magnetized CTS spectrum and fluctuation diagnostics.
 
@@ -241,6 +242,27 @@ def full_em_cts_spectral_density(
     f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
     ne = _positive(electron_density_m3, "electron_density_m3")
     te = _positive(electron_temperature_eV, "electron_temperature_eV")
+    theta_e = float(te / 510998.95069)
+    if electron_distribution is None:
+        if bindslev_validity_theta_e_limit is None:
+            bindslev_validity_status = "not_quantitatively_screened"
+        else:
+            bindslev_limit = _positive(
+                bindslev_validity_theta_e_limit, "bindslev_validity_theta_e_limit"
+            )
+            if bindslev_limit >= 1.0:
+                raise ValueError("bindslev_validity_theta_e_limit must be a dimensionless positive value below 1")
+            if theta_e > bindslev_limit:
+                raise ValueError(
+                    "Full-EM CTS rejected: electron theta_e exceeds the researcher-supplied "
+                    "Bindslev low-temperature closure screening limit. Supply an explicit "
+                    "relativistic electron distribution or revise the stated validity limit."
+                )
+            bindslev_validity_status = "within_researcher_supplied_asymptotic_screening_limit"
+    else:
+        if bindslev_validity_theta_e_limit is not None:
+            raise ValueError("bindslev_validity_theta_e_limit applies only when the Maxwellian Bindslev closure is selected")
+        bindslev_validity_status = "not_applicable_explicit_relativistic_electron_distribution"
     if ion_temperature_eV is None:
         raise ValueError("ion_temperature_eV must be supplied for every thermal ion species")
     if not isinstance(scattering_geometry, Mapping):
@@ -763,9 +785,20 @@ def full_em_cts_spectral_density(
         "numerical_controls": {"harmonic_order": int(harmonic_order),
             "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping,
             "damping_rate_source": ("caller_supplied" if damping_rate_rad_s is not None else "documented_numerical_default_max_2pi_probe_frequency_times_1e-7_or_1_rad_per_s")},
-        "electron_thermal_relativistic_parameter": float(te / 510998.95069),
+        "electron_thermal_relativistic_parameter": theta_e,
         "bulk_electron_closure": ("explicit_relativistic_gyrotropic_distribution" if electron_distribution is not None else "Maxwellian_Bindslev_low_temperature_closure"),
-        "bulk_electron_closure_validity_note": ("Bindslev closure is an asymptotic low-temperature approximation; assess theta_e = T_e/(m_e c^2) << 1. The returned theta_e is not a universal acceptance cutoff." if electron_distribution is None else "The explicit electron distribution replaces the Maxwellian Bindslev closure."),
+        "bulk_electron_closure_validity_status": bindslev_validity_status,
+        "bulk_electron_closure_validity_theta_e_limit": (
+            None if electron_distribution is not None or bindslev_validity_theta_e_limit is None
+            else float(bindslev_validity_theta_e_limit)
+        ),
+        "bulk_electron_closure_validity_note": (
+            "Bindslev is an asymptotic low-temperature closure. theta_e is reported; no universal numerical cutoff is assumed. Supply bindslev_validity_theta_e_limit to enforce a researcher-selected screening threshold."
+            if electron_distribution is None and bindslev_validity_theta_e_limit is None
+            else "The fitted theta_e is within the researcher-supplied Bindslev asymptotic screening limit."
+            if electron_distribution is None
+            else "The explicit electron distribution replaces the Maxwellian Bindslev closure."
+        ),
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied electron distributions may use relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum distributions, and fast ions use bi-Gaussian or tabulated distributions.",
@@ -786,6 +819,7 @@ def analyze_full_em_cts_spectrum(
     instrument_response, signal_uncertainty=None, spectral_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
+    bindslev_validity_theta_e_limit=None,
 ):
     """Fit n_e, T_e and a separate T_i for every supplied thermal ion species.
 
@@ -895,6 +929,7 @@ def analyze_full_em_cts_spectrum(
             damping_rate_rad_s=damping_rate_rad_s,
             fast_ion_populations=fast_ion_populations,
             electron_distribution=electron_distribution,
+            bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
         )["spectral_density"]
         widths = np.empty_like(f)
         widths[0] = 0.5 * (f[1] - f[0])
@@ -944,6 +979,7 @@ def analyze_full_em_cts_spectrum(
         damping_rate_rad_s=damping_rate_rad_s,
         fast_ion_populations=fast_ion_populations,
         electron_distribution=electron_distribution,
+        bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
     )
     return {
         "electron_density_m3": float(values[0]),
