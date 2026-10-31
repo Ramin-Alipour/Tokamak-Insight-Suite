@@ -75,3 +75,16 @@ def test_thomson_density_propagates_fitted_power_cross_section_covariance():
     assert result["electron_density_uncertainty_m3"] == pytest.approx(
         expected_density*np.sqrt(expected_relative_variance), rel=1e-12
     )
+
+
+def test_relativistic_mj_effective_cross_section_formula_library_link():
+    from tokamak_analysis.formula_library import relativistic_mj_effective_differential_cross_section
+
+    wavelength = np.linspace(532.0-40.0, 532.0+40.0, 801)
+    value = relativistic_mj_effective_differential_cross_section(
+        wavelength, 532.0, math.pi/2, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=np.array([0.0, 0.0, 1.0]),
+    )
+    assert np.isfinite(value)
+    assert value > 0.0
