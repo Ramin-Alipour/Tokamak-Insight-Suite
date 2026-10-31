@@ -47,7 +47,7 @@ def _apply_response(response, spectrum, wavelength_nm):
 def relativistic_maxwell_juttner_spectrum(
     wavelength_nm, laser_wavelength_nm, scattering_angle_rad,
     electron_temperature_eV, *, flow_projection_m_s=0.0,
-    radial_order=36, angular_order=18,
+    incident_polarization, radial_order=36, angular_order=18,
 ):
     """Return a unit-area relativistic Thomson spectrum on a wavelength grid.
 
@@ -57,9 +57,10 @@ def relativistic_maxwell_juttner_spectrum(
     elastic Thomson frequency ratio in the instantaneous electron rest frame:
     lambda_s/lambda_i=(1-n_s·beta)/(1-n_i·beta).
 
-    The rest-frame Thomson angular factor and incident-flux / aberration
-    Jacobians are included. Recoil and quantum Compton corrections are outside
-    the Thomson limit and are not included.
+    The supplied incident polarization is Lorentz-transformed into each
+    electron rest frame and the polarized Thomson differential cross-section
+    is evaluated there, together with incident-flux and aberration Jacobians.
+    Recoil and quantum Compton corrections are not included.
     """
     x = np.asarray(wavelength_nm, dtype=float)
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
@@ -83,6 +84,12 @@ def relativistic_maxwell_juttner_spectrum(
     # Choose coordinates with q=k_s-k_i along +x. Then n_s-n_i=2 sin(theta/2) xhat.
     n_incident = np.array([-sine, cosine, 0.0])
     n_scattered = np.array([sine, cosine, 0.0])
+    polarization = np.asarray(incident_polarization, dtype=float)
+    if polarization.shape != (3,) or np.any(~np.isfinite(polarization)) or np.linalg.norm(polarization) == 0:
+        raise ValueError("incident_polarization must be a finite non-zero 3-vector")
+    if abs(float(np.dot(polarization/np.linalg.norm(polarization), n_incident))) > 1e-6:
+        raise ValueError("incident_polarization must be transverse to incident_direction")
+    polarization = polarization/np.linalg.norm(polarization)
 
     radial_nodes, radial_weights = leggauss(int(radial_order))
     umax = max(12.0*np.sqrt(theta)+12.0*theta, 1e-5)
@@ -122,9 +129,26 @@ def relativistic_maxwell_juttner_spectrum(
 
     ni_rest = aberrated_direction(n_incident)
     ns_rest = aberrated_direction(n_scattered)
-    cos_rest = np.clip(np.einsum("...j,...j->...", ni_rest, ns_rest), -1.0, 1.0)
+    # Lorentz-transform the incident electric field to each electron rest frame.
+    magnetic_direction_cross_e = np.cross(n_incident, polarization)
+    e_rest = (
+        gamma_lab[..., None]*(
+            polarization+np.cross(beta, magnetic_direction_cross_e)
+        )
+        -(gamma_lab*gamma_lab/(gamma_lab+1.0))[..., None]
+        *beta*np.einsum("...j,j->...", beta, polarization)[..., None]
+    )
+    e_rest -= np.einsum("...j,...j->...", e_rest, ni_rest)[..., None]*ni_rest
+    e_rest_norm = np.linalg.norm(e_rest, axis=-1)
+    e_rest = np.divide(
+        e_rest, e_rest_norm[..., None],
+        out=np.zeros_like(e_rest), where=e_rest_norm[..., None] > 0,
+    )
+    polarization_factor = np.maximum(
+        1.0-np.square(np.einsum("...j,...j->...", ns_rest, e_rest)), 0.0
+    )
     differential_weight = (
-        (1.0-ni_dot)*(1.0+cos_rest*cos_rest)
+        (1.0-ni_dot)*polarization_factor
         /(gamma_lab*gamma_lab*np.square(1.0-ns_dot))
     )
     radial_weight = (
@@ -169,6 +193,7 @@ def relativistic_maxwell_juttner_spectrum(
         "frequency_ratio": "lambda_s/lambda_i=(1-n_s dot beta)/(1-n_i dot beta)",
         "distribution": "Lorentz-boosted isotropic Maxwell-Juttner",
         "recoil_included": False,
+        "polarization_model": "supplied incident polarization Lorentz-transformed to the electron rest frame",
         "quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order), "gyrophase_points": nphi},
     }
 
@@ -176,7 +201,7 @@ def relativistic_maxwell_juttner_spectrum(
 def fit_relativistic_maxwell_juttner(
     wavelength_nm, signal, laser_wavelength_nm, scattering_angle_rad,
     response, uncertainty=None, *, incident_direction, scattered_direction,
-    radial_order=36, angular_order=18,
+    incident_polarization, radial_order=36, angular_order=18,
 ):
     """Fit relativistic Maxwell-Juttner Te and q-parallel bulk flow to one spectrum."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -222,6 +247,7 @@ def fit_relativistic_maxwell_juttner(
         physical = relativistic_maxwell_juttner_spectrum(
             x, laser_wavelength_nm, scattering_angle_rad, te,
             flow_projection_m_s=beta_flow*C,
+            incident_polarization=incident_polarization,
             radial_order=radial_order, angular_order=angular_order,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
@@ -289,6 +315,7 @@ def fit_relativistic_maxwell_juttner(
             "Single-scattering non-collective Thomson regime.",
             "Isotropic Maxwell-Juttner electron distribution in its rest frame.",
             "Bulk electron flow is parallel to the scattering vector.",
+            "The incident polarization is explicitly supplied and Lorentz-transformed into each electron rest frame.",
             "Exact relativistic photon-frequency ratio and Lorentz aberration are used.",
             "Photon recoil/Compton corrections are neglected; the Thomson limit is assumed.",
             "Measured instrument response is applied to the calculated spectral density."
