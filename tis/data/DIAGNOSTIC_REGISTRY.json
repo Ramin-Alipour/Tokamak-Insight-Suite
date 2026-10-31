@@ -2,15 +2,15 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "Per-channel electron temperature and supported flow projection from measured full spectra; absolute electron density where identifiable; joint channel-to-channel covariance for non-collective Maxwellian/Kappa models when a full spectral covariance is supplied; collective-mode external-parameter and response uncertainty propagation by Monte Carlo when supplied.",
+    "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated spectra; absolute electron density where identifiable; collective Maxwellian density/temperature and collective kappa density/temperature/kappa where jointly identifiable; relativistic Maxwell-Juttner non-collective temperature and flow projection.",
     "status": "D",
-    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
-    "caveat": "Collective-mode ion temperatures and ion/electron flow vectors remain externally supplied, not fitted. Supplied uncertainties and measured response-matrix uncertainty are propagated by Monte Carlo when supplied; beam-direction component uncertainties are independent and cross-source correlations are not represented. Joint full-covariance GLS supports non-collective Maxwellian and Kappa only. Relativistic Thomson-scattering inference is not included. No independent experimental validation is claimed.",
+    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra with the supplied measured instrument response. Supports non-collective Maxwellian, non-collective isotropic kappa, exact relativistic single-particle Thomson scattering with Lorentz-boosted Maxwell-Juttner electrons, collective Maxwellian dielectric inference and an unmagnetized collective kappa-electron dielectric model with Maxwellian ions. Absolute non-collective density requires calibrated W/nm spectral power and complete optical geometry.",
+    "caveat": "The relativistic optical model assumes an isotropic Maxwell-Juttner rest-frame distribution, bulk flow parallel to the scattering vector, exact elastic Thomson photon kinematics, and neglects recoil/Compton corrections. The collective kappa model uses a 1-D projected isotropic kappa electron VDF and Maxwellian ions in an unmagnetized longitudinal dielectric response; arbitrary 3-D or magnetized non-Maxwellian collective inference is not claimed. Collective ion temperatures/composition/flows remain external. Joint full-covariance GLS remains Maxwellian/Kappa non-collective only. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
     ],
-    "implementation_status": "Canonical measured-calibrated-spectrum physical inference supports non-collective Maxwellian, Kappa and optional PlasmaPy collective Maxwellian models; full channel-major GLS for Maxwellian/Kappa; Monte Carlo propagation of supplied collective beam-geometry, flow, ion-temperature, laser-wavelength and response uncertainties; absolute-density recomputation after joint fitting; and separate model-discrepancy diagnostics. Optional full 6N x 6N density-input covariance preserves cross-channel correlations in absolute electron-density outputs.",
+    "implementation_status": "Canonical measured-calibrated-spectrum physical inference supports non-collective Maxwellian/Kappa, relativistic Maxwell-Juttner single-particle Thomson, collective Maxwellian dielectric, and collective kappa-electron dielectric models. The relativistic model uses exact relativistic photon-frequency kinematics and a Lorentz-boosted Maxwell-Juttner population. The collective kappa model computes Landau-contour longitudinal susceptibilities from the projected kappa electron VDF and supplied Maxwellian ion species. Joint full-channel GLS remains limited to non-collective Maxwellian/Kappa; uncertainty propagation for new models is declared by model-specific limits.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -59,7 +59,7 @@
         },
         {
           "name": "model",
-          "unit": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian",
+          "unit": "non_collective_maxwellian, non_collective_kappa, non_collective_relativistic_maxwell_juttner, collective_maxwellian or collective_kappa",
           "required": false
         },
         {
@@ -125,12 +125,14 @@
         {
           "name": "incident_direction",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for collective Maxwellian/Kappa and relativistic Maxwell-Juttner models; unit vector."
         },
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for collective Maxwellian/Kappa and relativistic Maxwell-Juttner models; unit vector."
         },
         {
           "name": "spectral_power_density_calibrated",
@@ -241,6 +243,16 @@
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
           "description": "Non-collective models only. Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties. Collective mode exposes its external-parameter covariance separately."
+        },
+        {
+          "name": "collective_kappa_initial",
+          "unit": "dimensionless; optimizer initial kappa index >1.5",
+          "required": false
+        },
+        {
+          "name": "collective_kappa_bounds",
+          "unit": "dimensionless; increasing pair with lower bound >1.5",
+          "required": false
         }
       ],
       "output_specs": [
@@ -328,66 +340,99 @@
           "name": "temperature_gradient_covariance_eV2_m-2",
           "unit": "N x N; eV^2 m^-2",
           "description": "Full covariance of the radial temperature gradient, propagated from temperature input covariance."
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless; inferred for non-collective Kappa and collective Kappa models"
+        },
+        {
+          "name": "kappa_index_uncertainty",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "boolean; exact photon-frequency ratio used by relativistic Maxwell-Juttner model"
+        },
+        {
+          "name": "captured_spectral_probability",
+          "unit": "dimensionless; fraction of quadrature spectrum inside the supplied wavelength range"
         }
       ],
       "assumptions": [
         "Input spectra and wavelength axes are measured and calibrated; calibration is not performed by Analysis 1.",
         "Spatial coordinates are supplied for each measured channel.",
-        "Non-collective Maxwellian model assumes isotropic non-relativistic Maxwellian electrons.",
-        "Collective Maxwellian model requires explicit ion species and ion temperatures; missing values are not silently inferred.",
+        "Non-collective Maxwellian and Kappa models use isotropic non-relativistic projected velocity distributions.",
+        "Relativistic Maxwell-Juttner model uses an isotropic rest-frame distribution and a bulk velocity parallel to the scattering vector.",
+        "Relativistic optical model uses elastic Thomson scattering; recoil/Compton corrections are neglected.",
+        "Collective Maxwellian and Kappa models use an unmagnetized longitudinal dielectric response with explicit ion species, temperatures, fractions and flow vectors.",
+        "Collective kappa model uses a one-dimensional projected isotropic kappa electron distribution and Maxwellian ions.",
         "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
-        "Collective-mode flow vectors and incident/scattered beam directions are expressed in one explicitly supplied coordinate frame; no canonical beam orientation is assumed."
+        "Collective-mode flow vectors and beam directions share one explicitly supplied coordinate frame."
       ],
       "preprocessing": [
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported flow projection; infer collective-mode density only where the collective spectral shape resolves it, and non-collective absolute density only when calibrated spectral power and complete optical geometry are supplied.",
-      "uncertainty_model": "Non-collective fits use local fit covariance and optional Monte Carlo LSF uncertainty. A full channel-major covariance is handled by joint GLS for Maxwellian/Kappa and final physical parameters, integrated powers and absolute densities are recomputed from the joint fit. Collective external-parameter Monte Carlo includes supplied ion-temperature, ion/electron flow-vector, laser-wavelength, scattering-angle or beam-direction component, and measured response-matrix uncertainties; the returned covariance includes channel density, temperature and projected flow parameters. A supplied 6x6 relative optical-input covariance is authoritative and mutually exclusive with separate scalar uncertainty inputs. Excess reduced chi-square is exposed as a separate model-adequacy covariance diagnostic, not experimental validation. Optional joint_density_relative_covariance provides a complete 6N x 6N channel-major covariance for absolute-density inversion and returns the full cross-channel density covariance; it cannot be combined with joint_spectral_covariance or separate response/scalar optical uncertainty models.",
+      "algorithm": "Forward-fit measured multi-channel spectra using the supplied instrument response. Non-collective relativistic inference evaluates the exact photon-frequency ratio over a Lorentz-boosted Maxwell-Juttner electron distribution. Collective kappa inference evaluates electron/ion Landau-contour susceptibilities, forms the longitudinal dielectric response and fits density, temperature and kappa to the measured collective spectral shape. Other Maxwellian/Kappa paths retain their existing physical forward models.",
+      "uncertainty_model": "Non-collective fits use local fit covariance and optional response-matrix Monte Carlo. Full channel-major GLS remains available for non-collective Maxwellian/Kappa only. Collective Maxwellian external-parameter Monte Carlo retains its existing supported inputs. New relativistic Maxwell-Juttner and collective-kappa models report local model-fit covariance; unsupported external geometry/ion/response covariance contributions are explicitly marked missing rather than silently inferred. Model-discrepancy covariance remains a conditional residual diagnostic, not experimental validation.",
       "limitations": [
-        "Relativistic Thomson-scattering inference is not implemented; arbitrary non-Maxwellian VDF inversion is also outside scope.",
-        "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
-        "The kappa model is a parameterized isotropic non-Maxwellian approximation, not arbitrary VDF inversion.",
-        "Absolute density is not identifiable from spectral shape alone.",
+        "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
+        "Relativistic optical model neglects photon recoil and Compton corrections and is limited to the Thomson regime.",
+        "Collective kappa model is unmagnetized and longitudinal, with a one-dimensional projected isotropic kappa electron distribution and Maxwellian ions; magnetized and arbitrary 3-D non-Maxwellian collective optical models are not implemented.",
+        "Collective kappa model does not yet propagate the complete supplied external-parameter and response-matrix covariance by Monte Carlo.",
+        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; relativistic and collective-kappa models require dedicated joint forward models.",
+        "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
-        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
-        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle.",
-        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; other models require dedicated joint forward models.",
-        "Model-discrepancy covariance uses excess reduced chi-square as a conditional diagnostic and is not a substitute for independent model validation.",
-        "Collective beam-direction component uncertainties are propagated as independent component-wise Gaussian perturbations; correlations among beam-vector components and correlations with other external inputs are not represented.",
-        "A supplied density_relative_covariance is authoritative for all six optical inversion inputs, including the scattered-power uncertainty; do not also supply separate scalar uncertainties."
+        "Collective-mode ion temperatures and flow vectors remain externally supplied, not fitted.",
+        "Collective beam-direction component uncertainty correlations with other external inputs are not represented.",
+        "A supplied density_relative_covariance is authoritative for all six optical inversion inputs and cannot be combined with separate scalar uncertainty inputs."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
       ],
       "raw_data_to_physics": false,
-      "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Legacy profile-summary/interpolation helpers are compatibility utilities only and are not registered or exposed as diagnostic workflows.",
+      "note": "Primary Analysis 1 now includes a relativistic Maxwell-Juttner single-particle model and an unmagnetized collective kappa-electron dielectric model, in addition to the established Maxwellian/Kappa and collective Maxwellian paths. Declared model limits and unsupported uncertainty paths remain explicit.",
       "workflow_modes": [
         {
-          "name": "multi_channel_spectral_inference",
-          "function": "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
+          "name": "non_collective_relativistic_maxwell_juttner",
+          "function": "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
           "inputs": [
-            "wavelength_nm",
-            "spectra (channel × wavelength)",
-            "radius_m",
-            "laser_wavelength_nm",
-            "scattering_angle_rad",
-            "instrument_response",
-            "optional signal uncertainty and full channel-major spectral covariance",
-            "optional explicit collective ion composition/temperature/flow inputs",
-            "optional absolute-density optical geometry"
+            "calibrated wavelength spectrum",
+            "laser wavelength and scattering angle",
+            "incident/scattered unit vectors",
+            "measured instrument response"
           ],
           "outputs": [
-            "electron_temperature_profile_eV",
-            "electron_density_profile_m3 where identifiable",
-            "electron_velocity_projection_profile_m_s",
-            "per-channel fit diagnostics and covariance"
+            "electron temperature",
+            "scattering-vector flow projection",
+            "fitted spectrum and residual",
+            "local fit covariance",
+            "integrated spectral power"
           ],
-          "scope": "Canonical physical inference from measured calibrated multi-channel spectra; no pre-derived ne/Te profile inputs."
+          "scope": "Exact relativistic photon-frequency ratio for Lorentz-boosted isotropic Maxwell-Juttner electrons; recoil neglected."
+        },
+        {
+          "name": "collective_kappa_electron_dielectric",
+          "function": "tokamak_analysis.thomson_kinetic_models.fit_collective_kappa",
+          "inputs": [
+            "calibrated wavelength spectrum",
+            "ion species/fractions/temperatures/flow vectors",
+            "electron flow vector",
+            "beam directions",
+            "initial ne/Te/kappa and bounds"
+          ],
+          "outputs": [
+            "electron density",
+            "electron temperature",
+            "kappa index",
+            "fitted collective spectrum",
+            "local fit covariance"
+          ],
+          "scope": "Unmagnetized longitudinal dielectric model with projected isotropic kappa electrons and Maxwellian ions."
         }
       ],
-      "completion_scope": "Multi-channel measured-spectrum physical inference using the registered Maxwellian, Kappa, collective model options, instrument-response convolution and optional absolute-density inversion. Legacy profile-summary/interpolation functions are compatibility helpers only and are not registered diagnostic workflows. Relativistic Thomson-scattering inference and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
+      "completion_scope": "Measured calibrated multi-channel spectrum-to-physics inference using non-collective Maxwellian/Kappa, relativistic Maxwell-Juttner, collective Maxwellian and collective kappa-electron dielectric models. Joint GLS remains limited to non-collective Maxwellian/Kappa. No detector calibration or independent experimental validation is performed.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
@@ -420,6 +465,26 @@
         "year": 2026,
         "doi": "10.1063/5.0350497",
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent optical Thomson diagnostic modelling and instrument-aware spectral inference context."
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic magnetized scattering context; the optical Maxwell-Juttner model here is a separate unmagnetized single-particle Thomson limit."
       }
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis."
