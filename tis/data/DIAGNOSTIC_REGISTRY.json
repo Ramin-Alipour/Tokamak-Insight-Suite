@@ -2,15 +2,15 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson scattering",
-    "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated spectra; absolute electron density where identifiable; collective Maxwellian density/temperature and collective kappa density/temperature/kappa where jointly identifiable; relativistic Maxwell-Juttner non-collective temperature and flow projection.",
+    "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated optical Thomson spectra; absolute electron density only where identifiable from calibrated spectral power and complete optical geometry.",
     "status": "D",
-    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra with the supplied measured instrument response. Supports non-collective Maxwellian, non-collective isotropic kappa, exact relativistic single-particle Thomson scattering with Lorentz-boosted Maxwell-Juttner electrons, collective Maxwellian dielectric inference and an unmagnetized collective kappa-electron dielectric model with Maxwellian ions. Absolute non-collective density requires calibrated W/nm spectral power and complete optical geometry.",
-    "caveat": "The relativistic optical model assumes an isotropic Maxwell-Juttner rest-frame distribution, bulk flow parallel to the scattering vector, explicit incident polarization Lorentz-transformed into electron rest frames, exact elastic Thomson photon kinematics, and neglects recoil/Compton corrections. The collective kappa model uses a 1-D projected isotropic kappa electron VDF and Maxwellian ions in an unmagnetized longitudinal dielectric response; arbitrary 3-D or magnetized non-Maxwellian collective inference is not claimed. Collective ion temperatures/composition/flows remain external. Joint full-covariance GLS remains Maxwellian/Kappa non-collective only. No independent experimental validation is claimed.",
+    "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Collective microwave CTS is a separate registered workflow.",
+    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; recoil/Compton corrections are neglected and the Thomson limit must be respected. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is a separate workflow. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
     ],
-    "implementation_status": "Canonical measured-calibrated-spectrum physical inference supports non-collective Maxwellian/Kappa, relativistic Maxwell-Juttner single-particle Thomson, collective Maxwellian dielectric, and collective kappa-electron dielectric models. The relativistic model uses exact relativistic photon-frequency kinematics and a Lorentz-boosted Maxwell-Juttner population. The collective kappa model computes Landau-contour longitudinal susceptibilities from the projected kappa electron VDF and supplied Maxwellian ion species. Joint full-channel GLS remains limited to non-collective Maxwellian/Kappa; uncertainty propagation for new models is declared by model-specific limits.",
+    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered separately.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -61,7 +61,7 @@
           "name": "model",
           "unit": "non_collective_maxwellian, non_collective_kappa or non_collective_relativistic_maxwell_juttner",
           "required": true,
-          "description": "Select one of the three optical Thomson forward models explicitly; collective microwave CTS is a separate registered workflow."
+          "description": "Select one of the three implemented optical Thomson forward models explicitly; collective microwave CTS is a separate registered workflow."
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
@@ -225,7 +225,7 @@
         },
         {
           "name": "kappa_index",
-          "unit": "dimensionless; inferred for non-collective Kappa and collective Kappa models"
+          "unit": "dimensionless; inferred for non-collective Kappa model"
         },
         {
           "name": "kappa_index_uncertainty",
@@ -252,16 +252,15 @@
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner physical model. Infer electron temperature and scattering-vector flow; infer absolute electron density only from W/nm spectra with complete optical geometry and polarization inputs.",
+      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry.",
       "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance and measured-response Monte Carlo; full channel-major spectral GLS and external laser-wavelength/scattering-angle/polarization uncertainty propagation are not implemented. Supplied unsupported relativistic geometry uncertainties are rejected rather than silently ignored. Absolute-density uncertainty uses the supplied optical-factor uncertainty model; unprovided covariance and model discrepancy are excluded.",
       "limitations": [
         "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
         "Relativistic optical model neglects photon recoil and Compton corrections and is limited to the Thomson regime.",
-        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; the relativistic Maxwell-Juttner model currently uses channel-local fit covariance.",
         "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
         "A supplied density_relative_covariance is authoritative for all six optical inversion inputs and cannot be combined with separate scalar uncertainty inputs.",
-        "Optical collective dielectric inference is outside the current Analysis 1 model shortlist; microwave CTS is a separate registered subanalysis."
+        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -270,7 +269,7 @@
         "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner"
       ],
       "raw_data_to_physics": false,
-      "note": "Primary Analysis 1 provides three explicitly selected optical Thomson forward models: non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner. Collective microwave CTS is a separate registered subanalysis. Declared uncertainty limits remain explicit.",
+      "note": "Primary Analysis 1 provides three explicitly selected non-collective optical Thomson forward models. Collective microwave CTS is a separate registered subanalysis.",
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
@@ -293,27 +292,9 @@
             "per-channel fit diagnostics and covariance"
           ],
           "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
-        },
-        {
-          "name": "non_collective_relativistic_maxwell_juttner",
-          "function": "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
-          "inputs": [
-            "calibrated wavelength spectrum",
-            "laser wavelength and scattering angle",
-            "incident/scattered unit vectors",
-            "measured instrument response"
-          ],
-          "outputs": [
-            "electron temperature",
-            "scattering-vector flow projection",
-            "fitted spectrum and residual",
-            "local fit covariance",
-            "integrated spectral power"
-          ],
-          "scope": "Exact relativistic photon-frequency ratio for Lorentz-boosted isotropic Maxwell-Juttner electrons; recoil neglected."
         }
       ],
-      "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. The separate registered spatial subanalysis reconstructs identifiable radial profiles from these measured spectra. Collective microwave CTS is handled by its own registered workflow. No detector calibration or independent experimental validation is performed.",
+      "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its separate registered workflow. No detector calibration or independent experimental validation is performed.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
@@ -4077,7 +4058,8 @@
           "name": "external_parameter_uncertainties",
           "unit": "structured 1-sigma mapping",
           "required": false,
-          "description": "Electrostatic path only: supported independent 1-sigma marginals for probe frequency, electron-flow projection, scalar scattering angle and ion fractions. Full cross-parameter covariance is not supported."
+          "description": "Electrostatic path only: supported independent 1-sigma marginals for probe frequency, electron-flow projection, scalar scattering angle and ion fractions. Full cross-parameter covariance is not supported.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "inversion_method",
@@ -4093,32 +4075,37 @@
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
-          "required": true,
-          "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed."
+          "required": false,
+          "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
-          "required": true,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
+          "required": false,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
-          "required": true,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
+          "required": false,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
-          "required": true,
-          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed."
+          "required": false,
+          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": true,
-          "description": "Required common projected ion-flow optimizer initial estimate; no zero-flow initial value is assumed."
+          "required": false,
+          "description": "Required common projected ion-flow optimizer initial estimate; no zero-flow initial value is assumed.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "global_search",
@@ -4141,43 +4128,50 @@
           "name": "magnetic_field_T",
           "unit": "T; non-zero vector in the common laboratory coordinate frame",
           "required": false,
-          "description": "Mandatory for full_electromagnetic."
+          "description": "Mandatory for full_electromagnetic.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "electron_flow_velocity_m_s",
           "unit": "m s^-1; explicit 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; no scalar projection is substituted."
+          "description": "Mandatory for full_electromagnetic; no scalar projection is substituted.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "ion_flow_velocity_m_s",
           "unit": "m s^-1; mapping from every ion species name to a 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector."
+          "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "incident_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "incident_polarization",
           "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed."
+          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "scattered_polarization",
           "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed."
+          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "harmonic_order",
@@ -4212,8 +4206,9 @@
         {
           "name": "ion_temperature_eV",
           "unit": "positive scalar, species-name mapping or one value per ion species",
-          "required": true,
-          "description": "For full-EM inversion, each ion species temperature is an independent fitted parameter; a scalar is broadcast only as an optimizer initial estimate."
+          "required": false,
+          "description": "For full-EM inversion, each ion species temperature is an independent fitted parameter; a scalar is broadcast only as an optimizer initial estimate.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "frequency_resolved_geometry",
@@ -6362,5 +6357,144 @@
       "raw_data_to_physics": false,
       "note": "Empty input/output specifications mean not yet declared, not that no inputs are required. Do not claim end-to-end raw-instrument analysis."
     }
+  },
+  {
+    "family": "Plasma parameters",
+    "diagnostic": "Thomson spectral distribution",
+    "quantities": "Model-independent spectral centroid, observed width, skewness, excess kurtosis, signed spectral moments, and uncertainty diagnostics from one measured calibrated Thomson spectrum.",
+    "status": "D",
+    "method": "Analyze the measured calibrated spectrum independently of physical Maxwellian/Kappa fitting. The caller must supply a fitted background signal, an explicit background mask, or explicitly select a spectral-edge background fraction. A measured instrument response matrix is preferred; scalar Gaussian width is accepted only as an explicitly supplied measured instrument-width summary.",
+    "caveat": "Spectral moments characterize the measured distribution and do not uniquely recover an electron velocity distribution. No automatic edge-background assumption is made. Signed residuals are retained; no clipping-based moments are used.",
+    "implementation_functions": [
+      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+    ],
+    "implementation_status": "Independent callable for one calibrated measured spectrum; it does not depend on success of the primary Thomson physical fit.",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "execution_level": "analysis_pipeline",
+      "completeness": "complete_with_declared_scope",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing measured wavelength samples",
+          "required": true
+        },
+        {
+          "name": "signal",
+          "unit": "calibrated measured spectral intensity",
+          "required": true
+        },
+        {
+          "name": "instrument_response_matrix",
+          "unit": "measured normalized wavelength response matrix",
+          "required": false
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm; independently measured Gaussian instrument-width summary",
+          "required": false
+        },
+        {
+          "name": "background_signal",
+          "unit": "same as signal; fitted background spectrum",
+          "required": false
+        },
+        {
+          "name": "background_mask",
+          "unit": "boolean mask identifying background samples",
+          "required": false
+        },
+        {
+          "name": "background_fraction",
+          "unit": "fraction of wavelength span at each edge; explicit user selection only",
+          "required": false
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "same as signal; pointwise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "signal_covariance",
+          "unit": "full within-channel spectral covariance",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_centroid_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "observed_sigma_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "spectral_skewness",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "spectral_excess_kurtosis",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "integrated_spectral_measure",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "moment_uncertainty_diagnostics",
+          "unit": "structured"
+        },
+        {
+          "name": "gaussian_fit_parameters",
+          "unit": "structured"
+        },
+        {
+          "name": "residual",
+          "unit": "signal"
+        }
+      ],
+      "assumptions": [
+        "Input wavelength and signal are measured and calibrated.",
+        "Background selection is explicit or supplied from an independently fitted physical-model nuisance component.",
+        "A scalar instrument sigma represents a measured Gaussian width; it is not converted into a synthetic response matrix."
+      ],
+      "preprocessing": [
+        "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
+      ],
+      "algorithm": "Compute signed background-subtracted moments with wavelength quadrature and fit a Gaussian diagnostic shape using the supplied measured response model.",
+      "uncertainty_model": "Propagate supplied pointwise uncertainty or full within-channel covariance through Monte Carlo moment evaluation and fit covariance where identifiable.",
+      "limitations": [
+        "Spectral moments do not uniquely identify an electron VDF.",
+        "No independent experimental validation is claimed."
+      ],
+      "function_links": [
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true
+    },
+    "scientific_references": [
+      {
+        "title": "Computing the generalized plasma dispersion function for non-Maxwellian plasmas, with applications to Thomson scattering",
+        "authors": "Skolar, Longley and Goodwin",
+        "journal": "Physics of Plasmas",
+        "volume": "32",
+        "year": 2025,
+        "doi": "10.1063/5.0261966",
+        "scope": "Context for non-Maxwellian Thomson spectral response; not the direct derivation of this module's model-independent spectral moments."
+      },
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Diagnostic forward/instrument-response modeling context."
+      }
+    ],
+    "note": "Independent measured-spectrum descriptor. It can run even when a physical Maxwellian/Kappa fit fails."
   }
 ]
