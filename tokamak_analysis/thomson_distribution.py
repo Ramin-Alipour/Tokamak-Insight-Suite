@@ -174,7 +174,12 @@ def analyze_thomson_spectral_distribution(
     background_selection_count = sum(
         value is not None for value in (explicit_background, mask, background_fraction)
     )
-    if background_selection_count != 1:
+    if background_selection_count == 0:
+        raise ValueError(
+            "Background is not inferred automatically. Supply background_signal, "
+            "background_mask, or explicitly select background_fraction."
+        )
+    if background_selection_count > 1:
         raise ValueError(
             "Supply exactly one background specification: background_signal, "
             "background_mask, or background_fraction."
@@ -205,8 +210,6 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
-    if mask is None and explicit_background is None and background_fraction is None:
-        raise ValueError("Background is not inferred automatically. Supply background_signal, background_mask, or explicitly select background_fraction.")
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
@@ -230,12 +233,13 @@ def analyze_thomson_spectral_distribution(
     span = float(x[-1] - x[0])
     if explicit_background is not None:
         initial_background_slope = float(np.polyfit(x, background, 1)[0])
+    elif mask is not None:
+        initial_background_slope = float(np.polyfit(x[mask], y[mask], 1)[0])
     else:
         edge_count = max(3, int(np.ceil(x.size * background_fraction)))
         edge_indices = np.r_[np.arange(edge_count), np.arange(x.size-edge_count, x.size)]
         initial_background_slope = float(np.polyfit(
-            x[mask] if mask is not None else x[edge_indices],
-            y[mask] if mask is not None else y[edge_indices], 1
+            x[edge_indices], y[edge_indices], 1
         )[0])
     p0 = [
         amplitude0, float(x[peak]), max(sigma_observed, spacing),
