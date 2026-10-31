@@ -885,6 +885,7 @@ elif page=='Spectral Analysis':
                     scattered_direction_unc_text=st.text_input('Scattered-direction component 1σ uncertainties (x,y,z; optional)',value='',key='ts_infer_scattered_direction_unc')
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
+            relativistic_polarization_text=None
             if model=='non_collective_relativistic_maxwell_juttner':
                 st.markdown('**Relativistic Thomson geometry**')
                 rg1,rg2=st.columns(2)
@@ -892,7 +893,8 @@ elif page=='Spectral Analysis':
                     relativistic_incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_rel_incident_direction')
                 with rg2:
                     relativistic_scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_rel_scattered_direction')
-                st.caption('The relativistic model uses exact photon-frequency kinematics and assumes the bulk electron flow is parallel to the scattering vector.')
+                relativistic_polarization_text=st.text_input('Incident polarization vector (x,y,z)',key='ts_infer_rel_incident_polarization')
+                st.caption('The relativistic model uses exact photon-frequency kinematics, the measured incident polarization, and assumes bulk electron flow parallel to the scattering vector.')
             absolute_density=False
             if model not in {'collective_maxwellian','collective_kappa'}:
                 absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
@@ -919,7 +921,8 @@ elif page=='Spectral Analysis':
                     if model=='non_collective_relativistic_maxwell_juttner':
                         incident_direction_text=relativistic_incident_direction_text
                         scattered_direction_text=relativistic_scattered_direction_text
-                        st.caption('The beam directions entered in the relativistic geometry section are reused for absolute-density inference.')
+                        polarization_text=relativistic_polarization_text
+                        st.caption('The beam directions and incident polarization entered in the relativistic geometry section are reused for absolute-density inference.')
                     else:
                         incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
                         scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
@@ -1035,6 +1038,7 @@ elif page=='Spectral Analysis':
                         kwargs.update({
                             'incident_direction':_parse_ts_vector(relativistic_incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(relativistic_scattered_direction_text,'Scattered direction'),
+                            'incident_polarization':_parse_ts_vector(relativistic_polarization_text,'Incident polarization'),
                         })
                     if absolute_density:
                         kwargs.update({
