@@ -175,8 +175,8 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("instrument_sigma_uncertainty_nm requires scalar instrument_sigma_nm")
         if isinstance(instrument_sigma_uncertainty_nm, (bool, np.bool_)) or not isinstance(instrument_sigma_uncertainty_nm, (int, float, np.integer, np.floating)) or not np.isfinite(instrument_sigma_uncertainty_nm) or instrument_sigma_uncertainty_nm < 0:
             raise ValueError("instrument_sigma_uncertainty_nm must be finite and non-negative")
-    if background_fraction is not None and (isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.02 <= background_fraction <= 0.4)):
-        raise ValueError("background_fraction must be None or an explicitly selected finite real number in [0.02, 0.4]")
+    if background_fraction is not None and (isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.0 < background_fraction < 0.5)):
+        raise ValueError("background_fraction must be None or an explicitly selected finite real number strictly between 0 and 0.5")
     if isinstance(moment_mc_samples, (bool, np.bool_)) or not isinstance(moment_mc_samples, (int, np.integer)) or moment_mc_samples < 20:
         raise ValueError("moment_mc_samples must be an integer >= 20")
 
