@@ -3394,7 +3394,7 @@
     "equation": "L_s f_s^(2) = -q[(E_i+v×B_i)·∇_p f_f^(1) + (E_f+v×B_f)·∇_p f_i^(1)]; J_s^(2)=q∫v f_s^(2)d³p",
     "inputs": "Incident and fluctuation frequencies/wavevectors; incident electric field; local magnetic field; species charge, mass and density; relativistic gyrotropic momentum-space VDF",
     "output": "3×3 complex current vertex mapping fluctuation electric field to second-order scattered current density",
-    "assumptions": "Collisionless homogeneous relativistic Vlasov equation; gyrotropic prescribed equilibrium; Faraday-consistent first-order wave magnetic fields; explicit Lorentzian resonance broadening; no finite-orbit-width or nonlinear equilibrium evolution",
+    "assumptions": "Collisionless homogeneous relativistic Vlasov equation; prescribed gyrotropic equilibrium distribution (Maxwell-Juttner, bi-Gaussian or tabulated); Faraday-consistent first-order waves; explicit Lorentzian resonance broadening; no finite-orbit-width or nonlinear equilibrium evolution",
     "status": "D",
     "category": "Magnetized relativistic collective Thomson scattering",
     "execution_contract": {
@@ -3450,7 +3450,7 @@
         },
         {
           "name": "distribution",
-          "unit": "relativistic_bigaussian or tabulated_gyrotropic momentum-space distribution",
+          "unit": "relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic momentum-space VDF",
           "required": true
         },
         {
@@ -3793,6 +3793,98 @@
         "year": 1991,
         "doi": "10.1088/0741-3335/33/14/005",
         "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
+      }
+    ]
+  },
+  {
+    "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
+    "equation": "L_s f_s^(1)=−q_s(E+v×B)·∇_p f_{0s}; σ_s·E=q_s n_s∫v f_s^(1)d³p; Q_s∝q_s²n_s∫vv f_{0s}δ(ω−k·v−nΩ_s/γ)d³p",
+    "inputs": "Species density, mass and charge; local magnetic field; wave frequency/wavevector; prescribed relativistic gyrotropic VDF",
+    "output": "Complex kinetic conductivity and particle shot-noise fluctuation covariance",
+    "assumptions": "Relativistic kinematics v=p/(γm), gyrofrequency qB/(γm); gyrotropic VDF; collisionless homogeneous local plasma; Lorentzian resonance broadening",
+    "status": "D",
+    "category": "Magnetized relativistic collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
+      "formula_key": "relativistic_gyrotropic_linear_response",
+      "input_specs": [
+        {
+          "name": "omega_rad_s",
+          "unit": "rad s^-1",
+          "required": true
+        },
+        {
+          "name": "wavevector_rad_m",
+          "unit": "m^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; 3-vector",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg",
+          "required": true
+        },
+        {
+          "name": "charge_C",
+          "unit": "C",
+          "required": true
+        },
+        {
+          "name": "distribution",
+          "unit": "relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "conductivity_S_m",
+          "unit": "S m^-1; complex tensor"
+        },
+        {
+          "name": "fluctuation_covariance",
+          "unit": "state covariance"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "boolean"
+        }
+      ],
+      "uncertainty_model": "No experimental uncertainty is assigned to the externally supplied VDF or truncation controls; numerical convergence must be assessed independently.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_relativistic_maxwell_juttner_momentum_grid_is_normalized"
+      ],
+      "note": "The linear conductivity integrates the first-order perturbation against momentum-space volume weights; it must not multiply by f0 a second time because the perturbation already contains ∇p f0."
+    },
+    "references": [
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic magnetized plasma response."
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "journal": "Journal of Fusion Energy",
+        "volume": "45",
+        "article": "55",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7",
+        "scope": "Recent energetic/bulk ion CTS diagnostic context."
       }
     ]
   }
