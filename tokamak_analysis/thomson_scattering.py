@@ -98,6 +98,8 @@ def density_from_thomson_scattered_power(
     scattered_direction_vector=None,
     polarization_factor_uncertainty=None,
     relative_input_covariance=None,
+    effective_differential_cross_section_m2_sr=None,
+    effective_differential_cross_section_uncertainty_m2_sr=None,
 ):
     """Infer density from calibrated collected Thomson power.
 
@@ -118,11 +120,22 @@ def density_from_thomson_scattered_power(
     eta = _positive_finite_scalar(optical_efficiency, "optical_efficiency")
     if eta > 1.0:
         raise ValueError("optical_efficiency must not exceed 1")
-    dsigma = thomson_differential_cross_section_m2_sr(
-        theta, incident_polarization_vector=incident_polarization_vector,
-        incident_direction_vector=incident_direction_vector,
-        scattered_direction_vector=scattered_direction_vector,
-    )
+    if effective_differential_cross_section_m2_sr is None:
+        dsigma = thomson_differential_cross_section_m2_sr(
+            theta, incident_polarization_vector=incident_polarization_vector,
+            incident_direction_vector=incident_direction_vector,
+            scattered_direction_vector=scattered_direction_vector,
+        )
+    else:
+        dsigma = _positive_finite_scalar(
+            effective_differential_cross_section_m2_sr,
+            "effective_differential_cross_section_m2_sr",
+        )
+        if scattering_angle_uncertainty_rad is not None or polarization_factor_uncertainty is not None:
+            raise ValueError(
+                "For a supplied effective relativistic cross-section, propagate angle/polarization "
+                "uncertainty through effective_differential_cross_section_uncertainty_m2_sr instead."
+            )
     if dsigma <= 0:
         raise ValueError("The supplied polarization/collection geometry has zero Thomson differential cross-section")
     density = ps / (pi * length * dsigma * omega * eta)
@@ -147,6 +160,15 @@ def density_from_thomson_scattered_power(
                 optical_efficiency_uncertainty, polarization_factor_uncertainty)):
             raise ValueError("Use relative_input_covariance instead of separate scalar optical-factor uncertainties; do not double-count uncertainty inputs")
         gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+        if effective_differential_cross_section_uncertainty_m2_sr is not None:
+            sigma_cross_section = _positive_finite_scalar(
+                effective_differential_cross_section_uncertainty_m2_sr,
+                "effective_differential_cross_section_uncertainty_m2_sr",
+                allow_zero=True,
+            )
+            covariance = covariance.copy()
+            covariance[5, 5] += (sigma_cross_section / dsigma) ** 2
+            uncertainty_supplied = True
         rel_variance = float(gradient @ covariance @ gradient)
         if scattered_power_uncertainty_W is not None:
             # A zero first row/column declares that measured-power uncertainty
@@ -185,6 +207,14 @@ def density_from_thomson_scattered_power(
                 raise ValueError(f"{name} cannot be propagated relative to a zero nominal value")
         else:
             rel_variance += (sigma / nominal) ** 2
+    if effective_differential_cross_section_uncertainty_m2_sr is not None and relative_input_covariance is None:
+        sigma_cross_section = _positive_finite_scalar(
+            effective_differential_cross_section_uncertainty_m2_sr,
+            "effective_differential_cross_section_uncertainty_m2_sr",
+            allow_zero=True,
+        )
+        uncertainty_supplied = True
+        rel_variance += (sigma_cross_section / dsigma) ** 2
     if polarization_factor_uncertainty is not None:
         sigma_pol = _positive_finite_scalar(polarization_factor_uncertainty, "polarization_factor_uncertainty", allow_zero=True)
         if incident_polarization_vector is None or dsigma <= 0:
@@ -241,8 +271,9 @@ def density_from_thomson_scattered_power(
             "Absolutely calibrated scattered and incident laser power.",
             "Optically thin, single-scattering Thomson relation; polarization dependence is included when incident polarization and scattered direction vectors are supplied, otherwise the unpolarized cross-section is used.",
             "The returned density is the interaction-length-averaged effective density; it equals a local density only when density is uniform along the scattering path.",
+            "A model-supplied effective differential cross-section may be used when relativistic electron kinematics and polarization are integrated over the electron distribution.",
             "Collection solid angle and optical efficiency describe the actual collection path.",
         ],
         "density_interpretation": "interaction_length_averaged_effective_density",
-        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor." if relative_input_covariance is not None else "Optional first-order independent-input propagation; unprovided covariance and model discrepancy are not included."),
+        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty is added to its final diagonal term." if relative_input_covariance is not None else "Optional first-order independent-input propagation; unprovided covariance and model discrepancy are not included."),
     }
