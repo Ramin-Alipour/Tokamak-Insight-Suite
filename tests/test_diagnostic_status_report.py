@@ -23,7 +23,7 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
 
     report = json.loads((tmp_path / "DIAGNOSTIC_STATUS_REPORT.json").read_text(encoding="utf-8"))
     assert report["source_of_truth"] == "DIAGNOSTIC_REGISTRY.json"
-    assert report["diagnostic_record_count"] == 79
+    assert report["diagnostic_record_count"] == 80
     assert report["diagnostic_execution_level_counts"] == {
         "analysis_pipeline": 16,
         "limited_calculation": 16,
@@ -34,8 +34,8 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
         "complete_with_declared_scope": 11,
         "incomplete": 62,
     }
-    assert report["callable_analysis_entry_point_count"] == 79
-    assert sum(report["callable_analysis_completeness_counts"].values()) == 79
+    assert report["callable_analysis_entry_point_count"] == 80
+    assert sum(report["callable_analysis_completeness_counts"].values()) == 80
 
     first_ten = report["first_ten_diagnostics"]
     assert len(first_ten) == 10
