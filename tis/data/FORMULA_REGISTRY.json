@@ -3002,6 +3002,59 @@
           "unit": "dimensionless",
           "required": false,
           "description": "Relative covariance between fitted scattered power and effective differential cross-section; propagated with the negative cross term for P_s/σ_eff."
+        },
+        {
+          "name": "incident_polarization_vector",
+          "unit": "unit vector",
+          "required": false,
+          "description": "Lab-frame incident polarization; required with incident/scattered direction vectors when no effective cross-section override is supplied."
+        },
+        {
+          "name": "incident_direction_vector",
+          "unit": "unit vector",
+          "required": false,
+          "description": "Lab-frame incident propagation direction; paired with incident_polarization_vector and scattered_direction_vector for the classical polarized cross-section."
+        },
+        {
+          "name": "scattered_direction_vector",
+          "unit": "unit vector",
+          "required": false,
+          "description": "Lab-frame scattered-light collection direction; paired with the incident vectors for the classical polarized cross-section."
+        },
+        {
+          "name": "scattered_power_uncertainty_W",
+          "unit": "W",
+          "required": false
+        },
+        {
+          "name": "incident_power_uncertainty_W",
+          "unit": "W",
+          "required": false
+        },
+        {
+          "name": "interaction_length_uncertainty_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_uncertainty_sr",
+          "unit": "sr",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency_uncertainty",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "polarization_factor_uncertainty",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad",
+          "required": false
         }
       ],
       "output_specs": [
@@ -3024,9 +3077,10 @@
       ],
       "prerequisites": [
         "Optically thin single scattering",
-        "absolute power calibration",
+        "absolute scattered-power calibration",
         "uniform density over interaction length",
-        "supplied collection and polarization geometry"
+        "collection solid angle and optical efficiency",
+        "either classical polarization geometry or a model-consistent effective differential cross-section"
       ],
       "uncertainty_model": "First-order propagation using independent supplied standard uncertainties or a 6x6 relative covariance matrix for the six multiplicative inputs, plus fitted power/effective-cross-section covariance. For relativistic Maxwell-Juttner, fitted-parameter covariance, instrument-response uncertainty and supplied geometry/polarization uncertainty are propagated through the velocity-averaged effective differential cross-section. Scattering-angle uncertainty is handled separately for non-relativistic models; do not double-count inputs.",
       "test_links": [
@@ -4176,7 +4230,7 @@
   {
     "name": "Relativistic Maxwell-Juttner effective Thomson differential cross-section",
     "equation": "(dσ_eff/dΩ) = r_e² [∫ d³u f_MJ(u) ((1−n_i·β)/(γ²(1−n_s·β)²)) (1−(n_s'·ε_i')²)] / [∫ d³u f_MJ(u)]",
-    "inputs": "Fitted electron temperature [eV], fitted scattering-vector flow projection [m s^-1], incident/scattered directions, incident polarization and laser geometry",
+    "inputs": "Wavelength grid [nm], laser wavelength [nm], scattering angle [rad], fitted electron temperature [eV], optional scattering-vector flow projection [m s^-1], and incident polarization unit vector in scattering-local coordinates",
     "output": "m² sr^-1",
     "assumptions": "Single scattering in the Thomson limit; isotropic Maxwell-Juttner distribution in its rest frame, Lorentz-boosted along the scattering vector; electron-rest-frame polarization and scattering direction; unanalysed scattered polarization; no Compton recoil.",
     "status": "D",
@@ -4184,7 +4238,7 @@
     "execution_contract": {
       "schema_version": "1.0",
       "implementation_link_status": "mapped",
-      "function_link": "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+      "function_link": "tokamak_analysis.formula_library.relativistic_mj_effective_differential_cross_section",
       "formula_key": "relativistic_mj_effective_differential_cross_section",
       "input_specs": [
         {
@@ -4237,14 +4291,6 @@
         {
           "name": "effective_differential_cross_section_m2_sr",
           "unit": "m² sr^-1"
-        },
-        {
-          "name": "captured_probability",
-          "unit": "dimensionless"
-        },
-        {
-          "name": "spectral_density_per_nm",
-          "unit": "nm^-1"
         }
       ],
       "prerequisites": [
@@ -4254,13 +4300,12 @@
       ],
       "uncertainty_model": "Finite-difference propagation of fitted Te/flow covariance; instrument-response and supplied geometry/polarization uncertainty propagated by Monte Carlo refits. Cross-covariance with fitted integrated scattered power is retained.",
       "test_links": [
-        "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
-        "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters",
-        "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties"
+        "tests/test_thomson_formula_contracts.py::test_relativistic_mj_effective_cross_section_formula_library_link",
+        "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit"
       ],
       "note": "Numerical deterministic quadrature and synthetic/limiting-case software tests; not empirical validation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
