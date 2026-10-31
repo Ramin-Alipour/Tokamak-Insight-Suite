@@ -1102,6 +1102,7 @@ def analyze_thomson_spectra(
                 density_inputs.update({
                     "effective_differential_cross_section_m2_sr": fit["effective_differential_cross_section_m2_sr"],
                     "effective_differential_cross_section_uncertainty_m2_sr": fit.get("effective_differential_cross_section_uncertainty_m2_sr"),
+                    "power_cross_section_relative_covariance": fit.get("power_cross_section_relative_covariance"),
                     "scattering_angle_uncertainty_rad": None,
                     "incident_polarization_vector": None,
                     "incident_direction_vector": None,
@@ -1240,6 +1241,16 @@ def analyze_thomson_spectra(
                     ))
                     fit["differential_cross_section_uncertainty_m2_sr"] = fit["effective_differential_cross_section_uncertainty_m2_sr"]
                     fit["instrument_response_cross_section_uncertainty_m2_sr"] = cross_section_lsf_sigma
+                    paired_lsf = np.column_stack((np.asarray(area_samples, dtype=float), np.asarray(cross_section_samples, dtype=float)))
+                    paired_lsf = paired_lsf[np.all(np.isfinite(paired_lsf), axis=1)]
+                    if paired_lsf.shape[0] >= required_successes:
+                        lsf_power_cross_covariance = float(
+                            np.cov(paired_lsf[:, 0], paired_lsf[:, 1], ddof=1)[0, 1]
+                            / (np.mean(paired_lsf[:, 0]) * np.mean(paired_lsf[:, 1]))
+                        )
+                        fit["power_cross_section_relative_covariance"] = float(
+                            fit.get("power_cross_section_relative_covariance") or 0.0
+                        ) + lsf_power_cross_covariance
                 if lsf_unc.ndim == 2:
                     fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
                     fit["_shared_lsf_velocity_draws"] = np.asarray(velocity_samples, dtype=float)
@@ -1346,7 +1357,7 @@ def analyze_thomson_spectra(
             incident_direction_unc, scattered_direction_unc, polarization_unc,
         )):
             rng_external = np.random.default_rng(84271 + i)
-            external_te_samples, external_velocity_samples, external_cross_section_samples = [], [], []
+            external_te_samples, external_velocity_samples, external_cross_section_samples, external_area_samples = [], [], [], []
             incident_nominal = np.asarray(probe_vec, dtype=float)
             scattered_nominal = np.asarray(scatter_vec, dtype=float)
             polarization_nominal = np.asarray(
@@ -1411,7 +1422,9 @@ def analyze_thomson_spectra(
                     external_te_samples.append(float(draw["electron_temperature_eV"]))
                     external_velocity_samples.append(float(draw["electron_velocity_projection_m_s"]))
                     external_cross_section_samples.append(float(draw["effective_differential_cross_section_m2_sr"]))
+                    external_area_samples.append(float(draw["integrated_scattered_power_W"]))
                 except (ValueError, RuntimeError):
+                    external_area_samples.append(np.nan)
                     continue
             required_external = max(
                 8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples))
@@ -1432,8 +1445,27 @@ def analyze_thomson_spectra(
                     fit.get("effective_differential_cross_section_uncertainty_m2_sr") or 0.0,
                     cross_section_external_sigma,
                 ))
+                external_area_sigma = float(np.std(external_area_samples, ddof=1))
+                fit["integrated_scattered_power_uncertainty_W"] = float(np.hypot(
+                    fit.get("integrated_scattered_power_uncertainty_W") or 0.0,
+                    external_area_sigma,
+                ))
+                fit["relativistic_external_integrated_power_uncertainty_W"] = external_area_sigma
                 fit["relativistic_external_cross_section_uncertainty_m2_sr"] = cross_section_external_sigma
                 fit["differential_cross_section_uncertainty_m2_sr"] = fit["effective_differential_cross_section_uncertainty_m2_sr"]
+                paired_external = np.column_stack((
+                    np.asarray(external_area_samples, dtype=float),
+                    np.asarray(external_cross_section_samples, dtype=float),
+                ))
+                paired_external = paired_external[np.all(np.isfinite(paired_external), axis=1)]
+                if paired_external.shape[0] >= required_external:
+                    external_power_cross_covariance = float(
+                        np.cov(paired_external[:, 0], paired_external[:, 1], ddof=1)[0, 1]
+                        / (np.mean(paired_external[:, 0]) * np.mean(paired_external[:, 1]))
+                    )
+                    fit["power_cross_section_relative_covariance"] = float(
+                        fit.get("power_cross_section_relative_covariance") or 0.0
+                    ) + external_power_cross_covariance
                 fit["relativistic_external_parameter_uncertainty_propagated"] = True
                 fit["relativistic_external_temperature_uncertainty_eV"] = te_external_sigma
                 fit["relativistic_external_velocity_uncertainty_m_s"] = velocity_external_sigma
@@ -1452,6 +1484,28 @@ def analyze_thomson_spectra(
                     density_inputs["effective_differential_cross_section_uncertainty_m2_sr"] = fit[
                         "effective_differential_cross_section_uncertainty_m2_sr"
                     ]
+                    density_inputs["power_cross_section_relative_covariance"] = fit.get(
+                        "power_cross_section_relative_covariance"
+                    )
+                    covariance_density = density_inputs.get("relative_input_covariance")
+                    if covariance_density is None:
+                        density_inputs["scattered_power_uncertainty_W"] = float(np.hypot(
+                            density_inputs.get("scattered_power_uncertainty_W") or 0.0,
+                            external_area_sigma,
+                        ))
+                    else:
+                        covariance_density = np.asarray(covariance_density, dtype=float).copy()
+                        if np.allclose(covariance_density[0, :], 0.0, rtol=0.0, atol=1e-14) and np.allclose(
+                            covariance_density[:, 0], 0.0, rtol=0.0, atol=1e-14
+                        ):
+                            density_inputs["scattered_power_uncertainty_W"] = float(np.hypot(
+                                density_inputs.get("scattered_power_uncertainty_W") or 0.0,
+                                external_area_sigma,
+                            ))
+                        else:
+                            area_now = float(fit["integrated_scattered_power_W"])
+                            covariance_density[0, 0] += (external_area_sigma / area_now) ** 2
+                            density_inputs["relative_input_covariance"] = covariance_density
                     density_result = density_from_thomson_scattered_power(**density_inputs)
                     fit["electron_density_m3"] = density_result["electron_density_m3"]
                     fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
