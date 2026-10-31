@@ -473,8 +473,13 @@ def reconstruct_thomson_profile_from_spectra(
                 channel.get("integrated_spectral_signal_uncertainty_input_units_nm", np.nan),
             ) for channel in result["channels"]
         ], dtype=float)
+        power_profile_name = (
+            "integrated_scattered_power_W"
+            if result.get("absolute_scattered_power_available")
+            else "integrated_spectral_signal_input_units_nm"
+        )
         candidates.append((
-            "integrated_scattered_power_W", None, None,
+            power_profile_name, None, None,
             np.diag(power_sigma**2) if np.all(np.isfinite(power_sigma)) else None,
             True,
         ))
@@ -512,7 +517,7 @@ def reconstruct_thomson_profile_from_spectra(
         elif name == "scattering_parameter_alpha":
             values = alpha_values
             uncertainty_values = None
-        elif name == "integrated_scattered_power_W":
+        elif name in {"integrated_scattered_power_W", "integrated_spectral_signal_input_units_nm"}:
             values = power_values
             uncertainty_values = power_sigma if np.all(np.isfinite(power_sigma)) else None
         elif name in spectral_profile_inputs:
