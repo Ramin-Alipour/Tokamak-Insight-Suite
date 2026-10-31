@@ -164,6 +164,7 @@ def _fit_identifiability(
         "covariance_correlation_condition_number": condition,
         "fit_residual_rms": float(np.sqrt(np.mean(residual ** 2))) if residual.size else None,
         "fit_reduced_chi_square": chi2,
+        "fit_reduced_chi_square_policy": "diagnostic_only_no_hard_acceptance_cutoff_without_an_explicit_noise_and_significance_policy",
         "fit_degrees_of_freedom": int(dof),
     }
 
