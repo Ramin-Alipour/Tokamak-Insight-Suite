@@ -228,7 +228,8 @@ def full_em_cts_spectral_density(
 ):
     """Return a local full-EM magnetized CTS spectrum and fluctuation diagnostics.
 
-    Required geometry keys: incident_direction, scattered_direction (unit vectors).
+    Geometry may be supplied as local incident/scattered unit vectors or as
+    frequency_resolved_geometry records produced by trace_cts_frequency_resolved_beams.
     Polarizations are complex 3-vectors supplied by the diagnostic mode definition.
     Fluctuation covariance includes electron density/current/E/B cross-correlations.
     """
