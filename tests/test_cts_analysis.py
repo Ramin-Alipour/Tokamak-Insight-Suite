@@ -203,6 +203,10 @@ def test_cts_analysis_can_fit_fraction_of_fixed_tabulated_fast_ion_vdf():
 
 def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normalized_shape():
     f0,f,g,ions,frac,response=_case()
+    # Keep the measured frequency window inside the supplied fast-ion VDF's
+    # resonant velocity support; otherwise the inverse problem is correctly
+    # rejected as non-identifiable.
+    f=np.linspace(-1.5e9,1.5e9,f.size)
     velocity=np.linspace(-2.0e6,2.0e6,41)
     initial_pdf=np.exp(-0.5*(velocity/2.8e5)**2)*(1.0+0.2*np.exp(-0.5*((velocity-3e5)/1.5e5)**2))
     truth={"species_index":0,"fraction":0.06,"kind":"tabulated_1d",
@@ -620,6 +624,7 @@ def test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry(monkeypatch):
              "initial_wavevector_rad_m": [0.0, 1.0, 0.0]},
         ],
         equilibrium=equilibrium,
+        mode_index=0,
         incident_beam_covariance_m2=cov,
         receiver_beam_covariances_m2=cov,
     )
