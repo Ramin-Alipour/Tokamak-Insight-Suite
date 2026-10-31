@@ -386,6 +386,7 @@ def analyze_thomson_spectra(
     joint_spectral_covariance=None,
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
+    collective_kappa_initial=3.0, collective_kappa_bounds=(1.51, 50.0),
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
