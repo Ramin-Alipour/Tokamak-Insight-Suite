@@ -382,12 +382,16 @@ def test_thomson_scalar_physical_inputs_reject_booleans():
 
 
 def test_descriptive_moments_report_negative_residual_clipping_caveat():
-    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
-    x=np.linspace(500.0,564.0,401)
-    y=100.0*np.exp(-0.5*((x-532.0)/8.0)**2)+10.0
-    y[0]=0.0
-    y[-1]=0.0
-    out=analyze_thomson_spectral_distribution(x,y,instrument_sigma_nm=0.2,background_fraction=0.1)
+    x = np.linspace(500.0, 564.0, 401)
+    y = 100.0*np.exp(-0.5*((x-532.0)/8.0)**2) + 10.0
+    y[0] = 0.0
+    y[-1] = 0.0
+    result = analyze_thomson_spectra(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+    )
+    out = result["channels"][0]["spectral_distribution"]
+    assert out["physical_parameter_extraction"]["status"] == "completed"
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
 
