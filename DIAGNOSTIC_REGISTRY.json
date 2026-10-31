@@ -4203,11 +4203,6 @@
           "required": false
         },
         {
-          "name": "instrument_response_uncertainty",
-          "unit": "frequency-response matrix 1-sigma",
-          "required": false
-        },
-        {
           "name": "external_parameter_uncertainties",
           "unit": "structured 1-sigma mapping",
           "required": false
@@ -4257,11 +4252,6 @@
         {
           "name": "random_seed",
           "unit": "integer; deterministic search seed",
-          "required": false
-        },
-        {
-          "name": "response_mc_samples",
-          "unit": "count",
           "required": false
         },
         {
