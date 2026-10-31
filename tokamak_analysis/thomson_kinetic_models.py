@@ -219,6 +219,23 @@ def fit_relativistic_maxwell_juttner(
     angle_from_vectors = float(np.arccos(np.clip(np.dot(ni, ns), -1.0, 1.0)))
     if not np.isclose(angle_from_vectors, scattering_angle_rad, rtol=0.0, atol=1e-5):
         raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
+    polarization_lab = np.asarray(incident_polarization, dtype=float)
+    if (polarization_lab.shape != (3,) or np.any(~np.isfinite(polarization_lab))
+            or np.linalg.norm(polarization_lab) == 0):
+        raise ValueError("incident_polarization must be a finite non-zero 3-vector")
+    polarization_lab = polarization_lab/np.linalg.norm(polarization_lab)
+    if abs(float(np.dot(polarization_lab, ni))) > 1e-6:
+        raise ValueError("incident_polarization must be transverse to incident_direction")
+    qhat = ns-ni
+    qhat /= np.linalg.norm(qhat)
+    e3 = np.cross(ni, ns)
+    if np.linalg.norm(e3) <= 1e-12:
+        e3 = polarization_lab-np.dot(polarization_lab,qhat)*qhat
+    e3 /= np.linalg.norm(e3)
+    e2 = np.cross(qhat,e3)
+    e2 /= np.linalg.norm(e2)
+    local_to_lab = np.column_stack((qhat,e2,e3))
+    polarization_local = local_to_lab.T@polarization_lab
     scale = max(float(np.max(np.abs(y))), np.finfo(float).tiny)
     ys = y/scale
     unc = None if uncertainty is None else np.asarray(uncertainty, dtype=float)/scale
@@ -247,7 +264,7 @@ def fit_relativistic_maxwell_juttner(
         physical = relativistic_maxwell_juttner_spectrum(
             x, laser_wavelength_nm, scattering_angle_rad, te,
             flow_projection_m_s=beta_flow*C,
-            incident_polarization=incident_polarization,
+            incident_polarization=polarization_local,
             radial_order=radial_order, angular_order=angular_order,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
