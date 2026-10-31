@@ -3207,6 +3207,7 @@ elif page=='Advanced Analysis':
                 cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=1,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
                 cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
                 cts_damping=st.text_input('Optional resonance damping rate (rad/s)',key='cts_full_damping')
+                cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV:D+":[10,200]}',key='cts_full_parameter_bounds')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
             with s1: cts_species_text=st.text_input('Ion species names (comma-separated)',key='cts_full_species')
@@ -3272,6 +3273,7 @@ elif page=='Advanced Analysis':
                             raise ValueError('Ray geometry JSON must contain frequency_resolved_geometry from the CTS ray/beam helper.')
                     electron_distribution=None if not cts_electron_distribution_json.strip() else json.loads(cts_electron_distribution_json)
                     fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
+                    parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
                     kwargs_cts={
                         'frequency_shift_Hz':frequency,
                         'measured_spectrum':spectrum,
@@ -3290,6 +3292,7 @@ elif page=='Advanced Analysis':
                         'instrument_response':cts_response,
                         'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
+                        'parameter_bounds':parameter_bounds,
                         'fast_ion_populations':fast_ions,
                         'electron_distribution':electron_distribution,
                         'harmonic_order':int(cts_harmonic_order),
