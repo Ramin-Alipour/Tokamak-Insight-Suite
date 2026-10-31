@@ -1850,8 +1850,13 @@ def analyze_thomson_spectra(
             * float(scattering_angle_unc) ** 2
         )
         if density_joint_covariance_output is not None:
-            valid_angle = np.isfinite(density_angle_covariance_output)
-            density_joint_covariance_output[valid_angle] += density_angle_covariance_output[valid_angle]
+            angle_covariance_to_add = density_angle_covariance_output.copy()
+            if joint_density_covariance is None:
+                # The marginal density errors already include the common angle
+                # contribution; only its cross-channel terms are missing here.
+                np.fill_diagonal(angle_covariance_to_add, 0.0)
+            valid_angle = np.isfinite(angle_covariance_to_add)
+            density_joint_covariance_output[valid_angle] += angle_covariance_to_add[valid_angle]
     density_cross_channel_covariance_available = bool(
         (
             density_joint_covariance_output is not None
