@@ -377,7 +377,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         except np.linalg.LinAlgError as exc: raise ValueError("spectral_covariance must be positive definite") from exc
         whiten=lambda z: np.linalg.solve(chol,z)
     else:
-        whiten=lambda z: z/noise
+        whiten=lambda z: z/noise.reshape((-1,) + (1,) * (np.ndim(z) - 1))
     response_sigma=None if instrument_response_uncertainty is None else _array(instrument_response_uncertainty,"instrument_response_uncertainty",2)
     if response_sigma is not None and (response_sigma.shape!=response.shape or np.any(response_sigma<0)):
         raise ValueError("instrument_response_uncertainty must match the response matrix and be non-negative")
