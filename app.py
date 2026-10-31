@@ -1116,9 +1116,7 @@ elif page=='Spectral Analysis':
                     'electron_velocity_projection_m_s':result['electron_velocity_projection_profile_m_s'],
                     'electron_velocity_projection_uncertainty_m_s':result['electron_velocity_projection_uncertainty_profile_m_s'],
                 })
-                if model=='non_collective_kappa':
-                    profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
-                if model=='collective_kappa':
+                if model in {'non_collective_kappa','collective_kappa'}:
                     profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
                 if model in {'collective_maxwellian','collective_kappa'}:
                     profile['scattering_parameter_alpha']=[channel.get('scattering_parameter_alpha',np.nan) for channel in result['channels']]
