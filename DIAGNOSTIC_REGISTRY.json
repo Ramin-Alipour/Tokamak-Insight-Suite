@@ -165,7 +165,7 @@
           "name": "density_relative_covariance",
           "unit": "6x6 relative covariance",
           "required": false,
-          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) relative covariance for scattered power and five multiplicative optical/cross-section factors. For the relativistic Maxwell-Juttner model, the final factor is the velocity-averaged effective differential cross-section, not a scalar polarization factor. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when its scattered-power row/column is zero; measured-power uncertainty is then supplied by spectral/response propagation."
+          "description": "External per-channel (shared 6x6 or channel-specific N x 6 x 6) relative covariance for scattered power and five multiplicative optical/cross-section factors. For the relativistic Maxwell-Juttner model, the final factor is the velocity-averaged effective differential cross-section, not a scalar polarization factor. Fitted power/cross-section covariance and model-fit uncertainty are propagated internally and must not be duplicated in this matrix. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when its scattered-power row/column is zero; measured-power uncertainty is then supplied by spectral/response propagation."
         },
         {
           "name": "joint_density_relative_covariance",
