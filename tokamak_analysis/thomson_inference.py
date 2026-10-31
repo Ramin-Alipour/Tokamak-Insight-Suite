@@ -629,7 +629,24 @@ def analyze_thomson_spectra(
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
-        else:
+        elif model == "non_collective_relativistic_maxwell_juttner":
+            fit = fit_relativistic_maxwell_juttner(
+                xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
+                response, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+            )
+        elif model == "collective_kappa":
+            fit = fit_collective_kappa(
+                xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
+                response, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+                ion_species=ion_species, ion_fractions=ion_fract,
+                ion_temperature_eV=ion_t, electron_velocity_m_s=electron_v[0],
+                ion_velocity_m_s=ion_v,
+                initial_density_m3=collective_initial_density_m3,
+                initial_temperature_eV=collective_initial_temperature_eV,
+                density_bounds_m3=density_bounds, temperature_bounds_eV=temperature_bounds,
+                initial_kappa=collective_kappa_initial, kappa_bounds=collective_kappa_bounds,
+            )
+        elif model == "collective_maxwellian":
             # PlasmaPy's kinetic Maxwellian spectral-density model evaluates
             # collective and non-collective regimes from the same dielectric
             # response; ion species/temperature are never silently defaulted.
