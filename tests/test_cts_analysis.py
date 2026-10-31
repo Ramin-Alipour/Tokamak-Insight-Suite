@@ -477,7 +477,7 @@ def test_bindslev_dielectric_form_factors_are_hermitian_and_flux_normalized():
         wavevector_incident_rad_m=ki,wavevector_scattered_rad_m=ks,
         incident_electric_field=ei,incident_susceptibility=chi_i,
         scattered_susceptibility=chi_s,magnetic_field_T=b,electron_density_m3=ne,
-    )["source_current_operator"]
+    )["dielectric_coupling_operator"]
     result=bindslev_dielectric_form_factors(op,ei,es,ki,ks,wi,ws,ne)
     G=result["G_alpha_beta"]
     assert G.shape==(10,10)
