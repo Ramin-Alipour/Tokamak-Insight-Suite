@@ -6550,43 +6550,43 @@
           "name": "instrument_response_matrix",
           "unit": "measured normalized wavelength response matrix",
           "required": false,
-          "description": "Measured normalized response matrix. Supply this or instrument_sigma_nm, but not both."
+          "description": "Finite non-negative measured normalized square response matrix on the wavelength grid. Supply this or instrument_sigma_nm, but not both."
         },
         {
           "name": "instrument_sigma_nm",
           "unit": "nm; independently measured Gaussian instrument-width summary",
           "required": false,
-          "description": "Independently measured Gaussian instrument-width summary. Supply this or instrument_response_matrix, but not both."
+          "description": "Positive independently measured Gaussian instrument-width summary. Supply this or instrument_response_matrix, but not both."
         },
         {
           "name": "background_signal",
           "unit": "same as signal; fitted background spectrum",
           "required": false,
-          "description": "Explicit fitted background spectrum; mutually exclusive with background_mask and background_fraction."
+          "description": "Finite fitted background spectrum matching wavelength_nm; exactly one background specification must be supplied."
         },
         {
           "name": "background_mask",
           "unit": "boolean mask identifying background samples",
           "required": false,
-          "description": "Explicit boolean background selection; mutually exclusive with background_signal and background_fraction."
+          "description": "Boolean mask identifying at least three background samples; exactly one background specification must be supplied."
         },
         {
           "name": "background_fraction",
           "unit": "fraction of wavelength span at each edge; explicit user selection only",
           "required": false,
-          "description": "Explicit user-selected fraction of the wavelength span at each edge; mutually exclusive with background_signal and background_mask."
+          "description": "Explicit user-selected fraction of the wavelength span at each edge (0.02–0.4); exactly one background specification must be supplied."
         },
         {
           "name": "signal_uncertainty",
           "unit": "same as signal; pointwise 1-sigma",
           "required": false,
-          "description": "Optional positive pointwise 1-sigma uncertainty; mutually exclusive with signal_covariance."
+          "description": "Optional strictly positive pointwise 1-sigma uncertainty; mutually exclusive with signal_covariance."
         },
         {
           "name": "signal_covariance",
           "unit": "full within-channel spectral covariance",
           "required": false,
-          "description": "Optional positive-definite within-channel covariance; mutually exclusive with signal_uncertainty."
+          "description": "Optional finite symmetric positive-definite within-channel covariance; mutually exclusive with signal_uncertainty."
         },
         {
           "name": "instrument_sigma_uncertainty_nm",
@@ -6604,12 +6604,104 @@
       ],
       "output_specs": [
         {
+          "name": "wavelength_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "signal",
+          "unit": "calibrated spectral intensity"
+        },
+        {
+          "name": "background",
+          "unit": "signal units"
+        },
+        {
+          "name": "background_subtracted_signal",
+          "unit": "signal units"
+        },
+        {
+          "name": "positive_spectral_weights",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "wavelength_quadrature_weights_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "integrated_spectral_measure",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "integrated_positive_spectral_signal",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "integrated_signed_spectral_signal",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "integrated_negative_background_subtracted_signal",
+          "unit": "signal × nm"
+        },
+        {
+          "name": "negative_area_fraction",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "negative_area_fraction_removed_by_clipping",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "moment_weighting_method",
+          "unit": "text"
+        },
+        {
+          "name": "moment_clipping_bias_warning",
+          "unit": "text"
+        },
+        {
+          "name": "background_estimation_method",
+          "unit": "text"
+        },
+        {
+          "name": "background_mask",
+          "unit": "boolean vector"
+        },
+        {
           "name": "spectral_centroid_nm",
           "unit": "nm"
         },
         {
           "name": "observed_sigma_nm",
           "unit": "nm"
+        },
+        {
+          "name": "observed_variance_nm2",
+          "unit": "nm^2"
+        },
+        {
+          "name": "instrument_sigma_nm",
+          "unit": "nm or null"
+        },
+        {
+          "name": "instrument_sigma_uncertainty_nm",
+          "unit": "nm or null"
+        },
+        {
+          "name": "instrument_corrected_sigma_nm",
+          "unit": "nm or null"
+        },
+        {
+          "name": "instrument_corrected_variance_nm2",
+          "unit": "nm^2 or null"
+        },
+        {
+          "name": "instrument_width_resolved",
+          "unit": "boolean or null"
+        },
+        {
+          "name": "instrument_response_model",
+          "unit": "text"
         },
         {
           "name": "spectral_skewness",
@@ -6620,35 +6712,116 @@
           "unit": "dimensionless"
         },
         {
-          "name": "integrated_spectral_measure",
-          "unit": "signal × nm"
+          "name": "spectral_centroid_uncertainty_nm",
+          "unit": "nm; optional"
         },
         {
-          "name": "moment_uncertainty_diagnostics",
-          "unit": "structured"
+          "name": "observed_variance_uncertainty_nm2",
+          "unit": "nm^2; optional"
+        },
+        {
+          "name": "observed_sigma_uncertainty_nm",
+          "unit": "nm; optional"
+        },
+        {
+          "name": "spectral_skewness_uncertainty",
+          "unit": "dimensionless; optional"
+        },
+        {
+          "name": "spectral_excess_kurtosis_uncertainty",
+          "unit": "dimensionless; optional"
+        },
+        {
+          "name": "instrument_corrected_sigma_uncertainty_nm",
+          "unit": "nm; optional"
+        },
+        {
+          "name": "moment_uncertainty_warning",
+          "unit": "text; optional"
+        },
+        {
+          "name": "moment_uncertainty_method",
+          "unit": "text"
+        },
+        {
+          "name": "signal_uncertainty_model",
+          "unit": "text"
+        },
+        {
+          "name": "moment_uncertainty_successful_draws",
+          "unit": "integer"
         },
         {
           "name": "gaussian_fit_parameters",
           "unit": "structured"
         },
         {
+          "name": "gaussian_fit_parameter_uncertainties",
+          "unit": "structured"
+        },
+        {
+          "name": "gaussian_fit_covariance_valid",
+          "unit": "boolean"
+        },
+        {
+          "name": "gaussian_fit_covariance_correlation_condition_number",
+          "unit": "dimensionless or null"
+        },
+        {
+          "name": "fitted_spectrum",
+          "unit": "signal units"
+        },
+        {
           "name": "residual",
-          "unit": "signal"
+          "unit": "signal units"
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer"
+        },
+        {
+          "name": "chi_square",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "r_squared",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "model",
+          "unit": "text"
+        },
+        {
+          "name": "assumptions",
+          "unit": "text list"
+        },
+        {
+          "name": "limitations",
+          "unit": "text list"
         }
       ],
       "assumptions": [
-        "Input wavelength and signal are measured and calibrated.",
-        "Background selection is explicit or supplied from an independently fitted physical-model nuisance component.",
-        "A scalar instrument sigma represents a measured Gaussian width; it is not converted into a synthetic response matrix."
+        "Input wavelength axis and spectral intensity are measured and calibrated.",
+        "Exactly one background representation is supplied: fitted background signal, explicit boolean background mask, or explicitly selected spectral-edge fraction.",
+        "Exactly one measured instrument-response representation is supplied: normalized response matrix or independently measured scalar Gaussian width.",
+        "Signed background-subtracted samples are used for moments without clipping negative residuals."
       ],
       "preprocessing": [
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
       "algorithm": "Compute signed background-subtracted moments with wavelength quadrature and fit a Gaussian diagnostic shape using the supplied measured response model.",
-      "uncertainty_model": "Propagate supplied pointwise uncertainty or full within-channel covariance through Monte Carlo moment evaluation and fit covariance where identifiable.",
+      "uncertainty_model": "Optional pointwise signal uncertainty or full positive-definite within-channel covariance is propagated by parametric Monte Carlo; optional scalar instrument-width uncertainty is included when the scalar Gaussian response model is selected. Monte Carlo success counts and uncertainty availability are reported explicitly.",
       "limitations": [
-        "Spectral moments do not uniquely identify an electron VDF.",
-        "No independent experimental validation is claimed."
+        "Spectral moments characterize the measured wavelength distribution and do not uniquely identify an electron velocity distribution.",
+        "This descriptive subanalysis does not infer electron temperature or electron density.",
+        "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
+        "A scalar Gaussian deconvolution is not applied to a general measured response matrix.",
+        "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
+        "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in fitted background nuisance parameters is not jointly sampled."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
