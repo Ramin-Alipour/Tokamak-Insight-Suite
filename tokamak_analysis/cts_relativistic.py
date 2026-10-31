@@ -216,8 +216,13 @@ def relativistic_gyrotropic_three_wave_vertex(
             axis=2,
         )
         pp_safe = np.maximum(pperp[:, :, None], np.finfo(float).tiny)
-        gx = cosphi[None, None, :]*dpperp - sinphi[None, None, :]*dphi/pp_safe
-        gy = sinphi[None, None, :]*dpperp + cosphi[None, None, :]*dphi/pp_safe
+        dphi_over_p = np.divide(
+            dphi, pp_safe,
+            out=np.zeros_like(dphi, dtype=complex),
+            where=pperp[:, :, None] > 1e-14*max(float(np.max(pperp)), 1.0),
+        )
+        gx = cosphi[None, None, :]*dpperp - sinphi[None, None, :]*dphi_over_p
+        gy = sinphi[None, None, :]*dpperp + cosphi[None, None, :]*dphi_over_p
         gz = dppar
         return np.stack((gx, gy, gz), axis=-1)
 
