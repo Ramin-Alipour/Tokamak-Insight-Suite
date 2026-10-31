@@ -2826,7 +2826,9 @@
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
       ],
-      "note": "Analytic software calculation with numerical tests; not empirical validation."
+      "note": "Analytic software calculation with numerical tests; not empirical validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true
     },
     "references": [
       {
@@ -2910,7 +2912,9 @@
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
       ],
-      "note": "Analytic software calculation with numerical tests; not empirical validation."
+      "note": "Analytic software calculation with numerical tests; not empirical validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true
     },
     "references": [
       {
@@ -3002,7 +3006,9 @@
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference"
       ],
-      "note": "Analytic software calculation with numerical tests; not empirical validation."
+      "note": "Analytic software calculation with numerical tests; not empirical validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true
     },
     "references": [
       {
@@ -3148,7 +3154,9 @@
       "function_links": [
         "tokamak_analysis.cts_analysis.cts_spectral_density",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
-      ]
+      ],
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
@@ -3611,7 +3619,9 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite"
       ],
-      "note": "Uses exact relativistic photon-frequency kinematics for an isotropic Maxwell-Juttner rest-frame distribution Lorentz-boosted along q. Assumes the Thomson limit and omits photon recoil."
+      "note": "Uses exact relativistic photon-frequency kinematics for an isotropic Maxwell-Juttner rest-frame distribution Lorentz-boosted along q. Assumes the Thomson limit and omits photon recoil.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
@@ -3755,7 +3765,13 @@
       "test_links": [
         "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
       ],
-      "note": "This is a collective dielectric model using a non-Maxwellian kappa electron VDF, not a non-collective Student-t profile fit. It is unmagnetized and uses Maxwellian ions."
+      "note": "Reference-only helper; not part of the public Analysis 1 model shortlist. Microwave collective CTS is handled by the separate registered CTS workflow.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+        "tokamak_analysis.thomson_kinetic_models.fit_collective_kappa"
+      ]
     },
     "references": [
       {
@@ -3796,7 +3812,8 @@
         "doi": "10.1088/0741-3335/33/14/005",
         "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
       }
-    ]
+    ],
+    "description": "Reference-only low-level optical collective Kappa spectral model retained for reproducibility; it is not exposed by the current Analysis 1 model selector. The active optical Analysis 1 shortlist contains three non-collective models."
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
@@ -3968,7 +3985,9 @@
         "tests/test_cts_analysis.py::test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry",
         "tests/test_cts_analysis.py::test_full_em_cts_integrates_scattering_volume_samples"
       ],
-      "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation."
+      "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
