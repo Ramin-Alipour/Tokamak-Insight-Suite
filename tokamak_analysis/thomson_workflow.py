@@ -446,20 +446,28 @@ def reconstruct_thomson_profile_from_spectra(
         ("electron_velocity_projection_m_s", "electron_velocity_projection_profile_m_s",
          "electron_velocity_projection_uncertainty_profile_m_s", flow_covariance, False),
     ]
-    if result.get("model") == "non_collective_kappa":
+    if result.get("model") in {"non_collective_kappa", "collective_kappa"}:
         kappa_values = np.asarray([channel.get("kappa_index", np.nan) for channel in result["channels"]], dtype=float)
-        kappa_variances = [
-            float(np.asarray(channel["fit_covariance"], dtype=float)[3, 3])
-            if channel.get("fit_covariance") is not None
-            and np.asarray(channel["fit_covariance"]).shape == (6, 6) else np.nan
-            for channel in result["channels"]
-        ]
+        if result.get("model") == "collective_kappa":
+            kappa_variances = [
+                float(np.asarray(channel["fit_covariance"], dtype=float)[2, 2])
+                if channel.get("fit_covariance") is not None
+                and np.asarray(channel["fit_covariance"]).shape == (3, 3) else np.nan
+                for channel in result["channels"]
+            ]
+        else:
+            kappa_variances = [
+                float(np.asarray(channel["fit_covariance"], dtype=float)[3, 3])
+                if channel.get("fit_covariance") is not None
+                and np.asarray(channel["fit_covariance"]).shape == (6, 6) else np.nan
+                for channel in result["channels"]
+            ]
         candidates.append((
             "electron_kappa_index", None, None,
             np.diag(kappa_variances) if np.all(np.isfinite(kappa_variances)) else None,
             False,
         ))
-    if result.get("model") == "collective_maxwellian":
+    if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         alpha_values = np.asarray([
             channel.get("scattering_parameter_alpha", np.nan) for channel in result["channels"]
         ], dtype=float)
@@ -551,7 +559,7 @@ def reconstruct_thomson_profile_from_spectra(
         except ValueError as exc:
             profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
 
-    if result.get("model") == "collective_maxwellian":
+    if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         species_count = len(result["channels"][0].get("ion_velocity_projection_m_s", []))
         for species_index in range(species_count):
             name = f"ion_{species_index}_velocity_projection_m_s"
