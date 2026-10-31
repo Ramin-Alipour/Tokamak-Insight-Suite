@@ -6605,8 +6605,8 @@
         {
           "name": "physical_parameters",
           "unit": "structured canonical physical-fit result for the same calibrated measured spectrum",
-          "required": true,
-          "description": "Supplied internally by the primary Analysis 1 selected physical forward fit; includes model, electron_temperature_eV, electron_velocity_projection_m_s and uncertainties, plus electron_density_m3 and uncertainty when identifiable. No second fit is performed."
+          "required": false,
+          "description": "Optional for direct shape-only calls. The primary Analysis 1 pipeline always supplies the canonical physical fit for the same calibrated measured spectrum; no second physical fit is performed."
         }
       ],
       "output_specs": [
