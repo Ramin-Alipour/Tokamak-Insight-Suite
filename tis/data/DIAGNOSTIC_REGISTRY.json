@@ -386,7 +386,12 @@
         }
       ],
       "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": true,
+      "test_links": [
+        "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties",
+        "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
+        "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins"
+      ]
     },
     "scientific_references": [
       {
@@ -6866,7 +6871,12 @@
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": true,
       "note": "This subanalysis complements, and never replaces, physical parameter extraction by the canonical Thomson forward model. The application reuses the same-spectrum physical fit and its fitted background.",
-      "completion_scope": "Spectral-shape descriptors accompanied by electron temperature and scattering-vector flow projection from the canonical selected physical Thomson fit of the same calibrated measured spectrum; density only when independently identifiable from the supplied absolute optical inputs."
+      "completion_scope": "Spectral-shape descriptors accompanied by electron temperature and scattering-vector flow projection from the canonical selected physical Thomson fit of the same calibrated measured spectrum; density only when independently identifiable from the supplied absolute optical inputs.",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_spectral_distribution_rejects_shape_only_execution",
+        "tests/test_thomson_inference.py::test_spectral_distribution_requires_fitted_physical_parameters_and_reports_them",
+        "tests/test_thomson_inference.py::test_descriptive_moments_report_negative_residual_clipping_caveat"
+      ]
     },
     "scientific_references": [
       {
