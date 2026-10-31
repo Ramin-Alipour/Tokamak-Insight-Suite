@@ -2193,15 +2193,25 @@ def analyze_thomson_spectra(
                 signal_uncertainty=channel_uncertainty,
                 signal_covariance=channel_covariance,
                 background_signal=fitted_background,
+                physical_parameters={
+                    "model": model,
+                    "electron_temperature_eV": channel_result.get("electron_temperature_eV"),
+                    "electron_temperature_uncertainty_eV": channel_result.get("electron_temperature_uncertainty_eV"),
+                    "electron_velocity_projection_m_s": channel_result.get("electron_velocity_projection_m_s"),
+                    "electron_velocity_projection_uncertainty_m_s": channel_result.get("electron_velocity_projection_uncertainty_m_s"),
+                    "electron_density_m3": channel_result.get("electron_density_m3"),
+                    "electron_density_uncertainty_m3": channel_result.get("electron_density_uncertainty_m3"),
+                },
             )
             distribution["analysis_status"] = "completed"
             distribution["background_source"] = (
                 "background nuisance component from the selected Thomson physical forward fit"
             )
             distribution["interpretation"] = (
-                "Observed wavelength-space moments and a response-convolved Gaussian shape diagnostic. "
-                "Physical Te and flow remain those inferred by the selected optical Thomson forward model; "
-                "these descriptive moments are not a unique arbitrary electron VDF inversion."
+                "Physical electron temperature, scattering-vector flow projection and identifiable electron density "
+                "are exposed from the selected physical forward fit of this same calibrated measured spectrum. "
+                "Wavelength-space moments and the Gaussian shape fit remain complementary spectral-shape descriptors, "
+                "not a unique arbitrary electron velocity-distribution inversion."
             )
         except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
             distribution = {
