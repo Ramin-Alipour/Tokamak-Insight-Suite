@@ -26,7 +26,8 @@ The Spectral Analysis workspace exposes this primary multi-channel spectral-infe
 | laser_wavelength_nm | nm | Required |
 | scattering_angle_rad | rad | Required |
 | instrument_response | callable, 1-D kernel, 2-D matrix or channel-specific 3-D matrix | Required measured response; use an explicit identity matrix only when a delta-like response is justified |
-| signal_uncertainty | same unit/shape as spectra | Optional 1-sigma spectral uncertainty |
+| signal_uncertainty | same unit/shape as spectra | Optional independent pointwise 1-sigma spectral uncertainty |
+| joint_spectral_covariance | (channels × wavelengths)² | Optional full positive-definite channel-major spectral covariance; the within-channel marginal covariance is also propagated into spectral-distribution moments |
 | instrument_response_uncertainty | same shape as response | Optional 1-sigma response-matrix uncertainty |
 | ion_species | explicit species list | Required for collective Maxwellian mode |
 | ion_fractions | dimensionless; one per species | Required for multiple ion species; fractions must sum to one |
@@ -92,6 +93,8 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Per-channel absolute electron density only when identifiable from the selected model and supplied optical inputs.
 - Multi-channel radial profiles of the inferred quantities.
 - Per-channel fitted spectra, residuals, fit covariance and model assumptions.
+- Signed wavelength-space centroid, observed variance/width, skewness, excess kurtosis, positive/signed integrated spectral measure and Gaussian shape-fit diagnostics. The background subtracted for these moments is the fitted nuisance-background component from the physical forward fit.
+- When a full channel-major spectral covariance is supplied, its within-channel marginal block is used for spectral-moment and shape-fit uncertainty propagation; independent pointwise errors are not substituted.
 - Explicit model, instrument-response usage, input provenance and limitations.
 - Per-channel signed spectral centroid, observed width, skewness, excess kurtosis, integrated spectral measure, and response-convolved Gaussian shape diagnostics.
 - Parameterized kappa index for the non-collective kappa model.
@@ -101,7 +104,7 @@ The differential Thomson cross-section uses the incident polarization dependence
 
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
 - The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion. A single projected spectrum does not uniquely determine a general multidimensional electron velocity distribution without additional independent angular/spectral constraints and a specified regularized inversion model.
-- Spectral moments and Gaussian shape diagnostics describe the observed wavelength-space distribution; they are not a substitute for the physical Maxwellian/Kappa/collective forward inference and are not interpreted as a unique VDF.
+- Spectral moments and Gaussian shape diagnostics describe the observed wavelength-space distribution; they are not a substitute for the physical Maxwellian/Kappa/collective forward inference and are not interpreted as a unique VDF. Moment uncertainty propagation uses the full within-channel covariance when supplied, or independent pointwise errors when that is the supplied uncertainty model. Uncertainty in the fitted background nuisance parameters is not yet jointly sampled with the spectral moments.
 - An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm. Otherwise it is returned as integrated_spectral_signal_input_units_nm in the input intensity unit multiplied by nm.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
 - The collective fit uses a log-parameterized least-squares inversion for positive density and temperature with adaptive bounds around explicit user starting estimates. Ion temperatures and ion/electron flow vectors remain external inputs, not fitted parameters. Supplied ion-temperature, flow-vector, laser-wavelength, scattering-angle/beam-direction and measured response-matrix uncertainties can be propagated by Monte Carlo refitting; the resulting covariance includes per-channel density, temperature, electron-flow projection and species-resolved ion-flow projections. These contributions are conditional on the specified uncertainty distributions and successful perturbation fits.
