@@ -148,7 +148,7 @@ def gaussian_beam_overlap(center_incident_m, covariance_incident_m2,
 def trace_cold_plasma_ray(
     initial_position_m, initial_wavevector_rad_m, omega_rad_s, *,
     equilibrium: Callable[[np.ndarray], Mapping],
-    mode_index=1, path_parameter_max=1.0, sample_count=256,
+    mode_index=None, path_parameter_max=1.0, sample_count=256,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
 ):
     """Trace a cold-plasma eigenmode ray through a supplied 3-D equilibrium.
@@ -166,8 +166,8 @@ def trace_cold_plasma_ray(
     x0 = _vector(initial_position_m, "initial_position_m")
     k0 = _vector(initial_wavevector_rad_m, "initial_wavevector_rad_m")
     omega = _positive(omega_rad_s, "omega_rad_s")
-    if isinstance(mode_index, bool) or int(mode_index) not in (0, 1, 2):
-        raise ValueError("mode_index must be 0, 1 or 2")
+    if mode_index is None or isinstance(mode_index, bool) or int(mode_index) not in (0, 1, 2):
+        raise ValueError("mode_index must be explicitly selected as 0, 1 or 2; no propagation branch is assumed")
     if int(sample_count) < 2:
         raise ValueError("sample_count must be >= 2")
     smax = _positive(path_parameter_max, "path_parameter_max")
@@ -434,8 +434,8 @@ def solve_cold_plasma_propagating_modes(
     bmag = float(np.linalg.norm(b))
     if bmag == 0:
         raise ValueError("magnetic_field_T must be non-zero")
-    if isinstance(mode_index, bool) or int(mode_index) not in (0, 1):
-        raise ValueError("mode_index must select one of the two propagating branches (0 or 1)")
+    if mode_index is None or isinstance(mode_index, bool) or int(mode_index) not in (0, 1):
+        raise ValueError("mode_index must be explicitly selected as one of the two propagating branches (0 or 1)")
     epsilon = cold_plasma_dielectric_tensor(omega, b, species)
     # Recover Stix S,D,P in the B-aligned frame.
     bhat = b / bmag
