@@ -890,12 +890,35 @@ def thomson_density_from_scattered_power(*args, **kwargs):
     return density_from_thomson_scattered_power(*args, **kwargs)
 
 
-def relativistic_mj_effective_differential_cross_section(*args, **kwargs):
+def relativistic_mj_effective_differential_cross_section(
+    wavelength_nm,
+    laser_wavelength_nm,
+    scattering_angle_rad,
+    electron_temperature_eV,
+    *,
+    flow_projection_m_s=0.0,
+    incident_polarization,
+    radial_order=36,
+    angular_order=18,
+    maximum_recoil_correction_fraction=0.01,
+    require_full_spectrum=True,
+):
     """Return the distribution-averaged polarized Thomson cross-section [m^2 sr^-1].
 
-    Arguments follow relativistic_maxwell_juttner_spectrum. The incident
-    polarization vector is expressed in the scattering-local coordinate frame.
+    The incident polarization vector is expressed in the scattering-local
+    coordinate frame. Other arguments match the relativistic spectral model.
     """
     from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
-    result = relativistic_maxwell_juttner_spectrum(*args, **kwargs)
+    result = relativistic_maxwell_juttner_spectrum(
+        wavelength_nm,
+        laser_wavelength_nm,
+        scattering_angle_rad,
+        electron_temperature_eV,
+        flow_projection_m_s=flow_projection_m_s,
+        incident_polarization=incident_polarization,
+        radial_order=radial_order,
+        angular_order=angular_order,
+        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+        require_full_spectrum=require_full_spectrum,
+    )
     return float(result["effective_differential_cross_section_m2_sr"])
