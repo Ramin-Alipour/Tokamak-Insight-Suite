@@ -1,4 +1,4 @@
-# Thomson Scattering (Analysis 1 of 80)
+# Thomson Scattering — Analysis 1
 
 ## Primary contract
 
@@ -10,8 +10,9 @@ The primary execution path is:
 2. Evaluate the selected physical Thomson forward model on each supplied calibrated wavelength grid.
 3. Convolve the physical spectrum with the supplied measured instrument line-spread response.
 4. Fit each spatial channel and report channel-resolved physical parameters and fit diagnostics.
-5. Construct the electron-temperature profile and, only when identifiable, the electron-density profile.
-6. Keep the legacy calibrated-profile summary/reconstruction routines as downstream utilities; they are not the primary Analysis 1 input contract.
+5. Return all parameters identifiable under the selected physical model, including electron temperature, supported flow projection, and electron density only when the absolute-power/collective identifiability conditions are met.
+6. Attach per-channel spectral-distribution diagnostics using the fitted background nuisance component.
+7. For the registered spatial-profile subanalysis, reconstruct the inferred channel profiles with PCHIP and/or a GCV smoothing spline, with no extrapolation.
 
 The Spectral Analysis workspace exposes this primary multi-channel spectral-inference workflow. Advanced Analysis routes to the same canonical UI rather than maintaining a second inference implementation. The legacy single-channel API in thomson_spectrum.py is now a compatibility adapter to the canonical engine. It preserves source row order: it does not sort, repair, calibrate, or silently discard samples.
 
@@ -92,11 +93,16 @@ The differential Thomson cross-section uses the incident polarization dependence
 - Multi-channel radial profiles of the inferred quantities.
 - Per-channel fitted spectra, residuals, fit covariance and model assumptions.
 - Explicit model, instrument-response usage, input provenance and limitations.
+- Per-channel signed spectral centroid, observed width, skewness, excess kurtosis, integrated spectral measure, and response-convolved Gaussian shape diagnostics.
+- Parameterized kappa index for the non-collective kappa model.
+- Spatial PCHIP/GCV reconstructions, gradients and covariance-based Monte Carlo bands in the registered profile subanalysis.
 
 ## Deliberate limitations
 
 - Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian. The non-collective kappa option is parameterized and does not reconstruct an arbitrary VDF.
-- The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion.
+- The kappa model is a parameterized isotropic non-Maxwellian approximation, not an arbitrary electron VDF inversion. A single projected spectrum does not uniquely determine a general multidimensional electron velocity distribution without additional independent angular/spectral constraints and a specified regularized inversion model.
+- Spectral moments and Gaussian shape diagnostics describe the observed wavelength-space distribution; they are not a substitute for the physical Maxwellian/Kappa/collective forward inference and are not interpreted as a unique VDF.
+- An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm. Otherwise it is returned as integrated_spectral_signal_input_units_nm in the input intensity unit multiplied by nm.
 - Absolute density in non-collective mode requires absolute W/nm intensity and complete optical geometry; spectral shape alone is insufficient.
 - The collective fit uses a log-parameterized least-squares inversion for positive density and temperature with adaptive bounds around explicit user starting estimates. Ion temperatures and ion/electron flow vectors remain external inputs, not fitted parameters. Supplied ion-temperature, flow-vector, laser-wavelength, scattering-angle/beam-direction and measured response-matrix uncertainties can be propagated by Monte Carlo refitting; the resulting covariance includes per-channel density, temperature, electron-flow projection and species-resolved ion-flow projections. These contributions are conditional on the specified uncertainty distributions and successful perturbation fits.
 - Optional joint_spectral_covariance supplies a full channel-major covariance matrix spanning all wavelength bins and channels. It is mutually exclusive with signal_uncertainty: the full covariance is the complete spectral-noise model. A joint generalized least-squares fit uses Cholesky whitening and returns cross-channel parameter covariance for non-collective Maxwellian and Kappa models. Integrated scattered power and absolute density are recomputed from the final joint-fit spectrum, rather than retaining values from the superseded independent fits. Collective and custom models do not yet use this joint GLS path.
@@ -110,6 +116,7 @@ The implementation uses three focused physical model families rather than an unb
 2. Recent experimental CTS work demonstrates the importance of robust spectral/background treatment for thermal- and fast-ion monitoring (Verdier et al., Review of Scientific Instruments 96, 043513, 2025, DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948)).
 3. Recent non-Maxwellian Thomson forward-model work motivates retaining a non-Maxwellian option rather than treating a Gaussian as a universal spectrum (Skolar, Longley & Goodwin, Physics of Plasmas 32, 043907 (2025), DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966)). The kappa implementation here is a bounded parameterized approximation and is not claimed to reproduce that paper's general arbitrary-distribution solver.
 4. Recent multi-regime analysis of Thomson spectra reports inference in both collective and non-collective regimes using physical spectral models (Eisenbach et al., Journal of Physics D: Applied Physics 58, 035202, 2025, DOI: [10.1088/1361-6463/ad89d6](https://doi.org/10.1088/1361-6463/ad89d6)).
+5. Recent work develops a Monte Carlo forward-spectrum method for arbitrary electron distributions, including relativistic Maxwellian and kappa cases (Sakai et al., JINST 21 (2026) C01002, DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002)). This supports flexible forward modelling; it does not by itself make an arbitrary VDF uniquely identifiable from one measured projection.
 
 References:
 - PlasmaPy, “Thomson Scattering: Spectral Density,” https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html
@@ -120,7 +127,7 @@ References:
 
 ## Legacy profile utilities
 
-analyze_thomson_profile and reconstruct_thomson_profile are retained only as backward-compatibility numerical helpers for historical callers that already possess derived ne/Te profile points. They are not registered diagnostic subanalyses and are not exposed in the dashboard. The registered “Thomson spatial profile reconstruction” subanalysis instead accepts measured, calibrated multi-channel spectra and delegates to the canonical physical forward-inference engine; it never accepts pre-derived ne/Te profile points.
+analyze_thomson_profile and reconstruct_thomson_profile remain downstream compatibility utilities for callers that already possess derived ne/Te profile points. The registered “Thomson spatial profile reconstruction” subanalysis is a distinct spectrum-to-profile path: it accepts measured, calibrated multi-channel spectra, runs the canonical physical inference, and then reconstructs every identifiable radial parameter profile using PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived ne/Te profile points. Full supplied cross-channel covariance is propagated through Monte Carlo where available; pointwise-only errors use an explicitly declared independent-channel approximation.
 
 ## Software testing
 
@@ -130,9 +137,9 @@ The new test module checks multi-channel data flow, arbitrary non-Gaussian respo
 
 The profile summary reports radial-coordinate averages over the supplied interval. They are not line-of-sight averages or volume averages unless the corresponding geometric weighting is explicitly applied. The legacy attribute names containing "line_average" are compatibility aliases and emit DeprecationWarning when accessed.
 
-For reconstruction, omitting smoothing_factor selects the smoothing-spline regularization parameter by generalized cross-validation. An explicitly supplied smoothing_factor selects the legacy weighted-residual target. A negative reconstructed density or temperature overshoot is rejected rather than clipped, because clipping would change both the profile and its derivative.
+The registered spectrum-to-profile subanalysis uses two numerical representations: shape-preserving PCHIP and a GCV smoothing spline. PCHIP is available with at least two distinct spatial channels; the smoothing spline requires at least five. The reconstruction is restricted to the measured radial interval and never extrapolates. Pointwise or full cross-channel covariance is propagated by Monte Carlo when supplied. These are spatial representations of parameters already inferred from measured spectra, not additional physical inference models.
 
-Scale lengths are reported only where the gradient exceeds twice its propagated 1-sigma uncertainty when uncertainties are supplied; without uncertainty inputs, the numerical round-off threshold is used. The profile-summary function accepts separate full density and temperature covariance matrices and returns the corresponding full gradient covariance matrices. The downstream reconstruct_thomson_profile utility supports separate full density and temperature covariance matrices and a full joint density-temperature covariance matrix. The joint matrix is ordered [density_0..N-1, temperature_0..N-1] and is sampled jointly by Monte Carlo, preserving reconstructed ne–Te cross-covariance and returning reconstructed covariance and 95% bands. This is downstream interpolation/smoothing of already-derived profile points, not spectrum-to-profile physical inference.
+Scale lengths are reported only where the gradient exceeds twice its propagated 1-sigma uncertainty when uncertainties are supplied; without uncertainty inputs, the numerical round-off threshold is used. The profile-summary function accepts separate full density and temperature covariance matrices and returns the corresponding full gradient covariance matrices. The downstream reconstruct_thomson_profile utility supports separate full density and temperature covariance matrices and a full joint density-temperature covariance matrix. The joint matrix is ordered [density_0..N-1, temperature_0..N-1] and is sampled jointly by Monte Carlo, preserving reconstructed ne–Te cross-covariance and returning reconstructed covariance and 95% bands. This legacy utility is downstream interpolation/smoothing of already-derived profile points. It is separate from the registered spectrum-to-profile workflow described above.
 
 
 ## Joint multi-channel inference and model-discrepancy uncertainty
@@ -150,4 +157,4 @@ Per-channel fits report a separate model_discrepancy_covariance when a reduced c
 
 ## Dashboard access
 
-The Advanced Analysis menu includes a shortcut to the same canonical Thomson inference interface in Spectral Analysis. It changes the workspace rather than running a duplicate implementation. The input mapping, model selection, response upload, uncertainty handling and output contract therefore remain shared.
+The Advanced Analysis menu exposes the registered Thomson spatial-profile subanalysis. It routes to the canonical calibrated-spectrum input workflow and runs the spectrum-to-profile reconstruction after physical inference; it does not create a second physical inference engine.
