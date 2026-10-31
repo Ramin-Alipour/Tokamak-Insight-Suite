@@ -4057,15 +4057,20 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature, ion temperature and ion-flow projection from calibrated microwave frequency-shift spectra; optional fast-ion fraction and temperature for hot-Maxwellian mode; optional reconstructed non-negative normalized tabulated 1-D fast-ion VDF under regularized inversion.",
     "status": "D",
-    "method": "Explicitly selectable unmagnetized electrostatic longitudinal CTS or local magnetized full-electromagnetic kinetic CTS. The full-EM path solves the linearized Maxwellian Vlasov response with gyro-harmonic velocity quadrature, assembles dielectric and wave tensors, screens species current fluctuations, and retains joint electron-density/current/E/B covariance. The inversion fits density and temperatures with explicit vector flows, magnetic field, beam directions and mode polarizations.",
-    "caveat": "Full-EM mode requires complete vector magnetic-field, flow, beam-direction and polarization metadata; no silent defaults. This local Maxwellian full-EM path is not a complete diagnostic propagation/three-wave coupling model.",
+    "method": "Explicitly selectable electrostatic longitudinal CTS or magnetized full-electromagnetic CTS. The full-EM path combines magnetized kinetic fluctuation response, the Bindslev low-temperature Gamma/X three-wave source-current tensor and full n/v/E/B covariance contraction. Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise.",
+    "caveat": "The Bindslev nonlinear source-current vertex is the low-temperature magnetized closure; relativistic fast-ion linear response/noise is supported, but a fully relativistic nonlinear three-wave vertex is not claimed. Bulk thermal species remain non-relativistic Maxwellians. Fast-ion populations must be supplied explicitly.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
       "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
-      "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum"
+      "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+      "tokamak_analysis.cts_bindslev.bindslev_gamma_tensor",
+      "tokamak_analysis.cts_bindslev.bindslev_x_tensor",
+      "tokamak_analysis.cts_bindslev.bindslev_source_current_operator",
+      "tokamak_analysis.cts_bindslev.bindslev_correlated_transfer_spectrum",
+      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response"
     ],
-    "implementation_status": "Electrostatic CTS inversion retained. Separate local magnetized full-EM Maxwellian kinetic forward solver and density/temperature inversion implemented and explicitly dispatchable. The current full-EM path retains density/current/E/B cross-covariance but does not yet reproduce the complete Bindslev three-wave transfer tensor, relativistic/anisotropic fast-ion response, ray tracing or finite beam overlap.",
+    "implementation_status": "Electrostatic CTS path retained. Magnetized full-EM path now includes the Bindslev low-temperature Gamma inverse/X tensor, source-current coupling for n/v/E/B fluctuations and full correlated covariance contraction. Optional relativistic anisotropic fast-ion linear response and Klimontovich orbit shot-noise are integrated. The nonlinear three-wave vertex remains the low-temperature Bindslev closure; the fully relativistic second-order vertex is not implemented.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4253,6 +4258,12 @@
           "unit": "rad s^-1 numerical regularization",
           "required": false,
           "description": "Not a physical collision frequency."
+        },
+        {
+          "name": "fast_ion_populations",
+          "unit": "sequence of explicit relativistic gyrotropic populations",
+          "required": false,
+          "description": "Each item requires name, charge_state, mass_amu, density_m3, optional flow_velocity_m_s and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3)."
         }
       ],
       "output_specs": [
@@ -4335,6 +4346,30 @@
         {
           "name": "parameter_uncertainties",
           "unit": "m^-3, eV, eV"
+        },
+        {
+          "name": "bindslev_source_current_operator",
+          "unit": "frequency x 3 x 10 complex tensor",
+          "description": "Bindslev low-temperature source-current operator from density, particle flux, electric and magnetic fluctuations."
+        },
+        {
+          "name": "bindslev_coupling_coefficients",
+          "unit": "frequency-dependent complex amplitudes",
+          "description": "Receiver-projected density, flux, electric and magnetic coupling coefficients and transfer contributions."
+        },
+        {
+          "name": "Gamma_inverse_tensor",
+          "unit": "complex rank-four tensor",
+          "description": "Inverse Bindslev Gamma tensor used to construct X."
+        },
+        {
+          "name": "X_tensor",
+          "unit": "complex rank-three tensor",
+          "description": "Bindslev magnetized three-wave pseudotensor."
+        },
+        {
+          "name": "fast_ion_populations",
+          "unit": "explicit user-supplied distribution metadata"
         }
       ],
       "assumptions": [
@@ -4343,14 +4378,16 @@
         "Quasi-neutral plasma and supplied fixed ion composition.",
         "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate.",
         "Electron-flow projection is an explicit external input; no zero-flow default is imposed.",
-        "Full-EM local kinetic response assumes homogeneous, non-relativistic, isotropic Maxwellian species in a uniform magnetic field.",
-        "Gyro-harmonic and velocity-quadrature convergence must be checked."
+        "Gyro-harmonic and velocity-quadrature convergence must be checked.",
+        "The Bindslev Gamma/X nonlinear source-current closure is the low-temperature magnetized formulation; it is not the fully relativistic second-order vertex.",
+        "Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise; the supplied distribution is external and not fitted.",
+        "Bulk thermal electrons and ions remain non-relativistic Maxwellian species."
       ],
       "preprocessing": [
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
-      "algorithm": "Compute the multi-species longitudinal dielectric spectral density and infer plasma parameters using differential-evolution or adaptive real-coded genetic global initialization followed by bounded least squares. The regularized option adds a scaled prior penalty; infer_tabulated_1d adds a non-negative softmax VDF parameterization and second-difference smoothness penalty. Full spectral covariance whitening, response/external Monte Carlo and residual-based model-discrepancy diagnostics are available.",
+      "algorithm": "Electrostatic CTS retains its original longitudinal model. Magnetized full-EM evaluates species kinetic response, builds the dielectric and Maxwell wave tensors, screens the species fluctuation sources, constructs the joint n/v/E/B covariance, applies the Bindslev low-temperature Gamma/X source-current tensor and contracts all auto/cross spectra with the receiver polarization. Optional relativistic anisotropic fast-ion populations use momentum-space gyrophase Fourier collocation and Klimontovich orbit shot noise.",
       "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Ion-fraction uncertainties are independently perturbed and renormalized; full species-composition covariance is not supported.",
       "limitations": [
         "Not a full magnetized electromagnetic CTS scattering tensor, ray-tracing/beam-overlap model or receiver/absolute-power transfer model.",
@@ -4365,7 +4402,10 @@
         "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized.",
         "Non-relativistic isotropic Maxwellians only; anisotropic/non-Maxwellian/relativistic fast ions not implemented.",
         "Complete Bindslev three-wave density/current/E/B coupling tensors and cold-plasma mode-flux normalization not yet implemented.",
-        "No ray tracing, finite beam overlap or spatially varying magnetic geometry."
+        "No ray tracing, finite beam overlap or spatially varying magnetic geometry.",
+        "The Bindslev nonlinear three-wave source-current vertex is the low-temperature magnetized closure, not the fully relativistic second-order kinetic vertex.",
+        "Relativistic gyrotropic fast-ion response/noise is supported only for explicitly supplied populations; fast-ion parameters are not inferred.",
+        "Bulk thermal species retain the non-relativistic Maxwellian solver."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -4406,6 +4446,24 @@
             "joint density/current/E/B fluctuation covariance"
           ],
           "scope": "Local magnetized Maxwellian kinetic full-EM path; flow vectors and composition fixed externally."
+        },
+        {
+          "name": "relativistic_anisotropic_fast_ion_cts",
+          "function": "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+          "inputs": [
+            "fast_ion_populations",
+            "distribution.kind",
+            "distribution momentum grids or perpendicular/parallel temperatures",
+            "density_m3",
+            "mass_amu",
+            "charge_state"
+          ],
+          "outputs": [
+            "relativistic fast-ion conductivity",
+            "Klimontovich bare current covariance",
+            "screened joint density/current/E/B covariance"
+          ],
+          "scope": "Relativistic gyrotropic fast-ion linear response and particle shot noise; the nonlinear source-current vertex remains the low-temperature Bindslev closure."
         }
       ]
     },
@@ -4447,6 +4505,31 @@
         "year": 2025,
         "doi": "10.12096/j.2096-4528.pgt.24149",
         "scope": "Recent magnetized full-EM CTS reference; implementation is scoped and does not reproduce full Bindslev three-wave coupling."
+      },
+      {
+        "title": "Three Wave Mixing and Thomson Scattering in Plasmas",
+        "authors": "H. Bindslev",
+        "year": 1993,
+        "type": "JET technical report JET-P(93)41",
+        "scope": "Detailed kinetic low-temperature magnetized source-current, Gamma/X tensor and microscopic fluctuation transfer derivation."
+      },
+      {
+        "title": "A quantitative study of scattering from electromagnetic fluctuations in plasmas",
+        "authors": "H. Bindslev",
+        "journal": "Journal of Atmospheric and Terrestrial Physics",
+        "volume": "58",
+        "pages": "983-989",
+        "year": 1996,
+        "doi": "10.1016/0021-9169(95)00129-8"
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005"
       }
     ]
   },
