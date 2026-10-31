@@ -6641,7 +6641,7 @@
           "name": "physical_parameters",
           "unit": "structured canonical physical-fit result for the same calibrated measured spectrum",
           "required": true,
-          "description": "Required physical parameters from the canonical selected Thomson forward fit of this same calibrated measured spectrum; finite positive electron_temperature_eV, finite electron_velocity_projection_m_s, and explicit model are mandatory."
+          "description": "Canonical fit result from the same calibrated spectrum. Electron temperature is required. Electron velocity projection is required for non-collective fits; for collective fits it must remain null unless the selected model explicitly identifies an electron-flow parameter. Density is optional and remains unavailable when not identifiable."
         }
       ],
       "output_specs": [
