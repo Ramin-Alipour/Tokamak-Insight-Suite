@@ -810,6 +810,31 @@ def analyze_thomson_spectra(
                 ion_vel=ion_v*u.m/u.s, electron_vel=electron_v*u.m/u.s,
                 probe_vec=probe_vec, scatter_vec=scatter_vec)
             alpha_value=float(np.asarray(getattr(alpha_fit,"value",alpha_fit)))
+            # PlasmaPy's scattering parameter follows alpha = 1/(|k_s-k_i| lambda_D),
+            # hence alpha scales as sqrt(n_e/T_e) * lambda_L / sin(theta/2).
+            # Propagate the complete fitted (n_e,T_e) covariance, including its
+            # off-diagonal term, plus independently supplied laser/angle errors.
+            alpha_gradient_ne_te = np.array([
+                alpha_value / (2.0 * ne_fit),
+                -alpha_value / (2.0 * te_fit),
+            ], dtype=float)
+            alpha_variance = None
+            if parameter_covariance is not None:
+                alpha_variance = float(
+                    alpha_gradient_ne_te @ parameter_covariance @ alpha_gradient_ne_te
+                )
+                alpha_variance += (alpha_value * laser_wavelength_unc / float(laser_wavelength_nm)) ** 2
+                if scattering_angle_uncertainty_rad is not None:
+                    alpha_angle_sensitivity = -0.5 * alpha_value / np.tan(
+                        float(scattering_angle_rad) / 2.0
+                    )
+                    alpha_variance += (
+                        alpha_angle_sensitivity * scattering_angle_unc
+                    ) ** 2
+                alpha_variance = max(alpha_variance, 0.0)
+            alpha_uncertainty = (
+                float(np.sqrt(alpha_variance)) if alpha_variance is not None else None
+            )
             amp_fit, background_fit, background_slope_fit = map(float,fit_nuisance(model_spec))
             fitted_collective = amp_fit*model_spec+background_fit+background_slope_fit*(xi-float(laser_wavelength_nm))
             residual_collective = y[i]-fitted_collective
@@ -834,6 +859,12 @@ def analyze_thomson_spectra(
                    "reduced_chi_square": float(np.sum((residual_collective/ui)**2)/dof) if ui is not None else None,
                    "ion_species": list(ion_species), "ion_fractions": ion_fract.tolist(),
                    "scattering_parameter_alpha": alpha_value,
+                   "scattering_parameter_alpha_uncertainty": alpha_uncertainty,
+                   "scattering_parameter_alpha_gradient_ne_te": alpha_gradient_ne_te,
+                   "scattering_parameter_alpha_uncertainty_model": (
+                       "first-order propagation of the full fitted ne/Te covariance plus supplied independent laser-wavelength and scalar scattering-angle uncertainties"
+                       if alpha_uncertainty is not None else "not_available_without_finite_fit_covariance"
+                   ),
                    "scattering_regime": "collective" if alpha_value > 1.0 else "non_collective_or_weakly_collective",
                    "ion_temperature_eV": np.atleast_1d(ion_t).tolist(),
                    "ion_velocity_m_s": ion_v.tolist(), "electron_velocity_m_s": electron_v.tolist()}
