@@ -231,7 +231,7 @@ def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normal
     assert out["fast_ion_vdf_covariance"].shape==(velocity.size,velocity.size)
     assert out["fast_ion_vdf_uncertainty_m_s_inverse"].shape==velocity.shape
     assert "fast_ion_vdf_logit_0" in out["parameter_names"]
-    assert out["regularization_scope"] == "fast-ion VDF smoothness only; no plasma-parameter prior"
+    assert out["regularization_scope"] == "fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior"
 
 
 def test_cts_forward_model_requires_explicit_ion_flow_projection():
