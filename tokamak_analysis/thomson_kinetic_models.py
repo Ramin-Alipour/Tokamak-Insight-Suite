@@ -329,7 +329,13 @@ def fit_relativistic_maxwell_juttner(
                 return np.full_like(ys, 1.0e6)
             raise
 
-    fit = least_squares(objective, p0, x_scale="jac", max_nfev=1200)
+    # Keep the atanh(beta) coordinate away from floating-point saturation: tanh(±20)
+    # rounds to exactly ±1 and would create a spurious |v|=c trial during optimization.
+    fit = least_squares(
+        objective, p0, x_scale="jac", max_nfev=1200,
+        bounds=(np.array([-np.inf, -18.0, -np.inf, -np.inf, -np.inf]),
+                np.array([np.inf, 18.0, np.inf, np.inf, np.inf])),
+    )
     if not fit.success:
         raise ValueError(f"relativistic Maxwell-Juttner Thomson fit failed: {fit.message}")
     jacobian = np.asarray(fit.jac, dtype=float)
