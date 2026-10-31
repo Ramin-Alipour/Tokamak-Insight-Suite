@@ -89,6 +89,29 @@ def _reconstruct_inferred_parameter_profile(
     def fit_profile(sample, selected_method):
         if selected_method == "pchip":
             fit = PchipInterpolator(radius, sample, extrapolate=False)
+            reconstructed = np.asarray(fit(grid), dtype=float)
+            gradient = np.asarray(fit.derivative()(grid), dtype=float)
+        elif positive:
+            # An unconstrained smoothing spline in physical coordinates can
+            # overshoot below zero between positive measured channels. Fit the
+            # logarithm instead so density/temperature-like profiles remain
+            # strictly positive throughout the reconstructed interval.
+            if np.any(sample <= 0.0):
+                raise ValueError("Positive profile samples must remain strictly positive.")
+            log_sample = np.log(sample)
+            if sigma is None or not np.any(sigma > 0):
+                weights = None
+            else:
+                relative_sigma = sigma / sample
+                sigma_floor = max(
+                    float(np.max(relative_sigma)) * 1e-12,
+                    np.sqrt(np.finfo(float).tiny),
+                )
+                weights = 1.0 / np.maximum(relative_sigma, sigma_floor)
+            fit = make_smoothing_spline(radius, log_sample, w=weights, lam=None)
+            log_profile = np.asarray(fit(grid), dtype=float)
+            reconstructed = np.exp(log_profile)
+            gradient = reconstructed * np.asarray(fit.derivative()(grid), dtype=float)
         else:
             if sigma is None or not np.any(sigma > 0):
                 weights = None
@@ -99,7 +122,9 @@ def _reconstruct_inferred_parameter_profile(
                 )
                 weights = 1.0 / np.maximum(sigma, sigma_floor)
             fit = make_smoothing_spline(radius, sample, w=weights, lam=None)
-        return np.asarray(fit(grid), dtype=float), np.asarray(fit.derivative()(grid), dtype=float)
+            reconstructed = np.asarray(fit(grid), dtype=float)
+            gradient = np.asarray(fit.derivative()(grid), dtype=float)
+        return reconstructed, gradient
 
     rng = np.random.default_rng(random_seed)
     draws = None
