@@ -237,11 +237,12 @@
         {
           "name": "electron_density_joint_covariance_m6",
           "unit": "n_channels x n_channels; m^-6",
-          "description": "Full cross-channel absolute-density covariance propagated from joint_density_relative_covariance."
+          "description": "Full cross-channel absolute-density covariance including joint optical-factor covariance, common scattering-angle covariance, and spectral/response-derived scattered-power covariance where available."
         },
         {
           "name": "electron_density_cross_channel_covariance_available",
-          "unit": "boolean"
+          "unit": "boolean",
+          "description": "True when cross-channel density covariance is available from joint optical inputs, common geometry uncertainty, joint spectral GLS or shared instrument-response uncertainty."
         },
         {
           "name": "kappa_index",
@@ -279,6 +280,21 @@
           "unit": "per-channel dimensionless validity parameters and screening limits",
           "required": false,
           "description": "Non-relativistic Maxwellian/Kappa: theta_e < 0.01 and |v_flow|/c < 0.1. Conservative asymptotic error-budget screens (thermal corrections scale with theta_e; leading bulk-flow corrections scale with beta^2), not universal validity boundaries."
+        },
+        {
+          "name": "electron_density_angle_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Common scalar scattering-angle uncertainty contribution to cross-channel absolute-density covariance."
+        },
+        {
+          "name": "electron_density_shared_response_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Absolute-density covariance contribution propagated from measured-response Monte Carlo, including shared 2-D or channel-specific 3-D response uncertainty."
+        },
+        {
+          "name": "integrated_scattered_power_joint_covariance",
+          "unit": "n_channels x n_channels; integrated power squared",
+          "description": "Cross-channel covariance of fitted integrated spectral power from joint spectral GLS and measured-response Monte Carlo."
         }
       ],
       "assumptions": [
