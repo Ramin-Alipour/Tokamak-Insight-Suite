@@ -211,7 +211,15 @@ def _weighted_standard_uncertainty(weights, uncertainty) -> float | None:
     return float(np.sqrt(np.sum(np.square(weights * uncertainty))))
 
 
-def profile_summary(profile: ThomsonProfile) -> ThomsonSummary:
+def profile_summary(profile: ThomsonProfile, density_m3=None, temperature_ev=None) -> ThomsonSummary:
+    if not isinstance(profile, ThomsonProfile):
+        if density_m3 is None or temperature_ev is None:
+            raise TypeError("profile_summary requires a ThomsonProfile or radius, density and temperature arrays")
+        warnings.warn(
+            "Passing separate profile arrays to profile_summary is deprecated; pass a ThomsonProfile.",
+            DeprecationWarning, stacklevel=2,
+        )
+        profile = build_profile(profile, density_m3, temperature_ev)
     """Summarize calibrated profiles over the measured radial interval only.
 
     The summary deliberately excludes geometry-weighted volume averages: those
@@ -462,13 +470,29 @@ def reconstruct_thomson_profile(
     rng = np.random.default_rng(91473)
     minimum_draws = max(20, int(np.ceil(0.8 * uncertainty_mc_samples)))
 
+    def draw_correlated_sample(values, covariance):
+        """Sample mixed-unit covariance after standardizing to a correlation matrix."""
+        values = np.asarray(values, dtype=float)
+        covariance = np.asarray(covariance, dtype=float)
+        sigma = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+        active = sigma > 0.0
+        draw = values.copy()
+        if np.any(active):
+            block = covariance[np.ix_(active, active)]
+            scale = sigma[active]
+            correlation = block / np.outer(scale, scale)
+            correlation = 0.5 * (correlation + correlation.T)
+            standardized = rng.multivariate_normal(np.zeros(scale.size), correlation, check_valid="raise")
+            draw[active] += scale * standardized
+        return draw
+
     def profile_monte_carlo(values, covariance, uncertainty, label):
         if covariance is None:
             return None
         samples = []
         for _ in range(int(uncertainty_mc_samples)):
             try:
-                draw = rng.multivariate_normal(values, covariance, check_valid="raise")
+                draw = draw_correlated_sample(values, covariance)
                 if np.any(draw < 0):
                     continue
                 reconstructed, _ = fit_channel(draw, uncertainty, label)
@@ -494,7 +518,7 @@ def reconstruct_thomson_profile(
         joint_values = np.r_[profile.density_m3, profile.temperature_ev]
         for _ in range(int(uncertainty_mc_samples)):
             try:
-                draw = rng.multivariate_normal(joint_values, joint_covariance, check_valid="raise")
+                draw = draw_correlated_sample(joint_values, joint_covariance)
                 density_draw, temperature_draw = draw[:r.size], draw[r.size:]
                 if np.any(density_draw < 0) or np.any(temperature_draw < 0):
                     continue

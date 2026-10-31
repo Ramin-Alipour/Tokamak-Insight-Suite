@@ -35,11 +35,9 @@ def _trapz(y, x):
 
 def _moment_statistics(x, y, instrument_sigma_nm, background_fraction, background_mask):
     if background_mask is None:
-        n_edge = max(3, int(np.ceil(x.size * background_fraction)))
-        mask = np.zeros(x.size, dtype=bool)
-        mask[:n_edge] = True
-        mask[-n_edge:] = True
-        background_source = "spectral_edges_assumed_background"
+        edge_width = float(background_fraction) * float(x[-1] - x[0])
+        mask = (x <= x[0] + edge_width) | (x >= x[-1] - edge_width)
+        background_source = "spectral_edges_assumed_background_by_wavelength_span"
     else:
         mask = background_mask
         background_source = "user_supplied_background_mask"

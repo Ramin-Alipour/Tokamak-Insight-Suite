@@ -65,7 +65,7 @@ def fit_thomson_spectrum(
     x = _finite_vector(wavelength_nm, "wavelength_nm")
     y = _finite_vector(signal, "signal")
     if x.size != y.size or np.any(np.diff(x) <= 0):
-        raise ValueError("wavelength_nm and signal must have equal lengths and wavelength must increase strictly")
+        raise ValueError("wavelength_nm and signal must have equal lengths and wavelength must be strictly increasing")
     if not _is_finite_real(instrument_sigma_nm) or instrument_sigma_nm <= 0:
         raise ValueError("instrument_sigma_nm must be positive and finite")
     if signal_uncertainty is not None:

@@ -240,3 +240,17 @@ def analyze_thomson_spectra(*args, **kwargs):
     """
     from .thomson_inference import analyze_thomson_spectra as _infer
     return _infer(*args, **kwargs)
+
+
+
+def reconstruct_thomson_profile_from_spectra(*args, **kwargs):
+    """Return channel-resolved Thomson profiles inferred from measured spectra.
+
+    This registered subanalysis accepts the same measured, calibrated
+    multi-channel spectra as the canonical Analysis 1 engine. It does not accept
+    previously inferred density/temperature profile points.
+    """
+    result = analyze_thomson_spectra(*args, **kwargs)
+    result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
+    result["profile_source"] = "physical inference from measured calibrated multi-channel Thomson spectra"
+    return result

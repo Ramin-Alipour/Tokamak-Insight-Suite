@@ -438,6 +438,16 @@ def _default_collective_bounds(initial_density_m3, initial_temperature_eV):
     return (np.array([density / 100.0, density * 100.0]),
             np.array([temperature / 100.0, temperature * 100.0]))
 
+def _collective_external_parameter_indices(channel_index, ion_species_count):
+    """Return covariance-vector indices for one channel in channel-major order."""
+    channel_index = int(channel_index)
+    ion_species_count = int(ion_species_count)
+    if channel_index < 0 or ion_species_count < 1:
+        raise ValueError("channel_index must be non-negative and ion_species_count must be positive")
+    base = channel_index * (3 + ion_species_count)
+    return base, base + 1, base + 2, tuple(range(base + 3, base + 3 + ion_species_count))
+
+
 def analyze_thomson_spectra(
     wavelength_nm, spectra, radius_m, *, laser_wavelength_nm, scattering_angle_rad,
     laser_wavelength_uncertainty_nm=None, scattering_angle_uncertainty_rad=None,
@@ -471,7 +481,7 @@ def analyze_thomson_spectra(
     radii = _finite_array(radius_m, "radius_m", 1)
     if y.shape[0] != radii.size:
         raise ValueError("radius_m length must equal the number of spectral channels")
-    x = _finite_array(wavelength_nm)
+    x = _finite_array(wavelength_nm, "wavelength_nm")
     if x.ndim == 1:
         if x.size != y.shape[1]:
             raise ValueError("wavelength_nm length must equal the spectral width")
@@ -1449,9 +1459,9 @@ def analyze_thomson_spectra(
             if np.any(valid_columns):
                 covariance[np.ix_(valid_columns,valid_columns)]=np.cov(draw_array[:,valid_columns],rowvar=False,ddof=1)
                 for channel in range(len(results)):
-                    density_col=2*channel
-                    temperature_col=density_col+1
-                    velocity_col=density_col+2
+                    density_col, temperature_col, velocity_col, ion_columns = (
+                        _collective_external_parameter_indices(channel, len(ion_species))
+                    )
                     results[channel]["electron_temperature_uncertainty_eV"]=float(np.hypot(
                         results[channel]["electron_temperature_uncertainty_eV"],
                         np.sqrt(max(covariance[temperature_col,temperature_col],0.0))))
@@ -1469,10 +1479,8 @@ def analyze_thomson_spectra(
                         results[channel]["electron_density_uncertainty_m3"]=float(np.hypot(
                             results[channel]["electron_density_uncertainty_m3"],
                             np.sqrt(max(covariance[density_col,density_col],0.0))))
-                    ion_offset=density_col+3
                     ion_uncertainties=[]
-                    for species_index in range(len(ion_species)):
-                        ion_col=ion_offset+species_index
+                    for ion_col in ion_columns:
                         ion_sigma=float(np.sqrt(max(covariance[ion_col,ion_col],0.0)))
                         ion_uncertainties.append(
                             ion_sigma if ion_v_unc is not None or scattering_angle_uncertainty_rad is not None
@@ -1492,7 +1500,10 @@ def analyze_thomson_spectra(
                 )
             output["collective_external_parameter_covariance_order"]=covariance_order
             output["collective_external_parameter_covariance"]=covariance
-            density_columns = [channel * (3 + len(ion_species)) for channel in range(len(results))]
+            density_columns = [
+                _collective_external_parameter_indices(channel, len(ion_species))[0]
+                for channel in range(len(results))
+            ]
             external_density_covariance = covariance[np.ix_(density_columns, density_columns)].copy()
             for channel_index, channel_result in enumerate(results):
                 if channel_result.get("electron_density_m3") is None:
