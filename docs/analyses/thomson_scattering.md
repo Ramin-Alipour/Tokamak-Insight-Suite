@@ -38,7 +38,7 @@ Input spectra are assumed to be prepared and calibrated. The analysis does not p
 
 The supplied measured response is applied in the physical forward model. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, supporting nonuniform calibrated wavelength grids. No Gaussian line-spread function is imposed by the primary physical fit.
 
-For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting where supported by the model-specific forward path. The spectral-distribution subanalysis is model-independent: it reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution. If moments are not identifiable for a channel, the subanalysis reports that channel as unavailable without aborting the primary physical inference.
+For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting where supported by the model-specific forward path. The spectral-distribution subanalysis is independently registered as entry 81 and can run directly from one calibrated measured spectrum even when the primary physical fit fails. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution. If moments are not identifiable for a channel, the subanalysis reports that channel as unavailable without aborting the primary physical inference.
 
 ## Electron density and identifiability
 
@@ -90,3 +90,14 @@ These references motivate the selected physical scope; TIS does not claim to rep
 ## Dashboard access
 
 The Spectral Analysis workspace exposes the canonical multi-channel optical Thomson inference. The Advanced Analysis profile workflow routes to the same canonical engine. The microwave CTS workflow separately exposes electrostatic and magnetized full-electromagnetic forward models.
+
+
+## Independent spectral-distribution subanalysis (registry entry 81)
+
+The callable `tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution` is registered independently and accepts a single measured calibrated spectrum. It does not require a successful primary Maxwellian/Kappa/Maxwell-Juttner fit. The background must be explicitly supplied as `background_signal`, `background_mask`, or a researcher-selected `background_fraction`; the code does not silently designate the first/last 10% of the wavelength range as background. A measured response matrix is used directly. The legacy `thomson_spectrum.fit_thomson_spectrum` adapter also requires a measured response matrix and no longer synthesizes a Gaussian response from a scalar width.
+
+The Kappa physical fit reports the Student-t probability captured by the measured wavelength window. It does not impose the Gaussian ±3σ coverage rule on a heavy-tailed distribution; if the fitted model has appreciable tails outside the measured window, the extrapolated full-model area is explicitly flagged.
+
+## Literature traceability
+
+The Kappa forward model implemented here is the analytic one-dimensional Student-t projection of an isotropic finite-variance Kappa velocity distribution. Skolar, Longley and Goodwin (2025, DOI 10.1063/5.0261966) develop a generalized plasma-dispersion-function approach for non-Maxwellian Thomson response; that is related literature but is **not** the same numerical algorithm as this Student-t fit. Sakai et al. (2026, DOI 10.1088/1748-0221/21/01/C01002) provide Monte Carlo reference spectra for arbitrary electron distributions, including relativistic Maxwellian and Kappa cases; TIS's deterministic quadrature is not claimed to reproduce their Monte Carlo method. These papers are references for comparison and equation traceability, not evidence of experimental validation of this repository.
