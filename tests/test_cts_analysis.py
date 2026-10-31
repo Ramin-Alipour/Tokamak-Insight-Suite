@@ -310,3 +310,16 @@ def test_cts_cold_plasma_ray_trace_is_straight_in_vacuum():
     assert result["position_m"].shape == (8, 3)
     assert np.all(np.isfinite(result["wavevector_rad_m"]))
     np.testing.assert_allclose(result["wavevector_rad_m"], k0, rtol=1e-7, atol=1e-7)
+
+
+def test_cts_cold_plasma_vacuum_propagating_mode_is_flux_normalized():
+    from tokamak_analysis.cts_em_geometry import solve_cold_plasma_propagating_modes
+
+    omega = 2.0 * np.pi * 140e9
+    mode = solve_cold_plasma_propagating_modes(
+        omega, [1.0, 0.0, 0.0], [0.0, 0.0, 2.0], [], mode_index=0
+    )
+    assert mode["refractive_index"] == pytest.approx(1.0, rel=1e-12)
+    assert mode["signed_longitudinal_flux_before_normalization"] > 0
+    assert np.dot(mode["poynting_vector_unit_flux"], [1.0, 0.0, 0.0]) == pytest.approx(1.0, rel=1e-10)
+    assert np.all(np.isfinite(mode["electric_polarization_unit_flux"]))
