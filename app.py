@@ -1080,7 +1080,30 @@ elif page=='Spectral Analysis':
                     'electron_velocity_projection_m_s':result['electron_velocity_projection_profile_m_s'],
                     'electron_velocity_projection_uncertainty_m_s':result['electron_velocity_projection_uncertainty_profile_m_s'],
                 })
+                if model=='non_collective_kappa':
+                    profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
+                if model=='collective_maxwellian':
+                    profile['scattering_parameter_alpha']=[channel.get('scattering_parameter_alpha',np.nan) for channel in result['channels']]
+                if result.get('absolute_scattered_power_available'):
+                    profile['integrated_scattered_power_W']=[channel.get('integrated_scattered_power_W',np.nan) for channel in result['channels']]
+                else:
+                    profile['integrated_spectral_signal_input_units_nm']=[channel.get('integrated_spectral_signal_input_units_nm',np.nan) for channel in result['channels']]
                 st.dataframe(profile,width="stretch")
+                distribution_rows=[]
+                for channel in result['channels']:
+                    distribution=channel.get('spectral_distribution',{})
+                    distribution_rows.append({
+                        'channel_index':channel.get('channel_index'),
+                        'radius_m':channel.get('radius_m'),
+                        'analysis_status':distribution.get('analysis_status'),
+                        'spectral_centroid_nm':distribution.get('spectral_centroid_nm'),
+                        'observed_sigma_nm':distribution.get('observed_sigma_nm'),
+                        'spectral_skewness':distribution.get('spectral_skewness'),
+                        'spectral_excess_kurtosis':distribution.get('spectral_excess_kurtosis'),
+                        'integrated_signed_spectral_signal':distribution.get('integrated_signed_spectral_signal'),
+                    })
+                st.markdown('**Thomson spectral-distribution diagnostics**')
+                st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
                 st.line_chart(profile.set_index('radius_m')[['electron_temperature_eV']])
                 if np.any(np.isfinite(result['electron_density_profile_m3'])):
                     st.line_chart(profile.set_index('radius_m')[['electron_density_m3']])
