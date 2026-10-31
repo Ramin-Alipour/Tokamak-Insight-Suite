@@ -160,6 +160,10 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
         "unmagnetized_electrostatic_longitudinal_cts",
         "magnetized_full_electromagnetic_cts",
     }
+    assert all(
+        item["function"] == "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model"
+        for item in cts_contract["workflow_modes"]
+    )
     assert callable(resolve_analysis(46))
     assert callable(resolve_analysis(81))
 
