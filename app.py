@@ -984,7 +984,11 @@ elif page=='Spectral Analysis':
                         polarization_text=st.text_input('Incident polarization vector (x,y,z; required)',value='',key='ts_infer_polarization')
                         incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
                         scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
-                    polarization_unc_text=st.text_input('Polarization-factor 1σ uncertainty (optional)',value='',key='ts_infer_polarization_unc')
+                    if model=='non_collective_relativistic_maxwell_juttner':
+                        polarization_unc_text=''
+                        st.caption('The relativistic model propagates the supplied incident-polarization component uncertainty through its velocity-averaged effective differential cross-section; a separate scalar polarization-factor uncertainty is not used.')
+                    else:
+                        polarization_unc_text=st.text_input('Polarization-factor 1σ uncertainty (optional)',value='',key='ts_infer_polarization_unc')
                     density_covariance_upload=st.file_uploader('Optional within-channel 6×6 density-input relative covariance CSV',type=['csv','txt'],key='ts_infer_density_covariance')
                     joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
                     st.caption('A density covariance file describes the six optical inversion inputs. It may be combined with joint spectral covariance and/or measured-response uncertainty only when the scattered-power row and column are zero; those power uncertainties are then supplied by the spectral/response propagation. Do not also enter duplicate scalar optical-factor uncertainties.')
