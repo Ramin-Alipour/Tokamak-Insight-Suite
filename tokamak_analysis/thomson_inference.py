@@ -1641,16 +1641,25 @@ def analyze_thomson_spectra(
                         density_inputs["scattered_power_uncertainty_W"] = joint_area_sigma
                     else:
                         covariance = np.asarray(density_inputs["relative_input_covariance"], dtype=float).copy()
-                        old_sigma = float(np.sqrt(max(covariance[0, 0], 0.0))) * float(
-                            results[channel]["integrated_scattered_power_W"]
-                        )
                         new_relative_sigma = 0.0 if area == 0.0 else joint_area_sigma / abs(area)
-                        old_relative_sigma = 0.0 if results[channel]["integrated_scattered_power_W"] == 0.0 else old_sigma / abs(float(results[channel]["integrated_scattered_power_W"]))
-                        if old_relative_sigma > 0.0:
-                            scale_cov = new_relative_sigma / old_relative_sigma
-                            covariance[0, :] *= scale_cov
-                            covariance[:, 0] *= scale_cov
-                        covariance[0, 0] = new_relative_sigma**2
+                        if np.allclose(covariance[0, :], 0.0, rtol=0.0, atol=1e-14) and np.allclose(
+                            covariance[:, 0], 0.0, rtol=0.0, atol=1e-14
+                        ):
+                            density_inputs["scattered_power_uncertainty_W"] = joint_area_sigma
+                        else:
+                            old_sigma = float(np.sqrt(max(covariance[0, 0], 0.0))) * float(
+                                results[channel]["integrated_scattered_power_W"]
+                            )
+                            old_relative_sigma = (
+                                0.0 if results[channel]["integrated_scattered_power_W"] == 0.0
+                                else old_sigma / abs(float(results[channel]["integrated_scattered_power_W"]))
+                            )
+                            if old_relative_sigma > 0.0:
+                                scale_cov = new_relative_sigma / old_relative_sigma
+                                covariance[0, :] *= scale_cov
+                                covariance[:, 0] *= scale_cov
+                            covariance[0, 0] = new_relative_sigma**2
+                            density_inputs["scattered_power_uncertainty_W"] = None
                         density_inputs["relative_input_covariance"] = covariance
                     density_result = density_from_thomson_scattered_power(**density_inputs)
                     fit["electron_density_m3"] = density_result["electron_density_m3"]
