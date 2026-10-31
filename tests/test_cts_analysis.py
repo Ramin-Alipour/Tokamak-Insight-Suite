@@ -164,7 +164,7 @@ def test_cts_analysis_can_fit_fraction_of_fixed_tabulated_fast_ion_vdf():
 
 def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normalized_shape():
     f0,f,g,ions,frac,response=_case()
-    velocity=np.linspace(-8e5,8e5,9)
+    velocity=np.linspace(-2.0e6,2.0e6,41)
     initial_pdf=np.exp(-0.5*(velocity/2.8e5)**2)*(1.0+0.2*np.exp(-0.5*((velocity-3e5)/1.5e5)**2))
     truth={"species_index":0,"fraction":0.06,"kind":"tabulated_1d",
            "velocity_m_s":velocity,"probability_density_m_s_inverse":initial_pdf}
