@@ -3495,6 +3495,38 @@
         {
           "name": "second_order_vlasov",
           "unit": "boolean"
+        },
+        {
+          "name": "incident_frequency_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "fluctuation_frequency_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "distribution_kind",
+          "unit": "text"
+        },
+        {
+          "name": "vertex_definition",
+          "unit": "text"
+        },
+        {
+          "name": "momentum_quadrature_order",
+          "unit": "integer"
+        },
+        {
+          "name": "gyrophase_points",
+          "unit": "integer"
+        },
+        {
+          "name": "resonance_width_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "assumptions",
+          "unit": "text list"
         }
       ],
       "prerequisites": [
