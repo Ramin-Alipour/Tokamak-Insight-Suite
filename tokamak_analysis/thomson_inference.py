@@ -1192,6 +1192,19 @@ def analyze_thomson_spectra(
         discrepancy_scale=max(reduced_chi2_joint-1.0,0.0)
         discrepancy_covariance=discrepancy_scale*physical_covariance
         total_physical_covariance=physical_covariance+discrepancy_covariance
+        kappa_parameter_covariance = None
+        total_kappa_parameter_covariance = None
+        if model == "non_collective_kappa":
+            kappa_transform = np.zeros((nchan, joint_parameter_count*nchan))
+            for channel in range(nchan):
+                kappa_transform[channel, joint_parameter_count*channel+3] = 1.0
+            kappa_parameter_covariance = (
+                kappa_transform @ parameter_covariance @ kappa_transform.T
+            )
+            total_kappa_parameter_covariance = (
+                kappa_parameter_covariance
+                + discrepancy_scale*kappa_parameter_covariance
+            )
         joint_fitted=joint_forward(joint_fit.x)
         for channel in range(nchan):
             p=joint_fit.x[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
@@ -1220,6 +1233,12 @@ def analyze_thomson_spectra(
                 "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
                 "model_discrepancy_covariance_included": bool(discrepancy_scale > 0.0),
             })
+            if model == "non_collective_kappa":
+                fit["kappa_index_uncertainty"] = float(np.sqrt(max(
+                    total_kappa_parameter_covariance[channel, channel], 0.0
+                )))
+                fit["kappa_parameter_covariance"] = kappa_parameter_covariance.copy()
+                fit["total_kappa_parameter_covariance"] = total_kappa_parameter_covariance.copy()
             channel_residual = fit["residual"]
             channel_slice = slice(channel * y.shape[1], (channel + 1) * y.shape[1])
             channel_spectral_covariance = joint_covariance[channel_slice, channel_slice]
@@ -1334,6 +1353,12 @@ def analyze_thomson_spectra(
             "physical_parameter_order":[name for i in range(nchan) for name in (f"channel_{i}_electron_temperature_eV",f"channel_{i}_electron_velocity_projection_m_s")],
             "joint_parameter_count_per_channel":joint_parameter_count,
             "physical_parameter_covariance":physical_covariance,
+            "kappa_parameter_covariance":kappa_parameter_covariance,
+            "total_kappa_parameter_covariance":total_kappa_parameter_covariance,
+            "kappa_parameter_order": (
+                [f"channel_{i}_kappa_index" for i in range(nchan)]
+                if model == "non_collective_kappa" else None
+            ),
             "model_discrepancy_covariance":discrepancy_covariance,
             "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
             "total_physical_parameter_covariance":total_physical_covariance,
