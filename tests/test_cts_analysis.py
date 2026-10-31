@@ -642,3 +642,16 @@ def test_full_em_cts_consumes_frequency_resolved_ray_and_overlap_geometry():
     np.testing.assert_allclose(result["relative_gaussian_beam_overlap"], [0.25, 1.0])
     assert result["scattering_locations_m"].shape == (2, 3)
     assert np.all(np.isfinite(result["spectral_density"]))
+
+
+def test_relativistic_maxwell_juttner_momentum_grid_is_normalized():
+    from tokamak_analysis.cts_relativistic import _momentum_grid, ME
+
+    pperp, ppar, f0, dfperp, dfpar, weights = _momentum_grid(
+        {"kind": "relativistic_maxwell_juttner", "temperature_eV": 2.0e5},
+        ME, 16,
+    )
+    assert pperp.shape == ppar.shape == f0.shape == weights.shape
+    assert np.all(np.isfinite(dfperp)) and np.all(np.isfinite(dfpar))
+    assert np.all(f0 >= 0)
+    assert np.sum(weights*f0) == pytest.approx(1.0, rel=1e-10)
