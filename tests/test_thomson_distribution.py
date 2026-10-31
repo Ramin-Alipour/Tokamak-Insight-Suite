@@ -230,3 +230,18 @@ def test_distribution_uses_general_instrument_response_matrix_without_gaussian_d
     assert out["instrument_response_model"] == "general_measured_response_matrix"
     assert out["instrument_corrected_sigma_nm"] is None
     assert out["instrument_width_resolved"] is None
+
+
+
+def test_spectral_distribution_uses_explicit_physical_fit_background_without_edge_refit():
+    x, y = _spectrum()
+    fitted_background = 12.0 + 0.8 * (x - 500.0)
+    out = analyze_thomson_spectral_distribution(
+        x, y,
+        instrument_response_matrix=np.eye(x.size),
+        background_signal=fitted_background,
+        signal_uncertainty=np.full(x.size, 1.0),
+    )
+    assert out["background_estimation_method"] == "explicit_fitted_background_signal"
+    assert out["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.01)
+    assert out["instrument_corrected_sigma_nm"] is None
