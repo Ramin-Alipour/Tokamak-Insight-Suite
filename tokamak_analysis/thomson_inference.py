@@ -1238,6 +1238,7 @@ def analyze_thomson_spectra(
                         fit.get("effective_differential_cross_section_uncertainty_m2_sr") or 0.0,
                         cross_section_lsf_sigma,
                     ))
+                    fit["differential_cross_section_uncertainty_m2_sr"] = fit["effective_differential_cross_section_uncertainty_m2_sr"]
                     fit["instrument_response_cross_section_uncertainty_m2_sr"] = cross_section_lsf_sigma
                 if lsf_unc.ndim == 2:
                     fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
@@ -1432,6 +1433,7 @@ def analyze_thomson_spectra(
                     cross_section_external_sigma,
                 ))
                 fit["relativistic_external_cross_section_uncertainty_m2_sr"] = cross_section_external_sigma
+                fit["differential_cross_section_uncertainty_m2_sr"] = fit["effective_differential_cross_section_uncertainty_m2_sr"]
                 fit["relativistic_external_parameter_uncertainty_propagated"] = True
                 fit["relativistic_external_temperature_uncertainty_eV"] = te_external_sigma
                 fit["relativistic_external_velocity_uncertainty_m_s"] = velocity_external_sigma
