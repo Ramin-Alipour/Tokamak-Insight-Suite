@@ -72,8 +72,8 @@ def relativistic_maxwell_juttner_spectrum(
         raise ValueError("wavelength_nm must be a finite, positive, strictly increasing vector")
     if not np.isfinite(angle) or not 0 < angle <= np.pi:
         raise ValueError("scattering_angle_rad must lie in (0, pi]")
-    if not np.isfinite(flow) or abs(flow) >= 0.9*C:
-        raise ValueError("flow_projection_m_s must be finite and subluminal with |v| < 0.9c")
+    if not np.isfinite(flow) or abs(flow) >= C:
+        raise ValueError("flow_projection_m_s must be finite and strictly subluminal (|v| < c)")
     if int(radial_order) < 12 or int(angular_order) < 8:
         raise ValueError("radial_order >=12 and angular_order >=8 are required")
 
@@ -208,8 +208,8 @@ def fit_relativistic_maxwell_juttner(
     y = np.asarray(signal, dtype=float)
     if x.ndim != 1 or y.shape != x.shape or x.size < 12:
         raise ValueError("wavelength_nm and signal must be matching vectors with >=12 samples")
-    ni = np.asarray(incident_direction, dtype=float)
-    ns = np.asarray(scattered_direction, dtype=float)
+    ni = np.array(incident_direction, dtype=float, copy=True)
+    ns = np.array(scattered_direction, dtype=float, copy=True)
     if ni.shape != (3,) or ns.shape != (3,) or np.any(~np.isfinite(ni)) or np.any(~np.isfinite(ns)):
         raise ValueError("incident_direction and scattered_direction must be finite 3-vectors")
     if np.linalg.norm(ni) == 0 or np.linalg.norm(ns) == 0:
