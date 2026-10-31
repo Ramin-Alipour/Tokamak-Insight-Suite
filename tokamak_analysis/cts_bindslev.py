@@ -162,12 +162,12 @@ def bindslev_source_current_operator(
     for j in range(3):
         unit = np.eye(3)[j]
         operator[:, 1 + j] = chi_s @ np.cross(unit, bi)
-        operator[:, 1 + j] += np.einsum("ijl,l->i", x[:, j, :], ei) / C
+        operator[:, 1 + j] += np.einsum("il,l->i", x[:, j, :], ei) / C
     # delta_E terms: chi_s . (n_i delta_E) + X:(v_i delta_E)/c
     for l in range(3):
         unit = np.eye(3)[l]
         operator[:, 4 + l] = chi_s @ (ni * unit)
-        operator[:, 4 + l] += np.einsum("ijl,j->i", x[:, :, l], vi) / C
+        operator[:, 4 + l] += np.einsum("ij,j->i", x[:, :, l], vi) / C
     # delta_B terms: chi_s . (v_i x delta_B)
     for n in range(3):
         unit = np.eye(3)[n]
