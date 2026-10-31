@@ -4277,8 +4277,7 @@
         {
           "name": "model",
           "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
-          "required": true,
-          "default": "electrostatic"
+          "required": true
         },
         {
           "name": "magnetic_field_T",
