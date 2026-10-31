@@ -3227,7 +3227,7 @@ elif page=='Advanced Analysis':
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_full_frequency_col')
                 cts_spectrum_col=col_select('Calibrated CTS spectral power',[x for x in numeric if x!=cts_frequency_col] or numeric,'cts_full_spectrum_col')
-                cts_uncertainty_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_full_uncertainty_col')
+                cts_uncertainty_col=st.selectbox('Spectral 1σ uncertainty column (required unless covariance is supplied)',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_full_uncertainty_col')
                 cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_full_probe_frequency')
                 cts_density_initial=st.text_input('Initial electron density (m⁻³)',key='cts_full_density_initial')
                 cts_temperature_initial=st.text_input('Initial electron temperature (eV)',key='cts_full_temperature_initial')
@@ -3283,6 +3283,8 @@ elif page=='Advanced Analysis':
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    if cts_uncertainty is None and cts_spectral_cov is None:
+                        raise ValueError('Full-EM CTS requires either a positive spectral 1σ uncertainty column or a full frequency-bin covariance matrix.')
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
