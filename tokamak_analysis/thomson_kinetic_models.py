@@ -252,15 +252,17 @@ def fit_relativistic_maxwell_juttner(
     sigma0 = max(sigma0, float(np.median(np.diff(x))))
     sine = np.sin(float(scattering_angle_rad)/2.0)
     te0 = E_REST_EV*(sigma0/(2.0*float(laser_wavelength_nm)*sine))**2
-    te0 = float(np.clip(te0, 0.05, 5.0e5))
-    amp0 = max(float(np.max(positive)), 1e-8)
-    p0 = np.array([np.log(te0), 0.0, np.log(amp0), baseline, 0.0])
-    lower = np.array([np.log(0.01), -0.9, -40.0, -np.inf, -np.inf])
-    upper = np.array([np.log(1.0e6), 0.9, 40.0, np.inf, np.inf])
+    if not np.isfinite(te0) or te0 <= 0:
+        raise ValueError("The measured spectral width does not provide a positive relativistic temperature initial estimate")
+    beta0 = -(centroid0-float(laser_wavelength_nm))/(2.0*float(laser_wavelength_nm)*sine)
+    if not np.isfinite(beta0) or abs(beta0) >= 1.0:
+        raise ValueError("The measured spectral centroid implies a non-physical initial flow projection |v| >= c")
+    amp0 = max(float(np.max(positive)), np.finfo(float).tiny)
+    p0 = np.array([np.log(te0), np.arctanh(beta0), np.log(amp0), baseline, 0.0])
 
     def evaluate(parameters, return_parts=False):
-        te = float(np.exp(parameters[0]))
-        beta_flow = float(parameters[1])
+        te = float(np.exp(np.clip(parameters[0], -700.0, 700.0)))
+        beta_flow = float(np.tanh(parameters[1]))
         physical = relativistic_maxwell_juttner_spectrum(
             x, laser_wavelength_nm, scattering_angle_rad, te,
             flow_projection_m_s=beta_flow*C,
@@ -268,14 +270,14 @@ def fit_relativistic_maxwell_juttner(
             radial_order=radial_order, angular_order=angular_order,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
-        amplitude = float(np.exp(parameters[2]))
+        amplitude = float(np.exp(np.clip(parameters[2], -700.0, 700.0)))
         offset, slope = float(parameters[3]), float(parameters[4])
         predicted = amplitude*shape+offset+slope*(x-float(laser_wavelength_nm))
         return (predicted, physical, shape) if return_parts else predicted
 
     fit = least_squares(
         lambda p: (evaluate(p)-ys)/residual_scale,
-        p0, bounds=(lower, upper), x_scale="jac", max_nfev=1200,
+        p0, x_scale="jac", max_nfev=1200,
     )
     if not fit.success:
         raise ValueError(f"relativistic Maxwell-Juttner Thomson fit failed: {fit.message}")
@@ -288,10 +290,10 @@ def fit_relativistic_maxwell_juttner(
     covariance_fit = np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None:
         covariance_fit *= float(2.0*fit.cost/dof)
-    te = float(np.exp(fit.x[0]))
-    beta_flow = float(fit.x[1])
-    amplitude_scaled = float(np.exp(fit.x[2]))
-    transform = np.diag([te, C, amplitude_scaled*scale, scale, scale])
+    te = float(np.exp(np.clip(fit.x[0], -700.0, 700.0)))
+    beta_flow = float(np.tanh(fit.x[1]))
+    amplitude_scaled = float(np.exp(np.clip(fit.x[2], -700.0, 700.0)))
+    transform = np.diag([te, C*(1.0-beta_flow*beta_flow), amplitude_scaled*scale, scale, scale])
     covariance_physical = transform@covariance_fit@transform.T
     amplitude = amplitude_scaled*scale
     offset = float(fit.x[3]*scale)
