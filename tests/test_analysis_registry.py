@@ -153,6 +153,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     cts_contract = cts["execution_contract"]
     cts_inputs = {item["name"] for item in cts_contract["input_specs"]}
     assert {"frequency_shift_Hz", "spectrum", "scattering_geometry", "model"} <= cts_inputs
+    assert {"instrument_response_uncertainty", "response_mc_samples"} <= cts_inputs
     assert not {"incident_direction", "scattered_direction", "mode_index",
                 "frequency_resolved_geometry", "scattering_sample_count",
                 "ion_temperature_eV"} & cts_inputs
