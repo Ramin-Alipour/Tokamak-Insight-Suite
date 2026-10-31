@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "primary_analysis_count": 20,
-  "underlying_entry_point_count": 80,
-  "policy": "The 20 primary analyses are navigation/grouping families. The 80 underlying entry points remain intact as subanalyses/workflows; no computational implementation is removed by this grouping.",
+  "underlying_entry_point_count": 79,
+  "policy": "The 20 primary analyses are navigation/grouping families. The 79 registered underlying entry points remain intact as subanalyses/workflows; retired duplicate entry ID 7 is not registered.",
   "families": [
     {
       "id": 1,
@@ -11,7 +11,6 @@
       "description": "Navigation family only: optical Thomson measured-spectrum inference, microwave frequency-domain CTS inference, descriptive spectral-moment diagnostics, and downstream ne/Te radial-profile utilities remain separate workflows with distinct physical models and input contracts.",
       "entry_ids": [
         1,
-        7,
         30,
         46
       ]
