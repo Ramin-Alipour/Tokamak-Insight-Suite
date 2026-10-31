@@ -169,7 +169,7 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
 
 def test_legacy_relativistic_model_alias_is_rejected():
     x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="Unsupported Thomson model"):
+    with pytest.raises(ValueError, match="Unsupported optical Thomson model"):
         analyze_thomson_spectra(
             x, y[None, :], [0.12], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
@@ -206,7 +206,7 @@ def test_collective_external_covariance_indices_use_full_channel_stride():
 def test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties():
     from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
 
-    x = np.linspace(520.0, 544.0, 81)
+    x = np.linspace(480.0, 584.0, 81)
     physical = relativistic_maxwell_juttner_spectrum(
         x, 532.0, np.pi / 2, 100.0,
         flow_projection_m_s=0.0,
@@ -243,6 +243,7 @@ def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
     result = entrypoint(
         x, y[None, :], [0.1], laser_wavelength_nm=532.0,
         scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        model="non_collective_maxwellian",
     )
     assert result["registered_subanalysis"] == "Thomson spatial profile reconstruction from calibrated spectra"
     assert result["electron_temperature_profile_eV"][0] == pytest.approx(100.0, rel=0.05)
@@ -745,7 +746,7 @@ def test_thomson_spatial_subanalysis_reconstructs_all_identifiable_spectral_prof
     result = reconstruct_thomson_profile_from_spectra(
         wavelength, np.asarray(spectra), radii,
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
-        instrument_response=np.eye(wavelength.size),
+        instrument_response=np.eye(wavelength.size), model="non_collective_maxwellian",
         signal_uncertainty=np.ones((3, wavelength.size)),
         profile_reconstruction_method="both",
         profile_reconstruction_points=41,
@@ -779,9 +780,9 @@ def test_relativistic_fit_does_not_mutate_caller_direction_arrays():
     with pytest.raises(ValueError, match="inconsistent"):
         fit_relativistic_maxwell_juttner(
             wavelength, signal, 532.0, np.pi / 3.0,
+            np.eye(wavelength.size),
             incident_direction=incident, scattered_direction=scattered,
             incident_polarization=[0.0, 0.0, 1.0],
-            instrument_response=np.eye(wavelength.size),
         )
     np.testing.assert_array_equal(incident, incident_before)
     np.testing.assert_array_equal(scattered, scattered_before)
@@ -811,12 +812,12 @@ def test_scattering_angle_uncertainty_is_not_dropped_with_density_relative_covar
     x, y, _ = _spectral_case(100.0, n=161)
     common = dict(
         wavelength_nm=x, spectra=(y * 1e-18)[None, :], radius_m=[0.1],
-        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 3,
         instrument_response=np.eye(x.size),
         laser_power_w=2.0, interaction_length_m=0.1,
         collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
-        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
-        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+        incident_polarization=[0, 1, 0], incident_direction=[1, 0, 0],
+        scattered_direction=[0.5, np.sqrt(3.0) / 2.0, 0.0], spectral_power_density_calibrated=True,
         density_relative_covariance=np.eye(6) * 1e-6,
     )
     without_angle = analyze_thomson_spectra(**common)["channels"][0]
