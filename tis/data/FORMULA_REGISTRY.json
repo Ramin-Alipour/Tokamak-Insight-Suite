@@ -4288,6 +4288,11 @@
           "name": "maximum_recoil_correction_fraction",
           "unit": "dimensionless",
           "required": false
+        },
+        {
+          "name": "require_full_spectrum",
+          "unit": "boolean",
+          "required": false
         }
       ],
       "output_specs": [
