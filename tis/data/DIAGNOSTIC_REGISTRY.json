@@ -4074,7 +4074,7 @@
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "implemented_with_declared_scope",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "frequency_shift_Hz",
@@ -4195,39 +4195,39 @@
         },
         {
           "name": "model",
-          "unit": "electrostatic or full_electromagnetic",
+          "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
           "required": false,
           "default": "electrostatic"
         },
         {
           "name": "magnetic_field_T",
-          "unit": "T; non-zero vector",
+          "unit": "T; non-zero vector in the common laboratory coordinate frame",
           "required": false,
-          "description": "Mandatory for full-EM."
+          "description": "Mandatory for full_electromagnetic."
         },
         {
           "name": "electron_flow_velocity_m_s",
-          "unit": "m s^-1; 3-vector",
+          "unit": "m s^-1; explicit 3-vector",
           "required": false,
-          "description": "Mandatory for full-EM."
+          "description": "Mandatory for full_electromagnetic; no scalar projection is substituted."
         },
         {
           "name": "ion_flow_velocity_m_s",
-          "unit": "m s^-1; species-name to 3-vector mapping",
+          "unit": "m s^-1; mapping from every ion species name to a 3-vector",
           "required": false,
-          "description": "Mandatory for every ion species in full-EM."
+          "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector."
         },
         {
           "name": "incident_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Mandatory for full-EM."
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
         },
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Mandatory for full-EM."
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
         },
         {
           "name": "incident_polarization",
@@ -4255,9 +4255,9 @@
         },
         {
           "name": "damping_rate_rad_s",
-          "unit": "rad s^-1 numerical regularization",
+          "unit": "rad s^-1; positive numerical regularization",
           "required": false,
-          "description": "Not a physical collision frequency."
+          "description": "Optional numerical Landau-contour regularization; not a physical collision frequency."
         },
         {
           "name": "fast_ion_populations",
@@ -4333,11 +4333,11 @@
         {
           "name": "fluctuation_covariance_density_current_E_B",
           "unit": "frequency x 10 x 10 complex covariance",
-          "description": "Joint density/current/E/B covariance with cross-correlations."
+          "description": "Joint electron density/current/electric-field/magnetic-field covariance including cross-correlations."
         },
         {
           "name": "dielectric_tensor",
-          "unit": "frequency x 3 x 3 complex tensor"
+          "unit": "frequency x 3 x 3 complex relative dielectric tensor"
         },
         {
           "name": "wave_tensor",
@@ -4345,7 +4345,7 @@
         },
         {
           "name": "parameter_uncertainties",
-          "unit": "m^-3, eV, eV"
+          "unit": "m^-3, eV, eV; local Jacobian uncertainty for full-EM density and temperatures"
         },
         {
           "name": "bindslev_source_current_operator",
@@ -4393,7 +4393,7 @@
         "Quasi-neutral plasma and supplied fixed ion composition.",
         "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate.",
         "Electron-flow projection is an explicit external input; no zero-flow default is imposed.",
-        "Gyro-harmonic and velocity-quadrature convergence must be checked.",
+        "Full-EM numerical gyro-harmonic and velocity-quadrature truncation must be checked for convergence by varying harmonic_order and quadrature_order.",
         "The Bindslev Gamma/X nonlinear source-current closure is the low-temperature magnetized formulation; it is not the fully relativistic second-order vertex.",
         "Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise; the supplied distribution is external and not fitted.",
         "Bulk thermal electrons and ions remain non-relativistic Maxwellian species.",
@@ -4416,8 +4416,7 @@
         "One common ion temperature and one common projected ion flow are shared across all background ion species; species-specific Ti and flow inference is not implemented.",
         "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption.",
         "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized.",
-        "Non-relativistic isotropic Maxwellians only; anisotropic/non-Maxwellian/relativistic fast ions not implemented.",
-        "No ray tracing, finite beam overlap or spatially varying magnetic geometry.",
+        "Full-EM ray tracing, refraction along finite paths, finite beam overlap and spatially varying magnetic geometry are not implemented.",
         "The Bindslev nonlinear three-wave source-current vertex is the low-temperature magnetized closure, not the fully relativistic second-order kinetic vertex.",
         "Relativistic gyrotropic fast-ion response/noise is supported only for explicitly supplied populations; fast-ion parameters are not inferred.",
         "Bulk thermal species retain the non-relativistic Maxwellian solver."
@@ -4460,7 +4459,7 @@
             "fitted_spectrum",
             "joint density/current/E/B fluctuation covariance"
           ],
-          "scope": "Local magnetized Maxwellian kinetic full-EM path; flow vectors and composition fixed externally."
+          "scope": "Local magnetized Maxwellian kinetic full-EM forward/inverse path; flow vectors and composition are fixed external inputs."
         },
         {
           "name": "relativistic_anisotropic_fast_ion_cts",
@@ -4519,7 +4518,7 @@
         "pages": "200-208",
         "year": 2025,
         "doi": "10.12096/j.2096-4528.pgt.24149",
-        "scope": "Recent magnetized full-EM CTS reference; implementation is scoped and does not reproduce full Bindslev three-wave coupling."
+        "scope": "Recent magnetized full-electromagnetic CTS reference; TIS implementation is a scoped local Maxwellian kinetic solver and does not reproduce the full Bindslev three-wave coupling transfer model."
       },
       {
         "title": "Three Wave Mixing and Thomson Scattering in Plasmas",
