@@ -173,7 +173,11 @@ def _convolve(response,spectrum,axis):
     if r.shape!=(axis.size,axis.size) or np.any(r<0) or np.any(r.sum(axis=0)<=0):
         raise ValueError("instrument_response must be a valid non-negative square matrix on the frequency grid")
     r=r/r.sum(axis=0)[None,:]
-    w=np.empty_like(axis); w[1:-1]=.5*(axis[2:]-axis[:-2]); w[0]=.5*(axis[1]-axis[0]); w[-1]=.5*(axis[-1]-axis[-2])
+    edges=np.empty(axis.size+1,dtype=float)
+    edges[1:-1]=.5*(axis[:-1]+axis[1:])
+    edges[0]=axis[0]-.5*(axis[1]-axis[0])
+    edges[-1]=axis[-1]+.5*(axis[-1]-axis[-2])
+    w=np.diff(edges)
     if np.any(w<=0): raise ValueError("frequency axis must be strictly increasing")
     return (r@(spectrum*w))/w
 
