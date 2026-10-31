@@ -41,7 +41,7 @@ def bindslev_gamma_tensor(omega_scattered_rad_s, magnetic_field_T):
     bmag = float(np.linalg.norm(b))
     if not np.isfinite(omega) or omega == 0 or bmag == 0:
         raise ValueError("non-zero finite scattered frequency and magnetic field are required")
-    omega_c = -E_CHARGE * bmag / ME
+    omega_c = E_CHARGE * bmag / ME
     Omega = omega_c / omega
     eta = np.diag([1.0, 1.0, 0.0])
     xi = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
