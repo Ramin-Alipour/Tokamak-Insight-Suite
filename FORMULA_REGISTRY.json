@@ -3532,7 +3532,7 @@
     "equation": "ν_s/ν_i=(1−n_i·β)/(1−n_s·β); λ_s/λ_i=(1−n_s·β)/(1−n_i·β); f_J(p)∝exp(−γ/θ), θ=T_e/(m_ec²)",
     "inputs": "Calibrated wavelength grid, laser wavelength, scattering geometry, electron temperature, scattering-vector bulk-flow projection",
     "output": "Unit-area wavelength spectral density and fitted Te/flow projection",
-    "assumptions": "Isotropic Maxwell-Juttner rest-frame electron distribution; Lorentz boost along scattering vector; Thomson limit; no recoil/Compton correction",
+    "assumptions": "Isotropic Maxwell-Juttner rest-frame electron distribution; Lorentz boost along scattering vector; supplied incident polarization transformed into electron rest frame; Thomson limit; no recoil/Compton correction",
     "status": "D",
     "category": "Optical relativistic Thomson scattering",
     "execution_contract": {
@@ -3574,6 +3574,11 @@
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "transverse dimensionless 3-vector",
           "required": true
         }
       ],
