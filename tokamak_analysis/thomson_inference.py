@@ -974,17 +974,9 @@ def analyze_thomson_spectra(
             ])
         if model in {"collective_maxwellian", "collective_kappa"}:
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
-            if model == "collective_kappa":
-                missing_uncertainties.extend([
-                    "instrument_response_uncertainty_propagation_not_implemented_for_collective_kappa",
-                    "laser_wavelength_uncertainty_propagation_not_implemented_for_collective_kappa",
-                    "scattering_angle_uncertainty_propagation_not_implemented_for_collective_kappa",
-                ])
-            if incident_direction_unc is not None or scattered_direction_unc is not None:
-                missing_uncertainties.append("beam_direction_uncertainty_propagation_not_implemented_for_collective_kappa")
             if lsf_unc is not None:
-                # Collective LSF uncertainty is propagated in the external-parameter
-                # Monte Carlo below; do not mark it missing here.
+                # Collective response uncertainty is propagated in the external-input
+                # Monte Carlo below; do not mark it missing before that calculation.
                 fit["instrument_response_uncertainty_propagated"] = False
         if all(v is not None for v in (laser_power_w,interaction_length_m,collection_solid_angle_sr,optical_efficiency)) and density_relative_covariance is None:
             for key,value in (("laser_power_uncertainty_W",laser_power_uncertainty_W),
@@ -1399,7 +1391,7 @@ def analyze_thomson_spectra(
             *(
                 ["Collective Maxwellian inference uses PlasmaPy's Maxwellian kinetic dielectric response; ion temperatures, composition and flow vectors are fixed external inputs."]
                 if model == "collective_maxwellian" else
-                ["Collective kappa inference uses the implemented unmagnetized longitudinal dielectric response with projected isotropic kappa electrons and Maxwellian ions; complete external-parameter and response-matrix covariance propagation is not yet implemented."]
+                ["Collective kappa inference uses the implemented unmagnetized longitudinal dielectric response with projected isotropic kappa electrons and Maxwellian ions; supplied external-input and response-matrix 1-sigma uncertainties are propagated by Monte Carlo, but cross-correlations among distinct external inputs and full channel-major GLS are not implemented."]
                 if model == "collective_kappa" else
                 ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector; external geometry and response-matrix uncertainty propagation is not yet complete."]
                 if model == "non_collective_relativistic_maxwell_juttner" else
@@ -1591,9 +1583,17 @@ def analyze_thomson_spectra(
             output["collective_external_uncertainty_warning"]="Too few successful external-parameter/response perturbation refits."
             for channel_result in results:
                 channel_result["collective_external_parameter_uncertainty_propagated"]=False
+                channel_result.setdefault("uncertainty_inputs_missing", []).append(
+                    "collective_external_parameter_monte_carlo_propagation_failed"
+                )
+                channel_result["uncertainty_completeness"] = "partial"
                 if lsf_unc is not None:
                     channel_result["instrument_response_uncertainty_propagated"]=False
                     channel_result["instrument_response_uncertainty_warning"]=output["collective_external_uncertainty_warning"]
+                    channel_result.setdefault("uncertainty_inputs_missing", []).append(
+                        "instrument_response_uncertainty_propagation_failed"
+                    )
+                    channel_result["uncertainty_completeness"] = "partial"
 
     # Attach model-independent observed spectral-distribution diagnostics to every
     # channel, using the background nuisance term already fitted by the selected
