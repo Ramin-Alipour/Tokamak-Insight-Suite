@@ -33,18 +33,27 @@ def _trapz(y, x):
     return integrate(y, x) if integrate is not None else np.trapz(y, x)
 
 
-def _moment_statistics(x, y, instrument_sigma_nm, background_fraction, background_mask):
-    if background_mask is None:
-        edge_width = float(background_fraction) * float(x[-1] - x[0])
-        mask = (x <= x[0] + edge_width) | (x >= x[-1] - edge_width)
-        background_source = "spectral_edges_assumed_background_by_wavelength_span"
+def _moment_statistics(
+    x, y, instrument_sigma_nm, background_fraction, background_mask,
+    background_signal=None,
+):
+    if background_signal is not None:
+        background = np.asarray(background_signal, dtype=float)
+        if background.shape != x.shape or not np.all(np.isfinite(background)):
+            raise ValueError("background_signal must be a finite array matching wavelength_nm")
+        background_source = "explicit_fitted_background_signal"
     else:
-        mask = background_mask
-        background_source = "user_supplied_background_mask"
-    if np.count_nonzero(mask) < 3:
-        raise ValueError("background_mask must select at least three wavelength samples")
-    slope, intercept = np.polyfit(x[mask], y[mask], 1)
-    background = slope * x + intercept
+        if background_mask is None:
+            edge_width = float(background_fraction) * float(x[-1] - x[0])
+            mask = (x <= x[0] + edge_width) | (x >= x[-1] - edge_width)
+            background_source = "spectral_edges_assumed_background_by_wavelength_span"
+        else:
+            mask = background_mask
+            background_source = "user_supplied_background_mask"
+        if np.count_nonzero(mask) < 3:
+            raise ValueError("background_mask must select at least three wavelength samples")
+        slope, intercept = np.polyfit(x[mask], y[mask], 1)
+        background = slope * x + intercept
     corrected = y - background
     positive = np.maximum(corrected, 0.0)
     negative = np.minimum(corrected, 0.0)
@@ -102,6 +111,7 @@ def analyze_thomson_spectral_distribution(
     signal_uncertainty=None,
     background_fraction: float = 0.1,
     background_mask=None,
+    background_signal=None,
     moment_mc_samples: int = 200,
 ) -> dict:
     """Return signed spectral moments and instrument-aware Gaussian-fit diagnostics.
@@ -151,6 +161,13 @@ def analyze_thomson_spectral_distribution(
         if np.count_nonzero(raw_mask) < 3:
             raise ValueError("background_mask must select at least three samples")
         mask = raw_mask.astype(bool, copy=True)
+    explicit_background = None
+    if background_signal is not None:
+        if mask is not None:
+            raise ValueError("Supply background_signal or background_mask, not both.")
+        explicit_background = _vector(background_signal, "background_signal")
+        if explicit_background.size != x.size:
+            raise ValueError("background_signal must have the same length as wavelength_nm")
 
     uncertainty = None
     if signal_uncertainty is not None:
@@ -160,7 +177,7 @@ def analyze_thomson_spectral_distribution(
         if np.any(uncertainty <= 0):
             raise ValueError("signal_uncertainty must be strictly positive")
 
-    moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask)
+    moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
     weights = moments["positive"]
@@ -235,7 +252,7 @@ def analyze_thomson_spectral_distribution(
             if instrument_sigma_nm is not None and instrument_sigma_uncertainty_nm is not None and instrument_sigma_uncertainty_nm > 0:
                 sampled_sigma = max(np.finfo(float).tiny, float(rng.normal(instrument_sigma_nm, instrument_sigma_uncertainty_nm)))
             try:
-                sample = _moment_statistics(x, sampled_signal, sampled_sigma, background_fraction, mask)
+                sample = _moment_statistics(x, sampled_signal, sampled_sigma, background_fraction, mask, explicit_background)
                 draws.append(sample)
             except ValueError:
                 continue
