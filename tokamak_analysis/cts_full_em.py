@@ -251,6 +251,12 @@ def full_em_cts_spectral_density(
     else:
         if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
             raise ValueError("frequency_resolved_geometry must contain one traced geometry record per frequency bin")
+        if not isinstance(frequency_geometry[0], Mapping):
+            raise ValueError("frequency_resolved_geometry entries must be mappings")
+        if "frequency_shift_Hz" in scattering_geometry:
+            geometry_shifts = np.asarray(scattering_geometry["frequency_shift_Hz"], dtype=float)
+            if geometry_shifts.shape != shifts.shape or not np.allclose(geometry_shifts, shifts, rtol=1e-10, atol=1e-6):
+                raise ValueError("ray-traced geometry must use the same frequency_shift_Hz axis as the measured spectrum")
         ki_hat = _vec3(frequency_geometry[0].get("incident_direction"), "first frequency-resolved incident direction")
         ks_hat = _vec3(frequency_geometry[0].get("scattered_direction"), "first frequency-resolved scattered direction")
     b = np.asarray(magnetic_field_T, dtype=float)
