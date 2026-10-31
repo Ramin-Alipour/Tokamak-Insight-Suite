@@ -65,6 +65,7 @@ def test_collective_kappa_profile_uses_external_monte_carlo_covariance(monkeypat
         lambda radius, values, **kwargs: {
             "status": "captured",
             "covariance": kwargs.get("covariance"),
+            "uncertainty": kwargs.get("uncertainty"),
         },
     )
 
@@ -86,6 +87,12 @@ def test_collective_kappa_profile_uses_external_monte_carlo_covariance(monkeypat
         profiles["electron_density_m3"]["covariance"],
         expected_density_covariance,
     )
+    for name in ("electron_kappa_index", "electron_temperature_eV", "electron_density_m3"):
+        profile = profiles[name]
+        np.testing.assert_allclose(
+            np.asarray(profile["uncertainty"], dtype=float),
+            np.sqrt(np.maximum(np.diag(profile["covariance"]), 0.0)),
+        )
 
 
 def test_noncollective_kappa_profile_uses_joint_gls_covariance(monkeypatch):
