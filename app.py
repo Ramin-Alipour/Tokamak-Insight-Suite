@@ -822,9 +822,7 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True,key='spectral_analysis_workflow')
-    if mode=='Thomson spectral distribution':
-        mode='Thomson multi-channel spectral inference'
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True,key='spectral_analysis_workflow')
     if mode=='Thomson multi-channel spectral inference':
         st.caption('Primary Analysis 1: fit measured, calibrated multi-channel Thomson spectra and infer physical parameters. No detector calibration, data repair, or experimental validation is performed.')
         all_cols=[str(c) for c in df.columns]
@@ -840,7 +838,7 @@ elif page=='Spectral Analysis':
                 uncertainty_col=st.selectbox('Per-sample spectral 1σ uncertainty (optional)',['<none>']+numeric_cols,key='ts_infer_uncertainty')
             model=st.selectbox('Physical spectral model',[
                 'non_collective_maxwellian','non_collective_kappa',
-                'relativistic_maxwell_juttner','collective_maxwellian'
+                'collective_maxwellian'
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
             g1,g2,g3=st.columns(3)
             with g1:
