@@ -60,7 +60,7 @@
         {
           "name": "model",
           "unit": "non_collective_maxwellian, non_collective_kappa, non_collective_relativistic_maxwell_juttner, collective_maxwellian or collective_kappa",
-          "required": false
+          "required": true
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
@@ -4277,7 +4277,7 @@
         {
           "name": "model",
           "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
-          "required": false,
+          "required": true,
           "default": "electrostatic"
         },
         {
@@ -5186,7 +5186,7 @@
         {
           "name": "model",
           "unit": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian",
-          "required": false
+          "required": true
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
