@@ -2983,7 +2983,7 @@
           "name": "relative_input_covariance",
           "unit": "6x6 relative covariance matrix",
           "required": false,
-          "description": "Optional 6x6 relative covariance of scattered power, incident power, interaction length, collection solid angle, optical efficiency and effective differential cross-section. For relativistic Maxwell-Jüttner, the final factor is the velocity-averaged cross-section; fitted power/cross-section covariance is added internally. Mutually exclusive with scalar optical-factor uncertainties."
+          "description": "Optional external 6x6 relative covariance of scattered power, incident power, interaction length, collection solid angle, optical efficiency and effective differential cross-section. For relativistic Maxwell-Juttner, the final factor is the velocity-averaged cross-section; fitted parameter uncertainty and fitted power/cross-section covariance are added internally and must not be duplicated."
         },
         {
           "name": "effective_differential_cross_section_m2_sr",
