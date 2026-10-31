@@ -51,7 +51,7 @@ def _positive(value, name):
 def _hermitian_psd(matrix, name, tolerance=1e-9):
     h = 0.5 * (matrix + matrix.conj().T)
     eigenvalues = np.linalg.eigvalsh(h)
-    scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
     if float(np.min(eigenvalues)) < -tolerance * scale:
         raise ValueError(f"{name} is not positive semidefinite")
     if np.min(eigenvalues) < 0:
@@ -127,7 +127,6 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
     xperp, wperp = roots_laguerre(int(quadrature_order))
     xpar, wpar = roots_hermite(int(quadrature_order))
     sigma = np.zeros((3, 3), dtype=complex)
-    eye = np.eye(nh, dtype=complex)
     coupling = np.zeros((nh, nh), dtype=complex)
     for j in range(nh - 1):
         coupling[j, j + 1] = 0.5
@@ -160,38 +159,6 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
             sigma += charge * measure * np.vstack((jx, jy, jz))
     # Transform the conductivity from the B-aligned frame to laboratory axes.
     return rotation @ sigma @ rotation.T
-
-
-def _cold_mode_polarization(frequency_Hz, direction, magnetic_field_T,
-                            species, mode_index):
-    """Cold-plasma eigenpolarization for incident/scattered high-frequency modes."""
-    omega = 2.0 * np.pi * frequency_Hz
-    b_hat = np.asarray(magnetic_field_T, dtype=float)
-    b_hat /= np.linalg.norm(b_hat)
-    # Cold dielectric tensor is used only for the high-frequency probe modes.
-    eps = np.eye(3, dtype=complex)
-    cross_b = np.array([[0, -b_hat[2], b_hat[1]],
-                        [b_hat[2], 0, -b_hat[0]],
-                        [-b_hat[1], b_hat[0], 0]], dtype=complex)
-    for sp in species:
-        wp2 = sp["density"] * sp["charge"] ** 2 / (EPS0 * sp["mass"])
-        wc = sp["charge"] * np.linalg.norm(magnetic_field_T) / sp["mass"]
-        eps -= wp2 / (omega * (omega + 1j * 1e-12)) * (
-            np.eye(3) + 1j * wc / (omega + 1j * 1e-12) * cross_b
-        )
-    khat = _vec3(direction, "beam direction")
-    n2 = (C * 2.0 * np.pi * frequency_Hz / C) ** 2 / omega ** 2
-    wave = eps + n2 * (np.outer(khat, khat) - np.eye(3))
-    _, vectors = np.linalg.eig(wave)
-    transverse = vectors[:, np.argsort(np.abs(np.linalg.eigvals(wave)))[:2]]
-    if mode_index not in (0, 1):
-        raise ValueError("polarization mode index must be 0 or 1")
-    p = transverse[:, mode_index]
-    p = p - khat * np.dot(khat, p)
-    norm = np.linalg.norm(p)
-    if norm <= 1e-12:
-        raise ValueError("selected cold-plasma mode is not transverse to its beam direction")
-    return p / norm
 
 
 def full_em_cts_spectral_density(
