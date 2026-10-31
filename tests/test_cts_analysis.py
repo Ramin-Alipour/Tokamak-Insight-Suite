@@ -451,3 +451,31 @@ def test_full_em_cts_accepts_relativistic_anisotropic_fast_ion_population():
     assert len(result["fast_ion_populations"])==1
     assert result["spectral_density"].shape==(2,)
     assert np.all(np.isfinite(result["spectral_density"]))
+
+
+def test_bindslev_dielectric_form_factors_are_hermitian_and_flux_normalized():
+    from tokamak_analysis.cts_bindslev import (
+        bindslev_source_current_operator, bindslev_dielectric_form_factors,
+    )
+    from tokamak_analysis.cts_em_geometry import cold_plasma_dielectric_tensor
+
+    wi=2*np.pi*140e9; ws=2*np.pi*141e9; b=np.array([0.0,0.0,2.0]); ne=2e19
+    ions=[{"density_m3":ne,"charge_C":-1.602176634e-19,"mass_kg":9.1093837015e-31}]
+    chi_i=cold_plasma_dielectric_tensor(wi,b,ions)-np.eye(3)
+    chi_s=cold_plasma_dielectric_tensor(ws,b,ions)-np.eye(3)
+    ki=np.array([wi/299792458.0,0.0,0.0])
+    ks=np.array([0.0,ws/299792458.0,0.0])
+    ei=np.array([0.0,0.0,1.0],complex)
+    es=np.array([0.0,0.0,1.0],complex)
+    op=bindslev_source_current_operator(
+        omega_incident_rad_s=wi,omega_scattered_rad_s=ws,
+        wavevector_incident_rad_m=ki,wavevector_scattered_rad_m=ks,
+        incident_electric_field=ei,incident_susceptibility=chi_i,
+        scattered_susceptibility=chi_s,magnetic_field_T=b,electron_density_m3=ne,
+    )["source_current_operator"]
+    result=bindslev_dielectric_form_factors(op,ei,es,ki,ks,wi,ws,ne)
+    G=result["G_alpha_beta"]
+    assert G.shape==(10,10)
+    np.testing.assert_allclose(G,G.conj().T,rtol=1e-10,atol=1e-20)
+    assert result["normalized_incident_flux_S_i"]>0
+    assert result["normalized_scattered_flux_S_s"]>0
