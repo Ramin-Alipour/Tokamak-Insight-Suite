@@ -56,7 +56,7 @@
           "name": "joint_spectral_covariance",
           "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
           "required": false,
-          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit."
+          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit. May be combined with density_relative_covariance or joint_density_relative_covariance when the scattered-power rows/columns of the optical covariance are zero."
         },
         {
           "name": "model",
@@ -79,7 +79,8 @@
         {
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Non-negative 2-D common response-matrix uncertainty (same instrument realization across all channels) or 3-D channel-specific uncertainty. Propagated by Monte Carlo; may be combined with density covariance when its scattered-power rows/columns are zero."
         },
         {
           "name": "instrument_response_mc_samples",
@@ -164,13 +165,13 @@
           "name": "density_relative_covariance",
           "unit": "6x6 relative covariance",
           "required": false,
-          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. Mutually exclusive with scalar optical uncertainties and joint_spectral_covariance."
+          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when its scattered-power row/column is zero; measured-power uncertainty is then supplied by the spectral/response propagation. Other duplicate scalar optical uncertainties remain prohibited."
         },
         {
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when all scattered-power rows/columns are zero; otherwise those sources would be double-counted. Mutually exclusive with density_relative_covariance and scalar optical-factor uncertainties."
         },
         {
           "name": "incident_direction_uncertainty",
