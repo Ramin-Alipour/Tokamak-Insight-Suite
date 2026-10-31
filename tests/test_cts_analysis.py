@@ -777,3 +777,38 @@ def test_full_em_bindslev_closure_enforces_researcher_supplied_theta_limit():
             scattered_polarization=[0.0, 0.0, 1.0],
             bindslev_validity_theta_e_limit=0.001,
         )
+
+
+def test_cts_full_em_dispatcher_maps_public_spectrum_keyword(monkeypatch):
+    from tokamak_analysis import cts_analysis
+
+    captured = {}
+
+    def fake_full_em(**kwargs):
+        captured.update(kwargs)
+        return {"received": True}
+
+    monkeypatch.setattr(cts_analysis, "analyze_full_em_cts_spectrum", fake_full_em)
+    result = cts_analysis.analyze_cts_spectrum_model(
+        model="full_electromagnetic",
+        frequency_shift_Hz=np.array([-1.0, 1.0]),
+        spectrum=np.array([2.0, 3.0]),
+    )
+    assert result == {"received": True}
+    assert "spectrum" not in captured
+    np.testing.assert_array_equal(captured["measured_spectrum"], [2.0, 3.0])
+
+
+def test_cts_full_em_dispatcher_rejects_duplicate_spectrum_keywords(monkeypatch):
+    from tokamak_analysis import cts_analysis
+
+    monkeypatch.setattr(
+        cts_analysis, "analyze_full_em_cts_spectrum",
+        lambda **kwargs: kwargs,
+    )
+    with pytest.raises(ValueError, match="Supply the calibrated CTS spectrum once"):
+        cts_analysis.analyze_cts_spectrum_model(
+            model="full_electromagnetic",
+            spectrum=[1.0, 2.0],
+            measured_spectrum=[1.0, 2.0],
+        )
