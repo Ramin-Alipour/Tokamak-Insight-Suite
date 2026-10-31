@@ -18,7 +18,7 @@ def test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite():
     assert spectrum.shape == wavelength.shape
     assert np.all(np.isfinite(spectrum))
     assert np.all(spectrum >= 0)
-    np.testing.assert_allclose(np.trapz(spectrum, wavelength), 1.0, rtol=2e-3)
+    np.testing.assert_allclose(np.trapezoid(spectrum, wavelength), 1.0, rtol=2e-3)
     assert result["captured_probability"] >= 0.995
     assert result["relativistic_kinematics"] is True
     assert result["recoil_included"] is False
