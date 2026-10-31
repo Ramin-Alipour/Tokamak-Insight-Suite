@@ -65,7 +65,7 @@ def test_cli_catalog_status_reports_canonical_completeness_counts(tmp_path, monk
     assert report["callable_analysis_entry_point_count"] == 80
     assert report["diagnostic_completeness_counts"] == {
         "complete": 6,
-        "complete_with_declared_scope": 11,
+        "complete_with_declared_scope": 12,
         "incomplete": 62,
     }
     first_ten = report["first_ten_diagnostics"]
