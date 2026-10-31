@@ -326,13 +326,3 @@ def analyze_thomson_spectral_distribution(
             "Uncertainty estimates are Monte Carlo sampling uncertainties under the supplied pointwise noise model; shared systematic and correlated wavelength-bin errors are not included",
         ],
     }
-
-
-
-def analyze_thomson_spectral_distribution_inference(*args, **kwargs):
-    """Registered physical-inference workflow; moments remain supplementary only."""
-    from .thomson_inference import analyze_thomson_spectra
-    result = analyze_thomson_spectra(*args, **kwargs)
-    result["registered_subanalysis"] = "Thomson spectral distribution physical inference"
-    result["spectral_shape_moments_are_not_a_velocity_distribution"] = True
-    return result
