@@ -1,11 +1,11 @@
 """Relativistic gyrotropic kinetic response and three-wave CTS coupling.
 
 This module solves the relativistic Vlasov equation in momentum/gyrophase
-space for explicitly supplied anisotropic bi-Gaussian or tabulated gyrotropic
-electron/ion populations. It provides the linear conductivity, Klimontovich
-particle shot-noise covariance, and a second-order relativistic Vlasov
-three-wave current vertex. The equilibrium VDF is supplied by the caller;
-no distribution is silently inferred or reconstructed.
+space for explicitly supplied Maxwell-Juttner, anisotropic bi-Gaussian or
+tabulated gyrotropic electron/ion populations. It provides the linear
+conductivity, Klimontovich particle shot-noise covariance, and a second-order
+relativistic Vlasov three-wave current vertex. The equilibrium VDF is supplied
+by the caller; no distribution is silently inferred or reconstructed.
 """
 from __future__ import annotations
 
