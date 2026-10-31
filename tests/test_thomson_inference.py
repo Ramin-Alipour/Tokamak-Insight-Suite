@@ -1,7 +1,13 @@
 import numpy as np
 import pytest
 
-from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+from tokamak_analysis.thomson_inference import analyze_thomson_spectra as _analyze_thomson_spectra
+
+
+def analyze_thomson_spectra(*args, **kwargs):
+    """Keep legacy test fixtures explicit while testing the production API separately."""
+    kwargs.setdefault("model", "non_collective_maxwellian")
+    return _analyze_thomson_spectra(*args, **kwargs)
 
 
 def _spectral_case(te_ev, center_nm=532.0, laser_nm=532.0, angle=np.pi/2, n=801):
@@ -863,3 +869,13 @@ def test_thomson_spatial_subanalysis_reconstructs_all_identifiable_spectral_prof
     assert reconstructed["methods"]["pchip"]["status"] == "completed"
     assert reconstructed["methods"]["pchip"]["values"].shape == (41,)
     assert reconstructed["methods"]["smoothing_spline"]["status"] == "insufficient_spatial_channels"
+
+
+
+def test_physical_model_must_be_selected_explicitly():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="Select a Thomson physical model explicitly"):
+        _analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        )
