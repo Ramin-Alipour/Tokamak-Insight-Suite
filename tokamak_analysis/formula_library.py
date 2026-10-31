@@ -888,3 +888,14 @@ def thomson_density_from_scattered_power(*args, **kwargs):
     """Expose the shared polarization-aware absolute Thomson-density inversion."""
     from .thomson_scattering import density_from_thomson_scattered_power
     return density_from_thomson_scattered_power(*args, **kwargs)
+
+
+def relativistic_mj_effective_differential_cross_section(*args, **kwargs):
+    """Return the distribution-averaged polarized Thomson cross-section [m^2 sr^-1].
+
+    Arguments follow relativistic_maxwell_juttner_spectrum. The incident
+    polarization vector is expressed in the scattering-local coordinate frame.
+    """
+    from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+    result = relativistic_maxwell_juttner_spectrum(*args, **kwargs)
+    return float(result["effective_differential_cross_section_m2_sr"])
