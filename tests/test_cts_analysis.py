@@ -868,3 +868,33 @@ def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(ar
         kwargs["spectral_covariance"] = bad_value
     with pytest.raises(ValueError, match="real numeric"):
         analyze_full_em_cts_spectrum(frequency, spectrum, **kwargs)
+
+
+def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
+    from tokamak_analysis.cts_analysis import _convolve
+
+    frequency = np.array([-5.0, -3.0, 0.0, 4.0, 9.0, 15.0, 22.0, 30.0])
+    edges = np.empty(frequency.size+1)
+    edges[1:-1] = 0.5*(frequency[:-1]+frequency[1:])
+    edges[0] = frequency[0]-0.5*(frequency[1]-frequency[0])
+    edges[-1] = frequency[-1]+0.5*(frequency[-1]-frequency[-2])
+    widths = np.diff(edges)
+    spectrum = np.array([0.1, 0.4, 1.0, 1.8, 1.4, 0.7, 0.3, 0.1])
+    response = 0.85*np.eye(frequency.size) + 0.15*np.roll(np.eye(frequency.size), 1, axis=0)
+    convolved = _convolve(response, spectrum, frequency)
+    assert np.sum(convolved*widths) == pytest.approx(np.sum(spectrum*widths), rel=1e-12)
+
+
+def test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins():
+    from tokamak_analysis.cts_full_em import _apply_frequency_response
+
+    frequency = np.array([-5.0, -3.0, 0.0, 4.0, 9.0, 15.0, 22.0, 30.0])
+    edges = np.empty(frequency.size+1)
+    edges[1:-1] = 0.5*(frequency[:-1]+frequency[1:])
+    edges[0] = frequency[0]-0.5*(frequency[1]-frequency[0])
+    edges[-1] = frequency[-1]+0.5*(frequency[-1]-frequency[-2])
+    widths = np.diff(edges)
+    spectrum = np.array([0.1, 0.4, 1.0, 1.8, 1.4, 0.7, 0.3, 0.1])
+    response = 0.85*np.eye(frequency.size) + 0.15*np.roll(np.eye(frequency.size), 1, axis=0)
+    convolved = _apply_frequency_response(response, spectrum, frequency)
+    assert np.sum(convolved*widths) == pytest.approx(np.sum(spectrum*widths), rel=1e-12)
