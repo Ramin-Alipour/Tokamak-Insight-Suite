@@ -482,7 +482,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[3]),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
       "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if (unc is not None or spectral_covariance is not None) else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
-      "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"jacobian_rank":rank,"jacobian_condition_number":cond,
+      "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"regularization_scope":"fast-ion VDF smoothness only; no plasma-parameter prior","jacobian_rank":rank,"jacobian_condition_number":cond,
       "degrees_of_freedom":int(dof),"scattering_wave_number_m-1":q,"scattering_wavevector_direction":qhat,
       "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
