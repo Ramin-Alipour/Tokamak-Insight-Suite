@@ -8,7 +8,7 @@
       "id": 1,
       "name": "Thomson Scattering",
       "category": "physical_diagnostic",
-      "description": "Navigation family for measured optical Thomson inference, microwave CTS inference and downstream ne/Te radial-profile utilities. The descriptive spectral-moment function remains an unregistered supplementary utility; the retired duplicate physical-inference wrapper is not a separate workflow.",
+      "description": "Navigation family for measured, calibrated optical Thomson physical inference, microwave CTS physical inference, per-channel spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. Legacy ne/Te profile-point utilities remain downstream compatibility helpers.",
       "entry_ids": [
         1,
         30,
