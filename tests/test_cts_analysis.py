@@ -309,7 +309,7 @@ def test_cts_cold_plasma_ray_trace_is_straight_in_vacuum():
     )
     assert result["position_m"].shape == (8, 3)
     assert np.all(np.isfinite(result["wavevector_rad_m"]))
-    np.testing.assert_allclose(result["wavevector_rad_m"], k0, rtol=1e-7, atol=1e-7)
+    np.testing.assert_allclose(result["wavevector_rad_m"], np.broadcast_to(k0, result["wavevector_rad_m"].shape), rtol=1e-7, atol=1e-7)
 
 
 def test_cts_cold_plasma_vacuum_propagating_mode_is_flux_normalized():
