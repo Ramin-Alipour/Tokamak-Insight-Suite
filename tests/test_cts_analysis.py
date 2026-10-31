@@ -184,7 +184,7 @@ def test_cts_regularized_tabulated_vdf_inversion_reconstructs_nonnegative_normal
     )
     pdf=out["fast_ion_vdf_probability_density_m_s_inverse"]
     assert np.all(pdf>=0)
-    assert np.trapz(pdf,velocity)==pytest.approx(1.0,rel=1e-6)
+    assert np.trapezoid(pdf,velocity)==pytest.approx(1.0,rel=1e-6)
     assert out["fast_ion_vdf_covariance"].shape==(velocity.size,velocity.size)
     assert out["fast_ion_vdf_uncertainty_m_s_inverse"].shape==velocity.shape
     assert "fast_ion_vdf_logit_0" in out["parameter_names"]
