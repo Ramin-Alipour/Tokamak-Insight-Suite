@@ -912,20 +912,12 @@ elif page=='Spectral Analysis':
             g1,g2,g3=st.columns(3)
             with g1:
                 laser_nm_text=st.text_input('Laser wavelength (nm; required)',value='',key='ts_infer_laser')
-                if model=='non_collective_relativistic_maxwell_juttner':
-                    laser_unc_text=None
-                    st.caption('Laser-wavelength uncertainty is not yet propagated by the relativistic Maxwell-Juttner fit.')
-                else:
-                    use_laser_unc=st.checkbox('Supply laser-wavelength uncertainty',value=False,key='ts_infer_use_laser_unc')
-                    laser_unc_text=st.text_input('Laser wavelength 1σ uncertainty (nm)',value='',key='ts_infer_laser_unc') if use_laser_unc else None
+                use_laser_unc=st.checkbox('Supply laser-wavelength uncertainty',value=False,key='ts_infer_use_laser_unc')
+                laser_unc_text=st.text_input('Laser wavelength 1σ uncertainty (nm)',value='',key='ts_infer_laser_unc') if use_laser_unc else None
             with g2:
                 angle_rad_text=st.text_input('Scattering angle (rad; required)',value='',key='ts_infer_angle')
-                if model=='non_collective_relativistic_maxwell_juttner':
-                    angle_unc_text=None
-                    st.caption('Scattering-angle uncertainty is not yet propagated by the relativistic Maxwell-Juttner fit.')
-                else:
-                    use_angle_unc=st.checkbox('Supply scattering-angle uncertainty',value=False,key='ts_infer_use_angle_unc')
-                    angle_unc_text=st.text_input('Scattering angle 1σ uncertainty (rad)',value='',key='ts_infer_angle_unc') if use_angle_unc else None
+                use_angle_unc=st.checkbox('Supply scattering-angle uncertainty',value=False,key='ts_infer_use_angle_unc')
+                angle_unc_text=st.text_input('Scattering angle 1σ uncertainty (rad)',value='',key='ts_infer_angle_unc') if use_angle_unc else None
             with g3:
                 response_upload=st.file_uploader('Measured shared instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
                 response_channel_upload=st.file_uploader('Alternative: channel-specific measured response matrices JSON (Nchannel × Nλ × Nλ)',type=['json'],key='ts_infer_channel_response')
@@ -940,15 +932,21 @@ elif page=='Spectral Analysis':
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
             relativistic_polarization_text=None
+            relativistic_incident_direction_unc_text=None
+            relativistic_scattered_direction_unc_text=None
+            relativistic_polarization_unc_text=None
             if model=='non_collective_relativistic_maxwell_juttner':
-                st.markdown('**Relativistic Thomson geometry**')
+                st.markdown('**Relativistic Thomson geometry and uncertainty**')
                 rg1,rg2=st.columns(2)
                 with rg1:
                     relativistic_incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_rel_incident_direction')
+                    relativistic_incident_direction_unc_text=st.text_input('Incident-direction component 1σ uncertainties (x,y,z; optional)',key='ts_infer_rel_incident_direction_unc')
                 with rg2:
                     relativistic_scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_rel_scattered_direction')
+                    relativistic_scattered_direction_unc_text=st.text_input('Scattered-direction component 1σ uncertainties (x,y,z; optional)',key='ts_infer_rel_scattered_direction_unc')
                 relativistic_polarization_text=st.text_input('Incident polarization vector (x,y,z)',key='ts_infer_rel_incident_polarization')
-                st.caption('The relativistic model uses exact photon-frequency kinematics, the measured incident polarization, and assumes bulk electron flow parallel to the scattering vector.')
+                relativistic_polarization_unc_text=st.text_input('Incident-polarization component 1σ uncertainties (x,y,z; optional)',key='ts_infer_rel_incident_polarization_unc')
+                st.caption('The relativistic fit now Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
             absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
             density_kwargs={}
             density_covariance_upload=None
@@ -1072,6 +1070,15 @@ elif page=='Spectral Analysis':
                             'scattered_direction':_parse_ts_vector(relativistic_scattered_direction_text,'Scattered direction'),
                             'incident_polarization':_parse_ts_vector(relativistic_polarization_text,'Incident polarization'),
                         })
+                        if relativistic_incident_direction_unc_text.strip():
+                            kwargs['incident_direction_uncertainty']=_parse_ts_vector(
+                                relativistic_incident_direction_unc_text,'Incident-direction component uncertainties')
+                        if relativistic_scattered_direction_unc_text.strip():
+                            kwargs['scattered_direction_uncertainty']=_parse_ts_vector(
+                                relativistic_scattered_direction_unc_text,'Scattered-direction component uncertainties')
+                        if relativistic_polarization_unc_text.strip():
+                            kwargs['incident_polarization_uncertainty']=_parse_ts_vector(
+                                relativistic_polarization_unc_text,'Incident-polarization component uncertainties')
                     if absolute_density:
                         kwargs.update({
                             'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
