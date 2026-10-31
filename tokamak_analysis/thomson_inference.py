@@ -1418,12 +1418,12 @@ def analyze_thomson_spectra(
                 if model == "collective_maxwellian" else
                 ["Collective kappa inference uses the implemented unmagnetized longitudinal dielectric response with projected isotropic kappa electrons and Maxwellian ions; supplied external-input and response-matrix 1-sigma uncertainties are propagated by Monte Carlo, but cross-correlations among distinct external inputs and full channel-major GLS are not implemented."]
                 if model == "collective_kappa" else
-                ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector; external geometry and response-matrix uncertainty propagation is not yet complete."]
+                ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector; supplied response-matrix uncertainty is propagated by Monte Carlo, but laser/angle/beam-direction and incident-polarization uncertainty propagation is not yet complete."]
                 if model == "non_collective_relativistic_maxwell_juttner" else
                 []
             ),
             "Absolute non-collective density requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the researcher.",
-            "For non-collective Maxwellian/Kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied optical-factor uncertainty terms and excludes unprovided correlations and model discrepancy.",
+            "For non-collective Maxwellian/Kappa/relativistic fits, supplied response-matrix uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied optical-factor uncertainty terms and excludes unprovided correlations and model discrepancy.",
         ],
     }
     if model in collective_models and any(v is not None for v in (
