@@ -11,7 +11,7 @@ def test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite():
     wavelength = np.linspace(800.0, 1328.0, 801)
     result = relativistic_maxwell_juttner_spectrum(
         wavelength, 1064.0, np.pi/2.0, 500.0,
-        flow_projection_m_s=2.0e4,
+        flow_projection_m_s=1.0e6,
         radial_order=16, angular_order=8,
     )
     spectrum = result["spectral_density_per_nm"]
@@ -78,6 +78,6 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
         radial_order=16, angular_order=8,
     )
     assert result["electron_temperature_eV"] == pytest.approx(500.0, rel=0.15)
-    assert result["electron_velocity_projection_m_s"] == pytest.approx(2.0e4, abs=2.0e4)
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(1.0e6, abs=2.0e5)
     assert result["relativistic_kinematics"] is True
     assert result["fit_covariance"].shape == (5, 5)
