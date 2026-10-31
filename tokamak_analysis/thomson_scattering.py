@@ -86,7 +86,7 @@ def density_from_thomson_scattered_power(
     scattering_angle_rad,
     collection_solid_angle_sr,
     *,
-    optical_efficiency=1.0,
+    optical_efficiency=None,
     scattered_power_uncertainty_W=None,
     incident_power_uncertainty_W=None,
     interaction_length_uncertainty_m=None,
@@ -111,6 +111,10 @@ def density_from_thomson_scattered_power(
     if theta > np.pi:
         raise ValueError("scattering_angle_rad must lie between 0 and pi")
     omega = _positive_finite_scalar(collection_solid_angle_sr, "collection_solid_angle_sr")
+    if optical_efficiency is None:
+        raise ValueError(
+            "optical_efficiency must be supplied explicitly; perfect collection efficiency is not assumed"
+        )
     eta = _positive_finite_scalar(optical_efficiency, "optical_efficiency")
     if eta > 1.0:
         raise ValueError("optical_efficiency must not exceed 1")
