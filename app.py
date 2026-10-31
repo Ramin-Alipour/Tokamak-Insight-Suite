@@ -3044,13 +3044,85 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Microwave CTS spectral inversion (frequency-domain)','Thomson spatial profile reconstruction from calibrated spectra','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Thomson spectral distribution (independent)','Microwave CTS spectral inversion (frequency-domain)','Thomson spatial profile reconstruction from calibrated spectra','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson multi-channel spectral inference (canonical Analysis 1)':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
+    elif workflow=='Thomson spectral distribution (independent)':
+        st.caption('Independent model-free analysis of one measured, calibrated Thomson spectrum. This workflow does not depend on a successful Maxwellian, Kappa or relativistic physical fit.')
+        if df is None or len(numeric)<2:
+            st.info('Load a table with calibrated wavelength and spectral-intensity columns.')
+        else:
+            from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+            td1,td2=st.columns(2)
+            with td1:
+                td_wavelength_col=col_select('Calibrated wavelength (nm)',numeric,'ts_distribution_wavelength')
+                td_signal_col=col_select('Calibrated measured spectral intensity',[c for c in numeric if c!=td_wavelength_col] or numeric,'ts_distribution_signal')
+                td_uncertainty_col=st.selectbox('Optional pointwise spectral 1σ uncertainty',['<none>']+[c for c in numeric if c not in {td_wavelength_col,td_signal_col}],key='ts_distribution_uncertainty')
+            with td2:
+                td_response_upload=st.file_uploader('Measured instrument-response matrix CSV (optional)',type=['csv','txt'],key='ts_distribution_response')
+                td_instrument_sigma=st.text_input('Measured Gaussian instrument σ (nm; use only if no response matrix)',value='',key='ts_distribution_instrument_sigma')
+                td_covariance_upload=st.file_uploader('Optional full within-spectrum covariance CSV',type=['csv','txt'],key='ts_distribution_covariance')
+            td_background_mode=st.selectbox(
+                'Background definition',
+                ['Measured background spectrum column','Explicit background mask column','Explicit spectral-edge fraction'],
+                index=None,placeholder='Select the background definition explicitly',
+                key='ts_distribution_background_mode',
+            )
+            td_background_signal_col=None
+            td_background_mask_col=None
+            td_background_fraction_text=''
+            if td_background_mode=='Measured background spectrum column':
+                td_background_signal_col=col_select('Measured/fitted background spectrum column',[c for c in numeric if c not in {td_wavelength_col,td_signal_col}], 'ts_distribution_background_signal')
+            elif td_background_mode=='Explicit background mask column':
+                td_background_mask_col=st.selectbox('Background mask column (values must be 0/1)',[c for c in df.columns if c not in {td_wavelength_col,td_signal_col}],index=None,placeholder='Select mask column',key='ts_distribution_background_mask')
+            elif td_background_mode=='Explicit spectral-edge fraction':
+                td_background_fraction_text=st.text_input('Fraction of wavelength span at each edge (0.02–0.4)',value='',key='ts_distribution_background_fraction')
+            td_mc_samples=st.number_input('Monte-Carlo samples for moment/fit uncertainty',min_value=20,max_value=10000,value=200,step=20,key='ts_distribution_mc_samples')
+            if st.button('Run independent Thomson spectral-distribution analysis',type='primary',key='run_ts_distribution_independent'):
+                try:
+                    if td_background_mode is None:
+                        raise ValueError('Select an explicit background definition; no spectral-edge background is assumed.')
+                    if td_wavelength_col==td_signal_col:
+                        raise ValueError('Wavelength and spectral intensity must use distinct columns.')
+                    td_x=pd.to_numeric(df[td_wavelength_col],errors='coerce').to_numpy(dtype=float)
+                    td_y=pd.to_numeric(df[td_signal_col],errors='coerce').to_numpy(dtype=float)
+                    if not np.all(np.isfinite(td_x)) or not np.all(np.isfinite(td_y)):
+                        raise ValueError('Wavelength and measured spectral intensity must be finite; source rows are not dropped or repaired.')
+                    td_response=None if td_response_upload is None else pd.read_csv(td_response_upload,header=None).to_numpy(dtype=float)
+                    td_sigma=_parse_ts_optional_scalar(td_instrument_sigma,'Measured Gaussian instrument sigma')
+                    if (td_response is None)==(td_sigma is None):
+                        raise ValueError('Provide exactly one measured instrument-response matrix or measured Gaussian instrument sigma.')
+                    td_unc=None if td_uncertainty_col=='<none>' else pd.to_numeric(df[td_uncertainty_col],errors='coerce').to_numpy(dtype=float)
+                    td_cov=None if td_covariance_upload is None else pd.read_csv(td_covariance_upload,header=None).to_numpy(dtype=float)
+                    td_kwargs={'instrument_sigma_nm':td_sigma,'instrument_response_matrix':td_response,
+                               'signal_uncertainty':td_unc,'signal_covariance':td_cov,
+                               'moment_mc_samples':int(td_mc_samples)}
+                    if td_background_mode=='Measured background spectrum column':
+                        if td_background_signal_col is None:
+                            raise ValueError('Select the measured/fitted background spectrum column.')
+                        td_kwargs['background_signal']=pd.to_numeric(df[td_background_signal_col],errors='coerce').to_numpy(dtype=float)
+                    elif td_background_mode=='Explicit background mask column':
+                        if td_background_mask_col is None:
+                            raise ValueError('Select the explicit background mask column.')
+                        mask_values=pd.to_numeric(df[td_background_mask_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(mask_values)) or not np.all(np.isin(mask_values,[0.0,1.0])):
+                            raise ValueError('The selected background mask column must contain only finite 0/1 values.')
+                        td_kwargs['background_mask']=mask_values.astype(bool)
+                    else:
+                        td_kwargs['background_fraction']=_parse_ts_scalar(
+                            td_background_fraction_text,'Explicit background fraction',minimum=0.02,maximum=0.4)
+                    result_distribution=analyze_thomson_spectral_distribution(td_x,td_y,**td_kwargs)
+                    st.success('Independent Thomson spectral-distribution analysis completed.')
+                    st.json(result_distribution)
+                    json_download('Export independent Thomson spectral-distribution diagnostics',result_distribution,'tis_thomson_spectral_distribution.json')
+                    add_report_section('Independent Thomson spectral-distribution analysis',result_distribution)
+                except Exception as exc:
+                    st.error(f'Independent Thomson spectral-distribution analysis failed: {exc}')
+
     elif workflow=='Microwave CTS spectral inversion (frequency-domain)':
         st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
