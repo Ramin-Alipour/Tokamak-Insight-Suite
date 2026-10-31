@@ -19,6 +19,7 @@ ME = 9.1093837015e-31
 AMU = 1.66053906660e-27
 C = 299792458.0
 E_REST_EV = 510998.95069
+ELECTRON_CLASSICAL_RADIUS_M = 2.8179403262e-15
 _LANDAU_NODES, _LANDAU_WEIGHTS = leggauss(192)
 
 
@@ -190,10 +191,13 @@ def relativistic_maxwell_juttner_spectrum(
         wu[:, None, None]*u[:, None, None]**2
         * np.exp(-(GAMMA_REST-1.0)/theta)
     )
-    quadrature_weight = (
+    distribution_quadrature_weight = (
         radial_weight*wmu[None, :, None]*(2.0*np.pi/nphi)
-        * differential_weight
     )
+    distribution_normalization = float(np.sum(distribution_quadrature_weight))
+    if not np.isfinite(distribution_normalization) or distribution_normalization <= 0.0:
+        raise ValueError("Maxwell-Juttner momentum quadrature has a non-positive normalization")
+    quadrature_weight = distribution_quadrature_weight * differential_weight
 
     edges = np.empty(x.size+1, dtype=float)
     edges[1:-1] = 0.5*(x[:-1]+x[1:])
@@ -208,6 +212,11 @@ def relativistic_maxwell_juttner_spectrum(
     sampled_wavelength = lambda_scattered.ravel()
     sampled_weight = quadrature_weight.ravel()
     total_weight = float(np.sum(sampled_weight))
+    if not np.isfinite(total_weight) or total_weight <= 0.0:
+        raise ValueError("Relativistic Thomson quadrature has a non-positive integrated scattering weight")
+    effective_differential_cross_section = (
+        ELECTRON_CLASSICAL_RADIUS_M**2 * total_weight / distribution_normalization
+    )
     inside = (
         (sampled_wavelength >= edges[0])
         & (sampled_wavelength <= edges[-1])
@@ -250,6 +259,7 @@ def relativistic_maxwell_juttner_spectrum(
     return {
         "spectral_density_per_nm": density,
         "integrated_probability": 1.0,
+        "effective_differential_cross_section_m2_sr": float(effective_differential_cross_section),
         "fitted_centroid_nm": centroid,
         "spectral_rms_width_nm": float(np.sqrt(max(variance, 0.0))),
         "captured_probability": captured,
@@ -401,6 +411,31 @@ def fit_relativistic_maxwell_juttner(
     amplitude_scaled = float(np.exp(np.clip(fit.x[2], -700.0, 700.0)))
     transform = np.diag([te, C*(1.0-beta_flow*beta_flow), amplitude_scaled*scale, scale, scale])
     covariance_physical = transform@covariance_fit@transform.T
+    cross_section_gradient = np.zeros(2, dtype=float)
+    def effective_cross_section(parameters):
+        sampled_te = float(np.exp(np.clip(parameters[0], -700.0, 700.0)))
+        sampled_flow = float(np.tanh(parameters[1]) * C)
+        return relativistic_maxwell_juttner_spectrum(
+            x, laser_wavelength_nm, scattering_angle_rad, sampled_te,
+            flow_projection_m_s=sampled_flow,
+            incident_polarization=polarization_local,
+            radial_order=radial_order, angular_order=angular_order,
+            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            require_full_spectrum=False,
+        )["effective_differential_cross_section_m2_sr"]
+    for parameter_index in range(2):
+        step = np.cbrt(np.finfo(float).eps) * max(abs(float(fit.x[parameter_index])), 1.0)
+        plus = np.asarray(fit.x, dtype=float).copy()
+        minus = np.asarray(fit.x, dtype=float).copy()
+        plus[parameter_index] += step
+        minus[parameter_index] -= step
+        cross_section_gradient[parameter_index] = (
+            effective_cross_section(plus)-effective_cross_section(minus)
+        )/(2.0*step)
+    cross_section_variance = float(
+        cross_section_gradient @ covariance_fit[:2, :2] @ cross_section_gradient
+    )
+    cross_section_uncertainty = float(np.sqrt(max(cross_section_variance, 0.0)))
     amplitude = amplitude_scaled*scale
     offset = float(fit.x[3]*scale)
     slope = float(fit.x[4]*scale)
@@ -425,6 +460,9 @@ def fit_relativistic_maxwell_juttner(
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_sigma,
         "integrated_scattered_power_fit_uncertainty_W": area_sigma,
+        "effective_differential_cross_section_m2_sr": float(physical["effective_differential_cross_section_m2_sr"]),
+        "effective_differential_cross_section_uncertainty_m2_sr": cross_section_uncertainty,
+        "effective_cross_section_uncertainty_method": "finite-difference propagation of fitted Te/flow covariance through the Lorentz-transformed polarized Thomson cross-section",
         "reduced_chi_square": float(np.sum((residual/np.asarray(uncertainty,dtype=float))**2)/dof) if uncertainty is not None else None,
         "fitted_spectrum": fitted,
         "residual": residual,
