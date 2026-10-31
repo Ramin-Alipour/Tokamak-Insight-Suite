@@ -4122,8 +4122,8 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with Gaussian beam-overlap weighting.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and uses caller-supplied local Gaussian covariance matrices; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. The optical Thomson model is a separate workflow.",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. The optical Thomson model is a separate workflow.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4349,6 +4349,12 @@
           "unit": "one geometry record per frequency bin",
           "required": false,
           "description": "Output of trace_cts_frequency_resolved_beams; contains local incident/scattered directions, magnetic field, scattering location and normalized Gaussian beam-overlap weight."
+        },
+        {
+          "name": "scattering_sample_count",
+          "unit": "integer >=2",
+          "required": false,
+          "description": "Number of incident-ray samples used for path-integrated Gaussian scattering-volume quadrature."
         }
       ],
       "output_specs": [
@@ -4510,6 +4516,21 @@
           "name": "kinetic_population_diagnostics",
           "unit": "frequency-indexed electron/ion kinetic population diagnostics",
           "description": "Alias containing relativistic gyrotropic conductivity/noise diagnostics for all supplied non-Maxwellian kinetic populations."
+        },
+        {
+          "name": "scattering_volume_integration_used",
+          "unit": "boolean",
+          "description": "True when the solver evaluates and sums local full-EM spectra over the supplied scattering-volume samples."
+        },
+        {
+          "name": "scattering_volume_sample_count",
+          "unit": "integer; one per frequency bin",
+          "description": "Number of local scattering samples integrated for each frequency bin."
+        },
+        {
+          "name": "scattering_volume_weighting",
+          "unit": "method description",
+          "description": "Normalized local Gaussian beam overlap multiplied by incident-ray path-length quadrature."
         }
       ],
       "assumptions": [
@@ -4533,8 +4554,9 @@
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
         "Ray tracing is cold-plasma geometrical optics. Diffraction, quasi-optical beam propagation and branch tracking through degeneracies are not included.",
-        "Gaussian covariance matrices are supplied by the caller at the scattering locations; beam covariance evolution is not computed.",
-        "Absolute received-power transfer and full launcher/receiver hardware coupling normalization are not implemented.",
+        "Gaussian covariance matrices are supplied by the caller along the rays; covariance evolution is not computed.",
+        "Scattering-volume integration assumes fitted electron density, electron temperature and thermal-ion temperatures are uniform across the sampled volume; local ray directions and magnetic field vary.",
+        "Absolute beam-overlap path integrals are used as relative spectral-bin weights; absolute launcher/receiver power coupling normalization is not implemented.",
         "Ion species and charge-density fractions are fixed external inputs; only their temperatures are fitted.",
         "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
         "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model."
@@ -4548,7 +4570,7 @@
         "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
       ],
       "raw_data_to_physics": false,
-      "note": "Full-EM CTS provides species-resolved thermal-ion temperature inference, relativistic gyrotropic non-Maxwellian electron/fast-ion kinetic response and second-order vertices, plus optional frequency-resolved cold-plasma ray tracing/Gaussian overlap. Maxwellian bulk-electron scattering retains the low-temperature Bindslev source. No experimental validation is claimed.",
+      "note": "Full-EM CTS provides species-resolved thermal-ion temperature inference, relativistic Maxwell-Juttner or supplied non-Maxwellian gyrotropic electron/fast-ion response and second-order vertices, plus optional path-integrated cold-plasma ray tracing/Gaussian scattering-volume weighting. Maxwellian bulk-electron scattering retains the low-temperature Bindslev source. No experimental validation is claimed.",
       "calibrated_measurements_to_physics": true,
       "workflow_modes": [
         {
@@ -4598,8 +4620,8 @@
           ],
           "outputs": [
             "frequency-resolved local scattering geometry",
-            "relative Gaussian beam overlap",
-            "ray diagnostics"
+            "path-integrated Gaussian overlap weights",
+            "local scattering samples and path-length quadrature"
           ],
           "scope": "Cold-plasma geometrical-optics ray tracing with caller-supplied local Gaussian beam covariance; no diffraction."
         }
