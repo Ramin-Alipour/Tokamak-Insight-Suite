@@ -4211,7 +4211,8 @@
         {
           "name": "parameter_bounds",
           "unit": "structured",
-          "required": false
+          "required": false,
+          "description": "Optional researcher-supplied positive increasing pairs keyed by electron_density_m3, electron_temperature_eV and ion_temperature_eV:<species> (or common ion_temperature_eV). No scientific parameter bounds are imposed when omitted; positive log-parameters remain unbounded."
         },
         {
           "name": "spectral_covariance",
@@ -4243,17 +4244,20 @@
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
-          "required": false
+          "required": true,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
-          "required": false
+          "required": true,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
-          "required": false
+          "required": true,
+          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed."
         },
         {
           "name": "ion_velocity_initial_m_s",
