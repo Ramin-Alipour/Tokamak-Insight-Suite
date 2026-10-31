@@ -309,7 +309,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     )["electron_velocity_projection_m_s"]
     q_projection=2.0*np.sin(angle/2.0)
     if te / ELECTRON_REST_ENERGY_EV >= 0.01:
-        raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; select the relativistic Maxwell-Juttner model.")
+        raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
     if abs(velocity) >= 0.1 * C_M_S:
         raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     residual=signal-observed(wavelength,*p)
@@ -868,7 +868,7 @@ def analyze_thomson_spectra(
                 if value is None: missing_uncertainties.append(key)
         fit["uncertainty_inputs_missing"] = missing_uncertainties
         fit["uncertainty_completeness"] = "partial" if missing_uncertainties else "all_supported_inputs_supplied"
-        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
+        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples, area_samples = [], [], []
@@ -955,7 +955,7 @@ def analyze_thomson_spectra(
         elif density_inputs is not None:
             fit["instrument_response_density_uncertainty_propagated"] = False
 
-        if model in {"non_collective_maxwellian", "non_collective_kappa", "relativistic_maxwell_juttner"}:
+        if model in {"non_collective_maxwellian", "non_collective_kappa"}:
             te = fit["electron_temperature_eV"]
             external_te_sigma = thomson_electron_temperature_from_spectral_width(
                 float(fit["intrinsic_sigma_nm"]), float(laser_wavelength_nm),
