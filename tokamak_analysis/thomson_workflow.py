@@ -456,7 +456,10 @@ def reconstruct_thomson_profile_from_spectra(
         ], dtype=float)
         candidates.append(("scattering_parameter_alpha", None, None, None, True))
     power_values = np.asarray([
-        channel.get("integrated_scattered_power_W", np.nan) for channel in result["channels"]
+        channel.get(
+            "integrated_scattered_power_W",
+            channel.get("integrated_spectral_signal_input_units_nm", np.nan),
+        ) for channel in result["channels"]
     ], dtype=float)
     if np.all(np.isfinite(power_values)):
         power_sigma = np.asarray([
