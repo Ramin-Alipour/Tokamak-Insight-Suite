@@ -46,10 +46,13 @@ def _apply_response(response, spectrum, wavelength_nm):
     r = np.asarray(response, dtype=float)
     if r.shape != (x.size, x.size) or y.shape != x.shape:
         raise ValueError("response must be square on the supplied wavelength grid")
-    widths = np.empty_like(x)
-    widths[0] = 0.5*(x[1]-x[0])
-    widths[-1] = 0.5*(x[-1]-x[-2])
-    widths[1:-1] = 0.5*(x[2:]-x[:-2])
+    edges = np.empty(x.size + 1, dtype=float)
+    edges[1:-1] = 0.5*(x[:-1] + x[1:])
+    edges[0] = x[0] - 0.5*(x[1]-x[0])
+    edges[-1] = x[-1] + 0.5*(x[-1]-x[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("wavelength grid must define positive bin widths")
     return (r @ (y*widths))/widths
 
 
