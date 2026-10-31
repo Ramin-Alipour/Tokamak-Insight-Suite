@@ -3207,11 +3207,13 @@ elif page=='Advanced Analysis':
             st.markdown('**Scattering geometry and polarization**')
             g1,g2=st.columns(2)
             with g1:
-                cts_incident_direction=st.text_input('Incident wave direction (x,y,z)',key='cts_full_incident_direction')
-                cts_incident_polarization=st.text_input('Incident polarization (x,y,z)',key='cts_full_incident_polarization')
+                cts_incident_direction=st.text_input('Incident wave direction (x,y,z; used without ray-geometry JSON)',key='cts_full_incident_direction')
+                cts_incident_polarization=st.text_input('Incident polarization (x,y,z or complex JSON vector)',key='cts_full_incident_polarization')
             with g2:
-                cts_scattered_direction=st.text_input('Scattered wave direction (x,y,z)',key='cts_full_scattered_direction')
-                cts_scattered_polarization=st.text_input('Scattered polarization (x,y,z)',key='cts_full_scattered_polarization')
+                cts_scattered_direction=st.text_input('Scattered wave direction (x,y,z; used without ray-geometry JSON)',key='cts_full_scattered_direction')
+                cts_scattered_polarization=st.text_input('Scattered polarization (x,y,z or complex JSON vector)',key='cts_full_scattered_polarization')
+            if cts_geometry_upload is not None:
+                st.caption('Incident/scattered directions are read from the uploaded frequency-resolved geometry; the text direction fields are not required.')
             cts_electron_distribution_json=st.text_area(
                 'Optional relativistic electron distribution JSON',
                 placeholder='{"kind":"relativistic_maxwell_juttner"}',
@@ -3255,14 +3257,15 @@ elif page=='Advanced Analysis':
                     if len(ion_flow_parts)!=len(species_names):
                         raise ValueError('Enter one ion flow vector per supplied ion species, separated by semicolons.')
                     ion_flows={name:_parse_ts_vector(value,f'Ion flow for {name}') for name,value in zip(species_names,ion_flow_parts)}
-                    scattering_geometry={
-                        'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
-                        'scattered_direction':_parse_ts_vector(cts_scattered_direction,'Scattered direction'),
-                    }
                     if cts_geometry_upload is not None:
                         scattering_geometry=json.load(cts_geometry_upload)
                         if not isinstance(scattering_geometry,dict) or 'frequency_resolved_geometry' not in scattering_geometry:
                             raise ValueError('Ray geometry JSON must contain frequency_resolved_geometry from the CTS ray/beam helper.')
+                    else:
+                        scattering_geometry={
+                            'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
+                            'scattered_direction':_parse_ts_vector(cts_scattered_direction,'Scattered direction'),
+                        }
                     electron_distribution=None if not cts_electron_distribution_json.strip() else json.loads(cts_electron_distribution_json)
                     fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
