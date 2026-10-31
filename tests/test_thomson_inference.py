@@ -812,3 +812,41 @@ def test_per_channel_density_covariance_cannot_be_combined_with_joint_spectral_c
             density_relative_covariance=np.eye(6),
             joint_spectral_covariance=np.eye(x.size),
         )
+
+
+
+def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
+    x, y, _ = _spectral_case(120.0)
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.0], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full((1, x.size), 1.0),
+    )
+    distribution = out["channels"][0]["spectral_distribution"]
+    assert distribution["analysis_status"] == "completed"
+    assert distribution["background_source"].startswith("background nuisance")
+    assert "spectral_distribution" in out
+
+
+def test_thomson_spatial_subanalysis_reconstructs_all_identifiable_spectral_profiles():
+    from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
+
+    radii = np.array([0.0, 0.1, 0.2])
+    spectra = []
+    wavelength = None
+    for temperature in (80.0, 120.0, 160.0):
+        wavelength, signal, _ = _spectral_case(temperature)
+        spectra.append(signal)
+    result = reconstruct_thomson_profile_from_spectra(
+        wavelength, np.asarray(spectra), radii,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.ones((3, wavelength.size)),
+        profile_reconstruction_method="both",
+        profile_reconstruction_points=41,
+        profile_reconstruction_mc_samples=20,
+    )
+    reconstructed = result["spatial_profile_reconstruction"]["profiles"]["electron_temperature_eV"]
+    assert reconstructed["methods"]["pchip"]["status"] == "completed"
+    assert reconstructed["methods"]["pchip"]["values"].shape == (41,)
+    assert reconstructed["methods"]["smoothing_spline"]["status"] == "insufficient_spatial_channels"
