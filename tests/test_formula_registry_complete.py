@@ -1,4 +1,4 @@
-"""Independent reference and contract checks for all 42 formula registry entries."""
+"""Independent reference and contract checks for all 53 formula registry entries."""
 import ast
 import importlib
 import json
