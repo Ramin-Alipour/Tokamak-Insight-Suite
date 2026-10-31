@@ -6551,13 +6551,13 @@
           "name": "instrument_response_matrix",
           "unit": "measured normalized wavelength response matrix",
           "required": false,
-          "description": "Finite non-negative measured normalized square response matrix on the wavelength grid. Supply this or instrument_sigma_nm, but not both."
+          "description": "Supplied by the canonical Thomson fit in the primary workflow; direct calls require exactly one of instrument_response_matrix or instrument_sigma_nm."
         },
         {
           "name": "instrument_sigma_nm",
           "unit": "nm; independently measured Gaussian instrument-width summary",
           "required": false,
-          "description": "Positive independently measured Gaussian instrument-width summary. Supply this or instrument_response_matrix, but not both."
+          "description": "Optional measured Gaussian response-width summary; direct calls require exactly one of instrument_response_matrix or instrument_sigma_nm."
         },
         {
           "name": "background_signal",
@@ -6824,7 +6824,7 @@
       "preprocessing": [
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
-      "algorithm": "Expose physical electron temperature, scattering-vector flow projection and identifiable electron density from the canonical selected physical forward fit of the same calibrated measured spectrum; additionally compute signed wavelength-space moments and response-convolved Gaussian shape diagnostics.",
+      "algorithm": "Compute signed wavelength-space spectral moments and response-convolved Gaussian shape diagnostics alongside the physical parameters supplied by the canonical selected Thomson forward fit of the same calibrated measured spectrum. Shape-only completion is prohibited.",
       "uncertainty_model": "Optional pointwise signal uncertainty or full positive-definite within-channel covariance is propagated by parametric Monte Carlo; optional scalar instrument-width uncertainty is included when the scalar Gaussian response model is selected. Monte Carlo success counts and uncertainty availability are reported explicitly.",
       "limitations": [
         "Spectral moments characterize the measured wavelength distribution and do not uniquely identify an electron velocity distribution.",
@@ -6832,13 +6832,16 @@
         "A scalar Gaussian deconvolution is not applied to a general measured response matrix.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
         "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in fitted background nuisance parameters is not jointly sampled.",
-        "The physical parameter extraction is delegated to the selected canonical Analysis 1 forward fit of the same calibrated measured spectrum; it is not a second independent physical fit."
+        "The physical parameter extraction is delegated to the selected canonical Analysis 1 forward fit of the same calibrated measured spectrum; it is not a second independent physical fit.",
+        "A successful canonical Thomson physical forward fit of the same calibrated measured spectrum is mandatory; shape-only calls are rejected."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
       ],
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": true,
+      "note": "This subanalysis complements, and never replaces, physical parameter extraction by the canonical Thomson forward model. The application reuses the same-spectrum physical fit and its fitted background.",
+      "completion_scope": "Spectral-shape descriptors accompanied by electron temperature and scattering-vector flow projection from the canonical selected physical Thomson fit of the same calibrated measured spectrum; density only when independently identifiable from the supplied absolute optical inputs."
     },
     "scientific_references": [
       {
