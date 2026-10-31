@@ -84,8 +84,9 @@ def fit_thomson_spectrum(
             x, y[None, :], [0.0],
         laser_wavelength_nm=laser_wavelength_nm,
         scattering_angle_rad=scattering_angle_rad,
-        instrument_response=response,
-        signal_uncertainty=None if uncertainty is None else uncertainty[None, :],
+            instrument_response=response,
+            signal_uncertainty=None if uncertainty is None else uncertainty[None, :],
+            model="non_collective_maxwellian",
             spectral_power_density_calibrated=spectral_power_density_calibrated,
         )["channels"][0]
     except ValueError as exc:
