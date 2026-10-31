@@ -167,11 +167,18 @@ def analyze_thomson_spectral_distribution(
         mask = raw_mask.astype(bool, copy=True)
     explicit_background = None
     if background_signal is not None:
-        if mask is not None:
-            raise ValueError("Supply background_signal or background_mask, not both.")
         explicit_background = _vector(background_signal, "background_signal")
         if explicit_background.size != x.size:
             raise ValueError("background_signal must have the same length as wavelength_nm")
+
+    background_selection_count = sum(
+        value is not None for value in (explicit_background, mask, background_fraction)
+    )
+    if background_selection_count != 1:
+        raise ValueError(
+            "Supply exactly one background specification: background_signal, "
+            "background_mask, or background_fraction."
+        )
 
     uncertainty = None
     signal_covariance_matrix = None
