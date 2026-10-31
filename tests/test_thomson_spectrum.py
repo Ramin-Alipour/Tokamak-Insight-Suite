@@ -60,14 +60,14 @@ def test_raw_thomson_spectrum_rejects_nonmonotonic_wavelength():
             laser_wavelength_nm=532,
             scattering_angle_rad=np.pi / 2,
             instrument_sigma_nm=0.05,
-            instrument_response_matrix=_measured_response(wavelength),
+            instrument_response_matrix=np.eye(7),
         )
 
 
 def test_raw_thomson_spectrum_rejects_unresolved_instrument_width():
     wavelength = np.linspace(531.8, 532.2, 51)
     signal = 100 * np.exp(-0.5 * ((wavelength - 532.0) / 0.01) ** 2) + 2
-    with pytest.raises(ValueError, match="not larger than the instrumental width"):
+    with pytest.raises(ValueError, match="not resolved relative to its fit uncertainty"):
         fit_thomson_spectrum(
             wavelength,
             signal,
