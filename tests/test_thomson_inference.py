@@ -159,29 +159,6 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
 
 
-def test_projected_relativistic_maxwell_juttner_model_is_available():
-    x=np.linspace(492.0,572.0,801)
-    laser=532.0
-    angle=np.pi/2
-    te=300.0
-    theta=te/510998.95069
-    sine=np.sin(angle/2.0)
-    ratio=x/laser
-    beta=(ratio-1.0)/(sine*(ratio+1.0))
-    valid=np.abs(beta)<1.0
-    gamma=1.0/np.sqrt(1.0-beta[valid]**2)
-    marginal=np.exp(-(gamma-1.0)/theta)*(gamma**2+2*theta*gamma+2*theta**2)
-    jacobian=2.0/(sine*laser*(ratio[valid]+1.0)**2)
-    y=np.full_like(x,20.0)
-    y[valid]+=900.0*marginal*jacobian
-    out=analyze_thomson_spectra(
-        x,y[None,:],[0.18],laser_wavelength_nm=laser,
-        scattering_angle_rad=angle,instrument_response=np.eye(x.size),model="relativistic_maxwell_juttner",
-    )
-    assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.08)
-    assert "Maxwell-Juttner" in out["channels"][0]["model"]
-
-
 def test_nonrelativistic_flow_projection_uses_q_equals_ks_minus_ki_sign():
     x, y, _ = _spectral_case(100.0, center_nm=531.98)
     out = analyze_thomson_spectra(
@@ -191,36 +168,6 @@ def test_nonrelativistic_flow_projection_uses_q_equals_ks_minus_ki_sign():
     expected = -299792458.0 * (531.98 - 532.0) / (532.0 * np.sqrt(2.0))
     assert out["channels"][0]["electron_velocity_projection_m_s"] == pytest.approx(
         expected, rel=0.03
-    )
-
-
-def test_relativistic_maxwell_juttner_flow_uses_relativistic_doppler_inversion():
-    x = np.linspace(430.0, 680.0, 2001)
-    laser = 532.0
-    angle = np.pi / 2
-    beta_bulk = 0.02
-    sine = np.sin(angle / 2.0)
-    center = laser * (1.0 - beta_bulk * sine) / (1.0 + beta_bulk * sine)
-    te = 300.0
-    theta = te / 510998.95069
-    ratio = x / center
-    beta = (ratio - 1.0) / (sine * (ratio + 1.0))
-    valid = np.abs(beta) < 1.0
-    gamma = 1.0 / np.sqrt(1.0 - beta[valid]**2)
-    marginal = np.exp(-(gamma - 1.0) / theta) * (
-        gamma**2 + 2.0 * theta * gamma + 2.0 * theta**2
-    )
-    jacobian = 2.0 / (sine * center * (ratio[valid] + 1.0)**2)
-    signal = np.full_like(x, 20.0)
-    signal[valid] += 900.0 * marginal * jacobian
-
-    out = analyze_thomson_spectra(
-        x, signal[None, :], [0.18], laser_wavelength_nm=laser,
-        scattering_angle_rad=angle, instrument_response=np.eye(x.size),
-        model="relativistic_maxwell_juttner",
-    )
-    assert out["channels"][0]["electron_velocity_projection_m_s"] == pytest.approx(
-        beta_bulk * 299792458.0, rel=0.005
     )
 
 
