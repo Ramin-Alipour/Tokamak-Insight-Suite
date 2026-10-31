@@ -240,3 +240,12 @@ def test_thomson_density_propagates_scattering_angle_uncertainty():
     expected_sigma = density * abs(relative_sensitivity) * angle_sigma
     assert actual_sigma == pytest.approx(expected_sigma, rel=1e-12)
     assert actual_sigma > 0
+
+
+def test_legacy_adapter_rejects_synthetic_response_from_scalar_width():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    with pytest.raises(ValueError, match="measured instrument_response_matrix is required"):
+        fit_thomson_spectrum(
+            wavelength, signal, laser_wavelength_nm=laser_nm,
+            scattering_angle_rad=angle, instrument_sigma_nm=0.05,
+        )
