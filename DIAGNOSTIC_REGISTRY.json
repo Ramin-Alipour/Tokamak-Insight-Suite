@@ -4,13 +4,13 @@
     "diagnostic": "Thomson scattering",
     "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated optical Thomson spectra; absolute electron density only where identifiable from calibrated spectral power and complete optical geometry.",
     "status": "D",
-    "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Collective microwave CTS is a separate registered workflow.",
-    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it screens the maximum represented electron-rest-frame Compton correction and rejects cases exceeding the configured 1% default limit. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is a separate workflow. No independent experimental validation is claimed.",
+    "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Microwave CTS is a registered subanalysis of primary Analysis 1; its electrostatic and full-electromagnetic models remain a distinct CTS model branch.",
+    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it screens the maximum represented electron-rest-frame Compton correction and rejects cases exceeding the configured 1% default limit. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is included as a subanalysis of primary Analysis 1. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
     ],
-    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered separately.",
+    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -62,7 +62,7 @@
           "name": "model",
           "unit": "non_collective_maxwellian, non_collective_kappa or non_collective_relativistic_maxwell_juttner",
           "required": true,
-          "description": "Select one of the three implemented optical Thomson forward models explicitly; collective microwave CTS is a separate registered workflow."
+          "description": "Select one of the three implemented non-collective optical Thomson forward models explicitly. Microwave CTS is selected through its dedicated Analysis 1 subanalysis contract; CTS models are not optical models."
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
@@ -317,7 +317,7 @@
         "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
         "A supplied density_relative_covariance or joint_density_relative_covariance describes the six optical inversion inputs. It can be combined with joint spectral covariance and/or response-matrix uncertainty when the scattered-power row and column are zero; measured-power uncertainty is then propagated separately. Scalar scattering-angle uncertainty is an additional common geometry contribution, while duplicate scalar optical-factor uncertainties remain prohibited.",
-        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow.",
+        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1.",
         "Non-relativistic Maxwellian and Kappa use explicit conservative screening limits theta_e < 0.01 and |v_flow|/c < 0.1; these are asymptotic error-budget screens, not universal physical validity boundaries."
       ],
       "function_links": [
@@ -327,7 +327,7 @@
         "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner"
       ],
       "raw_data_to_physics": false,
-      "note": "Primary Analysis 1 provides three explicitly selected non-collective optical Thomson forward models. Collective microwave CTS is a separate registered subanalysis.",
+      "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
@@ -419,7 +419,8 @@
       }
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
-    "calibrated_measurements_to_physics": true
+    "calibrated_measurements_to_physics": true,
+    "primary_analysis_id": 1
   },
   {
     "family": "Plasma parameters",
@@ -4054,8 +4055,8 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. The optical Thomson model is a separate workflow.",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4576,7 +4577,7 @@
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response"
       ],
       "raw_data_to_physics": false,
-      "note": "Full-EM CTS provides species-resolved thermal-ion temperature inference, relativistic Maxwell-Juttner or supplied non-Maxwellian gyrotropic electron/fast-ion response and second-order vertices, plus optional path-integrated cold-plasma ray tracing/Gaussian scattering-volume weighting. Maxwellian bulk-electron scattering retains the low-temperature Bindslev source. No experimental validation is claimed.",
+      "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
       "calibrated_measurements_to_physics": true,
       "workflow_modes": [
         {
@@ -4698,7 +4699,9 @@
         "year": 1991,
         "doi": "10.1088/0741-3335/33/14/005"
       }
-    ]
+    ],
+    "primary_analysis_id": 1,
+    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. This subanalysis consumes measured calibrated frequency-shift spectra and does not perform instrument calibration or experimental validation."
   },
   {
     "family": "Density and refractive diagnostics",
@@ -5428,9 +5431,10 @@
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
       }
     ],
-    "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
+    "note": "Analysis 1 subanalysis: reconstruct radial profiles from measured calibrated optical Thomson spectra by invoking the canonical physical inference engine. Never accepts pre-derived ne/Te profiles.",
     "calibrated_measurements_to_physics": true,
-    "completion_scope": "Profile-oriented output from the canonical measured, calibrated spectrum-to-physics inference, using the same physical models and uncertainty scope as Analysis 1. No pre-derived profile input, device calibration or independent experimental validation is performed."
+    "completion_scope": "Profile-oriented output from the canonical measured, calibrated spectrum-to-physics inference, using the same physical models and uncertainty scope as Analysis 1. No pre-derived profile input, device calibration or independent experimental validation is performed.",
+    "primary_analysis_id": 1
   },
   {
     "family": "Fast particles",
@@ -6628,6 +6632,7 @@
         "scope": "Diagnostic forward/instrument-response modeling context."
       }
     ],
-    "note": "Independent measured-spectrum descriptor. It can run even when a physical Maxwellian/Kappa fit fails."
+    "note": "Analysis 1 subanalysis: single-spectrum distribution/moment diagnostics. It is independent of a successful primary physical fit, but remains part of primary Analysis 1 and does not claim to reconstruct an arbitrary electron velocity distribution.",
+    "primary_analysis_id": 1
   }
 ]
