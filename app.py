@@ -908,7 +908,7 @@ elif page=='Spectral Analysis':
                 'non_collective_kappa',
                 'non_collective_relativistic_maxwell_juttner',
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
-            st.caption('Optical Analysis 1 uses three explicitly selected non-collective forward models. Microwave collective Thomson scattering is a separate registered CTS workflow.')
+            st.caption('Optical Analysis 1 uses three explicitly selected non-collective forward models. Microwave collective Thomson scattering is a dedicated CTS subanalysis within primary Analysis 1; its electrostatic and full-electromagnetic models are not optical Thomson models.')
             g1,g2,g3=st.columns(3)
             with g1:
                 laser_nm_text=st.text_input('Laser wavelength (nm; required)',value='',key='ts_infer_laser')
@@ -3060,15 +3060,15 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Thomson spectral distribution (independent)','Microwave CTS spectral inversion (frequency-domain)','Thomson spatial profile reconstruction from calibrated spectra','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
-    if workflow=='Thomson multi-channel spectral inference (canonical Analysis 1)':
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    if workflow=='Analysis 1 / Optical multi-channel Thomson inference':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
-    elif workflow=='Thomson spectral distribution (independent)':
-        st.caption('Independent model-free analysis of one measured, calibrated Thomson spectrum. This workflow does not depend on a successful Maxwellian, Kappa or relativistic physical fit.')
+    elif workflow=='Analysis 1 / Spectral-distribution subanalysis':
+        st.caption('Analysis 1 subanalysis: model-independent diagnostics of one measured, calibrated Thomson spectrum. It can run without a successful Maxwellian, Kappa or relativistic fit, but it is not a separate primary analysis.')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated wavelength and spectral-intensity columns.')
         else:
@@ -3098,7 +3098,7 @@ elif page=='Advanced Analysis':
             elif td_background_mode=='Explicit spectral-edge fraction':
                 td_background_fraction_text=st.text_input('Fraction of wavelength span at each edge (0.02–0.4)',value='',key='ts_distribution_background_fraction')
             td_mc_samples=st.number_input('Monte-Carlo samples for moment/fit uncertainty',min_value=20,max_value=10000,value=200,step=20,key='ts_distribution_mc_samples')
-            if st.button('Run independent Thomson spectral-distribution analysis',type='primary',key='run_ts_distribution_independent'):
+            if st.button('Run Analysis 1 spectral-distribution subanalysis',type='primary',key='run_ts_distribution_independent'):
                 try:
                     if td_background_mode is None:
                         raise ValueError('Select an explicit background definition; no spectral-edge background is assumed.')
@@ -3132,15 +3132,15 @@ elif page=='Advanced Analysis':
                         td_kwargs['background_fraction']=_parse_ts_scalar(
                             td_background_fraction_text,'Explicit background fraction',minimum=0.02,maximum=0.4)
                     result_distribution=analyze_thomson_spectral_distribution(td_x,td_y,**td_kwargs)
-                    st.success('Independent Thomson spectral-distribution analysis completed.')
+                    st.success('Analysis 1 spectral-distribution subanalysis completed.')
                     st.json(result_distribution)
-                    json_download('Export independent Thomson spectral-distribution diagnostics',result_distribution,'tis_thomson_spectral_distribution.json')
-                    add_report_section('Independent Thomson spectral-distribution analysis',result_distribution)
+                    json_download('Export Analysis 1 spectral-distribution diagnostics',result_distribution,'tis_thomson_spectral_distribution.json')
+                    add_report_section('Analysis 1 spectral-distribution subanalysis',result_distribution)
                 except Exception as exc:
-                    st.error(f'Independent Thomson spectral-distribution analysis failed: {exc}')
+                    st.error(f'Analysis 1 spectral-distribution subanalysis failed: {exc}')
 
-    elif workflow=='Microwave CTS spectral inversion (frequency-domain)':
-        st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
+    elif workflow=='Analysis 1 / Microwave CTS subanalysis':
+        st.markdown('Analysis 1 subanalysis — microwave CTS: infer plasma and ion parameters from a measured, calibrated frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
             'electrostatic','full_electromagnetic'
         ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else 'Magnetized full-electromagnetic CTS',key='cts_physical_model')
@@ -3457,7 +3457,7 @@ elif page=='Advanced Analysis':
                 except Exception as e:
                     st.error(f'Full-EM CTS inversion failed: {e}')
 
-    elif workflow=='Thomson spatial profile reconstruction from calibrated spectra':
+    elif workflow=='Analysis 1 / Spatial-profile reconstruction':
         st.info('This subanalysis starts from measured, calibrated multi-channel Thomson spectra, infers every identifiable physical parameter with the selected forward model, and reconstructs radial profiles using PCHIP and/or a GCV smoothing spline. It does not accept pre-derived ne/Te profile points and does not extrapolate beyond measured channel coordinates.')
         if st.button('Open Thomson spectral-to-spatial-profile workflow',type='primary',key='open_thomson_profile_inference_from_advanced'):
             st.session_state['tis_thomson_profile_reconstruction_requested']=True
