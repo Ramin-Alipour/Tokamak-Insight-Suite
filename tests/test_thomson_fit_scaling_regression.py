@@ -6,7 +6,7 @@ from tokamak_analysis.thomson_inference import _fit_noncollective, _fit_kappa
 
 @pytest.mark.parametrize("model", ["maxwellian", "kappa"])
 def test_fitted_spectrum_and_residual_are_in_measured_intensity_units(model):
-    x = np.linspace(502.0, 562.0, 401)
+    x = np.linspace(496.0, 568.0, 481)
     sigma = 2.0 * 532.0 * np.sqrt(100.0 / 510998.95069) * np.sin(np.pi / 4)
 
     if model == "maxwellian":
