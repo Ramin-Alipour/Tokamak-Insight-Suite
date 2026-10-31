@@ -109,6 +109,7 @@ def analyze_thomson_spectral_distribution(
     instrument_sigma_uncertainty_nm: float | None = None,
     instrument_response_matrix=None,
     signal_uncertainty=None,
+    signal_covariance=None,
     background_fraction: float = 0.1,
     background_mask=None,
     background_signal=None,
@@ -170,12 +171,28 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("background_signal must have the same length as wavelength_nm")
 
     uncertainty = None
+    covariance = None
+    if signal_uncertainty is not None and signal_covariance is not None:
+        raise ValueError("Supply signal_uncertainty or signal_covariance, not both.")
     if signal_uncertainty is not None:
         uncertainty = _vector(signal_uncertainty, "signal_uncertainty")
         if uncertainty.size != y.size:
             raise ValueError("signal_uncertainty must have the same length as signal")
         if np.any(uncertainty <= 0):
             raise ValueError("signal_uncertainty must be strictly positive")
+    if signal_covariance is not None:
+        covariance_raw = np.asarray(signal_covariance)
+        if covariance_raw.dtype.kind not in "iuf":
+            raise ValueError("signal_covariance must contain real numeric values")
+        covariance = covariance_raw.astype(float, copy=False)
+        if covariance.shape != (y.size, y.size) or not np.all(np.isfinite(covariance)):
+            raise ValueError("signal_covariance must be a finite square matrix matching signal")
+        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
+            raise ValueError("signal_covariance must be symmetric")
+        try:
+            np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("signal_covariance must be positive definite") from exc
 
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
@@ -205,7 +222,11 @@ def analyze_thomson_spectral_distribution(
     if fit_scale <= 0:
         raise ValueError("Signal must have nonzero scale for Gaussian fitting")
     fit_y = y / fit_scale
-    fit_sigma = None if uncertainty is None else uncertainty / fit_scale
+    fit_sigma = (
+        uncertainty / fit_scale if uncertainty is not None
+        else covariance / fit_scale**2 if covariance is not None
+        else None
+    )
     fit_p0 = [p0[0] / fit_scale, p0[1], p0[2], p0[3] / fit_scale, p0[4] / fit_scale]
     fit_lower = [lower[0] / fit_scale, lower[1], lower[2], lower[3], lower[4] / fit_scale]
     fit_upper = [upper[0] / fit_scale, upper[1], upper[2], upper[3], upper[4] / fit_scale]
@@ -222,7 +243,7 @@ def analyze_thomson_spectral_distribution(
     try:
         scaled_params, scaled_covariance = curve_fit(
             fit_model, x, fit_y, p0=fit_p0, bounds=(fit_lower, fit_upper),
-            sigma=fit_sigma, absolute_sigma=uncertainty is not None, maxfev=50000,
+            sigma=fit_sigma, absolute_sigma=(uncertainty is not None or covariance is not None), maxfev=50000,
         )
         parameter_scales = np.array([fit_scale, 1.0, 1.0, fit_scale, fit_scale])
         params = scaled_params * parameter_scales
@@ -243,11 +264,15 @@ def analyze_thomson_spectral_distribution(
 
     moment_uncertainties = {}
     successful_draws = 0
-    if uncertainty is not None:
+    if uncertainty is not None or covariance is not None:
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
-            sampled_signal = y + rng.normal(0.0, uncertainty)
+            sampled_signal = (
+                y + rng.normal(0.0, uncertainty)
+                if uncertainty is not None
+                else rng.multivariate_normal(y, covariance, check_valid="raise")
+            )
             sampled_sigma = instrument_sigma_nm
             if instrument_sigma_nm is not None and instrument_sigma_uncertainty_nm is not None and instrument_sigma_uncertainty_nm > 0:
                 sampled_sigma = max(np.finfo(float).tiny, float(rng.normal(instrument_sigma_nm, instrument_sigma_uncertainty_nm)))
@@ -310,7 +335,22 @@ def analyze_thomson_spectral_distribution(
         "spectral_skewness": float(skewness),
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
-        "moment_uncertainty_method": "parametric Monte Carlo from pointwise signal uncertainty and optional instrument-width uncertainty" if uncertainty is not None else "instrument-width-only propagation" if instrument_sigma_uncertainty_nm is not None else "not_available",
+        "moment_uncertainty_method": (
+            "parametric Monte Carlo from full within-channel signal covariance and optional instrument-width uncertainty"
+            if covariance is not None else
+            "parametric Monte Carlo from independent pointwise signal uncertainty and optional instrument-width uncertainty"
+            if uncertainty is not None else
+            "instrument-width-only propagation"
+            if instrument_sigma_uncertainty_nm is not None else
+            "not_available"
+        ),
+        "signal_uncertainty_model": (
+            "full_within_channel_spectral_covariance"
+            if covariance is not None else
+            "independent_pointwise_standard_uncertainties"
+            if uncertainty is not None else
+            "not_supplied"
+        ),
         "moment_uncertainty_successful_draws": int(successful_draws),
         "gaussian_fit_parameters": {
             "amplitude": float(params[0]), "center_nm": float(params[1]),
