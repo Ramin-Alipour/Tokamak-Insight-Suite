@@ -63,7 +63,7 @@ def test_thomson_profile_subanalysis_routes_to_canonical_spectral_inference():
     app = _app_with_table(frame)
     workflow = next(item for item in app.selectbox if item.label == "Select workflow")
     workflow.set_value("Thomson spatial profile reconstruction from calibrated spectra").run()
-    next(item for item in app.button if item.label == "Open canonical Thomson profile-inference workflow").click().run()
+    next(item for item in app.button if item.label == "Open Thomson spectral-to-spatial-profile workflow").click().run()
 
     assert not app.exception, [str(error.value) for error in app.exception]
     assert app.radio[0].value == "Spectral Analysis"
