@@ -7,15 +7,15 @@ Tokamak Insight Suite exposes **20 primary analyses** in its navigation:
 
 ## Design rule
 
-The 20 families are a user-facing organization layer, not a replacement for the scientific implementations. The existing **80 ordered analysis entry points** remain intact as subanalyses/workflows. A family may contain more than one physically distinct solver; grouping never implies that their equations or assumptions are interchangeable.
+The 20 families are a user-facing organization layer, not a replacement for the scientific implementations. The existing **79 registered analysis entry points** remain intact as subanalyses/workflows. A family may contain more than one physically distinct solver; grouping never implies that their equations or assumptions are interchangeable.
 
-The mapping is maintained in `ANALYSIS_FAMILIES.json` and mirrored in `tis/data/ANALYSIS_FAMILIES.json` for packaged installations. The registry loader verifies that family IDs are 1–20 and that every underlying analysis ID from 1 to 80 appears exactly once.
+The mapping is maintained in `ANALYSIS_FAMILIES.json` and mirrored in `tis/data/ANALYSIS_FAMILIES.json` for packaged installations. The registry loader verifies that family IDs are 1–20 and that every registered underlying analysis ID appears exactly once; retired ID 7 is intentionally absent.
 
 ## Primary analyses
 
 | # | Primary analysis | Existing entry-point IDs |
 |---:|---|---|
-| 1 | Thomson Scattering | 1, 7, 30, 46 |
+| 1 | Thomson Scattering | 1, 30, 46 |
 | 2 | Langmuir & Electrostatic Probes | 2, 16–20 |
 | 3 | Electron Cyclotron Emission (ECE) | 3 |
 | 4 | Doppler & Charge-Exchange Spectroscopy | 4, 5, 24 |
@@ -38,7 +38,7 @@ The mapping is maintained in `ANALYSIS_FAMILIES.json` and mirrored in `tis/data/
 
 ## Thomson family
 
-All Thomson-scattering-related paths are grouped under primary analysis 1, including the spectral-distribution path and both existing collective/coherent-scattering entries. These remain separately identifiable subanalyses; the family grouping does not force them into a single physical model.
+All Thomson-scattering-related paths are grouped under primary analysis 1, including the canonical optical inference, the collective/coherent-scattering entry and the spatial-profile workflow. The former duplicate spectral-distribution wrapper (ID 7) has been retired.
 
 ## Instrumentation support family
 
@@ -46,4 +46,4 @@ Primary analysis 20 consolidates cross-diagnostic measurement-support functions 
 
 ## Compatibility
 
-The numeric IDs and callable signatures of the 80 existing analysis entry points are preserved. Existing registry consumers, analysis contracts, and scientific workflows can continue to refer to those IDs. The primary-family ID is a separate navigation identifier.
+The numeric IDs and callable signatures of the 79 remaining analysis entry points are preserved; ID 7 is intentionally retired and existing IDs are not renumbered. Existing registry consumers, analysis contracts, and scientific workflows can continue to refer to those IDs. The primary-family ID is a separate navigation identifier.
