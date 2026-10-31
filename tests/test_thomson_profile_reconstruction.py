@@ -48,7 +48,7 @@ def test_collective_kappa_profile_uses_external_monte_carlo_covariance(monkeypat
         "radius_m": radii,
         "channels": channels,
         "electron_temperature_profile_eV": np.array([100.0, 110.0, 120.0]),
-        "electron_temperature_uncertainty_profile_eV": np.full(3, 2.0),
+        "electron_temperature_uncertainty_profile_eV": np.full(3, np.sqrt(5.0)),
         "electron_density_profile_m3": np.array([4.0e18, 4.1e18, 4.2e18]),
         "electron_density_uncertainty_profile_m3": np.full(3, 1.0e17),
         "electron_density_joint_covariance_m6": None,
