@@ -14,6 +14,10 @@ from .formula_library import (
     thomson_electron_temperature_from_spectral_width,
     thomson_velocity_projection,
 )
+from .thomson_kinetic_models import (
+    fit_relativistic_maxwell_juttner,
+    fit_collective_kappa,
+)
 
 ELECTRON_REST_ENERGY_EV = 510_998.95069
 C_M_S = 299_792_458.0
@@ -431,10 +435,15 @@ def analyze_thomson_spectra(
             raise ValueError(f"{name} must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and scattering_angle_uncertainty_rad is not None:
         raise ValueError("Use scattering_angle_uncertainty_rad or beam-direction component uncertainties, not both; they describe the same geometry uncertainty.")
-    if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "collective_maxwellian":
-        raise ValueError("Beam-direction component uncertainty is currently propagated only by the collective Maxwellian model.")
-    if model not in {"non_collective_maxwellian", "non_collective_kappa", "collective_maxwellian"}:
-        raise ValueError("model must be non_collective_maxwellian, non_collective_kappa or collective_maxwellian")
+    if (incident_direction_unc is not None or scattered_direction_unc is not None) and model not in {"collective_maxwellian", "collective_kappa"}:
+        raise ValueError("Beam-direction component uncertainty is currently supported only by collective dielectric models.")
+    supported_models = {
+        "non_collective_maxwellian", "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+        "collective_maxwellian", "collective_kappa",
+    }
+    if model not in supported_models:
+        raise ValueError("Unsupported Thomson model; choose a non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner or collective Maxwellian/Kappa model.")
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if isinstance(instrument_response_mc_samples, (bool, np.bool_)) or not isinstance(instrument_response_mc_samples, (int, np.integer)) or instrument_response_mc_samples < 20:
@@ -456,21 +465,11 @@ def analyze_thomson_spectra(
         raise ValueError("Collective density and temperature bounds must be positive increasing pairs")
     if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1] or not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:
         raise ValueError("Collective initial density and temperature must lie within their supplied bounds")
-    if model == "collective_maxwellian":
-        if isinstance(collective_external_parameter_mc_samples,bool) or not isinstance(collective_external_parameter_mc_samples,(int,np.integer)) or collective_external_parameter_mc_samples<20:
-            raise ValueError("collective_external_parameter_mc_samples must be an integer >= 20")
-        if not ion_species or isinstance(ion_species, (str, bytes)):
-            raise ValueError("Collective Thomson inference requires an explicit non-empty ion species list")
-        if ion_velocity_m_s is None or electron_velocity_m_s is None:
-            raise ValueError("Collective inference requires measured ion/electron flow vectors or explicit zero vectors to declare a stationary-flow assumption")
-        if ion_temperature_eV is None:
-            raise ValueError("Collective Maxwellian inference requires independently supplied ion temperature(s); no ion temperature is assumed")
-        if ion_fractions is None:
-            if len(ion_species) > 1:
-                raise ValueError("Collective multi-species inference requires explicit ion_fractions summing to one")
-            ion_fractions = [1.0]
+    collective_models = {"collective_maxwellian", "collective_kappa"}
+    probe_vec = scatter_vec = None
+    if model in collective_models or model == "non_collective_relativistic_maxwell_juttner":
         if incident_direction is None or scattered_direction is None:
-            raise ValueError("Collective Thomson inference requires explicit incident_direction and scattered_direction 3-vectors in the same coordinate frame as the supplied flow vectors")
+            raise ValueError("The selected Thomson model requires explicit incident_direction and scattered_direction 3-vectors.")
         probe_vec = _finite_array(incident_direction, "incident_direction", 1)
         scatter_vec = _finite_array(scattered_direction, "scattered_direction", 1)
         if probe_vec.shape != (3,) or scatter_vec.shape != (3,):
@@ -479,19 +478,85 @@ def analyze_thomson_spectra(
         scatter_norm = float(np.linalg.norm(scatter_vec))
         if probe_norm <= 0 or scatter_norm <= 0:
             raise ValueError("incident_direction and scattered_direction must be non-zero")
-        probe_vec = probe_vec / probe_norm
-        scatter_vec = scatter_vec / scatter_norm
+        probe_vec = probe_vec/probe_norm
+        scatter_vec = scatter_vec/scatter_norm
         geometry_angle = float(np.arccos(np.clip(np.dot(probe_vec, scatter_vec), -1.0, 1.0)))
         if not np.isclose(geometry_angle, float(scattering_angle_rad), rtol=0.0, atol=1e-5):
             raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
-        try:
-            from astropy import units as u
-            from plasmapy.diagnostics import thomson
-        except ImportError as exc:
-            raise ImportError("Collective Thomson inference requires the optional PlasmaPy and Astropy packages") from exc
-        # PlasmaPy is used below with an explicit, user-supplied species list.
+
+    if model in collective_models:
+        if model == "collective_maxwellian" and (
+            isinstance(collective_external_parameter_mc_samples,bool)
+            or not isinstance(collective_external_parameter_mc_samples,(int,np.integer))
+            or collective_external_parameter_mc_samples<20
+        ):
+            raise ValueError("collective_external_parameter_mc_samples must be an integer >= 20")
+        if not ion_species or isinstance(ion_species, (str, bytes)):
+            raise ValueError("Collective Thomson inference requires an explicit non-empty ion species list")
+        if ion_velocity_m_s is None or electron_velocity_m_s is None:
+            raise ValueError("Collective inference requires explicit ion/electron flow vectors; use zero vectors only to declare stationary flow.")
+        if ion_temperature_eV is None:
+            raise ValueError("Collective inference requires independently supplied ion temperature(s); no ion temperature is assumed")
+        ion_t_check = _finite_array(np.atleast_1d(ion_temperature_eV), "ion_temperature_eV", 1)
+        if ion_t_check.size != len(ion_species) or np.any(ion_t_check <= 0):
+            raise ValueError("ion_temperature_eV must contain one positive temperature per ion species")
+        if ion_fractions is None:
+            if len(ion_species) > 1:
+                raise ValueError("Collective multi-species inference requires explicit ion_fractions summing to one")
+            ion_fractions = [1.0]
+        ion_fract_check = _finite_array(ion_fractions, "ion_fractions", 1)
+        if ion_fract_check.size != len(ion_species) or np.any(ion_fract_check <= 0) or not np.isclose(np.sum(ion_fract_check),1.0,rtol=1e-6,atol=1e-8):
+            raise ValueError("ion_fractions must contain one positive fraction per species and sum to one")
+        ion_v_check = _finite_array(ion_velocity_m_s, "ion_velocity_m_s")
+        electron_v_check = _finite_array(electron_velocity_m_s, "electron_velocity_m_s")
+        if ion_v_check.shape == (3,) and len(ion_species) == 1:
+            ion_v_check = ion_v_check.reshape(1,3)
+        if electron_v_check.shape == (3,):
+            electron_v_check = electron_v_check.reshape(1,3)
+        if electron_v_check.shape != (1, 3) or ion_v_check.shape != (len(ion_species), 3):
+            raise ValueError("electron_velocity_m_s must be a 3-vector and ion_velocity_m_s one 3-vector per species")
+        if np.any(np.linalg.norm(ion_v_check,axis=1) >= C_M_S) or np.linalg.norm(electron_v_check[0]) >= C_M_S:
+            raise ValueError("Collective ion/electron flow speeds must be subluminal")
+        ion_t_unc = None
+        if ion_temperature_uncertainty_eV is not None:
+            ion_t_unc = _finite_array(np.atleast_1d(ion_temperature_uncertainty_eV),"ion_temperature_uncertainty_eV",1)
+            if ion_t_unc.shape != ion_t_check.shape or np.any(ion_t_unc < 0):
+                raise ValueError("ion_temperature_uncertainty_eV must be non-negative and match ion species")
+        ion_v_unc = None
+        if ion_velocity_uncertainty_m_s is not None:
+            ion_v_unc = _finite_array(ion_velocity_uncertainty_m_s,"ion_velocity_uncertainty_m_s")
+            if ion_v_unc.shape == (3,) and len(ion_species) == 1:
+                ion_v_unc = ion_v_unc.reshape(1,3)
+            if ion_v_unc.shape != ion_v_check.shape or np.any(ion_v_unc < 0):
+                raise ValueError("ion_velocity_uncertainty_m_s must be non-negative and match ion velocity vectors")
+        electron_v_unc = None
+        if electron_velocity_uncertainty_m_s is not None:
+            electron_v_unc = _finite_array(electron_velocity_uncertainty_m_s,"electron_velocity_uncertainty_m_s",1)
+            if electron_v_unc.shape != (3,) or np.any(electron_v_unc < 0):
+                raise ValueError("electron_velocity_uncertainty_m_s must be a non-negative 3-vector")
+        ion_t = ion_t_check
+        ion_fract = ion_fract_check
+        ion_v = ion_v_check
+        electron_v = electron_v_check
+        if model == "collective_maxwellian":
+            try:
+                from astropy import units as u
+                from plasmapy.diagnostics import thomson
+            except ImportError as exc:
+                raise ImportError("Collective Maxwellian Thomson inference requires the optional PlasmaPy and Astropy packages") from exc
+        else:
+            thomson = None
     else:
         thomson = None
+        ion_t = ion_fract = ion_v = electron_v = None
+        ion_t_unc = ion_v_unc = electron_v_unc = None
+
+    collective_kappa_initial = _finite_scalar(collective_kappa_initial, "collective_kappa_initial", minimum=1.5000001)
+    collective_kappa_bounds = _finite_array(collective_kappa_bounds, "collective_kappa_bounds", 1)
+    if (collective_kappa_bounds.shape != (2,) or collective_kappa_bounds[0] <= 1.5
+            or collective_kappa_bounds[0] >= collective_kappa_bounds[1]
+            or not collective_kappa_bounds[0] <= collective_kappa_initial <= collective_kappa_bounds[1]):
+        raise ValueError("collective_kappa_bounds must be an increasing pair >1.5 containing collective_kappa_initial")
 
     unc = None if signal_uncertainty is None else _finite_array(signal_uncertainty, "signal_uncertainty", 2)
     if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
