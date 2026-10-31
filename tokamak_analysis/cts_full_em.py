@@ -246,6 +246,146 @@ def full_em_cts_spectral_density(
     if not isinstance(scattering_geometry, Mapping):
         raise ValueError("scattering_geometry must be a mapping")
     frequency_geometry = scattering_geometry.get("frequency_resolved_geometry")
+    if frequency_geometry is not None and any(
+        isinstance(item, Mapping) and "scattering_samples" in item
+        for item in frequency_geometry
+    ):
+        if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
+            raise ValueError("scattering-volume geometry must contain one frequency record per measured spectral bin")
+        integrated_spectrum = np.zeros(shifts.size, dtype=float)
+        diagnostic_keys = (
+            "fluctuation_covariance_density_current_E_B", "dielectric_tensor",
+            "wave_tensor", "bindslev_source_current_operator",
+            "total_three_wave_source_current_operator", "bindslev_dielectric_form_factors",
+            "bindslev_X_tensor", "bindslev_Gamma_inverse_tensor",
+        )
+        integrated_diagnostics = {key: [] for key in diagnostic_keys}
+        integrated_locations = []
+        integrated_fields = []
+        integrated_sample_diagnostics = []
+        integrated_coefficients = []
+        integrated_fast_kinetics = []
+        integrated_vertices = []
+        first_result = None
+        for frequency_index, (shift, frequency_record) in enumerate(zip(shifts, frequency_geometry)):
+            if not isinstance(frequency_record, Mapping) or "scattering_samples" not in frequency_record:
+                raise ValueError(f"frequency geometry record {frequency_index} is missing scattering_samples")
+            samples = frequency_record["scattering_samples"]
+            if not isinstance(samples, Sequence) or isinstance(samples, (str, bytes)) or len(samples) == 0:
+                raise ValueError(f"scattering_samples[{frequency_index}] must be a non-empty sequence")
+            sample_weights = np.asarray([sample.get("sample_weight", np.nan) for sample in samples], dtype=float)
+            if (np.any(~np.isfinite(sample_weights)) or np.any(sample_weights < 0)
+                    or not np.isclose(np.sum(sample_weights), 1.0, rtol=1e-8, atol=1e-10)):
+                raise ValueError(f"scattering_samples[{frequency_index}] weights must be finite, non-negative and sum to one")
+            local_spectrum = 0.0
+            local_diagnostics = {key: None for key in diagnostic_keys}
+            local_location = np.zeros(3, dtype=float)
+            local_field = np.zeros(3, dtype=float)
+            local_sample_results = []
+            local_coefficients = []
+            local_fast_kinetics = []
+            local_vertices = []
+            for sample_index, (sample, sample_weight) in enumerate(zip(samples, sample_weights)):
+                if not isinstance(sample, Mapping):
+                    raise ValueError(f"scattering_samples[{frequency_index}][{sample_index}] must be a mapping")
+                sample_geometry = {
+                    "frequency_resolved_geometry": [{
+                        "incident_direction": sample.get("incident_direction"),
+                        "scattered_direction": sample.get("scattered_direction"),
+                        "magnetic_field_T": sample.get("magnetic_field_T"),
+                        "scattering_location_m": sample.get("scattering_location_m"),
+                        "beam_overlap_relative": 1.0,
+                    }]
+                }
+                sample_result = full_em_cts_spectral_density(
+                    [float(shift)], f0, sample_geometry,
+                    electron_density_m3=ne, electron_temperature_eV=te,
+                    ion_temperature_eV=ion_temperature_eV,
+                    ion_species=ion_species, ion_fractions=ion_fractions,
+                    magnetic_field_T=magnetic_field_T,
+                    electron_flow_velocity_m_s=electron_flow_velocity_m_s,
+                    ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+                    incident_polarization=incident_polarization,
+                    scattered_polarization=scattered_polarization,
+                    harmonic_order=harmonic_order, quadrature_order=quadrature_order,
+                    damping_rate_rad_s=damping_rate_rad_s,
+                    fast_ion_populations=fast_ion_populations,
+                    electron_distribution=electron_distribution,
+                )
+                local_spectrum += float(sample_weight)*float(sample_result["spectral_density"][0])
+                local_location += float(sample_weight)*np.asarray(sample["scattering_location_m"], dtype=float)
+                local_field += float(sample_weight)*np.asarray(sample["magnetic_field_T"], dtype=float)
+                for key in diagnostic_keys:
+                    value = np.asarray(sample_result[key][0])
+                    if local_diagnostics[key] is None:
+                        local_diagnostics[key] = float(sample_weight)*value
+                    else:
+                        local_diagnostics[key] = local_diagnostics[key]+float(sample_weight)*value
+                local_sample_results.append({
+                    "sample_index": sample_index,
+                    "sample_weight": float(sample_weight),
+                    "scattering_location_m": np.asarray(sample["scattering_location_m"], dtype=float),
+                    "magnetic_field_T": np.asarray(sample["magnetic_field_T"], dtype=float),
+                    "ray_separation_m": sample.get("ray_separation_m"),
+                    "spectral_density": float(sample_result["spectral_density"][0]),
+                })
+                local_coefficients.append({
+                    "sample_weight": float(sample_weight),
+                    "coefficients": sample_result["bindslev_coupling_coefficients"][0],
+                })
+                local_fast_kinetics.append(sample_result["fast_ion_kinetic_diagnostics"])
+                local_vertices.append(sample_result["relativistic_three_wave_vertex_diagnostics"])
+                if first_result is None:
+                    first_result = sample_result
+            path_weight = _positive(frequency_record.get("beam_overlap_relative"), "beam_overlap_relative")
+            integrated_spectrum[frequency_index] = path_weight*local_spectrum
+            for key in diagnostic_keys:
+                integrated_diagnostics[key].append(local_diagnostics[key])
+            integrated_locations.append(local_location)
+            integrated_fields.append(local_field)
+            integrated_sample_diagnostics.append(local_sample_results)
+            integrated_coefficients.append({"scattering_volume_samples": local_coefficients})
+            integrated_fast_kinetics.append(local_fast_kinetics)
+            integrated_vertices.append(local_vertices)
+        result = dict(first_result)
+        result.update({
+            "frequency_shift_Hz": shifts,
+            "spectral_density": integrated_spectrum,
+            **{key: np.asarray(values) for key, values in integrated_diagnostics.items()},
+            "bindslev_coupling_coefficients": integrated_coefficients,
+            "fast_ion_kinetic_diagnostics": integrated_fast_kinetics,
+            "kinetic_population_diagnostics": integrated_fast_kinetics,
+            "relativistic_three_wave_vertex_diagnostics": integrated_vertices,
+            "relativistic_kinetic_three_wave_vertex_used": any(
+                any(any(sample_vertices) for sample_vertices in frequency_vertices)
+                for frequency_vertices in integrated_vertices
+            ),
+            "frequency_resolved_magnetic_field_T": np.asarray(integrated_fields),
+            "scattering_locations_m": np.asarray(integrated_locations),
+            "relative_gaussian_beam_overlap": np.asarray([
+                item["beam_overlap_relative"] for item in frequency_geometry
+            ], dtype=float),
+            "ray_tracing_geometry_used": True,
+            "scattering_volume_integration_used": True,
+            "scattering_volume_sample_count": np.asarray([
+                len(item["scattering_samples"]) for item in frequency_geometry
+            ], dtype=int),
+            "scattering_volume_sample_diagnostics": integrated_sample_diagnostics,
+            "scattering_volume_weighting": "normalized local Gaussian beam overlap times incident-ray path-length quadrature",
+            "magnetic_field_T": np.mean(np.asarray(integrated_fields), axis=0),
+            "limitations": list(first_result.get("limitations", []))+[
+                "Scattering-volume integration uses local Gaussian overlap samples and assumes fitted ne, Te and thermal-ion temperatures are uniform across the volume.",
+                "Absolute beam-overlap path integrals are used only as relative spectral-bin weights; absolute launcher/receiver power coupling is not normalized."
+            ],
+        })
+        result["relativistic_fast_ion_three_wave_vertex_used"] = any(
+            any(
+                any(item.get("population_role") == "fast ion" for item in sample_vertex_list)
+                for sample_vertex_list in frequency_vertex_list
+            )
+            for frequency_vertex_list in integrated_vertices
+        )
+        return result
     if frequency_geometry is None:
         ki_hat = _vec3(scattering_geometry.get("incident_direction"), "incident_direction")
         ks_hat = _vec3(scattering_geometry.get("scattered_direction"), "scattered_direction")
