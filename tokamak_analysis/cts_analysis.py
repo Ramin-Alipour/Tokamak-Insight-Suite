@@ -15,6 +15,14 @@ AMU=1.66053906660e-27
 C=299792458.0
 
 
+def _trapezoid(y, x):
+    """NumPy-version-independent trapezoidal integration."""
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    return float(integrate(y, x))
+
+
 def _array(value,name,ndim=None):
     a=np.asarray(value)
     if a.dtype.kind not in "iuf" or (ndim is not None and a.ndim!=ndim):
@@ -76,7 +84,7 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
     pdf=_array(pdf,"fast-ion probability density",1)
     if velocity_grid.size!=pdf.size or velocity_grid.size<9 or np.any(np.diff(velocity_grid)<=0) or np.any(pdf<0):
         raise ValueError("tabulated fast-ion VDF needs >=9 increasing velocity nodes and non-negative values")
-    area=float(np.trapz(pdf,velocity_grid))
+    area=_trapezoid(pdf,velocity_grid)
     if area<=0: raise ValueError("tabulated fast-ion VDF must have positive integral")
     pdf=pdf/area
     interpolator=PchipInterpolator(velocity_grid,pdf,extrapolate=False)
@@ -224,7 +232,7 @@ def _whitener(covariance, n, uncertainty):
     noise = uncertainty if uncertainty is not None else None
     if noise is None:
         raise ValueError("internal uncertainty scale is required")
-    return lambda residual: residual / noise, np.diag(noise ** 2)
+    return lambda residual: residual / noise.reshape((-1,) + (1,) * (np.ndim(residual) - 1)), np.diag(noise ** 2)
 
 
 def _trapezoid_node_weights(axis):
@@ -266,7 +274,7 @@ def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness
     smoothness = float(smoothness)
     if not np.isfinite(smoothness) or smoothness < 0:
         raise ValueError("fast-ion smoothness must be finite and non-negative")
-    area = float(np.trapz(p, v))
+    area = _trapezoid(p, v)
     if area <= 0:
         raise ValueError("tabulated fast-ion VDF must have positive integral")
     p = p / area
@@ -356,7 +364,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if not np.isfinite(regularization_strength) or regularization_strength<0:
         raise ValueError("regularization_strength must be finite and non-negative")
     if inversion_method=="regularized" and (not np.isfinite(regularization_strength) or regularization_strength<=0):
-        raise ValueError("regularized inversion requires a finite regularization_strength > 0")
+        raise ValueError("regularized inversion requires regularization_strength to be finite and > 0")
     if inversion_method=="regularized" and (fast is None or fast["kind"]!="infer_tabulated_1d"):
         raise ValueError("regularized inversion requires fast_ion.kind='infer_tabulated_1d'; initial plasma guesses are not regularization priors")
     if fast and fast["kind"]=="infer_tabulated_1d" and fast["vdf"]["smoothness_parameter"]<=0:
