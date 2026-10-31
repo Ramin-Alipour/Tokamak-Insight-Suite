@@ -44,6 +44,8 @@ def _moment_statistics(
         background_source = "explicit_fitted_background_signal"
     else:
         if background_mask is None:
+            if background_fraction is None:
+                raise ValueError("Specify background_signal, background_mask, or an explicit background_fraction; no spectral-edge background is assumed.")
             edge_width = float(background_fraction) * float(x[-1] - x[0])
             mask = (x <= x[0] + edge_width) | (x >= x[-1] - edge_width)
             background_source = "spectral_edges_assumed_background_by_wavelength_span"
@@ -111,7 +113,7 @@ def analyze_thomson_spectral_distribution(
     instrument_response_matrix=None,
     signal_uncertainty=None,
     signal_covariance=None,
-    background_fraction: float = 0.1,
+    background_fraction: float | None = None,
     background_mask=None,
     background_signal=None,
     moment_mc_samples: int = 200,
@@ -140,8 +142,8 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("instrument_sigma_uncertainty_nm requires scalar instrument_sigma_nm")
         if isinstance(instrument_sigma_uncertainty_nm, (bool, np.bool_)) or not isinstance(instrument_sigma_uncertainty_nm, (int, float, np.integer, np.floating)) or not np.isfinite(instrument_sigma_uncertainty_nm) or instrument_sigma_uncertainty_nm < 0:
             raise ValueError("instrument_sigma_uncertainty_nm must be finite and non-negative")
-    if isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.02 <= background_fraction <= 0.4):
-        raise ValueError("background_fraction must be a finite real number in [0.02, 0.4]")
+    if background_fraction is not None and (isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.02 <= background_fraction <= 0.4)):
+        raise ValueError("background_fraction must be None or an explicitly selected finite real number in [0.02, 0.4]")
     if isinstance(moment_mc_samples, (bool, np.bool_)) or not isinstance(moment_mc_samples, (int, np.integer)) or moment_mc_samples < 20:
         raise ValueError("moment_mc_samples must be an integer >= 20")
 
@@ -196,6 +198,8 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
+    if mask is None and explicit_background is None and background_fraction is None:
+        raise ValueError("Background is not inferred automatically. Supply background_signal, background_mask, or explicitly select background_fraction.")
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
