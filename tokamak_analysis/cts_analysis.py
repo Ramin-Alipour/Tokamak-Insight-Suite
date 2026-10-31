@@ -312,6 +312,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping")
     b=parameter_bounds or {}
+    allowed_bound_names={"electron_density_m3","electron_temperature_eV","ion_temperature_eV","ion_velocity_projection_m_s"}
+    unknown_bound_names=set(b)-allowed_bound_names
+    if unknown_bound_names:
+        raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
     def positive_bounds(name):
         if name not in b:
             return None
