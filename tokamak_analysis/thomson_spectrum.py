@@ -115,7 +115,7 @@ def fit_thomson_spectrum(
         "amplitude": result["amplitude"],
         "center_wavelength_nm": result["fitted_center_nm"],
         "fitted_sigma_nm": fitted_sigma,
-        "instrument_sigma_nm": float(instrument_sigma_nm),
+        "instrument_sigma_nm": None if instrument_sigma_nm is None else float(instrument_sigma_nm),
         "physical_sigma_nm": intrinsic_sigma,
         "background_intercept": result["background_intercept"],
         "background_slope_per_nm": result["background_slope_per_nm"],
