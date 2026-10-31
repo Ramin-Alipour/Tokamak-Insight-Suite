@@ -288,9 +288,9 @@ def _regularized_tabulated_fast_ion(velocity_m_s, pdf_m_s_inverse, *, smoothness
 
 def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scattering_geometry,
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
-    electron_density_initial_m3=1e19,electron_temperature_initial_eV=1000.,ion_temperature_initial_eV=500.,
-    ion_velocity_initial_m_s=0.,parameter_bounds=None,electron_velocity_projection_m_s=None,
-    fast_ion=None,global_search=True,random_seed=1729, inversion_method="differential_evolution",
+    electron_density_initial_m3=None,electron_temperature_initial_eV=None,ion_temperature_initial_eV=None,
+    ion_velocity_initial_m_s=None,parameter_bounds=None,electron_velocity_projection_m_s=None,
+    fast_ion=None,global_search=False,random_seed=1729, inversion_method="differential_evolution",
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None):
     """Infer CTS plasma parameters with selectable genetic, differential-evolution or regularized inversion."""
@@ -312,31 +312,74 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping")
     b=parameter_bounds or {}
-    def bounds(name,default):
-        lo,hi=map(float,b.get(name,default))
-        if not np.isfinite(lo+hi) or lo<=0 or lo>=hi: raise ValueError(f"invalid bounds for {name}")
-        return lo,hi
-    nb=bounds("electron_density_m3",(1e17,1e22)); tb=bounds("electron_temperature_eV",(10.,2e4)); ib=bounds("ion_temperature_eV",(1.,1e4))
-    ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-1e6,1e6))))
-    if len(ub)!=2 or not np.isfinite(sum(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>=C: raise ValueError("invalid subluminal ion-flow bounds")
+    def positive_bounds(name):
+        if name not in b:
+            return None
+        pair=np.asarray(b[name],dtype=float)
+        if pair.shape!=(2,) or np.any(~np.isfinite(pair)) or np.any(pair<=0) or pair[0]>=pair[1]:
+            raise ValueError(f"parameter_bounds[{name!r}] must be a positive finite increasing pair")
+        return float(pair[0]),float(pair[1])
+    nb=positive_bounds("electron_density_m3")
+    tb=positive_bounds("electron_temperature_eV")
+    ib=positive_bounds("ion_temperature_eV")
+    ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-C,C))))
+    if len(ub)!=2 or not np.all(np.isfinite(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>C:
+        raise ValueError("ion-flow bounds must be finite, increasing and within the physical subluminal domain")
+    if any(value is None for value in (
+        electron_density_initial_m3,electron_temperature_initial_eV,
+        ion_temperature_initial_eV,ion_velocity_initial_m_s
+    )):
+        raise ValueError("Explicit optimizer initial estimates are required for electron density, electron temperature, ion temperature and ion flow; no scientific defaults are assumed.")
     us=1e5
-    p0=np.array([np.log10(_positive(electron_density_initial_m3,"initial density")),np.log10(_positive(electron_temperature_initial_eV,"initial Te")),
-        np.log10(_positive(ion_temperature_initial_eV,"initial Ti")),float(ion_velocity_initial_m_s)/us])
-    if any(not lo<=10**p0[i]<=hi for i,(lo,hi) in enumerate((nb,tb,ib))) or not ub[0]<=ion_velocity_initial_m_s<=ub[1]:
-        raise ValueError("initial values must lie inside parameter_bounds")
-    lo=np.array([np.log10(nb[0]),np.log10(tb[0]),np.log10(ib[0]),ub[0]/us]); hi=np.array([np.log10(nb[1]),np.log10(tb[1]),np.log10(ib[1]),ub[1]/us])
+    initial_density=_positive(electron_density_initial_m3,"initial density")
+    initial_te=_positive(electron_temperature_initial_eV,"initial Te")
+    initial_ti=_positive(ion_temperature_initial_eV,"initial Ti")
+    initial_ion_flow=float(_array([ion_velocity_initial_m_s],"ion_velocity_initial_m_s")[0])
+    if abs(initial_ion_flow)>=C:
+        raise ValueError("ion_velocity_initial_m_s must be subluminal")
+    for name,value,pair in (
+        ("electron_density_m3",initial_density,nb),
+        ("electron_temperature_eV",initial_te,tb),
+        ("ion_temperature_eV",initial_ti,ib),
+    ):
+        if pair is not None and not pair[0]<=value<=pair[1]:
+            raise ValueError(f"initial value for {name} must lie inside its supplied parameter_bounds")
+    if not ub[0]<=initial_ion_flow<=ub[1]:
+        raise ValueError("initial ion flow must lie inside its supplied parameter_bounds")
+    p0=np.array([np.log10(initial_density),np.log10(initial_te),np.log10(initial_ti),initial_ion_flow/us])
+    lo=np.array([
+        np.log10(nb[0]) if nb is not None else -np.inf,
+        np.log10(tb[0]) if tb is not None else -np.inf,
+        np.log10(ib[0]) if ib is not None else -np.inf,
+        ub[0]/us,
+    ])
+    hi=np.array([
+        np.log10(nb[1]) if nb is not None else np.inf,
+        np.log10(tb[1]) if tb is not None else np.inf,
+        np.log10(ib[1]) if ib is not None else np.inf,
+        ub[1]/us,
+    ])
+    if not isinstance(global_search,(bool,np.bool_)):
+        raise ValueError("global_search must be boolean")
+    if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
+        not np.all(np.isfinite(lo)) or not np.all(np.isfinite(hi))
+    ):
+        raise ValueError("Global search requires explicit finite parameter_bounds for electron density, electron temperature and ion temperature; local least-squares inference supports unbounded positive log-parameters.")
     fast=None
     if fast_ion is not None:
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
         idx=fast_ion.get("species_index")
         if isinstance(idx,bool) or not isinstance(idx,(int,np.integer)) or not 0<=idx<len(ions): raise ValueError("invalid fast-ion species_index")
         idx=int(idx)
-        kind=fast_ion.get("kind","maxwellian")
+        kind=fast_ion.get("kind")
         if kind not in {"maxwellian","tabulated_1d","infer_tabulated_1d"}:
-            raise ValueError("fast_ion.kind must be maxwellian, tabulated_1d or infer_tabulated_1d")
-        flo,fhi=map(float,fast_ion.get("fraction_bounds",(.001,.5)))
-        fi=float(fast_ion.get("fraction_initial",.05))
-        if not 0<flo<fi<fhi<1: raise ValueError("invalid fast-ion fraction initial value or bounds")
+            raise ValueError("fast_ion.kind must be explicitly set to maxwellian, tabulated_1d or infer_tabulated_1d")
+        flo,fhi=map(float,fast_ion.get("fraction_bounds",(0.0,1.0)))
+        if fast_ion.get("fraction_initial") is None:
+            raise ValueError("fast_ion.fraction_initial is required; no fast-ion fraction is assumed")
+        fi=float(fast_ion["fraction_initial"])
+        if not np.isfinite(flo+fhi+fi) or not 0.0<=flo<fi<fhi<=1.0:
+            raise ValueError("fast-ion fraction initial value and bounds must satisfy 0 <= lower < initial < upper <= 1")
         if kind=="tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
@@ -353,10 +396,21 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             fast={"species_index":idx,"kind":"infer_tabulated_1d","vdf":vdf}
             p0=np.r_[p0,fi,logits]; lo=np.r_[lo,flo,np.full(logits.size,-20.0)]; hi=np.r_[hi,fhi,np.full(logits.size,20.0)]
         else:
-            tlo,thi=map(float,fast_ion.get("temperature_bounds_eV",(1e3,1e6)))
-            ft=float(fast_ion.get("temperature_initial_eV",max(2e3,3*ion_temperature_initial_eV)))
-            if not 0<tlo<ft<thi: raise ValueError("invalid fast-ion temperature initial value or bounds")
-            fast={"species_index":idx,"kind":"maxwellian"}; p0=np.r_[p0,fi,np.log10(ft)]; lo=np.r_[lo,flo,np.log10(tlo)]; hi=np.r_[hi,fhi,np.log10(thi)]
+            if fast_ion.get("temperature_initial_eV") is None:
+                raise ValueError("fast_ion.temperature_initial_eV is required for a Maxwellian fast-ion component")
+            ft=_positive(fast_ion["temperature_initial_eV"],"fast_ion.temperature_initial_eV")
+            temperature_bounds=fast_ion.get("temperature_bounds_eV")
+            if temperature_bounds is None:
+                tlo_log,thi_log=-np.inf,np.inf
+            else:
+                pair=np.asarray(temperature_bounds,dtype=float)
+                if pair.shape!=(2,) or np.any(~np.isfinite(pair)) or np.any(pair<=0) or pair[0]>=pair[1] or not pair[0]<=ft<=pair[1]:
+                    raise ValueError("fast_ion.temperature_bounds_eV must be a positive increasing pair containing temperature_initial_eV")
+                tlo_log,thi_log=np.log10(pair)
+            fast={"species_index":idx,"kind":"maxwellian"}
+            p0=np.r_[p0,fi,np.log10(ft)]
+            lo=np.r_[lo,flo,tlo_log]
+            hi=np.r_[hi,fhi,thi_log]
     noise=unc if unc is not None else np.full_like(y,max(float(np.std(y)),float(np.max(y))*1e-6,np.finfo(float).tiny))
     if inversion_method not in {"differential_evolution", "improved_genetic", "regularized"}:
         raise ValueError("inversion_method must be differential_evolution, improved_genetic or regularized")
