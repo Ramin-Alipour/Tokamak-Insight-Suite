@@ -1168,6 +1168,32 @@ def analyze_thomson_spectra(
             fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
             fit["uncertainty_completeness"] = "partial"
         results.append(fit)
+    shared_lsf_covariance = None
+    shared_lsf_covariance_order = []
+    if lsf_unc is not None and lsf_unc.ndim == 2 and results and all(
+        "_shared_lsf_temperature_draws" in item for item in results
+    ):
+        # Same draw index is the same shared instrument-response realization.
+        draw_columns = []
+        for channel_index, item in enumerate(results):
+            draw_columns.extend([
+                item["_shared_lsf_temperature_draws"],
+                item["_shared_lsf_velocity_draws"],
+                item["_shared_lsf_area_draws"],
+            ])
+            shared_lsf_covariance_order.extend([
+                f"channel_{channel_index}_electron_temperature_eV",
+                f"channel_{channel_index}_electron_velocity_projection_m_s",
+                f"channel_{channel_index}_integrated_scattered_power_W",
+            ])
+        aligned_draws = np.column_stack(draw_columns)
+        valid_draws = np.all(np.isfinite(aligned_draws), axis=1)
+        if np.count_nonzero(valid_draws) >= 2:
+            shared_lsf_covariance = np.cov(aligned_draws[valid_draws], rowvar=False, ddof=1)
+    for item in results:
+        item.pop("_shared_lsf_temperature_draws", None)
+        item.pop("_shared_lsf_velocity_draws", None)
+        item.pop("_shared_lsf_area_draws", None)
     joint_summary = None
     if joint_covariance is not None:
         from scipy.optimize import least_squares
@@ -1468,6 +1494,11 @@ def analyze_thomson_spectra(
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
         "electron_density_external_parameter_covariance_m6": None,
         "electron_density_cross_channel_covariance_available": density_cross_channel_covariance_available,
+        "shared_instrument_response_parameter_covariance": shared_lsf_covariance,
+        "shared_instrument_response_parameter_covariance_order": shared_lsf_covariance_order,
+        "shared_instrument_response_cross_channel_covariance_available": bool(
+            shared_lsf_covariance is not None and len(results) >= 2
+        ),
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
