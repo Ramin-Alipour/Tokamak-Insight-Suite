@@ -1728,6 +1728,40 @@ def analyze_thomson_spectra(
             )
     elif response_area_covariance_output is not None:
         joint_area_covariance_output = response_area_covariance_output.copy()
+        local_fit_variances = np.asarray([
+            (
+                float(item["integrated_scattered_power_fit_uncertainty_W"]) ** 2
+                if item.get("integrated_scattered_power_fit_uncertainty_W") is not None
+                else (
+                    float(item["integrated_scattered_power_uncertainty_W"]) ** 2
+                    if item.get("integrated_scattered_power_uncertainty_W") is not None
+                    else np.nan
+                )
+            )
+            for item in results
+        ], dtype=float)
+        for channel_index, variance in enumerate(local_fit_variances):
+            if np.isfinite(variance):
+                joint_area_covariance_output[channel_index, channel_index] += variance
+    elif joint_density_covariance is not None:
+        power_indices_for_area = np.arange(0, 6 * len(results), 6, dtype=int)
+        power_rows_zero_for_area = (
+            np.allclose(joint_density_covariance[power_indices_for_area, :], 0.0, rtol=0.0, atol=1e-14)
+            and np.allclose(joint_density_covariance[:, power_indices_for_area], 0.0, rtol=0.0, atol=1e-14)
+        )
+        if power_rows_zero_for_area:
+            local_fit_variances = np.asarray([
+                (
+                    float(item["integrated_scattered_power_uncertainty_W"]) ** 2
+                    if item.get("integrated_scattered_power_uncertainty_W") is not None
+                    else np.nan
+                )
+                for item in results
+            ], dtype=float)
+            if np.any(np.isfinite(local_fit_variances)):
+                joint_area_covariance_output = np.diag(
+                    np.nan_to_num(local_fit_variances, nan=0.0)
+                )
     shared_response_density_covariance = None
     if response_area_covariance_output is not None:
         channel_count = len(results)
