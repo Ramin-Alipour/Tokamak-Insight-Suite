@@ -3640,6 +3640,56 @@
         {
           "name": "captured_probability",
           "unit": "dimensionless"
+        },
+        {
+          "name": "distribution",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "frequency_ratio",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "integrated_probability",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "polarization_model",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "quadrature",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "recoil_included",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "thomson_recoil_correction_fraction_limit",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "thomson_no_recoil_validity_status",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "thomson_recoil_correction_fraction_max_on_quadrature_support",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "structured / dimensionless",
+          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
         }
       ],
       "prerequisites": [
