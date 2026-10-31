@@ -352,7 +352,7 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
     y=100.0*np.exp(-0.5*((x-532.0)/8.0)**2)+10.0
     y[0]=0.0
     y[-1]=0.0
-    out=analyze_thomson_spectral_distribution(x,y,instrument_sigma_nm=0.2)
+    out=analyze_thomson_spectral_distribution(x,y,instrument_sigma_nm=0.2,background_fraction=0.1)
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
 
