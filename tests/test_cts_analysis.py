@@ -556,7 +556,7 @@ def test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry(monkeypatch):
         }
 
     monkeypatch.setattr(geometry, "trace_cold_plasma_ray", fake_trace)
-    equilibrium = lambda x: {"magnetic_field_T": np.array([0.0, 0.0, 2.0])}
+    equilibrium = lambda x: {"magnetic_field_T": np.array([0.0, 0.0, 2.0]), "species": []}
     cov = np.eye(3)*1.0e-4
     shifts = np.array([0.8e9, 1.0e9])
     result = geometry.trace_cts_frequency_resolved_beams(
@@ -574,6 +574,9 @@ def test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry(monkeypatch):
         receiver_beam_covariances_m2=cov,
     )
     assert len(result["frequency_resolved_geometry"]) == 2
+    assert all(len(item["scattering_samples"]) == 3 for item in result["frequency_resolved_geometry"])
+    for item in result["frequency_resolved_geometry"]:
+        assert sum(sample["sample_weight"] for sample in item["scattering_samples"]) == pytest.approx(1.0)
     np.testing.assert_allclose(result["relative_beam_overlap"], [1.0, 1.0])
     np.testing.assert_allclose(
         result["frequency_resolved_geometry"][0]["magnetic_field_T"], [0.0, 0.0, 2.0]
