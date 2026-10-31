@@ -260,6 +260,14 @@ def trace_cts_frequency_resolved_beams(
     assumes uniform fitted ne/Te/Ti across the sampled volume while allowing
     local ray directions and magnetic field to vary.
     """
+    if (
+        isinstance(mode_index, bool) or not isinstance(mode_index, (int, np.integer))
+        or int(mode_index) not in (0, 1, 2)
+    ):
+        raise ValueError(
+            "mode_index must be explicitly selected as 0, 1 or 2 for "
+            "frequency-resolved cold-plasma ray tracing"
+        )
     shifts = np.asarray(frequency_shift_Hz, dtype=float)
     if (shifts.ndim != 1 or shifts.size < 1 or np.any(~np.isfinite(shifts))
             or np.any(np.diff(shifts) <= 0)):
