@@ -417,6 +417,7 @@ def analyze_thomson_spectra(
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
     incident_polarization_uncertainty=None,
+    maximum_recoil_correction_fraction=0.01,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -473,6 +474,10 @@ def analyze_thomson_spectra(
         "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
     }
+    maximum_recoil_correction_fraction = _finite_scalar(
+        maximum_recoil_correction_fraction, "maximum_recoil_correction_fraction",
+        minimum=np.finfo(float).tiny, maximum=1.0 - np.finfo(float).eps,
+    )
     if model not in supported_models:
         raise ValueError(
             "Unsupported optical Thomson model. Analysis 1 supports non_collective_maxwellian, "
@@ -749,6 +754,7 @@ def analyze_thomson_spectra(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
                 response, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
                 incident_polarization=incident_polarization,
+                maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
@@ -1159,6 +1165,7 @@ def analyze_thomson_spectra(
                             xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
                             sampled, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
                             incident_polarization=incident_polarization,
+                            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                         )
                     else:
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
@@ -1347,6 +1354,7 @@ def analyze_thomson_spectra(
                         incident_direction=sampled_incident,
                         scattered_direction=sampled_scattered,
                         incident_polarization=sampled_polarization,
+                        maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                     )
                     external_te_samples.append(float(draw["electron_temperature_eV"]))
                     external_velocity_samples.append(float(draw["electron_velocity_projection_m_s"]))
