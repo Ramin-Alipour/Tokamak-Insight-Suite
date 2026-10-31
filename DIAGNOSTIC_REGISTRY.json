@@ -6848,6 +6848,10 @@
         {
           "name": "physical_parameter_extraction",
           "unit": "structured physical plasma parameters with provenance and identifiability status"
+        },
+        {
+          "name": "gaussian_fit_uncertainty_scope",
+          "unit": "text"
         }
       ],
       "assumptions": [
@@ -6860,7 +6864,7 @@
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
       "algorithm": "Compute signed wavelength-space spectral moments and response-convolved Gaussian shape diagnostics alongside the physical parameters supplied by the canonical selected Thomson forward fit of the same calibrated measured spectrum. Shape-only completion is prohibited.",
-      "uncertainty_model": "Optional pointwise signal uncertainty or full positive-definite within-channel covariance is propagated by parametric Monte Carlo; optional scalar instrument-width uncertainty is included when the scalar Gaussian response model is selected. Monte Carlo success counts and uncertainty availability are reported explicitly.",
+      "uncertainty_model": "Signed spectral-moment uncertainties are propagated by Monte Carlo from supplied signal uncertainty/covariance and optional scalar instrument-width uncertainty. The response-convolved Gaussian shape-fit covariance is conditional on a fixed supplied response matrix; the canonical physical parameters and their response-matrix uncertainty are inherited from the primary Thomson fit.",
       "limitations": [
         "Spectral moments characterize the measured wavelength distribution and do not uniquely identify an electron velocity distribution.",
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
