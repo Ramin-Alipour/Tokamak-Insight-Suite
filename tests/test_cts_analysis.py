@@ -492,3 +492,89 @@ def test_bindslev_dielectric_form_factors_are_hermitian_and_flux_normalized():
     np.testing.assert_allclose(G,G.conj().T,rtol=1e-10,atol=1e-20)
     assert result["normalized_incident_flux_S_i"]>0
     assert result["normalized_scattered_flux_S_s"]>0
+
+
+def test_full_em_species_resolved_ion_temperature_inputs():
+    from tokamak_analysis.cts_full_em import _species_list
+
+    species = _species_list(
+        2.0e19,
+        [
+            {"name": "D+", "charge_state": 1, "mass_amu": 2.014},
+            {"name": "C6+", "charge_state": 6, "mass_amu": 12.0},
+        ],
+        [0.7, 0.3], 1200.0,
+        {"D+": 400.0, "C6+": 900.0},
+        [0.0, 0.0, 0.0],
+        {"D+": [0.0, 0.0, 0.0], "C6+": [0.0, 0.0, 0.0]},
+    )
+    assert species[1]["temperature"] == pytest.approx(400.0)
+    assert species[2]["temperature"] == pytest.approx(900.0)
+    assert species[1]["density"] == pytest.approx(0.7*2.0e19)
+    assert species[2]["density"] == pytest.approx(0.3*2.0e19/6.0)
+    with pytest.raises(ValueError, match="exactly the ion species names"):
+        _species_list(
+            2.0e19,
+            [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            [1.0], 1200.0, {"T+": 400.0},
+            [0.0, 0.0, 0.0], {"D+": [0.0, 0.0, 0.0]},
+        )
+
+
+def test_relativistic_gyrotropic_three_wave_vertex_is_finite():
+    from tokamak_analysis.cts_relativistic import relativistic_gyrotropic_three_wave_vertex
+
+    wi = 2*np.pi*140e9
+    wf = 2*np.pi*1.0e8
+    result = relativistic_gyrotropic_three_wave_vertex(
+        wi, [wi/299792458.0, 0.0, 0.0], [0.0, 0.0, 1.0],
+        wf, [0.0, 12.0, 18.0], [0.0, 0.0, 2.0],
+        density_m3=1.0e14, mass_kg=2.014*1.66053906660e-27,
+        charge_C=1.602176634e-19,
+        distribution={"kind": "relativistic_bigaussian",
+                      "temperature_perpendicular_eV": 2.0e5,
+                      "temperature_parallel_eV": 1.0e5},
+        quadrature_order=4, gyrophase_points=16,
+        resonance_width_rad_s=2*np.pi*1.0e6,
+    )
+    vertex = result["current_vertex_A_m2_per_V_m"]
+    assert vertex.shape == (3, 3)
+    assert np.all(np.isfinite(vertex))
+    assert result["relativistic_kinematics"] is True
+    assert result["second_order_vlasov"] is True
+
+
+def test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry(monkeypatch):
+    import tokamak_analysis.cts_em_geometry as geometry
+
+    def fake_trace(position, wavevector, omega, **kwargs):
+        base = np.asarray(position, dtype=float)
+        k = np.asarray(wavevector, dtype=float)
+        return {
+            "position_m": np.vstack((base, base + np.array([0.5, 0.0, 0.0]), base + np.array([1.0, 0.0, 0.0]))),
+            "wavevector_rad_m": np.vstack((k, k, k)),
+        }
+
+    monkeypatch.setattr(geometry, "trace_cold_plasma_ray", fake_trace)
+    equilibrium = lambda x: {"magnetic_field_T": np.array([0.0, 0.0, 2.0])}
+    cov = np.eye(3)*1.0e-4
+    shifts = np.array([0.8e9, 1.0e9])
+    result = geometry.trace_cts_frequency_resolved_beams(
+        shifts, 140e9,
+        incident_ray={"initial_position_m": [0.0, 0.0, 0.0],
+                      "initial_wavevector_rad_m": [1.0, 0.0, 0.0]},
+        receiver_rays=[
+            {"initial_position_m": [0.0, 0.0, 0.0],
+             "initial_wavevector_rad_m": [0.0, 1.0, 0.0]},
+            {"initial_position_m": [0.0, 0.0, 0.0],
+             "initial_wavevector_rad_m": [0.0, 1.0, 0.0]},
+        ],
+        equilibrium=equilibrium,
+        incident_beam_covariance_m2=cov,
+        receiver_beam_covariances_m2=cov,
+    )
+    assert len(result["frequency_resolved_geometry"]) == 2
+    np.testing.assert_allclose(result["relative_beam_overlap"], [1.0, 1.0])
+    np.testing.assert_allclose(
+        result["frequency_resolved_geometry"][0]["magnetic_field_T"], [0.0, 0.0, 2.0]
+    )
