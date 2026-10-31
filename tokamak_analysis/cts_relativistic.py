@@ -139,7 +139,7 @@ def relativistic_gyrotropic_species_response(
                 bfield=np.cross(k,efield)/omega
                 force=charge*(efield[None,:]+np.cross(velocity,bfield))
                 rhs[:,col]=-np.sum(force*gradf,axis=1)
-            streaming=-1j*(omega-kpar*vpar-kperp*vperp*np.cos(phi))
+            streaming=width-1j*(omega-kpar*vpar-kperp*vperp*np.cos(phi))
             operator=np.diag(streaming)+omega_g*derivative
             try:
                 delta_f=np.linalg.solve(operator,rhs)
@@ -172,7 +172,7 @@ def relativistic_gyrotropic_species_response(
         "resonance_broadening_rad_s": width,
         "gyrophase_points": nphi,
         "quadrature_order": int(quadrature_order),
-        "velocity_max_fraction_c": float(np.max(np.sqrt((pperp/(gamma*mass))**2+(ppar/(gamma*mass))**2))/C),
+        "velocity_max_fraction_c": float(np.max(np.sqrt((pperp/(gamma_grid*mass))**2+(ppar/(gamma_grid*mass))**2))/C),
         "noise_model": "Klimontovich uncorrelated-particle orbit spectrum; not equilibrium FDT",
         "wavevector_lab_rad_m": klab,
     }
