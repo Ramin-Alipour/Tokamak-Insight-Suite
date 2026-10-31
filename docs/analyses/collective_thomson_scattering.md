@@ -97,6 +97,12 @@ These are mathematical and software regression tests using controlled synthetic 
 4. G. A. Baker et al., “Recovering Non-Maxwellian Velocity Distribution Functions from Collective Thomson Scattering Spectra Using Generalized Basis Representations,” arXiv:2610.37516 (2026). This preprint motivates flexible non-Maxwellian VDF inversion; TIS currently uses a tabulated 1-D projected VDF with explicit smoothness regularization.
 
 
+## Magnetized electromagnetic CTS references
+
+7. X. Fang, D. Xia, M. Huang, F. Zhang and Y. Ding, “Study on the Full Electromagnetic Model of Collective Thomson Scattering in Magnetic Confinement Fusion,” *Power Generation Technology* **46**(1), 200–208 (2025), DOI: [10.12096/j.2096-4528.pgt.24149](https://doi.org/10.12096/j.2096-4528.pgt.24149). This is the primary recent reference for the magnetized full-electromagnetic CTS formulation, including density, current, electric-field and magnetic-field fluctuations and their cross-correlations.
+
+8. H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58**(8–9), 983–989 (1996), DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8). Foundational transfer/coupling formulation for correlated electromagnetic plasma fluctuations.
+
 ## Recent diagnostic and inversion literature
 
 5. T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513. DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948). This supports the importance of CTS background characterization; TIS does not perform automatic background estimation because the project input contract assumes prepared, calibrated measurement data.
