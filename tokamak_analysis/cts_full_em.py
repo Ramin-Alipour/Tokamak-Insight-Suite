@@ -427,6 +427,20 @@ def analyze_full_em_cts_spectrum(
     values = 10.0**fit.x
     transform = np.diag(np.log(10.0) * values)
     covariance = transform @ covariance_log @ transform.T
+    forward_diagnostics = full_em_cts_spectral_density(
+        f, probe_frequency_Hz, scattering_geometry,
+        electron_density_m3=float(values[0]),
+        electron_temperature_eV=float(values[1]),
+        ion_temperature_eV=float(values[2]),
+        ion_species=ion_species, ion_fractions=ion_fractions,
+        magnetic_field_T=magnetic_field_T,
+        electron_flow_velocity_m_s=electron_flow_velocity_m_s,
+        ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+        incident_polarization=incident_polarization,
+        scattered_polarization=scattered_polarization,
+        harmonic_order=harmonic_order, quadrature_order=quadrature_order,
+        damping_rate_rad_s=damping_rate_rad_s,
+    )
     return {
         "electron_density_m3": float(values[0]),
         "electron_temperature_eV": float(values[1]),
@@ -448,4 +462,8 @@ def analyze_full_em_cts_spectrum(
             "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
         ],
         "inversion_scope": "electron density, electron temperature and one common ion temperature; flow vectors and composition are not fitted",
+        "fluctuation_covariance_density_current_E_B": forward_diagnostics["fluctuation_covariance_density_current_E_B"],
+        "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
+        "wave_tensor": forward_diagnostics["wave_tensor"],
+        "forward_model_diagnostics": forward_diagnostics,
     }
