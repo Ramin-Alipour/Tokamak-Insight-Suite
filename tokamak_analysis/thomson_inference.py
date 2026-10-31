@@ -992,7 +992,7 @@ def analyze_thomson_spectra(
                 "scattered_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else area_sigma),
                 "incident_power_uncertainty_W": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(laser_power_uncertainty_W, i, y.shape[0], "laser_power_uncertainty_W")),
                 "interaction_length_uncertainty_m": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(interaction_length_uncertainty_m, i, y.shape[0], "interaction_length_uncertainty_m")),
-                "scattering_angle_uncertainty_rad": (None if joint_density_covariance is not None or scattering_angle_uncertainty_rad is None else scattering_angle_unc),
+                "scattering_angle_uncertainty_rad": (None if scattering_angle_uncertainty_rad is None else scattering_angle_unc),
                 "collection_solid_angle_uncertainty_sr": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(collection_solid_angle_uncertainty_sr, i, y.shape[0], "collection_solid_angle_uncertainty_sr")),
                 "optical_efficiency_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(optical_efficiency_uncertainty, i, y.shape[0], "optical_efficiency_uncertainty")),
                 "incident_polarization_vector": _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
@@ -1011,6 +1011,9 @@ def analyze_thomson_spectra(
             fit["integrated_scattered_power_W"] = area
             fit["integrated_scattered_power_uncertainty_W"] = area_sigma
             fit["differential_cross_section_m2_sr"] = density_result["differential_cross_section_m2_sr"]
+            fit["scattering_angle_relative_sensitivity"] = density_result.get(
+                "scattering_angle_relative_sensitivity"
+            )
             fit["density_method"] = "absolute integrated Thomson power using shared polarization-aware density inversion"
             fit["density_uncertainty_model"] = density_result["uncertainty_model"]
             if density_inputs.get("relative_input_covariance") is not None:
@@ -1639,8 +1642,33 @@ def analyze_thomson_spectra(
                 channel_result["electron_density_joint_covariance_diagonal_m6"] = float(
                     density_joint_covariance_output[channel_index, channel_index]
                 )
+    density_angle_covariance_output = None
+    if scattering_angle_uncertainty_rad is not None and any(
+        item.get("scattering_angle_relative_sensitivity") is not None
+        and item.get("electron_density_m3") is not None for item in results
+    ):
+        angle_density_sensitivity = np.asarray([
+            (
+                float(item["electron_density_m3"])
+                * float(item["scattering_angle_relative_sensitivity"])
+                if item.get("electron_density_m3") is not None
+                and item.get("scattering_angle_relative_sensitivity") is not None
+                else np.nan
+            )
+            for item in results
+        ], dtype=float)
+        density_angle_covariance_output = (
+            np.outer(angle_density_sensitivity, angle_density_sensitivity)
+            * float(scattering_angle_unc) ** 2
+        )
+        if density_joint_covariance_output is not None:
+            valid_angle = np.isfinite(density_angle_covariance_output)
+            density_joint_covariance_output[valid_angle] += density_angle_covariance_output[valid_angle]
     density_cross_channel_covariance_available = bool(
-        density_joint_covariance_output is not None
+        (
+            density_joint_covariance_output is not None
+            or density_angle_covariance_output is not None
+        )
         and sum(result.get("electron_density_m3") is not None for result in results) >= 2
     )
     output = {
@@ -1652,6 +1680,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
+        "electron_density_angle_covariance_m6": density_angle_covariance_output,
         "electron_density_shared_response_covariance_m6": shared_response_density_covariance,
         "electron_density_external_parameter_covariance_m6": None,
         "electron_density_cross_channel_covariance_available": density_cross_channel_covariance_available,
