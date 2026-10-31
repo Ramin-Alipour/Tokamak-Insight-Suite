@@ -138,12 +138,28 @@ def density_from_thomson_scattered_power(
             raise ValueError("relative_input_covariance must be symmetric")
         if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError("relative_input_covariance must be positive semidefinite")
-        if any(v is not None for v in (scattered_power_uncertainty_W, incident_power_uncertainty_W,
+        if any(v is not None for v in (incident_power_uncertainty_W,
                 interaction_length_uncertainty_m, collection_solid_angle_uncertainty_sr,
                 optical_efficiency_uncertainty, polarization_factor_uncertainty)):
-            raise ValueError("Use relative_input_covariance instead of separate scalar uncertainties; do not double-count uncertainty inputs")
+            raise ValueError("Use relative_input_covariance instead of separate scalar optical-factor uncertainties; do not double-count uncertainty inputs")
         gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
         rel_variance = float(gradient @ covariance @ gradient)
+        if scattered_power_uncertainty_W is not None:
+            # A zero first row/column declares that measured-power uncertainty
+            # is supplied separately (e.g. by joint spectral GLS or response MC).
+            if not np.allclose(covariance[0, :], 0.0, rtol=0.0, atol=1e-14) or not np.allclose(
+                covariance[:, 0], 0.0, rtol=0.0, atol=1e-14
+            ):
+                raise ValueError(
+                    "scattered_power_uncertainty_W may accompany relative_input_covariance "
+                    "only when its first row and column are zero; otherwise power uncertainty "
+                    "would be double-counted."
+                )
+            sigma_power = _positive_finite_scalar(
+                scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
+            )
+            if ps > 0.0:
+                rel_variance += (sigma_power / ps) ** 2
         if rel_variance < -1e-12:
             raise ValueError("relative_input_covariance produced a negative propagated variance")
         rel_variance = max(0.0, rel_variance)
