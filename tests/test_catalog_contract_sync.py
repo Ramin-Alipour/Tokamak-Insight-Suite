@@ -149,7 +149,7 @@ def test_thomson_spatial_reconstruction_is_a_registered_measured_spectrum_subana
     )
     contract = entry["execution_contract"]
     assert contract["calibrated_measurements_to_physics"] is True
-    assert any("measured calibrated spectra" in item.lower() for item in contract["limitations"] + contract["assumptions"])
+    assert "measured calibrated spectra" in contract["note"].lower()
     module = importlib.import_module("tokamak_analysis.thomson_workflow")
     assert callable(module.reconstruct_thomson_profile_from_spectra)
 
