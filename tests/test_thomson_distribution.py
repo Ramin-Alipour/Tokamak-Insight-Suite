@@ -203,7 +203,7 @@ def test_moments_use_signed_residuals_and_propagate_uncertainty():
     y = y.copy()
     y[0] -= 2.0
     out = analyze_thomson_spectral_distribution(
-        x, y, instrument_sigma_nm=0.06, background_fraction=0.1,
+        x, y, instrument_sigma_nm=0.06,
         signal_uncertainty=np.full(x.size, 0.5),
         background_mask=(x < 499.2) | (x > 500.8),
         moment_mc_samples=40,
