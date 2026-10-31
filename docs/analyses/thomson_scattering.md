@@ -8,7 +8,7 @@ The execution path is measured spectrum → selected physical forward model → 
 
 ## Implemented model choices
 
-The model must be selected explicitly. The analysis does not silently substitute one physical model for another.
+The model must be selected explicitly in both the dashboard and the public Python API. The API rejects an omitted model; it never silently defaults to Maxwellian or substitutes one physical model for another.
 
 ### 1. Non-collective Maxwellian
 
