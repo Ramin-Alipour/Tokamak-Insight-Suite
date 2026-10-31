@@ -1,7 +1,7 @@
 """Magnetized full-electromagnetic CTS fluctuation and transfer solver.
 
 Thermal Maxwellian species use the magnetized kinetic response. Explicitly
-supplied relativistic gyrotropic non-Maxwellian electron/fast-ion populations
+supplied relativistic gyrotropic non-Maxwellian electron populations and fast-ion populations
 use momentum-space Vlasov response, Klimontovich orbit noise and a second-order
 relativistic Vlasov three-wave current vertex. Maxwellian bulk-electron
 scattering retains the low-temperature Bindslev Gamma/X source-current
