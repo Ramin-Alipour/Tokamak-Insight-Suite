@@ -44,7 +44,8 @@
         {
           "name": "instrument_response",
           "unit": "measured normalized response matrix/kernel/callable",
-          "required": true
+          "required": true,
+          "description": "Measured response may be one shared 1-D kernel, shared 2-D matrix, or channel-specific 3-D response matrix (Nchannel × Nλ × Nλ); no response is synthesized."
         },
         {
           "name": "signal_uncertainty",
@@ -337,6 +338,26 @@
         "year": 1991,
         "doi": "10.1088/0741-3335/33/14/005",
         "scope": "Foundational relativistic magnetized scattering context; the optical Maxwell-Juttner model here is a separate unmagnetized single-particle Thomson limit."
+      },
+      {
+        "title": "Computing the generalized plasma dispersion function for non-Maxwellian plasmas, with applications to Thomson scattering",
+        "authors": "C. R. Skolar, W. J. Longley and L. V. Goodwin",
+        "journal": "Physics of Plasmas",
+        "volume": "32",
+        "article": "043907",
+        "year": 2025,
+        "doi": "10.1063/5.0261966",
+        "scope": "Generalized plasma-dispersion-function treatment of non-Maxwellian Thomson response; not the same algorithm as TIS's analytic Student-t projection of isotropic Kappa."
+      },
+      {
+        "title": "Monte Carlo simulation method for incoherent Thomson scattering spectra from arbitrary electron distribution functions",
+        "authors": "K. Sakai et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "21",
+        "article": "C01002",
+        "year": 2026,
+        "doi": "10.1088/1748-0221/21/01/C01002",
+        "scope": "Reference spectra for arbitrary electron distributions, including relativistic Maxwellian and Kappa cases; TIS uses deterministic quadrature and does not claim to reproduce the paper's Monte Carlo algorithm."
       }
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
@@ -4035,13 +4056,14 @@
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
-          "description": "Optional for electrostatic CTS. Full-electromagnetic CTS requires this or spectral_covariance."
+          "description": "Optional pointwise spectral uncertainty; Full-EM requires this or spectral_covariance."
         },
         {
           "name": "fast_ion",
           "unit": "structured",
           "required": false,
-          "description": "If supplied, kind and fraction_initial are mandatory. Maxwellian fast ions additionally require temperature_initial_eV; temperature_bounds_eV is optional. Inferred tabulated VDFs require explicit smoothness and regularized inversion. Fraction bounds default only to the physical interval (0,1)."
+          "description": "If supplied, kind and fraction_initial are mandatory. Maxwellian fast ions additionally require temperature_initial_eV; temperature_bounds_eV is optional. Inferred tabulated VDFs require explicit smoothness and regularized inversion. Fraction bounds default only to the physical interval (0,1).",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "parameter_bounds",
@@ -4064,13 +4086,15 @@
         {
           "name": "inversion_method",
           "unit": "text",
-          "required": true,
-          "description": "Explicit selection: local_least_squares, differential_evolution, improved_genetic or regularized. Global-search methods require global_search=true and finite explicit bounds; regularized is only for inferred tabulated fast-ion VDF."
+          "required": false,
+          "description": "Explicit selection: local_least_squares, differential_evolution, improved_genetic or regularized. Global-search methods require global_search=true and finite explicit bounds; regularized is only for inferred tabulated fast-ion VDF.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "regularization_strength",
           "unit": "dimensionless",
-          "required": false
+          "required": false,
+          "required_when_model": "electrostatic"
         },
         {
           "name": "electron_velocity_projection_m_s",
@@ -4082,23 +4106,20 @@
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
-          "required": false,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed.",
-          "required_when_model": "electrostatic"
+          "required": true,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
-          "required": false,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed.",
-          "required_when_model": "electrostatic"
+          "required": true,
+          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
-          "required": false,
-          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed.",
-          "required_when_model": "electrostatic"
+          "required": true,
+          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed."
         },
         {
           "name": "ion_velocity_initial_m_s",
@@ -4111,12 +4132,14 @@
           "name": "global_search",
           "unit": "boolean; enables differential-evolution global initialization",
           "required": false,
-          "description": "Boolean. True only for differential_evolution or improved_genetic; local_least_squares and regularized require false."
+          "description": "Boolean. True only for differential_evolution or improved_genetic; local_least_squares and regularized require false.",
+          "required_when_model": "electrostatic"
         },
         {
           "name": "random_seed",
           "unit": "integer; deterministic search seed",
-          "required": false
+          "required": false,
+          "required_when_model": "electrostatic"
         },
         {
           "name": "model",
@@ -4177,31 +4200,36 @@
           "name": "harmonic_order",
           "unit": "integer >= 2",
           "required": false,
-          "default": 8
+          "default": 8,
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "quadrature_order",
           "unit": "integer >= 4",
           "required": false,
-          "default": 12
+          "default": 12,
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "damping_rate_rad_s",
           "unit": "rad s^-1; positive numerical regularization",
           "required": false,
-          "description": "Optional numerical Landau-contour regularization; not a physical collision frequency."
+          "description": "Full-EM only. Optional numerical regularization; omission uses max(2π f_probe × 10^-7, 1 rad/s), recorded in numerical_controls; not a physical collision frequency.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "fast_ion_populations",
           "unit": "sequence of explicit relativistic gyrotropic populations",
           "required": false,
-          "description": "Each item requires name, charge_state, mass_amu, density_m3 and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3). Any fast-ion drift must be represented in the supplied asymmetric tabulated momentum distribution."
+          "description": "Each item requires name, charge_state, mass_amu, density_m3 and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3). Any fast-ion drift must be represented in the supplied asymmetric tabulated momentum distribution.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "electron_distribution",
           "unit": "relativistic gyrotropic momentum-space distribution",
           "required": false,
-          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_maxwell_juttner (temperature follows fitted electron_temperature_eV unless explicitly matched), relativistic_bigaussian or tabulated_gyrotropic."
+          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_maxwell_juttner (temperature follows fitted electron_temperature_eV unless explicitly matched), relativistic_bigaussian or tabulated_gyrotropic.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "ion_temperature_eV",
@@ -4214,13 +4242,15 @@
           "name": "frequency_resolved_geometry",
           "unit": "one geometry record per frequency bin",
           "required": false,
-          "description": "Output of trace_cts_frequency_resolved_beams; contains local incident/scattered directions, magnetic field, scattering location and normalized Gaussian beam-overlap weight."
+          "description": "Output of trace_cts_frequency_resolved_beams; contains local incident/scattered directions, magnetic field, scattering location and normalized Gaussian beam-overlap weight.",
+          "required_when_model": "full_electromagnetic"
         },
         {
           "name": "scattering_sample_count",
           "unit": "integer >=2",
           "required": false,
-          "description": "Number of incident-ray samples used for path-integrated Gaussian scattering-volume quadrature."
+          "description": "Number of incident-ray samples used for path-integrated Gaussian scattering-volume quadrature.",
+          "required_when_model": "full_electromagnetic"
         }
       ],
       "output_specs": [
@@ -4275,17 +4305,20 @@
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
-          "description": "Explicit externally supplied electron-flow projection used in the CTS forward model; not fitted."
+          "description": "Explicit externally supplied electron-flow projection used in the CTS forward model; not fitted.",
+          "available_when_model": "electrostatic"
         },
         {
           "name": "electron_velocity_projection_is_fitted",
           "unit": "boolean",
-          "description": "Always false; electron-flow projection is an external fixed input."
+          "description": "Always false; electron-flow projection is an external fixed input.",
+          "available_when_model": "electrostatic"
         },
         {
           "name": "electron_velocity_projection_input_uncertainty_m_s",
           "unit": "m s^-1; optional 1-sigma",
-          "description": "User-supplied uncertainty for the external electron-flow projection."
+          "description": "User-supplied uncertainty for the external electron-flow projection.",
+          "available_when_model": "electrostatic"
         },
         {
           "name": "fluctuation_covariance_density_current_E_B",
@@ -4294,11 +4327,13 @@
         },
         {
           "name": "dielectric_tensor",
-          "unit": "frequency x 3 x 3 complex relative dielectric tensor"
+          "unit": "frequency x 3 x 3 complex relative dielectric tensor",
+          "available_when_model": "full_electromagnetic"
         },
         {
           "name": "wave_tensor",
-          "unit": "frequency x 3 x 3 complex Maxwell wave tensor"
+          "unit": "frequency x 3 x 3 complex Maxwell wave tensor",
+          "available_when_model": "full_electromagnetic"
         },
         {
           "name": "parameter_uncertainties",
@@ -4307,7 +4342,8 @@
         {
           "name": "bindslev_source_current_operator",
           "unit": "frequency x 3 x 10 complex tensor",
-          "description": "Bindslev low-temperature source-current operator from density, particle flux, electric and magnetic fluctuations."
+          "description": "Bindslev low-temperature source-current operator from density, particle flux, electric and magnetic fluctuations.",
+          "available_when_model": "full_electromagnetic"
         },
         {
           "name": "bindslev_coupling_coefficients",
@@ -4341,7 +4377,8 @@
         {
           "name": "cold_mode_diagnostics",
           "unit": "frequency-indexed mode metadata",
-          "description": "Selected incident/scattered cold-plasma branches, refractive indices, polarization matching and unit-flux mode diagnostics."
+          "description": "Selected incident/scattered cold-plasma branches, refractive indices, polarization matching and unit-flux mode diagnostics.",
+          "available_when_model": "full_electromagnetic"
         },
         {
           "name": "ion_temperature_eV_by_species",
@@ -4366,7 +4403,8 @@
         {
           "name": "total_three_wave_source_current_operator",
           "unit": "frequency x 3 x 10 complex tensor",
-          "description": "Combined Bindslev bulk-electron and relativistic non-Maxwellian electron/fast-ion second-order source operator used in the correlated transfer contraction."
+          "description": "Combined Bindslev bulk-electron and relativistic non-Maxwellian electron/fast-ion second-order source operator used in the correlated transfer contraction.",
+          "available_when_model": "full_electromagnetic"
         },
         {
           "name": "relativistic_kinetic_three_wave_vertex_used",
