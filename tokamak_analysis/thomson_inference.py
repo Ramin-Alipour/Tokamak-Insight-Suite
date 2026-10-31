@@ -378,7 +378,7 @@ def analyze_thomson_spectra(
     interaction_length_uncertainty_m=None, collection_solid_angle_uncertainty_sr=None,
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
     density_relative_covariance=None, joint_density_relative_covariance=None,
-    instrument_response_uncertainty=None, model="non_collective_maxwellian",
+    instrument_response_uncertainty=None, model=None,
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=None, collective_initial_temperature_eV=None,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
@@ -438,6 +438,8 @@ def analyze_thomson_spectra(
         raise ValueError("Use scattering_angle_uncertainty_rad or beam-direction component uncertainties, not both; they describe the same geometry uncertainty.")
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model not in {"collective_maxwellian", "collective_kappa"}:
         raise ValueError("Beam-direction component uncertainty is currently supported only by collective dielectric models.")
+    if model is None:
+        raise ValueError("Select a Thomson physical model explicitly; no default Maxwellian assumption is applied.")
     supported_models = {
         "non_collective_maxwellian", "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
