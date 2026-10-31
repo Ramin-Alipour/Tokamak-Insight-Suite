@@ -50,8 +50,9 @@ def _moment_statistics(
         else:
             mask = background_mask
             background_source = "user_supplied_background_mask"
-        if np.count_nonzero(mask) < 3:
-            raise ValueError("background_mask must select at least three wavelength samples")
+        minimum_background_samples = 2 if background_mask is None else 3
+        if np.count_nonzero(mask) < minimum_background_samples:
+            raise ValueError(f"background selection must include at least {minimum_background_samples} wavelength samples")
         slope, intercept = np.polyfit(x[mask], y[mask], 1)
         background = slope * x + intercept
     corrected = y - background
