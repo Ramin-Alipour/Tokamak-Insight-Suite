@@ -790,15 +790,18 @@ def analyze_thomson_spectra(
                 fit["electron_density_m3"] = None
                 fit["electron_density_uncertainty_m3"] = None
                 fit["density_status"] = "spectral_shape_does_not_resolve_collective_density"
-        expected_parameter_count = (2 if model == "collective_maxwellian" else
-                                    6 if model == "non_collective_kappa" else 5)
+        expected_parameter_count = (
+            2 if model == "collective_maxwellian" else
+            3 if model == "collective_kappa" else
+            6 if model == "non_collective_kappa" else 5
+        )
         quality = _fit_identifiability(
             fit.get("fit_covariance"), fit.get("residual"), ui, expected_parameter_count,
             optimizer_success=fit.get("optimizer_success", True),
             jacobian_rank=(fit.get("collective_parameter_jacobian_rank")
-                           if model == "collective_maxwellian" else None),
+                           if model in {"collective_maxwellian", "collective_kappa"} else None),
             jacobian_condition_number=(fit.get("collective_parameter_jacobian_condition_number")
-                                       if model == "collective_maxwellian" else None),
+                                       if model in {"collective_maxwellian", "collective_kappa"} else None),
         )
         fit.update(quality)
         fit_covariance_for_discrepancy=fit.get("fit_covariance")
@@ -818,6 +821,10 @@ def analyze_thomson_spectra(
                 if fit.get("electron_density_m3") is not None:
                     fit["electron_density_uncertainty_m3"]=float(total_sigma[0])
                 fit["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
+            elif model=="collective_kappa" and total_sigma.size>=3:
+                fit["electron_density_uncertainty_m3"]=float(total_sigma[0])
+                fit["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
+                fit["kappa_index_uncertainty"]=float(total_sigma[2])
             elif model=="non_collective_kappa":
                 fit["electron_temperature_uncertainty_eV"]=float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"],
@@ -836,10 +843,11 @@ def analyze_thomson_spectra(
                     fit["electron_velocity_projection_uncertainty_m_s"],velocity_discrepancy))
         if not fit["fit_accepted"]:
             raise ValueError(f"Thomson fit rejected for channel {i}: {'; '.join(fit['fit_quality_reasons'])}")
-        if model == "collective_maxwellian":
+        if model in {"collective_maxwellian", "collective_kappa"}:
             fit["parameter_provenance"] = {
                 "electron_density": "inferred from the measured collective spectrum",
                 "electron_temperature": "inferred from the measured collective spectrum",
+                "electron_distribution": ("kappa index inferred from the measured collective spectrum" if model == "collective_kappa" else "Maxwellian"),
                 "ion_temperature": "externally supplied fixed input; not inferred",
                 "ion_velocity": "externally supplied fixed input; not inferred",
                 "electron_velocity": "externally supplied fixed input; not inferred",
@@ -868,7 +876,7 @@ def analyze_thomson_spectra(
                 "model_discrepancy_uncertainty_available"
             ]
         density_inputs = None
-        if model in {"non_collective_maxwellian", "non_collective_kappa"} and all(v is not None for v in (
+        if model in {"non_collective_maxwellian", "non_collective_kappa", "non_collective_relativistic_maxwell_juttner"} and all(v is not None for v in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency,
             incident_polarization, incident_direction, scattered_direction
         )):
@@ -935,7 +943,7 @@ def analyze_thomson_spectra(
         if lsf_unc is None: missing_uncertainties.append("instrument_response_uncertainty")
         if laser_wavelength_uncertainty_nm is None: missing_uncertainties.append("laser_wavelength_uncertainty_nm")
         if scattering_angle_uncertainty_rad is None: missing_uncertainties.append("scattering_angle_uncertainty_rad")
-        if model == "collective_maxwellian":
+        if model in {"collective_maxwellian", "collective_kappa"}:
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
             if lsf_unc is not None:
                 # Collective LSF uncertainty is propagated in the external-parameter
@@ -950,7 +958,7 @@ def analyze_thomson_spectra(
                 if value is None: missing_uncertainties.append(key)
         fit["uncertainty_inputs_missing"] = missing_uncertainties
         fit["uncertainty_completeness"] = "partial" if missing_uncertainties else "all_supported_inputs_supplied"
-        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa"}:
+        if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "non_collective_relativistic_maxwell_juttner"}:
             lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
             rng = np.random.default_rng(7319 + i)
             te_samples, velocity_samples, area_samples = [], [], []
@@ -961,9 +969,15 @@ def analyze_thomson_spectra(
                     continue
                 sampled /= colsum[None, :]
                 try:
-                    fitter = _fit_kappa if model == "non_collective_kappa" else _fit_noncollective
-                    draw = fitter(xi, y[i], float(laser_wavelength_nm),
-                                  float(scattering_angle_rad), sampled, ui)
+                    if model == "non_collective_kappa":
+                        draw = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
+                    elif model == "non_collective_relativistic_maxwell_juttner":
+                        draw = fit_relativistic_maxwell_juttner(
+                            xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
+                            sampled, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+                        )
+                    else:
+                        draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     if "integrated_scattered_power_W" in draw and np.isfinite(draw["integrated_scattered_power_W"]):
