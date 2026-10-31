@@ -25,6 +25,13 @@ def _synthetic_spectrum(temperature_ev=100.0, instrument_sigma_nm=0.05):
     return wavelength, signal, laser_nm, angle, sigma_physical
 
 
+def _measured_response(wavelength, sigma_nm=0.05):
+    x = np.asarray(wavelength, dtype=float)
+    delta = x[:, None] - x[None, :]
+    response = np.exp(-0.5 * (delta / sigma_nm) ** 2)
+    return response / response.sum(axis=0, keepdims=True)
+
+
 def test_raw_thomson_spectrum_recovers_temperature_with_instrument_deconvolution():
     wavelength, signal, laser_nm, angle, sigma_physical = _synthetic_spectrum()
     out = fit_thomson_spectrum(
@@ -33,6 +40,7 @@ def test_raw_thomson_spectrum_recovers_temperature_with_instrument_deconvolution
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         signal_uncertainty=np.full(signal.size, 0.8),
     )
     assert out["electron_temperature_eV"] == pytest.approx(100.0, rel=0.03)
@@ -52,6 +60,7 @@ def test_raw_thomson_spectrum_rejects_nonmonotonic_wavelength():
             laser_wavelength_nm=532,
             scattering_angle_rad=np.pi / 2,
             instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         )
 
 
@@ -65,6 +74,7 @@ def test_raw_thomson_spectrum_rejects_unresolved_instrument_width():
             laser_wavelength_nm=532,
             scattering_angle_rad=np.pi / 2,
             instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         )
 
 
@@ -79,6 +89,7 @@ def test_raw_thomson_spectrum_rejects_invalid_uncertainty():
             laser_wavelength_nm=laser_nm,
             scattering_angle_rad=angle,
             instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
             signal_uncertainty=uncertainty,
         )
 
@@ -91,6 +102,7 @@ def test_raw_thomson_spectrum_does_not_claim_chi_square_without_uncertainties():
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
     )
     assert out["chi_square"] is None
     assert out["reduced_chi_square"] is None
@@ -107,6 +119,7 @@ def test_calibrated_thomson_spectral_power_integrates_fitted_gaussian_area():
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         signal_uncertainty=np.full(signal.size, 0.8e-18),
         spectral_power_density_calibrated=True,
     )
@@ -125,12 +138,14 @@ def test_thomson_temperature_fit_is_stable_under_signal_unit_scaling():
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
     )
     power_density_fit = fit_thomson_spectrum(
         wavelength, signal * 1.0e-18,
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         signal_uncertainty=np.full(signal.size, 0.8e-18),
         spectral_power_density_calibrated=True,
     )
@@ -151,6 +166,7 @@ def test_calibrated_thomson_spectrum_to_temperature_and_density_pipeline():
         laser_wavelength_nm=laser_nm,
         scattering_angle_rad=angle,
         instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         signal_uncertainty=np.full(signal.size, 0.8e-18),
         spectral_power_density_calibrated=True,
     )
@@ -186,6 +202,7 @@ def test_raw_thomson_spectrum_rejects_insufficient_wavelength_window():
             laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2,
             instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
         )
 
 
@@ -199,6 +216,7 @@ def test_raw_thomson_spectrum_requires_boolean_power_calibration_flag():
             laser_wavelength_nm=laser_nm,
             scattering_angle_rad=angle,
             instrument_sigma_nm=0.05,
+            instrument_response_matrix=_measured_response(wavelength),
             spectral_power_density_calibrated="yes",
         )
 
