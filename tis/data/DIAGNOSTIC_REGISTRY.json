@@ -312,6 +312,21 @@
           "name": "effective_differential_cross_section_uncertainty_m2_sr",
           "unit": "m^2 sr^-1",
           "description": "Relativistic Maxwell-Juttner only: fitted-parameter covariance plus supplied instrument-response and geometry/polarization uncertainty contributions."
+        },
+        {
+          "name": "power_cross_section_relative_covariance",
+          "unit": "dimensionless",
+          "description": "Relativistic Maxwell-Juttner only: covariance between fitted total scattered power and velocity-averaged effective differential cross-section."
+        },
+        {
+          "name": "captured_spectral_probability_uncertainty",
+          "unit": "dimensionless",
+          "description": "Relativistic Maxwell-Juttner only: fitted-parameter uncertainty in the fraction of the full scattering spectrum inside the measured wavelength window."
+        },
+        {
+          "name": "integrated_scattered_power_window_W",
+          "unit": "W",
+          "description": "Relativistic Maxwell-Juttner only: fitted scattered power within the recorded wavelength window before captured-probability correction."
         }
       ],
       "assumptions": [
