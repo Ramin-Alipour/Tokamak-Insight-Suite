@@ -221,6 +221,8 @@ def full_em_cts_spectral_density(
     dielectric_tensors = np.empty((shifts.size, 3, 3), dtype=complex)
     wave_tensors = np.empty_like(dielectric_tensors)
     harmonic_counts = []
+    bindslev_operators = []
+    bindslev_coefficients = []
     for index, shift in enumerate(shifts):
         fs = f0 + shift
         ki = (2.0 * np.pi * f0 / C) * ki_hat
@@ -279,14 +281,48 @@ def full_em_cts_spectral_density(
         component_covariances[index] = state_cov
         dielectric_tensors[index] = epsilon
         wave_tensors[index] = wave_tensor
-        # The receiver measures the transverse electron-current radiation.
-        # Incident polarization sets the Thomson polarization factor; all
-        # density/current/E/B cross-correlations remain available in state_cov.
-        receiver = np.zeros(10, dtype=complex)
-        receiver[1:4] = es.conj()
-        received_current_power = float(np.real(receiver @ state_cov @ receiver.conj()))
-        polarization_factor = abs(np.vdot(es, ei)) ** 2
-        spectra[index] = max(received_current_power * polarization_factor, 0.0)
+        # Apply the complete low-temperature Bindslev source-current tensor
+        # to the joint fluctuation covariance.  The fluctuation covariance
+        # above is [delta_n, delta_j, delta_E, delta_B]; Bindslev's Eq. (111)
+        # is written in [delta_n, delta_particle_flux, delta_E, delta_B].
+        from .cts_bindslev import bindslev_source_current_operator, bindslev_correlated_transfer_spectrum
+        from .cts_em_geometry import cold_plasma_dielectric_tensor
+        electron_cold = [{
+            "density_m3": ne, "charge_C": -E_CHARGE, "mass_kg": ME
+        }]
+        omega_i = 2.0 * np.pi * f0
+        omega_s = 2.0 * np.pi * fs
+        chi_i = cold_plasma_dielectric_tensor(omega_i, b, electron_cold) - np.eye(3)
+        chi_s = cold_plasma_dielectric_tensor(omega_s, b, electron_cold) - np.eye(3)
+        source = bindslev_source_current_operator(
+            omega_incident_rad_s=omega_i,
+            omega_scattered_rad_s=omega_s,
+            wavevector_incident_rad_m=ki,
+            wavevector_scattered_rad_m=ks,
+            incident_electric_field=ei,
+            incident_susceptibility=chi_i,
+            scattered_susceptibility=chi_s,
+            magnetic_field_T=b,
+            electron_density_m3=ne,
+        )
+        # Electron particle flux is j_e/q_e.  This exact unit conversion is
+        # required before contracting the Bindslev velocity/flux terms.
+        to_flux = np.eye(10, dtype=complex)
+        to_flux[1:4, 1:4] /= -E_CHARGE
+        covariance_n_v_E_B = to_flux @ state_cov @ to_flux.conj().T
+        transfer = bindslev_correlated_transfer_spectrum(
+            covariance_n_v_E_B, source["source_current_operator"], es
+        )
+        spectra[index] = transfer["received_source_current_spectral_power"]
+        bindslev_operators.append(source["source_current_operator"])
+        projected = es.conj() @ source["source_current_operator"]
+        bindslev_coefficients.append({
+            "G_n": projected[0],
+            "G_v": projected[1:4],
+            "G_E": projected[4:7],
+            "G_B": projected[7:10],
+            "transfer_contributions": transfer["transfer_contributions"],
+        })
         harmonic_counts.append(int(harmonic_order))
     return {
         "frequency_shift_Hz": shifts,
@@ -294,8 +330,11 @@ def full_em_cts_spectral_density(
         "fluctuation_covariance_density_current_E_B": component_covariances,
         "dielectric_tensor": dielectric_tensors,
         "wave_tensor": wave_tensors,
+        "bindslev_source_current_operator": np.asarray(bindslev_operators),
+        "bindslev_coupling_coefficients": bindslev_coefficients,
+        "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
         "magnetic_field_T": b,
-        "model": "magnetized full-electromagnetic kinetic CTS (local Maxwellian, non-relativistic)",
+        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling (thermal response currently Maxwellian, non-relativistic)",
         "kinetic_response": "linearized Vlasov equation; gyro-harmonic expansion and Gauss-Laguerre/Hermite velocity quadrature",
         "fluctuation_source": "classical fluctuation-dissipation theorem applied species-wise to Hermitian conductivity",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
@@ -305,7 +344,7 @@ def full_em_cts_spectral_density(
         "limitations": [
             "Homogeneous local plasma; no ray tracing, refraction along a finite path, or finite scattering-volume beam overlap.",
             "Non-relativistic isotropic Maxwellian distributions only; non-Maxwellian fast-ion VDFs are not yet supported by this full-EM solver.",
-            "High-frequency probe propagation and the receiver coupling are represented by supplied transverse polarization vectors; full Bindslev three-wave coupling tensors are not yet included.",
+            "The Bindslev three-wave source-current closure is the low-temperature magnetized formulation; its relativistic kinetic generalization is not used for the fast-ion population.",
             "Classical fluctuation-dissipation source assumes local thermodynamic equilibrium for each species."
         ],
     }
