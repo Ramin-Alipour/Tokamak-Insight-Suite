@@ -6524,14 +6524,14 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson spectral distribution",
-    "quantities": "Model-independent spectral centroid, observed width, skewness, excess kurtosis, signed spectral moments, and uncertainty diagnostics from one measured calibrated Thomson spectrum.",
+    "quantities": "Per-spectrum physical electron temperature, scattering-vector electron-flow projection, and electron density only when identifiable from absolute calibrated scattered power and complete optical geometry, together with model-independent spectral centroid, width, skewness, excess kurtosis and uncertainty diagnostics.",
     "status": "D",
-    "method": "Analyze the measured calibrated spectrum independently of physical Maxwellian/Kappa fitting. The caller must supply a fitted background signal, an explicit background mask, or explicitly select a spectral-edge background fraction. A measured instrument response matrix is preferred; scalar Gaussian width is accepted only as an explicitly supplied measured instrument-width summary.",
-    "caveat": "Spectral moments characterize the measured distribution and do not uniquely recover an electron velocity distribution. No automatic edge-background assumption is made. Signed residuals are retained; no clipping-based moments are used.",
+    "method": "The primary Analysis 1 pipeline forwards the selected canonical optical Thomson physical-fit result for the same calibrated measured spectrum into this subanalysis. It exposes the fitted Maxwellian, isotropic Kappa or relativistic Maxwell-Juttner physical parameters alongside signed wavelength-space moments and a response-convolved Gaussian shape diagnostic. It does not infer a unique electron velocity distribution from moments or run a second inconsistent physical fit.",
+    "caveat": "Physical Te and scattering-vector flow are supplied by the selected physical forward fit of the same calibrated measured spectrum. Absolute electron density is reported only when identifiable from calibrated W/nm scattered power and complete optical geometry/polarization inputs; otherwise it is explicitly unavailable. This subanalysis does not independently invert an arbitrary electron velocity distribution from spectral moments.",
     "implementation_functions": [
       "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
     ],
-    "implementation_status": "Independent callable for one calibrated measured spectrum; it does not depend on success of the primary Thomson physical fit.",
+    "implementation_status": "Integrated physical-parameter subanalysis of canonical Analysis 1: spectral moments and Gaussian shape diagnostics are returned only alongside the selected physical forward-fit parameters from the same calibrated measured spectrum. Shape-only execution is rejected.",
     "execution_contract": {
       "schema_version": "1.0",
       "execution_level": "analysis_pipeline",
@@ -6604,9 +6604,9 @@
         },
         {
           "name": "physical_parameters",
-          "unit": "structured canonical fit result",
+          "unit": "structured canonical physical-fit result for the same calibrated measured spectrum",
           "required": true,
-          "description": "Physical parameters from the canonical selected Thomson forward fit of this same calibrated measured spectrum; requires finite positive electron_temperature_eV, finite electron_velocity_projection_m_s, and explicit model."
+          "description": "Required physical parameters from the canonical selected Thomson forward fit of this same calibrated measured spectrum; finite positive electron_temperature_eV, finite electron_velocity_projection_m_s, and explicit model are mandatory."
         }
       ],
       "output_specs": [
@@ -6812,8 +6812,7 @@
         },
         {
           "name": "physical_parameter_extraction",
-          "unit": "structured",
-          "description": "Required canonical-fit electron temperature and scattering-vector flow projection, plus absolute density only when identifiable."
+          "unit": "structured physical plasma parameters with provenance and identifiability status"
         }
       ],
       "assumptions": [
@@ -6829,11 +6828,11 @@
       "uncertainty_model": "Optional pointwise signal uncertainty or full positive-definite within-channel covariance is propagated by parametric Monte Carlo; optional scalar instrument-width uncertainty is included when the scalar Gaussian response model is selected. Monte Carlo success counts and uncertainty availability are reported explicitly.",
       "limitations": [
         "Spectral moments characterize the measured wavelength distribution and do not uniquely identify an electron velocity distribution.",
-        "This descriptive subanalysis does not infer electron temperature or electron density.",
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
         "A scalar Gaussian deconvolution is not applied to a general measured response matrix.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
         "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in fitted background nuisance parameters is not jointly sampled.",
+        "The physical parameter extraction is delegated to the selected canonical Analysis 1 forward fit of the same calibrated measured spectrum; it is not a second independent physical fit.",
         "A successful canonical Thomson physical forward fit of the same calibrated measured spectrum is mandatory; shape-only calls are rejected."
       ],
       "function_links": [
@@ -6865,7 +6864,7 @@
         "scope": "Diagnostic forward/instrument-response modeling context."
       }
     ],
-    "note": "Analysis 1 subanalysis: single-spectrum distribution/moment diagnostics. It is independent of a successful primary physical fit, but remains part of primary Analysis 1 and does not claim to reconstruct an arbitrary electron velocity distribution.",
+    "note": "Analysis 1 subanalysis: single-spectrum spectral-shape diagnostics plus physical parameters from the canonical selected Thomson fit of the same calibrated measured spectrum; no arbitrary electron velocity-distribution reconstruction is claimed.",
     "primary_analysis_id": 1
   }
 ]
