@@ -196,6 +196,16 @@ def reconstruct_thomson_profile_from_spectra(
     reconstruction never accepts pre-derived profile input and never extrapolates
     beyond the measured channel coordinates.
     """
+    selected_model = kwargs.get("model")
+    if selected_model not in {
+        "non_collective_maxwellian",
+        "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+    }:
+        raise ValueError(
+            "Thomson spatial profile reconstruction supports only the three registered "
+            "non-collective optical Thomson models; microwave CTS has its own subanalysis."
+        )
     result = analyze_thomson_spectra(*args, **kwargs)
     radii = np.asarray(result["radius_m"], dtype=float)
     n_channels = radii.size
