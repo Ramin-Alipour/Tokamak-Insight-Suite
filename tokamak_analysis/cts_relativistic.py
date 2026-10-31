@@ -1,15 +1,11 @@
-"""Relativistic gyrotropic fast-ion response and Klimontovich shot noise.
+"""Relativistic gyrotropic kinetic response and three-wave CTS coupling.
 
-This module solves the linearized relativistic Vlasov equation in a uniform
-magnetic field by Fourier collocation in gyrophase and momentum-space
-quadrature. It supports an anisotropic bi-Gaussian momentum distribution and
-user-supplied tabulated gyrotropic distributions f(p_perp,p_parallel).
-
-The distribution is defined in momentum space; relativistic kinematics
-v=p/(gamma*m), gyrofrequency qB/(gamma*m), and the exact Lorentz force are
-used. The fluctuation source is computed from the Klimontovich particle
-shot-noise spectrum (not an equilibrium fluctuation-dissipation closure),
-with a documented Lorentzian representation of the causal resonance delta.
+This module solves the relativistic Vlasov equation in momentum/gyrophase
+space for explicitly supplied anisotropic bi-Gaussian or tabulated gyrotropic
+electron/ion populations. It provides the linear conductivity, Klimontovich
+particle shot-noise covariance, and a second-order relativistic Vlasov
+three-wave current vertex. The equilibrium VDF is supplied by the caller;
+no distribution is silently inferred or reconstructed.
 """
 from __future__ import annotations
 
