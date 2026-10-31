@@ -1679,7 +1679,7 @@ def analyze_thomson_spectra(
                         fit["integrated_scattered_power_uncertainty_W"] = joint_area_sigma
         joint_area_covariance_from_spectral_fit = (
             joint_area_gradient_matrix @ parameter_covariance @ joint_area_gradient_matrix.T
-        ) * (1.0 + discrepancy_scale)
+        )
         joint_summary={
             "method":"joint generalized least squares across all channels",
             "channel_major_covariance_order":True,
@@ -1728,6 +1728,36 @@ def analyze_thomson_spectra(
             )
     elif response_area_covariance_output is not None:
         joint_area_covariance_output = response_area_covariance_output.copy()
+    shared_response_density_covariance = None
+    if response_area_covariance_output is not None:
+        channel_count = len(results)
+        area_values_for_response = np.asarray([
+            item.get("integrated_scattered_power_W", np.nan) for item in results
+        ], dtype=float)
+        density_values_for_response = np.asarray([
+            np.nan if item.get("electron_density_m3") is None else item["electron_density_m3"]
+            for item in results
+        ], dtype=float)
+        shared_response_density_covariance = np.full(
+            (channel_count, channel_count), np.nan, dtype=float
+        )
+        for row_index in range(channel_count):
+            for column_index in range(channel_count):
+                area_row = area_values_for_response[row_index]
+                area_column = area_values_for_response[column_index]
+                density_row = density_values_for_response[row_index]
+                density_column = density_values_for_response[column_index]
+                area_covariance_value = response_area_covariance_output[row_index, column_index]
+                if (
+                    np.isfinite(area_row) and area_row != 0.0
+                    and np.isfinite(area_column) and area_column != 0.0
+                    and np.isfinite(density_row) and np.isfinite(density_column)
+                    and np.isfinite(area_covariance_value)
+                ):
+                    shared_response_density_covariance[row_index, column_index] = (
+                        density_row * density_column * area_covariance_value
+                        / (area_row * area_column)
+                    )
     density_joint_covariance_output = None
     if joint_density_covariance is not None:
         channel_count = len(results)
