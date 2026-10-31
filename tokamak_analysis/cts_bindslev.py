@@ -175,6 +175,7 @@ def bindslev_source_current_operator(
     operator *= prefactor
     return {
         "source_current_operator": operator,
+        "dielectric_coupling_operator": operator,
         "incident_density_perturbation": ni,
         "incident_particle_flux_m_s_m3": vi,
         "incident_magnetic_field": bi,
