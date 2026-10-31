@@ -695,7 +695,7 @@ def analyze_full_em_cts_spectrum(
     if rank < len(names) or not np.isfinite(condition) or condition > 1e12:
         raise ValueError("full-EM CTS fit rejected: density, electron temperature and all species-resolved ion temperatures are not jointly identifiable")
     r, amplitude, offset, convolved = residual(fit.x, return_profile=True)
-    dof = max(1, f.size - 5)
+    dof = max(1, f.size - (len(names) + 2))
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
     if spectral_covariance is None and signal_uncertainty is None:
         covariance_log *= float(r @ r / dof)
