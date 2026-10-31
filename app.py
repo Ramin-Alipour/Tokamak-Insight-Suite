@@ -842,8 +842,11 @@ elif page=='Spectral Analysis':
                 signal_col=st.selectbox('Calibrated spectral intensity',numeric_cols,index=None,placeholder='Select intensity column',key='ts_infer_signal')
                 uncertainty_col=st.selectbox('Per-sample spectral 1σ uncertainty (optional)',['<none>']+numeric_cols,key='ts_infer_uncertainty')
             model=st.selectbox('Physical spectral model',[
-                'non_collective_maxwellian','non_collective_kappa',
-                'collective_maxwellian'
+                'non_collective_maxwellian',
+                'non_collective_kappa',
+                'non_collective_relativistic_maxwell_juttner',
+                'collective_maxwellian',
+                'collective_kappa',
             ],index=None,placeholder='Select a physical model',key='ts_infer_model')
             g1,g2,g3=st.columns(3)
             with g1:
@@ -860,7 +863,7 @@ elif page=='Spectral Analysis':
                 joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
             collective_kwargs={}
-            if model=='collective_maxwellian':
+            if model in {'collective_maxwellian','collective_kappa'}:
                 st.markdown('**Collective-model inputs (explicit measured values / geometry; no defaults are inferred)**')
                 c1,c2=st.columns(2)
                 with c1:
@@ -870,6 +873,8 @@ elif page=='Spectral Analysis':
                     ion_temperature_unc_text=st.text_input('Ion-temperature 1σ uncertainties (eV; one per species; optional)',key='ts_infer_ion_temperature_unc')
                     ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors)',key='ts_infer_ion_velocities')
                     ion_velocity_unc_text=st.text_input('Ion-velocity component 1σ uncertainties (m/s; semicolon-separated 3-vectors; optional)',key='ts_infer_ion_velocity_unc')
+                    collective_kappa_initial_text=st.text_input('Initial electron kappa index (collective-kappa model)',value='3.0',key='ts_infer_collective_kappa_initial')
+                    collective_kappa_bounds_text=st.text_input('Kappa-index bounds (min,max)',value='1.51,50',key='ts_infer_collective_kappa_bounds')
                 with c2:
                     electron_velocity_text=st.text_input('Electron velocity vector (m/s; x,y,z)',key='ts_infer_electron_velocity')
                     electron_velocity_unc_text=st.text_input('Electron-velocity component 1σ uncertainties (m/s; x,y,z; optional)',key='ts_infer_electron_velocity_unc')
@@ -878,8 +883,18 @@ elif page=='Spectral Analysis':
                     st.caption('Use either the scalar scattering-angle uncertainty above or component-wise beam-direction uncertainties below, not both.')
                     incident_direction_unc_text=st.text_input('Incident-direction component 1σ uncertainties (x,y,z; optional)',value='',key='ts_infer_incident_direction_unc')
                     scattered_direction_unc_text=st.text_input('Scattered-direction component 1σ uncertainties (x,y,z; optional)',value='',key='ts_infer_scattered_direction_unc')
+            relativistic_incident_direction_text=None
+            relativistic_scattered_direction_text=None
+            if model=='non_collective_relativistic_maxwell_juttner':
+                st.markdown('**Relativistic Thomson geometry**')
+                rg1,rg2=st.columns(2)
+                with rg1:
+                    relativistic_incident_direction_text=st.text_input('Incident beam direction (x,y,z)',key='ts_infer_rel_incident_direction')
+                with rg2:
+                    relativistic_scattered_direction_text=st.text_input('Scattered beam direction (x,y,z)',key='ts_infer_rel_scattered_direction')
+                st.caption('The relativistic model uses exact photon-frequency kinematics and assumes the bulk electron flow is parallel to the scattering vector.')
             absolute_density=False
-            if model!='collective_maxwellian':
+            if model not in {'collective_maxwellian','collective_kappa'}:
                 absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
             else:
                 st.caption('Collective-mode density is inferred from the resolved dielectric spectral shape; the non-collective absolute-power inversion is not used.')
@@ -1011,6 +1026,11 @@ elif page=='Spectral Analysis':
                         kwargs['density_relative_covariance']=pd.read_csv(density_covariance_upload,header=None).to_numpy(dtype=float)
                     if joint_density_covariance_upload is not None:
                         kwargs['joint_density_relative_covariance']=pd.read_csv(joint_density_covariance_upload,header=None).to_numpy(dtype=float)
+                    if model=='non_collective_relativistic_maxwell_juttner':
+                        kwargs.update({
+                            'incident_direction':_parse_ts_vector(relativistic_incident_direction_text,'Incident direction'),
+                            'scattered_direction':_parse_ts_vector(relativistic_scattered_direction_text,'Scattered direction'),
+                        })
                     if absolute_density:
                         kwargs.update({
                             'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
@@ -1024,7 +1044,7 @@ elif page=='Spectral Analysis':
                             'polarization_factor_uncertainty':_parse_ts_optional_scalar(polarization_unc_text,'Polarization-factor uncertainty'),
                             'spectral_power_density_calibrated':True,
                         })
-                    if model=='collective_maxwellian':
+                    if model in {'collective_maxwellian','collective_kappa'}:
                         species=[v.strip() for v in ion_species_text.split(',') if v.strip()]
                         fractions=None if not ion_fraction_text.strip() else _parse_ts_float_list(ion_fraction_text,'Ion fractions')
                         ion_temperatures=_parse_ts_float_list(ion_temperature_text,'Ion temperatures')
@@ -1054,6 +1074,9 @@ elif page=='Spectral Analysis':
                             ],dtype=float)
                         if electron_velocity_unc_text.strip():
                             kwargs['electron_velocity_uncertainty_m_s']=_parse_ts_vector(electron_velocity_unc_text,'Electron-velocity uncertainties')
+                        if model=='collective_kappa':
+                            kwargs['collective_kappa_initial']=_parse_ts_scalar(collective_kappa_initial_text,'Initial collective kappa',minimum=1.5000001)
+                            kwargs['collective_kappa_bounds']=_parse_ts_float_list(collective_kappa_bounds_text,'Collective kappa bounds')
                     if absolute_density:
                         kwargs.update({
                             'incident_polarization':_parse_ts_vector(polarization_text,'Incident polarization'),
@@ -1086,7 +1109,9 @@ elif page=='Spectral Analysis':
                 })
                 if model=='non_collective_kappa':
                     profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
-                if model=='collective_maxwellian':
+                if model=='collective_kappa':
+                    profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
+                if model in {'collective_maxwellian','collective_kappa'}:
                     profile['scattering_parameter_alpha']=[channel.get('scattering_parameter_alpha',np.nan) for channel in result['channels']]
                 if result.get('absolute_scattered_power_available'):
                     profile['integrated_scattered_power_W']=[channel.get('integrated_scattered_power_W',np.nan) for channel in result['channels']]
