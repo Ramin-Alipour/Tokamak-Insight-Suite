@@ -386,8 +386,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             fast={"species_index":idx,"kind":"tabulated_1d","vdf":vdf}
             p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
         elif kind=="infer_tabulated_1d":
+            if fast_ion.get("smoothness") is None:
+                raise ValueError("fast_ion.smoothness is required for inferred tabulated VDF regularization")
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("initial_probability_density_m_s_inverse"),
-                                                smoothness=fast_ion.get("smoothness",1.0))
+                                                smoothness=fast_ion["smoothness"])
             weights=_trapezoid_node_weights(vdf["velocity_m_s"])
             masses=vdf["probability_density_m_s_inverse"]*weights
             logits=np.clip(np.log(np.maximum(masses[:-1],1e-12)/max(masses[-1],1e-12)),-19.0,19.0)
@@ -505,6 +507,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         data=data_residual(p)
         penalties=regularization_terms(p)
         return np.concatenate([data,*penalties]) if penalties else data
+    if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
+        not np.all(np.isfinite(lo)) or not np.all(np.isfinite(hi))
+    ):
+        raise ValueError("Global search requires finite explicit bounds for every fitted parameter, including any fast-ion component; use local least-squares inference when no scientific bounds are supplied.")
     score=None; genetic_history=None
     if global_search and inversion_method=="improved_genetic":
         start,score,genetic_history=_improved_genetic_search(
