@@ -71,8 +71,21 @@ def test_collective_kappa_profile_uses_external_monte_carlo_covariance(monkeypat
     result = workflow.reconstruct_thomson_profile_from_spectra(
         profile_reconstruction_method="pchip", profile_reconstruction_points=20,
     )
-    actual = result["spatial_profile_reconstruction"]["profiles"]["electron_kappa_index"]["covariance"]
-    np.testing.assert_allclose(actual, kappa_covariance)
+    profiles = result["spatial_profile_reconstruction"]["profiles"]
+    actual = profiles["electron_kappa_index"]["covariance"]
+    expected_kappa_covariance = kappa_covariance + np.diag([0.04, 0.09, 0.16])
+    np.testing.assert_allclose(actual, expected_kappa_covariance)
+
+    expected_temperature_covariance = np.eye(3) + np.diag([4.0, 4.0, 4.0])
+    np.testing.assert_allclose(
+        profiles["electron_temperature_eV"]["covariance"],
+        expected_temperature_covariance,
+    )
+    expected_density_covariance = density_covariance + np.diag([1.0e34] * 3)
+    np.testing.assert_allclose(
+        profiles["electron_density_m3"]["covariance"],
+        expected_density_covariance,
+    )
 
 
 def test_noncollective_kappa_profile_uses_joint_gls_covariance(monkeypatch):
