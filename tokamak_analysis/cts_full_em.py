@@ -357,8 +357,10 @@ def full_em_cts_spectral_density(
             "kinetic_population_diagnostics": integrated_fast_kinetics,
             "relativistic_three_wave_vertex_diagnostics": integrated_vertices,
             "relativistic_kinetic_three_wave_vertex_used": any(
-                any(any(sample_vertices) for sample_vertices in frequency_vertices)
-                for frequency_vertices in integrated_vertices
+                len(vertex_group) > 0
+                for frequency_samples in integrated_vertices
+                for sample_diagnostics in frequency_samples
+                for vertex_group in sample_diagnostics
             ),
             "frequency_resolved_magnetic_field_T": np.asarray(integrated_fields),
             "scattering_locations_m": np.asarray(integrated_locations),
@@ -379,11 +381,11 @@ def full_em_cts_spectral_density(
             ],
         })
         result["relativistic_fast_ion_three_wave_vertex_used"] = any(
-            any(
-                any(item.get("population_role") == "fast ion" for item in sample_vertex_list)
-                for sample_vertex_list in frequency_vertex_list
-            )
-            for frequency_vertex_list in integrated_vertices
+            item.get("population_role") == "fast ion"
+            for frequency_samples in integrated_vertices
+            for sample_diagnostics in frequency_samples
+            for vertex_group in sample_diagnostics
+            for item in vertex_group
         )
         return result
     if frequency_geometry is None:
