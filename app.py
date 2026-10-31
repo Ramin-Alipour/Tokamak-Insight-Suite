@@ -3239,7 +3239,7 @@ elif page=='Advanced Analysis':
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
                 cts_electron_flow=st.text_input('Electron flow vector (m/s; x,y,z)',key='cts_full_electron_flow')
                 cts_ion_flow=st.text_area('Ion flow vectors (m/s; one x,y,z vector per species, separated by semicolons)',key='cts_full_ion_flow')
-                cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=1,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
+                cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=2,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
                 cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
                 cts_damping=st.text_input('Optional resonance damping rate (rad/s)',key='cts_full_damping')
                 cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV:D+":[10,200]}',key='cts_full_parameter_bounds')
