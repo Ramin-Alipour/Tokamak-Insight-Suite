@@ -214,24 +214,26 @@
         {
           "name": "collective_initial_density_m3",
           "unit": "m^-3; optimizer initial estimate, not fixed inferred value",
-          "required": false,
-          "description": "Numerical optimizer seed only; not a fixed physical input."
+          "required": true,
+          "description": "Required optimizer initial estimate for collective Maxwellian and collective kappa models; it is not a fixed inferred value."
         },
         {
           "name": "collective_initial_temperature_eV",
           "unit": "eV; optimizer initial estimate, not fixed inferred value",
-          "required": false,
-          "description": "Numerical optimizer seed only; not a fixed physical input."
+          "required": true,
+          "description": "Required optimizer initial estimate for collective Maxwellian and collective kappa models; it is not a fixed inferred value."
         },
         {
           "name": "collective_density_bounds_m3",
           "unit": "m^-3; optional positive optimizer bounds",
-          "required": false
+          "required": false,
+          "description": "Required explicit positive increasing pair for collective Maxwellian; optional for collective kappa, where the positive log-parameterization is unbounded if omitted."
         },
         {
           "name": "collective_temperature_bounds_eV",
           "unit": "eV; optional positive optimizer bounds",
-          "required": false
+          "required": false,
+          "description": "Required explicit positive increasing pair for collective Maxwellian; optional for collective kappa, where the positive log-parameterization is unbounded if omitted."
         },
         {
           "name": "collective_external_parameter_mc_samples",
@@ -247,12 +249,14 @@
         {
           "name": "collective_kappa_initial",
           "unit": "dimensionless; optimizer initial kappa index >1.5",
-          "required": false
+          "required": true,
+          "description": "Required optimizer initial kappa index >1.5 for the collective kappa model."
         },
         {
           "name": "collective_kappa_bounds",
           "unit": "dimensionless; increasing pair with lower bound >1.5",
-          "required": false
+          "required": false,
+          "description": "Optional increasing pair with lower bound >1.5; omitted means only the physical kappa>1.5 domain is enforced."
         }
       ],
       "output_specs": [
