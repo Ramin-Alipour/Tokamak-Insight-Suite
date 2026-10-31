@@ -25,7 +25,7 @@ def test_status_report_uses_diagnostic_catalog_and_separates_callable_entries(tm
     assert report["source_of_truth"] == "DIAGNOSTIC_REGISTRY.json"
     assert report["diagnostic_record_count"] == 80
     assert report["diagnostic_execution_level_counts"] == {
-        "analysis_pipeline": 16,
+        "analysis_pipeline": 17,
         "limited_calculation": 16,
         "reference_only": 47,
     }
