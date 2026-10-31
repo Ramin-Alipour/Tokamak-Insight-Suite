@@ -3836,6 +3836,51 @@
         {
           "name": "dynamic_structure_factor",
           "unit": "model dynamic structure factor"
+        },
+        {
+          "name": "model",
+          "unit": "text",
+          "description": "Selected unmagnetized collective kappa-electron Thomson model."
+        },
+        {
+          "name": "wavenumber_m_inverse",
+          "unit": "m^-1",
+          "description": "Magnitude of the scattering wavevector."
+        },
+        {
+          "name": "phase_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Scattering phase velocity omega/k."
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Supplied electron flow projected along the scattering wavevector."
+        },
+        {
+          "name": "ion_flow_projections_m_s",
+          "unit": "m s^-1; one per species",
+          "description": "Supplied ion flow projections along the scattering wavevector."
+        },
+        {
+          "name": "ion_species",
+          "unit": "structured species metadata",
+          "description": "Resolved ion species and charge states."
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "dimensionless; charge-density fractions",
+          "description": "Normalized charge-density fractions for the supplied ion species."
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one per species",
+          "description": "Supplied Maxwellian ion temperatures."
+        },
+        {
+          "name": "kappa_index",
+          "unit": "dimensionless",
+          "description": "Kappa index of the projected electron velocity distribution."
         }
       ],
       "prerequisites": [
