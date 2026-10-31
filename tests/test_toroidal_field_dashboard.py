@@ -14,7 +14,8 @@ def test_toroidal_field_registered_analysis_executes_and_exports():
     assert not app.exception, [str(x.value) for x in app.exception]
     next(item for item in app.selectbox if item.label == "Select workflow").set_value("Registered analysis modules").run()
     assert not app.exception, [str(x.value) for x in app.exception]
-    next(item for item in app.selectbox if item.label == "Analysis").set_value(8).run()
+    next(item for item in app.selectbox if item.label == "Primary analysis (20)").set_value(6).run()
+    next(item for item in app.selectbox if item.label == "Subanalysis / workflow").set_value(8).run()
     assert any("Toroidal-field coils / magnetic probes" in x.value for x in app.get("caption"))
     args = {
         "time_s": [0.0, 0.1, 0.2],
