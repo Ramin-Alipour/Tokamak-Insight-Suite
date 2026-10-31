@@ -1063,6 +1063,10 @@ def analyze_thomson_spectra(
                 fit["instrument_response_mc_successful_samples"] = len(te_samples)
                 fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_samples, ddof=1))
                 fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_samples, ddof=1))
+                if lsf_unc.ndim == 2:
+                    fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
+                    fit["_shared_lsf_velocity_draws"] = np.asarray(velocity_samples, dtype=float)
+                    fit["_shared_lsf_area_draws"] = np.asarray(area_samples, dtype=float)
                 fit["integrated_scattered_power_fit_uncertainty_W"] = float(
                     fit.get("integrated_scattered_power_uncertainty_W") or 0.0
                 )
