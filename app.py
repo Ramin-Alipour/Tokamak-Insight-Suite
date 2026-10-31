@@ -3178,6 +3178,8 @@ elif page=='Advanced Analysis':
                             fast_ion['smoothness']=float(cts_fast_smoothness)
                     if cts_method is None:
                         raise ValueError('Select the CTS inversion method explicitly.')
+                    if cts_global_search and cts_method=='regularized':
+                        raise ValueError('Global-search initialization is not used by regularized tabulated-VDF inversion; disable global search or select a global-search method.')
                     if any(not value.strip() for value in (
                         cts_density_initial,cts_temperature_initial,cts_ion_temperature_initial,cts_ion_flow_initial
                     )):
