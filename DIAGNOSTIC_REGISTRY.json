@@ -4057,16 +4057,19 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature, ion temperature and ion-flow projection from calibrated microwave frequency-shift spectra; optional fast-ion fraction and temperature for hot-Maxwellian mode; optional reconstructed non-negative normalized tabulated 1-D fast-ion VDF under regularized inversion.",
     "status": "D",
-    "method": "Frequency-domain microwave CTS inversion using an unmagnetized electrostatic longitudinal dielectric model, multi-ion Maxwellian bulk response, measured frequency-response convolution, covariance-aware weighted residuals, selectable differential evolution or real-coded adaptive genetic global search, bounded least-squares refinement, optional Tikhonov-style prior/smoothness regularization, response/external-parameter Monte Carlo propagation and optional tabulated fast-ion VDF reconstruction.",
-    "caveat": "This is not a full magnetized electromagnetic CTS scattering tensor, ray-tracing, beam-overlap or absolute power-transfer model. Ion composition remains externally supplied. The improved-genetic option is an adaptive real-coded GA informed by Zhang et al. (2024), not an exact reproduction of their published fitness function. Tabulated fast-ion VDF inversion is 1-D, grid- and regularization-dependent, and should not be interpreted as a unique unrestricted 3-D VDF measurement.",
+    "method": "Explicitly selectable unmagnetized electrostatic longitudinal CTS or local magnetized full-electromagnetic kinetic CTS. The full-EM path solves the linearized Maxwellian Vlasov response with gyro-harmonic velocity quadrature, assembles dielectric and wave tensors, screens species current fluctuations, and retains the joint electron-density/current/E/B covariance. The full-EM inversion fits density and temperatures while requiring explicit vector flows, magnetic field, beam directions and mode polarizations.",
+    "caveat": "Full-EM mode requires complete vector magnetic-field, flow, beam-direction and polarization metadata; no silent geometric or flow defaults. The local Maxwellian full-EM path is not a complete diagnostic propagation/three-wave coupling model and must not be represented as one.",
     "implementation_functions": [
-      "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
+      "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
+      "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+      "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum"
     ],
-    "implementation_status": "Microwave frequency-domain CTS forward model and inverse fit include differential evolution, adaptive real-coded genetic search, full spectral covariance whitening, response-matrix/external-input Monte Carlo propagation, residual-based model-discrepancy covariance, hot-Maxwellian approximation, fixed tabulated VDF and regularized inferred tabulated 1-D fast-ion VDF. Full electromagnetic CTS remains outside scope. Electron-flow projection and ion composition no longer receive silent stationary/default species values.",
+    "implementation_status": "Electrostatic CTS inversion retained. A separate local magnetized full-EM Maxwellian kinetic forward solver and density/temperature inversion are implemented and explicitly dispatchable. The current full-EM path retains density/current/E/B cross-covariance but does not yet reproduce the complete Bindslev three-wave transfer tensor, relativistic/anisotropic fast-ion response, ray tracing or finite beam overlap.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "complete_with_declared_scope",
+      "completeness": "implemented_with_declared_scope",
       "input_specs": [
         {
           "name": "frequency_shift_Hz",
@@ -4184,6 +4187,72 @@
           "name": "response_mc_samples",
           "unit": "count",
           "required": false
+        },
+        {
+          "name": "model",
+          "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
+          "required": false,
+          "default": "electrostatic"
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; non-zero vector in the common laboratory coordinate frame",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic."
+        },
+        {
+          "name": "electron_flow_velocity_m_s",
+          "unit": "m s^-1; explicit 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic; no scalar projection is substituted."
+        },
+        {
+          "name": "ion_flow_velocity_m_s",
+          "unit": "m s^-1; mapping from every ion species name to a 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector."
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame."
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "complex dimensionless transverse 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic."
+        },
+        {
+          "name": "scattered_polarization",
+          "unit": "complex dimensionless transverse 3-vector",
+          "required": false,
+          "description": "Mandatory for full_electromagnetic."
+        },
+        {
+          "name": "harmonic_order",
+          "unit": "integer >= 2",
+          "required": false,
+          "default": 8
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer >= 4",
+          "required": false,
+          "default": 12
+        },
+        {
+          "name": "damping_rate_rad_s",
+          "unit": "rad s^-1; positive numerical regularization",
+          "required": false,
+          "description": "Optional numerical Landau-contour regularization; not a physical collision frequency."
         }
       ],
       "output_specs": [
@@ -4249,6 +4318,23 @@
           "name": "electron_velocity_projection_input_uncertainty_m_s",
           "unit": "m s^-1; optional 1-sigma",
           "description": "User-supplied uncertainty for the external electron-flow projection."
+        },
+        {
+          "name": "fluctuation_covariance_density_current_E_B",
+          "unit": "frequency x 10 x 10 complex covariance",
+          "description": "Joint electron density/current/electric-field/magnetic-field covariance including cross-correlations."
+        },
+        {
+          "name": "dielectric_tensor",
+          "unit": "frequency x 3 x 3 complex relative dielectric tensor"
+        },
+        {
+          "name": "wave_tensor",
+          "unit": "frequency x 3 x 3 complex Maxwell wave tensor"
+        },
+        {
+          "name": "parameter_uncertainties",
+          "unit": "m^-3, eV, eV; local Jacobian uncertainty for full-EM density and temperatures"
         }
       ],
       "assumptions": [
@@ -4256,7 +4342,10 @@
         "Maxwellian bulk electrons and ions; optional hot-Maxwellian ion component.",
         "Quasi-neutral plasma and supplied fixed ion composition.",
         "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate.",
-        "Electron-flow projection is an explicit external input; no zero-flow default is imposed."
+        "Electron-flow projection is an explicit external input; no zero-flow default is imposed.",
+        "Full-EM local kinetic response assumes a homogeneous, non-relativistic, isotropic Maxwellian plasma in a uniform magnetic field.",
+        "Full-EM numerical gyro-harmonic and velocity-quadrature truncation must be checked for convergence by varying harmonic_order and quadrature_order.",
+        "The current full-EM receiver kernel is not the complete Bindslev three-wave transfer/coupling formulation."
       ],
       "preprocessing": [
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
@@ -4274,15 +4363,52 @@
         "Model-discrepancy covariance is a residual-based conditional diagnostic, not independent experimental validation.",
         "One common ion temperature and one common projected ion flow are shared across all background ion species; species-specific Ti and flow inference is not implemented.",
         "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption.",
-        "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized."
+        "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized.",
+        "Full-EM path currently uses non-relativistic isotropic Maxwellian species; arbitrary gyrotropic/non-Maxwellian and relativistic fast-ion distributions are not implemented.",
+        "Full-EM receiver coupling does not yet include the complete Bindslev three-wave density/current/electric/magnetic coupling tensors and cold-plasma mode-flux normalization.",
+        "Full-EM ray tracing, refraction along finite paths, finite beam overlap and spatially varying magnetic geometry are not implemented."
       ],
       "function_links": [
-        "tokamak_analysis.cts_analysis.cts_spectral_density",
-        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
+        "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+        "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum"
       ],
       "raw_data_to_physics": false,
       "note": "Microwave CTS frequency-domain spectral inversion, explicitly scoped to unmagnetized electrostatic longitudinal response. The model must not be described as a complete electromagnetic CTS simulator.",
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": true,
+      "workflow_modes": [
+        {
+          "name": "magnetized_full_electromagnetic_cts",
+          "function": "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+          "inputs": [
+            "frequency_shift_Hz",
+            "spectrum",
+            "probe_frequency_Hz",
+            "instrument_response",
+            "signal_uncertainty or spectral_covariance",
+            "magnetic_field_T",
+            "incident_direction",
+            "scattered_direction",
+            "incident_polarization",
+            "scattered_polarization",
+            "electron_flow_velocity_m_s",
+            "ion_flow_velocity_m_s",
+            "ion_species",
+            "ion_fractions",
+            "initial density and temperatures"
+          ],
+          "outputs": [
+            "electron_density_m3",
+            "electron_temperature_eV",
+            "ion_temperature_eV",
+            "fit_covariance",
+            "fitted_spectrum",
+            "joint density/current/E/B fluctuation covariance"
+          ],
+          "scope": "Local magnetized Maxwellian kinetic full-EM forward/inverse path; flow vectors and composition are fixed external inputs."
+        }
+      ]
     },
     "scientific_references": [
       {
@@ -4311,6 +4437,17 @@
         "year": 2026,
         "url": "https://arxiv.org/abs/2610.37516",
         "type": "preprint"
+      },
+      {
+        "title": "Study on the Full Electromagnetic Model of Collective Thomson Scattering in Magnetic Confinement Fusion",
+        "authors": "Fang Xinyu, Xia Donghui, Huang Mei, Zhang Feng, Ding Yonghua",
+        "journal": "Power Generation Technology",
+        "volume": "46",
+        "issue": "1",
+        "pages": "200-208",
+        "year": 2025,
+        "doi": "10.12096/j.2096-4528.pgt.24149",
+        "scope": "Recent magnetized full-electromagnetic CTS reference; TIS implementation is a scoped local Maxwellian kinetic solver and does not reproduce the full Bindslev three-wave coupling transfer model."
       }
     ]
   },
