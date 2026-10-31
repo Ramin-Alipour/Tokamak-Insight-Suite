@@ -602,7 +602,8 @@ def test_full_em_cts_relativistic_non_maxwellian_electron_uses_kinetic_vertex():
             "temperature_parallel_eV": 1.0e5,
         },
     )
-    assert result["relativistic_fast_ion_three_wave_vertex_used"] is True
+    assert result["relativistic_fast_ion_three_wave_vertex_used"] is False
+    assert result["relativistic_kinetic_three_wave_vertex_used"] is True
     assert len(result["relativistic_three_wave_vertex_diagnostics"]) == 2
     assert result["relativistic_three_wave_vertex_diagnostics"][0][0]["population_role"] == "non-Maxwellian electron"
     assert "non-Maxwellian electron" in result["model"]
