@@ -4108,6 +4108,21 @@
           "required": true
         },
         {
+          "name": "instrument_response_uncertainty",
+          "unit": "response-matrix 1-sigma",
+          "required": false,
+          "required_when_model": "electrostatic",
+          "description": "Electrostatic CTS only: optional uncertainty of the supplied measured frequency-response matrix, propagated through response perturbation/refitting."
+        },
+        {
+          "name": "response_mc_samples",
+          "unit": "count",
+          "required": false,
+          "required_when_model": "electrostatic",
+          "default": 100,
+          "description": "Electrostatic CTS only: number of Monte Carlo response-matrix perturbation/refit samples when instrument_response_uncertainty is supplied."
+        },
+        {
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
