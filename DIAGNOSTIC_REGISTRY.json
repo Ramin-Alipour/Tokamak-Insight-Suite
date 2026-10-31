@@ -4531,6 +4531,11 @@
           "name": "scattering_volume_weighting",
           "unit": "method description",
           "description": "Normalized local Gaussian beam overlap multiplied by incident-ray path-length quadrature."
+        },
+        {
+          "name": "relativistic_electron_distribution",
+          "unit": "explicit relativistic electron VDF metadata",
+          "description": "Actual relativistic Maxwell-Juttner, bi-Gaussian or tabulated electron distribution used by the kinetic response."
         }
       ],
       "assumptions": [
