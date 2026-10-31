@@ -4490,6 +4490,26 @@
           "name": "relativistic_three_wave_vertex_diagnostics",
           "unit": "frequency-indexed species vertex tensors",
           "description": "Second-order relativistic gyrotropic Vlasov current vertices for explicitly supplied non-Maxwellian populations."
+        },
+        {
+          "name": "total_three_wave_source_current_operator",
+          "unit": "frequency x 3 x 10 complex tensor",
+          "description": "Combined Bindslev bulk-electron and relativistic non-Maxwellian electron/fast-ion second-order source operator used in the correlated transfer contraction."
+        },
+        {
+          "name": "relativistic_kinetic_three_wave_vertex_used",
+          "unit": "boolean",
+          "description": "True when a supplied non-Maxwellian electron or fast-ion population contributes a relativistic second-order Vlasov vertex."
+        },
+        {
+          "name": "relativistic_fast_ion_three_wave_vertex_used",
+          "unit": "boolean",
+          "description": "True only when at least one explicitly supplied fast-ion population contributes a relativistic second-order Vlasov vertex."
+        },
+        {
+          "name": "kinetic_population_diagnostics",
+          "unit": "frequency-indexed electron/ion kinetic population diagnostics",
+          "description": "Alias containing relativistic gyrotropic conductivity/noise diagnostics for all supplied non-Maxwellian kinetic populations."
         }
       ],
       "assumptions": [
