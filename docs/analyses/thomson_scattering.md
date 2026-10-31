@@ -40,7 +40,6 @@ The Spectral Analysis workspace exposes this primary multi-channel spectral-infe
 | Optical-factor uncertainty | W, m, sr, dimensionless | Optional; only supplied uncertainty terms are propagated |
 | density_relative_covariance | 6×6 relative covariance | Optional within-channel covariance for scattered power and the five multiplicative optical inputs; does not imply cross-channel correlations and is mutually exclusive with scalar uncertainty inputs and joint_spectral_covariance |
 | joint_density_relative_covariance | (6N)×(6N) relative covariance | Optional non-collective channel-major full covariance for six density inputs per channel, including cross-channel correlations; returns full density covariance |
-| joint_spectral_covariance | (channels × wavelengths)² | Optional full positive-definite channel-major covariance for joint Maxwellian/Kappa GLS; mutually exclusive with signal_uncertainty |
 | ion_temperature_uncertainty_eV / ion_velocity_uncertainty_m_s / electron_velocity_uncertainty_m_s | eV / m s⁻¹ | Optional collective external-input 1-sigma uncertainties, propagated by Monte Carlo |
 | incident_direction_uncertainty / scattered_direction_uncertainty | component-wise 1-sigma 3-vectors | Optional collective beam-direction uncertainties; use instead of scalar scattering_angle_uncertainty_rad, not together |
 
