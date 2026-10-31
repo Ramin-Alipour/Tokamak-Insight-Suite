@@ -140,3 +140,16 @@ def test_collective_kappa_fit_runs_with_and_without_explicit_parameter_bounds(us
     assert result["electron_temperature_eV"] == pytest.approx(150.0, rel=2e-3)
     assert result["kappa_index"] == pytest.approx(3.5, rel=2e-3)
     assert result["fit_covariance"].shape == (3, 3)
+
+
+def test_relativistic_effective_cross_section_matches_polarized_thomson_limit():
+    wavelength = np.linspace(532.0-40.0, 532.0+40.0, 801)
+    result = relativistic_maxwell_juttner_spectrum(
+        wavelength, 532.0, np.pi/2, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=np.array([0.0, 0.0, 1.0]),
+    )
+    classical_radius = 2.8179403262e-15
+    assert result["effective_differential_cross_section_m2_sr"] == pytest.approx(
+        classical_radius**2, rel=2e-3
+    )
