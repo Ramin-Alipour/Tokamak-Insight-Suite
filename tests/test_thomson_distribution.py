@@ -319,3 +319,34 @@ def test_spectral_distribution_rejects_non_real_numeric_response_matrix(response
             instrument_response_matrix=response,
             background_fraction=0.2,
         )
+
+
+def test_spectral_distribution_exposes_canonical_physical_parameters():
+    x, y = _spectrum()
+    physical = {
+        "model": "non_collective_maxwellian",
+        "electron_temperature_eV": 125.0,
+        "electron_temperature_uncertainty_eV": 4.0,
+        "electron_velocity_projection_m_s": 1200.0,
+        "electron_velocity_projection_uncertainty_m_s": 80.0,
+        "electron_density_m3": None,
+        "electron_density_uncertainty_m3": None,
+    }
+    out = analyze_thomson_spectral_distribution(
+        x, y, instrument_sigma_nm=0.06, background_fraction=0.1,
+        physical_parameters=physical,
+    )
+    extracted = out["physical_parameter_extraction"]
+    assert extracted["status"] == "completed"
+    assert extracted["electron_temperature_eV"] == pytest.approx(125.0)
+    assert extracted["electron_velocity_projection_m_s"] == pytest.approx(1200.0)
+    assert extracted["electron_density_m3"] is None
+
+
+def test_spectral_distribution_rejects_incomplete_physical_parameter_contract():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="missing canonical fit fields"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_sigma_nm=0.06, background_fraction=0.1,
+            physical_parameters={"model": "non_collective_maxwellian"},
+        )
