@@ -3265,6 +3265,7 @@ elif page=='Advanced Analysis':
                     fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
                     kwargs_cts={
                         'frequency_shift_Hz':frequency,
+                        'measured_spectrum':spectrum,
                         'probe_frequency_Hz':float(cts_probe_frequency),
                         'scattering_geometry':scattering_geometry,
                         'electron_density_initial_m3':float(cts_density_initial),
