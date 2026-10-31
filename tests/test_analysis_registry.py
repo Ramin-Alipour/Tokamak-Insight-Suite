@@ -1,15 +1,15 @@
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_80_unique_ordered_analysis_ids():
+def test_registry_contains_79_unique_ordered_analysis_ids_after_retiring_id_7():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 80
-    assert ids == list(range(1, 81))
+    assert len(ANALYSES) == 79
+    assert ids == [entry_id for entry_id in range(1, 81) if entry_id != 7]
 
 
-def test_registry_uses_distinct_entry_points_for_all_80_analyses():
+def test_registry_uses_distinct_entry_points_for_all_79_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 80
+    assert len(set(pairs)) == 79
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -23,7 +23,8 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     contract = entry["execution_contract"]
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
-    assert contract["raw_data_to_physics"] is True
+    assert contract["raw_data_to_physics"] is False
+    assert contract["calibrated_measurements_to_physics"] is True
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"wavelength_nm", "spectra", "radius_m", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response"} <= set(inputs)
