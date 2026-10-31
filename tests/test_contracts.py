@@ -85,3 +85,21 @@ def test_collective_thomson_contract_declares_calibrated_measurements():
     assert contract.supports_calibrated_measurements
     assert not contract.supports_raw_data
     assert "electron_velocity_projection_m_s" in {spec.name for spec in contract.input_specs}
+
+
+def test_all_thomson_and_cts_entry_points_are_subanalyses_of_primary_analysis_1():
+    path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    names = {
+        "Thomson scattering",
+        "Collective Thomson / coherent scattering (CTS)",
+        "Thomson spatial profile reconstruction",
+        "Thomson spectral distribution",
+    }
+    selected = {row["diagnostic"]: row for row in rows if row["diagnostic"] in names}
+    assert set(selected) == names
+    assert all(row["primary_analysis_id"] == 1 for row in selected.values())
+    families_path = Path(__file__).resolve().parents[1] / "ANALYSIS_FAMILIES.json"
+    families = json.loads(families_path.read_text(encoding="utf-8"))["families"]
+    analysis_1 = next(item for item in families if item["id"] == 1)
+    assert analysis_1["entry_ids"] == [1, 30, 46, 81]
