@@ -158,3 +158,6 @@ References:
 - H. Bindslev, “Three Wave Mixing and Thomson Scattering in Plasmas,” JET-P(93)41 (1993), detailed kinetic source-current derivation, including the `Gamma` and `X` tensors and the microscopic-fluctuation transfer equation.
 - H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58** (1996), 983–989, DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8).
 - H. Bindslev, “Dielectric effects on Thomson scattering in a relativistic magnetized plasma,” *Plasma Physics and Controlled Fusion* **33** (1991), 1775–1804, DOI: [10.1088/0741-3335/33/14/005](https://doi.org/10.1088/0741-3335/33/14/005).
+
+
+The full-EM forward solver now selects the incident and scattered cold-plasma propagating branches by matching the supplied polarization seed, replaces each seed with the corresponding eigenpolarization, and normalizes each mode to unit longitudinal Poynting flux. Magnetized eigenmodes may contain a longitudinal electric-field component; the implementation does not impose a vacuum-transverse polarization constraint. This is local cold-plasma plane-wave normalization, not a ray-traced finite-beam absolute-power calculation.
