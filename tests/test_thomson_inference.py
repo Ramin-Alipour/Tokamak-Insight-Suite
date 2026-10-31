@@ -203,18 +203,34 @@ def test_collective_external_covariance_indices_use_full_channel_stride():
     assert _collective_external_parameter_indices(1, 2) == (5, 6, 7, (8, 9))
 
 
-def test_relativistic_model_rejects_unpropagated_laser_and_angle_uncertainties():
-    x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="uncertainty propagation is not implemented"):
-        analyze_thomson_spectra(
-            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
-            model="non_collective_relativistic_maxwell_juttner",
-            incident_direction=[1.0, 0.0, 0.0],
-            scattered_direction=[0.0, 1.0, 0.0],
-            incident_polarization=[0.0, 0.0, 1.0],
-            laser_wavelength_uncertainty_nm=0.01,
-        )
+def test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    x = np.linspace(520.0, 544.0, 81)
+    physical = relativistic_maxwell_juttner_spectrum(
+        x, 532.0, np.pi / 2, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=12, angular_order=8,
+    )
+    y = 1000.0 * physical["spectral_density_per_nm"] + 20.0
+    result = analyze_thomson_spectra(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        model="non_collective_relativistic_maxwell_juttner",
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        incident_polarization=[0.0, 0.0, 1.0],
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=1e-4,
+        incident_polarization_uncertainty=[1e-4, 1e-4, 1e-4],
+        instrument_response_mc_samples=20,
+        instrument_response_mc_min_success_fraction=0.5,
+    )
+    channel = result["channels"][0]
+    assert channel["relativistic_external_parameter_uncertainty_propagated"] is True
+    assert channel["relativistic_external_parameter_mc_successful_samples"] >= 10
+    assert channel["relativistic_external_temperature_uncertainty_eV"] > 0.0
 
 
 def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
