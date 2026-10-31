@@ -51,3 +51,27 @@ def test_thomson_density_uses_supplied_effective_relativistic_cross_section():
     assert result["electron_density_m3"] == pytest.approx(expected, rel=1e-12)
     assert result["differential_cross_section_m2_sr"] == pytest.approx(effective_cross_section)
     assert result["electron_density_uncertainty_m3"] == pytest.approx(0.1*expected, rel=1e-12)
+
+
+def test_thomson_density_propagates_fitted_power_cross_section_covariance():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    power = 1e-12
+    cross_section = 1.7e-29
+    power_sigma = 0.1*power
+    cross_section_sigma = 0.2*cross_section
+    relative_covariance = 0.01
+    result = density_from_thomson_scattered_power(
+        power, 2.0, 0.2, math.pi/2, 0.01,
+        optical_efficiency=0.5,
+        scattered_power_uncertainty_W=power_sigma,
+        relative_input_covariance=np.zeros((6, 6)),
+        effective_differential_cross_section_m2_sr=cross_section,
+        effective_differential_cross_section_uncertainty_m2_sr=cross_section_sigma,
+        power_cross_section_relative_covariance=relative_covariance,
+    )
+    expected_density = power/(2.0*0.2*cross_section*0.01*0.5)
+    expected_relative_variance = 0.1**2 + 0.2**2 - 2.0*relative_covariance
+    assert result["electron_density_uncertainty_m3"] == pytest.approx(
+        expected_density*np.sqrt(expected_relative_variance), rel=1e-12
+    )
