@@ -48,6 +48,7 @@ def relativistic_maxwell_juttner_spectrum(
     wavelength_nm, laser_wavelength_nm, scattering_angle_rad,
     electron_temperature_eV, *, flow_projection_m_s=0.0,
     incident_polarization, radial_order=36, angular_order=18,
+    maximum_recoil_correction_fraction=0.01,
 ):
     """Return a unit-area relativistic Thomson spectrum on a wavelength grid.
 
@@ -76,6 +77,9 @@ def relativistic_maxwell_juttner_spectrum(
         raise ValueError("flow_projection_m_s must be finite and strictly subluminal (|v| < c)")
     if int(radial_order) < 12 or int(angular_order) < 8:
         raise ValueError("radial_order >=12 and angular_order >=8 are required")
+    recoil_limit = _positive(maximum_recoil_correction_fraction, "maximum_recoil_correction_fraction")
+    if recoil_limit >= 1.0:
+        raise ValueError("maximum_recoil_correction_fraction must be below 1")
 
     theta = temperature/E_REST_EV
     beta_bulk = flow/C
@@ -129,6 +133,28 @@ def relativistic_maxwell_juttner_spectrum(
 
     ni_rest = aberrated_direction(n_incident)
     ns_rest = aberrated_direction(n_scattered)
+    # Screen the Thomson/no-recoil approximation in each represented electron
+    # rest frame. The Compton fractional correction is r/(1+r), where
+    # r = (h nu' / m_e c^2) * (1 - cos(theta_scatter')).
+    rest_angle_cosine = np.clip(
+        np.einsum("...j,...j->...", ni_rest, ns_rest), -1.0, 1.0
+    )
+    incident_photon_energy_eV = 1239.8419843320026 / laser
+    rest_photon_energy_eV = (
+        incident_photon_energy_eV * gamma_lab * (1.0 - ni_dot)
+    )
+    recoil_parameter = (
+        rest_photon_energy_eV / E_REST_EV * (1.0 - rest_angle_cosine)
+    )
+    recoil_correction_fraction = float(np.max(
+        recoil_parameter / (1.0 + recoil_parameter)
+    ))
+    if not np.isfinite(recoil_correction_fraction) or recoil_correction_fraction > recoil_limit:
+        raise ValueError(
+            "The Thomson/no-recoil approximation is outside the selected validity "
+            f"limit: maximum represented Compton correction={recoil_correction_fraction:.6g}, "
+            f"limit={recoil_limit:.6g}. Use a lower photon energy or a Compton-capable model."
+        )
     # Lorentz-transform the incident electric field to each electron rest frame.
     magnetic_direction_cross_e = np.cross(n_incident, polarization)
     e_rest = (
@@ -193,6 +219,9 @@ def relativistic_maxwell_juttner_spectrum(
         "frequency_ratio": "lambda_s/lambda_i=(1-n_s dot beta)/(1-n_i dot beta)",
         "distribution": "Lorentz-boosted isotropic Maxwell-Juttner",
         "recoil_included": False,
+        "thomson_recoil_correction_fraction_max_on_quadrature_support": recoil_correction_fraction,
+        "thomson_recoil_correction_fraction_limit": float(recoil_limit),
+        "thomson_no_recoil_validity_status": "within_user_selected_fractional_correction_limit",
         "polarization_model": "supplied incident polarization Lorentz-transformed to the electron rest frame",
         "quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order), "gyrophase_points": nphi},
     }
