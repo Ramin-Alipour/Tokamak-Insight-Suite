@@ -3643,53 +3643,53 @@
         },
         {
           "name": "distribution",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "label",
+          "description": "Distribution family used by the forward model."
         },
         {
           "name": "frequency_ratio",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "dimensionless ratio expression",
+          "description": "Exact elastic Thomson wavelength/frequency ratio."
         },
         {
           "name": "integrated_probability",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "dimensionless",
+          "description": "Numerically integrated probability after normalization; equals one."
         },
         {
           "name": "polarization_model",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "model description",
+          "description": "Polarization transformation and differential-cross-section model."
         },
         {
           "name": "quadrature",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "structured numerical settings",
+          "description": "Radial, angular and gyrophase quadrature orders."
         },
         {
           "name": "recoil_included",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "boolean",
+          "description": "Whether recoil/Compton corrections are included; false for this Thomson model."
         },
         {
           "name": "thomson_recoil_correction_fraction_limit",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "dimensionless fraction",
+          "description": "User-selected maximum fractional Compton correction permitted by the Thomson validity screen."
         },
         {
           "name": "thomson_no_recoil_validity_status",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "status string",
+          "description": "Status of the no-recoil validity screen."
         },
         {
           "name": "thomson_recoil_correction_fraction_max_on_quadrature_support",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "dimensionless fraction",
+          "description": "Maximum represented Compton correction over the electron quadrature support."
         },
         {
           "name": "relativistic_kinematics",
-          "unit": "structured / dimensionless",
-          "description": "Returned diagnostic from the relativistic Thomson spectral forward model."
+          "unit": "boolean",
+          "description": "Indicates use of relativistic electron and photon kinematics."
         }
       ],
       "prerequisites": [
