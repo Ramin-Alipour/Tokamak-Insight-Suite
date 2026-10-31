@@ -82,3 +82,61 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
     assert result["electron_velocity_projection_m_s"] == pytest.approx(1.0e6, abs=2.0e5)
     assert result["relativistic_kinematics"] is True
     assert result["fit_covariance"].shape == (5, 5)
+
+@pytest.mark.parametrize("use_bounds", [False, True])
+def test_collective_kappa_fit_runs_with_and_without_explicit_parameter_bounds(use_bounds):
+    from tokamak_analysis.thomson_kinetic_models import fit_collective_kappa
+
+    wavelength = np.linspace(1048.0, 1080.0, 101)
+    angle = np.pi / 2.0
+    laser = 1064.0
+    incident = np.array([-np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    scattered = np.array([np.sin(angle / 2.0), np.cos(angle / 2.0), 0.0])
+    physical_inputs = dict(
+        electron_density_m3=1.0e19,
+        electron_temperature_eV=150.0,
+        kappa=3.5,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        ion_temperature_eV=[100.0],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        incident_direction=incident,
+        scattered_direction=scattered,
+    )
+    spectrum = collective_kappa_spectral_density(
+        wavelength, laser, angle, **physical_inputs
+    )["spectral_density_per_nm"]
+    signal = 2.0e4 * spectrum + 10.0 + 0.001 * (wavelength - laser)
+    fit_inputs = dict(
+        wavelength_nm=wavelength,
+        signal=signal,
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        response=np.eye(wavelength.size),
+        uncertainty=np.full(wavelength.size, 0.01 * np.max(signal)),
+        incident_direction=incident,
+        scattered_direction=scattered,
+        ion_species=physical_inputs["ion_species"],
+        ion_fractions=physical_inputs["ion_fractions"],
+        ion_temperature_eV=physical_inputs["ion_temperature_eV"],
+        electron_velocity_m_s=physical_inputs["electron_velocity_m_s"],
+        ion_velocity_m_s=physical_inputs["ion_velocity_m_s"],
+        initial_density_m3=1.0e19,
+        initial_temperature_eV=150.0,
+        initial_kappa=3.5,
+    )
+    if use_bounds:
+        fit_inputs.update(
+            density_bounds_m3=[5.0e18, 2.0e19],
+            temperature_bounds_eV=[75.0, 300.0],
+            kappa_bounds=[2.0, 6.0],
+        )
+
+    result = fit_collective_kappa(**fit_inputs)
+
+    assert result["optimizer_success"] is True
+    assert result["electron_density_m3"] == pytest.approx(1.0e19, rel=2e-3)
+    assert result["electron_temperature_eV"] == pytest.approx(150.0, rel=2e-3)
+    assert result["kappa_index"] == pytest.approx(3.5, rel=2e-3)
+    assert result["fit_covariance"].shape == (3, 3)
