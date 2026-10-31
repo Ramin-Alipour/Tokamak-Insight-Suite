@@ -268,26 +268,14 @@ def analyze_thomson_spectral_distribution(
     supported_models = {
         "non_collective_maxwellian", "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
-        "collective_maxwellian", "collective_kappa",
     }
     if model_name not in supported_models:
-        raise ValueError("physical_parameters.model must identify a supported canonical Thomson fit")
+        raise ValueError("physical_parameters.model must identify one of the three supported non-collective optical Thomson fits")
     flow = physical_parameters["electron_velocity_projection_m_s"]
-    non_collective_models = {
-        "non_collective_maxwellian", "non_collective_kappa",
-        "non_collective_relativistic_maxwell_juttner",
-    }
-    if model_name in non_collective_models:
-        if (isinstance(flow, (bool, np.bool_))
-                or not isinstance(flow, (int, float, np.integer, np.floating))
-                or not np.isfinite(flow)):
-            raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value for non-collective models")
-    elif flow is not None and (
-        isinstance(flow, (bool, np.bool_))
-        or not isinstance(flow, (int, float, np.integer, np.floating))
-        or not np.isfinite(flow)
-    ):
-        raise ValueError("A supplied collective-model electron flow must be a finite fitted value; otherwise pass None as not identifiable")
+    if (isinstance(flow, (bool, np.bool_))
+            or not isinstance(flow, (int, float, np.integer, np.floating))
+            or not np.isfinite(flow)):
+        raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value for the selected non-collective model")
     def optional_uncertainty(name):
         value = physical_parameters.get(name)
         if value is None:
@@ -307,8 +295,6 @@ def analyze_thomson_spectral_distribution(
     ):
         raise ValueError("physical_parameters.electron_density_m3 must be finite and positive when supplied")
     density_uncertainty = optional_uncertainty("electron_density_uncertainty_m3")
-    if flow is None and flow_uncertainty is not None:
-        raise ValueError("electron_velocity_projection_uncertainty_m_s cannot be supplied when electron flow is not identifiable")
     if density is None and density_uncertainty is not None:
         raise ValueError("electron_density_uncertainty_m3 cannot be supplied when electron density is unavailable")
 
@@ -517,18 +503,13 @@ def analyze_thomson_spectral_distribution(
             "model": model_name,
             "electron_temperature_eV": float(temperature),
             "electron_temperature_uncertainty_eV": temperature_uncertainty,
-            "electron_velocity_projection_m_s": None if flow is None else float(flow),
+            "electron_velocity_projection_m_s": float(flow),
             "electron_velocity_projection_uncertainty_m_s": flow_uncertainty,
-            "electron_velocity_projection_status": (
-                "fitted" if flow is not None else
-                "not_identifiable_from_selected_collective_model"
-            ),
+            "electron_velocity_projection_status": "fitted",
             "electron_density_m3": None if density is None else float(density),
             "electron_density_uncertainty_m3": density_uncertainty,
             "electron_density_status": "available" if density is not None else "not_identifiable_from_selected_canonical_physical_fit",
             "unavailable_parameters": (
-                [] if flow is not None else ["electron_velocity_projection_m_s"]
-            ) + (
                 [] if density is not None else ["electron_density_m3"]
             ),
         },
