@@ -27,23 +27,38 @@ AMU = 1.66053906660e-27
 C = 299792458.0
 
 
+def _real_array(value, name, ndim=None):
+    """Validate real numeric API inputs without coercing strings or booleans."""
+    raw = np.asarray(value)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans, strings or complex values")
+    if ndim is not None and raw.ndim != ndim:
+        raise ValueError(f"{name} must be {ndim}-dimensional")
+    array = raw.astype(float, copy=False)
+    if array.size == 0 or not np.all(np.isfinite(array)):
+        raise ValueError(f"{name} must contain finite non-empty real numeric values")
+    return array
+
+
 def _vec3(value, name):
-    a = np.asarray(value, dtype=float)
+    a = _real_array(value, name, 1)
     if a.shape != (3,) or not np.all(np.isfinite(a)) or np.linalg.norm(a) == 0:
         raise ValueError(f"{name} must be a finite non-zero 3-vector")
     return a / np.linalg.norm(a)
 
 
 def _finite_vec3(value, name):
-    a = np.asarray(value, dtype=float)
+    a = _real_array(value, name, 1)
     if a.shape != (3,) or not np.all(np.isfinite(a)):
         raise ValueError(f"{name} must be a finite 3-vector")
     return a
 
 
 def _positive(value, name):
-    if isinstance(value, (bool, np.bool_)) or not np.isscalar(value):
-        raise ValueError(f"{name} must be positive and finite")
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a positive finite real scalar")
     value = float(value)
     if not np.isfinite(value) or value <= 0:
         raise ValueError(f"{name} must be positive and finite")
@@ -65,7 +80,7 @@ def _hermitian_psd(matrix, name, tolerance=1e-9):
 def _species_list(electron_density_m3, ion_species, ion_fractions,
                   electron_temperature_eV, ion_temperature_eV,
                   electron_flow_m_s, ion_flow_m_s):
-    fractions = np.asarray(ion_fractions, dtype=float)
+    fractions = _real_array(ion_fractions, "ion_fractions", 1)
     if (not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes))
             or len(ion_species) == 0 or fractions.shape != (len(ion_species),)
             or np.any(~np.isfinite(fractions)) or np.any(fractions <= 0)
@@ -84,7 +99,7 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
         common = _positive(ion_temperature_eV, "ion_temperature_eV")
         temperatures = {name: common for name in names}
     else:
-        values = np.asarray(ion_temperature_eV, dtype=float)
+        values = _real_array(ion_temperature_eV, "ion_temperature_eV", 1)
         if values.shape != (len(names),) or np.any(~np.isfinite(values)) or np.any(values <= 0):
             raise ValueError("ion_temperature_eV must be a positive scalar, a species-name mapping, or one positive value per ion species")
         temperatures = dict(zip(names, map(float, values)))
@@ -110,7 +125,7 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
 
 
 def _gyro_basis(magnetic_field_T, k_vector):
-    b = np.asarray(magnetic_field_T, dtype=float)
+    b = _real_array(magnetic_field_T, "magnetic_field_T", 1)
     if b.shape != (3,) or np.any(~np.isfinite(b)) or np.linalg.norm(b) <= 0:
         raise ValueError("magnetic_field_T must be a finite non-zero 3-vector")
     bhat = b / np.linalg.norm(b)
@@ -234,7 +249,7 @@ def full_em_cts_spectral_density(
     Polarizations are complex 3-vectors supplied by the diagnostic mode definition.
     Fluctuation covariance includes electron density/current/E/B cross-correlations.
     """
-    shifts = np.asarray(frequency_shift_Hz, dtype=float)
+    shifts = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
     if shifts.ndim != 1 or shifts.size == 0 or np.any(~np.isfinite(shifts)):
         raise ValueError("frequency_shift_Hz must be a finite non-empty vector")
     if np.any(np.diff(shifts) <= 0):
@@ -275,7 +290,7 @@ def full_em_cts_spectral_density(
         if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
             raise ValueError("scattering-volume geometry must contain one frequency record per measured spectral bin")
         if "frequency_shift_Hz" in scattering_geometry:
-            geometry_shifts = np.asarray(scattering_geometry["frequency_shift_Hz"], dtype=float)
+            geometry_shifts = _real_array(scattering_geometry["frequency_shift_Hz"], "scattering_geometry.frequency_shift_Hz", 1)
             if geometry_shifts.shape != shifts.shape or not np.allclose(geometry_shifts, shifts, rtol=1e-10, atol=1e-6):
                 raise ValueError("scattering-volume ray geometry must use the same frequency_shift_Hz axis as the measured spectrum")
         integrated_spectrum = np.zeros(shifts.size, dtype=float)
@@ -831,20 +846,20 @@ def analyze_full_em_cts_spectrum(
     """
     from scipy.optimize import least_squares
 
-    f = np.asarray(frequency_shift_Hz, dtype=float)
-    y = np.asarray(measured_spectrum, dtype=float)
+    f = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    y = _real_array(measured_spectrum, "measured_spectrum", 1)
     if f.ndim != 1 or y.shape != f.shape or f.size < 8:
         raise ValueError("frequency_shift_Hz and measured_spectrum must be matching vectors with >=8 bins")
     if np.any(~np.isfinite(f)) or np.any(~np.isfinite(y)) or np.any(np.diff(f) <= 0) or np.any(y < 0):
         raise ValueError("frequency axis must increase; measured spectrum must be finite and non-negative")
-    response = np.asarray(instrument_response, dtype=float)
+    response = _real_array(instrument_response, "instrument_response", 2)
     if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
         raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
     response = response / response.sum(axis=0, keepdims=True)
     if signal_uncertainty is not None and spectral_covariance is not None:
         raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
     if spectral_covariance is not None:
-        cov_y = np.asarray(spectral_covariance, dtype=float)
+        cov_y = _real_array(spectral_covariance, "spectral_covariance", 2)
         if cov_y.shape != (f.size, f.size) or np.any(~np.isfinite(cov_y)) or not np.allclose(cov_y, cov_y.T):
             raise ValueError("spectral_covariance must be a finite symmetric square matrix")
         try:
@@ -853,7 +868,7 @@ def analyze_full_em_cts_spectrum(
             raise ValueError("spectral_covariance must be positive definite") from exc
         whiten = lambda value: np.linalg.solve(chol, value)
     elif signal_uncertainty is not None:
-        unc = np.asarray(signal_uncertainty, dtype=float)
+        unc = _real_array(signal_uncertainty, "signal_uncertainty", 1)
         if unc.shape != f.shape or np.any(~np.isfinite(unc)) or np.any(unc <= 0):
             raise ValueError("signal_uncertainty must be positive and match measured_spectrum")
         whiten = lambda value: value / unc
@@ -871,7 +886,7 @@ def analyze_full_em_cts_spectrum(
     elif np.isscalar(ion_temperature_initial_eV):
         ion_initials = np.full(len(species_names), _positive(ion_temperature_initial_eV, "ion_temperature_initial_eV"))
     else:
-        ion_initials = np.asarray(ion_temperature_initial_eV, dtype=float)
+        ion_initials = _real_array(ion_temperature_initial_eV, "ion_temperature_initial_eV", 1)
         if ion_initials.shape != (len(species_names),) or np.any(~np.isfinite(ion_initials)) or np.any(ion_initials <= 0):
             raise ValueError("ion_temperature_initial_eV must be a positive scalar, species-name mapping, or one positive value per species")
     names = ("electron_density_m3", "electron_temperature_eV") + tuple(
@@ -898,7 +913,7 @@ def analyze_full_em_cts_spectrum(
             pair_value = bounds.get("ion_temperature_eV")
         if pair_value is None:
             continue
-        pair = np.asarray(pair_value, dtype=float)
+        pair = _real_array(pair_value, f"parameter_bounds[{name!r}]", 1)
         if pair.shape != (2,) or np.any(~np.isfinite(pair)) or np.any(pair <= 0) or pair[0] >= pair[1]:
             raise ValueError(f"parameter_bounds[{name!r}] must be a positive finite increasing pair")
         if not pair[0] < initial[index] < pair[1]:

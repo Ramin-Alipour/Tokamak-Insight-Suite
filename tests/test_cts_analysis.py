@@ -817,3 +817,54 @@ def test_cts_full_em_dispatcher_rejects_duplicate_spectrum_keywords(monkeypatch)
             spectrum=[1.0, 2.0],
             measured_spectrum=[1.0, 2.0],
         )
+
+
+
+@pytest.mark.parametrize(
+    "argument,bad_value",
+    [
+        ("frequency_shift_Hz", [True] * 8),
+        ("measured_spectrum", ["1.0"] * 8),
+        ("instrument_response", np.eye(8, dtype=bool)),
+        ("signal_uncertainty", [True] * 8),
+        ("spectral_covariance", np.eye(8, dtype=object).tolist()),
+    ],
+)
+def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(argument, bad_value):
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    frequency = np.linspace(1.0e8, 2.0e8, 8)
+    spectrum = np.ones(8, dtype=float)
+    response = np.eye(8, dtype=float)
+    uncertainty = np.ones(8, dtype=float)
+    covariance = None
+    kwargs = {
+        "probe_frequency_Hz": 140.0e9,
+        "scattering_geometry": {},
+        "electron_density_initial_m3": 2.0e19,
+        "electron_temperature_initial_eV": 1000.0,
+        "ion_temperature_initial_eV": 500.0,
+        "ion_species": [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        "ion_fractions": [1.0],
+        "magnetic_field_T": [0.0, 0.0, 2.0],
+        "electron_flow_velocity_m_s": [0.0, 0.0, 0.0],
+        "ion_flow_velocity_m_s": {"D+": [0.0, 0.0, 0.0]},
+        "incident_polarization": [0.0, 0.0, 1.0],
+        "scattered_polarization": [0.0, 0.0, 1.0],
+        "instrument_response": response,
+        "signal_uncertainty": uncertainty,
+        "spectral_covariance": covariance,
+    }
+    if argument == "frequency_shift_Hz":
+        frequency = bad_value
+    elif argument == "measured_spectrum":
+        spectrum = bad_value
+    elif argument == "instrument_response":
+        kwargs["instrument_response"] = bad_value
+    elif argument == "signal_uncertainty":
+        kwargs["signal_uncertainty"] = bad_value
+    elif argument == "spectral_covariance":
+        kwargs["signal_uncertainty"] = None
+        kwargs["spectral_covariance"] = bad_value
+    with pytest.raises(ValueError, match="real numeric"):
+        analyze_full_em_cts_spectrum(frequency, spectrum, **kwargs)
