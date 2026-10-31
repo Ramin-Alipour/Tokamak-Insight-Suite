@@ -287,17 +287,24 @@ def reconstruct_thomson_profile_from_spectra(
             [f"channel_{i}_electron_density_m3" for i in range(n_channels)]
         )
     density_uncertainty_profile = result.get("electron_density_uncertainty_profile_m3")
-    shared_density_covariance = result.get("electron_density_shared_response_covariance_m6")
-    if shared_density_covariance is not None and density_uncertainty_profile is not None:
-        shared_density_covariance = np.asarray(shared_density_covariance, dtype=float)
-        if shared_density_covariance.shape == (n_channels, n_channels):
-            if density_covariance is None:
-                density_covariance = np.diag(np.square(np.asarray(density_uncertainty_profile, dtype=float)))
-            else:
-                density_covariance = np.asarray(density_covariance, dtype=float).copy()
-            off_diagonal = shared_density_covariance.copy()
-            np.fill_diagonal(off_diagonal, 0.0)
-            density_covariance += np.nan_to_num(off_diagonal, nan=0.0)
+    if density_uncertainty_profile is not None:
+        if density_covariance is None:
+            density_covariance = np.diag(np.square(np.asarray(density_uncertainty_profile, dtype=float)))
+        else:
+            density_covariance = np.asarray(density_covariance, dtype=float).copy()
+        if result.get("electron_density_joint_covariance_m6") is None:
+            for covariance_key in (
+                "electron_density_angle_covariance_m6",
+                "electron_density_shared_response_covariance_m6",
+            ):
+                additional_covariance = result.get(covariance_key)
+                if additional_covariance is None:
+                    continue
+                additional_covariance = np.asarray(additional_covariance, dtype=float)
+                if additional_covariance.shape == (n_channels, n_channels):
+                    off_diagonal = additional_covariance.copy()
+                    np.fill_diagonal(off_diagonal, 0.0)
+                    density_covariance += np.nan_to_num(off_diagonal, nan=0.0)
     if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         density_covariance = add_collective_local_fit_covariance(density_covariance, 0)
 
