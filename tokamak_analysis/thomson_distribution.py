@@ -171,7 +171,7 @@ def analyze_thomson_spectral_distribution(
             raise ValueError("background_signal must have the same length as wavelength_nm")
 
     uncertainty = None
-    covariance = None
+    signal_covariance_matrix = None
     covariance_cholesky = None
     if signal_uncertainty is not None and signal_covariance is not None:
         raise ValueError("Supply signal_uncertainty or signal_covariance, not both.")
@@ -185,13 +185,13 @@ def analyze_thomson_spectral_distribution(
         covariance_raw = np.asarray(signal_covariance)
         if covariance_raw.dtype.kind not in "iuf":
             raise ValueError("signal_covariance must contain real numeric values")
-        covariance = covariance_raw.astype(float, copy=False)
-        if covariance.shape != (y.size, y.size) or not np.all(np.isfinite(covariance)):
+        signal_covariance_matrix = covariance_raw.astype(float, copy=False)
+        if signal_covariance_matrix.shape != (y.size, y.size) or not np.all(np.isfinite(signal_covariance_matrix)):
             raise ValueError("signal_covariance must be a finite square matrix matching signal")
-        if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
+        if not np.allclose(signal_covariance_matrix, signal_covariance_matrix.T, rtol=1e-10, atol=0.0):
             raise ValueError("signal_covariance must be symmetric")
         try:
-            covariance_cholesky = np.linalg.cholesky(covariance)
+            covariance_cholesky = np.linalg.cholesky(signal_covariance_matrix)
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
@@ -225,7 +225,7 @@ def analyze_thomson_spectral_distribution(
     fit_y = y / fit_scale
     fit_sigma = (
         uncertainty / fit_scale if uncertainty is not None
-        else covariance / fit_scale**2 if covariance is not None
+        else signal_covariance_matrix / fit_scale**2 if signal_covariance_matrix is not None
         else None
     )
     fit_p0 = [p0[0] / fit_scale, p0[1], p0[2], p0[3] / fit_scale, p0[4] / fit_scale]
@@ -244,7 +244,7 @@ def analyze_thomson_spectral_distribution(
     try:
         scaled_params, scaled_covariance = curve_fit(
             fit_model, x, fit_y, p0=fit_p0, bounds=(fit_lower, fit_upper),
-            sigma=fit_sigma, absolute_sigma=(uncertainty is not None or covariance is not None), maxfev=50000,
+            sigma=fit_sigma, absolute_sigma=(uncertainty is not None or signal_covariance_matrix is not None), maxfev=50000,
         )
         parameter_scales = np.array([fit_scale, 1.0, 1.0, fit_scale, fit_scale])
         params = scaled_params * parameter_scales
@@ -256,7 +256,13 @@ def analyze_thomson_spectral_distribution(
         raise ValueError("Gaussian spectral-shape fit returned non-finite results")
     residual = y - fitted
     dof = max(1, x.size - len(params))
-    chi_square_raw = None if uncertainty is None else float(np.sum((residual / uncertainty) ** 2))
+    if uncertainty is not None:
+        chi_square_raw = float(np.sum((residual / uncertainty) ** 2))
+    elif signal_covariance_matrix is not None:
+        whitened_residual = np.linalg.solve(covariance_cholesky, residual)
+        chi_square_raw = float(whitened_residual @ whitened_residual)
+    else:
+        chi_square_raw = None
     chi_square = chi_square_raw if chi_square_raw is not None and np.isfinite(chi_square_raw) else None
     reduced_chi_square = None if chi_square is None else float(chi_square / dof)
     ss_total = float(np.sum((y - np.mean(y))**2))
@@ -265,7 +271,7 @@ def analyze_thomson_spectral_distribution(
 
     moment_uncertainties = {}
     successful_draws = 0
-    if uncertainty is not None or covariance is not None:
+    if uncertainty is not None or signal_covariance_matrix is not None:
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
@@ -338,7 +344,7 @@ def analyze_thomson_spectral_distribution(
         **moment_uncertainties,
         "moment_uncertainty_method": (
             "parametric Monte Carlo from full within-channel signal covariance and optional instrument-width uncertainty"
-            if covariance is not None else
+            if signal_covariance_matrix is not None else
             "parametric Monte Carlo from independent pointwise signal uncertainty and optional instrument-width uncertainty"
             if uncertainty is not None else
             "instrument-width-only propagation"
@@ -347,7 +353,7 @@ def analyze_thomson_spectral_distribution(
         ),
         "signal_uncertainty_model": (
             "full_within_channel_spectral_covariance"
-            if covariance is not None else
+            if signal_covariance_matrix is not None else
             "independent_pointwise_standard_uncertainties"
             if uncertainty is not None else
             "not_supplied"
@@ -381,6 +387,6 @@ def analyze_thomson_spectral_distribution(
             "A scalar Gaussian deconvolution is not applied to a general response matrix",
             "The edge-background fallback can remove real signal if the physical spectrum extends into both edges; supply background_mask to identify background-only samples",
             "No electron temperature or density is inferred by this generic descriptive helper",
-            "Uncertainty estimates are Monte Carlo sampling uncertainties under the supplied pointwise noise model; shared systematic and correlated wavelength-bin errors are not included",
+            "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in the fitted background nuisance parameters is not jointly sampled.",
         ],
     }
