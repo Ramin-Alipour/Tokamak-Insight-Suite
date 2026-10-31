@@ -397,7 +397,11 @@ def reconstruct_thomson_profile_from_spectra(
     n_channels = radii.size
     external_covariance = result.get("collective_external_parameter_covariance")
     external_order = result.get("collective_external_parameter_covariance_order") or []
-    joint_physical_covariance = (result.get("joint_inference") or {}).get("physical_parameter_covariance")
+    joint_summary = result.get("joint_inference") or {}
+    joint_physical_covariance = joint_summary.get(
+        "total_physical_parameter_covariance",
+        joint_summary.get("physical_parameter_covariance"),
+    )
     density_covariance = result.get("electron_density_joint_covariance_m6")
     if density_covariance is None:
         density_covariance = result.get("electron_density_external_parameter_covariance_m6")
@@ -455,6 +459,7 @@ def reconstruct_thomson_profile_from_spectra(
             channel.get("scattering_parameter_alpha", np.nan) for channel in result["channels"]
         ], dtype=float)
         candidates.append(("scattering_parameter_alpha", None, None, None, True))
+    spectral_profile_inputs = {}
     power_values = np.asarray([
         channel.get(
             "integrated_scattered_power_W",
@@ -463,14 +468,43 @@ def reconstruct_thomson_profile_from_spectra(
     ], dtype=float)
     if np.all(np.isfinite(power_values)):
         power_sigma = np.asarray([
-            channel.get("integrated_scattered_power_uncertainty_W", np.nan)
-            for channel in result["channels"]
+            channel.get(
+                "integrated_scattered_power_uncertainty_W",
+                channel.get("integrated_spectral_signal_uncertainty_input_units_nm", np.nan),
+            ) for channel in result["channels"]
         ], dtype=float)
         candidates.append((
             "integrated_scattered_power_W", None, None,
             np.diag(power_sigma**2) if np.all(np.isfinite(power_sigma)) else None,
             True,
         ))
+    # Spatially resolved spectral-shape descriptors are also useful outputs.
+    # They remain explicitly wavelength-space diagnostics, not substitutes for
+    # the physical temperature/flow inversion.
+    distribution_keys = (
+        ("spectral_centroid_nm", "spectral_centroid_nm", "spectral_centroid_uncertainty_nm", False),
+        ("observed_sigma_nm", "observed_sigma_nm", "observed_sigma_uncertainty_nm", True),
+        ("spectral_skewness", "spectral_skewness", "spectral_skewness_uncertainty", False),
+        ("spectral_excess_kurtosis", "spectral_excess_kurtosis", "spectral_excess_kurtosis_uncertainty", False),
+    )
+    for profile_name, metric_key, uncertainty_key, positive in distribution_keys:
+        metric_values = np.asarray([
+            channel.get("spectral_distribution", {}).get(metric_key, np.nan)
+            for channel in result["channels"]
+        ], dtype=float)
+        metric_uncertainties = np.asarray([
+            channel.get("spectral_distribution", {}).get(uncertainty_key, np.nan)
+            for channel in result["channels"]
+        ], dtype=float)
+        candidates.append((
+            profile_name, None, None, None, positive,
+        ))
+        # Keep the channel vectors in a private lookup used by the common
+        # reconstruction loop below.
+        spectral_profile_inputs[profile_name] = (
+            metric_values,
+            metric_uncertainties if np.all(np.isfinite(metric_uncertainties)) else None,
+        )
     for name, value_key, uncertainty_key, covariance, positive in candidates:
         if name == "electron_kappa_index":
             values = kappa_values
@@ -481,6 +515,8 @@ def reconstruct_thomson_profile_from_spectra(
         elif name == "integrated_scattered_power_W":
             values = power_values
             uncertainty_values = power_sigma if np.all(np.isfinite(power_sigma)) else None
+        elif name in spectral_profile_inputs:
+            values, uncertainty_values = spectral_profile_inputs[name]
         else:
             values = np.asarray(result[value_key], dtype=float)
             uncertainty_values = np.asarray(result.get(uncertainty_key), dtype=float)
