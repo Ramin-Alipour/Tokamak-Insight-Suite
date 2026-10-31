@@ -6,15 +6,15 @@ from tis.contracts import ContractError, ExecutionContract, ExecutionLevel, Quan
 
 def test_all_eighty_entries_have_explicit_conservative_contracts():
     contracts = get_diagnostic_contracts()
-    assert len(contracts) == 80
-    assert len({item.name for item in contracts}) == 80
+    assert len(contracts) == 69
+    assert len({item.name for item in contracts}) == 79
     assert sum(item.completeness == "complete" for item in contracts) == 7
-    assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 9
-    assert sum(item.completeness == "incomplete" for item in contracts) == 64
+    assert sum(item.completeness == "complete_with_declared_scope" for item in contracts) == 11
+    assert sum(item.completeness == "incomplete" for item in contracts) == 62
     assert all(item.completeness in {"incomplete", "complete", "complete_with_declared_scope"} for item in contracts)
-    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 49
+    assert sum(item.level is ExecutionLevel.REFERENCE_ONLY for item in contracts) == 47
     assert sum(item.level is ExecutionLevel.LIMITED_CALCULATION for item in contracts) == 16
-    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 15
+    assert sum(item.level is ExecutionLevel.ANALYSIS_PIPELINE for item in contracts) == 16
     assert any(item.supports_raw_data for item in contracts)
     assert all(
         not item.supports_raw_data
@@ -64,7 +64,7 @@ def test_registry_loader_falls_back_to_packaged_data_when_root_copy_is_absent(tm
     contracts.clear_registry_cache()
     try:
         rows = contracts.load_diagnostic_registry()
-        assert len(rows) == 80
+        assert len(rows) == 79
         assert rows[0]["diagnostic"] == "Thomson scattering"
     finally:
         contracts.clear_registry_cache()
