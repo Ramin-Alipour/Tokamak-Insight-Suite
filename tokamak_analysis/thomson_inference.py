@@ -1278,6 +1278,9 @@ def analyze_thomson_spectra(
                 density_inputs["effective_differential_cross_section_uncertainty_m2_sr"] = fit.get(
                     "effective_differential_cross_section_uncertainty_m2_sr"
                 )
+                density_inputs["power_cross_section_relative_covariance"] = fit.get(
+                    "power_cross_section_relative_covariance"
+                )
             if area_valid.size >= required_successes:
                 fit_area_uncertainty = float(
                     fit.get("integrated_scattered_power_fit_uncertainty_W",
@@ -1424,7 +1427,6 @@ def analyze_thomson_spectra(
                     external_cross_section_samples.append(float(draw["effective_differential_cross_section_m2_sr"]))
                     external_area_samples.append(float(draw["integrated_scattered_power_W"]))
                 except (ValueError, RuntimeError):
-                    external_area_samples.append(np.nan)
                     continue
             required_external = max(
                 8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples))
