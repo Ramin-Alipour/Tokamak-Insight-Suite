@@ -95,7 +95,7 @@ def fit_thomson_spectrum(
     intrinsic_sigma = float(result["intrinsic_sigma_nm"])
     intrinsic_uncertainty = float(np.sqrt(max(float(np.asarray(result["fit_covariance"])[2, 2]), 0.0)))
     if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0 or intrinsic_sigma <= intrinsic_uncertainty:
-        raise ValueError("Fitted physical width is not resolved: it is not larger than the instrumental-width uncertainty at the available spectral resolution.")
+        raise ValueError("Fitted physical width is not resolved: it is not larger than the instrumental width uncertainty at the available spectral resolution.")
     fitted_sigma = float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2))
     residual = np.asarray(result["residual"], dtype=float)
     dof = max(1, y.size - 5)
