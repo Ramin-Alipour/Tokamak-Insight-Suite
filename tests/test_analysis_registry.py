@@ -38,8 +38,14 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     profile_inputs = {item["name"] for item in get_analysis(46)["execution_contract"]["input_specs"]}
     assert {"profile_reconstruction_method", "profile_reconstruction_points",
             "profile_reconstruction_mc_samples", "maximum_recoil_correction_fraction"} <= profile_inputs
-    distribution_inputs = {item["name"] for item in get_analysis(81)["execution_contract"]["input_specs"]}
+    distribution_entry = get_analysis(81)
+    distribution_inputs = {item["name"] for item in distribution_entry["execution_contract"]["input_specs"]}
     assert {"instrument_sigma_uncertainty_nm", "moment_mc_samples"} <= distribution_inputs
+    distribution_outputs = {item["name"] for item in distribution_entry["execution_contract"]["output_specs"]}
+    assert {"instrument_corrected_sigma_nm", "instrument_width_resolved",
+            "moment_uncertainty_method", "gaussian_fit_parameter_uncertainties",
+            "fitted_spectrum", "reduced_chi_square"} <= distribution_outputs
+    assert "moment_uncertainty_diagnostics" not in distribution_outputs
     assert callable(resolve_analysis(1))
 
 
