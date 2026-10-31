@@ -839,33 +839,43 @@ def analyze_full_em_cts_spectrum(
     names = ("electron_density_m3", "electron_temperature_eV") + tuple(
         f"ion_temperature_eV:{name}" for name in species_names
     )
-    defaults = {
-        "electron_density_m3": (1e17, 1e22),
-        "electron_temperature_eV": (10.0, 2e4),
-    }
+    if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
+        raise ValueError("parameter_bounds must be a mapping from parameter names to positive increasing pairs")
+    bounds = {} if parameter_bounds is None else dict(parameter_bounds)
     initial = np.concatenate((
         [_positive(electron_density_initial_m3, "electron_density_initial_m3"),
          _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV")],
         ion_initials,
     ))
-    limit_rows = [bounds.get(name, defaults[name]) for name in names[:2]]
-    limit_rows.extend(bounds.get(name, bounds.get("ion_temperature_eV", (1.0, 1e4))) for name in names[2:])
-    limits = np.asarray(limit_rows, dtype=float)
-    if limits.shape != (len(names), 2) or np.any(~np.isfinite(limits)) or np.any(limits[:, 0] <= 0) or np.any(limits[:, 0] >= limits[:, 1]):
-        raise ValueError("parameter_bounds must contain positive increasing pairs for density, electron temperature and every ion species temperature")
-    if np.any(initial <= limits[:, 0]) or np.any(initial >= limits[:, 1]):
-        raise ValueError("initial density and temperatures must lie strictly inside parameter_bounds")
-    lower, upper = np.log10(limits[:, 0]), np.log10(limits[:, 1])
+    lower = np.full(len(names), -np.inf, dtype=float)
+    upper = np.full(len(names), np.inf, dtype=float)
+    applied_bounds = {}
+    for index, name in enumerate(names):
+        pair_value = bounds.get(name)
+        if pair_value is None and name.startswith("ion_temperature_eV:"):
+            pair_value = bounds.get("ion_temperature_eV")
+        if pair_value is None:
+            continue
+        pair = np.asarray(pair_value, dtype=float)
+        if pair.shape != (2,) or np.any(~np.isfinite(pair)) or np.any(pair <= 0) or pair[0] >= pair[1]:
+            raise ValueError(f"parameter_bounds[{name!r}] must be a positive finite increasing pair")
+        if not pair[0] < initial[index] < pair[1]:
+            raise ValueError(f"initial value for {name} must lie strictly inside its supplied parameter bounds")
+        lower[index], upper[index] = np.log10(pair)
+        applied_bounds[name] = pair.tolist()
     p0 = np.log10(initial)
 
     def unpack_temperatures(p):
-        return {name: float(10.0**p[2+i]) for i, name in enumerate(species_names)}
+        return {
+            name: float(10.0**np.clip(p[2+i], -300.0, 300.0))
+            for i, name in enumerate(species_names)
+        }
 
     def model(p):
         result = full_em_cts_spectral_density(
             f, probe_frequency_Hz, scattering_geometry,
-            electron_density_m3=10.0**p[0],
-            electron_temperature_eV=10.0**p[1],
+            electron_density_m3=10.0**np.clip(p[0], -300.0, 300.0),
+            electron_temperature_eV=10.0**np.clip(p[1], -300.0, 300.0),
             ion_temperature_eV=unpack_temperatures(p),
             ion_species=ion_species, ion_fractions=ion_fractions,
             magnetic_field_T=magnetic_field_T,
@@ -908,7 +918,7 @@ def analyze_full_em_cts_spectrum(
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
     if spectral_covariance is None and signal_uncertainty is None:
         covariance_log *= float(r @ r / dof)
-    values = 10.0**fit.x
+    values = 10.0**np.clip(fit.x, -300.0, 300.0)
     transform = np.diag(np.log(10.0) * values)
     covariance = transform @ covariance_log @ transform.T
     forward_diagnostics = full_em_cts_spectral_density(
