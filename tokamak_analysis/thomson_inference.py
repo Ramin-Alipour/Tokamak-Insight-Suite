@@ -1704,6 +1704,30 @@ def analyze_thomson_spectra(
         }
     for channel_result in results:
         channel_result.pop("_density_inputs_for_joint_refit", None)
+    response_area_covariance_output = None
+    if lsf_unc is not None:
+        channel_count = len(results)
+        response_area_covariance_output = np.zeros((channel_count, channel_count), dtype=float)
+        if shared_lsf_covariance is not None:
+            area_indices = np.asarray([3 * channel + 2 for channel in range(channel_count)], dtype=int)
+            response_area_covariance_output = shared_lsf_covariance[
+                np.ix_(area_indices, area_indices)
+            ].copy()
+        else:
+            for channel_index, channel_result in enumerate(results):
+                area_sigma_lsf = channel_result.get("integrated_scattered_power_lsf_uncertainty_W")
+                response_area_covariance_output[channel_index, channel_index] = (
+                    float(area_sigma_lsf) ** 2 if area_sigma_lsf is not None else np.nan
+                )
+    joint_area_covariance_output = None
+    if joint_area_covariance_from_spectral_fit is not None:
+        joint_area_covariance_output = joint_area_covariance_from_spectral_fit.copy()
+        if response_area_covariance_output is not None:
+            joint_area_covariance_output += np.nan_to_num(
+                response_area_covariance_output, nan=0.0
+            )
+    elif response_area_covariance_output is not None:
+        joint_area_covariance_output = response_area_covariance_output.copy()
     density_joint_covariance_output = None
     if joint_density_covariance is not None:
         channel_count = len(results)
@@ -1724,10 +1748,57 @@ def analyze_thomson_spectra(
                     float(density_row) * float(density_column)
                     * float(relative_density_gradient @ relative_block @ relative_density_gradient)
                 )
+        power_indices = np.arange(0, 6 * len(results), 6, dtype=int)
+        power_rows_zero = (
+            np.allclose(joint_density_covariance[power_indices, :], 0.0, rtol=0.0, atol=1e-14)
+            and np.allclose(joint_density_covariance[:, power_indices], 0.0, rtol=0.0, atol=1e-14)
+        )
+        if power_rows_zero and joint_area_covariance_output is not None:
+            for row_index, row_result in enumerate(results):
+                density_row = row_result.get("electron_density_m3")
+                area_row = row_result.get("integrated_scattered_power_W")
+                if density_row is None or area_row in (None, 0.0):
+                    continue
+                for column_index, column_result in enumerate(results):
+                    density_column = column_result.get("electron_density_m3")
+                    area_column = column_result.get("integrated_scattered_power_W")
+                    if density_column is None or area_column in (None, 0.0):
+                        continue
+                    density_joint_covariance_output[row_index, column_index] += (
+                        float(density_row) * float(density_column)
+                        * float(joint_area_covariance_output[row_index, column_index])
+                        / (float(area_row) * float(area_column))
+                    )
         for channel_index, channel_result in enumerate(results):
             if channel_result.get("electron_density_m3") is not None:
                 channel_result["electron_density_joint_covariance_diagonal_m6"] = float(
                     density_joint_covariance_output[channel_index, channel_index]
+                )
+    elif joint_area_covariance_output is not None and any(
+        item.get("electron_density_m3") is not None for item in results
+    ):
+        channel_count = len(results)
+        density_joint_covariance_output = np.full((channel_count, channel_count), np.nan, dtype=float)
+        for row_index, row_result in enumerate(results):
+            density_row = row_result.get("electron_density_m3")
+            area_row = row_result.get("integrated_scattered_power_W")
+            if density_row is None or area_row in (None, 0.0):
+                continue
+            sigma_row = row_result.get("electron_density_uncertainty_m3")
+            density_joint_covariance_output[row_index, row_index] = (
+                float(sigma_row) ** 2 if sigma_row is not None else np.nan
+            )
+            for column_index, column_result in enumerate(results):
+                if row_index == column_index:
+                    continue
+                density_column = column_result.get("electron_density_m3")
+                area_column = column_result.get("integrated_scattered_power_W")
+                if density_column is None or area_column in (None, 0.0):
+                    continue
+                density_joint_covariance_output[row_index, column_index] = (
+                    float(density_row) * float(density_column)
+                    * float(joint_area_covariance_output[row_index, column_index])
+                    / (float(area_row) * float(area_column))
                 )
     density_angle_covariance_output = None
     if scattering_angle_uncertainty_rad is not None and any(
@@ -1767,6 +1838,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
+        "integrated_scattered_power_joint_covariance": joint_area_covariance_output,
         "electron_density_angle_covariance_m6": density_angle_covariance_output,
         "electron_density_shared_response_covariance_m6": shared_response_density_covariance,
         "electron_density_external_parameter_covariance_m6": None,
