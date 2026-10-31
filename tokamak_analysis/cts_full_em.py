@@ -756,7 +756,7 @@ def full_em_cts_spectral_density(
                   if electron_distribution is not None
                   else "magnetized full-electromagnetic CTS with Bindslev low-temperature bulk-electron coupling and optional relativistic gyrotropic fast-ion kinetics"),
         "kinetic_response": "Maxwellian thermal species: magnetized Vlasov gyro-harmonics; explicitly supplied relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic electrons/fast ions: relativistic momentum-space Vlasov Fourier collocation",
-        "fluctuation_source": "Maxwellian thermal species: classical FDT; explicitly supplied non-Maxwellian electron/fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
+        "fluctuation_source": "Maxwellian thermal species: classical FDT; explicitly supplied relativistic electron/fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
         "numerical_controls": {"harmonic_order": int(harmonic_order),
@@ -765,7 +765,7 @@ def full_em_cts_spectral_density(
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied electron distributions may use relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum distributions, and fast ions use bi-Gaussian or tabulated distributions.",
             "When electron_distribution is supplied, the Maxwellian electron response and Bindslev electron nonlinear source are replaced by a relativistic gyrotropic electron Vlasov response and second-order kinetic vertex; supplied fast-ion populations add their own relativistic vertices.",
-            "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
+            "Classical FDT is applied only to bulk thermal Maxwellian species; explicitly supplied relativistic electron/fast-ion populations use the Klimontovich orbit spectrum."
         ],
     }
 
