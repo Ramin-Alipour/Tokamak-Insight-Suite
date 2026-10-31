@@ -39,7 +39,7 @@ This is an independent adaptive genetic implementation informed by Zhang et al.,
 
 ### Regularized inversion
 
-The regularized option adds a scaled prior penalty around the supplied initial parameter vector. For inferred tabulated fast-ion VDFs, it also adds a second-difference smoothness penalty on the normalized non-negative VDF. The regularization strength is user-supplied and should be varied in synthetic recovery and sensitivity tests; no universal default lambda is scientifically justified.
+The regularized option is restricted to inferred tabulated fast-ion VDF reconstruction. It adds a second-difference smoothness penalty to the normalized non-negative VDF only. It does **not** impose a prior or penalty around the initial electron density, electron temperature, ion temperature, ion flow, or fast-ion fraction; those initial values are optimizer starting points. The regularization strength and VDF smoothness scale are explicit user-supplied controls and should be varied in synthetic recovery and sensitivity tests; no universal default lambda is scientifically justified.
 
 The 2026 regularized Thomson-inversion literature motivates regularization to suppress data-consistent but physically implausible oscillatory solutions. The TIS regularized CTS objective is a scoped implementation, not an exact reproduction of that optical Thomson time-series method.
 
