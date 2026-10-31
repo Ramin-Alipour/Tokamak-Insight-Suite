@@ -17,6 +17,7 @@ from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
@@ -1055,7 +1056,10 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
-                    result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
+                    if st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
+                        result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
+                    else:
+                        result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
                     st.session_state['tis_thomson_spectral_inference']={
                         'data_sha':sha,'channel_col':channel_col,'radius_col':radius_col,
                         'wavelength_col':wavelength_col,'signal_col':signal_col,
@@ -1081,6 +1085,30 @@ elif page=='Spectral Analysis':
                 if np.any(np.isfinite(result['electron_density_profile_m3'])):
                     st.line_chart(profile.set_index('radius_m')[['electron_density_m3']])
                 st.caption('Electron density is reported only when identifiable from the selected physical model and supplied calibrated intensity/geometry. Flow is the projection along the scattering wavevector, not a reconstructed 3-D velocity vector.')
+                if 'spatial_profile_reconstruction' in result:
+                    st.markdown('**Reconstructed spatial profiles from the measured Thomson spectra**')
+                    spatial=result['spatial_profile_reconstruction']
+                    for parameter_name, parameter_result in spatial['profiles'].items():
+                        st.markdown(f'**{parameter_name}**')
+                        if parameter_result.get('status') not in (None,'completed'):
+                            st.caption(parameter_result.get('reason',parameter_result.get('status')))
+                            continue
+                        for method_name, method_result in parameter_result.get('methods',{}).items():
+                            if method_result.get('status')!='completed':
+                                st.caption(f'{method_name}: {method_result.get("status")}')
+                                continue
+                            curve=pd.DataFrame({
+                                'value':method_result['values'],
+                                'gradient_per_m':method_result['gradient_per_m'],
+                            },index=parameter_result['reconstructed_radius_m'])
+                            st.caption(method_name.replace('_',' ').title())
+                            st.line_chart(curve[['value']])
+                            if method_result.get('uncertainty_available'):
+                                band=pd.DataFrame({
+                                    'lower_95_percentile':method_result['lower_95_percentile'],
+                                    'upper_95_percentile':method_result['upper_95_percentile'],
+                                },index=parameter_result['reconstructed_radius_m'])
+                                st.line_chart(band)
                 export=_json_safe(result)
                 json_download('Export Thomson spectral-inference results',export,'tis_thomson_spectral_inference.json')
                 add_report_section('Thomson multi-channel spectral inference',export)
@@ -3087,8 +3115,9 @@ elif page=='Advanced Analysis':
                     st.error(f'CTS inversion failed: {e}')
 
     elif workflow=='Thomson spatial profile reconstruction from calibrated spectra':
-        st.info('This subanalysis uses the canonical Thomson forward-inference engine. It accepts measured, calibrated spectra and returns channel-resolved radial physical-parameter profiles; it does not accept pre-derived ne/Te profile points.')
-        if st.button('Open canonical Thomson profile-inference workflow',type='primary',key='open_thomson_profile_inference_from_advanced'):
+        st.info('This subanalysis starts from measured, calibrated multi-channel Thomson spectra, infers every identifiable physical parameter with the selected forward model, and reconstructs radial profiles using PCHIP and/or a GCV smoothing spline. It does not accept pre-derived ne/Te profile points and does not extrapolate beyond measured channel coordinates.')
+        if st.button('Open Thomson spectral-to-spatial-profile workflow',type='primary',key='open_thomson_profile_inference_from_advanced'):
+            st.session_state['tis_thomson_profile_reconstruction_requested']=True
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
