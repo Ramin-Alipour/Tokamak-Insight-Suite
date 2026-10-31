@@ -2937,10 +2937,10 @@
   },
   {
     "name": "Thomson electron density from calibrated scattered power",
-    "equation": "n_e = P_s/[P_i L (dσ_T/dΩ) ΔΩ η]",
+    "equation": "n_e = P_s/[P_i L (dσ_eff/dΩ) ΔΩ η]",
     "inputs": "Scattered power [W], incident power [W], interaction length [m], scattering angle and polarization geometry, solid angle [sr], efficiency",
     "output": "m^-3",
-    "assumptions": "Optically thin single scattering; absolute power calibration; uniform density over interaction length; supplied collection and polarization geometry",
+    "assumptions": "Optically thin single scattering; absolute power calibration; uniform density over interaction length; supplied collection and polarization geometry. For non-relativistic Maxwellian/Kappa fits dσ_eff/dΩ is the polarized stationary-electron Thomson cross-section; for relativistic Maxwell-Jüttner fits it is averaged over the fitted Lorentz-boosted electron distribution.",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
@@ -2983,7 +2983,25 @@
           "name": "relative_input_covariance",
           "unit": "6x6 relative covariance matrix",
           "required": false,
-          "description": "Optional covariance of relative inputs ordered as scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor. Mutually exclusive with the corresponding scalar uncertainty inputs."
+          "description": "Optional 6x6 relative covariance of scattered power, incident power, interaction length, collection solid angle, optical efficiency and effective differential cross-section. For relativistic Maxwell-Jüttner, the final factor is the velocity-averaged cross-section; fitted power/cross-section covariance is added internally. Mutually exclusive with scalar optical-factor uncertainties."
+        },
+        {
+          "name": "effective_differential_cross_section_m2_sr",
+          "unit": "m^2 sr^-1",
+          "required": false,
+          "description": "Optional model-consistent effective cross-section override; automatically supplied by the relativistic Maxwell-Jüttner inference."
+        },
+        {
+          "name": "effective_differential_cross_section_uncertainty_m2_sr",
+          "unit": "m^2 sr^-1",
+          "required": false,
+          "description": "Uncertainty of the supplied effective cross-section; fitted parameter and external geometry/polarization contributions."
+        },
+        {
+          "name": "power_cross_section_relative_covariance",
+          "unit": "dimensionless",
+          "required": false,
+          "description": "Relative covariance between fitted scattered power and effective differential cross-section; propagated with the negative cross term for P_s/σ_eff."
         }
       ],
       "output_specs": [
@@ -2994,6 +3012,14 @@
         {
           "name": "electron_density_uncertainty_m3",
           "unit": "m^-3"
+        },
+        {
+          "name": "differential_cross_section_m2_sr",
+          "unit": "m^2 sr^-1"
+        },
+        {
+          "name": "scattering_angle_relative_sensitivity",
+          "unit": "dimensionless"
         }
       ],
       "prerequisites": [
@@ -3002,7 +3028,7 @@
         "uniform density over interaction length",
         "supplied collection and polarization geometry"
       ],
-      "uncertainty_model": "First-order propagation using either independent supplied standard uncertainties or a 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and polarization/differential-cross-section factor; do not supply both. Scattering-angle uncertainty is handled separately. Unprovided covariance and model discrepancy are excluded.",
+      "uncertainty_model": "First-order propagation using independent supplied standard uncertainties or a 6x6 relative covariance matrix for the six multiplicative inputs, plus fitted power/effective-cross-section covariance. For relativistic Maxwell-Juttner, fitted-parameter covariance, instrument-response uncertainty and supplied geometry/polarization uncertainty are propagated through the velocity-averaged effective differential cross-section. Scattering-angle uncertainty is handled separately for non-relativistic models; do not double-count inputs.",
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference"
       ],
@@ -3026,6 +3052,16 @@
         "article": "P07014",
         "year": 2025,
         "doi": "10.1088/1748-0221/20/07/P07014"
+      },
+      {
+        "title": "Monte Carlo simulation method for incoherent Thomson scattering spectra from arbitrary electron distribution functions",
+        "authors": "Kentaro Sakai, Kentaro Tomita, Takeo Hoshi, Ryo Yasuhara",
+        "journal": "Journal of Instrumentation",
+        "volume": "21",
+        "article": "C01002",
+        "year": 2026,
+        "doi": "10.1088/1748-0221/21/01/C01002",
+        "scope": "Recent relativistic Maxwellian and Kappa Thomson spectral treatment; the TIS effective cross-section is computed by deterministic quadrature over the same Lorentz-transformed polarized scattering kernel."
       }
     ]
   },
@@ -4134,6 +4170,114 @@
         "article": "115845",
         "doi": "10.1016/j.fusengdes.2026.115845",
         "scope": "Recent CTS diagnostic optimization combining beam/ray and spectral forward modelling."
+      }
+    ]
+  },
+  {
+    "name": "Relativistic Maxwell-Juttner effective Thomson differential cross-section",
+    "equation": "(dσ_eff/dΩ) = r_e² [∫ d³u f_MJ(u) ((1−n_i·β)/(γ²(1−n_s·β)²)) (1−(n_s'·ε_i')²)] / [∫ d³u f_MJ(u)]",
+    "inputs": "Fitted electron temperature [eV], fitted scattering-vector flow projection [m s^-1], incident/scattered directions, incident polarization and laser geometry",
+    "output": "m² sr^-1",
+    "assumptions": "Single scattering in the Thomson limit; isotropic Maxwell-Juttner distribution in its rest frame, Lorentz-boosted along the scattering vector; electron-rest-frame polarization and scattering direction; unanalysed scattered polarization; no Compton recoil.",
+    "status": "D",
+    "category": "Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+      "formula_key": "relativistic_mj_effective_differential_cross_section",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "flow_projection_m_s",
+          "unit": "m s^-1",
+          "required": false
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "unit vector in scattering-local coordinates",
+          "required": true
+        },
+        {
+          "name": "radial_order",
+          "unit": "integer quadrature order",
+          "required": false
+        },
+        {
+          "name": "angular_order",
+          "unit": "integer quadrature order",
+          "required": false
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "effective_differential_cross_section_m2_sr",
+          "unit": "m² sr^-1"
+        },
+        {
+          "name": "captured_probability",
+          "unit": "dimensionless"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "nm^-1"
+        }
+      ],
+      "prerequisites": [
+        "Thomson recoil correction below configured limit",
+        "Full measured spectral window coverage at or above 99.5%",
+        "Supplied scattering geometry and incident polarization"
+      ],
+      "uncertainty_model": "Finite-difference propagation of fitted Te/flow covariance; instrument-response and supplied geometry/polarization uncertainty propagated by Monte Carlo refits. Cross-covariance with fitted integrated scattered power is retained.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
+        "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters",
+        "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties"
+      ],
+      "note": "Numerical deterministic quadrature and synthetic/limiting-case software tests; not empirical validation.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true
+    },
+    "references": [
+      {
+        "title": "Monte Carlo simulation method for incoherent Thomson scattering spectra from arbitrary electron distribution functions",
+        "authors": "Kentaro Sakai, Kentaro Tomita, Takeo Hoshi, Ryo Yasuhara",
+        "journal": "Journal of Instrumentation",
+        "volume": "21",
+        "article": "C01002",
+        "year": 2026,
+        "doi": "10.1088/1748-0221/21/01/C01002"
+      },
+      {
+        "title": "An Introduction to Special Relativity for Radiation and Plasma Physics",
+        "authors": "Greg Tallents",
+        "year": 2022,
+        "publisher": "Cambridge University Press",
+        "type": "textbook"
       }
     ]
   }
