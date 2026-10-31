@@ -238,6 +238,11 @@ df=st.session_state.get('tis_df')
 filename=st.session_state.get('tis_filename','')
 raw=st.session_state.get('tis_raw',b'')
 sha=st.session_state.get('tis_sha','')
+data_signature=(
+    st.session_state.get('tis_upload_signature')
+    if st.session_state.get('tis_active_source')=='upload'
+    else sha
+) or sha
 numeric=[] if df is None else [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
 def col_select(label, options, key, default=None):
     if not options: st.warning('No numeric columns are available. Load a suitable data file first.'); st.stop()
@@ -1112,7 +1117,7 @@ elif page=='Spectral Analysis':
                     else:
                         result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
                     st.session_state['tis_thomson_spectral_inference']={
-                        'data_sha':sha,'channel_col':channel_col,'radius_col':radius_col,
+                        'data_sha':data_signature,'channel_col':channel_col,'radius_col':radius_col,
                         'wavelength_col':wavelength_col,'signal_col':signal_col,
                         'uncertainty_col':uncertainty_col,'model':model,'result':result,
                     }
@@ -3072,7 +3077,7 @@ elif page=='Advanced Analysis':
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
         if df is None:
             st.info('Load the calibrated measurement table and run the canonical Thomson spectral-to-physics inference first.')
-        elif not saved_ts or saved_ts.get('data_sha')!=sha:
+        elif not saved_ts or saved_ts.get('data_sha')!=data_signature:
             st.info('No current canonical Thomson physical fit is available for this dataset. Run “Thomson multi-channel spectral inference” first; this subanalysis will then display the same-spectrum physical parameters with its spectral-distribution diagnostics.')
             if st.button('Open canonical Thomson spectral-to-physics workflow',type='primary',key='open_ts_distribution_physical_fit'):
                 st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
