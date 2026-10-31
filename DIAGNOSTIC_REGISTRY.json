@@ -4304,7 +4304,7 @@
           "name": "mode_index",
           "unit": "integer cold-plasma propagation branch index",
           "required": false,
-          "description": "Required explicitly when generating frequency_resolved_geometry with trace_cts_frequency_resolved_beams; select branch 0, 1 or 2. No default branch is assumed.",
+          "description": "Required explicitly when generating frequency_resolved_geometry with trace_cts_frequency_resolved_beams and selected again in the Full-EM UI to verify the uploaded geometry. Select branch 0, 1 or 2; no default branch is assumed.",
           "required_when_model": "full_electromagnetic"
         }
       ],
@@ -4511,6 +4511,11 @@
           "name": "bulk_electron_closure_validity_theta_e_limit",
           "unit": "dimensionless researcher-selected theta_e limit",
           "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer cold-plasma propagation branch index",
+          "available_when_model": "full_electromagnetic_ray_geometry"
         }
       ],
       "assumptions": [
