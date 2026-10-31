@@ -530,9 +530,8 @@ def fit_collective_kappa(
     response, uncertainty=None, *, incident_direction, scattered_direction,
     ion_species, ion_fractions, ion_temperature_eV,
     electron_velocity_m_s, ion_velocity_m_s,
-    initial_density_m3, initial_temperature_eV,
-    density_bounds_m3, temperature_bounds_eV,
-    initial_kappa=3.0, kappa_bounds=(1.51, 50.0),
+    initial_density_m3, initial_temperature_eV, initial_kappa,
+    density_bounds_m3=None, temperature_bounds_eV=None, kappa_bounds=None,
 ):
     """Fit ne, Te and kappa from a collective spectrum; ion inputs remain fixed."""
     x = np.asarray(wavelength_nm, dtype=float)
@@ -547,20 +546,41 @@ def fit_collective_kappa(
     residual_scale = np.full_like(ys, max(float(np.max(np.abs(ys))), np.finfo(float).tiny)) if unc is None else unc
     ne0 = _positive(initial_density_m3, "initial_density_m3")
     te0 = _positive(initial_temperature_eV, "initial_temperature_eV")
-    nb = np.asarray(density_bounds_m3, dtype=float)
-    tb = np.asarray(temperature_bounds_eV, dtype=float)
-    kb = np.asarray(kappa_bounds, dtype=float)
-    if nb.shape != (2,) or tb.shape != (2,) or kb.shape != (2,) or np.any(~np.isfinite(nb)) or np.any(~np.isfinite(tb)) or np.any(~np.isfinite(kb)) or np.any(nb <= 0) or np.any(tb <= 0) or nb[0] >= nb[1] or tb[0] >= tb[1] or kb[0] <= 1.5 or kb[0] >= kb[1]:
-        raise ValueError("density, temperature and kappa bounds must be finite increasing physical pairs")
-    if not nb[0] <= ne0 <= nb[1] or not tb[0] <= te0 <= tb[1] or not kb[0] <= initial_kappa <= kb[1]:
-        raise ValueError("initial density, temperature and kappa must lie within their bounds")
+    kap0 = _positive(initial_kappa-1.5, "initial_kappa_minus_1p5")+1.5
+    lower = np.full(3, -np.inf, dtype=float)
+    upper = np.full(3, np.inf, dtype=float)
+    for bounds, name, index, transform in (
+        (density_bounds_m3, "density_bounds_m3", 0, np.log10),
+        (temperature_bounds_eV, "temperature_bounds_eV", 1, np.log10),
+        (kappa_bounds, "kappa_bounds", 2, lambda value: np.log(value-1.5)),
+    ):
+        if bounds is None:
+            continue
+        pair = np.asarray(bounds, dtype=float)
+        if pair.shape != (2,) or np.any(~np.isfinite(pair)) or pair[0] >= pair[1]:
+            raise ValueError(f"{name} must be a finite increasing pair")
+        if index == 2 and pair[0] <= 1.5:
+            raise ValueError("kappa_bounds lower bound must be >1.5")
+        if index in (0,1) and pair[0] <= 0:
+            raise ValueError(f"{name} must be positive")
+        if index == 0 and not pair[0] <= ne0 <= pair[1]:
+            raise ValueError("initial_density_m3 must lie within density_bounds_m3")
+        if index == 1 and not pair[0] <= te0 <= pair[1]:
+            raise ValueError("initial_temperature_eV must lie within temperature_bounds_eV")
+        if index == 2 and not pair[0] <= kap0 <= pair[1]:
+            raise ValueError("initial_kappa must lie within kappa_bounds")
+        lower[index], upper[index] = transform(pair[0]), transform(pair[1])
     edge = max(2, x.size//10)
     baseline = float(np.median(np.r_[ys[:edge], ys[-edge:]]))
-    amp0 = max(float(np.max(ys)-baseline), 1e-8)
-    p0 = np.array([np.log10(ne0), np.log10(te0), np.log10(initial_kappa-1.5)])
+    amp0 = max(float(np.max(ys)-baseline), np.finfo(float).tiny)
+    p0 = np.array([np.log10(ne0), np.log10(te0), np.log(kap0-1.5)])
 
     def unpack(p):
-        return 10.0**p[0], 10.0**p[1], 1.5+10.0**p[2]
+        return (
+            10.0**np.clip(p[0], -300.0, 300.0),
+            10.0**np.clip(p[1], -300.0, 300.0),
+            1.5+np.exp(np.clip(p[2], -700.0, 700.0)),
+        )
 
     def spectrum(p):
         ne, te, kap = unpack(p)
@@ -607,7 +627,7 @@ def fit_collective_kappa(
     covariance_log=np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None:
         covariance_log*=float(r@r/dof)
-    transform=np.diag([np.log(10.0)*ne,np.log(10.0)*te,np.log(10.0)*(kap-1.5)])
+    transform=np.diag([np.log(10.0)*ne,np.log(10.0)*te,kap-1.5])
     covariance=transform@covariance_log@transform.T
     sigma=np.sqrt(np.maximum(np.diag(covariance),0.0))
     incident_unit=np.asarray(incident_direction,dtype=float)
