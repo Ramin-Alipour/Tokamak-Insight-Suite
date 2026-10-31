@@ -551,16 +551,24 @@ def full_em_cts_spectral_density(
         "total_three_wave_source_current_operator": np.asarray(total_three_wave_operators),
         "bindslev_coupling_coefficients": bindslev_coefficients,
         "relativistic_three_wave_vertex_diagnostics": relativistic_three_wave_vertex_diagnostics,
-        "relativistic_fast_ion_three_wave_vertex_used": any(relativistic_three_wave_vertex_diagnostics),
+        "relativistic_fast_ion_three_wave_vertex_used": any(
+            any(item.get("population_role") == "fast ion" for item in frequency_items)
+            for frequency_items in relativistic_three_wave_vertex_diagnostics
+        ),
+        "relativistic_kinetic_three_wave_vertex_used": any(relativistic_three_wave_vertex_diagnostics),
         "kinetic_population_diagnostics": fast_ion_kinetic_diagnostics,
         "nonthermal_electron_distribution": electron_distribution,
         "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
         "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
-        "three_wave_coupling": ("Bindslev low-temperature bulk-electron source-current tensor plus relativistic second-order gyrotropic Vlasov vertices for supplied fast-ion populations"
-                                if any(relativistic_three_wave_vertex_diagnostics)
-                                else "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms"),
+        "three_wave_coupling": (
+            "Relativistic second-order gyrotropic Vlasov vertices for supplied non-Maxwellian electrons/fast ions; Maxwellian bulk-electron Bindslev vertex replaced"
+            if electron_distribution is not None
+            else "Bindslev low-temperature bulk-electron source-current tensor plus relativistic second-order gyrotropic Vlasov vertices for supplied fast-ion populations"
+            if any(relativistic_three_wave_vertex_diagnostics)
+            else "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms"
+        ),
         "magnetic_field_T": b,
         "frequency_resolved_magnetic_field_T": np.asarray(local_magnetic_fields),
         "relative_gaussian_beam_overlap": np.asarray(beam_overlap_weights),
