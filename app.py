@@ -916,8 +916,13 @@ elif page=='Spectral Analysis':
                     efficiency_unc_text=st.text_input('Optical-efficiency 1σ uncertainty (optional)',value='',key='ts_infer_efficiency_unc')
                 with d3:
                     polarization_text=st.text_input('Incident polarization vector (x,y,z; required)',value='',key='ts_infer_polarization')
-                    incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
-                    scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
+                    if model=='non_collective_relativistic_maxwell_juttner':
+                        incident_direction_text=relativistic_incident_direction_text
+                        scattered_direction_text=relativistic_scattered_direction_text
+                        st.caption('The beam directions entered in the relativistic geometry section are reused for absolute-density inference.')
+                    else:
+                        incident_direction_text=st.text_input('Incident beam direction (x,y,z; required)',value='',key='ts_infer_abs_incident_direction')
+                        scattered_direction_text=st.text_input('Scattered beam direction (x,y,z; required)',value='',key='ts_infer_abs_scattered_direction')
                     polarization_unc_text=st.text_input('Polarization-factor 1σ uncertainty (optional)',value='',key='ts_infer_polarization_unc')
                     density_covariance_upload=st.file_uploader('Optional within-channel 6×6 density-input relative covariance CSV',type=['csv','txt'],key='ts_infer_density_covariance')
                     joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
