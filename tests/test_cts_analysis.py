@@ -261,3 +261,52 @@ def test_full_em_cts_requires_complete_vector_flow_and_polarization_metadata():
             electron_flow_velocity_m_s=None, ion_flow_velocity_m_s={"D+": [0, 0, 0]},
             incident_polarization=[0, 0, 1], scattered_polarization=[0, 0, 1],
         )
+
+
+def test_cts_cold_plasma_dielectric_vacuum_limit_and_hermiticity():
+    from tokamak_analysis.cts_em_geometry import cold_plasma_dielectric_tensor
+
+    epsilon = cold_plasma_dielectric_tensor(2.0e11, [0.0, 0.0, 2.0], [])
+    np.testing.assert_allclose(epsilon, np.eye(3), rtol=0.0, atol=1e-14)
+    species = [
+        {"density_m3": 2e19, "charge_C": -1.602176634e-19, "mass_kg": 9.1093837015e-31},
+        {"density_m3": 2e19, "charge_C": 1.602176634e-19, "mass_kg": 3.3435837724e-27},
+    ]
+    epsilon = cold_plasma_dielectric_tensor(2.0e11, [0.3, -0.4, 1.2], species)
+    np.testing.assert_allclose(epsilon, epsilon.conj().T, rtol=1e-12, atol=1e-12)
+
+
+def test_cts_cold_plasma_vacuum_modes_and_gaussian_beam_overlap():
+    from tokamak_analysis.cts_em_geometry import (
+        solve_cold_plasma_modes, gaussian_beam_overlap,
+    )
+
+    omega = 2.0 * np.pi * 140e9
+    k = np.array([omega / 299792458.0, 0.0, 0.0])
+    modes = solve_cold_plasma_modes(omega, k, [0.0, 0.0, 2.0], [])
+    np.testing.assert_allclose(modes["dispersion_eigenvalues"][:2], 0.0, atol=1e-12)
+    overlap = gaussian_beam_overlap(
+        [0, 0, 0], np.eye(3), [0, 0, 0], np.eye(3)
+    )
+    assert overlap == pytest.approx(1.0 / (8.0 * np.pi ** 1.5), rel=1e-12)
+    displaced = gaussian_beam_overlap(
+        [0, 0, 0], np.eye(3), [10, 0, 0], np.eye(3)
+    )
+    assert displaced < overlap
+
+
+def test_cts_cold_plasma_ray_trace_is_straight_in_vacuum():
+    from tokamak_analysis.cts_em_geometry import trace_cold_plasma_ray
+
+    omega = 2.0 * np.pi * 140e9
+    k0 = np.array([omega / 299792458.0, 0.0, 0.0])
+    result = trace_cold_plasma_ray(
+        [0.0, 0.0, 0.0], k0, omega,
+        equilibrium=lambda position: {
+            "magnetic_field_T": [0.0, 0.0, 2.0], "species": []
+        },
+        mode_index=0, path_parameter_max=1e-3, sample_count=8,
+    )
+    assert result["position_m"].shape == (8, 3)
+    assert np.all(np.isfinite(result["wavevector_rad_m"]))
+    np.testing.assert_allclose(result["wavevector_rad_m"], k0, rtol=1e-7, atol=1e-7)
