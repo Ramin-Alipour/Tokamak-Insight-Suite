@@ -216,7 +216,19 @@ def analyze_thomson_spectral_distribution(
     amplitude0 = float(max(corrected[peak], np.finfo(float).tiny))
     spacing = float(np.median(np.diff(x)))
     span = float(x[-1] - x[0])
-    p0 = [amplitude0, float(x[peak]), max(sigma_observed, spacing), float(np.interp(x[peak], x, background)), float(np.polyfit(x[mask] if mask is not None else np.r_[x[:max(3,int(np.ceil(x.size*background_fraction)))],x[-max(3,int(np.ceil(x.size*background_fraction))):]], y[mask] if mask is not None else np.r_[y[:max(3,int(np.ceil(x.size*background_fraction)))],y[-max(3,int(np.ceil(x.size*background_fraction))):]], 1)[0])]
+    if explicit_background is not None:
+        initial_background_slope = float(np.polyfit(x, background, 1)[0])
+    else:
+        edge_count = max(3, int(np.ceil(x.size * background_fraction)))
+        edge_indices = np.r_[np.arange(edge_count), np.arange(x.size-edge_count, x.size)]
+        initial_background_slope = float(np.polyfit(
+            x[mask] if mask is not None else x[edge_indices],
+            y[mask] if mask is not None else y[edge_indices], 1
+        )[0])
+    p0 = [
+        amplitude0, float(x[peak]), max(sigma_observed, spacing),
+        float(np.interp(x[peak], x, background)), initial_background_slope,
+    ]
     lower = [0.0, float(x[0]), max(spacing * 0.25, np.finfo(float).eps), -np.inf, -np.inf]
     upper = [np.inf, float(x[-1]), span, np.inf, np.inf]
     fit_scale = float(np.max(np.abs(y)))
@@ -378,7 +390,7 @@ def analyze_thomson_spectral_distribution(
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
             "A supplied Gaussian width or measured instrument-response matrix describes the spectral response",
-            "A user-supplied background mask is preferred; spectral-edge estimation is used only when no mask is supplied",
+            "Background moments use an explicitly supplied fitted background, a user mask, or spectral-edge estimation in that order",
             "Signed background-subtracted signal is used for moments without clipping negative residuals",
         ],
         "limitations": [
