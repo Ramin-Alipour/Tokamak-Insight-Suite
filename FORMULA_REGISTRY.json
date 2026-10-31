@@ -3887,5 +3887,106 @@
         "scope": "Recent energetic/bulk ion CTS diagnostic context."
       }
     ]
+  },
+  {
+    "name": "Path-integrated Gaussian beam overlap for CTS scattering volume",
+    "equation": "O_j=G(x_i,j,x_s,j;Σ_i,j,Σ_s,j); w_j=O_jΔs_j/Σ_l(O_lΔs_l); S_CTS(ω)=R(ω)Σ_jw_j S_CTS,j(ω)",
+    "inputs": "Incident and receiver cold-plasma ray paths; local Gaussian beam covariance matrices; equilibrium callback; frequency bins; local B and wave directions",
+    "output": "Frequency-resolved scattering-volume samples and normalized Gaussian-overlap/path-length weights",
+    "assumptions": "Cold-plasma geometrical optics; caller-supplied Gaussian covariance along rays; nearest receiver-ray pairing; fitted ne/Te/Ti uniform over sampled volume; local B and ray directions may vary",
+    "status": "D",
+    "category": "CTS beam geometry and spatial weighting",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+      "formula_key": "cts_path_integrated_gaussian_overlap",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "incident_ray",
+          "unit": "initial position and wavevector",
+          "required": true
+        },
+        {
+          "name": "receiver_rays",
+          "unit": "one initial position/wavevector per frequency bin",
+          "required": true
+        },
+        {
+          "name": "equilibrium",
+          "unit": "callback returning local magnetic field and species",
+          "required": true
+        },
+        {
+          "name": "incident_beam_covariance_m2",
+          "unit": "3x3 or ray-sampled 3x3 covariance",
+          "required": true
+        },
+        {
+          "name": "receiver_beam_covariances_m2",
+          "unit": "3x3, frequency x 3x3, or frequency x ray x 3x3 covariance",
+          "required": true
+        },
+        {
+          "name": "scattering_sample_count",
+          "unit": "integer >=2",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "frequency_resolved_geometry",
+          "unit": "frequency-indexed scattering-volume samples"
+        },
+        {
+          "name": "sample_weight",
+          "unit": "dimensionless; non-negative; sums to one per frequency"
+        },
+        {
+          "name": "beam_overlap_path_integral_m_minus2",
+          "unit": "m^-2"
+        },
+        {
+          "name": "relative_beam_overlap",
+          "unit": "dimensionless; normalized across frequency bins"
+        }
+      ],
+      "prerequisites": [
+        "Cold-plasma equilibrium profiles and ray-launch conditions",
+        "Incident/receiver beam covariance along rays",
+        "Mode branch selection"
+      ],
+      "uncertainty_model": "Ray integration and Gaussian covariance are numerical/model inputs; no automatic uncertainty is assigned to equilibrium or beam covariance. Sample-count convergence must be assessed by increasing scattering_sample_count.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_frequency_resolved_ray_and_beam_geometry",
+        "tests/test_cts_analysis.py::test_full_em_cts_integrates_scattering_volume_samples"
+      ],
+      "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation."
+    },
+    "references": [
+      {
+        "title": "Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks",
+        "journal": "Fusion Engineering and Design",
+        "volume": "212",
+        "article": "114826",
+        "year": 2025,
+        "doi": "10.1016/j.fusengdes.2025.114826",
+        "scope": "Recent quasi-optical beam tracing and CTS scattering-volume geometry context; present implementation is geometrical optics without diffraction."
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "J. L. Flocken, S. B. Korsholm, J. Rasmussen",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent CTS diagnostic optimization combining beam/ray and spectral forward modelling."
+      }
+    ]
   }
 ]
