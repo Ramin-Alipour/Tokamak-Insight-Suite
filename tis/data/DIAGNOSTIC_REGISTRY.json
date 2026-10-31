@@ -6885,7 +6885,8 @@
         "tests/test_thomson_inference.py::test_spectral_distribution_rejects_shape_only_execution",
         "tests/test_thomson_inference.py::test_spectral_distribution_requires_fitted_physical_parameters_and_reports_them",
         "tests/test_thomson_inference.py::test_descriptive_moments_report_negative_residual_clipping_caveat",
-        "tests/test_thomson_inference.py::test_spectral_distribution_response_conserves_area_on_nonuniform_bins"
+        "tests/test_thomson_inference.py::test_spectral_distribution_response_conserves_area_on_nonuniform_bins",
+        "tests/test_thomson_inference.py::test_spectral_distribution_requires_explicit_background_source"
       ]
     },
     "scientific_references": [
