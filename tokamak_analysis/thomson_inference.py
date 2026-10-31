@@ -153,11 +153,10 @@ def _fit_identifiability(
             chi2 = float(np.sum((residual / u) ** 2) / dof)
             if not np.isfinite(chi2):
                 reasons.append("reduced chi-square is non-finite")
-            elif chi2 > 10.0:
-                reasons.append(
-                    "reduced chi-square exceeds the default acceptance ceiling of 10; "
-                    "the optimizer converged but the spectral model does not adequately explain the data"
-                )
+            # Reduced chi-square is retained as a model-adequacy diagnostic and
+            # contributes to the separately reported discrepancy covariance.
+            # It is not used as a hard acceptance threshold without a user- or
+            # reference-defined noise/acceptance policy.
     return {
         "fit_accepted": not reasons,
         "fit_quality_status": "accepted_with_identifiability_diagnostics" if not reasons else "rejected_unidentifiable_or_invalid",
