@@ -280,13 +280,20 @@ def full_em_cts_spectral_density(
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
                             electron_flow_velocity_m_s, ion_flow_velocity_m_s)
+    electron_distribution_used = None
     if electron_distribution is not None:
         if not isinstance(electron_distribution, Mapping):
             raise ValueError("electron_distribution must be an explicit relativistic gyrotropic distribution mapping")
-        if electron_distribution.get("kind") not in {"relativistic_bigaussian", "tabulated_gyrotropic"}:
-            raise ValueError("electron_distribution kind must be relativistic_bigaussian or tabulated_gyrotropic")
+        if electron_distribution.get("kind") not in {"relativistic_maxwell_juttner", "relativistic_bigaussian", "tabulated_gyrotropic"}:
+            raise ValueError("electron_distribution kind must be relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic")
+        electron_distribution_used = dict(electron_distribution)
+        if electron_distribution_used["kind"] == "relativistic_maxwell_juttner":
+            distribution_temperature = _positive(electron_distribution_used.get("temperature_eV", te), "electron_distribution.temperature_eV")
+            if not np.isclose(distribution_temperature, te, rtol=1e-8, atol=0.0):
+                raise ValueError("relativistic Maxwell-Juttner electron distribution temperature must equal electron_temperature_eV")
+            electron_distribution_used["temperature_eV"] = te
         species[0].update({
-            "distribution": electron_distribution,
+            "distribution": electron_distribution_used,
             "fast_ion": True,
             "nonthermal_electron": True,
         })
@@ -566,7 +573,7 @@ def full_em_cts_spectral_density(
         ),
         "relativistic_kinetic_three_wave_vertex_used": any(relativistic_three_wave_vertex_diagnostics),
         "kinetic_population_diagnostics": fast_ion_kinetic_diagnostics,
-        "nonthermal_electron_distribution": electron_distribution,
+        "nonthermal_electron_distribution": electron_distribution_used,
         "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
