@@ -525,7 +525,7 @@ def analyze_thomson_spectral_distribution(
             ),
             "electron_density_m3": None if density is None else float(density),
             "electron_density_uncertainty_m3": density_uncertainty,
-            "electron_density_status": "available" if density is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
+            "electron_density_status": "available" if density is not None else "not_identifiable_from_selected_canonical_physical_fit",
             "unavailable_parameters": (
                 [] if flow is not None else ["electron_velocity_projection_m_s"]
             ) + (
