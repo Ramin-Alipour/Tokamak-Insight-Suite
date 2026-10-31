@@ -100,8 +100,8 @@ def fit_thomson_spectrum(
     intrinsic_uncertainty = float(np.sqrt(max(float(np.asarray(result["fit_covariance"])[2, 2]), 0.0)))
     if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0:
         raise ValueError("Fitted physical width is not positive and finite.")
-    if instrument_sigma_nm is not None and intrinsic_sigma <= intrinsic_uncertainty:
-        raise ValueError("Fitted physical width is not resolved relative to its fit uncertainty.")
+    if intrinsic_sigma <= intrinsic_uncertainty:
+        raise ValueError("Fitted physical width is not resolved relative to its fit uncertainty, independent of whether a scalar instrument-width summary was supplied.")
     # The canonical fit has already convolved the intrinsic physical spectrum
     # with the supplied measured response matrix. Derive the observed width from
     # that convolved fitted component; do not approximate an arbitrary response

@@ -289,3 +289,15 @@ def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_
     assert out["fitted_sigma_nm"] != pytest.approx(
         np.sqrt(out["physical_sigma_nm"] ** 2 + 0.05 ** 2), rel=1e-3
     )
+
+
+
+def test_legacy_adapter_applies_width_identifiability_gate_without_scalar_lsf_summary():
+    wavelength = np.linspace(531.8, 532.2, 51)
+    signal = 100 * np.exp(-0.5 * ((wavelength - 532.0) / 0.01) ** 2) + 2
+    with pytest.raises(ValueError, match="not resolved relative to its fit uncertainty"):
+        fit_thomson_spectrum(
+            wavelength, signal, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+            instrument_response_matrix=_measured_response(wavelength),
+        )
