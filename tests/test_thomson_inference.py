@@ -824,3 +824,29 @@ def test_scattering_angle_uncertainty_is_not_dropped_with_density_relative_covar
         **common, scattering_angle_uncertainty_rad=0.01
     )["channels"][0]
     assert with_angle["electron_density_uncertainty_m3"] > without_angle["electron_density_uncertainty_m3"]
+
+
+def test_joint_density_covariance_retains_common_scattering_angle_uncertainty():
+    x, y, _ = _spectral_case(100.0, n=161)
+    common = dict(
+        wavelength_nm=x, spectra=np.vstack([y, y]) * 1e-18, radius_m=[0.1, 0.2],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 3,
+        instrument_response=np.eye(x.size),
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0.0, 1.0, 0.0],
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.5, np.sqrt(3.0) / 2.0, 0.0],
+        spectral_power_density_calibrated=True,
+        joint_density_relative_covariance=np.eye(12) * 1e-6,
+    )
+    without_angle = analyze_thomson_spectra(**common)
+    with_angle = analyze_thomson_spectra(
+        **common, scattering_angle_uncertainty_rad=0.01
+    )
+    assert with_angle["electron_density_uncertainty_profile_m3"][0] > (
+        without_angle["electron_density_uncertainty_profile_m3"][0]
+    )
+    covariance = with_angle["electron_density_joint_covariance_m6"]
+    assert covariance.shape == (2, 2)
+    assert covariance[0, 1] > 0.0
