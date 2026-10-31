@@ -233,6 +233,106 @@ def trace_cold_plasma_ray(
     }
 
 
+
+def trace_cts_frequency_resolved_beams(
+    frequency_shift_Hz, probe_frequency_Hz, *,
+    incident_ray, receiver_rays, equilibrium,
+    incident_beam_covariance_m2, receiver_beam_covariances_m2,
+    mode_index=1, path_parameter_max=1.0, sample_count=256,
+    relative_tolerance=1e-8, absolute_tolerance=1e-10,
+):
+    """Trace probe/receiver rays and return frequency-resolved CTS geometry.
+
+    incident_ray and each receiver_rays item provide initial_position_m and
+    initial_wavevector_rad_m. The equilibrium callback is supplied by the
+    caller; this routine never invents equilibrium profiles. Beam covariance
+    matrices describe local 3-D Gaussian intensity ellipsoids at closest
+    approach. Their overlap is normalized across frequency bins and returned
+    as a dimensionless relative spectral-volume weighting.
+
+    This is geometrical optics: diffraction and mode conversion are not
+    included. Use quasi-optical beam tracing upstream when material.
+    """
+    shifts = np.asarray(frequency_shift_Hz, dtype=float)
+    if (shifts.ndim != 1 or shifts.size < 1 or np.any(~np.isfinite(shifts))
+            or np.any(np.diff(shifts) <= 0)):
+        raise ValueError("frequency_shift_Hz must be a finite strictly increasing vector")
+    f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    if not isinstance(incident_ray, Mapping):
+        raise ValueError("incident_ray must provide initial position and wavevector")
+    if not isinstance(receiver_rays, Sequence) or isinstance(receiver_rays, (str, bytes)) or len(receiver_rays) != shifts.size:
+        raise ValueError("receiver_rays must contain one ray specification per scattered frequency")
+    incident = trace_cold_plasma_ray(
+        incident_ray["initial_position_m"], incident_ray["initial_wavevector_rad_m"],
+        2.0*np.pi*f0, equilibrium=equilibrium, mode_index=mode_index,
+        path_parameter_max=incident_ray.get("path_parameter_max", path_parameter_max),
+        sample_count=incident_ray.get("sample_count", sample_count),
+        relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
+    )
+    ci_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
+    receiver_covariances = np.asarray(receiver_beam_covariances_m2, dtype=float)
+    if receiver_covariances.shape == (3, 3):
+        receiver_covariances = np.broadcast_to(receiver_covariances, (shifts.size, 3, 3))
+    if ci_cov.shape != (3, 3) or receiver_covariances.shape != (shifts.size, 3, 3):
+        raise ValueError("beam covariance inputs must be (3,3) or receiver (n_frequency,3,3)")
+    entries = []
+    overlaps = []
+    for index, (shift, ray_spec) in enumerate(zip(shifts, receiver_rays)):
+        if not isinstance(ray_spec, Mapping):
+            raise ValueError(f"receiver_rays[{index}] must be a mapping")
+        receiver = trace_cold_plasma_ray(
+            ray_spec["initial_position_m"], ray_spec["initial_wavevector_rad_m"],
+            2.0*np.pi*(f0+float(shift)), equilibrium=equilibrium, mode_index=mode_index,
+            path_parameter_max=ray_spec.get("path_parameter_max", path_parameter_max),
+            sample_count=ray_spec.get("sample_count", sample_count),
+            relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
+        )
+        delta = incident["position_m"][:, None, :] - receiver["position_m"][None, :, :]
+        distance2 = np.einsum("ijk,ijk->ij", delta, delta)
+        ii, jj = np.unravel_index(int(np.argmin(distance2)), distance2.shape)
+        xi = incident["position_m"][ii]
+        xs = receiver["position_m"][jj]
+        location = 0.5*(xi+xs)
+        local = equilibrium(location)
+        if not isinstance(local, Mapping) or "magnetic_field_T" not in local:
+            raise ValueError("equilibrium callback must return magnetic_field_T at the scattering location")
+        b_local = _vector(local["magnetic_field_T"], "local magnetic_field_T")
+        ki = incident["wavevector_rad_m"][ii]
+        ks = receiver["wavevector_rad_m"][jj]
+        overlap = gaussian_beam_overlap(xi, ci_cov, xs, receiver_covariances[index])
+        overlaps.append(overlap)
+        entries.append({
+            "incident_direction": ki/np.linalg.norm(ki),
+            "scattered_direction": ks/np.linalg.norm(ks),
+            "magnetic_field_T": b_local,
+            "scattering_location_m": location,
+            "beam_overlap_m_minus3": overlap,
+            "ray_separation_m": float(np.sqrt(distance2[ii, jj])),
+            "incident_ray_index": int(ii),
+            "receiver_ray_index": int(jj),
+        })
+    scale = max(overlaps)
+    if not np.isfinite(scale) or scale <= 0:
+        raise ValueError("Gaussian beam overlap is non-positive for all frequency bins")
+    for entry, overlap in zip(entries, overlaps):
+        entry["beam_overlap_relative"] = float(overlap/scale)
+    return {
+        "frequency_shift_Hz": shifts.copy(),
+        "frequency_resolved_geometry": entries,
+        "relative_beam_overlap": np.asarray(overlaps, dtype=float)/scale,
+        "absolute_beam_overlap_m_minus3": np.asarray(overlaps, dtype=float),
+        "incident_ray": incident,
+        "geometry_model": "cold-plasma Hamiltonian ray tracing with local Gaussian intensity overlap",
+        "limitations": [
+            "Geometrical optics; diffraction and mode conversion are not included.",
+            "Beam covariance matrices are supplied at the local scattering points; their propagation is not inferred.",
+            "Ray branch continuity near eigenvalue crossings must be checked by the caller.",
+            "The equilibrium callback supplies all magnetic and species profiles; no equilibrium is fabricated."
+        ],
+    }
+
+
+
 def solve_cold_plasma_propagating_modes(
     omega_rad_s, propagation_direction, magnetic_field_T, species, *,
     mode_index=0, discriminant_tolerance=1e-10,
