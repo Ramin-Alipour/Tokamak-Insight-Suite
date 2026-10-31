@@ -597,15 +597,15 @@ def test_full_em_cts_relativistic_non_maxwellian_electron_uses_kinetic_vertex():
         scattered_polarization=[0.0, 0.0, 1.0],
         harmonic_order=3, quadrature_order=4,
         electron_distribution={
-            "kind": "relativistic_bigaussian",
-            "temperature_perpendicular_eV": 2.0e5,
-            "temperature_parallel_eV": 1.0e5,
+            "kind": "relativistic_maxwell_juttner",
         },
     )
     assert result["relativistic_fast_ion_three_wave_vertex_used"] is False
     assert result["relativistic_kinetic_three_wave_vertex_used"] is True
     assert len(result["relativistic_three_wave_vertex_diagnostics"]) == 2
     assert result["relativistic_three_wave_vertex_diagnostics"][0][0]["population_role"] == "non-Maxwellian electron"
+    assert result["nonthermal_electron_distribution"]["kind"] == "relativistic_maxwell_juttner"
+    assert result["nonthermal_electron_distribution"]["temperature_eV"] == pytest.approx(1200.0)
     assert "non-Maxwellian electron" in result["model"]
     assert np.all(np.isfinite(result["spectral_density"]))
 
