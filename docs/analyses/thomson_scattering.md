@@ -97,6 +97,8 @@ Collective Maxwellian and collective kappa models infer density from the dielect
 
 The registered “Thomson spatial profile reconstruction” subanalysis starts from measured calibrated multi-channel spectra, runs the canonical physical inference, and reconstructs every identifiable radial parameter profile using PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived \(n_e/T_e\) profile points and never extrapolates beyond the measured radial interval. Kappa profiles are included for both kappa model families.
 
+For collective Maxwellian and collective-kappa profiles, the reconstruction covariance is the sum of (i) the cross-channel covariance from external-input Monte Carlo and (ii) the channel-local physical-fit covariance, including the separately reported residual-based discrepancy contribution when available. The diagonal therefore agrees with the per-channel total uncertainty used in the output; external-input covariance is not incorrectly treated as the complete uncertainty by itself. Electron-flow and ion-flow projection profiles retain only the covariance contributions actually estimated for those externally supplied flow vectors and geometry.
+
 No public Analysis 1 or subanalysis entry point accepts already-derived electron-density or electron-temperature profile points. Spatial reconstruction always starts from measured calibrated multi-channel spectra and invokes the canonical physical forward-inference engine.
 
 ## Scientific basis and recent literature
