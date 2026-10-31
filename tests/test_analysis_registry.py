@@ -150,6 +150,16 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     # CTS must require an explicit physical model; no electrostatic/full-EM fallback.
     with pytest.raises(ValueError, match="Select model"):
         resolve_analysis(30)()
+    cts_contract = cts["execution_contract"]
+    cts_inputs = {item["name"] for item in cts_contract["input_specs"]}
+    assert {"frequency_shift_Hz", "spectrum", "scattering_geometry", "model"} <= cts_inputs
+    assert not {"incident_direction", "scattered_direction", "mode_index",
+                "frequency_resolved_geometry", "scattering_sample_count",
+                "ion_temperature_eV"} & cts_inputs
+    assert {item["name"] for item in cts_contract["workflow_modes"]} == {
+        "unmagnetized_electrostatic_longitudinal_cts",
+        "magnetized_full_electromagnetic_cts",
+    }
     assert callable(resolve_analysis(46))
     assert callable(resolve_analysis(81))
 
