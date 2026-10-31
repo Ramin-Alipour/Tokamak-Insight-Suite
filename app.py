@@ -3092,10 +3092,10 @@ elif page=='Advanced Analysis':
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_response_upload')
                 cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
-                cts_method=st.selectbox('Optional global-search / VDF method',['differential_evolution','improved_genetic','regularized'],index=None,placeholder='Select method explicitly',key='cts_inversion_method')
-                cts_global_search=st.checkbox('Run finite-bound global search before local refinement',value=False,key='cts_global_search')
+                cts_method=st.selectbox('CTS inversion method',['local_least_squares','differential_evolution','improved_genetic','regularized'],index=None,placeholder='Select method explicitly',key='cts_inversion_method')
+                cts_global_search=cts_method in {'differential_evolution','improved_genetic'}
                 cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON (leave blank for unbounded positive log-parameters)',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV":[10,200]}',key='cts_parameter_bounds')
-                st.caption('Global search requires explicit finite bounds. Local least-squares inference does not impose scientific bounds. Regularized mode is only for an inferred tabulated fast-ion VDF.')
+                st.caption('Local least squares imposes no scientific bounds on positive log-parameters. Differential evolution and genetic search require explicit finite bounds. Regularized mode is only for an inferred tabulated fast-ion VDF.')
                 cts_regularization=st.text_input('Regularization strength (required only for regularized mode)',value='',key='cts_regularization')
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
@@ -3178,8 +3178,6 @@ elif page=='Advanced Analysis':
                             fast_ion['smoothness']=float(cts_fast_smoothness)
                     if cts_method is None:
                         raise ValueError('Select the CTS inversion method explicitly.')
-                    if cts_global_search and cts_method=='regularized':
-                        raise ValueError('Global-search initialization is not used by regularized tabulated-VDF inversion; disable global search or select a global-search method.')
                     if any(not value.strip() for value in (
                         cts_density_initial,cts_temperature_initial,cts_ion_temperature_initial,cts_ion_flow_initial
                     )):
