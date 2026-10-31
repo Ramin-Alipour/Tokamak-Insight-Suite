@@ -204,6 +204,54 @@ def test_collective_external_covariance_indices_use_full_channel_stride():
     assert _collective_external_parameter_indices(1, 2) == (5, 6, 7, (8, 9))
 
 
+def test_collective_kappa_external_parameter_mc_propagates_kappa_covariance(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+
+    def fake_fit(wavelength, signal, *args, **kwargs):
+        signal = np.asarray(signal, dtype=float)
+        return {
+            "electron_density_m3": 4.0e18,
+            "electron_density_uncertainty_m3": 1.0e17,
+            "electron_temperature_eV": 160.0,
+            "electron_temperature_uncertainty_eV": 5.0,
+            "kappa_index": 4.0,
+            "kappa_index_uncertainty": 0.2,
+            "electron_velocity_projection_m_s": 0.0,
+            "ion_velocity_projection_m_s": [0.0],
+            "fitted_spectrum": signal.copy(),
+            "residual": np.zeros_like(signal),
+            "amplitude": 100.0,
+            "background_intercept": 2.0,
+            "background_slope_per_nm": 0.0,
+            "fit_covariance": np.diag([1.0e34, 25.0, 0.04]),
+            "optimizer_success": True,
+            "collective_parameter_jacobian_rank": 3,
+            "collective_parameter_jacobian_condition_number": 1.0,
+        }
+
+    monkeypatch.setattr(inference, "fit_collective_kappa", fake_fit)
+    wavelength = np.linspace(520.0, 544.0, 31)
+    signal = 100.0 * np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 2.0
+    result = inference.analyze_thomson_spectra(
+        wavelength, signal[None, :], [0.1],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size), model="collective_kappa",
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        ion_species=["D+"], ion_fractions=[1.0],
+        ion_temperature_eV=[20.0], ion_temperature_uncertainty_eV=[1.0],
+        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
+        electron_velocity_m_s=[0.0, 0.0, 0.0],
+        collective_initial_density_m3=4.0e18,
+        collective_initial_temperature_eV=160.0,
+        collective_kappa_initial=4.0,
+    )
+    assert result["collective_external_uncertainty_propagated"] is True
+    assert result["collective_external_parameter_covariance"].shape == (5, 5)
+    assert "channel_0_kappa_index" in result["collective_external_parameter_covariance_order"]
+    assert result["channels"][0]["collective_external_parameter_uncertainty_propagated"] is True
+
+
 def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
     from tokamak_analysis.analysis_registry import resolve_analysis
 
