@@ -4,7 +4,7 @@
     "diagnostic": "Thomson scattering",
     "quantities": "Per-channel electron temperature and supported flow projection from measured full spectra; absolute electron density where identifiable; joint channel-to-channel covariance for non-collective Maxwellian/Kappa models when a full spectral covariance is supplied; collective-mode external-parameter and response uncertainty propagation by Monte Carlo when supplied.",
     "status": "D",
-    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa, projected relativistic Maxwell-Juttner and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
+    "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
     "caveat": "Collective-mode ion temperatures and ion/electron flow vectors remain externally supplied, not fitted. Supplied uncertainties and measured response-matrix uncertainty are propagated by Monte Carlo when supplied; beam-direction component uncertainties are independent and cross-source correlations are not represented. Joint full-covariance GLS supports non-collective Maxwellian and Kappa only. The relativistic option remains a 1-D projected approximation. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -59,7 +59,7 @@
         },
         {
           "name": "model",
-          "unit": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian",
+          "unit": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian",
           "required": false
         },
         {
@@ -2367,337 +2367,6 @@
       ],
       "note": "The supported exploratory workflow and custom-model fitting API are implemented and tested. Completeness refers only to the declared computational scope; physical inversion and automatic species identification are explicitly out of scope."
     }
-  },
-  {
-    "family": "Plasma parameters",
-    "diagnostic": "Thomson spectral distribution analysis",
-    "quantities": "Model-derived electron temperature, density where identifiable, electron-flow projection and per-channel fit diagnostics.",
-    "status": "D",
-    "method": "Delegates physical parameter inference to the canonical measured multi-channel Thomson forward model; signed spectral moments and Gaussian/general-response shape diagnostics are supplementary descriptors, not an electron velocity distribution.",
-    "caveat": "The registered workflow infers electron temperature and supported flow projection from measured spectra and density only where identifiable. Spectral moments are descriptive and do not uniquely determine an electron velocity distribution. Kappa is a parameterized isotropic projection; relativistic Maxwell-Juttner is a 1-D projected approximation; collective Maxwellian requires externally supplied ion parameters. Microwave CTS is a separate diagnostic.",
-    "implementation_functions": [
-      "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
-    ],
-    "implementation_status": "Physical-inference entry point delegates to the canonical measured-calibrated-spectrum Thomson engine with the same input/output and uncertainty contract. Supplementary descriptive spectral moments are a separate helper and are not an electron velocity distribution.",
-    "execution_contract": {
-      "schema_version": "1.0",
-      "execution_level": "analysis_pipeline",
-      "completeness": "complete_with_declared_scope",
-      "input_specs": [
-        {
-          "name": "wavelength_nm",
-          "unit": "nm; 1-D shared or channel x wavelength 2-D",
-          "required": true
-        },
-        {
-          "name": "spectra",
-          "unit": "calibrated spectral intensity; channel x wavelength",
-          "required": true
-        },
-        {
-          "name": "radius_m",
-          "unit": "m; one per channel",
-          "required": true
-        },
-        {
-          "name": "laser_wavelength_nm",
-          "unit": "nm",
-          "required": true
-        },
-        {
-          "name": "scattering_angle_rad",
-          "unit": "rad",
-          "required": true
-        },
-        {
-          "name": "instrument_response",
-          "unit": "measured normalized response matrix/kernel/callable",
-          "required": true
-        },
-        {
-          "name": "signal_uncertainty",
-          "unit": "spectral intensity; pointwise 1-sigma",
-          "required": false
-        },
-        {
-          "name": "joint_spectral_covariance",
-          "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
-          "required": false,
-          "description": "Full positive-definite covariance in channel-major order; cannot be combined with signal_uncertainty."
-        },
-        {
-          "name": "model",
-          "unit": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian",
-          "required": false
-        },
-        {
-          "name": "laser_wavelength_uncertainty_nm",
-          "unit": "nm; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "scattering_angle_uncertainty_rad",
-          "unit": "rad; 1-sigma; collective scalar geometry MC or non-collective analytic propagation",
-          "required": false
-        },
-        {
-          "name": "incident_direction_uncertainty",
-          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
-          "required": false
-        },
-        {
-          "name": "scattered_direction_uncertainty",
-          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
-          "required": false
-        },
-        {
-          "name": "instrument_response_uncertainty",
-          "unit": "response-matrix 1-sigma",
-          "required": false
-        },
-        {
-          "name": "instrument_response_mc_samples",
-          "unit": "count",
-          "required": false
-        },
-        {
-          "name": "instrument_response_mc_min_success_fraction",
-          "unit": "dimensionless",
-          "required": false
-        },
-        {
-          "name": "laser_power_w",
-          "unit": "W; incident power at scattering volume",
-          "required": false
-        },
-        {
-          "name": "interaction_length_m",
-          "unit": "m",
-          "required": false
-        },
-        {
-          "name": "collection_solid_angle_sr",
-          "unit": "sr",
-          "required": false
-        },
-        {
-          "name": "optical_efficiency",
-          "unit": "dimensionless",
-          "required": false
-        },
-        {
-          "name": "incident_polarization",
-          "unit": "dimensionless 3-vector",
-          "required": false
-        },
-        {
-          "name": "incident_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false
-        },
-        {
-          "name": "scattered_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false
-        },
-        {
-          "name": "spectral_power_density_calibrated",
-          "unit": "boolean; must be true to identify absolute density from W/nm spectra",
-          "required": false,
-          "description": "Explicit declaration that measured spectral density is calibrated in W/nm; false by default."
-        },
-        {
-          "name": "laser_power_uncertainty_W",
-          "unit": "W; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "interaction_length_uncertainty_m",
-          "unit": "m; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "collection_solid_angle_uncertainty_sr",
-          "unit": "sr; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "optical_efficiency_uncertainty",
-          "unit": "dimensionless; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "polarization_factor_uncertainty",
-          "unit": "dimensionless; 1-sigma",
-          "required": false
-        },
-        {
-          "name": "density_relative_covariance",
-          "unit": "6x6 relative covariance for scattered power and five optical inputs; sole uncertainty model for these factors",
-          "required": false,
-          "description": "Complete relative covariance for the six density inversion inputs; do not also provide scalar uncertainty inputs for those factors."
-        },
-        {
-          "name": "ion_species",
-          "unit": "explicit collective ion species list",
-          "required": false
-        },
-        {
-          "name": "ion_fractions",
-          "unit": "one charge-density fraction per ion species; sum to one",
-          "required": false
-        },
-        {
-          "name": "ion_temperature_eV",
-          "unit": "eV; one fixed external value per ion species",
-          "required": false
-        },
-        {
-          "name": "ion_velocity_m_s",
-          "unit": "m s^-1; species x 3 fixed external flow vectors",
-          "required": false
-        },
-        {
-          "name": "electron_velocity_m_s",
-          "unit": "m s^-1; fixed external 3-vector",
-          "required": false
-        },
-        {
-          "name": "ion_temperature_uncertainty_eV",
-          "unit": "eV; per species 1-sigma",
-          "required": false
-        },
-        {
-          "name": "ion_velocity_uncertainty_m_s",
-          "unit": "m s^-1; species x 3 component-wise 1-sigma",
-          "required": false
-        },
-        {
-          "name": "electron_velocity_uncertainty_m_s",
-          "unit": "m s^-1; 3-vector component-wise 1-sigma",
-          "required": false
-        },
-        {
-          "name": "collective_initial_density_m3",
-          "unit": "m^-3; optimizer initial estimate, not fixed inferred value",
-          "required": false,
-          "description": "Numerical optimizer seed only; not a fixed physical input."
-        },
-        {
-          "name": "collective_initial_temperature_eV",
-          "unit": "eV; optimizer initial estimate, not fixed inferred value",
-          "required": false,
-          "description": "Numerical optimizer seed only; not a fixed physical input."
-        },
-        {
-          "name": "collective_density_bounds_m3",
-          "unit": "m^-3; optional positive optimizer bounds",
-          "required": false
-        },
-        {
-          "name": "collective_temperature_bounds_eV",
-          "unit": "eV; optional positive optimizer bounds",
-          "required": false
-        },
-        {
-          "name": "collective_external_parameter_mc_samples",
-          "unit": "count",
-          "required": false
-        }
-      ],
-      "output_specs": [
-        {
-          "name": "electron_temperature_profile_eV",
-          "unit": "eV"
-        },
-        {
-          "name": "electron_density_profile_m3",
-          "unit": "m^-3",
-          "description": "Only where identifiable from selected model and supplied calibration/geometry."
-        },
-        {
-          "name": "electron_velocity_projection_profile_m_s",
-          "unit": "m s^-1"
-        },
-        {
-          "name": "channels",
-          "unit": "structured",
-          "description": "Per-channel fit, residuals, covariance, assumptions and provenance."
-        },
-        {
-          "name": "electron_temperature_uncertainty_profile_eV",
-          "unit": "eV"
-        },
-        {
-          "name": "electron_density_uncertainty_profile_m3",
-          "unit": "m^-3"
-        },
-        {
-          "name": "electron_velocity_projection_uncertainty_profile_m_s",
-          "unit": "m s^-1",
-          "description": "Per-channel uncertainty of the fitted non-collective projection; in collective mode available when supplied flow-vector and/or beam-geometry uncertainties are propagated by Monte Carlo."
-        },
-        {
-          "name": "joint_inference",
-          "unit": "structured",
-          "description": "Joint GLS parameters, covariance and fit diagnostics when joint_spectral_covariance is supplied."
-        },
-        {
-          "name": "collective_external_parameter_covariance",
-          "unit": "parameter covariance",
-          "description": "Cross-channel covariance of density, temperature and projected electron/ion flows from collective external-input Monte Carlo."
-        },
-        {
-          "name": "collective_external_parameter_covariance_order",
-          "unit": "ordered labels",
-          "description": "Names corresponding to the collective external-parameter covariance rows and columns."
-        },
-        {
-          "name": "model_discrepancy_covariance",
-          "unit": "parameter covariance",
-          "description": "Residual-based model-adequacy covariance, only when a supported reduced chi-square and fit covariance are available."
-        },
-        {
-          "name": "registered_subanalysis",
-          "unit": "text",
-          "description": "Identifies this entry as the physical-inference Thomson spectral-distribution wrapper."
-        },
-        {
-          "name": "spectral_shape_moments_are_not_a_velocity_distribution",
-          "unit": "boolean",
-          "description": "Explicit semantic guard for the supplementary descriptive moment analysis."
-        }
-      ],
-      "assumptions": [
-        "Measured calibrated multi-channel spectra, wavelength axes, instrument response and spatial coordinates are supplied.",
-        "Physical plasma parameters are inferred by the canonical Thomson forward model; spectral moments are supplementary descriptive quantities.",
-        "Signed background-subtracted spectral measures are used for moments; negative residual samples are retained rather than clipped.",
-        "When no background mask is supplied, a linear background is estimated from spectral-edge samples and may be biased if physical signal extends to the edges."
-      ],
-      "preprocessing": [
-        "Validate finite calibrated wavelength/signal arrays, strictly increasing wavelength, signal uncertainty and either a scalar Gaussian response width or a measured response matrix.",
-        "Use a user-supplied background-only mask when available; otherwise apply the documented spectral-edge fallback.",
-        "Do not clip negative background-subtracted residuals when calculating signed spectral moments."
-      ],
-      "algorithm": "The physical-inference entry point delegates to the canonical measured-spectrum Thomson forward model. The companion spectral-moment routine is a separate descriptive characterization and does not independently infer ne, Te or a unique electron velocity distribution.",
-      "uncertainty_model": "The physical-inference path delegates to the canonical Thomson uncertainty model. Descriptive moment uncertainties are estimated by parametric Monte Carlo from pointwise signal uncertainty and optional Gaussian instrument-width uncertainty; correlated wavelength-bin and shared systematic errors are not included.",
-      "limitations": [
-        "Spectral moments characterize the measured wavelength distribution and are not a unique electron velocity distribution.",
-        "The descriptive moment routine does not independently infer electron temperature or density; those quantities come from the canonical physical-inference workflow.",
-        "The spectral-edge background fallback can remove real signal when the physical spectrum extends into the selected edge samples; a background-only mask is preferred.",
-        "A general measured response matrix is used for the Gaussian forward-fit diagnostic, but scalar Gaussian variance deconvolution is not claimed for a general non-Gaussian response.",
-        "Monte Carlo moment uncertainty excludes correlated wavelength-bin noise and shared calibration/systematic uncertainty.",
-        "Kappa is a parameterized projection rather than arbitrary VDF inversion; projected Maxwell-Juttner is a 1-D approximation; collective Maxwellian requires external ion parameters.",
-        "Moment uncertainties are descriptive spectral-moment uncertainties only and must not be interpreted as complete physical-parameter uncertainties."
-      ],
-      "function_links": [
-        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution_inference"
-      ],
-      "raw_data_to_physics": false,
-      "note": "This entry delegates measured-spectrum physical inference to the canonical Thomson engine. The standalone moment helper is supplementary and descriptive; it does not itself infer Te, ne or a unique electron velocity distribution.",
-      "calibrated_measurements_to_physics": true
-    },
-    "note": "The registered entry performs canonical physical inference from calibrated measured spectra. The separate descriptive moment helper reports wavelength-distribution statistics only; it is not a velocity distribution or independent ne/Te estimator."
   },
   {
     "family": "Magnetic and equilibrium",
@@ -5117,7 +4786,7 @@
         },
         {
           "name": "model",
-          "unit": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian",
+          "unit": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian",
           "required": false
         },
         {
@@ -5479,7 +5148,8 @@
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": true
+    "calibrated_measurements_to_physics": true,
+    "completion_scope": ""
   },
   {
     "family": "Fast particles",
