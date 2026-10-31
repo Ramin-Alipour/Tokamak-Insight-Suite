@@ -1,13 +1,13 @@
-# Microwave Collective Thomson Scattering (CTS)
+# Analysis 1 subanalysis — Microwave Collective Thomson Scattering (CTS)
 
 ## Scope and model selection
 
-The CTS family is separate from optical Thomson Analysis 1. Its public dispatcher is:
+Microwave CTS is a dedicated subanalysis within primary Analysis 1. It is physically distinct from optical Thomson scattering and retains its own model selection and execution contracts. Its public dispatcher is:
 
 - \`tokamak_analysis.cts_analysis.analyze_cts_spectrum_model(model="electrostatic", ...)\`
 - \`tokamak_analysis.cts_analysis.analyze_cts_spectrum_model(model="full_electromagnetic", ...)\`
 
-The model must be selected explicitly. The software never silently substitutes the electrostatic model for the magnetized full-EM model or vice versa.
+The CTS model must be selected explicitly. The software never silently substitutes the electrostatic model for the magnetized full-EM model or vice versa, and neither CTS model is treated as an optical Thomson model.
 
 All spectra and frequency axes are assumed to be measured, prepared and calibrated. The CTS workflows do not calibrate the instrument, correct raw detector counts, infer a missing frequency axis, or perform experimental validation.
 
