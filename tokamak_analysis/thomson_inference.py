@@ -332,9 +332,9 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         center, laser_nm, angle
     )["electron_velocity_projection_m_s"]
     q_projection=2.0*np.sin(angle/2.0)
-    if te / ELECTRON_REST_ENERGY_EV >= 0.01:
+    if te / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
         raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
-    if abs(velocity) >= 0.1 * C_M_S:
+    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
         raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     residual=signal-observed(wavelength,*p)
     dof=max(1,wavelength.size-len(p))
@@ -1491,9 +1491,9 @@ def analyze_thomson_spectra(
         for channel in range(nchan):
             te_value=base_physical[2*channel]
             velocity_value=base_physical[2*channel+1]
-            if te_value/ELECTRON_REST_ENERGY_EV>=0.01:
+            if te_value/ELECTRON_REST_ENERGY_EV>=NONRELATIVE_THETA_E_SCREEN:
                 raise ValueError("Joint Thomson GLS fit rejected: non-relativistic electron-temperature limit exceeded")
-            if abs(velocity_value)>=0.1*C_M_S:
+            if abs(velocity_value)>=NONRELATIVE_FLOW_BETA_SCREEN*C_M_S:
                 raise ValueError("Joint Thomson GLS fit rejected: non-relativistic flow-projection limit exceeded")
         transform=np.zeros((2*nchan,joint_parameter_count*nchan))
         for j in range(joint_parameter_count*nchan):
