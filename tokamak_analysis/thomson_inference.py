@@ -21,6 +21,12 @@ from .thomson_kinetic_models import (
 
 ELECTRON_REST_ENERGY_EV = 510_998.95069
 C_M_S = 299_792_458.0
+# Conservative asymptotic screening policy: theta_e bounds leading thermal
+# relativistic corrections (~theta_e), while beta_flow bounds leading bulk
+# kinematic corrections (~beta_flow^2). These are software screening limits,
+# not universal physical validity boundaries.
+NONRELATIVE_THETA_E_SCREEN = 0.01
+NONRELATIVE_FLOW_BETA_SCREEN = 0.1
 R_E_M = 2.8179403262e-15
 
 
@@ -240,9 +246,9 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     # The canonical formula-library helper defines the Doppler sign convention.
     velocity = thomson_velocity_projection(center, laser_nm, angle)["electron_velocity_projection_m_s"]
     q_projection = 2.0*np.sin(angle/2.0)
-    if te / ELECTRON_REST_ENERGY_EV >= 0.01:
+    if te / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
         raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
-    if abs(velocity) >= 0.1 * C_M_S:
+    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
         raise ValueError("Non-relativistic Maxwellian model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     dof = max(1, wavelength.size-len(p))
     residual = signal-observed(wavelength, *p)
@@ -268,6 +274,13 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         "fit_parameters": np.asarray(p, dtype=float),
         "fit_parameter_names": ["amplitude", "center_nm", "intrinsic_sigma_nm", "background_intercept", "background_slope_per_nm"],
         "model": "non-collective, non-relativistic Maxwellian electron spectrum",
+        "validity_screening": {
+            "theta_e": float(te / ELECTRON_REST_ENERGY_EV),
+            "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
+            "bulk_flow_beta": float(abs(velocity) / C_M_S),
+            "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
+            "rationale": "Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal validity boundaries.",
+        },
         "assumptions": ["single-scattering non-collective regime", "isotropic Maxwellian electrons",
                         "non-relativistic electron velocities", "known scattering geometry"],
     }
@@ -354,6 +367,13 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
             "fitted_spectrum":observed(wavelength,*p),
             "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
+            "validity_screening":{
+                "theta_e":float(te/ELECTRON_REST_ENERGY_EV),
+                "theta_e_limit":NONRELATIVE_THETA_E_SCREEN,
+                "bulk_flow_beta":float(abs(velocity)/C_M_S),
+                "bulk_flow_beta_limit":NONRELATIVE_FLOW_BETA_SCREEN,
+                "rationale":"Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal validity boundaries."
+            },
             "assumptions":["non-collective single-particle scattering","isotropic kappa electron velocity distribution",
                            "non-relativistic velocities","finite-variance kappa index > 1.5",
                            "known scattering geometry"]}
