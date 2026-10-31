@@ -3,6 +3,8 @@
 ## Unreleased — 2026-10-30
 
 ### Thomson Scattering / Analysis 1
+- Made the parent/child hierarchy explicit for optical Thomson, microwave CTS, spectral-distribution and spatial-profile subanalyses in both registries and dashboard labels.
+- Clarified that the three optical forward models and two CTS forward models are distinct branches under one primary analysis; no model substitution or experimental validation is introduced.
 - Added full-covariance joint generalized least-squares inference for non-collective Maxwellian and Kappa spectra, including cross-channel physical-parameter covariance.
 - Added residual-based model-discrepancy covariance diagnostics and stricter joint-fit acceptance / physical-validity checks.
 - Added Monte Carlo refitting for supplied Collective ion-temperature, ion/electron-flow, laser-wavelength and instrument-response uncertainties.
