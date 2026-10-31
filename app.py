@@ -3227,13 +3227,19 @@ elif page=='Advanced Analysis':
             st.markdown('**Scattering geometry and polarization**')
             g1,g2=st.columns(2)
             with g1:
-                cts_incident_direction=st.text_input('Incident wave direction (x,y,z; used without ray-geometry JSON)',key='cts_full_incident_direction')
+                if cts_geometry_upload is None:
+                    cts_incident_direction=st.text_input('Incident wave direction (x,y,z)',key='cts_full_incident_direction')
+                else:
+                    cts_incident_direction=None
                 cts_incident_polarization=st.text_input('Incident polarization (x,y,z or complex JSON vector)',key='cts_full_incident_polarization')
             with g2:
-                cts_scattered_direction=st.text_input('Scattered wave direction (x,y,z; used without ray-geometry JSON)',key='cts_full_scattered_direction')
+                if cts_geometry_upload is None:
+                    cts_scattered_direction=st.text_input('Scattered wave direction (x,y,z)',key='cts_full_scattered_direction')
+                else:
+                    cts_scattered_direction=None
                 cts_scattered_polarization=st.text_input('Scattered polarization (x,y,z or complex JSON vector)',key='cts_full_scattered_polarization')
             if cts_geometry_upload is not None:
-                st.caption('Incident/scattered directions are read from the uploaded frequency-resolved geometry; the text direction fields are not required.')
+                st.caption('Incident/scattered directions are taken exclusively from the uploaded frequency-resolved geometry.')
             cts_electron_distribution_json=st.text_area(
                 'Optional relativistic electron distribution JSON',
                 placeholder='{"kind":"relativistic_maxwell_juttner"}',
