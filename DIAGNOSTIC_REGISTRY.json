@@ -4055,10 +4055,10 @@
   {
     "family": "Density and refractive diagnostics",
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
-    "quantities": "Electron density and temperature, ion temperature and ion-flow projection from calibrated microwave frequency-shift spectra; optional fast-ion fraction and temperature for hot-Maxwellian mode; optional reconstructed non-negative normalized tabulated 1-D fast-ion VDF under regularized inversion.",
+    "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicitly selectable electrostatic longitudinal CTS or magnetized full-electromagnetic CTS. The full-EM path combines magnetized kinetic fluctuation response, the Bindslev low-temperature Gamma/X three-wave source-current tensor and full n/v/E/B covariance contraction. Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise.",
-    "caveat": "The Bindslev nonlinear source-current vertex is the low-temperature magnetized closure; relativistic fast-ion linear response/noise is supported, but a fully relativistic nonlinear three-wave vertex is not claimed. Bulk thermal species remain non-relativistic Maxwellians. Fast-ion populations must be supplied explicitly.",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with Gaussian beam-overlap weighting.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and uses caller-supplied local Gaussian covariance matrices; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. The optical Thomson model is a separate workflow.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4068,9 +4068,11 @@
       "tokamak_analysis.cts_bindslev.bindslev_x_tensor",
       "tokamak_analysis.cts_bindslev.bindslev_source_current_operator",
       "tokamak_analysis.cts_bindslev.bindslev_correlated_transfer_spectrum",
-      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response"
+      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
+      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+      "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
     ],
-    "implementation_status": "Electrostatic CTS path retained. Magnetized full-EM path now includes the Bindslev low-temperature Gamma inverse/X tensor, source-current coupling for n/v/E/B fluctuations and full correlated covariance contraction. Optional relativistic anisotropic fast-ion linear response and Klimontovich orbit shot-noise are integrated. The nonlinear three-wave vertex remains the low-temperature Bindslev closure; the fully relativistic second-order vertex is not implemented.",
+    "implementation_status": "Electrostatic CTS path retained. Full-EM CTS now supports species-resolved thermal-ion temperatures in the inversion; relativistic gyrotropic non-Maxwellian electron and fast-ion linear response with Klimontovich noise; second-order relativistic Vlasov three-wave vertices for supplied non-Maxwellian populations; and frequency-resolved cold-plasma ray paths with Gaussian overlap weights applied to the spectral transfer. The Maxwellian bulk-electron nonlinear source remains the low-temperature Bindslev closure. The geometry path remains geometrical-optics/local-Gaussian and is not a quasi-optical diffraction solver.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4264,6 +4266,24 @@
           "unit": "sequence of explicit relativistic gyrotropic populations",
           "required": false,
           "description": "Each item requires name, charge_state, mass_amu, density_m3 and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3). Any fast-ion drift must be represented in the supplied asymmetric tabulated momentum distribution."
+        },
+        {
+          "name": "electron_distribution",
+          "unit": "relativistic gyrotropic momentum-space distribution",
+          "required": false,
+          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_bigaussian or tabulated_gyrotropic."
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "positive scalar, species-name mapping or one value per ion species",
+          "required": true,
+          "description": "For full-EM inversion, each ion species temperature is an independent fitted parameter; a scalar is broadcast only as an optimizer initial estimate."
+        },
+        {
+          "name": "frequency_resolved_geometry",
+          "unit": "one geometry record per frequency bin",
+          "required": false,
+          "description": "Output of trace_cts_frequency_resolved_beams; contains local incident/scattered directions, magnetic field, scattering location and normalized Gaussian beam-overlap weight."
         }
       ],
       "output_specs": [
@@ -4385,99 +4405,118 @@
           "name": "cold_mode_diagnostics",
           "unit": "frequency-indexed mode metadata",
           "description": "Selected incident/scattered cold-plasma branches, refractive indices, polarization matching and unit-flux mode diagnostics."
+        },
+        {
+          "name": "ion_temperature_eV_by_species",
+          "unit": "eV; mapping by ion species name",
+          "description": "Independently inferred thermal-ion temperatures."
+        },
+        {
+          "name": "relative_gaussian_beam_overlap",
+          "unit": "dimensionless; one value per frequency bin",
+          "description": "Frequency-resolved overlap weighting applied to the calculated spectral transfer."
+        },
+        {
+          "name": "scattering_locations_m",
+          "unit": "m; one local scattering location per frequency bin",
+          "description": "Closest-approach locations from the supplied cold-plasma ray traces."
+        },
+        {
+          "name": "relativistic_three_wave_vertex_diagnostics",
+          "unit": "frequency-indexed species vertex tensors",
+          "description": "Second-order relativistic gyrotropic Vlasov current vertices for explicitly supplied non-Maxwellian populations."
         }
       ],
       "assumptions": [
-        "Unmagnetized electrostatic longitudinal dielectric response.",
-        "Maxwellian bulk electrons and ions; optional hot-Maxwellian ion component.",
-        "Quasi-neutral plasma and supplied fixed ion composition.",
-        "Probe frequency is much larger than fitted frequency shifts so fixed scattering wave number is adequate.",
-        "Electron-flow projection is an explicit external input; no zero-flow default is imposed.",
-        "Full-EM numerical gyro-harmonic and velocity-quadrature truncation must be checked for convergence by varying harmonic_order and quadrature_order.",
-        "The Bindslev Gamma/X nonlinear source-current closure is the low-temperature magnetized formulation; it is not the fully relativistic second-order vertex.",
-        "Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise; the supplied distribution is external and not fitted.",
-        "Bulk thermal electrons and ions remain non-relativistic Maxwellian species.",
-        "Incident and scattered mode seed polarizations are matched to cold-plasma eigenbranches and replaced with unit-Poynting-flux eigenpolarizations; magnetized modes may be longitudinal."
+        "Thermal background ions are Maxwellian with one independently fitted temperature per supplied species.",
+        "Bulk electron response is Maxwellian unless an explicit relativistic gyrotropic electron_distribution is supplied.",
+        "Non-Maxwellian electron and fast-ion distributions are externally supplied and are not fitted or reconstructed by this workflow.",
+        "Relativistic kinetic response assumes a homogeneous local magnetic field and gyrotropic equilibrium distribution.",
+        "Second-order relativistic Vlasov coupling uses prescribed first-order waves and Lorentzian resonance broadening.",
+        "Optional ray tracing uses a supplied equilibrium callback and cold-plasma geometrical optics; no equilibrium profile is invented.",
+        "Gaussian beam covariance matrices are supplied at local scattering points; their propagation and diffraction are not inferred.",
+        "All full-EM numerical gyro-harmonic and momentum quadrature truncations require numerical convergence checks.",
+        "The Maxwellian bulk-electron nonlinear source uses the low-temperature Bindslev Gamma/X closure."
       ],
       "preprocessing": [
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
-      "algorithm": "Electrostatic CTS retains its original longitudinal model. Magnetized full-EM evaluates species kinetic response, builds the dielectric and Maxwell wave tensors, screens the species fluctuation sources, constructs the joint n/v/E/B covariance, applies the Bindslev low-temperature Gamma/X source-current tensor and contracts all auto/cross spectra with the receiver polarization. Optional relativistic anisotropic fast-ion populations use momentum-space gyrophase Fourier collocation and Klimontovich orbit shot noise.",
+      "algorithm": "Electrostatic CTS retains its longitudinal model. Magnetized full-EM computes species kinetic conductivity, screened fluctuation covariance and receiver-projected three-wave source. Maxwellian bulk electrons use the Bindslev Gamma/X source; explicitly supplied relativistic gyrotropic non-Maxwellian electrons/fast ions contribute a second-order relativistic Vlasov vertex. Thermal-ion temperatures are independently fitted by species. Optional frequency-resolved cold-plasma rays determine local wave directions/field and Gaussian beam-overlap weights applied bin-by-bin to spectral transfer.",
       "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Ion-fraction uncertainties are independently perturbed and renormalized; full species-composition covariance is not supported.",
       "limitations": [
-        "The low-temperature Bindslev magnetized source-current tensor and correlated n/v/E/B transfer contraction are implemented. The fully relativistic nonlinear vertex, ray-tracing/beam-overlap integration into the spectral transfer, and absolute received-power normalization remain outside the current solver scope.",
-        "Ion composition is fixed externally; uncertainty can be supplied for charge-density fractions but the species identities are not inferred.",
-        "The adaptive real-coded genetic option is an independent implementation informed by Zhang et al. (2024), not a claim of exact reproduction of their article-specific fitness function.",
-        "A tabulated fast-ion VDF is a 1-D projected distribution. Its reconstruction is ill-posed and depends on velocity grid, initial distribution and regularization strength; it is not a unique unrestricted 3-D VDF measurement.",
-        "The hot-Maxwellian option remains a two-population parameterization.",
-        "The electrostatic longitudinal susceptibility omits magnetized electromagnetic tensor response, ray tracing, polarization coupling, beam overlap and absolute received-power calibration.",
-        "Model-discrepancy covariance is a residual-based conditional diagnostic, not independent experimental validation.",
-        "One common ion temperature and one common projected ion flow are shared across all background ion species; species-specific Ti and flow inference is not implemented.",
-        "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption.",
-        "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized.",
-        "Full-EM ray tracing, refraction along finite paths, finite beam overlap and spatially varying magnetic geometry are not implemented.",
-        "The Bindslev nonlinear three-wave source-current vertex is the low-temperature magnetized closure, not the fully relativistic second-order kinetic vertex.",
-        "Relativistic gyrotropic fast-ion response/noise is supported only for explicitly supplied populations; fast-ion parameters are not inferred.",
-        "Bulk thermal species retain the non-relativistic Maxwellian solver."
+        "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
+        "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
+        "Ray tracing is cold-plasma geometrical optics. Diffraction, quasi-optical beam propagation and branch tracking through degeneracies are not included.",
+        "Gaussian covariance matrices are supplied by the caller at the scattering locations; beam covariance evolution is not computed.",
+        "Absolute received-power transfer and full launcher/receiver hardware coupling normalization are not implemented.",
+        "Ion species and charge-density fractions are fixed external inputs; only their temperatures are fitted.",
+        "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
+        "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
         "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
-        "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum"
+        "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+        "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
       ],
       "raw_data_to_physics": false,
-      "note": "CTS offers an explicitly selectable unmagnetized electrostatic workflow and a local magnetized full-electromagnetic workflow with low-temperature Bindslev three-wave coupling. Relativistic anisotropic fast-ion linear response and particle-noise are available when the distribution is supplied explicitly; the nonlinear three-wave vertex remains low-temperature.",
+      "note": "Full-EM CTS provides species-resolved thermal-ion temperature inference, relativistic gyrotropic non-Maxwellian electron/fast-ion kinetic response and second-order vertices, plus optional frequency-resolved cold-plasma ray tracing/Gaussian overlap. Maxwellian bulk-electron scattering retains the low-temperature Bindslev source. No experimental validation is claimed.",
       "calibrated_measurements_to_physics": true,
       "workflow_modes": [
         {
           "name": "magnetized_full_electromagnetic_cts",
           "function": "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
           "inputs": [
-            "frequency_shift_Hz",
-            "spectrum",
-            "probe_frequency_Hz",
-            "instrument_response",
-            "signal_uncertainty or spectral_covariance",
-            "magnetic_field_T",
-            "incident_direction",
-            "scattered_direction",
-            "incident_polarization",
-            "scattered_polarization",
-            "electron_flow_velocity_m_s",
-            "ion_flow_velocity_m_s",
-            "ion_species",
-            "ion_fractions",
-            "initial density and temperatures"
+            "calibrated frequency-shift spectrum",
+            "probe frequency",
+            "measured response matrix",
+            "species list and charge-density fractions",
+            "initial electron density and temperature",
+            "initial temperature for each ion species",
+            "magnetic field and explicit electron/ion flow vectors",
+            "incident/scattered directions and polarizations"
           ],
           "outputs": [
-            "electron_density_m3",
-            "electron_temperature_eV",
-            "ion_temperature_eV",
-            "fit_covariance",
-            "fitted_spectrum",
-            "joint density/current/E/B fluctuation covariance"
-          ],
-          "scope": "Local magnetized Maxwellian kinetic full-EM forward/inverse path; flow vectors and composition are fixed external inputs."
+            "electron density",
+            "electron temperature",
+            "independent ion temperature per species",
+            "fitted spectrum and residual",
+            "parameter covariance",
+            "joint fluctuation covariance"
+          ]
         },
         {
-          "name": "relativistic_anisotropic_fast_ion_cts",
+          "name": "relativistic_gyrotropic_non_maxwellian_cts",
           "function": "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
           "inputs": [
-            "fast_ion_populations",
-            "distribution.kind",
-            "distribution momentum grids or perpendicular/parallel temperatures",
-            "density_m3",
-            "mass_amu",
-            "charge_state"
+            "electron_distribution and/or fast_ion_populations",
+            "relativistic_bigaussian or tabulated_gyrotropic VDF",
+            "frequency-shift spectrum and full-EM geometry"
           ],
           "outputs": [
-            "relativistic fast-ion conductivity",
-            "Klimontovich bare current covariance",
-            "screened joint density/current/E/B covariance"
+            "relativistic conductivity and Klimontovich noise",
+            "second-order relativistic Vlasov vertices",
+            "correlated spectral transfer"
+          ]
+        },
+        {
+          "name": "frequency_resolved_ray_and_beam_overlap",
+          "function": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+          "inputs": [
+            "probe/receiver launch positions and wavevectors",
+            "supplied equilibrium callback",
+            "incident and receiver Gaussian beam covariance matrices",
+            "frequency bins"
           ],
-          "scope": "Relativistic gyrotropic fast-ion linear response and particle shot noise; the nonlinear source-current vertex remains the low-temperature Bindslev closure."
+          "outputs": [
+            "frequency-resolved local scattering geometry",
+            "relative Gaussian beam overlap",
+            "ray diagnostics"
+          ],
+          "scope": "Cold-plasma geometrical-optics ray tracing with caller-supplied local Gaussian beam covariance; no diffraction."
         }
       ]
     },
