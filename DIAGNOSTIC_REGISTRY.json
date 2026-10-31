@@ -4263,7 +4263,7 @@
           "name": "fast_ion_populations",
           "unit": "sequence of explicit relativistic gyrotropic populations",
           "required": false,
-          "description": "Each item requires name, charge_state, mass_amu, density_m3, optional flow_velocity_m_s and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3)."
+          "description": "Each item requires name, charge_state, mass_amu, density_m3 and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3). Any fast-ion drift must be represented in the supplied asymmetric tabulated momentum distribution."
         }
       ],
       "output_specs": [
