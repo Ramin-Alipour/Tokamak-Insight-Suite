@@ -243,12 +243,18 @@ def full_em_cts_spectral_density(
         raise ValueError("ion_temperature_eV must be supplied for every thermal ion species")
     if not isinstance(scattering_geometry, Mapping):
         raise ValueError("scattering_geometry must be a mapping")
-    ki_hat = _vec3(scattering_geometry.get("incident_direction"), "incident_direction")
-    ks_hat = _vec3(scattering_geometry.get("scattered_direction"), "scattered_direction")
+    frequency_geometry = scattering_geometry.get("frequency_resolved_geometry")
+    if frequency_geometry is None:
+        ki_hat = _vec3(scattering_geometry.get("incident_direction"), "incident_direction")
+        ks_hat = _vec3(scattering_geometry.get("scattered_direction"), "scattered_direction")
+    else:
+        if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
+            raise ValueError("frequency_resolved_geometry must contain one traced geometry record per frequency bin")
+        ki_hat = _vec3(frequency_geometry[0].get("incident_direction"), "first frequency-resolved incident direction")
+        ks_hat = _vec3(frequency_geometry[0].get("scattered_direction"), "first frequency-resolved scattered direction")
     b = np.asarray(magnetic_field_T, dtype=float)
     if b.shape != (3,) or np.any(~np.isfinite(b)) or np.linalg.norm(b) <= 0:
         raise ValueError("magnetic_field_T must be a finite non-zero 3-vector")
-    frequency_geometry = scattering_geometry.get("frequency_resolved_geometry")
     if frequency_geometry is not None:
         if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
             raise ValueError("frequency_resolved_geometry must contain one traced geometry record per frequency bin")
@@ -296,10 +302,13 @@ def full_em_cts_spectral_density(
     # In an anisotropic magnetized plasma, cold-plasma eigenmodes can have a longitudinal E component.\n    # These vectors are branch-selection seeds; the solver replaces them with flux-normalized eigenmodes.\n    cold_wave_species = [{
         "density_m3": sp["density"], "charge_C": sp["charge"], "mass_kg": sp["mass"]
     } for sp in species]
-    incident_wavevector, incident_mode_field, incident_mode_diagnostics = _select_flux_normalized_cold_mode(
-        2.0*np.pi*f0, ki_hat, b, cold_wave_species, ei
-    )
-    ei = incident_mode_field
+    if frequency_geometry is None:
+        incident_wavevector, incident_mode_field, incident_mode_diagnostics = _select_flux_normalized_cold_mode(
+            2.0*np.pi*f0, ki_hat, b, cold_wave_species, ei
+        )
+        ei = incident_mode_field
+    else:
+        incident_wavevector, incident_mode_diagnostics = None, None
     if isinstance(harmonic_order, bool) or not isinstance(harmonic_order, (int, np.integer)) or harmonic_order < 2:
         raise ValueError("harmonic_order must be an integer >= 2")
     if isinstance(quadrature_order, bool) or not isinstance(quadrature_order, (int, np.integer)) or quadrature_order < 4:
