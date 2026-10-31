@@ -34,6 +34,12 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
                for item in contract["assumptions"])
     assert any("not identifiable" in item.lower() or "absolute density" in item.lower()
                for item in contract["limitations"])
+    assert "maximum_recoil_correction_fraction" in inputs
+    profile_inputs = {item["name"] for item in get_analysis(46)["execution_contract"]["input_specs"]}
+    assert {"profile_reconstruction_method", "profile_reconstruction_points",
+            "profile_reconstruction_mc_samples", "maximum_recoil_correction_fraction"} <= profile_inputs
+    distribution_inputs = {item["name"] for item in get_analysis(81)["execution_contract"]["input_specs"]}
+    assert {"instrument_sigma_uncertainty_nm", "moment_mc_samples"} <= distribution_inputs
     assert callable(resolve_analysis(1))
 
 
