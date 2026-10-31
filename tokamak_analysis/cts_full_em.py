@@ -461,7 +461,7 @@ def full_em_cts_spectral_density(
             omega_scattered_rad_s=omega_s,
             wavevector_incident_rad_m=ki,
             wavevector_scattered_rad_m=ks,
-            incident_electric_field=ei,
+            incident_electric_field=ei_local,
             incident_susceptibility=chi_i,
             scattered_susceptibility=chi_s,
             magnetic_field_T=b_bin,
@@ -512,7 +512,7 @@ def full_em_cts_spectral_density(
         bindslev_x_tensors.append(source["X_tensor"])
         bindslev_gamma_inverse.append(source["Gamma_inverse_tensor"])
         relativistic_three_wave_vertex_diagnostics.append(relativistic_vertex_at_frequency)
-        projected = es_local.conj() @ source["dielectric_coupling_operator"]
+        projected = es_local.conj() @ total_source_operator
         bindslev_coefficients.append({
             "N": projected[0],
             "U_k": projected[1:4],
