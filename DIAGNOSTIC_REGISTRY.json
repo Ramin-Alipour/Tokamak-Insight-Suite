@@ -4143,7 +4143,8 @@
         {
           "name": "instrument_response",
           "unit": "normalized frequency response matrix",
-          "required": true
+          "required": true,
+          "description": "Calibrated frequency-bin probability response matrix; each column is normalized as a redistribution probability by the forward model. Spectral convolution conserves integrated power using the actual frequency-bin widths."
         },
         {
           "name": "instrument_response_uncertainty",
@@ -4661,7 +4662,11 @@
           "scope": "Magnetized full-electromagnetic kinetic CTS forward model and inversion. Optional relativistic gyrotropic populations and frequency-resolved cold-plasma ray/beam-overlap geometry are capabilities within this model, not additional CTS model choices."
         }
       ],
-      "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened."
+      "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins",
+        "tests/test_cts_analysis.py::test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins"
+      ]
     },
     "scientific_references": [
       {
