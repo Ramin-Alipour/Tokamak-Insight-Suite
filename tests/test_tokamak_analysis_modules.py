@@ -10,12 +10,26 @@ def test_all_analysis_modules_import(module_name):
     importlib.import_module(f"tokamak_analysis.{module_name}")
 
 
-def test_thomson_profile_workflow():
-    from tokamak_analysis.thomson_workflow import analyze_thomson_profile
-    r=np.array([0.0,0.1,0.2,0.3])
-    out=analyze_thomson_profile(r,2e19*(1-r),100*(1-.5*r))
-    np.testing.assert_allclose(out["density_gradient_m-4"],-2e19,rtol=1e-12)
-    np.testing.assert_allclose(out["temperature_gradient_eV_m-1"],-50,rtol=1e-12)
+def test_thomson_profile_workflow_extracts_parameters_from_measured_spectra():
+    from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
+    radius = np.array([0.0, 0.1, 0.2, 0.3])
+    temperature = 100.0 * (1.0 - 0.5 * radius)
+    wavelength = np.linspace(492.0, 572.0, 401)
+    sigma = 2.0 * 532.0 * np.sqrt(temperature / 510998.95069) * np.sin(np.pi / 4.0)
+    spectra = np.asarray([
+        1200.0 * np.exp(-0.5 * ((wavelength - 532.0) / width) ** 2) + 20.0
+        for width in sigma
+    ])
+    out = reconstruct_thomson_profile_from_spectra(
+        wavelength, spectra, radius,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        model="non_collective_maxwellian",
+    )
+    np.testing.assert_allclose(out["electron_temperature_profile_eV"], temperature, rtol=0.05)
+    assert out["spatial_profile_reconstruction"]["input_origin"] == (
+        "physical parameters inferred from measured calibrated Thomson spectra"
+    )
 
 
 def test_beta_and_confinement():
@@ -81,8 +95,8 @@ def test_invalid_input_rejected():
 
 def test_analysis_registry_resolves_every_callable():
     from tokamak_analysis.analysis_registry import ANALYSES, resolve_analysis
-    assert len(ANALYSES) == 79
-    assert [x["id"] for x in ANALYSES] == [i for i in range(1, 81) if i != 7]
+    assert len(ANALYSES) == 80
+    assert [x["id"] for x in ANALYSES] == [i for i in range(1, 82) if i != 7]
     for entry in ANALYSES:
         assert callable(resolve_analysis(entry["id"]))
 
