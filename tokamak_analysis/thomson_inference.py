@@ -230,8 +230,12 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     p, cov = curve_fit(observed, wavelength, signal_scaled, p0=p0, bounds=(lower, upper),
                        sigma=uncertainty_scaled, absolute_sigma=uncertainty_scaled is not None,
                        maxfev=50000)
+    # Keep optimizer-space parameters for evaluating the model: observed()
+    # is defined on signal_scaled, whereas the public fit parameters below
+    # are converted back to the measured intensity units.
+    p_scaled = np.asarray(p, dtype=float)
     parameter_scales=np.array([signal_scale,1.0,1.0,signal_scale,signal_scale])
-    p=np.asarray(p,dtype=float)*parameter_scales
+    p=p_scaled*parameter_scales
     cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp, center, sigma, offset, slope = map(float, p)
     if sigma <= 0:
@@ -251,7 +255,8 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
     if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
         raise ValueError("Non-relativistic Maxwellian model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     dof = max(1, wavelength.size-len(p))
-    residual = signal-observed(wavelength, *p)
+    fitted_spectrum = signal_scale * observed(wavelength, *p_scaled)
+    residual = signal - fitted_spectrum
     fit_cov = np.asarray(cov, dtype=float)
     te_unc = float(te*2*np.sqrt(max(fit_cov[2,2], 0.0))/sigma)
     # A normalized instrument-response operator redistributes power without
@@ -270,7 +275,7 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
         "fit_covariance": fit_cov, "residual": residual,
         "integrated_scattered_power_W": area, "integrated_scattered_power_uncertainty_W": area_unc,
         "reduced_chi_square": float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
-        "fitted_spectrum": observed(wavelength, *p),
+        "fitted_spectrum": fitted_spectrum,
         "fit_parameters": np.asarray(p, dtype=float),
         "fit_parameter_names": ["amplitude", "center_nm", "intrinsic_sigma_nm", "background_intercept", "background_slope_per_nm"],
         "model": "non-collective, non-relativistic Maxwellian electron spectrum",
@@ -312,8 +317,11 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         return _apply_response(response, component, x) + offset+slope*(x-center)
     p, cov = curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
                        sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=80000)
+    # observed() operates on normalized intensity; retain its optimizer
+    # parameters separately from the public, measured-unit fit parameters.
+    p_scaled=np.asarray(p,dtype=float)
     parameter_scales=np.array([signal_scale,1.0,1.0,1.0,signal_scale,signal_scale])
-    p=np.asarray(p,dtype=float)*parameter_scales
+    p=p_scaled*parameter_scales
     cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp,center,sigma,kappa,offset,slope=map(float,p)
     # A kappa spectrum has power-law tails; Gaussian ±3-sigma coverage is not
@@ -336,7 +344,8 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
     if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
         raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
-    residual=signal-observed(wavelength,*p)
+    fitted_spectrum=signal_scale*observed(wavelength,*p_scaled)
+    residual=signal-fitted_spectrum
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
         a, cen, sig, kap, off, sl = values
@@ -365,7 +374,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "captured_spectral_probability":captured_probability,
             "spectral_window_truncation_warning":("The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window." if captured_probability < 0.999 else None),
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
-            "fitted_spectrum":observed(wavelength,*p),
+            "fitted_spectrum":fitted_spectrum,
             "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
             "validity_screening":{
                 "theta_e":float(te/ELECTRON_REST_ENERGY_EV),
