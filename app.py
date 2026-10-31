@@ -3119,6 +3119,7 @@ elif page=='Advanced Analysis':
                 cts_fast_species=''; cts_fast_fraction=''
             if cts_fast_mode=='Hot Maxwellian component':
                 cts_fast_temperature=st.text_input('Initial fast-ion temperature (eV; required)',value='',key='cts_fast_temperature')
+                cts_fast_temperature_bounds=st.text_input('Optional fast-ion temperature bounds (eV; JSON pair)',value='',key='cts_fast_temperature_bounds')
             if cts_fast_mode=='Infer regularized tabulated 1-D VDF':
                 cts_fast_smoothness=st.text_input('VDF smoothness parameter (required)',value='',key='cts_fast_smoothness')
             if st.button('Run microwave CTS inversion',type='primary',key='run_cts_inversion'):
@@ -3157,6 +3158,8 @@ elif page=='Advanced Analysis':
                         fast_ion={'kind':'maxwellian','species_index':fast_species_index,
                             'fraction_initial':fast_fraction_initial,
                             'temperature_initial_eV':float(cts_fast_temperature)}
+                        if cts_fast_temperature_bounds.strip():
+                            fast_ion['temperature_bounds_eV']=json.loads(cts_fast_temperature_bounds)
                     elif cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
                         if cts_fast_vdf_upload is None:
                             raise ValueError('Upload a two-column fast-ion VDF CSV.')
