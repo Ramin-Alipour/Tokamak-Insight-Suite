@@ -127,6 +127,11 @@ def test_instrument_response_uncertainty_propagates_into_absolute_density():
     assert channel["instrument_response_density_uncertainty_propagated"] is True
     assert channel["integrated_scattered_power_lsf_uncertainty_W"] >= 0.0
     assert channel["electron_density_uncertainty_m3"] > 0.0
+    assert channel["integrated_scattered_power_W"] == pytest.approx(
+        channel["integrated_scattered_power_window_W"] / channel["captured_spectral_probability"],
+        rel=1e-10,
+    )
+    assert np.isfinite(channel["power_cross_section_relative_covariance"])
 
 
 def test_optical_analysis_1_rejects_collective_dielectric_models():
