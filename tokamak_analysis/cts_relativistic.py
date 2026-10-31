@@ -237,14 +237,35 @@ def relativistic_gyrotropic_three_wave_vertex(
             np.fft.fft(values, axis=2)*(1j*harmonics)[None, None, :],
             axis=2,
         )
-        pp_safe = np.maximum(pperp[:, :, None], np.finfo(float).tiny)
-        dphi_over_p = np.divide(
-            dphi, pp_safe,
-            out=np.zeros_like(dphi, dtype=complex),
-            where=pperp[:, :, None] > 1e-12*max(float(np.max(pperp)), np.finfo(float).tiny),
-        )
-        gx = cosphi[None, None, :]*dpperp - sinphi[None, None, :]*dphi_over_p
-        gy = sinphi[None, None, :]*dpperp + cosphi[None, None, :]*dphi_over_p
+        if values.ndim == 4:
+            # Three fluctuation-field components are carried on the final axis.
+            # Keep the gyrophase and Cartesian-component axes distinct when
+            # dividing by p_perp and rotating cylindrical gradients.
+            pp_safe = np.maximum(
+                pperp[:, :, None, None], np.finfo(float).tiny
+            )
+            nonzero_perp = (
+                pperp[:, :, None, None]
+                > 1e-12 * max(float(np.max(pperp)), np.finfo(float).tiny)
+            )
+            dphi_over_p = np.divide(
+                dphi, pp_safe,
+                out=np.zeros_like(dphi, dtype=complex),
+                where=nonzero_perp,
+            )
+            cosine = cosphi[None, None, :, None]
+            sine = sinphi[None, None, :, None]
+        else:
+            pp_safe = np.maximum(pperp[:, :, None], np.finfo(float).tiny)
+            dphi_over_p = np.divide(
+                dphi, pp_safe,
+                out=np.zeros_like(dphi, dtype=complex),
+                where=pperp[:, :, None] > 1e-12*max(float(np.max(pperp)), np.finfo(float).tiny),
+            )
+            cosine = cosphi[None, None, :]
+            sine = sinphi[None, None, :]
+        gx = cosine*dpperp - sine*dphi_over_p
+        gy = sine*dpperp + cosine*dphi_over_p
         gz = dppar
         return np.stack((gx, gy, gz), axis=-1)
 
