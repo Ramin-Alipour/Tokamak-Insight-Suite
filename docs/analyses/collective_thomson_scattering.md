@@ -62,8 +62,9 @@ Required inputs include:
 
 - Calibrated frequency-shift axis and calibrated CTS spectral power.
 - Probe frequency and measured instrument-response matrix.
-- Initial electron density and temperature.
+- Researcher-supplied initial electron density and temperature estimates.
 - Explicit ion species metadata, charge-density fractions and one initial temperature per ion species.
+- Optional researcher-supplied parameter bounds keyed by electron density, electron temperature and species-specific ion temperatures. If omitted, the positive log-parameters are not restricted by default scientific ranges.
 - Magnetic-field vector.
 - Explicit electron-flow vector and one ion-flow vector per ion species.
 - Incident/scattered wave directions and polarization vectors.
@@ -81,7 +82,7 @@ No zero flow, ion composition, polarization, VDF or equilibrium profile is silen
 
 ## Inversion and uncertainty
 
-The full-EM inversion uses bounded least-squares in logarithmic positive parameters, profiles spectral amplitude and constant background as nuisance parameters, and fits electron density, electron temperature and one temperature per supplied thermal-ion species. Flow vectors, species composition and supplied non-Maxwellian VDF shapes remain external inputs. The relativistic Maxwell-Juttner electron distribution follows the fitted electron temperature when no separate temperature is provided.
+The full-EM inversion uses least-squares in logarithmic positive parameters, profiles spectral amplitude and constant background as nuisance parameters, and fits electron density, electron temperature and one temperature per supplied thermal-ion species. No scientific parameter bounds are imposed by default; optional bounds must be supplied explicitly by the researcher. Flow vectors, species composition and supplied non-Maxwellian VDF shapes remain external inputs. The relativistic Maxwell-Juttner electron distribution follows the fitted electron temperature when no separate temperature is provided.
 
 The local Jacobian covariance is reported with fit residuals, identifiability rank and condition number. Full spectral covariance is used for whitening when supplied. The full-EM path does not claim complete propagation of every uncertainty in the supplied equilibrium, ray geometry, beam covariance, VDF or numerical truncation. These are declared model/input uncertainties, not set to zero.
 
