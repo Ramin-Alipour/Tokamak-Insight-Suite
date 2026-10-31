@@ -522,12 +522,14 @@ def full_em_cts_spectral_density(
             omega_i, omega_s, ne,
         )
         spectra[index] = overlap_weight * transfer["received_source_current_spectral_power"]
-        bindslev_operators.append(total_source_operator)
+        bindslev_operators.append(source["source_current_operator"])
+        total_three_wave_operators.append(total_source_operator)
         bindslev_form_factors.append(form_factors["G_alpha_beta"])
         bindslev_x_tensors.append(source["X_tensor"])
         bindslev_gamma_inverse.append(source["Gamma_inverse_tensor"])
         relativistic_three_wave_vertex_diagnostics.append(relativistic_vertex_at_frequency)
-        projected = es_local.conj() @ total_source_operator
+        projected = es_local.conj() @ source["source_current_operator"]
+        total_projected = es_local.conj() @ total_source_operator
         bindslev_coefficients.append({
             "N": projected[0],
             "U_k": projected[1:4],
@@ -536,6 +538,7 @@ def full_em_cts_spectral_density(
             "normalized_incident_flux_S_i": form_factors["normalized_incident_flux_S_i"],
             "normalized_scattered_flux_S_s": form_factors["normalized_scattered_flux_S_s"],
             "transfer_contributions": transfer["transfer_contributions"],
+            "total_three_wave_receiver_projection": total_projected,
         })
         harmonic_counts.append(int(harmonic_order))
     return {
@@ -545,7 +548,12 @@ def full_em_cts_spectral_density(
         "dielectric_tensor": dielectric_tensors,
         "wave_tensor": wave_tensors,
         "bindslev_source_current_operator": np.asarray(bindslev_operators),
+        "total_three_wave_source_current_operator": np.asarray(total_three_wave_operators),
         "bindslev_coupling_coefficients": bindslev_coefficients,
+        "relativistic_three_wave_vertex_diagnostics": relativistic_three_wave_vertex_diagnostics,
+        "relativistic_fast_ion_three_wave_vertex_used": any(relativistic_three_wave_vertex_diagnostics),
+        "kinetic_population_diagnostics": fast_ion_kinetic_diagnostics,
+        "nonthermal_electron_distribution": electron_distribution,
         "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
@@ -564,15 +572,15 @@ def full_em_cts_spectral_density(
         "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic non-Maxwellian electron/fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-electromagnetic CTS with Bindslev low-temperature bulk-electron coupling and optional relativistic gyrotropic fast-ion kinetics"),
-        "kinetic_response": "bulk species: magnetized Maxwellian Vlasov gyro-harmonics; optional fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
-        "fluctuation_source": "bulk thermal species: classical FDT; non-equilibrium fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
+        "kinetic_response": "Maxwellian thermal species: magnetized Vlasov gyro-harmonics; explicitly supplied non-Maxwellian electrons/fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
+        "fluctuation_source": "Maxwellian thermal species: classical FDT; explicitly supplied non-Maxwellian electron/fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
         "numerical_controls": {"harmonic_order": int(harmonic_order),
             "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping},
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
-            "Bulk thermal species use the non-relativistic isotropic Maxwellian solver; optional fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
+            "Thermal ions and Maxwellian electrons use the non-relativistic isotropic Maxwellian solver; explicitly supplied non-Maxwellian electron/fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
             "When electron_distribution is supplied, the Maxwellian electron response and Bindslev electron nonlinear source are replaced by a relativistic gyrotropic electron Vlasov response and second-order kinetic vertex; supplied fast-ion populations add their own relativistic vertices.",
             "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
         ],
