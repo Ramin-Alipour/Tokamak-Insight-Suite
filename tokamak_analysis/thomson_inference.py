@@ -1424,6 +1424,7 @@ def analyze_thomson_spectra(
         item.pop("_shared_lsf_velocity_draws", None)
         item.pop("_shared_lsf_area_draws", None)
     joint_summary = None
+    joint_area_covariance_from_spectral_fit = None
     if joint_covariance is not None:
         from scipy.optimize import least_squares
         nchan, nlam = y.shape
@@ -1519,6 +1520,9 @@ def analyze_thomson_spectra(
                 + discrepancy_scale*kappa_parameter_covariance
             )
         joint_fitted=joint_forward(joint_fit.x)
+        joint_area_gradient_matrix = np.zeros(
+            (nchan, joint_parameter_count * nchan), dtype=float
+        )
         for channel in range(nchan):
             p=joint_fit.x[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
             block=parameter_covariance[joint_parameter_count*channel:joint_parameter_count*(channel+1),
@@ -1607,6 +1611,11 @@ def analyze_thomson_spectra(
                 plus=p.copy(); minus=p.copy(); plus[j]+=step; minus[j]-=step
                 grad[j]=(area_function(plus)-area_function(minus))/(2.0*step)
             joint_area_sigma=float(np.sqrt(max(grad@block@grad,0.0)))
+            parameter_slice = slice(
+                joint_parameter_count * channel,
+                joint_parameter_count * (channel + 1),
+            )
+            joint_area_gradient_matrix[channel, parameter_slice] = grad
             lsf_area_sigma=fit.get("integrated_scattered_power_lsf_uncertainty_W")
             if lsf_area_sigma is not None:
                 joint_area_sigma=float(np.hypot(joint_area_sigma,float(lsf_area_sigma)))
@@ -1668,6 +1677,9 @@ def analyze_thomson_spectra(
                     if density_inputs.get("relative_input_covariance") is not None:
                         fit["integrated_scattered_power_covariance_uncertainty_W"] = joint_area_sigma
                         fit["integrated_scattered_power_uncertainty_W"] = joint_area_sigma
+        joint_area_covariance_from_spectral_fit = (
+            joint_area_gradient_matrix @ parameter_covariance @ joint_area_gradient_matrix.T
+        ) * (1.0 + discrepancy_scale)
         joint_summary={
             "method":"joint generalized least squares across all channels",
             "channel_major_covariance_order":True,
