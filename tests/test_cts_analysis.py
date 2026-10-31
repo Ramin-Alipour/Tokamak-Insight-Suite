@@ -31,7 +31,7 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
 def test_cts_hot_ion_component_forward_model():
     f0,f,g,ions,frac,_=_case()
     z=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,
-      ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,fast_ion={"species_index":0,"fraction":.08,"temperature_eV":12000})
+      ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,fast_ion={"kind":"maxwellian","species_index":0,"fraction":.08,"temperature_eV":12000})
     assert np.all(np.isfinite(z)) and np.all(z>0)
 
 @pytest.mark.parametrize("g",[{},{"scattering_angle_rad":0.},{"scattering_angle_rad":4.}])
