@@ -18,7 +18,7 @@ from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analy
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_inference import analyze_thomson_spectra
 from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
-from tokamak_analysis.cts_analysis import analyze_cts_spectrum
+from tokamak_analysis.cts_analysis import analyze_cts_spectrum_model
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
 from tokamak_analysis.poloidal_flux import reconstruct_poloidal_flux
@@ -3055,11 +3055,13 @@ elif page=='Advanced Analysis':
             st.rerun()
     elif workflow=='Microwave CTS spectral inversion (frequency-domain)':
         st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
-        st.caption('This workflow implements an unmagnetized electrostatic longitudinal CTS model; it is not a full magnetized electromagnetic CTS simulator.')
-        st.caption('Enter the electron-flow projection explicitly; zero is a deliberate stationary-flow assumption. One common ion temperature and projected ion flow are fitted across all supplied background ion species.')
+        cts_model=st.selectbox('CTS physical forward model',[
+            'electrostatic','full_electromagnetic'
+        ],format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else 'Magnetized full-electromagnetic CTS',key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
-        else:
+        elif cts_model=='electrostatic':
+            st.caption('This workflow uses the unmagnetized electrostatic longitudinal dielectric model. Electron flow is explicit; one common ion temperature and projected ion flow are fitted across supplied background species.')
             c1,c2=st.columns(2)
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_frequency_col')
@@ -3172,6 +3174,129 @@ elif page=='Advanced Analysis':
                     add_report_section('Microwave CTS spectral inversion',result_cts)
                 except Exception as e:
                     st.error(f'CTS inversion failed: {e}')
+
+        else:
+            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev Maxwellian-electron vertex or an explicitly supplied relativistic electron VDF, and species-resolved ion temperatures. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
+            c1,c2=st.columns(2)
+            with c1:
+                cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_full_frequency_col')
+                cts_spectrum_col=col_select('Calibrated CTS spectral power',[x for x in numeric if x!=cts_frequency_col] or numeric,'cts_full_spectrum_col')
+                cts_uncertainty_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_full_uncertainty_col')
+                cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_full_probe_frequency')
+                cts_density_initial=st.text_input('Initial electron density (m⁻³)',key='cts_full_density_initial')
+                cts_temperature_initial=st.text_input('Initial electron temperature (eV)',key='cts_full_temperature_initial')
+                cts_ion_temperature_initial=st.text_input('Initial ion temperatures (eV; one per species, comma-separated)',key='cts_full_ion_temperature_initial')
+                cts_magnetic_field=st.text_input('Magnetic field vector (T; x,y,z)',key='cts_full_magnetic_field')
+            with c2:
+                cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_full_response_upload')
+                cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_full_response_unc_upload')
+                cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_full_covariance_upload')
+                cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
+                cts_electron_flow=st.text_input('Electron flow vector (m/s; x,y,z)',key='cts_full_electron_flow')
+                cts_ion_flow=st.text_area('Ion flow vectors (m/s; one x,y,z vector per species, separated by semicolons)',key='cts_full_ion_flow')
+                cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=1,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
+                cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
+                cts_damping=st.text_input('Optional resonance damping rate (rad/s)',key='cts_full_damping')
+            st.markdown('**Ion composition (externally supplied)**')
+            s1,s2,s3=st.columns(3)
+            with s1: cts_species_text=st.text_input('Ion species names (comma-separated)',key='cts_full_species')
+            with s2: cts_charge_text=st.text_input('Charge states (comma-separated)',key='cts_full_charges')
+            with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated)',key='cts_full_masses')
+            cts_fraction_text=st.text_input('Charge-density fractions (comma-separated; sum to 1)',key='cts_full_fractions')
+            st.markdown('**Scattering geometry and polarization**')
+            g1,g2=st.columns(2)
+            with g1:
+                cts_incident_direction=st.text_input('Incident wave direction (x,y,z)',key='cts_full_incident_direction')
+                cts_incident_polarization=st.text_input('Incident polarization (x,y,z)',key='cts_full_incident_polarization')
+            with g2:
+                cts_scattered_direction=st.text_input('Scattered wave direction (x,y,z)',key='cts_full_scattered_direction')
+                cts_scattered_polarization=st.text_input('Scattered polarization (x,y,z)',key='cts_full_scattered_polarization')
+            cts_electron_distribution_json=st.text_area(
+                'Optional relativistic electron distribution JSON',
+                placeholder='{"kind":"relativistic_maxwell_juttner"}',
+                key='cts_full_electron_distribution_json',
+            )
+            cts_fast_ions_json=st.text_area(
+                'Optional relativistic fast-ion populations JSON',
+                placeholder='[{"name":"fast D+","charge_state":1,"mass_amu":2.014,"density_m3":1e17,"flow_velocity_m_s":[0,0,0],"distribution":{"kind":"relativistic_bigaussian","temperature_perpendicular_eV":2e5,"temperature_parallel_eV":1e5}}]',
+                key='cts_full_fast_ions_json',
+            )
+            if st.button('Run magnetized full-EM CTS inversion',type='primary',key='run_full_em_cts_inversion'):
+                try:
+                    frequency=pd.to_numeric(df[cts_frequency_col],errors='coerce').to_numpy(dtype=float)
+                    spectrum=pd.to_numeric(df[cts_spectrum_col],errors='coerce').to_numpy(dtype=float)
+                    if not np.all(np.isfinite(frequency)) or not np.all(np.isfinite(spectrum)):
+                        raise ValueError('CTS frequency and spectrum columns must contain only finite numeric values.')
+                    if cts_uncertainty_col!='<none>':
+                        cts_uncertainty=pd.to_numeric(df[cts_uncertainty_col],errors='coerce').to_numpy(dtype=float)
+                        if not np.all(np.isfinite(cts_uncertainty)) or np.any(cts_uncertainty<=0):
+                            raise ValueError('CTS spectral uncertainties must be finite and positive.')
+                    else:
+                        cts_uncertainty=None
+                    if cts_response_upload is None:
+                        raise ValueError('Upload the measured frequency-response matrix.')
+                    cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
+                    cts_response_unc=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
+                    cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
+                    charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
+                    masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
+                    fractions=[float(v.strip()) for v in cts_fraction_text.split(',') if v.strip()]
+                    if not species_names or not (len(species_names)==len(charges)==len(masses)==len(fractions)):
+                        raise ValueError('Ion names, charge states, masses and fractions must have equal non-zero lengths.')
+                    ion_species=[{'name':name,'charge_state':charge,'mass_amu':mass} for name,charge,mass in zip(species_names,charges,masses)]
+                    ion_temperatures=_parse_ts_float_list(cts_ion_temperature_initial,'Initial ion temperatures')
+                    if len(ion_temperatures)!=len(species_names):
+                        raise ValueError('Enter one initial ion temperature per supplied ion species.')
+                    ion_temperature_initial={name:value for name,value in zip(species_names,ion_temperatures)}
+                    ion_flow_parts=[v.strip() for v in cts_ion_flow.split(';') if v.strip()]
+                    if len(ion_flow_parts)!=len(species_names):
+                        raise ValueError('Enter one ion flow vector per supplied ion species, separated by semicolons.')
+                    ion_flows={name:_parse_ts_vector(value,f'Ion flow for {name}') for name,value in zip(species_names,ion_flow_parts)}
+                    scattering_geometry={
+                        'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
+                        'scattered_direction':_parse_ts_vector(cts_scattered_direction,'Scattered direction'),
+                    }
+                    if cts_geometry_upload is not None:
+                        scattering_geometry=json.load(cts_geometry_upload)
+                        if not isinstance(scattering_geometry,dict) or 'frequency_resolved_geometry' not in scattering_geometry:
+                            raise ValueError('Ray geometry JSON must contain frequency_resolved_geometry from the CTS ray/beam helper.')
+                    electron_distribution=None if not cts_electron_distribution_json.strip() else json.loads(cts_electron_distribution_json)
+                    fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
+                    kwargs_cts={
+                        'frequency_shift_Hz':frequency,
+                        'probe_frequency_Hz':float(cts_probe_frequency),
+                        'scattering_geometry':scattering_geometry,
+                        'electron_density_initial_m3':float(cts_density_initial),
+                        'electron_temperature_initial_eV':float(cts_temperature_initial),
+                        'ion_temperature_initial_eV':ion_temperature_initial,
+                        'ion_species':ion_species,
+                        'ion_fractions':fractions,
+                        'magnetic_field_T':_parse_ts_vector(cts_magnetic_field,'Magnetic field'),
+                        'electron_flow_velocity_m_s':_parse_ts_vector(cts_electron_flow,'Electron flow'),
+                        'ion_flow_velocity_m_s':ion_flows,
+                        'incident_polarization':_parse_ts_vector(cts_incident_polarization,'Incident polarization'),
+                        'scattered_polarization':_parse_ts_vector(cts_scattered_polarization,'Scattered polarization'),
+                        'instrument_response':cts_response,
+                        'signal_uncertainty':cts_uncertainty,
+                        'spectral_covariance':cts_spectral_cov,
+                        'instrument_response_uncertainty':cts_response_unc,
+                        'fast_ion_populations':fast_ions,
+                        'electron_distribution':electron_distribution,
+                        'harmonic_order':int(cts_harmonic_order),
+                        'quadrature_order':int(cts_quadrature_order),
+                    }
+                    if cts_damping.strip():
+                        kwargs_cts['damping_rate_rad_s']=float(cts_damping)
+                    result_cts=analyze_cts_spectrum_model(model='full_electromagnetic',**kwargs_cts)
+                    st.success('Magnetized full-EM CTS inversion completed within the declared model scope.')
+                    st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
+                    st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
+                    st.json(result_cts)
+                    json_download('Export full-EM CTS inversion and uncertainty diagnostics',result_cts,'tis_cts_full_em_inversion.json')
+                    add_report_section('Magnetized full-EM CTS inversion',result_cts)
+                except Exception as e:
+                    st.error(f'Full-EM CTS inversion failed: {e}')
 
     elif workflow=='Thomson spatial profile reconstruction from calibrated spectra':
         st.info('This subanalysis starts from measured, calibrated multi-channel Thomson spectra, infers every identifiable physical parameter with the selected forward model, and reconstructs radial profiles using PCHIP and/or a GCV smoothing spline. It does not accept pre-derived ne/Te profile points and does not extrapolate beyond measured channel coordinates.')
