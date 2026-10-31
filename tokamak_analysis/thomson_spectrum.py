@@ -50,15 +50,16 @@ def fit_thomson_spectrum(
     *,
     laser_wavelength_nm: float,
     scattering_angle_rad: float,
-    instrument_sigma_nm: float,
+    instrument_sigma_nm: float | None = None,
+    instrument_response_matrix=None,
     signal_uncertainty=None,
     spectral_power_density_calibrated: bool = False,
 ) -> dict:
     """Compatibility adapter to the canonical Thomson inference engine.
 
-    The historical Gaussian-width API is retained, but no independent fit is
-    performed here. A Gaussian line-spread response matrix is constructed and
-    passed to Analysis 1's canonical multi-channel Maxwellian inference path.
+    The historical scalar-width argument is retained only as an optional
+    measured width summary. A measured instrument-response matrix is mandatory;
+    this adapter never synthesizes a Gaussian response from a scalar width.
     """
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
@@ -66,18 +67,20 @@ def fit_thomson_spectrum(
     y = _finite_vector(signal, "signal")
     if x.size != y.size or np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm and signal must have equal lengths and wavelength must be strictly increasing")
-    if not _is_finite_real(instrument_sigma_nm) or instrument_sigma_nm <= 0:
-        raise ValueError("instrument_sigma_nm must be positive and finite")
+    if instrument_sigma_nm is not None and (not _is_finite_real(instrument_sigma_nm) or instrument_sigma_nm <= 0):
+        raise ValueError("instrument_sigma_nm must be positive and finite when supplied")
+    if instrument_response_matrix is None:
+        raise ValueError("A measured instrument_response_matrix is required; a scalar Gaussian width is not converted into a synthetic response.")
+    response = np.asarray(instrument_response_matrix, dtype=float)
+    if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
+        raise ValueError("instrument_response_matrix must be a finite non-negative measured square matrix with positive column sums")
+    response = response / response.sum(axis=0, keepdims=True)
     if signal_uncertainty is not None:
         uncertainty = _finite_vector(signal_uncertainty, "signal_uncertainty")
         if uncertainty.shape != y.shape or np.any(uncertainty <= 0):
             raise ValueError("signal_uncertainty must be strictly positive and match signal")
     else:
         uncertainty = None
-    # A Gaussian LSF matrix maps true wavelength bins to detector bins.
-    delta = x[:, None] - x[None, :]
-    response = np.exp(-0.5 * (delta / float(instrument_sigma_nm)) ** 2)
-    response /= response.sum(axis=0, keepdims=True)
     from .thomson_inference import analyze_thomson_spectra
     try:
         result = analyze_thomson_spectra(
@@ -95,9 +98,11 @@ def fit_thomson_spectrum(
         raise
     intrinsic_sigma = float(result["intrinsic_sigma_nm"])
     intrinsic_uncertainty = float(np.sqrt(max(float(np.asarray(result["fit_covariance"])[2, 2]), 0.0)))
-    if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0 or intrinsic_sigma <= intrinsic_uncertainty:
-        raise ValueError("Fitted physical width is not resolved: it is not larger than the instrumental width uncertainty at the available spectral resolution.")
-    fitted_sigma = float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2))
+    if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0:
+        raise ValueError("Fitted physical width is not positive and finite.")
+    if instrument_sigma_nm is not None and intrinsic_sigma <= intrinsic_uncertainty:
+        raise ValueError("Fitted physical width is not resolved relative to its fit uncertainty.")
+    fitted_sigma = (float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2)) if instrument_sigma_nm is not None else intrinsic_sigma)
     residual = np.asarray(result["residual"], dtype=float)
     dof = max(1, y.size - 5)
     reduced_chi_square = result.get("fit_reduced_chi_square")
@@ -126,8 +131,8 @@ def fit_thomson_spectrum(
         "spectral_power_density_calibrated": bool(spectral_power_density_calibrated),
         "integrated_scattered_power_W": result.get("integrated_scattered_power_W"),
         "integrated_scattered_power_uncertainty_W": result.get("integrated_scattered_power_uncertainty_W"),
-        "model": "Canonical Thomson inference: non-collective Maxwellian convolved with a Gaussian response matrix",
-        "assumptions": result["assumptions"] + ["Gaussian instrumental line-spread function represented on the measured wavelength grid"],
+        "model": "Canonical Thomson inference: non-collective Maxwellian convolved with the supplied measured response matrix",
+        "assumptions": result["assumptions"] + ["Measured instrument-response matrix supplied by the caller; no synthetic Gaussian response is generated"],
         "limitations": [
             "Does not infer electron density from spectral shape; all fitting and physical inference are delegated to Analysis 1's canonical engine.",
             "Absolute electron density still requires separately calibrated optical power and geometry.",
