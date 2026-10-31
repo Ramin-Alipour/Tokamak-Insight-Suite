@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_ui_catalogue_is_loaded_from_canonical_diagnostic_registry():
     rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(DIAGNOSTICS) == 80
+    assert len(DIAGNOSTICS) == 79
     assert DIAGNOSTICS == rows
     assert all("execution_contract" in row for row in DIAGNOSTICS)
 
@@ -32,11 +32,11 @@ def test_package_and_runtime_versions_are_consistent():
     assert version_line.split("=", 1)[1].strip().strip('"') == __version__
 
 
-def test_analysis_titles_numbers_and_order_match_canonical_80_diagnostic_catalog():
+def test_analysis_titles_numbers_and_order_match_canonical_79_diagnostic_catalog():
     from tokamak_analysis.analysis_registry import ANALYSES
 
     expected = [row["diagnostic"] for row in DIAGNOSTICS]
-    assert [row["id"] for row in ANALYSES] == list(range(1, 81))
+    assert [row["id"] for row in ANALYSES] == [entry_id for entry_id in range(1, 81) if entry_id != 7]
     assert [row["name"] for row in ANALYSES] == expected
     assert [row["diagnostic"] for row in DIAGNOSTICS] == expected
 
@@ -44,7 +44,7 @@ def test_analysis_titles_numbers_and_order_match_canonical_80_diagnostic_catalog
 def test_all_analysis_entry_points_declare_conservative_contracts():
     import importlib
     from tokamak_analysis.analysis_registry import ANALYSES
-    assert len(ANALYSES) == 80
+    assert len(ANALYSES) == 79
     for entry in ANALYSES:
         contract = entry["execution_contract"]
         assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
@@ -60,7 +60,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
             module_name, function_name = link.rsplit(".", 1)
             assert callable(getattr(importlib.import_module(module_name), function_name, None)), link
         if entry["name"].casefold() == "thomson scattering":
-            assert len(contract["function_links"]) == 4
+            assert len(contract["function_links"]) == 2
 
 
 def test_thomson_registry_links_resolve_to_real_callables():
@@ -68,7 +68,7 @@ def test_thomson_registry_links_resolve_to_real_callables():
 
     thomson = next(row for row in DIAGNOSTICS if row["diagnostic"].casefold() == "thomson scattering")
     links = thomson["implementation_functions"]
-    assert len(links) == 4
+    assert len(links) == 2
     for link in links:
         module_name, function_name = link.rsplit(".", 1)
         module = importlib.import_module(module_name)
@@ -80,9 +80,9 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
 
     levels = Counter(row["execution_contract"]["execution_level"] for row in DIAGNOSTICS)
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
-    assert len(DIAGNOSTICS) == 80
-    assert levels == {"reference_only": 47, "limited_calculation": 18, "analysis_pipeline": 15}
-    assert completeness == {"incomplete": 63, "complete": 6, "complete_with_declared_scope": 11}
+    assert len(DIAGNOSTICS) == 79
+    assert levels == {"reference_only": 47, "limited_calculation": 16, "analysis_pipeline": 16}
+    assert completeness == {"incomplete": 62, "complete": 6, "complete_with_declared_scope": 11}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.
@@ -156,16 +156,16 @@ def test_thomson_spatial_reconstruction_is_in_analysis_contract():
     assert callable(module.reconstruct_thomson_profile)
 
 
-def test_primary_analysis_registry_groups_all_80_entry_points_into_20_families():
+def test_primary_analysis_registry_groups_all_79_registered_entry_points_into_20_families():
     from tokamak_analysis.analysis_registry import ANALYSIS_FAMILIES, get_analysis_family, get_family_entry_points
 
     assert len(ANALYSIS_FAMILIES) == 20
     assert [family["id"] for family in ANALYSIS_FAMILIES] == list(range(1, 21))
     mapped_ids = [entry_id for family in ANALYSIS_FAMILIES for entry_id in family["entry_ids"]]
-    assert sorted(mapped_ids) == list(range(1, 81))
-    assert len(set(mapped_ids)) == 80
+    assert sorted(mapped_ids) == [entry_id for entry_id in range(1, 81) if entry_id != 7]
+    assert len(set(mapped_ids)) == 79
     thomson = get_analysis_family(1)
-    assert {1, 7, 30, 46} <= set(thomson["entry_ids"])
+    assert {1, 30, 46} == set(thomson["entry_ids"])
     support = get_analysis_family(20)
     assert support["category"] == "instrumentation_support"
     assert set(support["entry_ids"]) == {26, 27, 77, 78, 79, 80}
@@ -179,7 +179,6 @@ def test_thomson_family_callable_contracts_match_canonical_diagnostic_registry()
     analysis_by_name = {row["name"]: row for row in ANALYSES}
     for name in (
         "Thomson scattering",
-        "Thomson spectral distribution analysis",
         "Collective Thomson / coherent scattering (CTS)",
         "Thomson spatial profile reconstruction",
     ):
