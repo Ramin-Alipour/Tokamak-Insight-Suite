@@ -460,6 +460,14 @@ def reconstruct_thomson_profile_from_spectra(
                 [f"channel_{i}_kappa_index" for i in range(n_channels)],
                 kappa_covariance,
             )
+        elif joint_summary.get("total_kappa_parameter_covariance") is not None:
+            kappa_covariance = np.asarray(
+                joint_summary["total_kappa_parameter_covariance"], dtype=float
+            )
+        elif joint_summary.get("kappa_parameter_covariance") is not None:
+            kappa_covariance = np.asarray(
+                joint_summary["kappa_parameter_covariance"], dtype=float
+            )
         candidates.append((
             "electron_kappa_index", None, None, kappa_covariance, False,
         ))
