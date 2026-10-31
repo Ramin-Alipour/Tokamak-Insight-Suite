@@ -235,13 +235,17 @@ def test_collective_kappa_external_parameter_mc_propagates_kappa_covariance(monk
     result = inference.analyze_thomson_spectra(
         wavelength, signal[None, :], [0.1],
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
-        instrument_response=np.eye(wavelength.size), model="collective_kappa",
+        instrument_response=np.eye(wavelength.size),
+        instrument_response_uncertainty=np.zeros((wavelength.size, wavelength.size)),
+        model="collective_kappa",
         incident_direction=[1.0, 0.0, 0.0],
         scattered_direction=[0.0, 1.0, 0.0],
         ion_species=["D+"], ion_fractions=[1.0],
         ion_temperature_eV=[20.0], ion_temperature_uncertainty_eV=[1.0],
         ion_velocity_m_s=[[0.0, 0.0, 0.0]],
         electron_velocity_m_s=[0.0, 0.0, 0.0],
+        laser_wavelength_uncertainty_nm=0.01,
+        scattering_angle_uncertainty_rad=1.0e-4,
         collective_initial_density_m3=4.0e18,
         collective_initial_temperature_eV=160.0,
         collective_kappa_initial=4.0,
@@ -250,6 +254,9 @@ def test_collective_kappa_external_parameter_mc_propagates_kappa_covariance(monk
     assert result["collective_external_parameter_covariance"].shape == (5, 5)
     assert "channel_0_kappa_index" in result["collective_external_parameter_covariance_order"]
     assert result["channels"][0]["collective_external_parameter_uncertainty_propagated"] is True
+    assert result["channels"][0]["instrument_response_uncertainty_propagated"] is True
+    assert not any("not_implemented_for_collective_kappa" in item
+                   for item in result["channels"][0]["uncertainty_inputs_missing"])
 
 
 def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
