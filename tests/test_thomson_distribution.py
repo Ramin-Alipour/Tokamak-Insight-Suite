@@ -266,6 +266,7 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
     with pytest.raises(ValueError, match="not both"):
         analyze_thomson_spectral_distribution(
             x, y, instrument_response_matrix=np.eye(x.size),
+            background_signal=12.0 + 0.8 * (x - 500.0),
             signal_uncertainty=np.ones(x.size),
             signal_covariance=np.eye(x.size),
         )
@@ -273,6 +274,7 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
     with pytest.raises(ValueError, match="positive definite"):
         analyze_thomson_spectral_distribution(
             x, y, instrument_response_matrix=np.eye(x.size),
+            background_signal=12.0 + 0.8 * (x - 500.0),
             signal_covariance=singular,
         )
 
