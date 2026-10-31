@@ -624,8 +624,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
 from .cts_full_em import full_em_cts_spectral_density, analyze_full_em_cts_spectrum
 
 
-def analyze_cts_spectrum_model(model="electrostatic", **kwargs):
+def analyze_cts_spectrum_model(model=None, **kwargs):
     """Explicit dispatcher for the independent electrostatic and magnetized full-EM CTS inversions."""
+    if model is None:
+        raise ValueError("Select model='electrostatic' or model='full_electromagnetic' explicitly; no default model is selected.")
     if model == "electrostatic":
         return analyze_cts_spectrum(**kwargs)
     if model == "full_electromagnetic":
