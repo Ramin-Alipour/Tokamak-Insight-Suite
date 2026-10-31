@@ -618,3 +618,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["response_uncertainty_propagated"]=False
         out["external_parameter_uncertainty_propagated"]=False
     return out
+
+
+# Separate magnetized electromagnetic CTS path; the electrostatic API remains unchanged.
+from .cts_full_em import full_em_cts_spectral_density
