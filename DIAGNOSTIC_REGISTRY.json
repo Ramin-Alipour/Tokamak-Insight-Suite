@@ -171,6 +171,24 @@
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
           "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+        },
+        {
+          "name": "incident_direction_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ direction uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; mutually exclusive with scalar scattering_angle_uncertainty_rad."
+        },
+        {
+          "name": "scattered_direction_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ direction uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; mutually exclusive with scalar scattering_angle_uncertainty_rad."
+        },
+        {
+          "name": "incident_polarization_uncertainty",
+          "unit": "non-negative 3-vector; component-wise 1σ polarization uncertainty",
+          "required": false,
+          "description": "Relativistic Maxwell-Juttner only; polarization is reprojected transverse to each sampled incident direction."
         }
       ],
       "output_specs": [
@@ -239,6 +257,21 @@
         {
           "name": "captured_spectral_probability",
           "unit": "dimensionless; fraction of quadrature spectrum inside the supplied wavelength range"
+        },
+        {
+          "name": "shared_instrument_response_parameter_covariance",
+          "unit": "covariance of channel-major temperature, flow projection and integrated spectral power",
+          "required": false
+        },
+        {
+          "name": "shared_instrument_response_parameter_covariance_order",
+          "unit": "ordered parameter-name vector",
+          "required": false
+        },
+        {
+          "name": "shared_instrument_response_cross_channel_covariance_available",
+          "unit": "boolean",
+          "required": true
         }
       ],
       "assumptions": [
@@ -290,7 +323,8 @@
             "electron_density_profile_m3 where identifiable",
             "electron_velocity_projection_profile_m_s",
             "kappa_index_profile where applicable",
-            "per-channel fit diagnostics and covariance"
+            "per-channel fit diagnostics and covariance",
+            "shared instrument-response cross-channel parameter covariance where available"
           ],
           "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
         }
