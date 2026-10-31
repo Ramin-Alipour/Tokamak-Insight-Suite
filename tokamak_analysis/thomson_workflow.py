@@ -245,8 +245,6 @@ def reconstruct_thomson_profile_from_spectra(
     flow_covariance = covariance_for(flow_labels, flow_covariance)
     if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         te_covariance = add_collective_local_fit_covariance(te_covariance, 1)
-        if result.get("model") == "collective_kappa":
-            pass
     if density_covariance is None:
         density_covariance = covariance_for(
             [f"channel_{i}_electron_density_m3" for i in range(n_channels)]
