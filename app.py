@@ -3256,6 +3256,14 @@ elif page=='Advanced Analysis':
                 placeholder='{"kind":"relativistic_maxwell_juttner"}',
                 key='cts_full_electron_distribution_json',
             )
+            if not cts_electron_distribution_json.strip():
+                cts_bindslev_theta_limit=st.text_input(
+                    'Optional researcher-defined Bindslev validity limit θₑ = Tₑ/(mₑc²) (dimensionless, 0 < limit < 1)',
+                    value='', key='cts_full_bindslev_theta_limit',
+                )
+                st.caption('If blank, the result is explicitly marked not quantitatively screened; if supplied, fitted θₑ above this limit is rejected. No universal cutoff is imposed.')
+            else:
+                cts_bindslev_theta_limit=''
             cts_fast_ions_json=st.text_area(
                 'Optional relativistic fast-ion populations JSON',
                 placeholder='[{"name":"fast D+","charge_state":1,"mass_amu":2.014,"density_m3":1e17,"flow_velocity_m_s":[0,0,0],"distribution":{"kind":"relativistic_bigaussian","temperature_perpendicular_eV":2e5,"temperature_parallel_eV":1e5}}]',
@@ -3332,6 +3340,11 @@ elif page=='Advanced Analysis':
                     }
                     if cts_damping.strip():
                         kwargs_cts['damping_rate_rad_s']=float(cts_damping)
+                    if cts_bindslev_theta_limit.strip():
+                        kwargs_cts['bindslev_validity_theta_e_limit']=_parse_ts_scalar(
+                            cts_bindslev_theta_limit,'Bindslev theta_e validity limit',
+                            minimum=1e-12,maximum=0.999999,
+                        )
                     result_cts=analyze_cts_spectrum_model(model='full_electromagnetic',**kwargs_cts)
                     st.success('Magnetized full-EM CTS inversion completed within the declared model scope.')
                     st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
