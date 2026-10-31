@@ -77,16 +77,26 @@ def test_catalog_displays_analysis_contracts_separately_from_reference_entries()
 @pytest.mark.parametrize(
     "workflow",
     [
-        "Thomson multi-channel spectral inference (canonical Analysis 1)",
-        "Thomson spatial profile reconstruction from calibrated spectra",
+        "Thomson multi-channel spectral inference",
+        "Analysis 1 / Spatial-profile reconstruction",
     ],
 )
 def test_thomson_workflow_panels_render_without_streamlit_exceptions(workflow):
     app = _loaded_app()
     app.run()
-    app.radio[0].set_value("Advanced Analysis").run()
-    selector = next(item for item in app.selectbox if item.label == "Select workflow")
-    selector.set_value(workflow).run()
+    workspace = next(item for item in app.radio if item.label == "WORKSPACE")
+    if workflow == "Thomson multi-channel spectral inference":
+        workspace.set_value("Spectral Analysis").run()
+        selector = next(item for item in app.radio if item.label == "Workflow")
+        selector.set_value(workflow).run()
+    else:
+        workspace.set_value("Advanced Analysis").run()
+        selector = next(item for item in app.selectbox if item.label == "Select workflow")
+        selector.set_value(workflow).run()
+        next(
+            item for item in app.button
+            if item.label == "Open Thomson spectral-to-spatial-profile workflow"
+        ).click().run()
     assert not app.exception, (workflow, [str(error.value) for error in app.exception])
 
 
