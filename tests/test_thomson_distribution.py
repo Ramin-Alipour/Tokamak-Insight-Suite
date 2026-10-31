@@ -281,3 +281,20 @@ def test_spectral_distribution_requires_explicit_background_selection():
     x, y = _spectrum()
     with pytest.raises(ValueError, match="Background is not inferred automatically"):
         analyze_thomson_spectral_distribution(x, y, instrument_sigma_nm=0.06)
+
+
+def test_spectral_distribution_rejects_multiple_background_specifications():
+    x, y = _spectrum()
+    mask = np.zeros(x.size, dtype=bool)
+    mask[:20] = True
+    background = np.full_like(y, 12.0)
+    conflicting = [
+        {"background_mask": mask, "background_fraction": 0.1},
+        {"background_signal": background, "background_fraction": 0.1},
+        {"background_signal": background, "background_mask": mask},
+    ]
+    for selection in conflicting:
+        with pytest.raises(ValueError, match="Supply exactly one background specification"):
+            analyze_thomson_spectral_distribution(
+                x, y, instrument_sigma_nm=0.06, **selection
+            )
