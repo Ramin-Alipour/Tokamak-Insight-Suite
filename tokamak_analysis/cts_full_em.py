@@ -1,15 +1,16 @@
-"""Magnetized full-electromagnetic CTS fluctuation solver.
+"""Magnetized full-electromagnetic CTS fluctuation and transfer solver.
 
-Implements a collisionless, non-relativistic, isotropic-Maxwellian kinetic
-current response in a uniform magnetic field.  The response is evaluated by
-a converged gyro-harmonic/velocity-quadrature representation of the linearized
-Vlasov equation; Maxwell's wave operator then screens the independent particle
-current fluctuations.  Density, current, electric-field and magnetic-field
-cross-spectra are retained in one Hermitian covariance matrix.
+Bulk thermal species use the existing non-relativistic Maxwellian magnetized
+Vlasov response. Optional fast-ion populations use a relativistic gyrotropic
+momentum-space response and Klimontovich orbit shot-noise covariance. The
+screened joint density/current/E/B covariance is contracted with the
+low-temperature magnetized Bindslev Gamma/X three-wave source-current tensor.
 
-This is a homogeneous local model.  It does not implement ray tracing, finite
-beam overlap, relativistic or anisotropic fast-ion distributions, or the full
-three-wave coupling corrections of Bindslev (1993, 1996).
+This remains a homogeneous local model: ray tracing and Gaussian beam-overlap
+primitives exist in cts_em_geometry but are not yet integrated into the
+frequency-resolved transfer/inversion. The Bindslev nonlinear vertex remains
+the low-temperature closure; a fully relativistic second-order vertex is not
+claimed.
 """
 from __future__ import annotations
 
@@ -212,8 +213,6 @@ def full_em_cts_spectral_density(
             species.append({
                 "name": name, "density": density, "temperature": 1.0,
                 "mass": mass_amu * AMU, "charge": charge_state * E_CHARGE,
-                "flow": _finite_vec3(population.get("flow_velocity_m_s", [0, 0, 0]),
-                                     f"fast_ion_populations[{index}].flow_velocity_m_s"),
                 "distribution": distribution, "fast_ion": True,
             })
     ei = np.asarray(incident_polarization, dtype=complex).copy()
