@@ -38,6 +38,48 @@ from tis.core import (load_table, signal_quality, sha256_bytes,
     exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
     equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
 
+from tis.core import (load_table, signal_quality, sha256_bytes,
+    prepare_time_series, butterworth_filter, fft_spectrum, welch_psd, cross_analysis, cross_correlation_lag,
+    fit_spectral_line, doppler_temperature_eV, doppler_temperature_with_uncertainty_eV, doppler_velocity_with_uncertainty_m_s, doppler_velocity_m_s, derive_parameters,
+    uncertainty_linear, grid_from_table, regularized_tomography, select_tikhonov_lambda, doppler_temperature_from_fwhm_eV, probe_iv_summary,
+    linear_phase_density, langmuir_iv_analysis, suggest_langmuir_fit_windows, mode_number_from_phase, mode_number_from_channels, fluctuation_flux,
+    exponential_heat_flux_fit, eich_heat_flux_fit, integrate_profile, spectrum_moments, neutron_rate_from_counts,
+    equilibrium_grid_derivatives, xray_spectrum_summary, abel_reconstruction, axisymmetric_radiated_power, profile_gradient_analysis, triple_probe_temperature_eV, integrate_time_series, reflectometry_cutoff_density, electron_cyclotron_resonance_field, corrected_line_ratio, time_frequency_spectrogram, autocorrelation_analysis)
+
+def _parse_ts_vector(raw, label):
+    """Parse a real three-component vector for Thomson/CTS UI workflows."""
+    try:
+        values = np.asarray([float(value.strip()) for value in str(raw).split(",") if value.strip()], dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be three comma-separated numeric components.") from exc
+    if values.shape != (3,) or not np.all(np.isfinite(values)):
+        raise ValueError(f"{label} must contain exactly three finite components.")
+    return values
+
+
+def _parse_ts_float_list(raw, label):
+    try:
+        values = np.asarray([float(value.strip()) for value in str(raw).split(",") if value.strip()], dtype=float)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be comma-separated numeric values.") from exc
+    if values.size == 0 or not np.all(np.isfinite(values)):
+        raise ValueError(f"{label} must contain finite numeric values.")
+    return values
+
+
+def _parse_ts_scalar(raw, label, minimum=None, maximum=None):
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{label} must be supplied as a numeric value.") from exc
+    if not np.isfinite(value) or (minimum is not None and value < minimum) or (maximum is not None and value > maximum):
+        raise ValueError(f"{label} is outside its permitted finite range.")
+    return value
+
+
+def _parse_ts_optional_scalar(raw, label):
+    return None if raw is None or not str(raw).strip() else _parse_ts_scalar(raw, label, minimum=0.0)
+
 st.set_page_config(page_title='Tokamak Insight Suite', page_icon='⚛️', layout='wide', initial_sidebar_state='expanded')
 st.markdown('''<style>
 :root{--navy:#07182b;--panel:#0b2138;--panel2:#102b46;--blue:#168bff;--line:#204463;--text:#e6f1ff;}
@@ -917,32 +959,6 @@ elif page=='Spectral Analysis':
                     joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
                     st.caption('A density covariance file is a complete uncertainty model for its factors. Do not also enter scalar optical uncertainties or joint spectral covariance. The full cross-channel matrix also cannot be combined with response-matrix uncertainty.')
                 density_kwargs={}
-            def _parse_ts_vector(raw,label):
-                try:
-                    values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
-                except ValueError as exc:
-                    raise ValueError(f'{label} must be three comma-separated numeric components.') from exc
-                if values.shape!=(3,) or not np.all(np.isfinite(values)):
-                    raise ValueError(f'{label} must contain exactly three finite components.')
-                return values
-            def _parse_ts_float_list(raw,label):
-                try:
-                    values=np.asarray([float(v.strip()) for v in raw.split(',') if v.strip()],dtype=float)
-                except ValueError as exc:
-                    raise ValueError(f'{label} must be comma-separated numeric values.') from exc
-                if values.size==0 or not np.all(np.isfinite(values)):
-                    raise ValueError(f'{label} must contain finite numeric values.')
-                return values
-            def _parse_ts_scalar(raw,label,minimum=None,maximum=None):
-                try:
-                    value=float(raw)
-                except (TypeError,ValueError) as exc:
-                    raise ValueError(f'{label} must be supplied as a numeric value.') from exc
-                if not np.isfinite(value) or (minimum is not None and value<minimum) or (maximum is not None and value>maximum):
-                    raise ValueError(f'{label} is outside its permitted finite range.')
-                return value
-            def _parse_ts_optional_scalar(raw,label):
-                return None if raw is None or not str(raw).strip() else _parse_ts_scalar(raw,label,minimum=0.0)
             if st.button('Infer Thomson plasma parameters from measured spectra',type='primary',key='ts_infer_run'):
                 st.session_state.pop('tis_thomson_spectral_inference',None)
                 try:
