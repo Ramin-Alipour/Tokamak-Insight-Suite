@@ -3070,9 +3070,11 @@ elif page=='Advanced Analysis':
         st.markdown('Infer plasma and ion parameters from a calibrated microwave CTS frequency-shift spectrum.')
         cts_model=st.selectbox('CTS physical forward model',[
             'electrostatic','full_electromagnetic'
-        ],format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else 'Magnetized full-electromagnetic CTS',key='cts_physical_model')
+        ],index=None,placeholder='Select a CTS physical model',format_func=lambda v: 'Unmagnetized electrostatic longitudinal CTS' if v=='electrostatic' else 'Magnetized full-electromagnetic CTS',key='cts_physical_model')
         if df is None or len(numeric)<2:
             st.info('Load a table with calibrated frequency-shift and spectral-power columns.')
+        elif cts_model is None:
+            st.info('Select the CTS physical model explicitly. No model is selected automatically.')
         elif cts_model=='electrostatic':
             st.caption('This workflow uses the unmagnetized electrostatic longitudinal dielectric model. Electron flow is explicit; one common ion temperature and projected ion flow are fitted across supplied background species.')
             c1,c2=st.columns(2)
