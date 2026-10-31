@@ -11,7 +11,7 @@ def test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite():
     wavelength = np.linspace(800.0, 1328.0, 801)
     result = relativistic_maxwell_juttner_spectrum(
         wavelength, 1064.0, np.pi/2.0, 500.0,
-        flow_projection_m_s=1.0e6,
+        flow_projection_m_s=1.0e6, incident_polarization=[0.0, 0.0, 1.0],
         radial_order=16, angular_order=8,
     )
     spectrum = result["spectral_density_per_nm"]
@@ -67,7 +67,7 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
     scattered = np.array([np.sin(angle/2), np.cos(angle/2), 0.0])
     forward = relativistic_maxwell_juttner_spectrum(
         wavelength, laser, angle, 500.0,
-        flow_projection_m_s=2.0e4,
+        flow_projection_m_s=2.0e4, incident_polarization=[0.0, 0.0, 1.0],
         radial_order=16, angular_order=8,
     )
     signal = 2.0e4*forward["spectral_density_per_nm"] + 10.0 + 0.001*(wavelength-laser)
@@ -75,6 +75,7 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
         wavelength, signal, laser, angle, np.eye(wavelength.size),
         np.full(wavelength.size, 1.0),
         incident_direction=incident, scattered_direction=scattered,
+        incident_polarization=[0.0, 0.0, 1.0],
         radial_order=16, angular_order=8,
     )
     assert result["electron_temperature_eV"] == pytest.approx(500.0, rel=0.15)
