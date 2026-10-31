@@ -1328,6 +1328,28 @@ def analyze_thomson_spectra(
         valid_draws = np.all(np.isfinite(aligned_draws), axis=1)
         if np.count_nonzero(valid_draws) >= 2:
             shared_lsf_covariance = np.cov(aligned_draws[valid_draws], rowvar=False, ddof=1)
+    shared_response_density_covariance = None
+    if shared_lsf_covariance is not None:
+        channel_count = len(results)
+        area_indices = np.asarray([3 * channel + 2 for channel in range(channel_count)], dtype=int)
+        area_covariance = shared_lsf_covariance[np.ix_(area_indices, area_indices)]
+        density_values = np.asarray([
+            np.nan if item.get("electron_density_m3") is None else item["electron_density_m3"]
+            for item in results
+        ], dtype=float)
+        area_values = np.asarray([
+            item.get("integrated_scattered_power_W", np.nan) for item in results
+        ], dtype=float)
+        shared_response_density_covariance = np.full(
+            (channel_count, channel_count), np.nan, dtype=float
+        )
+        valid_density = np.isfinite(density_values) & np.isfinite(area_values) & (area_values != 0.0)
+        if np.any(valid_density):
+            scale = density_values[valid_density] / area_values[valid_density]
+            shared_response_density_covariance[np.ix_(valid_density, valid_density)] = (
+                np.outer(scale, scale)
+                * area_covariance[np.ix_(valid_density, valid_density)]
+            )
     for item in results:
         item.pop("_shared_lsf_temperature_draws", None)
         item.pop("_shared_lsf_velocity_draws", None)
@@ -1630,6 +1652,7 @@ def analyze_thomson_spectra(
         "electron_density_profile_m3": np.array([r.get("electron_density_m3", np.nan) if r.get("electron_density_m3") is not None else np.nan for r in results]),
         "electron_density_uncertainty_profile_m3": np.array([r.get("electron_density_uncertainty_m3", np.nan) if r.get("electron_density_uncertainty_m3") is not None else np.nan for r in results]),
         "electron_density_joint_covariance_m6": density_joint_covariance_output,
+        "electron_density_shared_response_covariance_m6": shared_response_density_covariance,
         "electron_density_external_parameter_covariance_m6": None,
         "electron_density_cross_channel_covariance_available": density_cross_channel_covariance_available,
         "shared_instrument_response_parameter_covariance": shared_lsf_covariance,
