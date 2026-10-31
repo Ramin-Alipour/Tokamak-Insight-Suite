@@ -340,3 +340,143 @@ def full_em_cts_spectral_density(
             "Classical fluctuation-dissipation source assumes local thermodynamic equilibrium for each species."
         ],
     }
+
+
+
+def analyze_full_em_cts_spectrum(
+    frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
+    scattering_geometry, electron_density_initial_m3,
+    electron_temperature_initial_eV, ion_temperature_initial_eV,
+    ion_species, ion_fractions, magnetic_field_T,
+    electron_flow_velocity_m_s, ion_flow_velocity_m_s,
+    incident_polarization, scattered_polarization,
+    instrument_response, signal_uncertainty=None, spectral_covariance=None,
+    parameter_bounds=None, harmonic_order=8, quadrature_order=12,
+    damping_rate_rad_s=None,
+):
+    """Fit n_e, T_e and common T_i using the magnetized full-EM forward model.
+
+    The instrument amplitude and constant background are profiled as nuisance
+    parameters. Flow vectors, composition, magnetic field, geometry and mode
+    polarizations remain explicit external inputs.
+    """
+    from scipy.optimize import least_squares
+
+    f = np.asarray(frequency_shift_Hz, dtype=float)
+    y = np.asarray(measured_spectrum, dtype=float)
+    if f.ndim != 1 or y.shape != f.shape or f.size < 8:
+        raise ValueError("frequency_shift_Hz and measured_spectrum must be matching vectors with >=8 bins")
+    if np.any(~np.isfinite(f)) or np.any(~np.isfinite(y)) or np.any(np.diff(f) <= 0) or np.any(y < 0):
+        raise ValueError("frequency axis must increase; measured spectrum must be finite and non-negative")
+    response = np.asarray(instrument_response, dtype=float)
+    if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
+        raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
+    response = response / response.sum(axis=0, keepdims=True)
+    if signal_uncertainty is not None and spectral_covariance is not None:
+        raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
+    if spectral_covariance is not None:
+        cov_y = np.asarray(spectral_covariance, dtype=float)
+        if cov_y.shape != (f.size, f.size) or np.any(~np.isfinite(cov_y)) or not np.allclose(cov_y, cov_y.T):
+            raise ValueError("spectral_covariance must be a finite symmetric square matrix")
+        try:
+            chol = np.linalg.cholesky(cov_y)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
+        whiten = lambda value: np.linalg.solve(chol, value)
+    elif signal_uncertainty is not None:
+        unc = np.asarray(signal_uncertainty, dtype=float)
+        if unc.shape != f.shape or np.any(~np.isfinite(unc)) or np.any(unc <= 0):
+            raise ValueError("signal_uncertainty must be positive and match measured_spectrum")
+        whiten = lambda value: value / unc
+    else:
+        raise ValueError("signal_uncertainty or spectral_covariance is required for full-EM inversion")
+    bounds = parameter_bounds or {}
+    defaults = {
+        "electron_density_m3": (1e17, 1e22),
+        "electron_temperature_eV": (10.0, 2e4),
+        "ion_temperature_eV": (1.0, 1e4),
+    }
+    names = tuple(defaults)
+    initial = np.array([
+        _positive(electron_density_initial_m3, "electron_density_initial_m3"),
+        _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV"),
+        _positive(ion_temperature_initial_eV, "ion_temperature_initial_eV"),
+    ])
+    limits = np.array([bounds.get(name, defaults[name]) for name in names], dtype=float)
+    if limits.shape != (3, 2) or np.any(~np.isfinite(limits)) or np.any(limits[:, 0] <= 0) or np.any(limits[:, 0] >= limits[:, 1]):
+        raise ValueError("parameter_bounds must contain positive increasing pairs for density and temperatures")
+    if np.any(initial <= limits[:, 0]) or np.any(initial >= limits[:, 1]):
+        raise ValueError("initial density and temperatures must lie strictly inside parameter_bounds")
+    lower, upper = np.log10(limits[:, 0]), np.log10(limits[:, 1])
+    p0 = np.log10(initial)
+
+    def model(p):
+        result = full_em_cts_spectral_density(
+            f, probe_frequency_Hz, scattering_geometry,
+            electron_density_m3=10.0**p[0],
+            electron_temperature_eV=10.0**p[1],
+            ion_temperature_eV=10.0**p[2],
+            ion_species=ion_species, ion_fractions=ion_fractions,
+            magnetic_field_T=magnetic_field_T,
+            electron_flow_velocity_m_s=electron_flow_velocity_m_s,
+            ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+            incident_polarization=incident_polarization,
+            scattered_polarization=scattered_polarization,
+            harmonic_order=harmonic_order, quadrature_order=quadrature_order,
+            damping_rate_rad_s=damping_rate_rad_s,
+        )["spectral_density"]
+        widths = np.empty_like(f)
+        widths[0] = 0.5 * (f[1] - f[0])
+        widths[-1] = 0.5 * (f[-1] - f[-2])
+        widths[1:-1] = 0.5 * (f[2:] - f[:-2])
+        return (response @ (result * widths)) / widths
+
+    def residual(p, return_profile=False):
+        z = model(p)
+        design = whiten(np.column_stack((z, np.ones_like(z))))
+        target = whiten(y)
+        amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
+        if amplitude < 0:
+            amplitude = 0.0
+            one = whiten(np.ones_like(y))
+            offset = float(one @ target / (one @ one))
+        r = whiten(amplitude * z + offset - y)
+        return (r, amplitude, offset, z) if return_profile else r
+
+    fit = least_squares(residual, p0, bounds=(lower, upper), x_scale="jac", max_nfev=1200)
+    if not fit.success:
+        raise ValueError(f"full-EM CTS inversion failed: {fit.message}")
+    rank = int(np.linalg.matrix_rank(fit.jac))
+    condition = float(np.linalg.cond(fit.jac))
+    if rank < 3 or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError("full-EM CTS fit rejected: density and temperatures are not jointly identifiable")
+    r, amplitude, offset, convolved = residual(fit.x, return_profile=True)
+    dof = max(1, f.size - 5)
+    covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
+    if spectral_covariance is None and signal_uncertainty is None:
+        covariance_log *= float(r @ r / dof)
+    values = 10.0**fit.x
+    transform = np.diag(np.log(10.0) * values)
+    covariance = transform @ covariance_log @ transform.T
+    return {
+        "electron_density_m3": float(values[0]),
+        "electron_temperature_eV": float(values[1]),
+        "ion_temperature_eV": float(values[2]),
+        "parameter_names": list(names),
+        "fit_covariance": covariance,
+        "parameter_uncertainties": np.sqrt(np.maximum(np.diag(covariance), 0.0)),
+        "fitted_spectrum": amplitude * convolved + offset,
+        "residual": y - (amplitude * convolved + offset),
+        "profiled_amplitude": float(amplitude),
+        "profiled_offset": float(offset),
+        "reduced_chi_square": float(r @ r / dof),
+        "jacobian_rank": rank,
+        "jacobian_condition_number": condition,
+        "optimizer_success": bool(fit.success),
+        "model": "magnetized full-electromagnetic kinetic CTS (local Maxwellian, non-relativistic)",
+        "external_inputs_fixed": [
+            "magnetic_field_T", "electron_flow_velocity_m_s", "ion_flow_velocity_m_s",
+            "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
+        ],
+        "inversion_scope": "electron density, electron temperature and one common ion temperature; flow vectors and composition are not fitted",
+    }
