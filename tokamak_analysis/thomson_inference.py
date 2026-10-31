@@ -1098,6 +1098,16 @@ def analyze_thomson_spectra(
                 "polarization_factor_uncertainty": (None if density_relative_covariance is not None or joint_density_covariance is not None else _channel_value(polarization_factor_uncertainty, i, y.shape[0], "polarization_factor_uncertainty")),
                 "relative_input_covariance": relative_input_covariance,
             }
+            if model == "non_collective_relativistic_maxwell_juttner":
+                density_inputs.update({
+                    "effective_differential_cross_section_m2_sr": fit["effective_differential_cross_section_m2_sr"],
+                    "effective_differential_cross_section_uncertainty_m2_sr": fit.get("effective_differential_cross_section_uncertainty_m2_sr"),
+                    "scattering_angle_uncertainty_rad": None,
+                    "incident_polarization_vector": None,
+                    "incident_direction_vector": None,
+                    "scattered_direction_vector": None,
+                    "polarization_factor_uncertainty": None,
+                })
             density_result = density_from_thomson_scattered_power(**density_inputs)
             fit["electron_density_m3"] = density_result["electron_density_m3"]
             fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
@@ -1107,8 +1117,15 @@ def analyze_thomson_spectra(
             fit["scattering_angle_relative_sensitivity"] = density_result.get(
                 "scattering_angle_relative_sensitivity"
             )
-            fit["density_method"] = "absolute integrated Thomson power using shared polarization-aware density inversion"
+            fit["density_method"] = (
+                "absolute integrated relativistic Thomson power using distribution-averaged effective cross-section"
+                if model == "non_collective_relativistic_maxwell_juttner"
+                else "absolute integrated Thomson power using shared polarization-aware density inversion"
+            )
             fit["density_uncertainty_model"] = density_result["uncertainty_model"]
+            if model == "non_collective_relativistic_maxwell_juttner":
+                fit["differential_cross_section_m2_sr"] = density_result["differential_cross_section_m2_sr"]
+                fit["differential_cross_section_uncertainty_m2_sr"] = fit.get("effective_differential_cross_section_uncertainty_m2_sr")
             if density_inputs.get("relative_input_covariance") is not None:
                 fit["integrated_scattered_power_fit_uncertainty_W"] = float(
                     fit.get("integrated_scattered_power_fit_uncertainty_W", area_sigma)
@@ -1162,7 +1179,7 @@ def analyze_thomson_spectra(
             # realization for every channel. Reuse the same random stream and
             # retain failed draw slots so cross-channel samples stay aligned.
             rng = np.random.default_rng(7319 if lsf_unc.ndim == 2 else 7319 + i)
-            te_samples, velocity_samples, area_samples = [], [], []
+            te_samples, velocity_samples, area_samples, cross_section_samples = [], [], [], []
             for _ in range(int(instrument_response_mc_samples)):
                 sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
@@ -1170,6 +1187,7 @@ def analyze_thomson_spectra(
                     te_samples.append(np.nan)
                     velocity_samples.append(np.nan)
                     area_samples.append(np.nan)
+                    cross_section_samples.append(np.nan)
                     continue
                 sampled /= colsum[None, :]
                 try:
@@ -1189,17 +1207,22 @@ def analyze_thomson_spectra(
                     area_samples.append(float(draw["integrated_scattered_power_W"])
                                         if "integrated_scattered_power_W" in draw
                                         and np.isfinite(draw["integrated_scattered_power_W"]) else np.nan)
+                    cross_section_samples.append(float(draw["effective_differential_cross_section_m2_sr"])
+                                                  if "effective_differential_cross_section_m2_sr" in draw else np.nan)
                 except (ValueError, RuntimeError):
                     te_samples.append(np.nan)
                     velocity_samples.append(np.nan)
                     area_samples.append(np.nan)
+                    cross_section_samples.append(np.nan)
             required_successes = max(8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples)))
             te_valid = np.asarray(te_samples, dtype=float)
             velocity_valid = np.asarray(velocity_samples, dtype=float)
             area_valid = np.asarray(area_samples, dtype=float)
+            cross_section_valid = np.asarray(cross_section_samples, dtype=float)
             te_valid = te_valid[np.isfinite(te_valid)]
             velocity_valid = velocity_valid[np.isfinite(velocity_valid)]
             area_valid = area_valid[np.isfinite(area_valid)]
+            cross_section_valid = cross_section_valid[np.isfinite(cross_section_valid)]
             if te_valid.size >= required_successes:
                 fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
                     fit["electron_temperature_uncertainty_eV"], np.std(te_valid, ddof=1)))
@@ -1209,10 +1232,19 @@ def analyze_thomson_spectra(
                 fit["instrument_response_mc_successful_samples"] = int(te_valid.size)
                 fit["instrument_response_temperature_uncertainty_eV"] = float(np.std(te_valid, ddof=1))
                 fit["instrument_response_velocity_uncertainty_m_s"] = float(np.std(velocity_valid, ddof=1))
+                if model == "non_collective_relativistic_maxwell_juttner" and cross_section_valid.size >= required_successes:
+                    cross_section_lsf_sigma = float(np.std(cross_section_valid, ddof=1))
+                    fit["effective_differential_cross_section_uncertainty_m2_sr"] = float(np.hypot(
+                        fit.get("effective_differential_cross_section_uncertainty_m2_sr") or 0.0,
+                        cross_section_lsf_sigma,
+                    ))
+                    fit["instrument_response_cross_section_uncertainty_m2_sr"] = cross_section_lsf_sigma
                 if lsf_unc.ndim == 2:
                     fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
                     fit["_shared_lsf_velocity_draws"] = np.asarray(velocity_samples, dtype=float)
                     fit["_shared_lsf_area_draws"] = np.asarray(area_samples, dtype=float)
+                    if model == "non_collective_relativistic_maxwell_juttner":
+                        fit["_shared_lsf_cross_section_draws"] = np.asarray(cross_section_samples, dtype=float)
                 fit["integrated_scattered_power_fit_uncertainty_W"] = float(
                     fit.get("integrated_scattered_power_uncertainty_W") or 0.0
                 )
@@ -1230,6 +1262,10 @@ def analyze_thomson_spectra(
                 fit["integrated_scattered_power_lsf_uncertainty_W"] = None
                 fit["instrument_response_uncertainty_warning"] = "Too few valid LSF perturbation fits to estimate its contribution."
         if density_inputs is not None and lsf_unc is not None:
+            if model == "non_collective_relativistic_maxwell_juttner":
+                density_inputs["effective_differential_cross_section_uncertainty_m2_sr"] = fit.get(
+                    "effective_differential_cross_section_uncertainty_m2_sr"
+                )
             if area_valid.size >= required_successes:
                 fit_area_uncertainty = float(
                     fit.get("integrated_scattered_power_fit_uncertainty_W",
@@ -1309,7 +1345,7 @@ def analyze_thomson_spectra(
             incident_direction_unc, scattered_direction_unc, polarization_unc,
         )):
             rng_external = np.random.default_rng(84271 + i)
-            external_te_samples, external_velocity_samples = [], []
+            external_te_samples, external_velocity_samples, external_cross_section_samples = [], [], []
             incident_nominal = np.asarray(probe_vec, dtype=float)
             scattered_nominal = np.asarray(scatter_vec, dtype=float)
             polarization_nominal = np.asarray(
@@ -1373,6 +1409,7 @@ def analyze_thomson_spectra(
                     )
                     external_te_samples.append(float(draw["electron_temperature_eV"]))
                     external_velocity_samples.append(float(draw["electron_velocity_projection_m_s"]))
+                    external_cross_section_samples.append(float(draw["effective_differential_cross_section_m2_sr"]))
                 except (ValueError, RuntimeError):
                     continue
             required_external = max(
@@ -1389,6 +1426,12 @@ def analyze_thomson_spectra(
                 fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
                     fit["electron_velocity_projection_uncertainty_m_s"], velocity_external_sigma
                 ))
+                cross_section_external_sigma = float(np.std(external_cross_section_samples, ddof=1))
+                fit["effective_differential_cross_section_uncertainty_m2_sr"] = float(np.hypot(
+                    fit.get("effective_differential_cross_section_uncertainty_m2_sr") or 0.0,
+                    cross_section_external_sigma,
+                ))
+                fit["relativistic_external_cross_section_uncertainty_m2_sr"] = cross_section_external_sigma
                 fit["relativistic_external_parameter_uncertainty_propagated"] = True
                 fit["relativistic_external_temperature_uncertainty_eV"] = te_external_sigma
                 fit["relativistic_external_velocity_uncertainty_m_s"] = velocity_external_sigma
@@ -1403,6 +1446,14 @@ def analyze_thomson_spectra(
                 fit["uncertainty_completeness"] = (
                     "partial" if fit["uncertainty_inputs_missing"] else "all_supported_inputs_supplied"
                 )
+                if density_inputs is not None:
+                    density_inputs["effective_differential_cross_section_uncertainty_m2_sr"] = fit[
+                        "effective_differential_cross_section_uncertainty_m2_sr"
+                    ]
+                    density_result = density_from_thomson_scattered_power(**density_inputs)
+                    fit["electron_density_m3"] = density_result["electron_density_m3"]
+                    fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
+                    fit["density_uncertainty_model"] = density_result["uncertainty_model"]
             else:
                 fit["relativistic_external_parameter_uncertainty_propagated"] = False
                 fit["uncertainty_inputs_missing"].append(
