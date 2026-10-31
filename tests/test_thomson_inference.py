@@ -249,6 +249,7 @@ def test_collective_kappa_external_parameter_mc_propagates_kappa_covariance(monk
         collective_initial_density_m3=4.0e18,
         collective_initial_temperature_eV=160.0,
         collective_kappa_initial=4.0,
+        collective_external_parameter_mc_samples=20,
     )
     assert result["collective_external_uncertainty_propagated"] is True
     assert result["collective_external_parameter_covariance"].shape == (5, 5)
