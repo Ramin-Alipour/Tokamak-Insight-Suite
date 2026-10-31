@@ -244,6 +244,7 @@ def full_em_cts_spectral_density(
     harmonic_counts = []
     bindslev_operators = []
     bindslev_coefficients = []
+    bindslev_form_factors = []
     for index, shift in enumerate(shifts):
         fs = f0 + shift
         ki = (2.0 * np.pi * f0 / C) * ki_hat
@@ -328,7 +329,7 @@ def full_em_cts_spectral_density(
         # to the joint fluctuation covariance.  The fluctuation covariance
         # above is [delta_n, delta_j, delta_E, delta_B]; Bindslev's Eq. (111)
         # is written in [delta_n, delta_particle_flux, delta_E, delta_B].
-        from .cts_bindslev import bindslev_source_current_operator, bindslev_correlated_transfer_spectrum
+        from .cts_bindslev import (bindslev_source_current_operator, bindslev_correlated_transfer_spectrum, bindslev_dielectric_form_factors)
         from .cts_em_geometry import cold_plasma_dielectric_tensor
         electron_cold = [{
             "density_m3": ne, "charge_C": -E_CHARGE, "mass_kg": ME
@@ -356,14 +357,21 @@ def full_em_cts_spectral_density(
         transfer = bindslev_correlated_transfer_spectrum(
             covariance_n_v_E_B, source["source_current_operator"], es
         )
+        form_factors = bindslev_dielectric_form_factors(
+            source["source_current_operator"], ei, es, ki, ks,
+            omega_i, omega_s, ne,
+        )
         spectra[index] = transfer["received_source_current_spectral_power"]
         bindslev_operators.append(source["source_current_operator"])
+        bindslev_form_factors.append(form_factors["G_alpha_beta"])
         projected = es.conj() @ source["source_current_operator"]
         bindslev_coefficients.append({
-            "G_n": projected[0],
-            "G_v": projected[1:4],
-            "G_E": projected[4:7],
-            "G_B": projected[7:10],
+            "N": projected[0],
+            "U_k": projected[1:4],
+            "E_k": projected[4:7],
+            "B_k": projected[7:10],
+            "normalized_incident_flux_S_i": form_factors["normalized_incident_flux_S_i"],
+            "normalized_scattered_flux_S_s": form_factors["normalized_scattered_flux_S_s"],
             "transfer_contributions": transfer["transfer_contributions"],
         })
         harmonic_counts.append(int(harmonic_order))
@@ -375,6 +383,7 @@ def full_em_cts_spectral_density(
         "wave_tensor": wave_tensors,
         "bindslev_source_current_operator": np.asarray(bindslev_operators),
         "bindslev_coupling_coefficients": bindslev_coefficients,
+        "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
         "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
         "magnetic_field_T": b,
         "fast_ion_populations": fast_ion_populations or [],
