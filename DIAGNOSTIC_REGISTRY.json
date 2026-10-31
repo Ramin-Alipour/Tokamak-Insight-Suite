@@ -326,26 +326,6 @@
           "description": "Collective external-parameter Monte Carlo contribution to cross-channel absolute-density covariance; distinct from per-channel spectral-fit uncertainty."
         },
         {
-          "name": "density_input_covariance_m3_2",
-          "unit": "N x N; m^-6",
-          "description": "Full density input covariance used by the downstream radial profile summary."
-        },
-        {
-          "name": "temperature_input_covariance_eV2",
-          "unit": "N x N; eV^2",
-          "description": "Full temperature input covariance used by the downstream radial profile summary."
-        },
-        {
-          "name": "density_gradient_covariance_m-8",
-          "unit": "N x N; m^-8",
-          "description": "Full covariance of the radial density gradient, propagated from density input covariance."
-        },
-        {
-          "name": "temperature_gradient_covariance_eV2_m-2",
-          "unit": "N x N; eV^2 m^-2",
-          "description": "Full covariance of the radial temperature gradient, propagated from temperature input covariance."
-        },
-        {
           "name": "kappa_index",
           "unit": "dimensionless; inferred for non-collective Kappa and collective Kappa models"
         },
@@ -507,7 +487,8 @@
         "scope": "Foundational relativistic magnetized scattering context; the optical Maxwell-Juttner model here is a separate unmagnetized single-particle Thomson limit."
       }
     ],
-    "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis."
+    "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
+    "calibrated_measurements_to_physics": true
   },
   {
     "family": "Plasma parameters",
@@ -5143,7 +5124,7 @@
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"
     ],
-    "implementation_status": "Complete as a profile-oriented entry point to the canonical measured-spectrum inference engine; it introduces no separate or duplicated physical model.",
+    "implementation_status": "Complete as a profile-oriented output of the canonical measured-spectrum physical inference; no separate profile-point input or duplicated physical model is exposed.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -5454,26 +5435,6 @@
           "description": "Collective external-parameter Monte Carlo contribution to cross-channel absolute-density covariance; distinct from per-channel spectral-fit uncertainty."
         },
         {
-          "name": "density_input_covariance_m3_2",
-          "unit": "N x N; m^-6",
-          "description": "Full density input covariance used by the downstream radial profile summary."
-        },
-        {
-          "name": "temperature_input_covariance_eV2",
-          "unit": "N x N; eV^2",
-          "description": "Full temperature input covariance used by the downstream radial profile summary."
-        },
-        {
-          "name": "density_gradient_covariance_m-8",
-          "unit": "N x N; m^-8",
-          "description": "Full covariance of the radial density gradient, propagated from density input covariance."
-        },
-        {
-          "name": "temperature_gradient_covariance_eV2_m-2",
-          "unit": "N x N; eV^2 m^-2",
-          "description": "Full covariance of the radial temperature gradient, propagated from temperature input covariance."
-        },
-        {
           "name": "spatial_profile_reconstruction",
           "unit": "structured",
           "description": "PCHIP and/or GCV smoothing-spline reconstructions of every identifiable spectrum-inferred parameter profile, including kappa index when supported; no extrapolation beyond measured channel coordinates."
@@ -5567,9 +5528,8 @@
       }
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
-    "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
-    "completion_scope": ""
+    "completion_scope": "Profile-oriented output from the canonical measured, calibrated spectrum-to-physics inference, using the same physical models and uncertainty scope as Analysis 1. No pre-derived profile input, device calibration or independent experimental validation is performed."
   },
   {
     "family": "Fast particles",

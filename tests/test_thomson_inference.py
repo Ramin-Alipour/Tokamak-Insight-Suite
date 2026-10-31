@@ -729,63 +729,6 @@ def test_joint_gls_recomputes_absolute_density_from_joint_integrated_power():
         assert channel["electron_density_m3"] == pytest.approx(expected["electron_density_m3"], rel=1e-10)
 
 
-def _joint_profile_covariance(n):
-    density_sigma = np.full(n, 1.0e17)
-    temperature_sigma = np.full(n, 2.0)
-    density_covariance = np.diag(density_sigma**2)
-    temperature_covariance = np.diag(temperature_sigma**2)
-    cross = np.diag(0.2 * density_sigma * temperature_sigma)
-    return np.block([[density_covariance, cross], [cross.T, temperature_covariance]])
-
-
-def test_thomson_profile_reconstruction_propagates_joint_ne_te_covariance():
-    from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
-    radius = np.linspace(0.0, 0.7, 9)
-    density = 4.0e19 * (1.0 - 0.25 * radius)
-    temperature = 900.0 * (1.0 - 0.35 * radius)
-    out = reconstruct_thomson_profile(
-        radius, density, temperature,
-        joint_density_temperature_covariance=_joint_profile_covariance(radius.size),
-        method="pchip", points=40, uncertainty_mc_samples=40,
-    )
-    assert out["uncertainty_model"]["joint_density_temperature_covariance_model"] == "full_joint_correlated_covariance"
-    assert out["reconstructed_joint_density_temperature_covariance"].shape == (80, 80)
-    cross = out["reconstructed_density_temperature_cross_covariance"]
-    assert cross.shape == (40, 40)
-    assert np.any(np.abs(cross) > 0.0)
-    assert out["uncertainty_model"]["joint_density_temperature_mc_successful_draws"] >= 32
-
-
-def test_thomson_profile_joint_covariance_rejects_inconsistent_marginal_block():
-    from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
-    radius = np.linspace(0.0, 0.7, 9)
-    density = 4.0e19 * (1.0 - 0.25 * radius)
-    temperature = 900.0 * (1.0 - 0.35 * radius)
-    with pytest.raises(ValueError, match="density block"):
-        reconstruct_thomson_profile(
-            radius, density, temperature,
-            density_covariance_m3_2=np.eye(radius.size) * 1.0e30,
-            joint_density_temperature_covariance=_joint_profile_covariance(radius.size),
-            method="pchip", points=40, uncertainty_mc_samples=40,
-        )
-
-
-def test_thomson_profile_reconstruction_retains_separate_covariance_compatibility():
-    from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
-    radius = np.linspace(0.0, 0.7, 9)
-    density = 4.0e19 * (1.0 - 0.25 * radius)
-    temperature = 900.0 * (1.0 - 0.35 * radius)
-    out = reconstruct_thomson_profile(
-        radius, density, temperature,
-        density_covariance_m3_2=np.eye(radius.size) * 1.0e34,
-        temperature_covariance_eV2=np.eye(radius.size) * 4.0,
-        method="pchip", points=40, uncertainty_mc_samples=40,
-    )
-    assert out["uncertainty_model"]["density_covariance_model"] == "full_correlated_covariance"
-    assert out["uncertainty_model"]["temperature_covariance_model"] == "full_correlated_covariance"
-    assert out["reconstructed_joint_density_temperature_covariance"] is None
-
-
 def test_joint_gls_preserves_laser_and_geometry_uncertainty_components():
     x, y, _ = _spectral_case(110.0)
     out = analyze_thomson_spectra(

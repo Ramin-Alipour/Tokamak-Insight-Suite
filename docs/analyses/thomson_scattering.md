@@ -97,7 +97,7 @@ Collective Maxwellian and collective kappa models infer density from the dielect
 
 The registered “Thomson spatial profile reconstruction” subanalysis starts from measured calibrated multi-channel spectra, runs the canonical physical inference, and reconstructs every identifiable radial parameter profile using PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived \(n_e/T_e\) profile points and never extrapolates beyond the measured radial interval. Kappa profiles are included for both kappa model families.
 
-Legacy functions that accept already-derived profile points remain downstream compatibility utilities only; they are not registered spectrum-to-physics workflows.
+No public Analysis 1 or subanalysis entry point accepts already-derived electron-density or electron-temperature profile points. Spatial reconstruction always starts from measured calibrated multi-channel spectra and invokes the canonical physical forward-inference engine.
 
 ## Scientific basis and recent literature
 

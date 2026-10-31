@@ -38,7 +38,7 @@ The mapping is maintained in `ANALYSIS_FAMILIES.json` and mirrored in `tis/data/
 
 ## Thomson family
 
-All Thomson-scattering-related paths are grouped under primary analysis 1, including the canonical optical inference, the collective/coherent-scattering entry and the spatial-profile workflow. The former duplicate spectral-distribution wrapper (ID 7) has been retired.
+All Thomson-scattering-related paths are grouped under primary analysis 1, including canonical optical inference, collective/coherent-scattering and spectrum-to-spatial-profile reconstruction. Every workflow starts from measured diagnostic spectra; profile-only inputs containing previously extracted ne/Te values are not accepted. The former duplicate spectral-distribution wrapper (ID 7) has been retired.
 
 ## Instrumentation support family
 
