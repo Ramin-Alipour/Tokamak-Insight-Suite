@@ -396,6 +396,7 @@ def analyze_thomson_spectra(
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
+    incident_polarization_uncertainty=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -459,19 +460,20 @@ def analyze_thomson_spectra(
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "has its own registered workflow (analysis 30)."
         )
-    if incident_direction_unc is not None or scattered_direction_unc is not None:
+    if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
-            "Beam-direction component uncertainty is not supported by the selected "
-            "non-collective optical Thomson model."
+            "Beam-direction component uncertainty is supported only by the relativistic "
+            "Maxwell-Juttner optical Thomson model."
         )
-    if model == "non_collective_relativistic_maxwell_juttner" and (
-        laser_wavelength_uncertainty_nm is not None
-        or scattering_angle_uncertainty_rad is not None
-    ):
-        raise ValueError(
-            "Laser-wavelength and scattering-angle uncertainty propagation is not implemented "
-            "for the relativistic Maxwell-Juttner optical model; omit these uncertainty inputs."
+    polarization_unc = None
+    if incident_polarization_uncertainty is not None:
+        if model != "non_collective_relativistic_maxwell_juttner":
+            raise ValueError("incident_polarization_uncertainty is supported only by the relativistic Maxwell-Juttner model")
+        polarization_unc = _finite_array(
+            incident_polarization_uncertainty, "incident_polarization_uncertainty", 1
         )
+        if polarization_unc.shape != (3,) or np.any(polarization_unc < 0):
+            raise ValueError("incident_polarization_uncertainty must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
     collective_only_inputs = (
         ion_species, ion_fractions, ion_temperature_eV, ion_velocity_m_s,
         electron_velocity_m_s, ion_temperature_uncertainty_eV,
@@ -1006,11 +1008,12 @@ def analyze_thomson_spectra(
         if laser_wavelength_uncertainty_nm is None: missing_uncertainties.append("laser_wavelength_uncertainty_nm")
         if scattering_angle_uncertainty_rad is None: missing_uncertainties.append("scattering_angle_uncertainty_rad")
         if model == "non_collective_relativistic_maxwell_juttner":
-            missing_uncertainties.extend([
-                "relativistic_laser_wavelength_uncertainty_propagation",
-                "relativistic_scattering_angle_uncertainty_propagation",
-                "incident_polarization_uncertainty",
-            ])
+            if laser_wavelength_uncertainty_nm is None:
+                missing_uncertainties.append("laser_wavelength_uncertainty_nm")
+            if scattering_angle_uncertainty_rad is None and incident_direction_unc is None and scattered_direction_unc is None:
+                missing_uncertainties.append("scattering_geometry_uncertainty")
+            if polarization_unc is None:
+                missing_uncertainties.append("incident_polarization_uncertainty")
         if model in {"collective_maxwellian", "collective_kappa"}:
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
             if lsf_unc is not None:
@@ -1164,6 +1167,110 @@ def analyze_thomson_spectra(
             fit["electron_velocity_projection_external_uncertainty_m_s"] = external_velocity_sigma
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
                 fit["electron_velocity_projection_uncertainty_m_s"], external_velocity_sigma))
+        if model == "non_collective_relativistic_maxwell_juttner" and any(value is not None for value in (
+            laser_wavelength_uncertainty_nm, scattering_angle_uncertainty_rad,
+            incident_direction_unc, scattered_direction_unc, polarization_unc,
+        )):
+            rng_external = np.random.default_rng(84271 + i)
+            external_te_samples, external_velocity_samples = [], []
+            incident_nominal = np.asarray(probe_vec, dtype=float)
+            scattered_nominal = np.asarray(scatter_vec, dtype=float)
+            polarization_nominal = np.asarray(
+                _channel_value(incident_polarization, i, y.shape[0], "incident_polarization", vector_length=3),
+                dtype=float,
+            )
+            for _ in range(int(instrument_response_mc_samples)):
+                sampled_laser = float(laser_wavelength_nm) + (
+                    0.0 if laser_wavelength_uncertainty_nm is None
+                    else float(rng_external.normal(0.0, laser_wavelength_unc))
+                )
+                if sampled_laser <= 0.0:
+                    continue
+                sampled_incident = incident_nominal.copy()
+                sampled_scattered = scattered_nominal.copy()
+                if incident_direction_unc is not None:
+                    sampled_incident += rng_external.normal(0.0, incident_direction_unc)
+                if scattered_direction_unc is not None:
+                    sampled_scattered += rng_external.normal(0.0, scattered_direction_unc)
+                if np.linalg.norm(sampled_incident) <= 0.0 or np.linalg.norm(sampled_scattered) <= 0.0:
+                    continue
+                sampled_incident /= np.linalg.norm(sampled_incident)
+                sampled_scattered /= np.linalg.norm(sampled_scattered)
+                if scattering_angle_uncertainty_rad is not None:
+                    sampled_angle = float(scattering_angle_rad) + float(
+                        rng_external.normal(0.0, scattering_angle_unc)
+                    )
+                    if not 0.0 < sampled_angle < np.pi:
+                        continue
+                    tangent = sampled_scattered - np.dot(sampled_scattered, sampled_incident) * sampled_incident
+                    tangent_norm = float(np.linalg.norm(tangent))
+                    if tangent_norm <= 1e-12:
+                        continue
+                    tangent /= tangent_norm
+                    sampled_scattered = (
+                        np.cos(sampled_angle) * sampled_incident
+                        + np.sin(sampled_angle) * tangent
+                    )
+                sampled_angle = float(np.arccos(np.clip(
+                    np.dot(sampled_incident, sampled_scattered), -1.0, 1.0
+                )))
+                if not 0.0 < sampled_angle < np.pi:
+                    continue
+                sampled_polarization = polarization_nominal.copy()
+                if polarization_unc is not None:
+                    sampled_polarization += rng_external.normal(0.0, polarization_unc)
+                sampled_polarization -= (
+                    np.dot(sampled_polarization, sampled_incident) * sampled_incident
+                )
+                polarization_norm = float(np.linalg.norm(sampled_polarization))
+                if polarization_norm <= 1e-12:
+                    continue
+                sampled_polarization /= polarization_norm
+                try:
+                    draw = fit_relativistic_maxwell_juttner(
+                        xi, y[i], sampled_laser, sampled_angle, response, ui,
+                        incident_direction=sampled_incident,
+                        scattered_direction=sampled_scattered,
+                        incident_polarization=sampled_polarization,
+                    )
+                    external_te_samples.append(float(draw["electron_temperature_eV"]))
+                    external_velocity_samples.append(float(draw["electron_velocity_projection_m_s"]))
+                except (ValueError, RuntimeError):
+                    continue
+            required_external = max(
+                8, int(np.ceil(instrument_response_mc_min_success_fraction * instrument_response_mc_samples))
+            )
+            fit["relativistic_external_parameter_mc_requested"] = int(instrument_response_mc_samples)
+            fit["relativistic_external_parameter_mc_successful_samples"] = len(external_te_samples)
+            if len(external_te_samples) >= required_external:
+                te_external_sigma = float(np.std(external_te_samples, ddof=1))
+                velocity_external_sigma = float(np.std(external_velocity_samples, ddof=1))
+                fit["electron_temperature_uncertainty_eV"] = float(np.hypot(
+                    fit["electron_temperature_uncertainty_eV"], te_external_sigma
+                ))
+                fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
+                    fit["electron_velocity_projection_uncertainty_m_s"], velocity_external_sigma
+                ))
+                fit["relativistic_external_parameter_uncertainty_propagated"] = True
+                fit["relativistic_external_temperature_uncertainty_eV"] = te_external_sigma
+                fit["relativistic_external_velocity_uncertainty_m_s"] = velocity_external_sigma
+                fit["uncertainty_inputs_missing"] = [
+                    name for name in fit["uncertainty_inputs_missing"]
+                    if name not in {
+                        "laser_wavelength_uncertainty_nm",
+                        "scattering_geometry_uncertainty",
+                        "incident_polarization_uncertainty",
+                    }
+                ]
+                fit["uncertainty_completeness"] = (
+                    "partial" if fit["uncertainty_inputs_missing"] else "all_supported_inputs_supplied"
+                )
+            else:
+                fit["relativistic_external_parameter_uncertainty_propagated"] = False
+                fit["uncertainty_inputs_missing"].append(
+                    "relativistic_external_parameter_monte_carlo_propagation_failed"
+                )
+                fit["uncertainty_completeness"] = "partial"
         if lsf_unc is not None and model not in {"collective_maxwellian", "collective_kappa"} and not fit.get("instrument_response_uncertainty_propagated",False):
             fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
             fit["uncertainty_completeness"] = "partial"
