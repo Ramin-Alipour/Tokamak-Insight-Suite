@@ -397,7 +397,10 @@ def _resolve_ion_species(ion_species):
             else:
                 mass = _positive(item["mass_amu"], f"ion_species[{index}].mass_amu")*AMU
         else:
-            from plasmapy.particles import Particle
+            try:
+                from plasmapy.particles import Particle
+            except ImportError as exc:
+                raise ImportError("String ion species require the optional PlasmaPy particle package; alternatively provide explicit name, charge_state and mass_amu/mass_kg mappings.") from exc
             particle = item if hasattr(item, "mass") and hasattr(item, "charge_number") else Particle(item)
             name = str(particle)
             mass = float(particle.mass.to_value("kg"))
