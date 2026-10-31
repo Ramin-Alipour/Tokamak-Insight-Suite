@@ -238,7 +238,7 @@ def trace_cts_frequency_resolved_beams(
     frequency_shift_Hz, probe_frequency_Hz, *,
     incident_ray, receiver_rays, equilibrium,
     incident_beam_covariance_m2, receiver_beam_covariances_m2,
-    mode_index=1, path_parameter_max=1.0, sample_count=256,
+    mode_index=None, path_parameter_max=1.0, sample_count=256,
     scattering_sample_count=16,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
 ):
