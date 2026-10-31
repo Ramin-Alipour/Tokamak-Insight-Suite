@@ -363,7 +363,7 @@ def full_em_cts_spectral_density(
             covariance_n_v_E_B, source["source_current_operator"], es
         )
         form_factors = bindslev_dielectric_form_factors(
-            source["source_current_operator"], ei, es, ki, ks,
+            source["dielectric_coupling_operator"], ei, es, ki, ks,
             omega_i, omega_s, ne,
         )
         spectra[index] = transfer["received_source_current_spectral_power"]
