@@ -176,6 +176,8 @@ def density_from_thomson_scattered_power(
         )
         if cross_covariance is not None and not np.isfinite(cross_covariance):
             raise ValueError("power_cross_section_relative_covariance must be finite")
+        if cross_covariance is not None and abs(cross_covariance) > 0.0 and ps <= 0.0:
+            raise ValueError("power_cross_section_relative_covariance requires positive fitted scattered power")
         if cross_covariance is not None and abs(cross_covariance) > 0.0 and scattered_power_uncertainty_W is not None:
             if not np.allclose(covariance[0, :], 0.0, rtol=0.0, atol=1e-14) or not np.allclose(
                 covariance[:, 0], 0.0, rtol=0.0, atol=1e-14
@@ -187,7 +189,10 @@ def density_from_thomson_scattered_power(
             sigma_power = _positive_finite_scalar(
                 scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
             )
-            covariance[0, 0] += (sigma_power / ps) ** 2
+            if ps <= 0.0 and sigma_power > 0.0:
+                raise ValueError("relative scattered-power covariance requires positive scattered_power_W")
+            if ps > 0.0:
+                covariance[0, 0] += (sigma_power / ps) ** 2
             scattered_power_uncertainty_W = None
         if cross_covariance is not None:
             covariance[0, 5] += cross_covariance
