@@ -501,6 +501,7 @@ def full_em_cts_spectral_density(
     wave_tensors = np.empty_like(dielectric_tensors)
     harmonic_counts = []
     bindslev_operators = []
+    total_three_wave_operators = []
     bindslev_coefficients = []
     bindslev_form_factors = []
     bindslev_x_tensors = []
