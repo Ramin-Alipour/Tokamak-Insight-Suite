@@ -33,6 +33,31 @@ def _trapz(y, x):
     return integrate(y, x) if integrate is not None else np.trapz(y, x)
 
 
+def _wavelength_bin_widths(x):
+    axis = np.asarray(x, dtype=float)
+    if axis.ndim != 1 or axis.size < 2 or np.any(~np.isfinite(axis)) or np.any(np.diff(axis) <= 0.0):
+        raise ValueError("wavelength axis must be finite, one-dimensional and strictly increasing")
+    edges = np.empty(axis.size+1, dtype=float)
+    edges[1:-1] = 0.5*(axis[:-1]+axis[1:])
+    edges[0] = axis[0]-0.5*(axis[1]-axis[0])
+    edges[-1] = axis[-1]+0.5*(axis[-1]-axis[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("wavelength axis must define positive bin widths")
+    return widths
+
+
+def _apply_response_matrix(response, spectrum, wavelength_nm):
+    """Apply a bin-probability response while conserving integrated spectral power."""
+    axis = np.asarray(wavelength_nm, dtype=float)
+    values = np.asarray(spectrum, dtype=float)
+    matrix = np.asarray(response, dtype=float)
+    if values.shape != axis.shape or matrix.shape != (axis.size, axis.size):
+        raise ValueError("response matrix, spectrum and wavelength axis must share a square grid")
+    widths = _wavelength_bin_widths(axis)
+    return (matrix @ (values*widths))/widths
+
+
 def _moment_statistics(
     x, y, instrument_sigma_nm, background_fraction, background_mask,
     background_signal=None,
@@ -239,11 +264,30 @@ def analyze_thomson_spectral_distribution(
             or not isinstance(temperature, (int, float, np.integer, np.floating))
             or not np.isfinite(temperature) or temperature <= 0):
         raise ValueError("physical_parameters.electron_temperature_eV must be a finite positive fitted value")
+    model_name = physical_parameters["model"].strip()
+    supported_models = {
+        "non_collective_maxwellian", "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+        "collective_maxwellian", "collective_kappa",
+    }
+    if model_name not in supported_models:
+        raise ValueError("physical_parameters.model must identify a supported canonical Thomson fit")
     flow = physical_parameters["electron_velocity_projection_m_s"]
-    if (isinstance(flow, (bool, np.bool_))
-            or not isinstance(flow, (int, float, np.integer, np.floating))
-            or not np.isfinite(flow)):
-        raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value")
+    non_collective_models = {
+        "non_collective_maxwellian", "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+    }
+    if model_name in non_collective_models:
+        if (isinstance(flow, (bool, np.bool_))
+                or not isinstance(flow, (int, float, np.integer, np.floating))
+                or not np.isfinite(flow)):
+            raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value for non-collective models")
+    elif flow is not None and (
+        isinstance(flow, (bool, np.bool_))
+        or not isinstance(flow, (int, float, np.integer, np.floating))
+        or not np.isfinite(flow)
+    ):
+        raise ValueError("A supplied collective-model electron flow must be a finite fitted value; otherwise pass None as not identifiable")
 
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
@@ -298,10 +342,9 @@ def analyze_thomson_spectral_distribution(
     if response is None:
         fit_model = _gaussian_background
     else:
-        widths = quadrature.copy()
         def fit_model(wavelength, amplitude, fitted_center, sigma, intercept, slope):
             intrinsic = amplitude * np.exp(-0.5 * ((wavelength - fitted_center) / sigma) ** 2)
-            convolved = (response @ (intrinsic * widths)) / widths
+            convolved = _apply_response_matrix(response, intrinsic, x)
             return convolved + intercept + slope * (wavelength - fitted_center)
 
     try:
@@ -443,14 +486,23 @@ def analyze_thomson_spectral_distribution(
         "physical_parameter_extraction": {
             "status": "completed",
             "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
-            "model": physical_parameters["model"],
-            "electron_temperature_eV": float(physical_parameters["electron_temperature_eV"]),
+            "model": model_name,
+            "electron_temperature_eV": float(temperature),
             "electron_temperature_uncertainty_eV": physical_parameters.get("electron_temperature_uncertainty_eV"),
-            "electron_velocity_projection_m_s": float(physical_parameters["electron_velocity_projection_m_s"]),
+            "electron_velocity_projection_m_s": None if flow is None else float(flow),
             "electron_velocity_projection_uncertainty_m_s": physical_parameters.get("electron_velocity_projection_uncertainty_m_s"),
+            "electron_velocity_projection_status": (
+                "fitted" if flow is not None else
+                "not_identifiable_from_selected_collective_model"
+            ),
             "electron_density_m3": physical_parameters.get("electron_density_m3"),
             "electron_density_uncertainty_m3": physical_parameters.get("electron_density_uncertainty_m3"),
             "electron_density_status": "available" if physical_parameters.get("electron_density_m3") is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
+            "unavailable_parameters": (
+                [] if flow is not None else ["electron_velocity_projection_m_s"]
+            ) + (
+                [] if physical_parameters.get("electron_density_m3") is not None else ["electron_density_m3"]
+            ),
         },
         "model": "canonical physical Thomson forward-fit parameters plus signed spectral moments and response-convolved Gaussian shape diagnostics",
         "assumptions": [
