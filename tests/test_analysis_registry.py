@@ -1,15 +1,15 @@
 from tokamak_analysis.analysis_registry import ANALYSES, get_analysis, resolve_analysis
 
 
-def test_registry_contains_79_unique_ordered_analysis_ids_after_retiring_id_7():
+def test_registry_contains_80_unique_ordered_analysis_ids_after_retiring_id_7():
     ids = [entry["id"] for entry in ANALYSES]
-    assert len(ANALYSES) == 79
-    assert ids == [entry_id for entry_id in range(1, 81) if entry_id != 7]
+    assert len(ANALYSES) == 80
+    assert ids == [entry_id for entry_id in range(1, 82) if entry_id != 7]
 
 
-def test_registry_uses_distinct_entry_points_for_all_79_registered_analyses():
+def test_registry_uses_distinct_entry_points_for_all_80_registered_analyses():
     pairs = [(entry["module"], entry["function"]) for entry in ANALYSES]
-    assert len(set(pairs)) == 79
+    assert len(set(pairs)) == 80
 
 
 def test_all_registered_analyses_resolve_to_callables():
@@ -112,11 +112,13 @@ def test_cxrs_is_analysis_four_with_explicit_physics_contract():
     assert callable(resolve_analysis(4))
 
 
-def test_analysis_id_81_is_not_part_of_the_canonical_80_analysis_registry():
-    import pytest
-
-    with pytest.raises(KeyError, match="Unknown analysis ID: 81"):
-        get_analysis(81)
+def test_thomson_spectral_distribution_is_registered_as_entry_81():
+    entry = get_analysis(81)
+    assert entry["name"] == "Thomson spectral distribution"
+    assert (entry["module"], entry["function"]) == (
+        "thomson_distribution", "analyze_thomson_spectral_distribution"
+    )
+    assert callable(resolve_analysis(81))
 
 
 def test_primary_analysis_family_lookup_rejects_invalid_ids():
@@ -139,7 +141,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46]
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46, 81]
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
         get_analysis(7)
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
@@ -149,6 +151,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     with pytest.raises(ValueError, match="Select model"):
         resolve_analysis(30)()
     assert callable(resolve_analysis(46))
+    assert callable(resolve_analysis(81))
 
 
 def test_thomson_formula_registry_contains_traceable_physical_relations():
