@@ -316,7 +316,9 @@ def _reconstruct_inferred_parameter_profile(
         if selected_method == "pchip":
             fit = PchipInterpolator(radius, sample, extrapolate=False)
         else:
-            weights = None if sigma is None else 1.0 / np.maximum(sigma, np.finfo(float).tiny)
+            sigma_floor = (np.finfo(float).tiny if sigma is None else
+                           max(float(np.max(sigma)), np.finfo(float).tiny) * 1e-12)
+            weights = None if sigma is None else 1.0 / np.maximum(sigma, sigma_floor)
             fit = make_smoothing_spline(radius, sample, w=weights, lam=None)
         return np.asarray(fit(grid), dtype=float), np.asarray(fit.derivative()(grid), dtype=float)
 
@@ -435,16 +437,59 @@ def reconstruct_thomson_profile_from_spectra(
         ("electron_velocity_projection_m_s", "electron_velocity_projection_profile_m_s",
          "electron_velocity_projection_uncertainty_profile_m_s", flow_covariance, False),
     ]
+    if result.get("model") == "non_collective_kappa":
+        kappa_values = np.asarray([channel.get("kappa_index", np.nan) for channel in result["channels"]], dtype=float)
+        kappa_variances = [
+            float(np.asarray(channel["fit_covariance"], dtype=float)[3, 3])
+            if channel.get("fit_covariance") is not None
+            and np.asarray(channel["fit_covariance"]).shape == (6, 6) else np.nan
+            for channel in result["channels"]
+        ]
+        candidates.append((
+            "electron_kappa_index", None, None,
+            np.diag(kappa_variances) if np.all(np.isfinite(kappa_variances)) else None,
+            False,
+        ))
+    if result.get("model") == "collective_maxwellian":
+        alpha_values = np.asarray([
+            channel.get("scattering_parameter_alpha", np.nan) for channel in result["channels"]
+        ], dtype=float)
+        candidates.append(("scattering_parameter_alpha", None, None, None, True))
+    power_values = np.asarray([
+        channel.get("integrated_scattered_power_W", np.nan) for channel in result["channels"]
+    ], dtype=float)
+    if np.all(np.isfinite(power_values)):
+        power_sigma = np.asarray([
+            channel.get("integrated_scattered_power_uncertainty_W", np.nan)
+            for channel in result["channels"]
+        ], dtype=float)
+        candidates.append((
+            "integrated_scattered_power_W", None, None,
+            np.diag(power_sigma**2) if np.all(np.isfinite(power_sigma)) else None,
+            True,
+        ))
     for name, value_key, uncertainty_key, covariance, positive in candidates:
-        values = np.asarray(result[value_key], dtype=float)
+        if name == "electron_kappa_index":
+            values = kappa_values
+            uncertainty_values = np.sqrt(np.maximum(np.diag(covariance), 0.0)) if covariance is not None else None
+        elif name == "scattering_parameter_alpha":
+            values = alpha_values
+            uncertainty_values = None
+        elif name == "integrated_scattered_power_W":
+            values = power_values
+            uncertainty_values = power_sigma if np.all(np.isfinite(power_sigma)) else None
+        else:
+            values = np.asarray(result[value_key], dtype=float)
+            uncertainty_values = np.asarray(result.get(uncertainty_key), dtype=float)
         if values.shape != (n_channels,) or not np.all(np.isfinite(values)):
             profiles[name] = {
                 "status": "not_identifiable_for_all_channels",
                 "reason": "The selected physical model did not identify this parameter at every measured channel.",
             }
             continue
-        uncertainty_values = np.asarray(result.get(uncertainty_key), dtype=float)
-        if uncertainty_values.shape != (n_channels,) or not np.all(np.isfinite(uncertainty_values)):
+        if uncertainty_values is not None and (
+            uncertainty_values.shape != (n_channels,) or not np.all(np.isfinite(uncertainty_values))
+        ):
             uncertainty_values = None
         try:
             profiles[name] = _reconstruct_inferred_parameter_profile(
@@ -472,13 +517,16 @@ def reconstruct_thomson_profile_from_spectra(
                 for channel in result["channels"]
             ]
             uncertainty_values = None if any(v is None for v in uncertainties) else np.asarray(uncertainties, dtype=float)
-            profiles[name] = _reconstruct_inferred_parameter_profile(
-                radii, values, uncertainty=uncertainty_values, covariance=covariance,
-                positive=False, method=profile_reconstruction_method,
-                points=profile_reconstruction_points,
-                mc_samples=profile_reconstruction_mc_samples,
-                random_seed=18473 + 10 + species_index,
-            )
+            try:
+                profiles[name] = _reconstruct_inferred_parameter_profile(
+                    radii, values, uncertainty=uncertainty_values, covariance=covariance,
+                    positive=False, method=profile_reconstruction_method,
+                    points=profile_reconstruction_points,
+                    mc_samples=profile_reconstruction_mc_samples,
+                    random_seed=18473 + 10 + species_index,
+                )
+            except ValueError as exc:
+                profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
     result["spatial_profile_reconstruction"] = {
         "input_origin": "physical parameters inferred from measured calibrated Thomson spectra",
         "profiles": profiles,
