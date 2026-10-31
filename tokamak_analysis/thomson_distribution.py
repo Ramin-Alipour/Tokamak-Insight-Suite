@@ -121,12 +121,13 @@ def analyze_thomson_spectral_distribution(
 ) -> dict:
     """Return spectral-shape diagnostics and physical parameters from the selected fit.
 
-    The canonical Thomson inference pipeline supplies physical_parameters from
+    The canonical Thomson inference pipeline must supply physical_parameters from
     its forward fit of this same calibrated measured spectrum. This subanalysis
     exposes those fitted plasma quantities alongside wavelength-space moments; it
     does not independently refit a second physical model or infer a unique electron
-    velocity distribution from moments. Direct callers may omit physical_parameters
-    for shape-only use, but the primary Analysis 1 pipeline always supplies it.
+    velocity distribution from moments. Shape-only execution is deliberately
+    rejected so this Analysis 1 entry point cannot report completion without physical
+    parameter extraction from the calibrated measurement.
 
     Supply either a scalar Gaussian instrument sigma or a general measured response
     matrix. A general response matrix is used in the Gaussian forward fit; no scalar
@@ -220,19 +221,29 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
-    if physical_parameters is not None:
-        if not isinstance(physical_parameters, dict):
-            raise ValueError("physical_parameters must be a mapping from the canonical Thomson physical fit")
-        required_physical_keys = ("model", "electron_temperature_eV", "electron_velocity_projection_m_s")
-        missing_physical_keys = [key for key in required_physical_keys if key not in physical_parameters]
-        if missing_physical_keys:
-            raise ValueError("physical_parameters is missing canonical fit fields: " + ", ".join(missing_physical_keys))
-        if not isinstance(physical_parameters["model"], str) or not physical_parameters["model"].strip():
-            raise ValueError("physical_parameters.model must identify the selected physical forward model")
-        for key in required_physical_keys[1:]:
-            value = physical_parameters[key]
-            if value is not None and (isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, float, np.integer, np.floating)) or not np.isfinite(value)):
-                raise ValueError(f"physical_parameters.{key} must be a finite real scalar or None")
+    if physical_parameters is None:
+        raise ValueError(
+            "physical_parameters is required: run the canonical Thomson physical forward fit "
+            "on this same calibrated measured spectrum and pass its fitted plasma parameters."
+        )
+    if not isinstance(physical_parameters, dict):
+        raise ValueError("physical_parameters must be a mapping from the canonical Thomson physical fit")
+    required_physical_keys = ("model", "electron_temperature_eV", "electron_velocity_projection_m_s")
+    missing_physical_keys = [key for key in required_physical_keys if key not in physical_parameters]
+    if missing_physical_keys:
+        raise ValueError("physical_parameters is missing canonical fit fields: " + ", ".join(missing_physical_keys))
+    if not isinstance(physical_parameters["model"], str) or not physical_parameters["model"].strip():
+        raise ValueError("physical_parameters.model must identify the selected physical forward model")
+    temperature = physical_parameters["electron_temperature_eV"]
+    if (isinstance(temperature, (bool, np.bool_))
+            or not isinstance(temperature, (int, float, np.integer, np.floating))
+            or not np.isfinite(temperature) or temperature <= 0):
+        raise ValueError("physical_parameters.electron_temperature_eV must be a finite positive fitted value")
+    flow = physical_parameters["electron_velocity_projection_m_s"]
+    if (isinstance(flow, (bool, np.bool_))
+            or not isinstance(flow, (int, float, np.integer, np.floating))
+            or not np.isfinite(flow)):
+        raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value")
 
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
@@ -429,27 +440,18 @@ def analyze_thomson_spectral_distribution(
         "fitted_spectrum": fitted, "residual": residual,
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square, "r_squared": r_squared,
-        "physical_parameter_extraction": (
-            {
-                "status": "completed" if physical_parameters.get("electron_temperature_eV") is not None and physical_parameters.get("electron_velocity_projection_m_s") is not None else "partial",
-                "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
-                "model": physical_parameters["model"],
-                "electron_temperature_eV": physical_parameters.get("electron_temperature_eV"),
-                "electron_temperature_uncertainty_eV": physical_parameters.get("electron_temperature_uncertainty_eV"),
-                "electron_velocity_projection_m_s": physical_parameters.get("electron_velocity_projection_m_s"),
-                "electron_velocity_projection_uncertainty_m_s": physical_parameters.get("electron_velocity_projection_uncertainty_m_s"),
-                "electron_density_m3": physical_parameters.get("electron_density_m3"),
-                "electron_density_uncertainty_m3": physical_parameters.get("electron_density_uncertainty_m3"),
-                "electron_density_status": "available" if physical_parameters.get("electron_density_m3") is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
-            }
-            if physical_parameters is not None else {
-                "status": "not_requested", "source": None, "model": None,
-                "electron_temperature_eV": None, "electron_temperature_uncertainty_eV": None,
-                "electron_velocity_projection_m_s": None, "electron_velocity_projection_uncertainty_m_s": None,
-                "electron_density_m3": None, "electron_density_uncertainty_m3": None,
-                "electron_density_status": "not_requested",
-            }
-        ),
+        "physical_parameter_extraction": {
+            "status": "completed",
+            "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
+            "model": physical_parameters["model"],
+            "electron_temperature_eV": float(physical_parameters["electron_temperature_eV"]),
+            "electron_temperature_uncertainty_eV": physical_parameters.get("electron_temperature_uncertainty_eV"),
+            "electron_velocity_projection_m_s": float(physical_parameters["electron_velocity_projection_m_s"]),
+            "electron_velocity_projection_uncertainty_m_s": physical_parameters.get("electron_velocity_projection_uncertainty_m_s"),
+            "electron_density_m3": physical_parameters.get("electron_density_m3"),
+            "electron_density_uncertainty_m3": physical_parameters.get("electron_density_uncertainty_m3"),
+            "electron_density_status": "available" if physical_parameters.get("electron_density_m3") is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
+        },
         "model": "canonical physical Thomson forward-fit parameters plus signed spectral moments and response-convolved Gaussian shape diagnostics",
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
