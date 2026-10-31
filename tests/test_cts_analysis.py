@@ -133,7 +133,8 @@ def test_cts_regularized_inversion_requires_explicit_vdf_regularization_target()
     with pytest.raises(ValueError,match="requires regularization_strength"):
         analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
             ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,inversion_method="regularized",
-            global_search=False)
+            global_search=False,electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
+            ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3])
     with pytest.raises(ValueError,match="requires fast_ion.kind='infer_tabulated_1d'"):
         analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
             ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,inversion_method="regularized",
@@ -149,7 +150,9 @@ def test_cts_unknown_fast_ion_kind_is_rejected():
             f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
             ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
             instrument_response=response,fast_ion={"species_index":0,"kind":"not-a-model"},
-            global_search=False,
+            electron_density_initial_m3=2e19,electron_temperature_initial_eV=1200.0,
+            ion_temperature_initial_eV=800.0,ion_velocity_initial_m_s=0.0,
+            global_search=False,inversion_method="local_least_squares",
         )
 
 
