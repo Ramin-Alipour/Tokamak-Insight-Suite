@@ -248,6 +248,21 @@ def full_em_cts_spectral_density(
     b = np.asarray(magnetic_field_T, dtype=float)
     if b.shape != (3,) or np.any(~np.isfinite(b)) or np.linalg.norm(b) <= 0:
         raise ValueError("magnetic_field_T must be a finite non-zero 3-vector")
+    frequency_geometry = scattering_geometry.get("frequency_resolved_geometry")
+    if frequency_geometry is not None:
+        if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
+            raise ValueError("frequency_resolved_geometry must contain one traced geometry record per frequency bin")
+        for geometry_index, item in enumerate(frequency_geometry):
+            if not isinstance(item, Mapping):
+                raise ValueError(f"frequency_resolved_geometry[{geometry_index}] must be a mapping")
+            _vec3(item.get("incident_direction"), f"frequency_resolved_geometry[{geometry_index}].incident_direction")
+            _vec3(item.get("scattered_direction"), f"frequency_resolved_geometry[{geometry_index}].scattered_direction")
+            local_b = np.asarray(item.get("magnetic_field_T"), dtype=float)
+            if local_b.shape != (3,) or np.any(~np.isfinite(local_b)) or np.linalg.norm(local_b) <= 0:
+                raise ValueError(f"frequency_resolved_geometry[{geometry_index}].magnetic_field_T must be a finite non-zero 3-vector")
+            overlap = _positive(item.get("beam_overlap_relative"), f"frequency_resolved_geometry[{geometry_index}].beam_overlap_relative")
+            if overlap > 1.0 + 1e-10:
+                raise ValueError("relative Gaussian beam-overlap weights must be <= 1")
     if not isinstance(ion_flow_velocity_m_s, Mapping):
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
@@ -308,16 +323,35 @@ def full_em_cts_spectral_density(
     bindslev_gamma_inverse = []
     fast_ion_kinetic_diagnostics = []
     cold_mode_diagnostics = []
+    local_magnetic_fields = []
+    beam_overlap_weights = []
     for index, shift in enumerate(shifts):
         fs = f0 + shift
-        ki = incident_wavevector
+        if frequency_geometry is None:
+            ki_hat_bin, ks_hat_bin, b_bin = ki_hat, ks_hat, b
+            overlap_weight = 1.0
+            incident_wavevector_bin, ei_bin = incident_wavevector, ei
+            incident_diag_bin = incident_mode_diagnostics
+        else:
+            geometry_bin = frequency_geometry[index]
+            ki_hat_bin = _vec3(geometry_bin["incident_direction"], "frequency-resolved incident direction")
+            ks_hat_bin = _vec3(geometry_bin["scattered_direction"], "frequency-resolved scattered direction")
+            b_bin = np.asarray(geometry_bin["magnetic_field_T"], dtype=float)
+            overlap_weight = _positive(geometry_bin["beam_overlap_relative"], "beam_overlap_relative")
+            incident_wavevector_bin, ei_bin, incident_diag_bin = _select_flux_normalized_cold_mode(
+                2.0*np.pi*f0, ki_hat_bin, b_bin, cold_wave_species, ei
+            )
         scattered_wavevector, scattered_mode_field, scattered_mode_diagnostics = _select_flux_normalized_cold_mode(
-            2.0*np.pi*fs, ks_hat, b, cold_wave_species, es
+            2.0*np.pi*fs, ks_hat_bin, b_bin, cold_wave_species, es
         )
+        ki = incident_wavevector_bin
         ks = scattered_wavevector
+        ei_local = ei_bin
         es_local = scattered_mode_field
+        local_magnetic_fields.append(b_bin.copy())
+        beam_overlap_weights.append(overlap_weight)
         cold_mode_diagnostics.append({
-            "incident": incident_mode_diagnostics,
+            "incident": incident_diag_bin,
             "scattered": scattered_mode_diagnostics,
         })
         kvec = ks - ki
@@ -331,7 +365,7 @@ def full_em_cts_spectral_density(
             if sp.get("fast_ion", False):
                 from .cts_relativistic import relativistic_gyrotropic_species_response
                 kinetic = relativistic_gyrotropic_species_response(
-                    omega, kvec, b, density_m3=sp["density"], mass_kg=sp["mass"],
+                    omega, kvec, b_bin, density_m3=sp["density"], mass_kg=sp["mass"],
                     charge_C=sp["charge"], distribution=sp["distribution"],
                     quadrature_order=int(quadrature_order),
                     gyrophase_points=max(16, 4*int(harmonic_order)),
@@ -342,7 +376,7 @@ def full_em_cts_spectral_density(
                 fast_kinetic_at_frequency.append({"name": sp["name"], "distribution_kind": kinetic["distribution_kind"], "relativistic_kinematics": kinetic["relativistic_kinematics"], "velocity_max_fraction_c": kinetic["velocity_max_fraction_c"], "bare_current_spectral_covariance": kinetic["bare_current_spectral_covariance"]})
             else:
                 sigmas.append(_species_conductivity(
-                    omega, kvec, b, sp, harmonic_order=int(harmonic_order),
+                    omega, kvec, b_bin, sp, harmonic_order=int(harmonic_order),
                     quadrature_order=int(quadrature_order),
                     damping_rate_rad_s=damping
                 ))
@@ -410,8 +444,8 @@ def full_em_cts_spectral_density(
         }]
         omega_i = 2.0 * np.pi * f0
         omega_s = 2.0 * np.pi * fs
-        chi_i = cold_plasma_dielectric_tensor(omega_i, b, electron_cold) - np.eye(3)
-        chi_s = cold_plasma_dielectric_tensor(omega_s, b, electron_cold) - np.eye(3)
+        chi_i = cold_plasma_dielectric_tensor(omega_i, b_bin, electron_cold) - np.eye(3)
+        chi_s = cold_plasma_dielectric_tensor(omega_s, b_bin, electron_cold) - np.eye(3)
         source = bindslev_source_current_operator(
             omega_incident_rad_s=omega_i,
             omega_scattered_rad_s=omega_s,
@@ -420,7 +454,7 @@ def full_em_cts_spectral_density(
             incident_electric_field=ei,
             incident_susceptibility=chi_i,
             scattered_susceptibility=chi_s,
-            magnetic_field_T=b,
+            magnetic_field_T=b_bin,
             electron_density_m3=ne,
         )
         # Electron particle flux is j_e/q_e.  This exact unit conversion is
@@ -432,10 +466,10 @@ def full_em_cts_spectral_density(
             covariance_n_v_E_B, source["source_current_operator"], es
         )
         form_factors = bindslev_dielectric_form_factors(
-            source["dielectric_coupling_operator"], ei, es_local, ki, ks,
+            source["dielectric_coupling_operator"], ei_local, es_local, ki, ks,
             omega_i, omega_s, ne,
         )
-        spectra[index] = transfer["received_source_current_spectral_power"]
+        spectra[index] = overlap_weight * transfer["received_source_current_spectral_power"]
         bindslev_operators.append(source["source_current_operator"])
         bindslev_form_factors.append(form_factors["G_alpha_beta"])
         bindslev_x_tensors.append(source["X_tensor"])
@@ -465,6 +499,12 @@ def full_em_cts_spectral_density(
         "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
         "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
         "magnetic_field_T": b,
+        "frequency_resolved_magnetic_field_T": np.asarray(local_magnetic_fields),
+        "relative_gaussian_beam_overlap": np.asarray(beam_overlap_weights),
+        "ray_tracing_geometry_used": frequency_geometry is not None,
+        "scattering_locations_m": (np.asarray([item["scattering_location_m"] for item in frequency_geometry])
+                                   if frequency_geometry is not None and all("scattering_location_m" in item for item in frequency_geometry)
+                                   else None),
         "fast_ion_populations": fast_ion_populations or [],
         "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling and optional relativistic gyrotropic fast-ion kinetics",
         "kinetic_response": "bulk species: magnetized Maxwellian Vlasov gyro-harmonics; optional fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
@@ -474,7 +514,7 @@ def full_em_cts_spectral_density(
         "numerical_controls": {"harmonic_order": int(harmonic_order),
             "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping},
         "limitations": [
-            "Homogeneous local plasma; no ray tracing, refraction along a finite path, or finite scattering-volume beam overlap.",
+            *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Bulk thermal species use the non-relativistic isotropic Maxwellian solver; optional fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
             "The Bindslev three-wave source-current closure is the low-temperature magnetized formulation; its relativistic kinetic generalization is not used for the fast-ion population.",
             "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
