@@ -3084,13 +3084,19 @@ elif page=='Advanced Analysis':
                 cts_uncertainty_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_uncertainty_col')
                 cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_probe_frequency')
                 cts_angle=st.text_input('Scattering angle (rad)',key='cts_scattering_angle')
+                cts_density_initial=st.text_input('Initial electron density (m⁻³; required optimizer start)',key='cts_density_initial')
+                cts_temperature_initial=st.text_input('Initial electron temperature (eV; required optimizer start)',key='cts_temperature_initial')
+                cts_ion_temperature_initial=st.text_input('Initial common ion temperature (eV; required optimizer start)',key='cts_ion_temperature_initial')
+                cts_ion_flow_initial=st.text_input('Initial common ion-flow projection (m/s; required optimizer start)',key='cts_ion_flow_initial')
             with c2:
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_response_upload')
                 cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
-                cts_method=st.selectbox('Inversion method',['differential_evolution','improved_genetic','regularized'],key='cts_inversion_method')
-                st.caption('Regularized inversion is only available when inferring a tabulated fast-ion velocity distribution; initial plasma guesses are optimizer starting points, not physical priors.')
-                cts_regularization=st.number_input('Regularization strength (used by regularized mode)',min_value=0.0,value=0.1,format='%.6g',key='cts_regularization')
+                cts_method=st.selectbox('Optional global-search / VDF method',['differential_evolution','improved_genetic','regularized'],index=None,placeholder='Select method explicitly',key='cts_inversion_method')
+                cts_global_search=st.checkbox('Run finite-bound global search before local refinement',value=False,key='cts_global_search')
+                cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON (leave blank for unbounded positive log-parameters)',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV":[10,200]}',key='cts_parameter_bounds')
+                st.caption('Global search requires explicit finite bounds. Local least-squares inference does not impose scientific bounds. Regularized mode is only for an inferred tabulated fast-ion VDF.')
+                cts_regularization=st.text_input('Regularization strength (required only for regularized mode)',value='',key='cts_regularization')
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
                 cts_electron_flow=st.text_input('Electron-flow projection (m/s; required; enter 0 only to assume stationary flow)',key='cts_electron_flow')
@@ -3107,12 +3113,14 @@ elif page=='Advanced Analysis':
             if cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
                 cts_fast_vdf_upload=st.file_uploader('Fast-ion VDF CSV (velocity_m_s, probability_density_m_s_inverse)',type=['csv','txt'],key='cts_fast_vdf')
             if cts_fast_mode!='None':
-                cts_fast_species=st.number_input('Fast-ion species index',min_value=0,value=0,step=1,key='cts_fast_species')
-                cts_fast_fraction=st.number_input('Initial fast-ion fraction',min_value=0.001,max_value=0.9,value=0.05,key='cts_fast_fraction')
+                cts_fast_species=st.text_input('Fast-ion species index (required)',value='',key='cts_fast_species')
+                cts_fast_fraction=st.text_input('Initial fast-ion fraction (0–1; required)',value='',key='cts_fast_fraction')
             else:
-                cts_fast_species=0; cts_fast_fraction=0.05
+                cts_fast_species=''; cts_fast_fraction=''
             if cts_fast_mode=='Hot Maxwellian component':
-                cts_fast_temperature=st.number_input('Fast-ion temperature (eV)',min_value=1.0,value=10000.0,key='cts_fast_temperature')
+                cts_fast_temperature=st.text_input('Initial fast-ion temperature (eV; required)',value='',key='cts_fast_temperature')
+            if cts_fast_mode=='Infer regularized tabulated 1-D VDF':
+                cts_fast_smoothness=st.text_input('VDF smoothness parameter (required)',value='',key='cts_fast_smoothness')
             if st.button('Run microwave CTS inversion',type='primary',key='run_cts_inversion'):
                 try:
                     frequency=pd.to_numeric(df[cts_frequency_col],errors='coerce').to_numpy(dtype=float)
@@ -3138,34 +3146,54 @@ elif page=='Advanced Analysis':
                         raise ValueError('Ion names, charge states, masses and fractions must have equal lengths.')
                     ion_species=[{'name':name,'charge_state':charge,'mass_amu':mass} for name,charge,mass in zip(species_names,charges,masses)]
                     fast_ion=None
+                    if cts_fast_mode!='None':
+                        if not cts_fast_species.strip() or not cts_fast_fraction.strip():
+                            raise ValueError('Enter the fast-ion species index and initial fraction explicitly.')
+                        fast_species_index=int(cts_fast_species)
+                        fast_fraction_initial=float(cts_fast_fraction)
                     if cts_fast_mode=='Hot Maxwellian component':
-                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95),'temperature_eV':float(cts_fast_temperature)}
+                        if not cts_fast_temperature.strip():
+                            raise ValueError('Enter the fast-ion temperature initial estimate explicitly.')
+                        fast_ion={'kind':'maxwellian','species_index':fast_species_index,
+                            'fraction_initial':fast_fraction_initial,
+                            'temperature_initial_eV':float(cts_fast_temperature)}
                     elif cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
                         if cts_fast_vdf_upload is None:
                             raise ValueError('Upload a two-column fast-ion VDF CSV.')
                         vdf=pd.read_csv(cts_fast_vdf_upload,header=None).to_numpy(dtype=float)
                         if vdf.ndim!=2 or vdf.shape[1]!=2:
                             raise ValueError('Fast-ion VDF CSV must contain exactly two columns: velocity and probability density.')
-                        fast_ion={'species_index':int(cts_fast_species),'fraction':float(cts_fast_fraction),
-                            'velocity_m_s':vdf[:,0] ,'probability_density_m_s_inverse':vdf[:,1],
-                            'fraction_initial':float(cts_fast_fraction),'fraction_bounds':(0.001,0.95)}
+                        fast_ion={'kind':'tabulated_1d' if cts_fast_mode=='Fixed tabulated 1-D VDF' else 'infer_tabulated_1d',
+                            'species_index':fast_species_index,'fraction_initial':fast_fraction_initial,
+                            'velocity_m_s':vdf[:,0]}
                         if cts_fast_mode=='Fixed tabulated 1-D VDF':
-                            fast_ion['kind']='tabulated_1d'
+                            fast_ion['probability_density_m_s_inverse']=vdf[:,1]
                         else:
-                            fast_ion['kind']='infer_tabulated_1d'
+                            if not cts_fast_smoothness.strip():
+                                raise ValueError('Enter the VDF smoothness parameter explicitly.')
                             fast_ion['initial_probability_density_m_s_inverse']=vdf[:,1]
-                            fast_ion.pop('probability_density_m_s_inverse',None)
-                            fast_ion['fraction_initial']=float(cts_fast_fraction)
-                            fast_ion['fraction_bounds']=(0.001,0.95)
-                            fast_ion['smoothness']=1.0
+                            fast_ion['smoothness']=float(cts_fast_smoothness)
+                    if cts_method is None:
+                        raise ValueError('Select the CTS inversion method explicitly.')
+                    if any(not value.strip() for value in (
+                        cts_density_initial,cts_temperature_initial,cts_ion_temperature_initial,cts_ion_flow_initial
+                    )):
+                        raise ValueError('Enter all four physical optimizer initial estimates explicitly.')
+                    parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
                     kwargs_cts={
                         'probe_frequency_Hz':float(cts_probe_frequency),
                         'scattering_geometry':{'scattering_angle_rad':float(cts_angle)},
                         'ion_species':ion_species,'ion_fractions':fractions,
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
+                        'electron_density_initial_m3':float(cts_density_initial),
+                        'electron_temperature_initial_eV':float(cts_temperature_initial),
+                        'ion_temperature_initial_eV':float(cts_ion_temperature_initial),
+                        'ion_velocity_initial_m_s':float(cts_ion_flow_initial),
+                        'parameter_bounds':parameter_bounds,
                         'electron_velocity_projection_m_s':float(cts_electron_flow),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
+                        'global_search':bool(cts_global_search),
                     }
                     external_unc={}
                     if cts_probe_frequency_unc.strip(): external_unc['probe_frequency_Hz']=float(cts_probe_frequency_unc)
@@ -3176,6 +3204,8 @@ elif page=='Advanced Analysis':
                         external_unc['ion_fractions']=fraction_unc
                     if external_unc: kwargs_cts['external_parameter_uncertainties']=external_unc
                     if cts_method=='regularized':
+                        if not cts_regularization.strip():
+                            raise ValueError('Enter the regularization strength explicitly for regularized inversion.')
                         kwargs_cts['regularization_strength']=float(cts_regularization)
                     result_cts=analyze_cts_spectrum(frequency,spectrum,**kwargs_cts)
                     st.success('CTS spectral inversion completed within the declared model scope.')
