@@ -81,3 +81,9 @@ These are mathematical and software regression tests using controlled synthetic 
 2. J. Zhang et al., “Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm,” *Review of Scientific Instruments* 95, 093542 (2024), DOI: 10.1063/5.0215734.
 3. B. C. Foo et al., “Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution,” *Review of Scientific Instruments* 97, 103535 (2026), DOI: 10.1063/5.0350497.
 4. G. A. Baker et al., “Recovering Non-Maxwellian Velocity Distribution Functions from Collective Thomson Scattering Spectra Using Generalized Basis Representations,” arXiv:2610.37516 (2026). This preprint motivates flexible non-Maxwellian VDF inversion; TIS currently uses a tabulated 1-D projected VDF with explicit smoothness regularization.
+
+
+## Recent diagnostic and inversion literature
+
+5. T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513. DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948). This supports the importance of CTS background characterization; TIS does not perform automatic background estimation because the project input contract assumes prepared, calibrated measurement data.
+6. “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026). DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845). This recent work combines ray tracing, forward modelling and Bayesian spectral inversion for CTS diagnostic design. It is cited as current diagnostic/inversion context, not as a claim that TIS reproduces its full magnetized electromagnetic model.

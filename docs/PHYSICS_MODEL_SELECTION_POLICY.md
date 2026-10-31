@@ -35,3 +35,13 @@ The first two are the primary regime-dependent model families; the third is cond
 ## Implementation status
 
 This file establishes the governing selection and documentation policy. It does **not** claim that all 80 diagnostic-specific model shortlists have already been researched or implemented. Each registry entry must be assessed against its own measured inputs and physics before its 2–3 model shortlist is finalized.
+
+
+## Collective Thomson / microwave CTS subanalysis
+
+The current TIS CTS implementation is deliberately scoped to a frequency-domain, unmagnetized electrostatic longitudinal dielectric-response model with explicitly supplied ion species/composition and a measured frequency-response operator. It is not a full magnetized electromagnetic CTS model for arbitrary tokamak geometry. Numerical optimizers (differential evolution, genetic search, bounded least squares and regularization) are inversion strategies, not additional physical models.
+
+Recent primary literature used to document the CTS diagnostic/inversion context:
+- J. Zhang et al., “Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm,” *Review of Scientific Instruments* **95** (2024), 093542. DOI: [10.1063/5.0215734](https://doi.org/10.1063/5.0215734). Supports CTS spectral decomposition and ion-temperature sensitivity; the genetic algorithm is an optimizer, not the scattering theory.
+- T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513. DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948). Supports current CTS background-characterization practice; automatic background estimation is outside the TIS calibrated-input contract.
+- “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026). DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845). Supports contemporary CTS forward-model and Bayesian-inversion architecture; the current TIS implementation does not claim to reproduce its full ray-tracing/electromagnetic model.

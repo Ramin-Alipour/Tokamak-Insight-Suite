@@ -125,7 +125,7 @@ References:
 
 ## Legacy profile utilities
 
-analyze_thomson_profile and reconstruct_thomson_profile remain available for users who already have independently obtained calibrated density/temperature profiles. They are downstream profile-summary utilities only and are no longer the primary Analysis 1 contract or registered entry point.
+analyze_thomson_profile and reconstruct_thomson_profile are retained only as backward-compatibility numerical helpers for historical callers that already possess derived ne/Te profile points. They are not registered diagnostic subanalyses and are not exposed in the dashboard. The registered “Thomson spatial profile reconstruction” subanalysis instead accepts measured, calibrated multi-channel spectra and delegates to the canonical physical forward-inference engine; it never accepts pre-derived ne/Te profile points.
 
 ## Software testing
 
