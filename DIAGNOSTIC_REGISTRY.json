@@ -302,6 +302,16 @@
           "name": "integrated_scattered_power_joint_covariance",
           "unit": "n_channels x n_channels; integrated power squared",
           "description": "Cross-channel covariance of fitted integrated spectral power from joint spectral GLS and measured-response Monte Carlo."
+        },
+        {
+          "name": "effective_differential_cross_section_m2_sr",
+          "unit": "m^2 sr^-1",
+          "description": "Relativistic Maxwell-Juttner only: velocity-averaged polarized differential cross-section from the same relativistic spectral forward model."
+        },
+        {
+          "name": "effective_differential_cross_section_uncertainty_m2_sr",
+          "unit": "m^2 sr^-1",
+          "description": "Relativistic Maxwell-Juttner only: fitted-parameter covariance plus supplied instrument-response and geometry/polarization uncertainty contributions."
         }
       ],
       "assumptions": [
