@@ -101,9 +101,9 @@ Legacy functions that accept already-derived profile points remain downstream co
 The implementation uses a small set of physical model families rather than an unbounded collection of fitting options. Recent peer-reviewed references informing the current model scope include:
 
 1. Carole et al., “A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak,” *Journal of Instrumentation* **20** (2025), P07014, DOI: [10.1088/1748-0221/20/07/P07014](https://doi.org/10.1088/1748-0221/20/07/P07014).
-2. Skolar, Longley and Goodwin, “Non-Maxwellian electron distribution effects in Thomson scattering,” *Physics of Plasmas* **32** (2025), 043907, DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966).
+2. Skolar, Longley and Goodwin, *Physics of Plasmas* **32** (2025), 043907, DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966), on non-Maxwellian electron-distribution effects in Thomson spectra.
 3. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering,” *Review of Scientific Instruments* **96** (2025), 043513, DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948).
-4. Sakai et al., relativistic/non-Maxwellian Thomson spectral forward modelling, *Journal of Instrumentation* **21** (2026), C01002, DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002).
+4. Sakai et al., *Journal of Instrumentation* **21** (2026), C01002, DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002), on Monte Carlo forward spectra for general electron distributions.
 5. Foo et al., “Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution,” *Review of Scientific Instruments* **97** (2026), 103535, DOI: [10.1063/5.0350497](https://doi.org/10.1063/5.0350497).
 
 These references motivate instrument-aware forward modelling, non-Maxwellian/relativistic spectral treatment and regularized inference. The TIS models are scoped implementations and are not claimed to reproduce every method in those papers.
