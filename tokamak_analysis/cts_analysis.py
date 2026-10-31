@@ -136,7 +136,9 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         idx=fast_ion.get("species_index")
         if isinstance(idx,bool) or not isinstance(idx,(int,np.integer)) or not 0<=idx<len(ions): raise ValueError("invalid fast_ion.species_index")
         idx=int(idx)
-        hf=float(fast_ion.get("fraction",0.))
+        if "fraction" not in fast_ion:
+            raise ValueError("fast_ion.fraction must be supplied explicitly when a fast-ion population is selected")
+        hf=float(fast_ion["fraction"])
         if not np.isfinite(hf) or not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
         kind=fast_ion.get("kind")
         if kind not in {"maxwellian","tabulated_1d"}:
