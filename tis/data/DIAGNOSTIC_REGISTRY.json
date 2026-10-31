@@ -353,7 +353,7 @@
           "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
         }
       ],
-      "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its separate registered workflow. No detector calibration or independent experimental validation is performed.",
+      "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
@@ -5177,7 +5177,7 @@
           "name": "model",
           "unit": "non_collective_maxwellian, non_collective_kappa or non_collective_relativistic_maxwell_juttner",
           "required": true,
-          "description": "Select one of the three optical Thomson forward models explicitly; collective microwave CTS is a separate registered workflow."
+          "description": "Select one of the three optical Thomson forward models explicitly; collective microwave CTS is a dedicated registered subanalysis within primary Analysis 1."
         },
         {
           "name": "laser_wavelength_uncertainty_nm",
@@ -5367,7 +5367,7 @@
         "Joint full-channel GLS is implemented for non-collective Maxwellian and Kappa models only; the relativistic Maxwell-Juttner model uses its declared channel-local covariance path.",
         "Profile reconstruction does not extrapolate beyond the measured radial interval; unresolved or non-identifiable parameters are reported as such.",
         "No independent experimental validation is claimed.",
-        "Optical collective dielectric inference is outside the current Analysis 1 model shortlist; microwave CTS is a separate registered subanalysis."
+        "Optical collective dielectric inference is outside the current Analysis 1 model shortlist; microwave CTS is a dedicated registered subanalysis within primary Analysis 1."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"
@@ -5396,7 +5396,7 @@
           "scope": "Profile-oriented output from the canonical measured calibrated spectrum-to-physics inference; no pre-derived profile input."
         }
       ],
-      "completion_scope": "Profile-oriented output from the canonical measured-calibrated optical Thomson spectrum-to-physics inference using the three selected non-collective models. PCHIP and generalized-cross-validation spline reconstruction are restricted to the measured radial interval; no pre-derived ne/Te profile points are accepted. Microwave collective CTS remains a separate registered subanalysis. No independent experimental validation is claimed.",
+      "completion_scope": "Profile-oriented output from the canonical measured-calibrated optical Thomson spectrum-to-physics inference using the three selected non-collective models. PCHIP and generalized-cross-validation spline reconstruction are restricted to the measured radial interval; no pre-derived ne/Te profile points are accepted. Microwave collective CTS remains a dedicated subanalysis within primary Analysis 1. No independent experimental validation is claimed.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
