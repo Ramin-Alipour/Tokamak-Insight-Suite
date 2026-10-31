@@ -212,6 +212,11 @@ def _weighted_standard_uncertainty(weights, uncertainty) -> float | None:
 
 
 def profile_summary(profile: ThomsonProfile, density_m3=None, temperature_ev=None) -> ThomsonSummary:
+    """Summarize calibrated profiles over the measured radial interval only.
+
+    The summary deliberately excludes geometry-weighted volume averages: those
+    require additional geometric assumptions and are outside the core workflow.
+    """
     if not isinstance(profile, ThomsonProfile):
         if density_m3 is None or temperature_ev is None:
             raise TypeError("profile_summary requires a ThomsonProfile or radius, density and temperature arrays")
@@ -220,11 +225,6 @@ def profile_summary(profile: ThomsonProfile, density_m3=None, temperature_ev=Non
             DeprecationWarning, stacklevel=2,
         )
         profile = build_profile(profile, density_m3, temperature_ev)
-    """Summarize calibrated profiles over the measured radial interval only.
-
-    The summary deliberately excludes geometry-weighted volume averages: those
-    require additional geometric assumptions and are outside the core workflow.
-    """
     r, ne, te = profile.radius_m, profile.density_m3, profile.temperature_ev
     radial_span = float(r[-1] - r[0])
     trap_weights = _trapezoid_weights(r)

@@ -2987,6 +2987,7 @@ elif page=='Advanced Analysis':
                 cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
                 cts_method=st.selectbox('Inversion method',['differential_evolution','improved_genetic','regularized'],key='cts_inversion_method')
+                st.caption('Regularized inversion is only available when inferring a tabulated fast-ion velocity distribution; initial plasma guesses are optimizer starting points, not physical priors.')
                 cts_regularization=st.number_input('Regularization strength (used by regularized mode)',min_value=0.0,value=0.1,format='%.6g',key='cts_regularization')
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
