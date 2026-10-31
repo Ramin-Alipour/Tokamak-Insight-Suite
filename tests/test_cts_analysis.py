@@ -25,7 +25,7 @@ def test_cts_global_search_requires_explicit_finite_scientific_bounds():
             ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
             instrument_response=response,electron_density_initial_m3=2e19,
             electron_temperature_initial_eV=1200.0,ion_temperature_initial_eV=800.0,
-            ion_velocity_initial_m_s=0.0,global_search=True,
+            ion_velocity_initial_m_s=0.0,global_search=True,inversion_method="differential_evolution",
         )
 
 
@@ -55,7 +55,7 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
     y=2.4e4*z+3.
     out=analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,
       signal_uncertainty=np.full_like(y,.02*np.max(y)),electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
-      ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],global_search=False)
+      ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],global_search=False,inversion_method="local_least_squares")
     assert out["electron_density_m3"]==pytest.approx(truth[0],rel=.08)
     assert out["electron_temperature_eV"]==pytest.approx(truth[1],rel=.08)
     assert out["ion_temperature_eV"]==pytest.approx(truth[2],rel=.08)
@@ -117,10 +117,10 @@ def test_cts_correlated_frequency_covariance_is_accepted_and_reported():
         ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,spectral_covariance=covariance,
         electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
         ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],
-        global_search=False,
+        global_search=False,inversion_method="local_least_squares",
     )
     assert out["reduced_chi_square"] is not None
-    assert out["inversion_method"]=="differential_evolution"
+    assert out["inversion_method"]=="local_least_squares"
 
 
 def test_cts_regularized_inversion_requires_explicit_vdf_regularization_target():
@@ -165,7 +165,7 @@ def test_cts_response_and_external_geometry_uncertainties_are_monte_carlo_propag
         ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,
         electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
         ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],
-        global_search=False,instrument_response_uncertainty=np.zeros_like(response),
+        global_search=False,inversion_method="local_least_squares",instrument_response_uncertainty=np.zeros_like(response),
         external_parameter_uncertainties={"scattering_angle_rad":1e-4,"electron_velocity_projection_m_s":50.0},
         response_mc_samples=20,
     )
@@ -191,7 +191,7 @@ def test_cts_analysis_can_fit_fraction_of_fixed_tabulated_fast_ion_vdf():
         electron_density_initial_m3=2e19,electron_temperature_initial_eV=1200,
         ion_temperature_initial_eV=800,ion_velocity_initial_m_s=1.5e4,
         fast_ion={**truth,"fraction_initial":0.08,"fraction_bounds":(0.01,0.2)},
-        global_search=False,
+        global_search=False,inversion_method="local_least_squares",
     )
     assert out["fast_ion"]["fraction"]==pytest.approx(0.08,rel=0.15)
     assert out["fast_ion_vdf_provenance"].startswith("externally supplied")
