@@ -276,6 +276,10 @@ def density_from_thomson_scattered_power(
                 scattering_angle_relative_sensitivity = -factor_derivative / factor
         rel_variance += (scattering_angle_relative_sensitivity * sigma_theta) ** 2
 
+    if rel_variance < -1e-12:
+        raise ValueError("density uncertainty propagation produced a negative relative variance")
+    rel_variance = max(0.0, rel_variance)
+
     return {
         "electron_density_m3": float(density),
         "electron_density_uncertainty_m3": float(density * np.sqrt(rel_variance)) if uncertainty_supplied else None,
