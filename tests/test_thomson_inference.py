@@ -870,3 +870,44 @@ def test_joint_density_covariance_retains_common_scattering_angle_uncertainty():
     covariance = with_angle["electron_density_joint_covariance_m6"]
     assert covariance.shape == (2, 2)
     assert covariance[0, 1] > 0.0
+
+
+def test_spectral_distribution_rejects_shape_only_execution():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    x, y, _ = _spectral_case(120.0)
+    background = 25.0 + 0.1 * (x - 532.0)
+    with pytest.raises(ValueError, match="physical_parameters is required"):
+        analyze_thomson_spectral_distribution(
+            x, y,
+            instrument_response_matrix=np.eye(x.size),
+            background_signal=background,
+        )
+
+
+def test_spectral_distribution_requires_fitted_physical_parameters_and_reports_them():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    x, y, _ = _spectral_case(120.0)
+    background = 25.0 + 0.1 * (x - 532.0)
+    physical = {
+        "model": "non_collective_maxwellian",
+        "electron_temperature_eV": 120.0,
+        "electron_temperature_uncertainty_eV": 2.0,
+        "electron_velocity_projection_m_s": 0.0,
+        "electron_velocity_projection_uncertainty_m_s": 100.0,
+        "electron_density_m3": None,
+        "electron_density_uncertainty_m3": None,
+    }
+    result = analyze_thomson_spectral_distribution(
+        x, y,
+        instrument_response_matrix=np.eye(x.size),
+        background_signal=background,
+        physical_parameters=physical,
+    )
+    extracted = result["physical_parameter_extraction"]
+    assert extracted["status"] == "completed"
+    assert extracted["model"] == "non_collective_maxwellian"
+    assert extracted["electron_temperature_eV"] == pytest.approx(120.0)
+    assert extracted["electron_velocity_projection_m_s"] == pytest.approx(0.0)
+    assert extracted["electron_density_status"].startswith("not_identifiable")
