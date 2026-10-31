@@ -260,9 +260,7 @@ def full_em_cts_spectral_density(
         raise ValueError("incident_polarization and scattered_polarization must be non-zero")
     ei /= np.linalg.norm(ei)
     es /= np.linalg.norm(es)
-    if abs(np.vdot(ei, ki_hat)) > 1e-6 or abs(np.vdot(es, ks_hat)) > 1e-6:
-        raise ValueError("incident and scattered polarization vectors must be transverse to their beam directions")
-    cold_wave_species = [{
+    # In an anisotropic magnetized plasma, cold-plasma eigenmodes can have a longitudinal E component.\n    # These vectors are branch-selection seeds; the solver replaces them with flux-normalized eigenmodes.\n    cold_wave_species = [{
         "density_m3": sp["density"], "charge_C": sp["charge"], "mass_kg": sp["mass"]
     } for sp in species]
     incident_wavevector, incident_mode_field, incident_mode_diagnostics = _select_flux_normalized_cold_mode(
