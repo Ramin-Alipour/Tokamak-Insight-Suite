@@ -820,7 +820,6 @@ def analyze_full_em_cts_spectrum(
         whiten = lambda value: value / unc
     else:
         raise ValueError("signal_uncertainty or spectral_covariance is required for full-EM inversion")
-    bounds = parameter_bounds or {}
     if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or len(ion_species) == 0:
         raise ValueError("ion_species must be a non-empty sequence for species-resolved CTS inversion")
     species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
@@ -842,6 +841,10 @@ def analyze_full_em_cts_spectrum(
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping from parameter names to positive increasing pairs")
     bounds = {} if parameter_bounds is None else dict(parameter_bounds)
+    allowed_bound_names = set(names) | {"ion_temperature_eV"}
+    unknown_bound_names = set(bounds)-allowed_bound_names
+    if unknown_bound_names:
+        raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
     initial = np.concatenate((
         [_positive(electron_density_initial_m3, "electron_density_initial_m3"),
          _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV")],
@@ -943,6 +946,7 @@ def analyze_full_em_cts_spectrum(
         "ion_temperature_eV": (float(values[2]) if len(species_names) == 1 else unpack_temperatures(fit.x)),
         "ion_temperature_eV_by_species": unpack_temperatures(fit.x),
         "parameter_names": list(names),
+        "parameter_bounds": applied_bounds,
         "fit_covariance": covariance,
         "parameter_uncertainties": np.sqrt(np.maximum(np.diag(covariance), 0.0)),
         "fitted_spectrum": amplitude * convolved + offset,
