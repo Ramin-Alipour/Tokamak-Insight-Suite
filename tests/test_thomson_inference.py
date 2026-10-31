@@ -944,3 +944,19 @@ def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
     convolved = _apply_response_matrix(response, signal, wavelength)
     widths = _wavelength_bin_widths(wavelength)
     assert np.sum(convolved*widths) == pytest.approx(np.sum(signal*widths), rel=1e-12)
+
+
+def test_spectral_distribution_requires_explicit_background_source():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    x, y, _ = _spectral_case(120.0)
+    with pytest.raises(ValueError, match="background"):
+        analyze_thomson_spectral_distribution(
+            x, y,
+            instrument_response_matrix=np.eye(x.size),
+            physical_parameters={
+                "model": "non_collective_maxwellian",
+                "electron_temperature_eV": 120.0,
+                "electron_velocity_projection_m_s": 0.0,
+            },
+        )
