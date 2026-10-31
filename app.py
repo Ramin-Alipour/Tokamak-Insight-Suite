@@ -932,6 +932,7 @@ elif page=='Spectral Analysis':
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
             relativistic_polarization_text=None
+            relativistic_recoil_limit_text=None
             relativistic_incident_direction_unc_text=None
             relativistic_scattered_direction_unc_text=None
             relativistic_polarization_unc_text=None
@@ -946,7 +947,11 @@ elif page=='Spectral Analysis':
                     relativistic_scattered_direction_unc_text=st.text_input('Scattered-direction component 1σ uncertainties (x,y,z; optional)',key='ts_infer_rel_scattered_direction_unc')
                 relativistic_polarization_text=st.text_input('Incident polarization vector (x,y,z)',key='ts_infer_rel_incident_polarization')
                 relativistic_polarization_unc_text=st.text_input('Incident-polarization component 1σ uncertainties (x,y,z; optional)',key='ts_infer_rel_incident_polarization_unc')
-                st.caption('The relativistic fit now Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
+                relativistic_recoil_limit_text=st.text_input(
+                    'Maximum accepted no-recoil Compton correction fraction (default 1%)',
+                    value='0.01',key='ts_infer_rel_recoil_limit',
+                )
+                st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. It evaluates the maximum represented electron-rest-frame Compton correction and rejects spectra above this explicit fractional limit. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
             absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
             density_kwargs={}
             density_covariance_upload=None
@@ -1079,6 +1084,10 @@ elif page=='Spectral Analysis':
                         if relativistic_polarization_unc_text.strip():
                             kwargs['incident_polarization_uncertainty']=_parse_ts_vector(
                                 relativistic_polarization_unc_text,'Incident-polarization component uncertainties')
+                        kwargs['maximum_recoil_correction_fraction']=_parse_ts_scalar(
+                            relativistic_recoil_limit_text,'Maximum no-recoil Compton correction fraction',
+                            minimum=1e-12,maximum=0.999999,
+                        )
                     if absolute_density:
                         kwargs.update({
                             'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
