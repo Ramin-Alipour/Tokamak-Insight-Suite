@@ -3084,7 +3084,10 @@
       ],
       "uncertainty_model": "First-order propagation using independent supplied standard uncertainties or a 6x6 relative covariance matrix for the six multiplicative inputs, plus fitted power/effective-cross-section covariance. For relativistic Maxwell-Juttner, fitted-parameter covariance, instrument-response uncertainty and supplied geometry/polarization uncertainty are propagated through the velocity-averaged effective differential cross-section. Scattering-angle uncertainty is handled separately for non-relativistic models; do not double-count inputs.",
       "test_links": [
-        "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference"
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference",
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_uses_supplied_effective_relativistic_cross_section",
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_propagates_fitted_power_cross_section_covariance",
+        "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties"
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation.",
       "raw_data_to_physics": false,
