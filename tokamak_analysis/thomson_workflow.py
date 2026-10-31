@@ -354,6 +354,20 @@ def reconstruct_thomson_profile_from_spectra(
             np.diag(np.square(alpha_uncertainties))
             if np.all(np.isfinite(alpha_uncertainties)) else None
         )
+        if alpha_covariance is not None:
+            for contribution_key in (
+                "scattering_parameter_alpha_laser_uncertainty_contribution",
+                "scattering_parameter_alpha_angle_uncertainty_contribution",
+            ):
+                shared_contribution = np.asarray([
+                    channel.get(contribution_key, np.nan) for channel in result["channels"]
+                ], dtype=float)
+                if np.all(np.isfinite(shared_contribution)):
+                    shared_source_covariance = np.outer(
+                        shared_contribution, shared_contribution
+                    )
+                    np.fill_diagonal(shared_source_covariance, 0.0)
+                    alpha_covariance += shared_source_covariance
         candidates.append(("scattering_parameter_alpha", None, None, alpha_covariance, True))
     spectral_profile_inputs = {}
     power_values = np.asarray([
