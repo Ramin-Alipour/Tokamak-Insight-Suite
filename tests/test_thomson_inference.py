@@ -736,7 +736,7 @@ def test_joint_gls_preserves_laser_and_geometry_uncertainty_components():
 
 def test_beam_direction_component_uncertainty_is_rejected_outside_collective_model():
     x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="only by the collective"):
+    with pytest.raises(ValueError, match="only by collective dielectric"):
         analyze_thomson_spectra(
             x, y[None, :], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
