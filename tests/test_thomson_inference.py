@@ -288,9 +288,11 @@ def test_kappa_fit_is_invariant_to_absolute_intensity_scaling_and_integrates_ful
 
     assert second["electron_temperature_eV"] == pytest.approx(first["electron_temperature_eV"], rel=1e-6)
     assert second["kappa_index"] == pytest.approx(first["kappa_index"], rel=1e-6)
-    assert second["integrated_scattered_power_W"] == pytest.approx(
-        first["integrated_scattered_power_W"] * 1e6, rel=1e-6
+    assert second["integrated_spectral_signal_input_units_nm"] == pytest.approx(
+        first["integrated_spectral_signal_input_units_nm"] * 1e6, rel=1e-6
     )
+    assert first["absolute_scattered_power_available"] is False
+    assert first["integrated_spectral_signal_unit"] == "input spectral-intensity unit × nm"
 
 
 def test_spectral_inference_rejects_boolean_and_string_measurements():
