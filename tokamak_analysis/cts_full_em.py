@@ -252,6 +252,10 @@ def full_em_cts_spectral_density(
     ):
         if not isinstance(frequency_geometry, Sequence) or isinstance(frequency_geometry, (str, bytes)) or len(frequency_geometry) != shifts.size:
             raise ValueError("scattering-volume geometry must contain one frequency record per measured spectral bin")
+        if "frequency_shift_Hz" in scattering_geometry:
+            geometry_shifts = np.asarray(scattering_geometry["frequency_shift_Hz"], dtype=float)
+            if geometry_shifts.shape != shifts.shape or not np.allclose(geometry_shifts, shifts, rtol=1e-10, atol=1e-6):
+                raise ValueError("scattering-volume ray geometry must use the same frequency_shift_Hz axis as the measured spectrum")
         integrated_spectrum = np.zeros(shifts.size, dtype=float)
         diagnostic_keys = (
             "fluctuation_covariance_density_current_E_B", "dielectric_tensor",
@@ -273,6 +277,8 @@ def full_em_cts_spectral_density(
             samples = frequency_record["scattering_samples"]
             if not isinstance(samples, Sequence) or isinstance(samples, (str, bytes)) or len(samples) == 0:
                 raise ValueError(f"scattering_samples[{frequency_index}] must be a non-empty sequence")
+            if any(not isinstance(sample, Mapping) for sample in samples):
+                raise ValueError(f"scattering_samples[{frequency_index}] entries must be mappings")
             sample_weights = np.asarray([sample.get("sample_weight", np.nan) for sample in samples], dtype=float)
             if (np.any(~np.isfinite(sample_weights)) or np.any(sample_weights < 0)
                     or not np.isclose(np.sum(sample_weights), 1.0, rtol=1e-8, atol=1e-10)):
@@ -313,8 +319,8 @@ def full_em_cts_spectral_density(
                     electron_distribution=electron_distribution,
                 )
                 local_spectrum += float(sample_weight)*float(sample_result["spectral_density"][0])
-                local_location += float(sample_weight)*np.asarray(sample["scattering_location_m"], dtype=float)
-                local_field += float(sample_weight)*np.asarray(sample["magnetic_field_T"], dtype=float)
+                local_location += float(sample_weight)*_finite_vec3(sample["scattering_location_m"], "scattering sample location")
+                local_field += float(sample_weight)*_finite_vec3(sample["magnetic_field_T"], "scattering sample magnetic field")
                 for key in diagnostic_keys:
                     value = np.asarray(sample_result[key][0])
                     if local_diagnostics[key] is None:
@@ -737,6 +743,8 @@ def full_em_cts_spectral_density(
         "frequency_resolved_magnetic_field_T": np.asarray(local_magnetic_fields),
         "relative_gaussian_beam_overlap": np.asarray(beam_overlap_weights),
         "ray_tracing_geometry_used": frequency_geometry is not None,
+        "scattering_volume_integration_used": False,
+        "scattering_volume_weighting": "single local scattering point; no path-integrated scattering-volume quadrature",
         "scattering_locations_m": (np.asarray([item["scattering_location_m"] for item in frequency_geometry])
                                    if frequency_geometry is not None and all("scattering_location_m" in item for item in frequency_geometry)
                                    else None),
