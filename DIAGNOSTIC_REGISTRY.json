@@ -4201,18 +4201,20 @@
         {
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Optional for electrostatic CTS. Full-electromagnetic CTS requires this or spectral_covariance."
         },
         {
           "name": "fast_ion",
           "unit": "structured",
-          "required": false
+          "required": false,
+          "description": "If supplied, kind and fraction_initial are mandatory. Maxwellian fast ions additionally require temperature_initial_eV; temperature_bounds_eV is optional. Inferred tabulated VDFs require explicit smoothness and regularized inversion. Fraction bounds default only to the physical interval (0,1)."
         },
         {
           "name": "parameter_bounds",
           "unit": "structured",
           "required": false,
-          "description": "Optional researcher-supplied positive increasing pairs keyed by electron_density_m3, electron_temperature_eV and ion_temperature_eV:<species> (or common ion_temperature_eV). No scientific parameter bounds are imposed when omitted; positive log-parameters remain unbounded."
+          "description": "Optional researcher-supplied bounds. When omitted, positive log-parameters remain unbounded and the common ion-flow projection is restricted only by the physical subluminal domain. Global search requires finite explicit bounds for every fitted parameter."
         },
         {
           "name": "spectral_covariance",
@@ -4222,7 +4224,8 @@
         {
           "name": "external_parameter_uncertainties",
           "unit": "structured 1-sigma mapping",
-          "required": false
+          "required": false,
+          "description": "Electrostatic path only: supported independent 1-sigma marginals for probe frequency, electron-flow projection, scalar scattering angle and ion fractions. Full cross-parameter covariance is not supported."
         },
         {
           "name": "inversion_method",
@@ -4262,7 +4265,8 @@
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": false
+          "required": true,
+          "description": "Required common projected ion-flow optimizer initial estimate; no zero-flow initial value is assumed."
         },
         {
           "name": "global_search",
@@ -4568,7 +4572,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "Electrostatic CTS retains its longitudinal model. Magnetized full-EM computes species kinetic conductivity, screened fluctuation covariance and receiver-projected three-wave source. Maxwellian bulk electrons use the Bindslev Gamma/X source; explicitly supplied relativistic gyrotropic non-Maxwellian electrons/fast ions contribute a second-order relativistic Vlasov vertex. Thermal-ion temperatures are independently fitted by species. Optional frequency-resolved cold-plasma rays determine local wave directions/field and Gaussian beam-overlap weights applied bin-by-bin to spectral transfer.",
-      "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Ion-fraction uncertainties are independently perturbed and renormalized; full species-composition covariance is not supported.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from the supplied signal uncertainty or spectral covariance only; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -4578,7 +4582,9 @@
         "Absolute beam-overlap path integrals are used as relative spectral-bin weights; absolute launcher/receiver power coupling normalization is not implemented.",
         "Ion species and charge-density fractions are fixed external inputs; only their temperatures are fitted.",
         "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
-        "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model."
+        "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model.",
+        "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
+        "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
