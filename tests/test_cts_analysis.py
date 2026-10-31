@@ -398,3 +398,56 @@ def test_full_em_cts_exposes_bindslev_three_wave_coupling():
     assert len(result["bindslev_coupling_coefficients"]) == 3
     assert "Gamma^{-1}" in result["three_wave_coupling"]
     assert np.all(np.isfinite(result["spectral_density"]))
+
+
+def test_relativistic_anisotropic_gyrotropic_fast_ion_response_and_shot_noise():
+    from tokamak_analysis.cts_relativistic import relativistic_gyrotropic_species_response
+
+    result = relativistic_gyrotropic_species_response(
+        2*np.pi*1.0e8, [12.0, 0.0, 18.0], [0.0, 0.0, 2.0],
+        density_m3=1.0e16, mass_kg=2.014*1.66053906660e-27,
+        charge_C=1.602176634e-19,
+        distribution={"kind":"relativistic_bigaussian",
+                      "temperature_perpendicular_eV":8.0e5,
+                      "temperature_parallel_eV":2.0e5},
+        quadrature_order=4, gyrophase_points=16,
+        resonance_width_rad_s=2*np.pi*1e5,
+    )
+    sigma=result["conductivity_S_m"]
+    noise=result["bare_current_spectral_covariance"]
+    assert sigma.shape==(3,3) and np.all(np.isfinite(sigma))
+    assert noise.shape==(3,3) and np.all(np.isfinite(noise))
+    np.testing.assert_allclose(noise,noise.conj().T,rtol=1e-10,atol=1e-30)
+    assert np.min(np.linalg.eigvalsh(noise)) >= -1e-10*max(np.max(np.abs(noise)),1e-300)
+    assert result["relativistic_kinematics"] is True
+    assert result["anisotropy"].startswith("p_perpendicular")
+    assert result["velocity_max_fraction_c"] > 0
+
+
+def test_full_em_cts_accepts_relativistic_anisotropic_fast_ion_population():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    result=full_em_cts_spectral_density(
+        [0.8e9,1.0e9],140e9,
+        {"incident_direction":[1.0,0.0,0.0],
+         "scattered_direction":[np.cos(1.8),np.sin(1.8),0.0]},
+        electron_density_m3=2e19,electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=[{"name":"D+","charge_state":1,"mass_amu":2.014}],
+        ion_fractions=[1.0],magnetic_field_T=[0.0,0.0,2.0],
+        electron_flow_velocity_m_s=[0.0,0.0,0.0],
+        ion_flow_velocity_m_s={"D+":[0.0,0.0,0.0]},
+        incident_polarization=[0.0,0.0,1.0],
+        scattered_polarization=[0.0,0.0,1.0],
+        harmonic_order=3,quadrature_order=4,
+        fast_ion_populations=[{
+            "name":"D_fast","charge_state":1,"mass_amu":2.014,
+            "density_m3":1e16,"flow_velocity_m_s":[0.0,0.0,0.0],
+            "distribution":{"kind":"relativistic_bigaussian",
+                "temperature_perpendicular_eV":8e5,
+                "temperature_parallel_eV":2e5}
+        }],
+    )
+    assert len(result["fast_ion_populations"])==1
+    assert result["spectral_density"].shape==(2,)
+    assert np.all(np.isfinite(result["spectral_density"]))
