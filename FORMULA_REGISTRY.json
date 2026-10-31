@@ -3289,11 +3289,12 @@
       "function_links": [
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
       ],
-      "raw_data_to_physics": true,
+      "raw_data_to_physics": false,
       "note": "This is a true joint generalized least-squares fit over all supplied channels, not post-hoc independent-channel error correlation.",
       "test_links": [
         "tests/test_thomson_inference.py::test_joint_multi_channel_gls_propagates_cross_channel_spectral_covariance"
-      ]
+      ],
+      "calibrated_measurements_to_physics": true
     },
     "references": [
       {
@@ -3367,11 +3368,12 @@
         "tokamak_analysis.cts_analysis._component_tabulated",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
-      "raw_data_to_physics": true,
+      "raw_data_to_physics": false,
       "note": "Tabulated VDF shape can be inferred only when infer_tabulated_1d is selected with regularized inversion; fixed tabulated_1d mode treats the shape as an external input.",
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_tabulated_non_maxwellian_fast_ion_forward_model"
-      ]
+      ],
+      "calibrated_measurements_to_physics": false
     },
     "references": [
       {
