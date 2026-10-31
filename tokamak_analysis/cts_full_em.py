@@ -168,6 +168,7 @@ def full_em_cts_spectral_density(
     electron_flow_velocity_m_s, ion_flow_velocity_m_s,
     incident_polarization, scattered_polarization,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
+    fast_ion_populations=None,
 ):
     """Return a local full-EM magnetized CTS spectrum and fluctuation diagnostics.
 
@@ -195,6 +196,26 @@ def full_em_cts_spectral_density(
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ti,
                             electron_flow_velocity_m_s, ion_flow_velocity_m_s)
+    if fast_ion_populations is not None:
+        if not isinstance(fast_ion_populations, Sequence) or isinstance(fast_ion_populations, (str, bytes)):
+            raise ValueError("fast_ion_populations must be a sequence of explicit gyrotropic populations")
+        for index, population in enumerate(fast_ion_populations):
+            if not isinstance(population, Mapping):
+                raise ValueError(f"fast_ion_populations[{index}] must be a mapping")
+            name = str(population.get("name", f"fast_ion_{index}"))
+            charge_state = _positive(population.get("charge_state"), f"fast_ion_populations[{index}].charge_state")
+            mass_amu = _positive(population.get("mass_amu"), f"fast_ion_populations[{index}].mass_amu")
+            density = _positive(population.get("density_m3"), f"fast_ion_populations[{index}].density_m3")
+            distribution = population.get("distribution")
+            if not isinstance(distribution, Mapping):
+                raise ValueError(f"fast_ion_populations[{index}].distribution is required")
+            species.append({
+                "name": name, "density": density, "temperature": 1.0,
+                "mass": mass_amu * AMU, "charge": charge_state * E_CHARGE,
+                "flow": _finite_vec3(population.get("flow_velocity_m_s", [0, 0, 0]),
+                                     f"fast_ion_populations[{index}].flow_velocity_m_s"),
+                "distribution": distribution, "fast_ion": True,
+            })
     ei = np.asarray(incident_polarization, dtype=complex).copy()
     es = np.asarray(scattered_polarization, dtype=complex).copy()
     if ei.shape != (3,) or es.shape != (3,) or np.any(~np.isfinite(ei)) or np.any(~np.isfinite(es)):
@@ -231,10 +252,26 @@ def full_em_cts_spectral_density(
         omega = 2.0 * np.pi * shift
         if abs(omega) < damping:
             omega = np.copysign(damping, omega if omega else 1.0)
-        sigmas = [_species_conductivity(omega, kvec, b, sp,
-                    harmonic_order=int(harmonic_order),
+        sigmas = []
+        fast_bare_covariances = {}
+        for species_index, sp in enumerate(species):
+            if sp.get("fast_ion", False):
+                from .cts_relativistic import relativistic_gyrotropic_species_response
+                kinetic = relativistic_gyrotropic_species_response(
+                    omega, kvec, b, density_m3=sp["density"], mass_kg=sp["mass"],
+                    charge_C=sp["charge"], distribution=sp["distribution"],
                     quadrature_order=int(quadrature_order),
-                    damping_rate_rad_s=damping) for sp in species]
+                    gyrophase_points=max(16, 4*int(harmonic_order)),
+                    resonance_width_rad_s=damping,
+                )
+                sigmas.append(kinetic["conductivity_S_m"])
+                fast_bare_covariances[species_index] = kinetic["bare_current_spectral_covariance"]
+            else:
+                sigmas.append(_species_conductivity(
+                    omega, kvec, b, sp, harmonic_order=int(harmonic_order),
+                    quadrature_order=int(quadrature_order),
+                    damping_rate_rad_s=damping
+                ))
         sigma_total = np.sum(sigmas, axis=0)
         epsilon = np.eye(3, dtype=complex) + 1j * sigma_total / (EPS0 * omega)
         k_norm = np.linalg.norm(kvec)
@@ -250,12 +287,18 @@ def full_em_cts_spectral_density(
         # Independent-particle Langevin currents are related to Re(sigma) by
         # the classical fluctuation-dissipation theorem (two-sided spectrum).
         q_blocks = []
-        for sp, sigma in zip(species, sigmas):
-            q_blocks.append(_hermitian_psd(
-                2.0 * KB * sp["temperature"] * E_CHARGE
-                * 0.5 * (sigma + sigma.conj().T),
-                f"bare current spectrum for {sp['name']}"
-            ))
+        for species_index, (sp, sigma) in enumerate(zip(species, sigmas)):
+            if species_index in fast_bare_covariances:
+                q_blocks.append(_hermitian_psd(
+                    fast_bare_covariances[species_index],
+                    f"Klimontovich bare current spectrum for {sp['name']}"
+                ))
+            else:
+                q_blocks.append(_hermitian_psd(
+                    2.0 * KB * sp["temperature"] * E_CHARGE
+                    * 0.5 * (sigma + sigma.conj().T),
+                    f"bare current spectrum for {sp['name']}"
+                ))
         source_cov = np.zeros((3 * len(species), 3 * len(species)), dtype=complex)
         for j, qj in enumerate(q_blocks):
             source_cov[3*j:3*j+3, 3*j:3*j+3] = qj
@@ -334,18 +377,19 @@ def full_em_cts_spectral_density(
         "bindslev_coupling_coefficients": bindslev_coefficients,
         "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
         "magnetic_field_T": b,
+        "fast_ion_populations": fast_ion_populations or [],
         "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling (thermal response currently Maxwellian, non-relativistic)",
-        "kinetic_response": "linearized Vlasov equation; gyro-harmonic expansion and Gauss-Laguerre/Hermite velocity quadrature",
-        "fluctuation_source": "classical fluctuation-dissipation theorem applied species-wise to Hermitian conductivity",
+        "kinetic_response": "bulk species: magnetized Maxwellian Vlasov gyro-harmonics; optional fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
+        "fluctuation_source": "bulk thermal species: classical FDT; non-equilibrium fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
         "numerical_controls": {"harmonic_order": int(harmonic_order),
             "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping},
         "limitations": [
             "Homogeneous local plasma; no ray tracing, refraction along a finite path, or finite scattering-volume beam overlap.",
-            "Non-relativistic isotropic Maxwellian distributions only; non-Maxwellian fast-ion VDFs are not yet supported by this full-EM solver.",
+            "Bulk thermal species use the non-relativistic isotropic Maxwellian solver; optional fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
             "The Bindslev three-wave source-current closure is the low-temperature magnetized formulation; its relativistic kinetic generalization is not used for the fast-ion population.",
-            "Classical fluctuation-dissipation source assumes local thermodynamic equilibrium for each species."
+            "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
         ],
     }
 
@@ -360,7 +404,7 @@ def analyze_full_em_cts_spectrum(
     incident_polarization, scattered_polarization,
     instrument_response, signal_uncertainty=None, spectral_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
-    damping_rate_rad_s=None,
+    damping_rate_rad_s=None, fast_ion_populations=None,
 ):
     """Fit n_e, T_e and common T_i using the magnetized full-EM forward model.
 
@@ -432,6 +476,7 @@ def analyze_full_em_cts_spectrum(
             scattered_polarization=scattered_polarization,
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
             damping_rate_rad_s=damping_rate_rad_s,
+            fast_ion_populations=fast_ion_populations,
         )["spectral_density"]
         widths = np.empty_like(f)
         widths[0] = 0.5 * (f[1] - f[0])
@@ -479,6 +524,7 @@ def analyze_full_em_cts_spectrum(
         scattered_polarization=scattered_polarization,
         harmonic_order=harmonic_order, quadrature_order=quadrature_order,
         damping_rate_rad_s=damping_rate_rad_s,
+        fast_ion_populations=fast_ion_populations,
     )
     return {
         "electron_density_m3": float(values[0]),
@@ -495,7 +541,7 @@ def analyze_full_em_cts_spectrum(
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "optimizer_success": bool(fit.success),
-        "model": "magnetized full-electromagnetic kinetic CTS (local Maxwellian, non-relativistic)",
+        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations",
         "external_inputs_fixed": [
             "magnetic_field_T", "electron_flow_velocity_m_s", "ion_flow_velocity_m_s",
             "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
