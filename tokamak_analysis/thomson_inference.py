@@ -384,7 +384,7 @@ def analyze_thomson_spectra(
     instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
     joint_spectral_covariance=None,
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
-    electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
+    electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
@@ -435,23 +435,53 @@ def analyze_thomson_spectra(
             raise ValueError(f"{name} must be a non-negative 3-vector of component-wise 1-sigma uncertainties")
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and scattering_angle_uncertainty_rad is not None:
         raise ValueError("Use scattering_angle_uncertainty_rad or beam-direction component uncertainties, not both; they describe the same geometry uncertainty.")
-    if (incident_direction_unc is not None or scattered_direction_unc is not None) and model not in {"collective_maxwellian", "collective_kappa"}:
-        raise ValueError("Beam-direction component uncertainty is currently supported only by collective dielectric models.")
     if model is None:
         raise ValueError("Select a Thomson physical model explicitly; no default Maxwellian assumption is applied.")
     supported_models = {
-        "non_collective_maxwellian", "non_collective_kappa",
+        "non_collective_maxwellian",
+        "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
-        "collective_maxwellian", "collective_kappa",
     }
     if model not in supported_models:
-        raise ValueError("Unsupported Thomson model; choose a non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner or collective Maxwellian/Kappa model.")
+        raise ValueError(
+            "Unsupported optical Thomson model. Analysis 1 supports non_collective_maxwellian, "
+            "non_collective_kappa and non_collective_relativistic_maxwell_juttner. "
+            "Optical collective dielectric models are outside this shortlist; microwave CTS "
+            "has its own registered workflow (analysis 30)."
+        )
+    if incident_direction_unc is not None or scattered_direction_unc is not None:
+        raise ValueError(
+            "Beam-direction component uncertainty is not supported by the selected "
+            "non-collective optical Thomson model."
+        )
+    if model == "non_collective_relativistic_maxwell_juttner" and (
+        laser_wavelength_uncertainty_nm is not None
+        or scattering_angle_uncertainty_rad is not None
+    ):
+        raise ValueError(
+            "Laser-wavelength and scattering-angle uncertainty propagation is not implemented "
+            "for the relativistic Maxwell-Juttner optical model; omit these uncertainty inputs."
+        )
+    collective_only_inputs = (
+        ion_species, ion_fractions, ion_temperature_eV, ion_velocity_m_s,
+        electron_velocity_m_s, ion_temperature_uncertainty_eV,
+        ion_velocity_uncertainty_m_s, electron_velocity_uncertainty_m_s,
+        collective_initial_density_m3, collective_initial_temperature_eV,
+        collective_density_bounds_m3, collective_temperature_bounds_eV,
+        collective_external_parameter_mc_samples, collective_kappa_initial,
+        collective_kappa_bounds,
+    )
+    if any(value is not None for value in collective_only_inputs):
+        raise ValueError(
+            "Collective-only inputs are not accepted by optical Thomson Analysis 1; "
+            "use the separate registered microwave CTS workflow for collective Thomson data."
+        )
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
     if isinstance(instrument_response_mc_samples, (bool, np.bool_)) or not isinstance(instrument_response_mc_samples, (int, np.integer)) or instrument_response_mc_samples < 20:
         raise ValueError("instrument_response_mc_samples must be an integer >= 20")
     instrument_response_mc_min_success_fraction = _finite_scalar(instrument_response_mc_min_success_fraction, "instrument_response_mc_min_success_fraction", minimum=0.5, maximum=1.0)
-    collective_models = {"collective_maxwellian", "collective_kappa"}
+    collective_models = set()
     density_bounds = temperature_bounds = None
     if model in collective_models:
         if collective_initial_density_m3 is None or collective_initial_temperature_eV is None:
@@ -1654,7 +1684,7 @@ def analyze_thomson_spectra(
             )
             distribution["interpretation"] = (
                 "Observed wavelength-space moments and a response-convolved Gaussian shape diagnostic. "
-                "Physical Te and flow remain those inferred by the selected Maxwellian/Kappa/collective model; "
+                "Physical Te and flow remain those inferred by the selected optical Thomson forward model; "
                 "these descriptive moments are not a unique arbitrary electron VDF inversion."
             )
         except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
