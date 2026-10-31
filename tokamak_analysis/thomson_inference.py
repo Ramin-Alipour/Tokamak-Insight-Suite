@@ -1488,4 +1488,26 @@ def analyze_thomson_spectra(
         channel_result["spectral_distribution"] = distribution
         spectral_distribution_results.append(distribution)
     output["spectral_distribution"] = spectral_distribution_results
+
+    # A fitted spectral integral is not a watt-valued scattered power unless the
+    # measured spectral density is explicitly calibrated in W/nm. Preserve the
+    # numerical integral while making its actual unit contract unambiguous.
+    output["absolute_scattered_power_available"] = bool(spectral_power_density_calibrated)
+    if not spectral_power_density_calibrated:
+        for channel_result in results:
+            area = channel_result.pop("integrated_scattered_power_W", None)
+            area_uncertainty = channel_result.pop("integrated_scattered_power_uncertainty_W", None)
+            if area is not None:
+                channel_result["integrated_spectral_signal_input_units_nm"] = area
+            if area_uncertainty is not None:
+                channel_result["integrated_spectral_signal_uncertainty_input_units_nm"] = area_uncertainty
+            for old_key, new_key in (
+                ("integrated_scattered_power_fit_uncertainty_W", "integrated_spectral_signal_fit_uncertainty_input_units_nm"),
+                ("integrated_scattered_power_lsf_uncertainty_W", "integrated_spectral_signal_lsf_uncertainty_input_units_nm"),
+                ("integrated_scattered_power_covariance_uncertainty_W", "integrated_spectral_signal_covariance_uncertainty_input_units_nm"),
+            ):
+                if old_key in channel_result:
+                    channel_result[new_key] = channel_result.pop(old_key)
+            channel_result["integrated_spectral_signal_unit"] = "input spectral-intensity unit × nm"
+            channel_result["absolute_scattered_power_available"] = False
     return output
