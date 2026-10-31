@@ -245,6 +245,9 @@ def full_em_cts_spectral_density(
     bindslev_operators = []
     bindslev_coefficients = []
     bindslev_form_factors = []
+    bindslev_x_tensors = []
+    bindslev_gamma_inverse = []
+    fast_ion_kinetic_diagnostics = []
     for index, shift in enumerate(shifts):
         fs = f0 + shift
         ki = (2.0 * np.pi * f0 / C) * ki_hat
@@ -255,6 +258,7 @@ def full_em_cts_spectral_density(
             omega = np.copysign(damping, omega if omega else 1.0)
         sigmas = []
         fast_bare_covariances = {}
+        fast_kinetic_at_frequency = []
         for species_index, sp in enumerate(species):
             if sp.get("fast_ion", False):
                 from .cts_relativistic import relativistic_gyrotropic_species_response
@@ -267,12 +271,14 @@ def full_em_cts_spectral_density(
                 )
                 sigmas.append(kinetic["conductivity_S_m"])
                 fast_bare_covariances[species_index] = kinetic["bare_current_spectral_covariance"]
+                fast_kinetic_at_frequency.append({"name": sp["name"], "distribution_kind": kinetic["distribution_kind"], "relativistic_kinematics": kinetic["relativistic_kinematics"], "velocity_max_fraction_c": kinetic["velocity_max_fraction_c"], "bare_current_spectral_covariance": kinetic["bare_current_spectral_covariance"]})
             else:
                 sigmas.append(_species_conductivity(
                     omega, kvec, b, sp, harmonic_order=int(harmonic_order),
                     quadrature_order=int(quadrature_order),
                     damping_rate_rad_s=damping
                 ))
+        fast_ion_kinetic_diagnostics.append(fast_kinetic_at_frequency)
         sigma_total = np.sum(sigmas, axis=0)
         epsilon = np.eye(3, dtype=complex) + 1j * sigma_total / (EPS0 * omega)
         k_norm = np.linalg.norm(kvec)
@@ -364,6 +370,8 @@ def full_em_cts_spectral_density(
         spectra[index] = transfer["received_source_current_spectral_power"]
         bindslev_operators.append(source["source_current_operator"])
         bindslev_form_factors.append(form_factors["G_alpha_beta"])
+        bindslev_x_tensors.append(source["X_tensor"])
+        bindslev_gamma_inverse.append(source["Gamma_inverse_tensor"])
         projected = es.conj() @ source["source_current_operator"]
         bindslev_coefficients.append({
             "N": projected[0],
@@ -384,10 +392,13 @@ def full_em_cts_spectral_density(
         "bindslev_source_current_operator": np.asarray(bindslev_operators),
         "bindslev_coupling_coefficients": bindslev_coefficients,
         "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
+        "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
+        "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
+        "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
         "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
         "magnetic_field_T": b,
         "fast_ion_populations": fast_ion_populations or [],
-        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling (thermal response currently Maxwellian, non-relativistic)",
+        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling and optional relativistic gyrotropic fast-ion kinetics",
         "kinetic_response": "bulk species: magnetized Maxwellian Vlasov gyro-harmonics; optional fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
         "fluctuation_source": "bulk thermal species: classical FDT; non-equilibrium fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
