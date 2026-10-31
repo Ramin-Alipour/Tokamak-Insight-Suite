@@ -5185,7 +5185,7 @@
         },
         {
           "name": "model",
-          "unit": "non_collective_maxwellian, non_collective_kappa or collective_maxwellian",
+          "unit": "non_collective_maxwellian, non_collective_kappa, non_collective_relativistic_maxwell_juttner, collective_maxwellian or collective_kappa",
           "required": true
         },
         {
