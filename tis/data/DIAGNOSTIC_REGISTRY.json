@@ -190,6 +190,13 @@
           "unit": "non-negative 3-vector; component-wise 1σ polarization uncertainty",
           "required": false,
           "description": "Relativistic Maxwell-Juttner only; polarization is reprojected transverse to each sampled incident direction."
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless; maximum accepted fractional recoil-correction estimate",
+          "required": false,
+          "default": 0.01,
+          "description": "Relativistic Maxwell-Juttner screening control. The implementation default is 0.01; the value is a user-adjustable software error-budget threshold, not a universal plasma validity boundary."
         }
       ],
       "output_specs": [
@@ -5276,6 +5283,34 @@
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
           "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless; maximum accepted fractional recoil-correction estimate",
+          "required": false,
+          "default": 0.01,
+          "description": "Forwarded to the canonical optical inference engine; used only by the relativistic Maxwell-Juttner model. The implementation default is 0.01 and is a software error-budget threshold, not a universal plasma validity boundary."
+        },
+        {
+          "name": "profile_reconstruction_method",
+          "unit": "text; both, pchip or smoothing_spline",
+          "required": false,
+          "default": "both",
+          "description": "Select PCHIP, generalized-cross-validation smoothing spline, or both for each identifiable inferred radial profile."
+        },
+        {
+          "name": "profile_reconstruction_points",
+          "unit": "integer; 20–5000",
+          "required": false,
+          "default": 200,
+          "description": "Number of radial points in the reconstruction grid; restricted to the measured channel-coordinate interval."
+        },
+        {
+          "name": "profile_reconstruction_mc_samples",
+          "unit": "integer; >=20",
+          "required": false,
+          "default": 200,
+          "description": "Number of joint Monte Carlo profile draws when covariance is available."
         }
       ],
       "output_specs": [
@@ -6514,37 +6549,57 @@
         {
           "name": "instrument_response_matrix",
           "unit": "measured normalized wavelength response matrix",
-          "required": false
+          "required": false,
+          "description": "Measured normalized response matrix. Supply this or instrument_sigma_nm, but not both."
         },
         {
           "name": "instrument_sigma_nm",
           "unit": "nm; independently measured Gaussian instrument-width summary",
-          "required": false
+          "required": false,
+          "description": "Independently measured Gaussian instrument-width summary. Supply this or instrument_response_matrix, but not both."
         },
         {
           "name": "background_signal",
           "unit": "same as signal; fitted background spectrum",
-          "required": false
+          "required": false,
+          "description": "Explicit fitted background spectrum; mutually exclusive with background_mask and background_fraction."
         },
         {
           "name": "background_mask",
           "unit": "boolean mask identifying background samples",
-          "required": false
+          "required": false,
+          "description": "Explicit boolean background selection; mutually exclusive with background_signal and background_fraction."
         },
         {
           "name": "background_fraction",
           "unit": "fraction of wavelength span at each edge; explicit user selection only",
-          "required": false
+          "required": false,
+          "description": "Explicit user-selected fraction of the wavelength span at each edge; mutually exclusive with background_signal and background_mask."
         },
         {
           "name": "signal_uncertainty",
           "unit": "same as signal; pointwise 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Optional positive pointwise 1-sigma uncertainty; mutually exclusive with signal_covariance."
         },
         {
           "name": "signal_covariance",
           "unit": "full within-channel spectral covariance",
-          "required": false
+          "required": false,
+          "description": "Optional positive-definite within-channel covariance; mutually exclusive with signal_uncertainty."
+        },
+        {
+          "name": "instrument_sigma_uncertainty_nm",
+          "unit": "nm; 1-sigma",
+          "required": false,
+          "description": "Optional uncertainty of instrument_sigma_nm; valid only when the scalar Gaussian-width input is selected."
+        },
+        {
+          "name": "moment_mc_samples",
+          "unit": "integer; >=20",
+          "required": false,
+          "default": 200,
+          "description": "Number of Monte Carlo draws used for moment uncertainty diagnostics."
         }
       ],
       "output_specs": [
