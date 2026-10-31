@@ -193,6 +193,42 @@ def reconstruct_thomson_profile_from_spectra(
                 return matrix[np.ix_(indices, indices)]
         return fallback
 
+    def add_collective_local_fit_covariance(covariance, parameter_index):
+        """Combine external-input MC covariance with each channel's local fit covariance.
+
+        The reported per-channel uncertainties already combine these independent
+        contributions. Profile reconstruction must use the same total covariance,
+        otherwise its covariance-diagonal consistency check fails and/or its bands
+        omit the spectral-fit contribution.
+        """
+        if result.get("model") not in {"collective_maxwellian", "collective_kappa"}:
+            return covariance
+        local_variances = []
+        for channel in result["channels"]:
+            local = channel.get(
+                "total_fit_covariance_including_discrepancy",
+                channel.get("fit_covariance"),
+            )
+            if local is None:
+                return covariance
+            local = np.asarray(local, dtype=float)
+            if (local.ndim != 2 or local.shape[0] != local.shape[1]
+                    or local.shape[0] <= parameter_index
+                    or not np.all(np.isfinite(local))):
+                return covariance
+            local_variances.append(float(local[parameter_index, parameter_index]))
+        if len(local_variances) != n_channels or np.any(np.asarray(local_variances) < 0):
+            return covariance
+        combined = (
+            np.zeros((n_channels, n_channels), dtype=float)
+            if covariance is None
+            else np.asarray(covariance, dtype=float).copy()
+        )
+        if combined.shape != (n_channels, n_channels):
+            raise ValueError("Collective cross-channel covariance does not match the number of Thomson channels.")
+        combined[np.diag_indices(n_channels)] += np.asarray(local_variances, dtype=float)
+        return combined
+
     profiles = {}
     te_covariance = None
     flow_covariance = None
@@ -207,10 +243,16 @@ def reconstruct_thomson_profile_from_spectra(
     flow_labels = [f"channel_{i}_electron_velocity_projection_m_s" for i in range(n_channels)]
     te_covariance = covariance_for(te_labels, te_covariance)
     flow_covariance = covariance_for(flow_labels, flow_covariance)
+    if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
+        te_covariance = add_collective_local_fit_covariance(te_covariance, 1)
+        if result.get("model") == "collective_kappa":
+            pass
     if density_covariance is None:
         density_covariance = covariance_for(
             [f"channel_{i}_electron_density_m3" for i in range(n_channels)]
         )
+    if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
+        density_covariance = add_collective_local_fit_covariance(density_covariance, 0)
 
     candidates = [
         ("electron_temperature_eV", "electron_temperature_profile_eV",
@@ -234,6 +276,7 @@ def reconstruct_thomson_profile_from_spectra(
                 [f"channel_{i}_kappa_index" for i in range(n_channels)],
                 kappa_covariance,
             )
+            kappa_covariance = add_collective_local_fit_covariance(kappa_covariance, 2)
         elif joint_summary.get("total_kappa_parameter_covariance") is not None:
             kappa_covariance = np.asarray(
                 joint_summary["total_kappa_parameter_covariance"], dtype=float
