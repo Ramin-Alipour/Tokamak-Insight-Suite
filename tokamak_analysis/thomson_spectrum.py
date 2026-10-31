@@ -123,12 +123,16 @@ def fit_thomson_spectrum(
     bin_widths = np.diff(bin_edges)
     if np.any(bin_widths <= 0.0):
         raise ValueError("Response-convolved fitted Thomson feature requires positive wavelength-bin widths.")
-    fitted_area = float(np.trapezoid(fitted_component, x) if hasattr(np, "trapezoid") else np.trapz(fitted_component, x))
+    # The response operator acts on wavelength-bin integrated power. Use the
+    # identical finite-volume measure for area, centroid and variance, including
+    # non-uniform wavelength grids (not trapezoidal point-sample weights).
+    fitted_area = float(np.sum(fitted_component * bin_widths))
     if not np.isfinite(fitted_area) or fitted_area <= 0.0:
         raise ValueError("Response-convolved fitted Thomson feature has no positive finite integrated area.")
-    fitted_mean = float((np.trapezoid(x * fitted_component, x) if hasattr(np, "trapezoid") else np.trapz(x * fitted_component, x)) / fitted_area)
-    second_moment = float((np.trapezoid((x - fitted_mean) ** 2 * fitted_component, x) if hasattr(np, "trapezoid") else np.trapz((x - fitted_mean) ** 2 * fitted_component, x)) / fitted_area)
-    fitted_variance = second_moment
+    fitted_mean = float(np.sum(x * fitted_component * bin_widths) / fitted_area)
+    fitted_variance = float(
+        np.sum((x - fitted_mean) ** 2 * fitted_component * bin_widths) / fitted_area
+    )
     if not np.isfinite(fitted_variance) or fitted_variance <= 0.0:
         raise ValueError("Response-convolved fitted Thomson feature has no positive finite spectral variance.")
     fitted_sigma = float(np.sqrt(fitted_variance))
