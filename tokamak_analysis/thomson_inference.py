@@ -568,8 +568,8 @@ def analyze_thomson_spectra(
     if density_relative_covariance is not None and joint_spectral_covariance is not None:
         raise ValueError("density_relative_covariance already contains the scattered-power uncertainty; do not combine it with joint_spectral_covariance. Use scalar optical-factor uncertainties with joint GLS, or use density_relative_covariance without joint GLS.")
     if joint_density_relative_covariance is not None:
-        if model == "collective_maxwellian":
-            raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective mode returns cross-channel density covariance from its external-parameter Monte Carlo.")
+        if model in {"collective_maxwellian", "collective_kappa"}:
+            raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective models infer density from the dielectric spectral shape.")
         if density_relative_covariance is not None:
             raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
         if joint_spectral_covariance is not None:
@@ -945,6 +945,10 @@ def analyze_thomson_spectra(
         if scattering_angle_uncertainty_rad is None: missing_uncertainties.append("scattering_angle_uncertainty_rad")
         if model in {"collective_maxwellian", "collective_kappa"}:
             missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
+            if lsf_unc is not None and model == "collective_kappa":
+                missing_uncertainties.append("instrument_response_uncertainty_propagation_not_implemented_for_collective_kappa")
+            if incident_direction_unc is not None or scattered_direction_unc is not None:
+                missing_uncertainties.append("beam_direction_uncertainty_propagation_not_implemented_for_collective_kappa")
             if lsf_unc is not None:
                 # Collective LSF uncertainty is propagated in the external-parameter
                 # Monte Carlo below; do not mark it missing here.
@@ -1076,7 +1080,7 @@ def analyze_thomson_spectra(
             fit["electron_velocity_projection_external_uncertainty_m_s"] = external_velocity_sigma
             fit["electron_velocity_projection_uncertainty_m_s"] = float(np.hypot(
                 fit["electron_velocity_projection_uncertainty_m_s"], external_velocity_sigma))
-        if lsf_unc is not None and model != "collective_maxwellian" and not fit.get("instrument_response_uncertainty_propagated",False):
+        if lsf_unc is not None and model not in {"collective_maxwellian", "collective_kappa"} and not fit.get("instrument_response_uncertainty_propagated",False):
             fit["uncertainty_inputs_missing"].append("instrument_response_uncertainty_propagation_failed")
             fit["uncertainty_completeness"] = "partial"
         results.append(fit)
