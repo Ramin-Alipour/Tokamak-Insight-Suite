@@ -69,18 +69,18 @@ def fit_thomson_spectrum(
         raise ValueError("wavelength_nm and signal must have equal lengths and wavelength must be strictly increasing")
     if instrument_sigma_nm is not None and (not _is_finite_real(instrument_sigma_nm) or instrument_sigma_nm <= 0):
         raise ValueError("instrument_sigma_nm must be positive and finite when supplied")
-    if instrument_response_matrix is None:
-        raise ValueError("A measured instrument_response_matrix is required; a scalar Gaussian width is not converted into a synthetic response.")
-    response = np.asarray(instrument_response_matrix, dtype=float)
-    if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
-        raise ValueError("instrument_response_matrix must be a finite non-negative measured square matrix with positive column sums")
-    response = response / response.sum(axis=0, keepdims=True)
     if signal_uncertainty is not None:
         uncertainty = _finite_vector(signal_uncertainty, "signal_uncertainty")
         if uncertainty.shape != y.shape or np.any(uncertainty <= 0):
             raise ValueError("signal_uncertainty must be strictly positive and match signal")
     else:
         uncertainty = None
+    if instrument_response_matrix is None:
+        raise ValueError("A measured instrument_response_matrix is required; a scalar Gaussian width is not converted into a synthetic response.")
+    response = np.asarray(instrument_response_matrix, dtype=float)
+    if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
+        raise ValueError("instrument_response_matrix must be a finite non-negative measured square matrix with positive column sums")
+    response = response / response.sum(axis=0, keepdims=True)
     from .thomson_inference import analyze_thomson_spectra
     try:
         result = analyze_thomson_spectra(
