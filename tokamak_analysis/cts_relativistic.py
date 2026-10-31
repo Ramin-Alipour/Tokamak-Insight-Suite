@@ -1,0 +1,178 @@
+"""Relativistic gyrotropic fast-ion response and Klimontovich shot noise.
+
+This module solves the linearized relativistic Vlasov equation in a uniform
+magnetic field by Fourier collocation in gyrophase and momentum-space
+quadrature. It supports an anisotropic bi-Gaussian momentum distribution and
+user-supplied tabulated gyrotropic distributions f(p_perp,p_parallel).
+
+The distribution is defined in momentum space; relativistic kinematics
+v=p/(gamma*m), gyrofrequency qB/(gamma*m), and the exact Lorentz force are
+used. The fluctuation source is computed from the Klimontovich particle
+shot-noise spectrum (not an equilibrium fluctuation-dissipation closure),
+with a documented Lorentzian representation of the causal resonance delta.
+"""
+from __future__ import annotations
+
+from collections.abc import Mapping
+import numpy as np
+from scipy.special import roots_laguerre, roots_hermite
+
+EPS0 = 8.8541878128e-12
+C = 299792458.0
+E_CHARGE = 1.602176634e-19
+ME = 9.1093837015e-31
+AMU = 1.66053906660e-27
+
+
+def _positive(x, name):
+    x = float(x)
+    if not np.isfinite(x) or x <= 0:
+        raise ValueError(f"{name} must be positive and finite")
+    return x
+
+
+def _momentum_grid(distribution, mass_kg, quadrature_order):
+    if not isinstance(distribution, Mapping):
+        raise ValueError("fast-ion distribution must be a mapping")
+    kind = distribution.get("kind")
+    if kind == "relativistic_bigaussian":
+        tperp = _positive(distribution.get("temperature_perpendicular_eV"), "temperature_perpendicular_eV")
+        tpar = _positive(distribution.get("temperature_parallel_eV"), "temperature_parallel_eV")
+        xp, wp = roots_laguerre(int(quadrature_order))
+        xa, wa = roots_hermite(int(quadrature_order))
+        pperp_th = np.sqrt(2.0 * mass_kg * tperp * E_CHARGE)
+        ppar_th = np.sqrt(2.0 * mass_kg * tpar * E_CHARGE)
+        pperp, ppar = np.meshgrid(pperp_th*np.sqrt(xp), ppar_th*xa, indexing="ij")
+        f0 = np.exp(-xp[:, None] - xa[None, :]**2) / (
+            np.pi**1.5 * pperp_th**2 * ppar_th
+        )
+        weights = np.broadcast_to(wp[:, None]*wa[None, :]/np.sqrt(np.pi), f0.shape).copy()
+        dpperp = -pperp/(mass_kg*tperp*E_CHARGE)*f0
+        dppar = -ppar/(mass_kg*tpar*E_CHARGE)*f0
+        return pperp, ppar, f0, dpperp, dppar, weights
+    if kind == "tabulated_gyrotropic":
+        pp = np.asarray(distribution.get("p_perpendicular_kg_m_s"), dtype=float)
+        pa = np.asarray(distribution.get("p_parallel_kg_m_s"), dtype=float)
+        f0 = np.asarray(distribution.get("distribution_kg_m_s_inverse3"), dtype=float)
+        if pp.ndim != 1 or pa.ndim != 1 or pp.size < 4 or pa.size < 4:
+            raise ValueError("tabulated gyrotropic momentum grids must be 1-D with >=4 nodes")
+        if np.any(~np.isfinite(pp)) or np.any(~np.isfinite(pa)) or np.any(np.diff(pp)<=0) or np.any(np.diff(pa)<=0) or pp[0]<0:
+            raise ValueError("momentum grids must be finite, increasing and p_perpendicular non-negative")
+        if f0.shape != (pp.size, pa.size) or np.any(~np.isfinite(f0)) or np.any(f0<0):
+            raise ValueError("tabulated distribution must be finite, non-negative and shaped (n_pperp,n_ppar)")
+        pperp, ppar = np.meshgrid(pp, pa, indexing="ij")
+        dpp = np.gradient(pp)
+        dpa = np.gradient(pa)
+        weights = 2.0*np.pi*pperp*dpp[:,None]*dpa[None,:]
+        norm = float(np.sum(weights*f0))
+        if norm <= 0:
+            raise ValueError("tabulated gyrotropic distribution has zero normalization")
+        f0 = f0/norm
+        dpperp, dppar = np.gradient(f0, pp, pa, edge_order=2)
+        return pperp, ppar, f0, dpperp, dppar, weights
+    raise ValueError("fast-ion distribution kind must be relativistic_bigaussian or tabulated_gyrotropic")
+
+
+def relativistic_gyrotropic_species_response(
+    omega_rad_s, wavevector_rad_m, magnetic_field_T, *,
+    density_m3, mass_kg, charge_C, distribution,
+    quadrature_order=8, gyrophase_points=32, resonance_width_rad_s=1e6,
+):
+    """Return relativistic gyrotropic conductivity and bare Klimontovich Q_jj.
+
+    Fourier collocation solves the linearized Vlasov equation in gyrophase.
+    Q_jj is the uncorrelated-particle spectrum using the same relativistic
+    gyro-orbits and a normalized Lorentzian approximation to the resonance
+    delta function. Both outputs are 3x3 complex Hermitian-compatible tensors.
+    """
+    omega = float(omega_rad_s)
+    k = np.asarray(wavevector_rad_m, dtype=float)
+    b = np.asarray(magnetic_field_T, dtype=float)
+    density = _positive(density_m3, "density_m3")
+    mass = _positive(mass_kg, "mass_kg")
+    charge = float(charge_C)
+    width = _positive(resonance_width_rad_s, "resonance_width_rad_s")
+    if not np.isfinite(omega) or omega == 0 or k.shape!=(3,) or b.shape!=(3,) or not np.all(np.isfinite(k)) or not np.all(np.isfinite(b)) or np.linalg.norm(b)==0 or charge==0:
+        raise ValueError("finite non-zero frequency, charge and magnetic field plus finite 3-vectors are required")
+    if int(quadrature_order)<4 or int(gyrophase_points)<16 or int(gyrophase_points)%2:
+        raise ValueError("quadrature_order >=4 and even gyrophase_points >=16 are required")
+    bhat=b/np.linalg.norm(b)
+    trial=np.array([1.0,0.0,0.0])
+    if abs(np.dot(trial,bhat))>0.9: trial=np.array([0.0,1.0,0.0])
+    e1=trial-np.dot(trial,bhat)*bhat; e1/=np.linalg.norm(e1)
+    e2=np.cross(bhat,e1)
+    rotation=np.column_stack((e1,e2,bhat))
+    klab=k.copy(); k=rotation.T@k
+    kperp,kpar=float(np.hypot(k[0],k[1])),float(k[2])
+    if kperp>0:
+        # Align local x with k_perp by a rotation about B.
+        angle=np.arctan2(k[1],k[0])
+        rz=np.array([[np.cos(angle),np.sin(angle),0.0],[-np.sin(angle),np.cos(angle),0.0],[0.0,0.0,1.0]])
+        rotation=rotation@rz
+        k=rz.T@k
+    pperp,ppar,f0,dfperp,dfpar,weights=_momentum_grid(distribution,mass,int(quadrature_order))
+    nphi=int(gyrophase_points)
+    phi=2*np.pi*np.arange(nphi)/nphi
+    harmonics=np.fft.fftfreq(nphi,d=1.0/nphi)
+    # Spectral derivative matrix: D f = F^{-1} diag(i m) F f.
+    dft=np.fft.fft(np.eye(nphi),axis=0)/nphi
+    invdft=np.fft.ifft(np.eye(nphi),axis=0)*nphi
+    derivative=invdft@np.diag(1j*harmonics)@dft
+    conductivity=np.zeros((3,3),dtype=complex)
+    bare=np.zeros((3,3),dtype=complex)
+    eye=np.eye(3)
+    for ip in range(pperp.shape[0]):
+        for ia in range(pperp.shape[1]):
+            pp=float(pperp[ip,ia]); pa=float(ppar[ip,ia]); f=float(f0[ip,ia])
+            if f<=0 or pp<=0: continue
+            pvec=np.sqrt(pp*pp+pa*pa)
+            gamma=np.sqrt(1.0+(pvec/(mass*C))**2)
+            vperp=pp/(gamma*mass); vpar=pa/(gamma*mass)
+            omega_g=charge*np.linalg.norm(b)/(gamma*mass)
+            velocity=np.column_stack((vperp*np.cos(phi),vperp*np.sin(phi),np.full(nphi,vpar)))
+            gradf=np.column_stack((dfperp[ip,ia]*np.cos(phi),dfperp[ip,ia]*np.sin(phi),np.full(nphi,dfpar[ip,ia])))
+            phase=np.exp(1j*kperp*pp/(charge*np.linalg.norm(b))*np.sin(phi))
+            # Exact relativistic Lorentz force for each unit electric-field component.
+            rhs=np.empty((nphi,3),dtype=complex)
+            for col in range(3):
+                efield=eye[col]
+                bfield=np.cross(k,efield)/omega
+                force=charge*(efield[None,:]+np.cross(velocity,bfield))
+                rhs[:,col]=-np.sum(force*gradf,axis=1)
+            streaming=-1j*(omega-kpar*vpar-kperp*vperp*np.cos(phi))
+            operator=np.diag(streaming)+omega_g*derivative
+            try:
+                delta_f=np.linalg.solve(operator,rhs)
+            except np.linalg.LinAlgError as exc:
+                raise ValueError("relativistic gyrophase Vlasov operator is singular; increase resonance_width_rad_s") from exc
+            measure=float(weights[ip,ia])*f
+            conductivity += charge*density*measure*(velocity.T@delta_f)/nphi
+            # Klimontovich shot noise: Fourier harmonics of the exact
+            # relativistic orbit current, broadened only by the explicit width.
+            orbit=velocity*phase[:,None]
+            coeff=np.fft.fft(orbit,axis=0)/nphi
+            detuning=omega-kpar*vpar-harmonics*omega_g
+            lorentz=width/(np.pi*(detuning*detuning+width*width))
+            for m in range(nphi):
+                a=coeff[m]
+                bare += (2.0*np.pi*density*charge*charge*measure*lorentz[m]
+                         * np.outer(a,a.conj()))
+    conductivity_lab=rotation@conductivity@rotation.T
+    bare_lab=rotation@bare@rotation.T
+    bare_lab=0.5*(bare_lab+bare_lab.conj().T)
+    # The gyrotropic Vlasov response is generally non-Hermitian; do not
+    # symmetrize conductivity because its anti-Hermitian part is dispersive.
+    return {
+        "conductivity_S_m": conductivity_lab,
+        "bare_current_spectral_covariance": bare_lab,
+        "distribution_kind": distribution["kind"],
+        "relativistic_kinematics": True,
+        "anisotropy": "p_perpendicular and p_parallel distributions are independently specified",
+        "momentum_space_normalization": "integral 2*pi*p_perp*f dp_perp dp_parallel = 1",
+        "resonance_broadening_rad_s": width,
+        "gyrophase_points": nphi,
+        "quadrature_order": int(quadrature_order),
+        "velocity_max_fraction_c": float(np.max(np.sqrt((pperp/(gamma*mass))**2+(ppar/(gamma*mass))**2))/C),
+        "noise_model": "Klimontovich uncorrelated-particle orbit spectrum; not equilibrium FDT",
+        "wavevector_lab_rad_m": klab,
+    }
