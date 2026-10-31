@@ -38,7 +38,7 @@ Input spectra are assumed to be prepared and calibrated. The analysis does not p
 
 The supplied measured response is applied in the physical forward model. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, supporting nonuniform calibrated wavelength grids. No Gaussian line-spread function is imposed by the primary physical fit.
 
-For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting where supported by the model-specific forward path. The spectral-distribution subanalysis is independently registered as entry 81 and can run directly from one calibrated measured spectrum even when the primary physical fit fails. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution. If moments are not identifiable for a channel, the subanalysis reports that channel as unavailable without aborting the primary physical inference.
+For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. A shared 2-D response matrix uses the same perturbation realization across all channels, and the resulting cross-channel covariance of temperature, flow projection and integrated power is returned; channel-specific 3-D response matrices retain channel-local uncertainty. The spectral-distribution subanalysis is independently registered as entry 81 and can run directly from one calibrated measured spectrum even when the primary physical fit fails. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution.
 
 ## Electron density and identifiability
 
@@ -58,11 +58,12 @@ The physical fit must pass its identifiability and fit-quality gates. Rank-defic
 
 ## Uncertainty and deliberate limitations
 
-- Full channel-major generalized least squares with Cholesky whitening is implemented for non-collective Maxwellian and Kappa fits. The relativistic Maxwell-Juttner fit currently uses channel-local fit covariance and response-matrix Monte Carlo; full cross-channel spectral GLS is not implemented for that model.
-- Laser-wavelength and scattering-angle uncertainty propagation is supported for the classical Maxwellian/Kappa fits. Those uncertainty inputs are rejected for the relativistic Maxwell-Juttner model rather than silently ignored. Incident-polarization and full beam-direction covariance are not propagated for the relativistic model.
+- Full channel-major generalized least squares with Cholesky whitening is implemented for non-collective Maxwellian and Kappa fits. The relativistic Maxwell-Juttner fit uses channel-local fit covariance plus Monte Carlo propagation of supplied laser-wavelength, scalar scattering-angle or beam-direction component, incident-polarization component, and response-matrix uncertainties; full cross-channel spectral GLS is not implemented for that model.
+- The relativistic Maxwell-Juttner external-parameter Monte Carlo samples the supplied 1σ component uncertainties and reprojects the polarization into the plane transverse to each sampled incident direction. Scalar angle uncertainty and beam-direction component uncertainties are alternative geometry descriptions and cannot be supplied together.
 - Absolute-density uncertainty uses either the supplied complete relative covariance of density-inversion inputs or the explicit scalar uncertainty terms. Unprovided cross-correlations and model discrepancy are not silently set to measured values.
 - Kappa is a parameterized finite-variance distribution, not an unrestricted VDF inversion.
-- The relativistic Maxwell-Juttner model assumes an isotropic rest-frame distribution and bulk flow parallel to the scattering vector; photon recoil and Compton corrections are neglected.
+- The relativistic Maxwell-Juttner model assumes an isotropic rest-frame distribution and bulk flow parallel to the scattering vector. It does not include recoil; it screens the maximum represented rest-frame Compton correction and rejects cases above the configured 1% default limit.
+- The non-relativistic Maxwellian and Kappa screens use Tₑ/(mₑc²) < 0.01 and |v_flow|/c < 0.1. These are conservative asymptotic error-budget screens (thermal relativistic corrections scale with θₑ; leading flow corrections scale with β²), not universal physical validity boundaries.
 - Optical collective dielectric inference is outside this Analysis 1 shortlist. Microwave CTS is covered by its separate registered workflow.
 - An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm.
 - No independent experimental validation is claimed. Automated tests are software/numerical consistency tests only.
@@ -89,7 +90,7 @@ These references motivate the selected physical scope; TIS does not claim to rep
 
 ## Dashboard access
 
-The Spectral Analysis workspace exposes the canonical multi-channel optical Thomson inference. The Advanced Analysis profile workflow routes to the same canonical engine. The microwave CTS workflow separately exposes electrostatic and magnetized full-electromagnetic forward models.
+The Spectral Analysis workspace exposes the canonical multi-channel optical Thomson inference. Advanced Analysis exposes both the independent single-spectrum spectral-distribution workflow and the profile workflow, which routes to the same canonical engine. The microwave CTS workflow separately exposes electrostatic and magnetized full-electromagnetic forward models.
 
 
 ## Independent spectral-distribution subanalysis (registry entry 81)
