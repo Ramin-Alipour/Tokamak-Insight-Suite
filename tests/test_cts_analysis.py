@@ -658,3 +658,47 @@ def test_relativistic_maxwell_juttner_momentum_grid_is_normalized():
     assert np.all(np.isfinite(dfperp)) and np.all(np.isfinite(dfpar))
     assert np.all(f0 >= 0)
     assert np.sum(weights*f0) == pytest.approx(1.0, rel=1e-10)
+
+
+def test_full_em_cts_integrates_scattering_volume_samples():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    local_samples = [
+        {"incident_direction": [1.0, 0.0, 0.0],
+         "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0],
+         "magnetic_field_T": [0.0, 0.0, 2.0],
+         "scattering_location_m": [0.0, 0.0, 0.0],
+         "sample_weight": 0.25, "beam_overlap_relative": 1.0},
+        {"incident_direction": [1.0, 0.0, 0.0],
+         "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0],
+         "magnetic_field_T": [0.0, 0.0, 2.1],
+         "scattering_location_m": [0.01, 0.0, 0.0],
+         "sample_weight": 0.75, "beam_overlap_relative": 1.0},
+    ]
+    result = full_em_cts_spectral_density(
+        [0.9e9], 140e9,
+        {"frequency_shift_Hz": [0.9e9],
+         "frequency_resolved_geometry": [{
+             "incident_direction": [1.0, 0.0, 0.0],
+             "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0],
+             "magnetic_field_T": [0.0, 0.0, 2.075],
+             "scattering_location_m": [0.0075, 0.0, 0.0],
+             "beam_overlap_relative": 0.5,
+             "scattering_samples": local_samples,
+         }]},
+        electron_density_m3=2e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV={"D+": 800.0},
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+        electron_flow_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        harmonic_order=3, quadrature_order=4,
+    )
+    assert result["scattering_volume_integration_used"] is True
+    np.testing.assert_array_equal(result["scattering_volume_sample_count"], [2])
+    np.testing.assert_allclose(result["relative_gaussian_beam_overlap"], [0.5])
+    np.testing.assert_allclose(result["scattering_locations_m"], [[0.0075, 0.0, 0.0]])
+    assert result["spectral_density"].shape == (1,)
+    assert np.all(np.isfinite(result["spectral_density"]))
