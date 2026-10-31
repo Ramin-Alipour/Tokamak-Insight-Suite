@@ -513,7 +513,7 @@ def analyze_thomson_spectra(
             raise ValueError("scattering_angle_rad is inconsistent with incident_direction and scattered_direction")
 
     if model in collective_models:
-        if model == "collective_maxwellian" and (
+        if model in collective_models and (
             isinstance(collective_external_parameter_mc_samples,bool)
             or not isinstance(collective_external_parameter_mc_samples,(int,np.integer))
             or collective_external_parameter_mc_samples<20
@@ -1409,7 +1409,7 @@ def analyze_thomson_spectra(
             "For non-collective Maxwellian/Kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied optical-factor uncertainty terms and excludes unprovided correlations and model discrepancy.",
         ],
     }
-    if model=="collective_maxwellian" and any(v is not None for v in (
+    if model in collective_models and any(v is not None for v in (
         ion_t_unc,ion_v_unc,electron_v_unc,lsf_unc,laser_wavelength_uncertainty_nm,
         scattering_angle_uncertainty_rad,incident_direction_unc,scattered_direction_unc
     )):
@@ -1485,14 +1485,18 @@ def analyze_thomson_spectra(
                     collective_initial_temperature_eV=collective_initial_temperature_eV,
                     collective_density_bounds_m3=collective_density_bounds_m3,
                     collective_temperature_bounds_eV=collective_temperature_bounds_eV,
+                    collective_kappa_initial=collective_kappa_initial,
+                    collective_kappa_bounds=collective_kappa_bounds,
                     collective_external_parameter_mc_samples=20,
                 )
                 vector=[]
                 for channel_result in draw["channels"]:
                     density_value=channel_result.get("electron_density_m3")
                     vector.extend([np.nan if density_value is None else float(density_value),
-                                   float(channel_result["electron_temperature_eV"]),
-                                   float(channel_result["electron_velocity_projection_m_s"])])
+                                   float(channel_result["electron_temperature_eV"])])
+                    if model == "collective_kappa":
+                        vector.append(float(channel_result["kappa_index"]))
+                    vector.append(float(channel_result["electron_velocity_projection_m_s"]))
                     vector.extend(np.asarray(channel_result["ion_velocity_projection_m_s"],dtype=float).tolist())
                 draws.append(vector)
             except (ValueError,RuntimeError,ImportError,np.linalg.LinAlgError):
@@ -1507,9 +1511,18 @@ def analyze_thomson_spectra(
             if np.any(valid_columns):
                 covariance[np.ix_(valid_columns,valid_columns)]=np.cov(draw_array[:,valid_columns],rowvar=False,ddof=1)
                 for channel in range(len(results)):
-                    density_col, temperature_col, velocity_col, ion_columns = (
-                        _collective_external_parameter_indices(channel, len(ion_species))
-                    )
+                    stride = (4 if model == "collective_kappa" else 3) + len(ion_species)
+                    base = channel * stride
+                    density_col, temperature_col = base, base + 1
+                    if model == "collective_kappa":
+                        kappa_col, velocity_col = base + 2, base + 3
+                        ion_columns = tuple(range(base + 4, base + 4 + len(ion_species)))
+                        results[channel]["kappa_index_uncertainty"] = float(np.hypot(
+                            results[channel]["kappa_index_uncertainty"],
+                            np.sqrt(max(covariance[kappa_col, kappa_col], 0.0))))
+                    else:
+                        velocity_col = base + 2
+                        ion_columns = tuple(range(base + 3, base + 3 + len(ion_species)))
                     results[channel]["electron_temperature_uncertainty_eV"]=float(np.hypot(
                         results[channel]["electron_temperature_uncertainty_eV"],
                         np.sqrt(max(covariance[temperature_col,temperature_col],0.0))))
@@ -1540,18 +1553,18 @@ def analyze_thomson_spectra(
                 covariance_order.extend([
                     f"channel_{i}_electron_density_m3",
                     f"channel_{i}_electron_temperature_eV",
-                    f"channel_{i}_electron_velocity_projection_m_s",
                 ])
+                if model == "collective_kappa":
+                    covariance_order.append(f"channel_{i}_kappa_index")
+                covariance_order.append(f"channel_{i}_electron_velocity_projection_m_s")
                 covariance_order.extend(
                     f"channel_{i}_ion_{species_index}_velocity_projection_m_s"
                     for species_index in range(len(ion_species))
                 )
             output["collective_external_parameter_covariance_order"]=covariance_order
             output["collective_external_parameter_covariance"]=covariance
-            density_columns = [
-                _collective_external_parameter_indices(channel, len(ion_species))[0]
-                for channel in range(len(results))
-            ]
+            external_stride = (4 if model == "collective_kappa" else 3) + len(ion_species)
+            density_columns = [channel * external_stride for channel in range(len(results))]
             external_density_covariance = covariance[np.ix_(density_columns, density_columns)].copy()
             for channel_index, channel_result in enumerate(results):
                 if channel_result.get("electron_density_m3") is None:
