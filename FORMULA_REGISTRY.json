@@ -4188,6 +4188,21 @@
       "formula_key": "relativistic_mj_effective_differential_cross_section",
       "input_specs": [
         {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
           "name": "electron_temperature_eV",
           "unit": "eV",
           "required": true
@@ -4195,27 +4210,27 @@
         {
           "name": "flow_projection_m_s",
           "unit": "m s^-1",
-          "required": true
-        },
-        {
-          "name": "incident_direction",
-          "unit": "unit vector",
-          "required": true
-        },
-        {
-          "name": "scattered_direction",
-          "unit": "unit vector",
-          "required": true
+          "required": false
         },
         {
           "name": "incident_polarization",
-          "unit": "unit vector",
+          "unit": "unit vector in scattering-local coordinates",
           "required": true
         },
         {
-          "name": "scattering_angle_rad",
-          "unit": "rad",
-          "required": true
+          "name": "radial_order",
+          "unit": "integer quadrature order",
+          "required": false
+        },
+        {
+          "name": "angular_order",
+          "unit": "integer quadrature order",
+          "required": false
+        },
+        {
+          "name": "maximum_recoil_correction_fraction",
+          "unit": "dimensionless",
+          "required": false
         }
       ],
       "output_specs": [
@@ -4226,6 +4241,10 @@
         {
           "name": "captured_probability",
           "unit": "dimensionless"
+        },
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "nm^-1"
         }
       ],
       "prerequisites": [
