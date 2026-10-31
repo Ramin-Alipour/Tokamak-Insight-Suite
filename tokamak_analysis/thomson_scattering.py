@@ -121,6 +121,10 @@ def density_from_thomson_scattered_power(
     if eta > 1.0:
         raise ValueError("optical_efficiency must not exceed 1")
     if effective_differential_cross_section_m2_sr is None:
+        if effective_differential_cross_section_uncertainty_m2_sr is not None:
+            raise ValueError(
+                "effective_differential_cross_section_uncertainty_m2_sr requires an effective cross-section value"
+            )
         dsigma = thomson_differential_cross_section_m2_sr(
             theta, incident_polarization_vector=incident_polarization_vector,
             incident_direction_vector=incident_direction_vector,
@@ -275,5 +279,5 @@ def density_from_thomson_scattered_power(
             "Collection solid angle and optical efficiency describe the actual collection path.",
         ],
         "density_interpretation": "interaction_length_averaged_effective_density",
-        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty is added to its final diagonal term." if relative_input_covariance is not None else "Optional first-order independent-input propagation; unprovided covariance and model discrepancy are not included."),
+        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty is added to its final diagonal term." if relative_input_covariance is not None else "Optional first-order independent-input propagation, including any supplied effective differential-cross-section model uncertainty; unprovided covariance and model discrepancy are not included."),
     }
