@@ -162,8 +162,12 @@ with st.sidebar:
         st.button('Clear loaded data',width="stretch",on_click=_clear_loaded_data)
     st.divider()
     pages=['Home','Public Data Access','Data Import & QC','Time Series & MHD','Events & Transients','Spectral Analysis','Probe Analysis','Plasma Parameters','Confinement & Scalings','Equilibrium & Reconstruction','Tomography & Bolometry','Advanced Analysis','Diagnostic Catalog','Project Manager','Reports & Export']
-    requested=st.session_state.pop('jump','Home')
-    page=st.radio('WORKSPACE',pages,index=pages.index(requested) if requested in pages else 0,key='workspace_page',label_visibility='collapsed')
+    requested=st.session_state.pop('jump',None)
+    if requested in pages:
+        # Apply navigation before the keyed radio widget is instantiated. This
+        # also overrides an existing workspace_page value during reruns.
+        st.session_state['workspace_page']=requested
+    page=st.radio('WORKSPACE',pages,index=0,key='workspace_page',label_visibility='collapsed')
     st.divider()
     st.caption('Reference catalog: extracted tokamak diagnostic reference')
     st.caption(f'Independent Python project · v{__version__}')
