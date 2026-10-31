@@ -355,8 +355,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     regularization_strength=float(regularization_strength)
     if not np.isfinite(regularization_strength) or regularization_strength<0:
         raise ValueError("regularization_strength must be finite and non-negative")
-    if inversion_method=="regularized" and regularization_strength<=0:
-        raise ValueError("regularized inversion requires regularization_strength > 0")
+    if inversion_method=="regularized" and (not np.isfinite(regularization_strength) or regularization_strength<=0):
+        raise ValueError("regularized inversion requires a finite regularization_strength > 0")
     if inversion_method=="regularized" and (fast is None or fast["kind"]!="infer_tabulated_1d"):
         raise ValueError("regularized inversion requires fast_ion.kind='infer_tabulated_1d'; initial plasma guesses are not regularization priors")
     if fast and fast["kind"]=="infer_tabulated_1d" and fast["vdf"]["smoothness_parameter"]<=0:
