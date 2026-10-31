@@ -51,7 +51,10 @@ This is a genuinely collective dielectric model, not a non-collective Student-t 
 | ion_species / ion_fractions | explicit metadata / charge-density fractions | Required for collective models |
 | ion_temperature_eV | eV; one per species | Required for collective models; external input |
 | ion_velocity_m_s / electron_velocity_m_s | m/s; explicit 3-vectors | Required for collective models; external inputs |
-| collective_kappa_initial / collective_kappa_bounds | dimensionless | Optional optimizer initialization and bounds for collective kappa |
+| collective_initial_density_m3 / collective_initial_temperature_eV | m⁻³ / eV | Required optimizer starting estimates for collective models |
+| collective_density_bounds_m3 / collective_temperature_bounds_eV | m⁻³ / eV | Required explicit bounds for collective Maxwellian; optional for collective kappa |
+| collective_kappa_initial | dimensionless; >1.5 | Required optimizer starting estimate for collective kappa |
+| collective_kappa_bounds | dimensionless; lower bound >1.5 | Optional; if omitted, only the physical kappa >1.5 domain is enforced |
 | absolute-density optical inputs | W, m, sr, efficiency and polarization geometry | Required for absolute non-collective density |
 
 Input spectra are assumed to be prepared and calibrated. The analysis does not perform wavelength calibration, detector calibration, background correction of the measurement system, or instrument-response measurement. A local background nuisance parameter in the physical spectral fit is part of inference, not detector calibration.
@@ -60,7 +63,7 @@ Input spectra are assumed to be prepared and calibrated. The analysis does not p
 
 The measured response is applied in the forward model. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, supporting nonuniform calibrated wavelength grids. A non-negative measured response matrix is mandatory; an identity matrix is accepted only when explicitly supplied and physically justified. No Gaussian line-spread function is imposed.
 
-For non-collective Maxwellian/Kappa and relativistic Maxwell-Juttner fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. The collective Maxwellian path retains its supported external-input Monte Carlo. The collective kappa path currently reports local fit covariance; complete response-matrix and external-parameter covariance propagation is not yet implemented and is explicitly marked as missing rather than treated as zero.
+For non-collective Maxwellian/Kappa and relativistic Maxwell-Juttner fits, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. The collective Maxwellian path retains its supported external-input Monte Carlo. The collective kappa path uses an unbounded positive log-parameterization for density and temperature unless the researcher supplies bounds; kappa is constrained only by its finite-variance physical domain unless explicit bounds are supplied. It currently reports local fit covariance; complete response-matrix and external-parameter covariance propagation is not yet implemented and is explicitly marked as missing rather than treated as zero.
 
 ## Electron density and identifiability
 
