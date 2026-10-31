@@ -84,7 +84,7 @@ def test_cts_tabulated_non_maxwellian_fast_ion_forward_model():
     spectrum=cts_spectral_density(
         f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
         ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
-        fast_ion={"species_index":0,"fraction":0.08,"kind":"tabulated_1d",
+        ion_velocity_projection_m_s=0.0,fast_ion={"species_index":0,"fraction":0.08,"kind":"tabulated_1d",
                   "velocity_m_s":velocity,"probability_density_m_s_inverse":pdf},
     )
     assert np.all(np.isfinite(spectrum))
@@ -259,7 +259,7 @@ def test_cts_requires_an_explicit_electron_flow_projection():
 
 def test_cts_forward_model_rejects_unknown_fast_ion_kind():
     f0,f,g,ions,frac,_=_case()
-    with pytest.raises(ValueError,match="fast_ion.kind must be maxwellian or tabulated_1d"):
+    with pytest.raises(ValueError,match="requires explicit fast_ion.kind"):
         cts_spectral_density(
             f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
             ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,
