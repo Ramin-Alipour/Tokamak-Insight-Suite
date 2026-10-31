@@ -387,7 +387,7 @@
           "scope": "Canonical physical inference from measured calibrated multi-channel spectra; no pre-derived ne/Te profile inputs."
         }
       ],
-      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
+      "completion_scope": "Multi-channel measured-spectrum physical inference using the registered Maxwellian, Kappa, projected relativistic and collective model options, instrument-response convolution and optional absolute-density inversion. Legacy profile-summary/interpolation functions are compatibility helpers only and are not registered diagnostic workflows. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
@@ -5442,7 +5442,7 @@
           "scope": "Profile-oriented output from the canonical measured calibrated spectrum-to-physics inference; no pre-derived profile input."
         }
       ],
-      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
+      "completion_scope": "Profile-oriented output from the canonical measured-spectrum Thomson physical inference, with the same models and uncertainty scope as Analysis 1. No interpolation or smoothing of pre-derived ne/Te profile points is performed. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
       "calibrated_measurements_to_physics": true
     },
     "scientific_references": [
