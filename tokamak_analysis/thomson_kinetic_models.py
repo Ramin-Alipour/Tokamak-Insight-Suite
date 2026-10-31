@@ -612,8 +612,10 @@ def fit_collective_kappa(
         value=(predicted-ys)/residual_scale
         return (value, predicted, shape, amp, offset, slope) if return_fit else value
 
-    lower=np.log10([nb[0],tb[0],kb[0]-1.5])
-    upper=np.log10([nb[1],tb[1],kb[1]-1.5])
+    # `lower` and `upper` were already assembled above in the optimizer's
+    # mixed transformed coordinates: log10(ne), log10(Te), and log(kappa-1.5).
+    # Rebuilding them here from undefined aliases both raised NameError and
+    # discarded the optional/unbounded parameter contract.
     fit=least_squares(residual,p0,bounds=(lower,upper),x_scale="jac",max_nfev=3000)
     if not fit.success:
         raise ValueError(f"collective kappa Thomson fit failed: {fit.message}")
