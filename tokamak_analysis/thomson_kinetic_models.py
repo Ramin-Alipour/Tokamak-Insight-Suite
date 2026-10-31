@@ -22,6 +22,14 @@ E_REST_EV = 510998.95069
 _LANDAU_NODES, _LANDAU_WEIGHTS = leggauss(192)
 
 
+def _trapezoid(y, x):
+    """NumPy-version-independent trapezoidal integration."""
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    return float(integrate(y, x))
+
+
 def _positive(value, name):
     if isinstance(value, (bool, np.bool_)) or not np.isscalar(value):
         raise ValueError(f"{name} must be positive and finite")
@@ -332,7 +340,7 @@ def fit_relativistic_maxwell_juttner(
     slope = float(fit.x[4]*scale)
     fitted = predicted_scaled*scale
     residual = y-fitted
-    area_shape = float(np.trapz(shape, x))
+    area_shape = _trapezoid(shape, x)
     area = amplitude*area_shape
     area_sigma = abs(area_shape)*float(np.sqrt(max(covariance_physical[2, 2], 0.0)))
     return {
