@@ -164,6 +164,7 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     )
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.05)
     assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
+    assert 0.0 < out["channels"][0]["captured_spectral_probability"] <= 1.0
 
 
 def test_legacy_relativistic_model_alias_is_rejected():
@@ -748,3 +749,23 @@ def test_physical_model_must_be_selected_explicitly():
             x, y[None, :], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
         )
+
+
+def test_relativistic_fit_does_not_mutate_caller_direction_arrays():
+    from tokamak_analysis.thomson_kinetic_models import fit_relativistic_maxwell_juttner
+
+    wavelength = np.linspace(500.0, 564.0, 32)
+    signal = np.ones_like(wavelength)
+    incident = np.array([2.0, 0.0, 0.0])
+    scattered = np.array([0.0, 3.0, 0.0])
+    incident_before = incident.copy()
+    scattered_before = scattered.copy()
+    with pytest.raises(ValueError, match="inconsistent"):
+        fit_relativistic_maxwell_juttner(
+            wavelength, signal, 532.0, np.pi / 3.0,
+            incident_direction=incident, scattered_direction=scattered,
+            incident_polarization=[0.0, 0.0, 1.0],
+            instrument_response=np.eye(wavelength.size),
+        )
+    np.testing.assert_array_equal(incident, incident_before)
+    np.testing.assert_array_equal(scattered, scattered_before)
