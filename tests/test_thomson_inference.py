@@ -438,7 +438,7 @@ def test_fit_identifiability_rejects_rank_deficient_or_ill_conditioned_jacobian(
     assert any("Jacobian is ill-conditioned" in reason for reason in ill_conditioned["fit_quality_reasons"])
 
 
-def test_fit_identifiability_rejects_optimizer_convergence_with_poor_reduced_chi_square():
+def test_fit_identifiability_reports_poor_reduced_chi_square_without_arbitrary_rejection():
     from tokamak_analysis.thomson_inference import _fit_identifiability
 
     result = _fit_identifiability(
@@ -447,10 +447,11 @@ def test_fit_identifiability_rejects_optimizer_convergence_with_poor_reduced_chi
         np.ones(4),
         2,
     )
-    assert result["fit_accepted"] is False
+    assert result["fit_accepted"] is True
     assert result["fit_reduced_chi_square"] > 10.0
-    assert any("does not adequately explain the data" in reason
-               for reason in result["fit_quality_reasons"])
+    assert result["fit_reduced_chi_square_policy"].startswith("diagnostic_only")
+    assert not any("does not adequately explain the data" in reason
+                   for reason in result["fit_quality_reasons"])
 
 
 def test_fit_identifiability_rejects_mismatched_uncertainty_shape():
