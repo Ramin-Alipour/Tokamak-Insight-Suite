@@ -129,21 +129,21 @@ def test_primary_analysis_family_lookup_rejects_invalid_ids():
         get_analysis_family(21)
 
 
-def test_thomson_subanalysis_registry_links_are_semantically_correct():
+def test_thomson_family_registry_contains_only_nonduplicate_workflows():
+    import pytest
     from tokamak_analysis.analysis_registry import get_analysis, get_analysis_family
 
-    distribution = get_analysis(7)
     cts = get_analysis(30)
     profile = get_analysis(46)
-    assert (distribution["module"], distribution["function"]) == (
-        "thomson_distribution", "analyze_thomson_spectral_distribution_inference"
-    )
     assert (cts["module"], cts["function"]) == ("cts_analysis", "analyze_cts_spectrum")
     assert (profile["module"], profile["function"]) == (
         "thomson_scattering", "reconstruct_thomson_profile"
     )
-    assert get_analysis_family(1)["entry_ids"] == [1, 7, 30, 46]
-    assert callable(resolve_analysis(7))
+    assert get_analysis_family(1)["entry_ids"] == [1, 30, 46]
+    with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
+        get_analysis(7)
+    with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
+        resolve_analysis(7)
     assert callable(resolve_analysis(30))
     assert callable(resolve_analysis(46))
 
