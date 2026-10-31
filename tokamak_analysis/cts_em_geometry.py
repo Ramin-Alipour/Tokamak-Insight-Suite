@@ -231,3 +231,96 @@ def trace_cold_plasma_ray(
             "The equilibrium callback and its spatial derivatives are supplied by the caller."
         ],
     }
+
+
+def solve_cold_plasma_propagating_modes(
+    omega_rad_s, propagation_direction, magnetic_field_T, species, *,
+    mode_index=0, discriminant_tolerance=1e-10,
+):
+    """Solve both cold-plasma refractive-index branches and flux-normalize one.
+
+    The Appleton-Hartree biquadratic is solved for N^2 at the specified
+    propagation direction.  The selected branch is converted to a laboratory
+    wavevector; its electric eigenvector is obtained from the full Maxwell
+    wave operator and normalized to unit magnitude of longitudinal Poynting
+    flux.  This is a cold, collisionless, local plane-wave normalization.
+    """
+    omega = _positive(omega_rad_s, "omega_rad_s")
+    direction = _vector(propagation_direction, "propagation_direction")
+    direction = direction / np.linalg.norm(direction)
+    b = _vector(magnetic_field_T, "magnetic_field_T")
+    bmag = float(np.linalg.norm(b))
+    if bmag == 0:
+        raise ValueError("magnetic_field_T must be non-zero")
+    if isinstance(mode_index, bool) or int(mode_index) not in (0, 1):
+        raise ValueError("mode_index must select one of the two propagating branches (0 or 1)")
+    epsilon = cold_plasma_dielectric_tensor(omega, b, species)
+    # Recover Stix S,D,P in the B-aligned frame.
+    bhat = b / bmag
+    trial = np.array([1.0, 0.0, 0.0])
+    if abs(float(np.dot(trial, bhat))) > 0.9:
+        trial = np.array([0.0, 1.0, 0.0])
+    e1 = trial - np.dot(trial, bhat) * bhat
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(bhat, e1)
+    rotation = np.column_stack((e1, e2, bhat))
+    eps_stix = rotation.T @ epsilon @ rotation
+    sval = float(np.real(0.5 * (eps_stix[0, 0] + eps_stix[1, 1])))
+    dval = float(np.real(0.5j * (eps_stix[1, 0] - eps_stix[0, 1])))
+    pval = float(np.real(eps_stix[2, 2]))
+    rvalue, lvalue = sval + dval, sval - dval
+    cos_theta = float(np.clip(np.dot(direction, bhat), -1.0, 1.0))
+    sin2 = max(0.0, 1.0 - cos_theta * cos_theta)
+    cos2 = cos_theta * cos_theta
+    aa = sval * sin2 + pval * cos2
+    bb = rvalue * lvalue * sin2 + pval * sval * (1.0 + cos2)
+    cc = pval * rvalue * lvalue
+    discriminant = bb * bb - 4.0 * aa * cc
+    scale = max(bb * bb, abs(4.0 * aa * cc), 1.0)
+    if discriminant < -abs(discriminant_tolerance) * scale:
+        raise ValueError("cold-plasma dispersion has no real refractive-index branches for this direction")
+    discriminant = max(discriminant, 0.0)
+    if abs(aa) <= np.finfo(float).eps * max(abs(bb), abs(cc), 1.0):
+        if abs(bb) <= np.finfo(float).eps:
+            raise ValueError("degenerate cold-plasma Appleton-Hartree dispersion")
+        roots = np.array([cc / bb, np.nan])
+    else:
+        root = np.sqrt(discriminant)
+        roots = np.array([(bb - root) / (2.0 * aa), (bb + root) / (2.0 * aa)])
+    roots = np.sort(roots[np.isfinite(roots)])
+    if roots.size == 0 or np.any(roots <= 0):
+        raise ValueError("selected cold-plasma branch is evanescent (N^2 is not positive)")
+    if int(mode_index) >= roots.size:
+        raise ValueError("requested propagating mode branch does not exist")
+    n_squared = float(roots[int(mode_index)])
+    refractive_index = float(np.sqrt(n_squared))
+    wavevector = (omega / C) * refractive_index * direction
+    operator, _ = cold_plasma_wave_operator(omega, wavevector, b, species)
+    _, singular_values, vh = np.linalg.svd(operator)
+    electric = vh[-1].conj()
+    electric /= np.linalg.norm(electric)
+    magnetic = np.cross(wavevector, electric) / (MU0 * omega)
+    poynting = 0.5 * np.real(np.cross(electric, magnetic.conj()))
+    longitudinal_flux = float(np.dot(poynting, direction))
+    if not np.isfinite(longitudinal_flux) or abs(longitudinal_flux) <= np.finfo(float).tiny:
+        raise ValueError("selected mode has zero or non-finite longitudinal Poynting flux")
+    electric /= np.sqrt(abs(longitudinal_flux))
+    magnetic /= np.sqrt(abs(longitudinal_flux))
+    poynting /= abs(longitudinal_flux)
+    return {
+        "refractive_index": refractive_index,
+        "refractive_index_squared": n_squared,
+        "wavevector_rad_m": wavevector,
+        "electric_polarization_unit_flux": electric,
+        "magnetic_field_per_sqrt_flux": magnetic,
+        "poynting_vector_unit_flux": poynting,
+        "signed_longitudinal_flux_before_normalization": longitudinal_flux,
+        "wave_operator_singular_values": singular_values,
+        "mode_index": int(mode_index),
+        "normalization": "absolute longitudinal time-averaged Poynting flux equals 1 W/m^2",
+        "assumptions": [
+            "Cold, collisionless, homogeneous local plasma.",
+            "Plane-wave geometrical optics; no finite-beam or diffraction correction.",
+            "The selected branch must be real and propagating; resonant and evanescent branches are rejected."
+        ],
+    }
