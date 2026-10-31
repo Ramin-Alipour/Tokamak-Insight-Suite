@@ -55,7 +55,7 @@
           "name": "joint_spectral_covariance",
           "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
           "required": false,
-          "description": "Full positive-definite covariance in channel-major order; cannot be combined with signal_uncertainty."
+          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit."
         },
         {
           "name": "model",
@@ -66,12 +66,14 @@
         {
           "name": "laser_wavelength_uncertainty_nm",
           "unit": "nm; 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated for non-collective Maxwellian/Kappa fits and rejected for relativistic Maxwell-Juttner."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
-          "unit": "rad; 1-sigma; collective scalar geometry MC or non-collective analytic propagation",
-          "required": false
+          "unit": "rad; 1-sigma; supported for non-collective Maxwellian/Kappa only",
+          "required": false,
+          "description": "Optional scalar scattering-angle uncertainty; analytic propagation is implemented for non-collective Maxwellian/Kappa fits. Relativistic Maxwell-Juttner uncertainty input is rejected rather than ignored."
         },
         {
           "name": "instrument_response_uncertainty",
@@ -111,19 +113,20 @@
         {
           "name": "incident_polarization",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference."
         },
         {
           "name": "incident_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Required for collective Maxwellian/Kappa and relativistic Maxwell-Juttner models; unit vector."
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference. Supply a unit 3-vector."
         },
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
           "required": false,
-          "description": "Required for collective Maxwellian/Kappa and relativistic Maxwell-Juttner models; unit vector."
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference. Supply a unit 3-vector."
         },
         {
           "name": "spectral_power_density_calibrated",
@@ -166,7 +169,7 @@
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Non-collective models only. Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties. Collective mode exposes its external-parameter covariance separately."
+          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
         }
       ],
       "output_specs": [
@@ -5037,7 +5040,7 @@
           "name": "joint_spectral_covariance",
           "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
           "required": false,
-          "description": "Full positive-definite covariance in channel-major order; cannot be combined with signal_uncertainty."
+          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit."
         },
         {
           "name": "model",
@@ -5048,12 +5051,14 @@
         {
           "name": "laser_wavelength_uncertainty_nm",
           "unit": "nm; 1-sigma",
-          "required": false
+          "required": false,
+          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated for non-collective Maxwellian/Kappa fits and rejected for relativistic Maxwell-Juttner."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
-          "unit": "rad; 1-sigma; collective scalar geometry MC or non-collective analytic propagation",
-          "required": false
+          "unit": "rad; 1-sigma; supported for non-collective Maxwellian/Kappa only",
+          "required": false,
+          "description": "Optional scalar scattering-angle uncertainty; analytic propagation is implemented for non-collective Maxwellian/Kappa fits. Relativistic Maxwell-Juttner uncertainty input is rejected rather than ignored."
         },
         {
           "name": "instrument_response_uncertainty",
@@ -5093,17 +5098,20 @@
         {
           "name": "incident_polarization",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference."
         },
         {
           "name": "incident_direction",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference. Supply a unit 3-vector."
         },
         {
           "name": "scattered_direction",
           "unit": "dimensionless 3-vector",
-          "required": false
+          "required": false,
+          "description": "Required for relativistic Maxwell-Juttner forward modelling; also required for absolute-density inference. Supply a unit 3-vector."
         },
         {
           "name": "spectral_power_density_calibrated",
@@ -5146,7 +5154,7 @@
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Non-collective models only. Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties. Collective mode exposes its external-parameter covariance separately."
+          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
         }
       ],
       "output_specs": [
