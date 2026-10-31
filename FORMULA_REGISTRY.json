@@ -3526,5 +3526,269 @@
         "scope": "Recent CTS energetic-ion diagnostic application."
       }
     ]
+  },
+  {
+    "name": "Relativistic single-particle Thomson spectral density",
+    "equation": "ν_s/ν_i=(1−n_i·β)/(1−n_s·β); λ_s/λ_i=(1−n_s·β)/(1−n_i·β); f_J(p)∝exp(−γ/θ), θ=T_e/(m_ec²)",
+    "inputs": "Calibrated wavelength grid, laser wavelength, scattering geometry, electron temperature, scattering-vector bulk-flow projection",
+    "output": "Unit-area wavelength spectral density and fitted Te/flow projection",
+    "assumptions": "Isotropic Maxwell-Juttner rest-frame electron distribution; Lorentz boost along scattering vector; Thomson limit; no recoil/Compton correction",
+    "status": "D",
+    "category": "Optical relativistic Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+      "formula_key": "relativistic_single_particle_thomson_spectrum",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "flow_projection_m_s",
+          "unit": "m s^-1; subluminal",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "nm^-1; unit area"
+        },
+        {
+          "name": "fitted_centroid_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "spectral_rms_width_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "captured_probability",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated wavelength axis",
+        "Laser wavelength and scattering geometry",
+        "Measured instrument response"
+      ],
+      "uncertainty_model": "Fit covariance is computed from the local least-squares Jacobian. Quadrature-order sensitivity is a numerical model-resolution issue and is not included as an experimental uncertainty term.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite"
+      ],
+      "note": "Uses exact relativistic photon-frequency kinematics for an isotropic Maxwell-Juttner rest-frame distribution Lorentz-boosted along q. Assumes the Thomson limit and omits photon recoil."
+    },
+    "references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent instrument-aware optical Thomson spectral modelling."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "issue": "10",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Recent optical Thomson spectral inversion methods."
+      },
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
+      }
+    ]
+  },
+  {
+    "name": "Collective kappa-electron Thomson dielectric spectrum",
+    "equation": "χ_s(k,ω)=−(ω_ps²/k²)∫_L [∂f_s(v)/∂v]/(v−ω/k) dv; ε=1+Σ_sχ_s; S=(2π/k){|1+Σ_iχ_i|² f_e/|ε|²+Σ_i(Z_i²n_i/n_e)|χ_e|²f_i/|ε|²}",
+    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/temperature/kappa, fixed Maxwellian ion species/fractions/temperatures/flows, electron flow and beam directions",
+    "output": "Collective spectral density, electron/ion susceptibilities, dielectric function and fitted ne/Te/kappa",
+    "assumptions": "Unmagnetized electrostatic longitudinal response; isotropic 1-D projected kappa electron VDF; Maxwellian ions; Landau contour; fixed supplied ion composition and flow vectors",
+    "status": "D",
+    "category": "Collective non-Maxwellian Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+      "formula_key": "collective_kappa_electron_thomson_spectrum",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; >1.5",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "charge-density fraction; sum to one",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one per species",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s^-1; species x 3",
+          "required": true
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "model spectral density"
+        },
+        {
+          "name": "electron_susceptibility",
+          "unit": "complex"
+        },
+        {
+          "name": "ion_susceptibility",
+          "unit": "species x wavelength complex"
+        },
+        {
+          "name": "dielectric_function",
+          "unit": "complex"
+        },
+        {
+          "name": "dynamic_structure_factor",
+          "unit": "model dynamic structure factor"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated wavelength spectrum",
+        "Explicit ion species/fractions/temperatures/flows",
+        "Explicit beam directions and scattering angle"
+      ],
+      "uncertainty_model": "Local Jacobian covariance for ne, Te and kappa. Supplied ion, flow, beam and instrument-response uncertainties are not yet fully propagated by this model and are reported as missing inputs in the analysis result.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
+      ],
+      "note": "This is a collective dielectric model using a non-Maxwellian kappa electron VDF, not a non-collective Student-t profile fit. It is unmagnetized and uses Maxwellian ions."
+    },
+    "references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent instrument-aware optical Thomson spectral modelling."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "issue": "10",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Recent optical Thomson spectral inversion methods."
+      },
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
+      }
+    ]
   }
 ]
