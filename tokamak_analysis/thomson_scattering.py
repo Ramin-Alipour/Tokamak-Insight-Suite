@@ -178,13 +178,34 @@ def density_from_thomson_scattered_power(
             scattering_angle_uncertainty_rad, "scattering_angle_uncertainty_rad", allow_zero=True
         )
         uncertainty_supplied = True
-        if incident_polarization_vector is not None and sigma_theta > 0:
-            raise ValueError("For polarized geometry, propagate angle uncertainty through the supplied direction vectors or provide polarization_factor_uncertainty; the scalar unpolarized angle derivative is not applicable.")
         if incident_polarization_vector is None:
             relative_sensitivity = abs(
                 2.0 * np.sin(theta) * np.cos(theta) / (1.0 + np.cos(theta) ** 2)
             )
-            rel_variance += (relative_sensitivity * sigma_theta) ** 2
+        else:
+            # A scalar angle uncertainty at fixed incident beam and polarization
+            # corresponds to rotating the scattered direction in its nominal
+            # scattering plane. Differentiate the polarized Thomson factor
+            # F = 1 - (k_s . epsilon_i)^2 along that angular coordinate.
+            eps = np.asarray(incident_polarization_vector, dtype=float)
+            incident = np.asarray(incident_direction_vector, dtype=float)
+            scattered = np.asarray(scattered_direction_vector, dtype=float)
+            eps = eps / np.linalg.norm(eps)
+            incident = incident / np.linalg.norm(incident)
+            scattered = scattered / np.linalg.norm(scattered)
+            cosine = float(np.clip(np.dot(incident, scattered), -1.0, 1.0))
+            sine = float(np.sqrt(max(0.0, 1.0 - cosine * cosine)))
+            factor = dsigma / (_ELECTRON_CLASSICAL_RADIUS_M ** 2)
+            if sine <= 1e-12:
+                relative_sensitivity = 0.0
+            else:
+                tangent = (scattered - cosine * incident) / sine
+                direction_derivative = -sine * incident + cosine * tangent
+                polarization_projection = float(np.dot(scattered, eps))
+                projection_derivative = float(np.dot(direction_derivative, eps))
+                factor_derivative = -2.0 * polarization_projection * projection_derivative
+                relative_sensitivity = abs(factor_derivative / factor)
+        rel_variance += (relative_sensitivity * sigma_theta) ** 2
 
     return {
         "electron_density_m3": float(density),
