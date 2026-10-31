@@ -1437,4 +1437,55 @@ def analyze_thomson_spectra(
                 if lsf_unc is not None:
                     channel_result["instrument_response_uncertainty_propagated"]=False
                     channel_result["instrument_response_uncertainty_warning"]=output["collective_external_uncertainty_warning"]
+
+    # Attach model-independent observed spectral-distribution diagnostics to every
+    # channel, using the background nuisance term already fitted by the selected
+    # physical forward model. This avoids a second, unrelated edge-background fit.
+    from .thomson_distribution import analyze_thomson_spectral_distribution
+    spectral_distribution_results = []
+    for channel_index, channel_result in enumerate(results):
+        channel_uncertainty = None if unc is None else unc[channel_index]
+        if joint_covariance is not None:
+            channel_slice = slice(channel_index * y.shape[1], (channel_index + 1) * y.shape[1])
+            marginal = joint_covariance[channel_slice, channel_slice]
+            channel_uncertainty = np.sqrt(np.maximum(np.diag(marginal), 0.0))
+            if np.any(channel_uncertainty <= 0):
+                channel_uncertainty = None
+        background_reference_nm = float(
+            channel_result.get("fitted_center_nm", laser_wavelength_nm)
+        )
+        fitted_background = (
+            float(channel_result["background_intercept"])
+            + float(channel_result["background_slope_per_nm"])
+            * (xs[channel_index] - background_reference_nm)
+        )
+        try:
+            distribution = analyze_thomson_spectral_distribution(
+                xs[channel_index],
+                y[channel_index],
+                instrument_response_matrix=channel_responses[channel_index],
+                signal_uncertainty=channel_uncertainty,
+                background_signal=fitted_background,
+            )
+            distribution["analysis_status"] = "completed"
+            distribution["background_source"] = (
+                "background nuisance component from the selected Thomson physical forward fit"
+            )
+            distribution["interpretation"] = (
+                "Observed wavelength-space moments and a response-convolved Gaussian shape diagnostic. "
+                "Physical Te and flow remain those inferred by the selected Maxwellian/Kappa/collective model; "
+                "these descriptive moments are not a unique arbitrary electron VDF inversion."
+            )
+        except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+            distribution = {
+                "analysis_status": "unavailable_for_this_channel",
+                "reason": str(exc),
+                "interpretation": (
+                    "The primary physical Thomson inference remains available; spectral-distribution "
+                    "diagnostics require sufficient wavelength coverage and a positive signed area/variance."
+                ),
+            }
+        channel_result["spectral_distribution"] = distribution
+        spectral_distribution_results.append(distribution)
+    output["spectral_distribution"] = spectral_distribution_results
     return output
