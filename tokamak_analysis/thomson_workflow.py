@@ -316,9 +316,14 @@ def _reconstruct_inferred_parameter_profile(
         if selected_method == "pchip":
             fit = PchipInterpolator(radius, sample, extrapolate=False)
         else:
-            sigma_floor = (np.finfo(float).tiny if sigma is None else
-                           max(float(np.max(sigma)), np.finfo(float).tiny) * 1e-12)
-            weights = None if sigma is None else 1.0 / np.maximum(sigma, sigma_floor)
+            if sigma is None or not np.any(sigma > 0):
+                weights = None
+            else:
+                sigma_floor = max(
+                    float(np.max(sigma)) * 1e-12,
+                    np.sqrt(np.finfo(float).tiny),
+                )
+                weights = 1.0 / np.maximum(sigma, sigma_floor)
             fit = make_smoothing_spline(radius, sample, w=weights, lam=None)
         return np.asarray(fit(grid), dtype=float), np.asarray(fit.derivative()(grid), dtype=float)
 
