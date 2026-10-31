@@ -827,7 +827,7 @@ def test_cts_full_em_dispatcher_rejects_duplicate_spectrum_keywords(monkeypatch)
         ("measured_spectrum", ["1.0"] * 8),
         ("instrument_response", np.eye(8, dtype=bool)),
         ("signal_uncertainty", [True] * 8),
-        ("spectral_covariance", np.eye(8, dtype=object).tolist()),
+        ("spectral_covariance", np.eye(8, dtype=bool)),
     ],
 )
 def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(argument, bad_value):
