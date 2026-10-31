@@ -57,6 +57,7 @@ def relativistic_maxwell_juttner_spectrum(
     electron_temperature_eV, *, flow_projection_m_s=0.0,
     incident_polarization, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01,
+    require_full_spectrum=True,
 ):
     """Return a unit-area relativistic Thomson spectrum on a wavelength grid.
 
@@ -203,7 +204,7 @@ def relativistic_maxwell_juttner_spectrum(
     )
     total_weight = float(np.sum(quadrature_weight))
     captured = float(np.sum(counts))/total_weight if total_weight > 0 else 0.0
-    if total_weight <= 0 or captured < 0.995:
+    if total_weight <= 0 or (require_full_spectrum and captured < 0.995):
         raise ValueError(
             "wavelength_nm must capture at least 99.5% of the relativistic Thomson spectrum; "
             f"captured fraction was {captured:.6g}"
@@ -299,7 +300,7 @@ def fit_relativistic_maxwell_juttner(
     amp0 = max(float(np.max(positive)), np.finfo(float).tiny)
     p0 = np.array([np.log(te0), np.arctanh(beta0), np.log(amp0), baseline, 0.0])
 
-    def evaluate(parameters, return_parts=False):
+    def evaluate(parameters, return_parts=False, *, require_full_spectrum=True):
         te = float(np.exp(np.clip(parameters[0], -700.0, 700.0)))
         beta_flow = float(np.tanh(parameters[1]))
         physical = relativistic_maxwell_juttner_spectrum(
@@ -308,6 +309,7 @@ def fit_relativistic_maxwell_juttner(
             incident_polarization=polarization_local,
             radial_order=radial_order, angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            require_full_spectrum=require_full_spectrum,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
         amplitude = float(np.exp(np.clip(parameters[2], -700.0, 700.0)))
@@ -315,17 +317,28 @@ def fit_relativistic_maxwell_juttner(
         predicted = amplitude*shape+offset+slope*(x-float(laser_wavelength_nm))
         return (predicted, physical, shape) if return_parts else predicted
 
-    fit = least_squares(
-        lambda p: (evaluate(p)-ys)/residual_scale,
-        p0, x_scale="jac", max_nfev=1200,
-    )
+    def objective(parameters):
+        try:
+            return (evaluate(parameters, require_full_spectrum=False)-ys)/residual_scale
+        except ValueError as exc:
+            message = str(exc)
+            if "capture at least 99.5%" in message or "produced zero spectral power" in message:
+                # A trial step can move the spectrum outside the measured window.
+                # Penalize that trial; retain the strict full-window requirement
+                # for the final reported physical fit.
+                return np.full_like(ys, 1.0e6)
+            raise
+
+    fit = least_squares(objective, p0, x_scale="jac", max_nfev=1200)
     if not fit.success:
         raise ValueError(f"relativistic Maxwell-Juttner Thomson fit failed: {fit.message}")
     rank = int(np.linalg.matrix_rank(fit.jac))
     condition = float(np.linalg.cond(fit.jac))
     if rank < 5 or not np.isfinite(condition) or condition > 1e12:
         raise ValueError("relativistic Maxwell-Juttner Thomson fit is not jointly identifiable")
-    predicted_scaled, physical, shape = evaluate(fit.x, return_parts=True)
+    predicted_scaled, physical, shape = evaluate(
+        fit.x, return_parts=True, require_full_spectrum=True
+    )
     dof = max(1, x.size-5)
     covariance_fit = np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None:
