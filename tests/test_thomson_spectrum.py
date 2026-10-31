@@ -301,3 +301,36 @@ def test_legacy_adapter_applies_width_identifiability_gate_without_scalar_lsf_su
             scattering_angle_rad=np.pi / 2,
             instrument_response_matrix=_measured_response(wavelength),
         )
+
+
+
+def test_legacy_adapter_response_convolved_width_uses_nonuniform_bin_measure():
+    coordinate = np.linspace(-1.0, 1.0, 401)
+    wavelength = 532.0 + 40.0 * (coordinate + 0.12 * coordinate**2)
+    laser_nm = 532.0
+    angle = np.pi / 2
+    sigma_intrinsic = 2.0 * laser_nm * np.sqrt(100.0 / ELECTRON_REST_ENERGY_EV) * np.sin(angle / 2)
+    edges = np.empty(wavelength.size + 1)
+    edges[1:-1] = 0.5 * (wavelength[:-1] + wavelength[1:])
+    edges[0] = wavelength[0] - 0.5 * (wavelength[1] - wavelength[0])
+    edges[-1] = wavelength[-1] + 0.5 * (wavelength[-1] - wavelength[-2])
+    widths = np.diff(edges)
+    delta = wavelength[:, None] - wavelength[None, :]
+    response = np.exp(-0.5 * (delta / 0.08) ** 2)
+    response /= response.sum(axis=0, keepdims=True)
+    intrinsic = 1200.0 * np.exp(-0.5 * ((wavelength - laser_nm) / sigma_intrinsic) ** 2)
+    signal = (response @ (intrinsic * widths)) / widths + 30.0
+    out = fit_thomson_spectrum(
+        wavelength, signal, laser_wavelength_nm=laser_nm,
+        scattering_angle_rad=angle, instrument_response_matrix=response,
+        signal_uncertainty=np.full(signal.size, 0.2),
+    )
+    component = np.asarray(out["fitted_spectrum"]) - (
+        out["background_intercept"]
+        + out["background_slope_per_nm"] * (wavelength - out["center_wavelength_nm"])
+    )
+    component = np.maximum(component, 0.0)
+    area = np.sum(component * widths)
+    center = np.sum(wavelength * component * widths) / area
+    expected_sigma = np.sqrt(np.sum((wavelength - center)**2 * component * widths) / area)
+    assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
