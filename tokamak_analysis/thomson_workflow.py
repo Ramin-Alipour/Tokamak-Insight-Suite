@@ -448,24 +448,20 @@ def reconstruct_thomson_profile_from_spectra(
     ]
     if result.get("model") in {"non_collective_kappa", "collective_kappa"}:
         kappa_values = np.asarray([channel.get("kappa_index", np.nan) for channel in result["channels"]], dtype=float)
+        kappa_uncertainties = np.asarray([
+            channel.get("kappa_index_uncertainty", np.nan) for channel in result["channels"]
+        ], dtype=float)
+        kappa_covariance = (
+            np.diag(np.square(kappa_uncertainties))
+            if np.all(np.isfinite(kappa_uncertainties)) else None
+        )
         if result.get("model") == "collective_kappa":
-            kappa_variances = [
-                float(np.asarray(channel["fit_covariance"], dtype=float)[2, 2])
-                if channel.get("fit_covariance") is not None
-                and np.asarray(channel["fit_covariance"]).shape == (3, 3) else np.nan
-                for channel in result["channels"]
-            ]
-        else:
-            kappa_variances = [
-                float(np.asarray(channel["fit_covariance"], dtype=float)[3, 3])
-                if channel.get("fit_covariance") is not None
-                and np.asarray(channel["fit_covariance"]).shape == (6, 6) else np.nan
-                for channel in result["channels"]
-            ]
+            kappa_covariance = covariance_for(
+                [f"channel_{i}_kappa_index" for i in range(n_channels)],
+                kappa_covariance,
+            )
         candidates.append((
-            "electron_kappa_index", None, None,
-            np.diag(kappa_variances) if np.all(np.isfinite(kappa_variances)) else None,
-            False,
+            "electron_kappa_index", None, None, kappa_covariance, False,
         ))
     if result.get("model") in {"collective_maxwellian", "collective_kappa"}:
         alpha_values = np.asarray([
