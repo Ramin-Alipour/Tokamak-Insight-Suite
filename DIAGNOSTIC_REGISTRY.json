@@ -375,7 +375,7 @@
         "article": "093542",
         "year": 2024,
         "doi": "10.1063/5.0215734",
-        "scope": "CTS spectral decomposition and ion-temperature extraction method; not yet implemented in this repository."
+        "scope": "Supports CTS spectral decomposition and ion-temperature inference; the repository implements the electrostatic CTS branch and separately documents its optimizer and model scope under the registered CTS subanalysis."
       },
       {
         "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
@@ -4060,17 +4060,11 @@
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
-      "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
       "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
-      "tokamak_analysis.cts_bindslev.bindslev_gamma_tensor",
-      "tokamak_analysis.cts_bindslev.bindslev_x_tensor",
-      "tokamak_analysis.cts_bindslev.bindslev_source_current_operator",
-      "tokamak_analysis.cts_bindslev.bindslev_correlated_transfer_spectrum",
-      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
-      "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+      "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
       "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
     ],
-    "implementation_status": "Electrostatic CTS path retained. Full-EM CTS now supports species-resolved thermal-ion temperatures in the inversion; relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion linear response with Klimontovich noise; second-order relativistic Vlasov three-wave vertices for supplied non-Maxwellian populations; and frequency-resolved cold-plasma ray paths with Gaussian overlap weights applied to the spectral transfer. The Maxwellian bulk-electron nonlinear source remains the low-temperature Bindslev closure. The geometry path remains geometrical-optics/local-Gaussian and is not a quasi-optical diffraction solver.",
+    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. The public dispatcher accepts the same `spectrum` keyword for both branches and adapts it to the Full-EM implementation. Optional relativistic gyrotropic populations and frequency-resolved ray/beam overlap remain scoped capabilities of Full-EM.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4084,7 +4078,8 @@
         {
           "name": "spectrum",
           "unit": "calibrated spectral power",
-          "required": true
+          "required": true,
+          "description": "Canonical measured, calibrated CTS spectral-power vector. The dispatcher maps this name to measured_spectrum for the Full-EM implementation."
         },
         {
           "name": "probe_frequency_Hz",
@@ -4094,7 +4089,8 @@
         {
           "name": "scattering_geometry",
           "unit": "structured",
-          "required": true
+          "required": true,
+          "description": "Structured geometry input. Electrostatic CTS accepts scattering_angle_rad or incident_direction/scattered_direction vectors. Full-electromagnetic CTS requires incident_direction and scattered_direction inside this mapping, or frequency_resolved_geometry records containing the corresponding local vectors and magnetic fields; these are not separate dispatcher keyword arguments."
         },
         {
           "name": "ion_species",
@@ -4115,7 +4111,7 @@
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
-          "description": "Optional pointwise spectral uncertainty; Full-EM requires this or spectral_covariance."
+          "description": "Optional pointwise 1-sigma uncertainty for electrostatic CTS. Full-electromagnetic CTS requires exactly one of signal_uncertainty or spectral_covariance."
         },
         {
           "name": "fast_ion",
@@ -4133,7 +4129,8 @@
         {
           "name": "spectral_covariance",
           "unit": "frequency-bin covariance matrix",
-          "required": false
+          "required": false,
+          "description": "Optional frequency-bin covariance for electrostatic CTS. Full-electromagnetic CTS requires exactly one of spectral_covariance or signal_uncertainty; the two are mutually exclusive."
         },
         {
           "name": "external_parameter_uncertainties",
@@ -4178,7 +4175,7 @@
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
           "required": true,
-          "description": "Required positive initial temperature per supplied ion species; no common temperature or range is assumed."
+          "description": "Required positive optimizer start for ion temperatures. Accepts a scalar (broadcast as the same initial guess), one value per species, or a species-name mapping; Full-EM fits an independent final temperature for every supplied species."
         },
         {
           "name": "ion_velocity_initial_m_s",
@@ -4225,20 +4222,6 @@
           "unit": "m s^-1; mapping from every ion species name to a 3-vector",
           "required": false,
           "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "incident_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false,
-          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "scattered_direction",
-          "unit": "dimensionless 3-vector",
-          "required": false,
-          "description": "Mandatory for full_electromagnetic; unit vector in common coordinate frame.",
           "required_when_model": "full_electromagnetic"
         },
         {
@@ -4316,13 +4299,6 @@
           "unit": "dimensionless positive limit on theta_e = T_e/(m_e c^2), below 1",
           "required": false,
           "description": "Full-EM only and only when electron_distribution is omitted. If supplied, the fitted theta_e above this researcher-selected asymptotic Bindslev screening limit is rejected. If omitted, validity is explicitly marked not_quantitatively_screened.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "mode_index",
-          "unit": "integer cold-plasma propagation branch index",
-          "required": false,
-          "description": "Required explicitly when generating frequency_resolved_geometry with trace_cts_frequency_resolved_beams and selected again in the Full-EM UI to verify the uploaded geometry. Select branch 0, 1 or 2; no default branch is assumed.",
           "required_when_model": "full_electromagnetic"
         }
       ],
@@ -4551,7 +4527,7 @@
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
-      "algorithm": "Electrostatic CTS retains its longitudinal model. Magnetized full-EM computes species kinetic conductivity, screened fluctuation covariance and receiver-projected three-wave source. Maxwellian bulk electrons use the Bindslev Gamma/X source; explicitly supplied relativistic gyrotropic non-Maxwellian electrons/fast ions contribute a second-order relativistic Vlasov vertex. Thermal-ion temperatures are independently fitted by species. Optional frequency-resolved cold-plasma rays determine local wave directions/field and Gaussian beam-overlap weights applied bin-by-bin to spectral transfer.",
+      "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
       "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from the supplied signal uncertainty or spectral covariance only; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
@@ -4581,56 +4557,74 @@
       "calibrated_measurements_to_physics": true,
       "workflow_modes": [
         {
+          "name": "unmagnetized_electrostatic_longitudinal_cts",
+          "function": "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
+          "inputs": [
+            "frequency_shift_Hz",
+            "spectrum",
+            "probe_frequency_Hz",
+            "scattering_geometry",
+            "ion_species",
+            "ion_fractions",
+            "instrument_response",
+            "electron_velocity_projection_m_s",
+            "electron_density_initial_m3",
+            "electron_temperature_initial_eV",
+            "ion_temperature_initial_eV",
+            "ion_velocity_initial_m_s",
+            "optional signal_uncertainty or spectral_covariance",
+            "optional fast_ion model and researcher-supplied parameter bounds"
+          ],
+          "outputs": [
+            "electron_density_m3",
+            "electron_temperature_eV",
+            "ion_temperature_eV",
+            "electron_velocity_projection_m_s (fixed supplied input)",
+            "ion_velocity_projection_m_s",
+            "fitted_spectrum",
+            "residual",
+            "fit_covariance",
+            "optional fast-ion VDF and covariance diagnostics"
+          ],
+          "scope": "Unmagnetized longitudinal multi-species dielectric forward model. The inversion method is selected explicitly; fast-ion Maxwellian/tabulated-VDF options are model components, not additional CTS physical model families."
+        },
+        {
           "name": "magnetized_full_electromagnetic_cts",
           "function": "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
           "inputs": [
-            "calibrated frequency-shift spectrum",
-            "probe frequency",
-            "measured response matrix",
-            "species list and charge-density fractions",
-            "initial electron density and temperature",
-            "initial temperature for each ion species",
-            "magnetic field and explicit electron/ion flow vectors",
-            "incident/scattered directions and polarizations"
+            "frequency_shift_Hz",
+            "spectrum (dispatcher maps to measured_spectrum)",
+            "probe_frequency_Hz",
+            "scattering_geometry (beam directions are nested here)",
+            "instrument_response",
+            "exactly one of signal_uncertainty or spectral_covariance",
+            "ion_species",
+            "ion_fractions",
+            "electron_density_initial_m3",
+            "electron_temperature_initial_eV",
+            "ion_temperature_initial_eV",
+            "magnetic_field_T",
+            "electron_flow_velocity_m_s",
+            "ion_flow_velocity_m_s",
+            "incident_polarization",
+            "scattered_polarization",
+            "optional parameter_bounds, harmonic_order, quadrature_order and damping_rate_rad_s",
+            "optional electron_distribution and fast_ion_populations",
+            "optional frequency_resolved_geometry generated by the CTS ray/beam helper"
           ],
           "outputs": [
-            "electron density",
-            "electron temperature",
-            "independent ion temperature per species",
-            "fitted spectrum and residual",
-            "parameter covariance",
-            "joint fluctuation covariance"
-          ]
-        },
-        {
-          "name": "relativistic_gyrotropic_non_maxwellian_cts",
-          "function": "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
-          "inputs": [
-            "electron_distribution and/or fast_ion_populations",
-            "relativistic_bigaussian or tabulated_gyrotropic VDF",
-            "frequency-shift spectrum and full-EM geometry"
+            "electron_density_m3",
+            "electron_temperature_eV",
+            "ion_temperature_eV_by_species",
+            "fitted_spectrum",
+            "residual",
+            "fit_covariance",
+            "fluctuation_covariance_density_current_E_B",
+            "dielectric_tensor",
+            "wave_tensor",
+            "parameter_uncertainties"
           ],
-          "outputs": [
-            "relativistic conductivity and Klimontovich noise",
-            "second-order relativistic Vlasov vertices",
-            "correlated spectral transfer"
-          ]
-        },
-        {
-          "name": "frequency_resolved_ray_and_beam_overlap",
-          "function": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
-          "inputs": [
-            "probe/receiver launch positions and wavevectors",
-            "supplied equilibrium callback",
-            "incident and receiver Gaussian beam covariance matrices",
-            "frequency bins"
-          ],
-          "outputs": [
-            "frequency-resolved local scattering geometry",
-            "path-integrated Gaussian overlap weights",
-            "local scattering samples and path-length quadrature"
-          ],
-          "scope": "Cold-plasma geometrical-optics ray tracing with caller-supplied local Gaussian beam covariance; no diffraction."
+          "scope": "Magnetized full-electromagnetic kinetic CTS forward model and inversion. Optional relativistic gyrotropic populations and frequency-resolved cold-plasma ray/beam-overlap geometry are capabilities within this model, not additional CTS model choices."
         }
       ],
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened."
@@ -4701,7 +4695,7 @@
       }
     ],
     "primary_analysis_id": 1,
-    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. This subanalysis consumes measured calibrated frequency-shift spectra and does not perform instrument calibration or experimental validation."
+    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed."
   },
   {
     "family": "Density and refractive diagnostics",
