@@ -105,3 +105,18 @@ These tests are synthetic numerical/software consistency checks. **No independen
 7. “Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks,” *Fusion Engineering and Design* **212** (2025), 114826, DOI: [10.1016/j.fusengdes.2025.114826](https://doi.org/10.1016/j.fusengdes.2025.114826). This is a diffraction-aware reference; TIS currently implements geometrical optics with supplied local Gaussian covariance.
 8. “Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device,” *Journal of Fusion Energy* **45** (2026), 55, DOI: [10.1007/s10894-026-00595-7](https://doi.org/10.1007/s10894-026-00595-7).
 9. J. L. Flocken, S. B. Korsholm and J. Rasmussen, “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026), 115845, DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845).
+
+
+## Model-conditional inputs and numerical provenance
+
+The public contract distinguishes Electrostatic and Full-EM inputs. The Electrostatic path alone consumes the scalar electron-flow projection, common projected ion-flow initial estimate, Electrostatic inversion-method/global-search controls, Electrostatic response-matrix Monte Carlo controls and its supported external-parameter uncertainty mapping. The Full-EM path alone consumes the magnetic-field vector, electron/ion flow vectors, incident/scattered directions and complex polarizations, harmonic/quadrature orders, optional relativistic distributions, frequency-resolved ray geometry and scattering-volume sample controls. Density/temperature initial estimates, ion species/composition, measured frequency axis/spectrum, probe frequency and measured response are shared. These conditions are encoded in `DIAGNOSTIC_REGISTRY.json` using `required_when_model`; a single flat list of mandatory inputs must not be used for both models.
+
+When `damping_rate_rad_s` is omitted, Full-EM uses the documented numerical regularization
+
+\[
+\gamma = \max(2\pi f_0\times 10^{-7},\;1\;\mathrm{rad\,s^{-1}}).
+\]
+
+This is not a physical collision frequency. The resolved value and whether it was caller-supplied or defaulted are returned in `numerical_controls`. Harmonic order, quadrature order and damping should be varied in numerical convergence studies before interpreting the result. Ray-tracing APIs require an explicit `mode_index`; no propagation branch is silently selected.
+
+If no pointwise uncertainty or spectral covariance is supplied to Electrostatic CTS, the fit is unweighted. The implementation does not invent a noise scale from the measured spectrum; the result reports `spectral_weighting_status=unweighted_no_measurement_uncertainty_supplied`, and reduced chi-square is unavailable.
