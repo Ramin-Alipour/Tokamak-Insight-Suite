@@ -154,14 +154,16 @@ def test_fit_uncertainties_and_goodness_metrics_remain_strict_json_safe():
     assert json.loads(encoded)["chi_square"] is not None
 
 
-def test_thomson_distribution_is_not_a_separate_canonical_analysis_entry():
+def test_thomson_distribution_moments_remain_unregistered_after_retiring_duplicate_wrapper():
     from tokamak_analysis.analysis_registry import ANALYSES, get_analysis
 
-    assert len(ANALYSES) == 80
+    assert len(ANALYSES) == 79
+    with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
+        get_analysis(7)
     with pytest.raises(KeyError, match="Unknown analysis ID: 81"):
         get_analysis(81)
-    # The numerical function remains tested directly below; it is not counted
-    # as a separate diagnostic/analysis entry in the canonical 80-item registry.
+    # The descriptive moment function remains tested directly below; its duplicate
+    # physical-inference wrapper is no longer a registered analysis entry.
 
 
 @pytest.mark.parametrize("scale", [1e-20, 1e-12, 1.0, 1e12])
