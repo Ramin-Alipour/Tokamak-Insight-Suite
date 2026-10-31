@@ -44,6 +44,8 @@ For the three optical models, supplied response-matrix uncertainty is propagated
 
 A normalized non-collective spectral shape alone does not determine absolute electron density. Absolute density is calculated only when the spectral intensity is explicitly declared calibrated in W/nm and all required optical factors are supplied: laser power at the scattering volume, interaction length, collection solid angle, optical efficiency, incident direction, incident polarization and scattered-light direction. If the contract is incomplete, density is reported unavailable rather than fabricated from fitted amplitude.
 
+For the relativistic Maxwell-Jüttner model, the density inversion does not substitute the stationary-electron classical differential cross-section. It uses the velocity-averaged effective polarized differential cross-section calculated by the same Lorentz-boosted Maxwell-Jüttner forward model, including the incident-flux and aberration factors. The fitted-parameter covariance and any supplied instrument-response, beam-geometry and polarization uncertainties are propagated through that effective cross-section before density uncertainty is reported.
+
 The physical fit must pass its identifiability and fit-quality gates. Rank-deficient, ill-conditioned or unacceptable fits are rejected rather than returning unsupported physical parameters. No regime or model is silently inferred from missing metadata.
 
 ## Outputs
