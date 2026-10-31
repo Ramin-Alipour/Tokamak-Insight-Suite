@@ -411,39 +411,59 @@ def fit_relativistic_maxwell_juttner(
     amplitude_scaled = float(np.exp(np.clip(fit.x[2], -700.0, 700.0)))
     transform = np.diag([te, C*(1.0-beta_flow*beta_flow), amplitude_scaled*scale, scale, scale])
     covariance_physical = transform@covariance_fit@transform.T
-    cross_section_gradient = np.zeros(2, dtype=float)
-    def effective_cross_section(parameters):
-        sampled_te = float(np.exp(np.clip(parameters[0], -700.0, 700.0)))
-        sampled_flow = float(np.tanh(parameters[1]) * C)
-        return relativistic_maxwell_juttner_spectrum(
-            x, laser_wavelength_nm, scattering_angle_rad, sampled_te,
-            flow_projection_m_s=sampled_flow,
-            incident_polarization=polarization_local,
-            radial_order=radial_order, angular_order=angular_order,
-            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
-            require_full_spectrum=False,
-        )["effective_differential_cross_section_m2_sr"]
-    for parameter_index in range(2):
+    def derived_spectral_quantities(parameters):
+        _, sampled_physical, sampled_shape = evaluate(
+            parameters, return_parts=True, require_full_spectrum=False
+        )
+        sampled_window_area = (
+            float(np.exp(np.clip(parameters[2], -700.0, 700.0)))
+            * scale * _trapezoid(sampled_shape, x)
+        )
+        captured_probability = float(sampled_physical["captured_probability"])
+        if not np.isfinite(captured_probability) or captured_probability <= 0.0:
+            raise ValueError("The fitted relativistic spectrum has no finite captured probability")
+        total_area = sampled_window_area / captured_probability
+        return (
+            float(sampled_physical["effective_differential_cross_section_m2_sr"]),
+            captured_probability,
+            total_area,
+            sampled_window_area,
+        )
+    cross_section_gradient = np.zeros(5, dtype=float)
+    area_gradient = np.zeros(5, dtype=float)
+    captured_gradient = np.zeros(5, dtype=float)
+    for parameter_index in range(3):
         step = np.cbrt(np.finfo(float).eps) * max(abs(float(fit.x[parameter_index])), 1.0)
         plus = np.asarray(fit.x, dtype=float).copy()
         minus = np.asarray(fit.x, dtype=float).copy()
         plus[parameter_index] += step
         minus[parameter_index] -= step
-        cross_section_gradient[parameter_index] = (
-            effective_cross_section(plus)-effective_cross_section(minus)
-        )/(2.0*step)
+        cs_plus, capture_plus, area_plus, _ = derived_spectral_quantities(plus)
+        cs_minus, capture_minus, area_minus, _ = derived_spectral_quantities(minus)
+        cross_section_gradient[parameter_index] = (cs_plus-cs_minus)/(2.0*step)
+        captured_gradient[parameter_index] = (capture_plus-capture_minus)/(2.0*step)
+        area_gradient[parameter_index] = (area_plus-area_minus)/(2.0*step)
+    cross_section, captured_probability, area, window_area = derived_spectral_quantities(fit.x)
     cross_section_variance = float(
-        cross_section_gradient @ covariance_fit[:2, :2] @ cross_section_gradient
+        cross_section_gradient @ covariance_fit @ cross_section_gradient
     )
     cross_section_uncertainty = float(np.sqrt(max(cross_section_variance, 0.0)))
+    area_variance = float(area_gradient @ covariance_fit @ area_gradient)
+    area_sigma = float(np.sqrt(max(area_variance, 0.0)))
+    captured_variance = float(captured_gradient @ covariance_fit @ captured_gradient)
+    captured_uncertainty = float(np.sqrt(max(captured_variance, 0.0)))
+    power_cross_section_covariance = float(
+        area_gradient @ covariance_fit @ cross_section_gradient
+    )
+    power_cross_section_relative_covariance = (
+        power_cross_section_covariance/(area*cross_section)
+        if area > 0.0 and cross_section > 0.0 else 0.0
+    )
     amplitude = amplitude_scaled*scale
     offset = float(fit.x[3]*scale)
     slope = float(fit.x[4]*scale)
     fitted = predicted_scaled*scale
     residual = y-fitted
-    area_shape = _trapezoid(shape, x)
-    area = amplitude*area_shape
-    area_sigma = abs(area_shape)*float(np.sqrt(max(covariance_physical[2, 2], 0.0)))
     return {
         "electron_temperature_eV": te,
         "electron_temperature_uncertainty_eV": float(np.sqrt(max(covariance_physical[0, 0], 0.0))),
@@ -460,8 +480,11 @@ def fit_relativistic_maxwell_juttner(
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_sigma,
         "integrated_scattered_power_fit_uncertainty_W": area_sigma,
-        "effective_differential_cross_section_m2_sr": float(physical["effective_differential_cross_section_m2_sr"]),
+        "effective_differential_cross_section_m2_sr": cross_section,
         "effective_differential_cross_section_uncertainty_m2_sr": cross_section_uncertainty,
+        "power_cross_section_relative_covariance": power_cross_section_relative_covariance,
+        "captured_spectral_probability_uncertainty": captured_uncertainty,
+        "integrated_scattered_power_window_W": window_area,
         "effective_cross_section_uncertainty_method": "finite-difference propagation of fitted Te/flow covariance through the Lorentz-transformed polarized Thomson cross-section",
         "reduced_chi_square": float(np.sum((residual/np.asarray(uncertainty,dtype=float))**2)/dof) if uncertainty is not None else None,
         "fitted_spectrum": fitted,
@@ -478,7 +501,7 @@ def fit_relativistic_maxwell_juttner(
         "thomson_recoil_correction_fraction_limit": physical["thomson_recoil_correction_fraction_limit"],
         "thomson_no_recoil_validity_status": physical["thomson_no_recoil_validity_status"],
         "quadrature_diagnostics": physical["quadrature"],
-        "captured_spectral_probability": physical["captured_probability"],
+        "captured_spectral_probability": captured_probability,
         "assumptions": [
             "Single-scattering non-collective Thomson regime.",
             "Isotropic Maxwell-Juttner electron distribution in its rest frame.",
