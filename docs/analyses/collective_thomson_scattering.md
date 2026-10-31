@@ -25,6 +25,20 @@ It does not include a full magnetized electromagnetic scattering tensor, ray tra
 
 The current background-ion model uses one common ion temperature and one common projected ion flow for all supplied ion species. Species-specific ion temperatures and species-specific flow inference are not implemented. Ion species, charge states, masses and fractions must be supplied explicitly; the interface does not prefill D+ or a unit fraction. The result returns the exact externally supplied electron-flow projection and its optional input uncertainty, explicitly marked as not fitted; inferred ion-flow uncertainty remains a separate fitted-parameter result.
 
+
+## Magnetized full-electromagnetic forward model
+
+A separate implementation is available as `tokamak_analysis.cts_full_em.full_em_cts_spectral_density` (also re-exported by `tokamak_analysis.cts_analysis`). It does not replace or silently alter the existing longitudinal electrostatic model.
+
+The implemented local kinetic response solves the linearized, collisionless Vlasov equation for isotropic non-relativistic Maxwellian species in a uniform magnetic field. Gyro-harmonics are retained explicitly and the velocity integrals use Gauss-Laguerre (perpendicular) and Gauss-Hermite (parallel) quadrature. The species conductivity tensors are assembled into the dielectric tensor and Maxwell wave tensor. Independent-particle current fluctuations are generated species-by-species with the classical fluctuation-dissipation relation, screened through the inverse wave tensor, and propagated into a joint covariance of electron density, electron current, electric field and magnetic field. The returned covariance retains their cross-correlations rather than summing independent fluctuation powers.
+
+Required inputs are the vector magnetic field, incident/scattered beam directions, complex transverse incident/scattered polarization vectors, electron flow vector, and a flow vector for every ion species. No vector direction, polarization, or ion flow is silently assumed. The harmonic order, velocity quadrature order and positive numerical damping rate are explicit numerical controls; the default damping is a numerical Landau-contour regularization, not a measured collision frequency.
+
+**Scope boundary:** this is a local magnetized electromagnetic kinetic fluctuation solver, not yet a reproduction of the complete Bindslev three-wave CTS transfer formulation. In particular, the receiver coupling currently projects the screened electron-current radiation with the supplied polarization factor; it does not yet include the complete density/current/E/B three-wave coupling tensors and their incident/scattered cold-plasma mode normalization. It also does not include ray tracing, finite beam overlap, relativistic or anisotropic fast-ion VDFs, or spatially varying magnetic geometry. These omissions are returned in the result metadata and must not be described as completed Full-EM diagnostic physics.
+
+Synthetic regression tests check finite non-negative spectra, covariance Hermiticity/positive semidefiniteness, and mandatory metadata errors. They are software consistency tests, not experimental validation.
+
+
 ## Inversion strategies
 
 ### Differential evolution
