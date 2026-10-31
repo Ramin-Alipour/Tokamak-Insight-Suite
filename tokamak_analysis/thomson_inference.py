@@ -1203,21 +1203,30 @@ def analyze_thomson_spectra(
                     combined_area_uncertainty = float(np.hypot(fit_area_uncertainty, lsf_area_uncertainty))
                     density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
                 else:
-                    # Preserve the caller's full optical-input correlation model,
-                    # while adding the independently sampled response contribution
-                    # to its scattered-power marginal. The covariance remains the
-                    # sole uncertainty input to the density inversion.
                     covariance = np.asarray(density_inputs["relative_input_covariance"], dtype=float).copy()
-                    base_relative_sigma = float(np.sqrt(max(covariance[0, 0], 0.0)))
                     lsf_relative_sigma = 0.0 if area == 0.0 else lsf_area_uncertainty / abs(area)
-                    # LSF Monte Carlo is an independent response contribution:
-                    # add only its variance to the scattered-power marginal and
-                    # preserve supplied cross-covariances with the optical factors.
-                    covariance[0, 0] += lsf_relative_sigma**2
-                    combined_relative_sigma = float(np.sqrt(max(covariance[0, 0], 0.0)))
-                    density_inputs["relative_input_covariance"] = covariance
-                    density_inputs["scattered_power_uncertainty_W"] = None
-                    combined_area_uncertainty = float(abs(area) * combined_relative_sigma)
+                    if np.allclose(covariance[0, :], 0.0, rtol=0.0, atol=1e-14) and np.allclose(
+                        covariance[:, 0], 0.0, rtol=0.0, atol=1e-14
+                    ):
+                        # Spectral/response uncertainty is supplied separately;
+                        # preserve the optical-factor covariance and combine the
+                        # independent area contributions as a scalar marginal.
+                        existing_area_sigma = float(
+                            density_inputs.get("scattered_power_uncertainty_W") or 0.0
+                        )
+                        combined_area_uncertainty = float(np.hypot(
+                            existing_area_sigma, lsf_area_uncertainty
+                        ))
+                        density_inputs["scattered_power_uncertainty_W"] = combined_area_uncertainty
+                    else:
+                        # A complete covariance already contains area uncertainty;
+                        # add the independent LSF contribution to its power block.
+                        covariance[0, 0] += lsf_relative_sigma**2
+                        density_inputs["relative_input_covariance"] = covariance
+                        density_inputs["scattered_power_uncertainty_W"] = None
+                        combined_area_uncertainty = float(
+                            abs(area) * np.sqrt(max(covariance[0, 0], 0.0))
+                        )
                 density_result = density_from_thomson_scattered_power(**density_inputs)
                 fit["electron_density_m3"] = density_result["electron_density_m3"]
                 fit["electron_density_uncertainty_m3"] = density_result["electron_density_uncertainty_m3"]
