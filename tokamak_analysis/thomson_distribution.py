@@ -172,6 +172,7 @@ def analyze_thomson_spectral_distribution(
 
     uncertainty = None
     covariance = None
+    covariance_cholesky = None
     if signal_uncertainty is not None and signal_covariance is not None:
         raise ValueError("Supply signal_uncertainty or signal_covariance, not both.")
     if signal_uncertainty is not None:
@@ -190,7 +191,7 @@ def analyze_thomson_spectral_distribution(
         if not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
             raise ValueError("signal_covariance must be symmetric")
         try:
-            np.linalg.cholesky(covariance)
+            covariance_cholesky = np.linalg.cholesky(covariance)
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
@@ -271,7 +272,7 @@ def analyze_thomson_spectral_distribution(
             sampled_signal = (
                 y + rng.normal(0.0, uncertainty)
                 if uncertainty is not None
-                else rng.multivariate_normal(y, covariance, check_valid="raise")
+                else y + covariance_cholesky @ rng.normal(size=y.size)
             )
             sampled_sigma = instrument_sigma_nm
             if instrument_sigma_nm is not None and instrument_sigma_uncertainty_nm is not None and instrument_sigma_uncertainty_nm > 0:
