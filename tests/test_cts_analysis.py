@@ -323,3 +323,78 @@ def test_cts_cold_plasma_vacuum_propagating_mode_is_flux_normalized():
     assert mode["signed_longitudinal_flux_before_normalization"] > 0
     assert np.dot(mode["poynting_vector_unit_flux"], [1.0, 0.0, 0.0]) == pytest.approx(1.0, rel=1e-10)
     assert np.all(np.isfinite(mode["electric_polarization_unit_flux"]))
+
+
+def test_bindslev_gamma_inverse_and_x_tensor_are_finite_and_consistent():
+    from tokamak_analysis.cts_bindslev import bindslev_gamma_tensor, bindslev_x_tensor
+
+    omega = 2.0 * np.pi * 140e9
+    b = np.array([0.0, 0.0, 2.0])
+    gamma = bindslev_gamma_tensor(omega, b)
+    assert gamma["inverse_identity_residual"] < 1e-10
+    x = bindslev_x_tensor(omega, [120.0, 0.0, 80.0], b)
+    assert x["X"].shape == (3, 3, 3)
+    assert np.all(np.isfinite(x["X"]))
+    np.testing.assert_allclose(x["rotation_lab_from_B"].T @ x["rotation_lab_from_B"],
+                               np.eye(3), atol=1e-12)
+
+
+def test_bindslev_source_current_operator_and_full_cross_spectrum_contraction():
+    from tokamak_analysis.cts_bindslev import (
+        bindslev_source_current_operator, bindslev_correlated_transfer_spectrum,
+    )
+    from tokamak_analysis.cts_em_geometry import cold_plasma_dielectric_tensor
+
+    omega_i = 2.0 * np.pi * 140e9
+    omega_s = 2.0 * np.pi * 141e9
+    b = np.array([0.0, 0.0, 2.0])
+    ne = 2e19
+    species = [{"density_m3": ne, "charge_C": -1.602176634e-19,
+                "mass_kg": 9.1093837015e-31}]
+    chi_i = cold_plasma_dielectric_tensor(omega_i, b, species) - np.eye(3)
+    chi_s = cold_plasma_dielectric_tensor(omega_s, b, species) - np.eye(3)
+    ei = np.array([0.0, 0.0, 1.0], dtype=complex)
+    source = bindslev_source_current_operator(
+        omega_incident_rad_s=omega_i, omega_scattered_rad_s=omega_s,
+        wavevector_incident_rad_m=[omega_i/299792458.0, 0.0, 0.0],
+        wavevector_scattered_rad_m=[0.0, omega_s/299792458.0, 0.0],
+        incident_electric_field=ei, incident_susceptibility=chi_i,
+        scattered_susceptibility=chi_s, magnetic_field_T=b,
+        electron_density_m3=ne,
+    )
+    operator = source["source_current_operator"]
+    assert operator.shape == (3, 10)
+    assert np.all(np.isfinite(operator))
+    seed = np.arange(1, 11, dtype=float).astype(complex)
+    covariance = np.outer(seed, seed.conj())
+    result = bindslev_correlated_transfer_spectrum(
+        covariance, operator, np.array([0.0, 0.0, 1.0])
+    )
+    assert result["received_source_current_spectral_power"] >= 0
+    assert result["includes_all_cross_correlations"] is True
+    assert set(result["transfer_contributions"]) == {
+        "density", "particle_flux", "electric_field", "magnetic_field"
+    }
+
+
+def test_full_em_cts_exposes_bindslev_three_wave_coupling():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    result = full_em_cts_spectral_density(
+        [0.8e9, 1.0e9, 1.2e9], 140e9,
+        {"incident_direction": [1.0, 0.0, 0.0],
+         "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0]},
+        electron_density_m3=2e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+        electron_flow_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        harmonic_order=3, quadrature_order=4,
+    )
+    assert result["bindslev_source_current_operator"].shape == (3, 3, 10)
+    assert len(result["bindslev_coupling_coefficients"]) == 3
+    assert "Gamma^{-1}" in result["three_wave_coupling"]
+    assert np.all(np.isfinite(result["spectral_density"]))
