@@ -157,6 +157,8 @@ def relativistic_gyrotropic_species_response(
                 a=coeff[m]
                 bare += (2.0*np.pi*density*charge*charge*measure*lorentz[m]
                          * np.outer(a,a.conj()))
+    p_total=np.sqrt(pperp*pperp+ppar*ppar)
+    gamma_grid=np.sqrt(1.0+(p_total/(mass*C))**2)
     conductivity_lab=rotation@conductivity@rotation.T
     bare_lab=rotation@bare@rotation.T
     bare_lab=0.5*(bare_lab+bare_lab.conj().T)
