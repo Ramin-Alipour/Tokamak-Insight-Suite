@@ -125,3 +125,36 @@ These are separate high-frequency propagation/geometry components. They do not y
 
 The cold-plasma tensor follows the Stix formulation documented by PlasmaPy and the high-frequency cold-wave / low-frequency hot-kinetic separation used by Fang et al. (2025). Software tests cover the vacuum limit, Hermiticity, Gaussian overlap normalization and straight-ray propagation in vacuum; they are numerical consistency tests, not experimental validation.
 
+
+
+## Bindslev three-wave coupling and relativistic fast-ion extension
+
+The full-EM forward path now applies the magnetized low-temperature Bindslev source-current closure rather than projecting only the electron-current covariance onto the receiver polarization.
+
+Implemented in `tokamak_analysis/cts_bindslev.py`:
+
+- Rank-four `Gamma_{abij}` tensor and its explicit inverse, with the inverse identity checked numerically.
+- Rank-three `X_{ijk}` pseudotensor generated from the inverse-`Gamma` contraction in Bindslev's magnetized source-current formulation.
+- Incident-wave density, particle-flux and magnetic perturbations derived from the cold-plasma susceptibility and Maxwell-Faraday relations.
+- Full source-current map from the ten fluctuation components `[delta_n, delta_v(3), delta_E(3), delta_B(3)]`.
+- Receiver projection and contraction with the complete Hermitian covariance, retaining every auto-spectrum and complex cross-spectrum. The density, particle-flux, electric-field and magnetic-field contributions are separately returned for diagnostics.
+
+This implements the low-temperature magnetized three-wave closure represented by Bindslev JET-P(93)41 Eqs. (98)-(102), (111), and (114)-(136), consistent with the correlated electromagnetic fluctuation transfer principle of Bindslev (1996). The cold high-frequency susceptibilities are evaluated separately at incident and scattered frequencies. This is not a claim that the entire relativistic nonlinear three-wave vertex has been derived: the Bindslev low-temperature source-current closure remains the coupling approximation.
+
+Implemented in `tokamak_analysis/cts_relativistic.py`:
+
+- Relativistic gyrotropic momentum-space Vlasov response with exact (v=p/(\gamma m)) and Ω/γ gyrofrequency.
+- Anisotropic relativistic bi-Gaussian momentum distributions with independently specified perpendicular and parallel temperatures.
+- User-supplied tabulated gyrotropic distributions (f(p_\perp,p_\parallel)), normalized over momentum space.
+- Fourier-collocation solution in gyrophase, including the full relativistic Lorentz force.
+- Non-equilibrium fast-ion fluctuation source from the relativistic Klimontovich orbit shot-noise spectrum, rather than applying an equilibrium fluctuation-dissipation theorem to an anisotropic population.
+- Fast-ion populations enter the total dielectric response and the screened fluctuation covariance through the explicit `fast_ion_populations` input.
+
+Each fast-ion population requires its name, charge state, mass, density, flow vector and either a `relativistic_bigaussian` distribution (perpendicular/parallel temperatures) or a `tabulated_gyrotropic` distribution with momentum grids and a non-negative distribution array. No fast-ion density, anisotropy or shape is inferred by default. The inversion currently fits (n_e,T_e,T_i); fast-ion distribution parameters are supplied externally, not fitted.
+
+Important scientific boundary: the relativistic fast-ion *linear response and particle-noise spectrum* are implemented, but the nonlinear Bindslev source-current vertex itself remains the low-temperature closure. A relativistic second-order kinetic vertex, including relativistic momentum derivatives and all corresponding fluctuation cross-correlations, is not claimed as complete. Bulk thermal species also remain on the existing non-relativistic Maxwellian kinetic path. Tests are numerical consistency/regression tests, not experimental validation.
+
+References:
+- H. Bindslev, “Three Wave Mixing and Thomson Scattering in Plasmas,” JET-P(93)41 (1993), detailed kinetic source-current derivation, including the `Gamma` and `X` tensors and the microscopic-fluctuation transfer equation.
+- H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58** (1996), 983–989, DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8).
+- H. Bindslev, “Dielectric effects on Thomson scattering in a relativistic magnetized plasma,” *Plasma Physics and Controlled Fusion* **33** (1991), 1775–1804, DOI: [10.1088/0741-3335/33/14/005](https://doi.org/10.1088/0741-3335/33/14/005).
