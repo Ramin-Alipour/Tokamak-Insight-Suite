@@ -3233,7 +3233,6 @@ elif page=='Advanced Analysis':
                     if cts_response_upload is None:
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
-                    cts_response_unc=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
@@ -3278,7 +3277,6 @@ elif page=='Advanced Analysis':
                         'instrument_response':cts_response,
                         'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
-                        'instrument_response_uncertainty':cts_response_unc,
                         'fast_ion_populations':fast_ions,
                         'electron_distribution':electron_distribution,
                         'harmonic_order':int(cts_harmonic_order),
