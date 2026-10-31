@@ -199,11 +199,40 @@ def relativistic_maxwell_juttner_spectrum(
     edges[1:-1] = 0.5*(x[:-1]+x[1:])
     edges[0] = x[0]-0.5*(x[1]-x[0])
     edges[-1] = x[-1]+0.5*(x[-1]-x[-2])
-    counts, _ = np.histogram(
-        lambda_scattered.ravel(), bins=edges, weights=quadrature_weight.ravel()
+    # Deposit quadrature weight with a linear (cloud-in-cell) spectral basis.
+    # A hard histogram is piecewise constant in flow/temperature parameters and
+    # gives least-squares optimizers a zero or discontinuous numerical Jacobian.
+    # Linear deposition is continuous, conserves probability and represents the
+    # finite wavelength-bin measurement without introducing a fitted line shape.
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    sampled_wavelength = lambda_scattered.ravel()
+    sampled_weight = quadrature_weight.ravel()
+    total_weight = float(np.sum(sampled_weight))
+    inside = (
+        (sampled_wavelength >= edges[0])
+        & (sampled_wavelength <= edges[-1])
+        & np.isfinite(sampled_weight)
+        & (sampled_weight >= 0.0)
     )
-    total_weight = float(np.sum(quadrature_weight))
-    captured = float(np.sum(counts))/total_weight if total_weight > 0 else 0.0
+    captured = float(np.sum(sampled_weight[inside])) / total_weight if total_weight > 0 else 0.0
+    counts = np.zeros(x.size, dtype=float)
+    if np.any(inside):
+        lam = sampled_wavelength[inside]
+        weight = sampled_weight[inside]
+        right = np.searchsorted(centers, lam, side="right")
+        below = right == 0
+        above = right == centers.size
+        right = np.clip(right, 1, centers.size - 1)
+        left = right - 1
+        fraction = (lam - centers[left]) / (centers[right] - centers[left])
+        left[below] = 0
+        right[below] = 0
+        fraction[below] = 0.0
+        left[above] = centers.size - 1
+        right[above] = centers.size - 1
+        fraction[above] = 0.0
+        np.add.at(counts, left, weight * (1.0 - fraction))
+        np.add.at(counts, right, weight * fraction)
     if total_weight <= 0 or (require_full_spectrum and captured < 0.995):
         raise ValueError(
             "wavelength_nm must capture at least 99.5% of the relativistic Thomson spectrum; "
