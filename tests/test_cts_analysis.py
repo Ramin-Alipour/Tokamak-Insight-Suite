@@ -204,3 +204,15 @@ def test_cts_requires_an_explicit_electron_flow_projection():
             scattering_geometry=g, ion_species=ions, ion_fractions=frac,
             instrument_response=np.eye(f.size),
         )
+
+
+
+def test_cts_forward_model_rejects_unknown_fast_ion_kind():
+    f0,f,g,ions,frac,_=_case()
+    with pytest.raises(ValueError,match="fast_ion.kind must be maxwellian or tabulated_1d"):
+        cts_spectral_density(
+            f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
+            ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,
+            electron_velocity_projection_m_s=0.0,
+            fast_ion={"species_index":0,"fraction":0.1,"kind":"not-a-model","temperature_eV":10000},
+        )

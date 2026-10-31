@@ -124,10 +124,14 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     if fast_ion is not None:
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
         idx=fast_ion.get("species_index")
-        if isinstance(idx,bool) or not isinstance(idx,int) or not 0<=idx<len(ions): raise ValueError("invalid fast_ion.species_index")
+        if isinstance(idx,bool) or not isinstance(idx,(int,np.integer)) or not 0<=idx<len(ions): raise ValueError("invalid fast_ion.species_index")
+        idx=int(idx)
         hf=float(fast_ion.get("fraction",0.))
-        if not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
-        if fast_ion.get("kind","maxwellian")=="tabulated_1d":
+        if not np.isfinite(hf) or not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
+        kind=fast_ion.get("kind","maxwellian")
+        if kind not in {"maxwellian","tabulated_1d"}:
+            raise ValueError("cts_spectral_density fast_ion.kind must be maxwellian or tabulated_1d")
+        if kind=="tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
             hot=(idx,hf,"tabulated",vdf)
