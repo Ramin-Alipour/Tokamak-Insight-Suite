@@ -19,6 +19,7 @@ ME = 9.1093837015e-31
 AMU = 1.66053906660e-27
 C = 299792458.0
 E_REST_EV = 510998.95069
+_LANDAU_NODES, _LANDAU_WEIGHTS = leggauss(192)
 
 
 def _positive(value, name):
@@ -326,8 +327,7 @@ def _landau_susceptibility(phase_velocity, plasma_frequency_squared, wavenumber,
         pdf_fn = lambda v: _maxwellian_pdf_and_derivatives(v, standard_deviation)
     vphi = float(phase_velocity)
     span = max(30.0*standard_deviation, 2.0*abs(vphi)+20.0*standard_deviation)
-    nodes, weights = leggauss(192)
-    velocity = span*nodes
+    velocity = span*_LANDAU_NODES
     _, derivative, _ = pdf_fn(velocity)
     _, derivative_at, second_at = pdf_fn(np.asarray(vphi))
     denominator = velocity-vphi
@@ -336,14 +336,13 @@ def _landau_susceptibility(phase_velocity, plasma_frequency_squared, wavenumber,
         out=np.full_like(velocity, float(second_at)),
         where=np.abs(denominator) > 1e-10*max(span, standard_deviation),
     )
-    principal = span*float(np.sum(weights*regular))
+    principal = span*float(np.sum(_LANDAU_WEIGHTS*regular))
     principal += float(derivative_at)*np.log(abs((span-vphi)/(span+vphi)))
     landau_integral = principal+1j*np.pi*float(derivative_at)
     return -(plasma_frequency_squared/(wavenumber*wavenumber))*landau_integral
 
 
 def _resolve_ion_species(ion_species):
-    from plasmapy.particles import Particle
     result = []
     for index, item in enumerate(ion_species):
         if isinstance(item, Mapping):
@@ -354,6 +353,7 @@ def _resolve_ion_species(ion_species):
             else:
                 mass = _positive(item["mass_amu"], f"ion_species[{index}].mass_amu")*AMU
         else:
+            from plasmapy.particles import Particle
             particle = item if hasattr(item, "mass") and hasattr(item, "charge_number") else Particle(item)
             name = str(particle)
             mass = float(particle.mass.to_value("kg"))
@@ -393,6 +393,8 @@ def collective_kappa_spectral_density(
     ns = np.asarray(scattered_direction, dtype=float)
     if ni.shape != (3,) or ns.shape != (3,) or np.any(~np.isfinite(ni)) or np.any(~np.isfinite(ns)):
         raise ValueError("incident_direction and scattered_direction must be finite 3-vectors")
+    if np.linalg.norm(ni) == 0 or np.linalg.norm(ns) == 0:
+        raise ValueError("incident_direction and scattered_direction must be non-zero")
     ni = ni/np.linalg.norm(ni)
     ns = ns/np.linalg.norm(ns)
     if not np.isclose(np.arccos(np.clip(np.dot(ni, ns), -1.0, 1.0)), angle, atol=1e-5, rtol=0.0):
@@ -559,7 +561,11 @@ def fit_collective_kappa(
     transform=np.diag([np.log(10.0)*ne,np.log(10.0)*te,np.log(10.0)*(kap-1.5)])
     covariance=transform@covariance_log@transform.T
     sigma=np.sqrt(np.maximum(np.diag(covariance),0.0))
-    qhat=np.asarray(scattered_direction,dtype=float)-np.asarray(incident_direction,dtype=float)
+    incident_unit=np.asarray(incident_direction,dtype=float)
+    scattered_unit=np.asarray(scattered_direction,dtype=float)
+    incident_unit=incident_unit/np.linalg.norm(incident_unit)
+    scattered_unit=scattered_unit/np.linalg.norm(scattered_unit)
+    qhat=scattered_unit-incident_unit
     qhat=qhat/np.linalg.norm(qhat)
     ue=float(np.dot(np.asarray(electron_velocity_m_s,dtype=float),qhat))
     ion_properties=_resolve_ion_species(ion_species)
