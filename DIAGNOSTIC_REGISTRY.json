@@ -4278,7 +4278,6 @@
           "name": "model",
           "unit": "electrostatic or full_electromagnetic; explicit selection, no automatic substitution",
           "required": true,
-          "default": "electrostatic",
           "description": "Explicitly select electrostatic or full_electromagnetic; no automatic model selection or substitution."
         },
         {
