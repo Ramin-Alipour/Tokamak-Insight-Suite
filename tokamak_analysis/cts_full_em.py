@@ -416,7 +416,7 @@ def full_em_cts_spectral_density(
             covariance_n_v_E_B, source["source_current_operator"], es
         )
         form_factors = bindslev_dielectric_form_factors(
-            source["dielectric_coupling_operator"], ei, es, ki, ks,
+            source["dielectric_coupling_operator"], ei, es_local, ki, ks,
             omega_i, omega_s, ne,
         )
         spectra[index] = transfer["received_source_current_spectral_power"]
@@ -424,7 +424,7 @@ def full_em_cts_spectral_density(
         bindslev_form_factors.append(form_factors["G_alpha_beta"])
         bindslev_x_tensors.append(source["X_tensor"])
         bindslev_gamma_inverse.append(source["Gamma_inverse_tensor"])
-        projected = es.conj() @ source["source_current_operator"]
+        projected = es_local.conj() @ source["dielectric_coupling_operator"]
         bindslev_coefficients.append({
             "N": projected[0],
             "U_k": projected[1:4],
