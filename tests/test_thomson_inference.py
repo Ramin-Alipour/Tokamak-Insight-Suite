@@ -224,6 +224,11 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
         laser_wavelength_uncertainty_nm=0.01,
         scattering_angle_uncertainty_rad=1e-4,
         incident_polarization_uncertainty=[1e-4, 1e-4, 1e-4],
+        laser_power_w=2.0,
+        interaction_length_m=0.1,
+        collection_solid_angle_sr=0.01,
+        optical_efficiency=0.5,
+        spectral_power_density_calibrated=True,
         instrument_response_mc_samples=20,
         instrument_response_mc_min_success_fraction=0.5,
     )
@@ -231,6 +236,13 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["relativistic_external_parameter_uncertainty_propagated"] is True
     assert channel["relativistic_external_parameter_mc_successful_samples"] >= 10
     assert channel["relativistic_external_temperature_uncertainty_eV"] > 0.0
+    assert channel["effective_differential_cross_section_m2_sr"] > 0.0
+    assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
+    expected_density = channel["integrated_scattered_power_W"] / (
+        2.0 * 0.1 * channel["effective_differential_cross_section_m2_sr"] * 0.01 * 0.5
+    )
+    assert channel["electron_density_m3"] == pytest.approx(expected_density, rel=1e-12)
+    assert channel["electron_density_uncertainty_m3"] > 0.0
 
 
 def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
