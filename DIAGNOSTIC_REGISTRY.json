@@ -4074,7 +4074,7 @@
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
-      "completeness": "implemented_with_declared_scope",
+      "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
           "name": "frequency_shift_Hz",
