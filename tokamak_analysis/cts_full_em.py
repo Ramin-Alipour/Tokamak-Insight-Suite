@@ -472,7 +472,9 @@ def full_em_cts_spectral_density(
         raise ValueError("incident_polarization and scattered_polarization must be non-zero")
     ei /= np.linalg.norm(ei)
     es /= np.linalg.norm(es)
-    # In an anisotropic magnetized plasma, cold-plasma eigenmodes can have a longitudinal E component.\n    # These vectors are branch-selection seeds; the solver replaces them with flux-normalized eigenmodes.\n    cold_wave_species = [{
+    # In an anisotropic magnetized plasma, cold-plasma eigenmodes can have a longitudinal E component.
+    # These vectors are branch-selection seeds; the solver replaces them with flux-normalized eigenmodes.
+    cold_wave_species = [{
         "density_m3": sp["density"], "charge_C": sp["charge"], "mass_kg": sp["mass"]
     } for sp in species]
     if frequency_geometry is None:
