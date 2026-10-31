@@ -219,3 +219,45 @@ def bindslev_correlated_transfer_spectrum(
         },
         "includes_all_cross_correlations": True,
     }
+
+
+def bindslev_dielectric_form_factors(
+    source_current_operator, incident_polarization, scattered_polarization,
+    wavevector_incident_rad_m, wavevector_scattered_rad_m,
+    omega_incident_rad_s, omega_scattered_rad_s, electron_density_m3,
+):
+    """Compute Bindslev Eq. (135) dielectric form-factor matrix.
+
+    The cold local dielectric has no spatial-dispersion derivative in Eq. (119),
+    so S_i and S_s are the normalized longitudinal Poynting fluxes. The supplied
+    polarizations must be the actual cold-plasma eigenmodes, not arbitrary
+    transverse trial vectors.
+    """
+    operator=np.asarray(source_current_operator,dtype=complex)
+    ei=np.asarray(incident_polarization,dtype=complex)
+    es=np.asarray(scattered_polarization,dtype=complex)
+    ki=_v3(wavevector_incident_rad_m,"wavevector_incident_rad_m")
+    ks=_v3(wavevector_scattered_rad_m,"wavevector_scattered_rad_m")
+    wi=float(omega_incident_rad_s); ws=float(omega_scattered_rad_s)
+    ne=float(electron_density_m3)
+    if operator.shape!=(3,10) or ei.shape!=(3,) or es.shape!=(3,) or wi<=0 or ws<=0 or ne<=0:
+        raise ValueError("invalid operator, mode polarization, frequency or density")
+    ei=ei/np.linalg.norm(ei); es=es/np.linalg.norm(es)
+    bi=np.cross(ki,ei)/wi
+    bs=np.cross(ks,es)/ws
+    si=float(np.real(np.dot(0.5*np.cross(ei,bi.conj()),ki/np.linalg.norm(ki)))/(EPS0*C))
+    ss=float(np.real(np.dot(0.5*np.cross(es,bs.conj()),ks/np.linalg.norm(ks)))/(EPS0*C))
+    if not np.isfinite(si) or not np.isfinite(ss) or si<=0 or ss<=0:
+        raise ValueError("incident/scattered modes must carry positive longitudinal Poynting flux")
+    amplitudes=es.conj()@operator
+    omega_p2=ne*E_CHARGE**2/(ME*EPS0)
+    factors=(ws**4/omega_p2**2)*np.outer(amplitudes,amplitudes.conj())/(si*ss)
+    return {
+        "coupling_amplitudes_n_v_E_B":amplitudes,
+        "normalized_incident_flux_S_i":si,
+        "normalized_scattered_flux_S_s":ss,
+        "plasma_frequency_squared_rad2_s2":omega_p2,
+        "G_alpha_beta":factors,
+        "fluctuation_channel_order":["n","v_x","v_y","v_z","E_x","E_y","E_z","B_x","B_y","B_z"],
+        "normalization":"Bindslev Eq. (135), with cold local no-spatial-dispersion flux normalization",
+    }
