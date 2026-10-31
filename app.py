@@ -57,6 +57,26 @@ def _parse_ts_vector(raw, label):
     return values
 
 
+def _parse_ts_complex_vector(raw, label):
+    """Parse a complex polarization vector from JSON or comma-separated components.
+
+    JSON entries may be real numbers or strings such as "1+0.2j".
+    Plain comma-separated real components remain supported.
+    """
+    try:
+        parsed = json.loads(raw) if isinstance(raw, str) and raw.strip().startswith("[") else [
+            part.strip() for part in str(raw).split(",") if part.strip()
+        ]
+        values = np.asarray([complex(value) for value in parsed], dtype=complex)
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"{label} must be three comma-separated values or a JSON array of three real/complex components.") from exc
+    if values.shape != (3,) or not np.all(np.isfinite(values)):
+        raise ValueError(f"{label} must contain exactly three finite complex components.")
+    if np.linalg.norm(values) == 0:
+        raise ValueError(f"{label} must be non-zero.")
+    return values
+
+
 def _parse_ts_float_list(raw, label):
     try:
         values = np.asarray([float(value.strip()) for value in str(raw).split(",") if value.strip()], dtype=float)
@@ -3282,8 +3302,8 @@ elif page=='Advanced Analysis':
                         'magnetic_field_T':_parse_ts_vector(cts_magnetic_field,'Magnetic field'),
                         'electron_flow_velocity_m_s':_parse_ts_vector(cts_electron_flow,'Electron flow'),
                         'ion_flow_velocity_m_s':ion_flows,
-                        'incident_polarization':_parse_ts_vector(cts_incident_polarization,'Incident polarization'),
-                        'scattered_polarization':_parse_ts_vector(cts_scattered_polarization,'Scattered polarization'),
+                        'incident_polarization':_parse_ts_complex_vector(cts_incident_polarization,'Incident polarization'),
+                        'scattered_polarization':_parse_ts_complex_vector(cts_scattered_polarization,'Scattered polarization'),
                         'instrument_response':cts_response,
                         'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
