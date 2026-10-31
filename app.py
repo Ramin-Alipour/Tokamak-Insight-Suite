@@ -243,6 +243,15 @@ data_signature=(
     if st.session_state.get('tis_active_source')=='upload'
     else sha
 ) or sha
+
+
+def _ts_upload_digest(upload):
+    if upload is None:
+        return None
+    payload = upload.getvalue() if hasattr(upload, "getvalue") else bytes(upload)
+    return hashlib.sha256(payload).hexdigest()
+
+
 numeric=[] if df is None else [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
 def col_select(label, options, key, default=None):
     if not options: st.warning('No numeric columns are available. Load a suitable data file first.'); st.stop()
@@ -993,6 +1002,48 @@ elif page=='Spectral Analysis':
                     joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
                     st.caption('A density covariance file describes external relative covariance of the six multiplicative density inputs. For relativistic Maxwell-Jüttner, the sixth factor is the velocity-averaged effective differential cross-section; fitted power/cross-section covariance and model-fit uncertainty are propagated internally, so do not duplicate them in this file. It may be combined with joint spectral covariance and/or measured-response uncertainty only when the scattered-power row and column are zero. Do not also enter duplicate scalar optical-factor uncertainties.')
                 density_kwargs={}
+            analysis_signature_payload = {
+                'data_signature': data_signature,
+                'channel_col': channel_col, 'radius_col': radius_col,
+                'wavelength_col': wavelength_col, 'signal_col': signal_col,
+                'uncertainty_col': uncertainty_col, 'model': model,
+                'laser_wavelength_nm': laser_nm_text,
+                'laser_wavelength_uncertainty_nm': laser_unc_text,
+                'scattering_angle_rad': angle_rad_text,
+                'scattering_angle_uncertainty_rad': angle_unc_text,
+                'response_upload': _ts_upload_digest(response_upload),
+                'channel_response_upload': _ts_upload_digest(response_channel_upload),
+                'response_uncertainty_upload': _ts_upload_digest(response_unc_upload),
+                'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
+                'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
+                'identity_response': identity_response,
+                'relativistic_incident_direction': relativistic_incident_direction_text,
+                'relativistic_incident_direction_uncertainty': relativistic_incident_direction_unc_text,
+                'relativistic_scattered_direction': relativistic_scattered_direction_text,
+                'relativistic_scattered_direction_uncertainty': relativistic_scattered_direction_unc_text,
+                'relativistic_incident_polarization': relativistic_polarization_text,
+                'relativistic_incident_polarization_uncertainty': relativistic_polarization_unc_text,
+                'relativistic_recoil_limit': relativistic_recoil_limit_text,
+                'absolute_density': absolute_density,
+                'laser_power': locals().get('laser_power_text'),
+                'laser_power_uncertainty': locals().get('laser_power_unc_text'),
+                'interaction_length': locals().get('interaction_length_text'),
+                'interaction_length_uncertainty': locals().get('interaction_length_unc_text'),
+                'collection_solid_angle': locals().get('solid_angle_text'),
+                'collection_solid_angle_uncertainty': locals().get('solid_angle_unc_text'),
+                'optical_efficiency': locals().get('efficiency_text'),
+                'optical_efficiency_uncertainty': locals().get('efficiency_unc_text'),
+                'density_incident_polarization': locals().get('polarization_text'),
+                'density_incident_direction': locals().get('incident_direction_text'),
+                'density_scattered_direction': locals().get('scattered_direction_text'),
+                'density_polarization_uncertainty': locals().get('polarization_unc_text'),
+                'density_covariance_upload': _ts_upload_digest(density_covariance_upload),
+                'joint_density_covariance_upload': _ts_upload_digest(joint_density_covariance_upload),
+            }
+            analysis_signature = hashlib.sha256(
+                json.dumps(analysis_signature_payload, sort_keys=True, default=str).encode('utf-8')
+            ).hexdigest()
+            st.session_state['tis_thomson_current_analysis_signature'] = analysis_signature
             if st.button('Infer Thomson plasma parameters from measured spectra',type='primary',key='ts_infer_run'):
                 st.session_state.pop('tis_thomson_spectral_inference',None)
                 try:
@@ -1121,14 +1172,17 @@ elif page=='Spectral Analysis':
                     else:
                         result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
                     st.session_state['tis_thomson_spectral_inference']={
-                        'data_sha':data_signature,'channel_col':channel_col,'radius_col':radius_col,
+                        'data_sha':data_signature,'analysis_signature':analysis_signature,
+                        'channel_col':channel_col,'radius_col':radius_col,
                         'wavelength_col':wavelength_col,'signal_col':signal_col,
                         'uncertainty_col':uncertainty_col,'model':model,'result':result,
                     }
                 except Exception as e:
                     st.error(f'Thomson spectral inference failed: {e}')
             saved_ts=st.session_state.get('tis_thomson_spectral_inference')
-            if saved_ts and saved_ts.get('data_sha')==sha and saved_ts.get('model')==model:
+            if (saved_ts and saved_ts.get('data_sha')==data_signature
+                    and saved_ts.get('model')==model
+                    and saved_ts.get('analysis_signature')==analysis_signature):
                 result=saved_ts['result']
                 st.success('Thomson spectral inference completed within the selected physical model.')
                 profile=pd.DataFrame({
@@ -1194,6 +1248,8 @@ elif page=='Spectral Analysis':
                 export=_json_safe(result)
                 json_download('Export Thomson spectral-inference results',export,'tis_thomson_spectral_inference.json')
                 add_report_section('Thomson multi-channel spectral inference',export)
+            elif saved_ts:
+                st.info('The calibrated data or one or more Thomson model/geometry/response inputs have changed since the saved fit. Run the inference again before using its subanalyses.')
     elif mode=='ECE channel/profile analysis':
         st.caption('ECE tools use already-calibrated radiance or brightness-temperature inputs. TIS never calibrates detector data. Cold resonance and circular-field radius estimates are approximate, not EFIT/ray-tracing results.')
         numeric_cols=[c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
@@ -3081,7 +3137,9 @@ elif page=='Advanced Analysis':
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
         if df is None:
             st.info('Load the calibrated measurement table and run the canonical Thomson spectral-to-physics inference first.')
-        elif not saved_ts or saved_ts.get('data_sha')!=data_signature:
+        elif (not saved_ts
+                or saved_ts.get('data_sha')!=data_signature
+                or saved_ts.get('analysis_signature')!=st.session_state.get('tis_thomson_current_analysis_signature')):
             st.info('No current canonical Thomson physical fit is available for this dataset. Run “Thomson multi-channel spectral inference” first; this subanalysis will then display the same-spectrum physical parameters with its spectral-distribution diagnostics.')
             if st.button('Open canonical Thomson spectral-to-physics workflow',type='primary',key='open_ts_distribution_physical_fit'):
                 st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
