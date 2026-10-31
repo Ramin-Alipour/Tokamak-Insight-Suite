@@ -46,6 +46,32 @@ def _momentum_grid(distribution, mass_kg, quadrature_order):
         dpperp = -pperp/(mass_kg*tperp*E_CHARGE)*f0
         dppar = -ppar/(mass_kg*tpar*E_CHARGE)*f0
         return pperp, ppar, f0, dpperp, dppar, weights
+    if kind == "relativistic_maxwell_juttner":
+        temperature = _positive(distribution.get("temperature_eV"), "temperature_eV")
+        if int(quadrature_order) < 4:
+            raise ValueError("quadrature_order must be >=4")
+        nodes, node_weights = np.polynomial.legendre.leggauss(int(quadrature_order))
+        theta = temperature*E_CHARGE/(mass_kg*C*C)
+        umax = max(12.0*np.sqrt(theta)+12.0*theta, 1e-5)
+        pperp_axis = 0.5*umax*(nodes+1.0)*mass_kg*C
+        pperp_weights = 0.5*umax*node_weights*mass_kg*C
+        ppar_axis = umax*nodes*mass_kg*C
+        ppar_weights = umax*node_weights*mass_kg*C
+        pperp, ppar = np.meshgrid(pperp_axis, ppar_axis, indexing="ij")
+        weights = (
+            2.0*np.pi*pperp
+            *pperp_weights[:,None]*ppar_weights[None,:]
+        )
+        gamma = np.sqrt(1.0+(pperp*pperp+ppar*ppar)/(mass_kg*mass_kg*C*C))
+        f0 = np.exp(-(gamma-1.0)/theta)
+        norm = float(np.sum(weights*f0))
+        if not np.isfinite(norm) or norm <= 0:
+            raise ValueError("Maxwell-Juttner momentum quadrature failed to normalize")
+        f0 /= norm
+        denominator = gamma*mass_kg*mass_kg*C*C*theta
+        dpperp = -pperp/denominator*f0
+        dppar = -ppar/denominator*f0
+        return pperp, ppar, f0, dpperp, dppar, weights
     if kind == "tabulated_gyrotropic":
         pp = np.asarray(distribution.get("p_perpendicular_kg_m_s"), dtype=float)
         pa = np.asarray(distribution.get("p_parallel_kg_m_s"), dtype=float)
@@ -66,7 +92,7 @@ def _momentum_grid(distribution, mass_kg, quadrature_order):
         f0 = f0/norm
         dpperp, dppar = np.gradient(f0, pp, pa, edge_order=2)
         return pperp, ppar, f0, dpperp, dppar, weights
-    raise ValueError("fast-ion distribution kind must be relativistic_bigaussian or tabulated_gyrotropic")
+    raise ValueError("fast-ion distribution kind must be relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic")
 
 
 def relativistic_gyrotropic_three_wave_vertex(
