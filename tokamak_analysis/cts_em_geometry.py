@@ -266,7 +266,7 @@ def solve_cold_plasma_propagating_modes(
     rotation = np.column_stack((e1, e2, bhat))
     eps_stix = rotation.T @ epsilon @ rotation
     sval = float(np.real(0.5 * (eps_stix[0, 0] + eps_stix[1, 1])))
-    dval = float(np.real(0.5j * (eps_stix[1, 0] - eps_stix[0, 1])))
+    dval = float(np.real(-0.5j * (eps_stix[1, 0] - eps_stix[0, 1])))
     pval = float(np.real(eps_stix[2, 2]))
     rvalue, lvalue = sval + dval, sval - dval
     cos_theta = float(np.clip(np.dot(direction, bhat), -1.0, 1.0))
