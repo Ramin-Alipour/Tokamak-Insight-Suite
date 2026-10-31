@@ -6641,7 +6641,7 @@
           "name": "physical_parameters",
           "unit": "structured canonical physical-fit result for the same calibrated measured spectrum",
           "required": true,
-          "description": "Canonical fit result from the same calibrated spectrum. Electron temperature is required. Electron velocity projection is required for non-collective fits; for collective fits it must remain null unless the selected model explicitly identifies an electron-flow parameter. Density is optional and remains unavailable when not identifiable."
+          "description": "Canonical fit result from the same calibrated spectrum using one of the three supported non-collective optical Thomson models. A finite positive fitted electron temperature and finite fitted scattering-vector flow projection are required. Density is optional and remains unavailable when not identifiable."
         }
       ],
       "output_specs": [
@@ -6885,7 +6885,6 @@
         "tests/test_thomson_inference.py::test_spectral_distribution_rejects_shape_only_execution",
         "tests/test_thomson_inference.py::test_spectral_distribution_requires_fitted_physical_parameters_and_reports_them",
         "tests/test_thomson_inference.py::test_descriptive_moments_report_negative_residual_clipping_caveat",
-        "tests/test_thomson_inference.py::test_spectral_distribution_keeps_collective_electron_flow_unidentified",
         "tests/test_thomson_inference.py::test_spectral_distribution_response_conserves_area_on_nonuniform_bins"
       ]
     },
