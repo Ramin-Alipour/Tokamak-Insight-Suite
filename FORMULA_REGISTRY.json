@@ -3963,7 +3963,7 @@
       ],
       "uncertainty_model": "Ray integration and Gaussian covariance are numerical/model inputs; no automatic uncertainty is assigned to equilibrium or beam covariance. Sample-count convergence must be assessed by increasing scattering_sample_count.",
       "test_links": [
-        "tests/test_cts_analysis.py::test_cts_frequency_resolved_ray_and_beam_geometry",
+        "tests/test_cts_analysis.py::test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry",
         "tests/test_cts_analysis.py::test_full_em_cts_integrates_scattering_volume_samples"
       ],
       "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation."
