@@ -5,12 +5,10 @@
     "quantities": "Per-channel electron temperature and supported flow projection from measured full spectra; absolute electron density where identifiable; joint channel-to-channel covariance for non-collective Maxwellian/Kappa models when a full spectral covariance is supplied; collective-mode external-parameter and response uncertainty propagation by Monte Carlo when supplied.",
     "status": "D",
     "method": "Forward-fit measured, calibrated multi-channel Thomson spectra using a required measured instrument-response callable/kernel/matrix. Supports non-collective Maxwellian, non-collective kappa, projected relativistic Maxwell-Juttner and optional PlasmaPy collective Maxwellian dielectric inference with explicit ion species, fractions, ion temperatures and flow vectors. Absolute non-collective density requires W/nm spectral intensity plus laser power, interaction length, collection solid angle, optical efficiency and complete polarized beam geometry.",
-    "caveat": "Collective-mode ion temperatures and ion/electron flow vectors remain externally supplied, not fitted. Their supplied uncertainties and measured response-matrix uncertainty are propagated by Monte Carlo refits when supplied; scattering-angle uncertainty associated with full vector beam geometry is not yet propagated. Joint full-covariance GLS currently supports non-collective Maxwellian and Kappa only. The relativistic option remains a 1-D projected approximation. No independent experimental validation is claimed.",
+    "caveat": "Collective-mode ion temperatures and ion/electron flow vectors remain externally supplied, not fitted. Supplied uncertainties and measured response-matrix uncertainty are propagated by Monte Carlo when supplied; beam-direction component uncertainties are independent and cross-source correlations are not represented. Joint full-covariance GLS supports non-collective Maxwellian and Kappa only. The relativistic option remains a 1-D projected approximation. No independent experimental validation is claimed.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
-      "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-      "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-      "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+      "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
     ],
     "implementation_status": "Canonical measured-calibrated-spectrum physical inference supports non-collective Maxwellian, Kappa, projected Maxwell-Juttner and optional PlasmaPy collective Maxwellian models; full channel-major GLS for Maxwellian/Kappa; Monte Carlo propagation of supplied collective beam-geometry, flow, ion-temperature, laser-wavelength and response uncertainties; absolute-density recomputation after joint fitting; and separate model-discrepancy diagnostics. Optional full 6N x 6N density-input covariance preserves cross-channel correlations in absolute electron-density outputs.",
     "execution_contract": {
@@ -361,12 +359,10 @@
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_workflow.analyze_thomson_profile",
-        "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
       ],
       "raw_data_to_physics": false,
-      "note": "Primary Analysis 1 accepts measured calibrated multi-channel spectra. It now supports optional joint GLS for non-collective Maxwellian/Kappa, plus Monte Carlo propagation of supplied collective external/response uncertainties. Detector calibration and independent experimental validation remain outside scope.",
+      "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. Legacy profile-summary/interpolation helpers are compatibility utilities only and are not registered or exposed as diagnostic workflows.",
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
@@ -378,17 +374,17 @@
             "laser_wavelength_nm",
             "scattering_angle_rad",
             "instrument_response",
-            "optional signal uncertainties",
-            "optional ion species/temperature/velocity inputs",
-            "optional absolute-density geometry"
+            "optional signal uncertainty and full channel-major spectral covariance",
+            "optional explicit collective ion composition/temperature/flow inputs",
+            "optional absolute-density optical geometry"
           ],
           "outputs": [
             "electron_temperature_profile_eV",
             "electron_density_profile_m3 where identifiable",
             "electron_velocity_projection_profile_m_s",
-            "per-channel fit diagnostics"
+            "per-channel fit diagnostics and covariance"
           ],
-          "scope": "Primary end-to-end physical inference from measured calibrated spectra; no detector calibration or experimental validation."
+          "scope": "Canonical physical inference from measured calibrated multi-channel spectra; no pre-derived ne/Te profile inputs."
         }
       ],
       "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
@@ -426,7 +422,7 @@
         "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
       }
     ],
-    "note": "Primary Analysis 1 accepts measured, wavelength- and intensity-calibrated multi-channel Thomson spectra. Detector calibration and independent experimental validation remain outside scope; downstream profile summaries consume derived calibrated ne/Te profiles."
+    "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis."
   },
   {
     "family": "Plasma parameters",
@@ -5065,154 +5061,425 @@
   {
     "family": "Plasma parameters",
     "diagnostic": "Thomson spatial profile reconstruction",
-    "quantities": "Within-domain reconstructed electron-density and electron-temperature radial curves and their gradients from already inferred spatial profile points.",
+    "quantities": "Channel-resolved radial electron-temperature and electron-density profiles where identifiable, electron-flow projection profiles, and their supported uncertainties inferred directly from measured calibrated Thomson spectra.",
     "status": "D",
-    "method": "Downstream reconstruction of previously inferred radial density and temperature samples using weighted smoothing splines with generalized-cross-validation selection or shape-preserving PCHIP; no raw spectral inversion is performed.",
-    "caveat": "This is a downstream profile utility. It accepts pointwise uncertainties or full positive-semidefinite covariance matrices and propagates them by Monte Carlo to reconstructed curves and confidence bands when sufficient physical draws succeed. Negative spline overshoot is rejected rather than clipped. It does not calculate geometry-weighted line-of-sight or volume averages.",
+    "method": "Delegates to the canonical multi-channel Thomson physical forward-inference model and returns its radial channel-resolved physical-parameter profiles. It does not interpolate or fit previously derived ne/Te samples.",
+    "caveat": "This profile subanalysis uses the same measured calibrated spectral inputs and physical inference as Analysis 1. It does not accept previously inferred density/temperature profiles, perform detector calibration, or claim independent experimental validation.",
     "implementation_functions": [
-      "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+      "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"
     ],
-    "implementation_status": "Downstream reconstruction from already-derived calibrated ne/Te radial profiles; supports separate density/temperature covariance and full joint density-temperature covariance with correlated Monte Carlo output.",
+    "implementation_status": "Complete as a profile-oriented entry point to the canonical measured-spectrum inference engine; it introduces no separate or duplicated physical model.",
     "execution_contract": {
-      "schema_version": "1.0",
-      "execution_level": "limited_calculation",
+      "schema_version": "2.0",
+      "execution_level": "analysis_pipeline",
       "completeness": "complete_with_declared_scope",
       "input_specs": [
         {
-          "name": "radius_m",
-          "unit": "m",
+          "name": "wavelength_nm",
+          "unit": "nm; 1-D shared or channel x wavelength 2-D",
           "required": true
         },
         {
-          "name": "density_m3",
-          "unit": "m^-3",
-          "required": true,
-          "description": "Electron density previously inferred from measured Thomson spectra."
+          "name": "spectra",
+          "unit": "calibrated spectral intensity; channel x wavelength",
+          "required": true
         },
         {
-          "name": "temperature_ev",
-          "unit": "eV",
-          "required": true,
-          "description": "Electron temperature previously inferred from measured Thomson spectra."
+          "name": "radius_m",
+          "unit": "m; one per channel",
+          "required": true
         },
         {
-          "name": "density_uncertainty_m3",
-          "unit": "m^-3",
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "instrument_response",
+          "unit": "measured normalized response matrix/kernel/callable",
+          "required": true
+        },
+        {
+          "name": "signal_uncertainty",
+          "unit": "spectral intensity; pointwise 1-sigma",
           "required": false
         },
         {
-          "name": "temperature_uncertainty_ev",
-          "unit": "eV",
+          "name": "joint_spectral_covariance",
+          "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
+          "required": false,
+          "description": "Full positive-definite covariance in channel-major order; cannot be combined with signal_uncertainty."
+        },
+        {
+          "name": "model",
+          "unit": "non_collective_maxwellian, non_collective_kappa, relativistic_maxwell_juttner or collective_maxwellian",
           "required": false
         },
         {
-          "name": "method",
-          "unit": "text",
+          "name": "laser_wavelength_uncertainty_nm",
+          "unit": "nm; 1-sigma",
           "required": false
         },
         {
-          "name": "smoothing_factor",
-          "unit": "dimensionless",
+          "name": "scattering_angle_uncertainty_rad",
+          "unit": "rad; 1-sigma; collective scalar geometry MC or non-collective analytic propagation",
           "required": false
         },
         {
-          "name": "points",
+          "name": "incident_direction_uncertainty",
+          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
+          "required": false
+        },
+        {
+          "name": "scattered_direction_uncertainty",
+          "unit": "dimensionless component-wise 1-sigma 3-vector; collective only",
+          "required": false
+        },
+        {
+          "name": "instrument_response_uncertainty",
+          "unit": "response-matrix 1-sigma",
+          "required": false
+        },
+        {
+          "name": "instrument_response_mc_samples",
           "unit": "count",
           "required": false
         },
         {
-          "name": "density_covariance_m3_2",
-          "unit": "m^-6",
+          "name": "instrument_response_mc_min_success_fraction",
+          "unit": "dimensionless",
           "required": false
         },
         {
-          "name": "temperature_covariance_eV2",
-          "unit": "eV^2",
+          "name": "laser_power_w",
+          "unit": "W; incident power at scattering volume",
           "required": false
         },
         {
-          "name": "joint_density_temperature_covariance",
-          "unit": "(2N x 2N) covariance",
+          "name": "interaction_length_m",
+          "unit": "m",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_sr",
+          "unit": "sr",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency",
+          "unit": "dimensionless",
+          "required": false
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": false
+        },
+        {
+          "name": "spectral_power_density_calibrated",
+          "unit": "boolean; must be true to identify absolute density from W/nm spectra",
           "required": false,
-          "description": "Full joint covariance ordered [density_0..N-1, temperature_0..N-1], propagated jointly through the downstream profile fit."
+          "description": "Explicit declaration that measured spectral density is calibrated in W/nm; false by default."
         },
         {
-          "name": "uncertainty_mc_samples",
-          "unit": "count; minimum 20",
+          "name": "laser_power_uncertainty_W",
+          "unit": "W; 1-sigma",
           "required": false
+        },
+        {
+          "name": "interaction_length_uncertainty_m",
+          "unit": "m; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "collection_solid_angle_uncertainty_sr",
+          "unit": "sr; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "optical_efficiency_uncertainty",
+          "unit": "dimensionless; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "polarization_factor_uncertainty",
+          "unit": "dimensionless; 1-sigma",
+          "required": false
+        },
+        {
+          "name": "density_relative_covariance",
+          "unit": "6x6 relative covariance",
+          "required": false,
+          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. Mutually exclusive with scalar optical uncertainties and joint_spectral_covariance."
+        },
+        {
+          "name": "ion_species",
+          "unit": "explicit collective ion species list",
+          "required": false
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "one charge-density fraction per ion species; sum to one",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one fixed external value per ion species",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s^-1; species x 3 fixed external flow vectors",
+          "required": false
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1; fixed external 3-vector",
+          "required": false
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV; per species 1-sigma",
+          "required": false
+        },
+        {
+          "name": "ion_velocity_uncertainty_m_s",
+          "unit": "m s^-1; species x 3 component-wise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "electron_velocity_uncertainty_m_s",
+          "unit": "m s^-1; 3-vector component-wise 1-sigma",
+          "required": false
+        },
+        {
+          "name": "collective_initial_density_m3",
+          "unit": "m^-3; optimizer initial estimate, not fixed inferred value",
+          "required": false,
+          "description": "Numerical optimizer seed only; not a fixed physical input."
+        },
+        {
+          "name": "collective_initial_temperature_eV",
+          "unit": "eV; optimizer initial estimate, not fixed inferred value",
+          "required": false,
+          "description": "Numerical optimizer seed only; not a fixed physical input."
+        },
+        {
+          "name": "collective_density_bounds_m3",
+          "unit": "m^-3; optional positive optimizer bounds",
+          "required": false
+        },
+        {
+          "name": "collective_temperature_bounds_eV",
+          "unit": "eV; optional positive optimizer bounds",
+          "required": false
+        },
+        {
+          "name": "collective_external_parameter_mc_samples",
+          "unit": "count",
+          "required": false
+        },
+        {
+          "name": "joint_density_relative_covariance",
+          "unit": "(6*n_channels) x (6*n_channels) relative covariance",
+          "required": false,
+          "description": "Non-collective models only. Complete channel-major covariance for six density-inversion inputs per channel, including cross-channel correlations. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties. Collective mode exposes its external-parameter covariance separately."
         }
       ],
       "output_specs": [
         {
-          "name": "reconstructed_density_m3",
-          "unit": "m^-3"
-        },
-        {
-          "name": "reconstructed_temperature_eV",
+          "name": "electron_temperature_profile_eV",
           "unit": "eV"
         },
         {
-          "name": "reconstruction_gradients",
-          "unit": "derivative units"
+          "name": "electron_density_profile_m3",
+          "unit": "m^-3",
+          "description": "Only where identifiable from selected model and supplied calibration/geometry."
         },
         {
-          "name": "reconstructed_density_uncertainty_m3",
-          "unit": "m^-3"
+          "name": "electron_velocity_projection_profile_m_s",
+          "unit": "m s^-1"
         },
         {
-          "name": "reconstructed_temperature_uncertainty_eV",
+          "name": "channels",
+          "unit": "structured",
+          "description": "Per-channel fit, residuals, covariance, assumptions and provenance."
+        },
+        {
+          "name": "electron_temperature_uncertainty_profile_eV",
           "unit": "eV"
         },
         {
-          "name": "reconstructed_density_lower_95_m3",
+          "name": "electron_density_uncertainty_profile_m3",
           "unit": "m^-3"
         },
         {
-          "name": "reconstructed_density_upper_95_m3",
-          "unit": "m^-3"
+          "name": "electron_velocity_projection_uncertainty_profile_m_s",
+          "unit": "m s^-1",
+          "description": "Per-channel uncertainty of the fitted non-collective projection; in collective mode available when supplied flow-vector and/or beam-geometry uncertainties are propagated by Monte Carlo."
         },
         {
-          "name": "reconstructed_joint_density_temperature_covariance",
-          "unit": "(2N_grid x 2N_grid) covariance"
+          "name": "joint_inference",
+          "unit": "structured",
+          "description": "Joint GLS parameters, covariance and fit diagnostics when joint_spectral_covariance is supplied."
         },
         {
-          "name": "reconstructed_density_temperature_cross_covariance",
-          "unit": "N_grid x N_grid covariance"
+          "name": "collective_external_parameter_covariance",
+          "unit": "parameter covariance",
+          "description": "Cross-channel covariance of density, temperature and projected electron/ion flows from collective external-input Monte Carlo."
         },
         {
-          "name": "reconstructed_temperature_lower_95_eV",
-          "unit": "eV"
+          "name": "collective_external_parameter_covariance_order",
+          "unit": "ordered labels",
+          "description": "Names corresponding to the collective external-parameter covariance rows and columns."
         },
         {
-          "name": "reconstructed_temperature_upper_95_eV",
-          "unit": "eV"
+          "name": "model_discrepancy_covariance",
+          "unit": "parameter covariance",
+          "description": "Residual-based model-adequacy covariance, only when a supported reduced chi-square and fit covariance are available."
+        },
+        {
+          "name": "electron_density_joint_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Full cross-channel absolute-density covariance propagated from joint_density_relative_covariance."
+        },
+        {
+          "name": "electron_density_cross_channel_covariance_available",
+          "unit": "boolean"
+        },
+        {
+          "name": "electron_density_external_parameter_covariance_m6",
+          "unit": "n_channels x n_channels; m^-6",
+          "description": "Collective external-parameter Monte Carlo contribution to cross-channel absolute-density covariance; distinct from per-channel spectral-fit uncertainty."
+        },
+        {
+          "name": "density_input_covariance_m3_2",
+          "unit": "N x N; m^-6",
+          "description": "Full density input covariance used by the downstream radial profile summary."
+        },
+        {
+          "name": "temperature_input_covariance_eV2",
+          "unit": "N x N; eV^2",
+          "description": "Full temperature input covariance used by the downstream radial profile summary."
+        },
+        {
+          "name": "density_gradient_covariance_m-8",
+          "unit": "N x N; m^-8",
+          "description": "Full covariance of the radial density gradient, propagated from density input covariance."
+        },
+        {
+          "name": "temperature_gradient_covariance_eV2_m-2",
+          "unit": "N x N; eV^2 m^-2",
+          "description": "Full covariance of the radial temperature gradient, propagated from temperature input covariance."
         }
       ],
       "assumptions": [
-        "Input density and temperature samples have already been physically inferred and calibrated from measured Thomson spectra.",
-        "The reconstructed curves are one-dimensional radial functions over the measured domain; no extrapolation is performed.",
-        "Supplied full covariance matrices describe the covariance of the input profile samples; separate density and temperature covariance matrices are currently used."
+        "Input spectra and wavelength axes are measured and calibrated; calibration is not performed by Analysis 1.",
+        "Spatial coordinates are supplied for each measured channel.",
+        "Non-collective Maxwellian model assumes isotropic non-relativistic Maxwellian electrons.",
+        "Collective Maxwellian model requires explicit ion species and ion temperatures; missing values are not silently inferred.",
+        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
+        "Collective-mode flow vectors and incident/scattered beam directions are expressed in one explicitly supplied coordinate frame; no canonical beam orientation is assumed."
       ],
       "preprocessing": [
-        "Validate finite radial profile arrays, unique radii, non-negative physical values, and either pointwise uncertainties or matching positive-semidefinite covariance matrices.",
-        "Sort coordinates and all associated measurements/covariance matrices consistently; do not extrapolate beyond the measured radial interval.",
-        "Select smoothing by generalized cross-validation when smoothing_factor is omitted; use PCHIP when shape preservation is preferred."
+        "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
+        "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Reconstruct within-domain one-dimensional density and temperature profiles using the selected spline/interpolation method.",
-      "uncertainty_model": "Separate density and temperature covariance matrices or a full joint density-temperature covariance can be sampled by Monte Carlo; the joint route preserves cross-covariance in reconstructed profiles.",
+      "algorithm": "Forward-fit measured multi-channel Thomson spectra with the supplied instrument response. Infer per-channel electron temperature and supported flow projection; infer collective-mode density only where the collective spectral shape resolves it, and non-collective absolute density only when calibrated spectral power and complete optical geometry are supplied.",
+      "uncertainty_model": "Non-collective fits use local fit covariance and optional Monte Carlo LSF uncertainty. A full channel-major covariance is handled by joint GLS for Maxwellian/Kappa and final physical parameters, integrated powers and absolute densities are recomputed from the joint fit. Collective external-parameter Monte Carlo includes supplied ion-temperature, ion/electron flow-vector, laser-wavelength, scattering-angle or beam-direction component, and measured response-matrix uncertainties; the returned covariance includes channel density, temperature and projected flow parameters. A supplied 6x6 relative optical-input covariance is authoritative and mutually exclusive with separate scalar uncertainty inputs. Excess reduced chi-square is exposed as a separate model-adequacy covariance diagnostic, not experimental validation. Optional joint_density_relative_covariance provides a complete 6N x 6N channel-major covariance for absolute-density inversion and returns the full cross-channel density covariance; it cannot be combined with joint_spectral_covariance or separate response/scalar optical uncertainty models.",
       "limitations": [
-        "This is a downstream utility for previously inferred density and temperature samples, not a raw-spectrum inversion.",
-        "No geometry-weighted line-of-sight average or volume average is inferred; the profile summary is a radial-coordinate average.",
-        "Negative spline overshoot is rejected rather than clipped because clipping would change the reconstructed profile and its derivatives; PCHIP is available when shape preservation is preferred.",
-        "Monte Carlo confidence bands are conditional on the supplied input covariance, selected interpolation model and accepted physical draws; model discrepancy and unprovided systematic uncertainties are not estimated."
+        "Full 3-D relativistic photon-geometry integration is not implemented; the relativistic option uses a 1-D projected Maxwell-Juttner approximation.",
+        "Collective non-Maxwellian kinetic distributions are not implemented; the collective backend is Maxwellian.",
+        "The kappa model is a parameterized isotropic non-Maxwellian approximation, not arbitrary VDF inversion.",
+        "Absolute density is not identifiable from spectral shape alone.",
+        "No independent experimental validation is claimed.",
+        "Collective multi-species inference requires explicit ion composition fractions; ion temperatures and flow vectors must be supplied or stationary assumptions declared.",
+        "Collective-mode fitting requires explicit incident/scattered beam direction vectors consistent with the supplied scattering angle.",
+        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; other models require dedicated joint forward models.",
+        "Model-discrepancy covariance uses excess reduced chi-square as a conditional diagnostic and is not a substitute for independent model validation.",
+        "Collective beam-direction component uncertainties are propagated as independent component-wise Gaussian perturbations; correlations among beam-vector components and correlations with other external inputs are not represented.",
+        "A supplied density_relative_covariance is authoritative for all six optical inversion inputs, including the scattered-power uncertainty; do not also supply separate scalar uncertainties."
       ],
       "function_links": [
-        "tokamak_analysis.thomson_scattering.reconstruct_thomson_profile"
+        "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"
       ],
       "raw_data_to_physics": false,
-      "note": "Downstream profile reconstruction only. Use Analysis 1 or the registered physical-inference subanalysis to infer plasma parameters from measured spectra.",
-      "calibrated_measurements_to_physics": false
-    }
+      "note": "This registered profile subanalysis consumes measured calibrated spectra and delegates to the canonical physical forward model. Pre-derived ne/Te profiles are not accepted.",
+      "workflow_modes": [
+        {
+          "name": "spatial_profile_from_measured_spectra",
+          "function": "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra",
+          "inputs": [
+            "wavelength_nm",
+            "spectra (channel × wavelength)",
+            "radius_m",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "instrument_response",
+            "optional uncertainty/covariance and explicit model inputs"
+          ],
+          "outputs": [
+            "electron_temperature_profile_eV",
+            "electron_density_profile_m3 where identifiable",
+            "electron_velocity_projection_profile_m_s",
+            "per-channel fit diagnostics"
+          ],
+          "scope": "Profile-oriented output from the canonical measured calibrated spectrum-to-physics inference; no pre-derived profile input."
+        }
+      ],
+      "completion_scope": "Multi-channel spectral inference with non-collective Maxwellian, kappa and projected relativistic Maxwell-Juttner models plus optional collective Maxwellian inference, instrument-response convolution, optional absolute-density inversion and downstream profile utilities. Full 3-D relativistic and collective non-Maxwellian models remain unimplemented; no independent experimental validation.",
+      "calibrated_measurements_to_physics": true
+    },
+    "scientific_references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Optical Thomson diagnostic forward/instrument model and parameter inference."
+      },
+      {
+        "title": "Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm",
+        "authors": "Zhang et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "95",
+        "article": "093542",
+        "year": 2024,
+        "doi": "10.1063/5.0215734",
+        "scope": "CTS spectral decomposition and ion-temperature extraction method; not yet implemented in this repository."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Regularized inversion and synthetic-data evidence for profile/time-resolved Thomson inference."
+      }
+    ],
+    "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true
   },
   {
     "family": "Fast particles",

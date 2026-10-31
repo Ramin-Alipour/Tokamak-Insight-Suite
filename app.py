@@ -16,10 +16,7 @@ from tokamak_analysis.ion_temperature import ion_temperature_from_doppler_spectr
 from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
-from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 from tokamak_analysis.thomson_inference import analyze_thomson_spectra
-from tokamak_analysis.thomson_scattering import reconstruct_thomson_profile
-from tokamak_analysis.thomson_workflow import analyze_thomson_profile
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
 from tokamak_analysis.flux_loops import analyze_flux_loop
@@ -825,7 +822,9 @@ elif page=='Confinement & Scalings':
 elif page=='Spectral Analysis':
     st.title('Spectroscopy, X-ray & Energy Spectra'); need_data()
     st.caption('Input columns must be calibrated to the physical coordinate used. Background, instrument function and detector response are not inferred automatically.')
-    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral-shape diagnostics (descriptive only)','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True,key='spectral_analysis_workflow')
+    mode=st.radio('Workflow',['Optical / emission line','Ion temperature from Doppler spectroscopy','CXRS line profile','Thomson multi-channel spectral inference','Thomson spectral distribution','Molecular spectroscopy','Molecular Boltzmann temperature','ECE channel/profile analysis','Mirnov / pickup coils','Line-ratio analysis','X-ray energy spectrum','Generic energy-spectrum moments'],horizontal=True,key='spectral_analysis_workflow')
+    if mode=='Thomson spectral distribution':
+        mode='Thomson multi-channel spectral inference'
     if mode=='Thomson multi-channel spectral inference':
         st.caption('Primary Analysis 1: fit measured, calibrated multi-channel Thomson spectra and infer physical parameters. No detector calibration, data repair, or experimental validation is performed.')
         all_cols=[str(c) for c in df.columns]
@@ -863,7 +862,7 @@ elif page=='Spectral Analysis':
                 c1,c2=st.columns(2)
                 with c1:
                     ion_species_text=st.text_input('Ion species (comma-separated)',key='ts_infer_ions')
-                    ion_fraction_text=st.text_input('Ion number fractions (comma-separated)',key='ts_infer_fractions')
+                    ion_fraction_text=st.text_input('Ion charge-density fractions (comma-separated)',key='ts_infer_fractions')
                     ion_temperature_text=st.text_input('Ion temperatures (eV; one per species)',key='ts_infer_ion_temperatures')
                     ion_temperature_unc_text=st.text_input('Ion-temperature 1σ uncertainties (eV; one per species; optional)',key='ts_infer_ion_temperature_unc')
                     ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors)',key='ts_infer_ion_velocities')
@@ -1462,42 +1461,6 @@ elif page=='Spectral Analysis':
                     json_download('Export Mirnov analysis JSON',result,'tis_mirnov_analysis.json')
                     add_report_section('Mirnov / pickup-coil analysis',result)
                 except Exception as e: st.error(f'Mirnov analysis failed: {e}')
-    elif mode=='Thomson spectral-shape diagnostics (descriptive only)':
-        st.caption('Model-independent spectral-shape characterization. This workflow does not infer electron temperature/density or uniquely reconstruct an electron velocity distribution.')
-        xcol=col_select('Calibrated Thomson wavelength (nm)',numeric,'tsd_x')
-        ycol=col_select('Thomson spectral signal',numeric,'tsd_y')
-        sigma_col=st.selectbox('Signal uncertainty σ (optional)', ['<none>']+numeric, key='tsd_sigma')
-        inst_sigma=st.number_input('Gaussian instrument standard deviation σ (nm; independently calibrated)',min_value=1e-12,value=0.05,format='%.8g',key='tsd_instrument_sigma')
-        background_fraction=st.slider('Fraction of each spectral edge used for background estimation',0.02,0.40,0.10,0.01,key='tsd_background_fraction')
-        if st.button('Analyze Thomson spectral-shape diagnostics (descriptive only)'):
-            try:
-                _x=pd.to_numeric(df[xcol],errors='coerce').to_numpy(dtype=float)
-                _y=pd.to_numeric(df[ycol],errors='coerce').to_numpy(dtype=float)
-                _unc=None if sigma_col=='<none>' else pd.to_numeric(df[sigma_col],errors='coerce').to_numpy(dtype=float)
-                _result=analyze_thomson_spectral_distribution(
-                    _x,_y,instrument_sigma_nm=float(inst_sigma),
-                    signal_uncertainty=_unc,background_fraction=float(background_fraction))
-                st.session_state['tis_thomson_distribution']={
-                    'xcol':xcol,'ycol':ycol,'sigma_col':sigma_col,'instrument_sigma_nm':float(inst_sigma),
-                    'background_fraction':float(background_fraction),'data_sha':sha,'result':_result}
-            except Exception as e:
-                st.error(str(e))
-        _saved_tsd=st.session_state.get('tis_thomson_distribution')
-        if _saved_tsd and _saved_tsd.get('xcol')==xcol and _saved_tsd.get('ycol')==ycol and _saved_tsd.get('sigma_col')==sigma_col and _saved_tsd.get('instrument_sigma_nm')==float(inst_sigma) and _saved_tsd.get('background_fraction')==float(background_fraction) and _saved_tsd.get('data_sha')==sha:
-            _r=_saved_tsd['result']
-            _m1,_m2,_m3,_m4=st.columns(4)
-            _m1.metric('Spectral centroid',f"{_r['spectral_centroid_nm']:.6g} nm")
-            _m2.metric('Observed RMS width',f"{_r['observed_sigma_nm']:.6g} nm")
-            _m3.metric('Instrument-corrected width',f"{_r['instrument_corrected_sigma_nm']:.6g} nm" if _r['instrument_width_resolved'] else "Unresolved")
-            _m4.metric('Positive integrated area',f"{_r['integrated_positive_spectral_signal']:.6g}")
-            if _r['instrument_width_resolved']:
-                st.success('Instrument-corrected spectral width is resolved under the stated Gaussian instrument-response assumption.')
-            else:
-                st.warning('The observed spectral variance does not exceed the calibrated instrument variance. Instrument-corrected width is unresolved and is intentionally not reported.')
-            st.caption('Descriptive spectral moments and Gaussian shape-fit diagnostics only. This workflow does not infer electron temperature, electron density, or a unique electron velocity distribution.')
-            st.json({k:v for k,v in _r.items() if not isinstance(v,(np.ndarray,dict)) and k not in {'signal','wavelength_nm','background','background_subtracted_signal','positive_spectral_weights','fitted_spectrum','residual'}} | {'gaussian_fit_parameters':_r['gaussian_fit_parameters'],'gaussian_fit_parameter_uncertainties':_r['gaussian_fit_parameter_uncertainties']})
-            st.line_chart(pd.DataFrame({'measured':_r['signal'],'background-subtracted':_r['background_subtracted_signal'],'Gaussian fit':_r['fitted_spectrum']} ,index=_r['wavelength_nm']))
-            json_download('Export Thomson spectral-distribution results', {k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in _r.items()}, 'thomson_spectral_distribution.json')
     elif mode=='Ion temperature from Doppler spectroscopy':
         st.caption('End-to-end Gaussian line fit and instrument-corrected ion temperature. Requires an independently calibrated wavelength axis, identified isolated transition, emitting-ion mass and measured instrument FWHM. This does not remove Stark/Zeeman broadening, blends, opacity or non-thermal broadening.')
         xcol=col_select('Calibrated wavelength (nm)',numeric,'ti_doppler_x')
@@ -2998,7 +2961,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Microwave CTS spectral inversion (frequency-domain)','Thomson downstream profile summary (pre-derived ne/Te)','Thomson downstream profile reconstruction (pre-derived ne/Te)','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Thomson multi-channel spectral inference (canonical Analysis 1)','Microwave CTS spectral inversion (frequency-domain)','Thomson spatial profile reconstruction from calibrated spectra','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Thomson multi-channel spectral inference (canonical Analysis 1)':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
@@ -3124,157 +3087,12 @@ elif page=='Advanced Analysis':
                 except Exception as e:
                     st.error(f'CTS inversion failed: {e}')
 
-    elif workflow=='Thomson downstream profile summary (pre-derived ne/Te)':
-        st.markdown('Analyze already-calibrated radial electron-density and electron-temperature profiles.')
-        st.caption('Inputs are calibrated profiles, not raw detector counts. Radius is in metres, density in m⁻³, and electron temperature in eV.')
-        if df is None or len(numeric) < 3:
-            st.info('Load a table with radius, electron-density, and electron-temperature columns.')
-        else:
-            radius_col=col_select('Radius / minor-radius coordinate (m)',numeric,'tis_thomson_profile_radius')
-            density_col=col_select('Electron density (m⁻³)',numeric,'tis_thomson_profile_density')
-            temperature_col=col_select('Electron temperature (eV)',numeric,'tis_thomson_profile_temperature')
-            uncertainty_options=['(none)']+list(numeric)
-            density_uncertainty_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_profile_density_unc')
-            temperature_uncertainty_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_profile_temperature_unc')
-            st.caption('This workflow is geometry-independent: it uses only the supplied calibrated profile coordinate and calibrated density/temperature values. Geometry-weighted volume averages are intentionally excluded.')
-            if st.button('Analyze calibrated Thomson profiles',type='primary',key='run_thomson_profile'):
-                try:
-                    required_cols=[radius_col,density_col,temperature_col]
-                    if len(set(required_cols))!=3:
-                        raise ValueError('Radius, density, and temperature must use different columns.')
-                    for optional_col in (density_uncertainty_col,temperature_uncertainty_col):
-                        if optional_col!='(none)' and optional_col in required_cols:
-                            raise ValueError('Uncertainty columns must differ from radius, density, and temperature columns.')
-                    if density_uncertainty_col!='(none)' and density_uncertainty_col==temperature_uncertainty_col:
-                        raise ValueError('Density and temperature uncertainty must use different columns because they have different physical units.')
-                    radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
-                    density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
-                    temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)
-                    density_uncertainty=None if density_uncertainty_col=='(none)' else pd.to_numeric(df[density_uncertainty_col],errors='raise').to_numpy(dtype=float)
-                    temperature_uncertainty=None if temperature_uncertainty_col=='(none)' else pd.to_numeric(df[temperature_uncertainty_col],errors='raise').to_numpy(dtype=float)
-                    profile=analyze_thomson_profile(
-                        radius_values,density_values,temperature_values,
-                        density_uncertainty_m3=density_uncertainty,
-                        temperature_uncertainty_ev=temperature_uncertainty,
-                    )
-                    summary=profile['summary']
-                    st.success('Calibrated Thomson profile analysis completed.')
-                    metric_cols=st.columns(4)
-                    metric_cols[0].metric('Minimum electron density',f"{summary.density_min_m3:.4g} m⁻³")
-                    metric_cols[1].metric('Maximum electron density',f"{summary.density_peak_m3:.4g} m⁻³")
-                    metric_cols[2].metric('Minimum electron temperature',f"{summary.temperature_min_ev:.4g} eV")
-                    metric_cols[3].metric('Maximum electron temperature',f"{summary.temperature_peak_ev:.4g} eV")
-                    profile_frame=pd.DataFrame({
-                        'Radius (m)':profile['radius_m'],
-                        'Electron density (m⁻³)':profile['density_m3'],
-                        'Electron temperature (eV)':profile['temperature_eV'],
-                        'Density gradient (m⁻⁴)':profile['density_gradient_m-4'],
-                        'Temperature gradient (eV/m)':profile['temperature_gradient_eV_m-1'],
-                        'Normalized density gradient (m⁻¹)':profile['density_normalized_gradient_m-1'],
-                        'Normalized temperature gradient (m⁻¹)':profile['temperature_normalized_gradient_m-1'],
-                        'Density scale length (m)':profile['density_scale_length_m'],
-                        'Temperature scale length (m)':profile['temperature_scale_length_m'],
-                    })
-                    optional_columns={
-                        'Density uncertainty (m⁻³)':'density_uncertainty_m3',
-                        'Temperature uncertainty (eV)':'temperature_uncertainty_eV',
-                        'Density-gradient uncertainty (m⁻⁴)':'density_gradient_uncertainty_m-4',
-                        'Temperature-gradient uncertainty (eV/m)':'temperature_gradient_uncertainty_eV_m-1',
-                        'Normalized density-gradient uncertainty (m⁻¹)':'density_normalized_gradient_uncertainty_m-1',
-                        'Normalized temperature-gradient uncertainty (m⁻¹)':'temperature_normalized_gradient_uncertainty_m-1',
-                        'Density scale-length uncertainty (m)':'density_scale_length_uncertainty_m',
-                        'Temperature scale-length uncertainty (m)':'temperature_scale_length_uncertainty_m',
-                    }
-                    for column_label,result_key in optional_columns.items():
-                        if result_key in profile:
-                            profile_frame[column_label]=profile[result_key]
-                    st.markdown('**Profile summary**')
-                    st.json(dict(vars(summary)))
-                    st.markdown('**Radial profiles**')
-                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron density (m⁻³)']])
-                    st.line_chart(profile_frame.set_index('Radius (m)')[['Electron temperature (eV)']])
-                    st.markdown('**Gradients and local scale lengths**')
-                    st.dataframe(profile_frame,width="stretch",hide_index=True)
-                    download_df('Download Thomson profile results',profile_frame,'tis_thomson_profile_results.csv')
-                    profile_json={k:(v.tolist() if isinstance(v,np.ndarray) else v) for k,v in profile.items() if k!='summary'}
-                    profile_json['summary']=dict(vars(summary))
-                    json_download('Export Thomson profile summary',profile_json,'tis_thomson_profile_summary.json')
-                    st.caption('Independent pointwise uncertainties are propagated through gradients, normalized gradients, scale lengths, and averages. Peak-location uncertainty is not estimated; model and calibration uncertainties are separate.')
-                except Exception as e:
-                    st.error(str(e))
-    elif workflow=='Thomson downstream profile reconstruction (pre-derived ne/Te)':
-        st.markdown('Reconstruct smooth radial electron-density and electron-temperature profiles from multiple spatially resolved Thomson measurements.')
-        st.caption('Use already-inferred, calibrated ne/Te profile points. Reconstruction is limited to the measured radial interval. Pointwise uncertainties are propagated by Monte Carlo into profile uncertainty bands; this does not calibrate raw spectra or infer equilibrium.')
-        if df is None or len(numeric) < 3:
-            st.info('Load a table with radius (m), electron density (m⁻³), and electron temperature (eV) columns.')
-        else:
-            radius_col=col_select('Measurement radius (m)',numeric,'tis_thomson_recon_radius')
-            density_col=col_select('Calibrated electron density (m⁻³)',numeric,'tis_thomson_recon_density')
-            temperature_col=col_select('Calibrated electron temperature (eV)',numeric,'tis_thomson_recon_temperature')
-            uncertainty_options=['(none)']+list(numeric)
-            density_unc_col=st.selectbox('Optional density 1-sigma uncertainty column (m⁻³)',uncertainty_options,key='tis_thomson_recon_density_unc')
-            temperature_unc_col=st.selectbox('Optional temperature 1-sigma uncertainty column (eV)',uncertainty_options,key='tis_thomson_recon_temperature_unc')
-            method=st.selectbox('Reconstruction method',['Smoothing spline','Shape-preserving PCHIP'],key='tis_thomson_recon_method')
-            smoothing_factor=None
-            if method=='Smoothing spline':
-                smoothing_selection=st.selectbox('Smoothing-parameter selection',['Automatic generalized cross-validation','Manual residual target'],key='tis_thomson_recon_smoothing_selection')
-                if smoothing_selection=='Manual residual target':
-                    smoothing_factor=st.number_input('Smoothing factor (0 = exact interpolation; larger = smoother fit)',min_value=0.0,value=1.0,step=0.25,format='%.3f',key='tis_thomson_recon_smoothing')
-            points=int(st.number_input('Output radial grid points',min_value=20,max_value=5000,value=200,step=10,key='tis_thomson_recon_points'))
-            if st.button('Reconstruct Thomson profiles',type='primary',key='run_thomson_profile_reconstruction'):
-                try:
-                    required=[radius_col,density_col,temperature_col]
-                    if len(set(required))!=3:
-                        raise ValueError('Radius, density and temperature must use different columns.')
-                    for optional_col in (density_unc_col,temperature_unc_col):
-                        if optional_col!='(none)' and optional_col in required:
-                            raise ValueError('Uncertainty columns must differ from radius, density and temperature columns.')
-                    if density_unc_col!='(none)' and density_unc_col==temperature_unc_col:
-                        raise ValueError('Density and temperature uncertainty must use different columns because they have different physical units.')
-                    radius_values=pd.to_numeric(df[radius_col],errors='raise').to_numpy(dtype=float)
-                    density_values=pd.to_numeric(df[density_col],errors='raise').to_numpy(dtype=float)
-                    temperature_values=pd.to_numeric(df[temperature_col],errors='raise').to_numpy(dtype=float)
-                    density_unc=None if density_unc_col=='(none)' else pd.to_numeric(df[density_unc_col],errors='raise').to_numpy(dtype=float)
-                    temperature_unc=None if temperature_unc_col=='(none)' else pd.to_numeric(df[temperature_unc_col],errors='raise').to_numpy(dtype=float)
-                    result=reconstruct_thomson_profile(
-                        radius_values,density_values,temperature_values,
-                        density_uncertainty_m3=density_unc,
-                        temperature_uncertainty_ev=temperature_unc,
-                        method='pchip' if method=='Shape-preserving PCHIP' else 'smoothing_spline',
-                        smoothing_factor=smoothing_factor,
-                        points=points,
-                    )
-                    frame=pd.DataFrame({
-                        'Radius (m)':result['radius_m'],
-                        'Reconstructed electron density (m⁻³)':result['density_m3'],
-                        'Reconstructed electron temperature (eV)':result['temperature_eV'],
-                        'Density gradient (m⁻⁴)':result['density_gradient_m-4'],
-                        'Temperature gradient (eV/m)':result['temperature_gradient_eV_m-1'],
-                    })
-                    if result.get('reconstructed_density_uncertainty_m3') is not None:
-                        frame['Density uncertainty (m⁻³)']=result['reconstructed_density_uncertainty_m3']
-                        frame['Density lower 95% (m⁻³)']=result['reconstructed_density_lower_95_m3']
-                        frame['Density upper 95% (m⁻³)']=result['reconstructed_density_upper_95_m3']
-                    if result.get('reconstructed_temperature_uncertainty_eV') is not None:
-                        frame['Temperature uncertainty (eV)']=result['reconstructed_temperature_uncertainty_eV']
-                        frame['Temperature lower 95% (eV)']=result['reconstructed_temperature_lower_95_eV']
-                        frame['Temperature upper 95% (eV)']=result['reconstructed_temperature_upper_95_eV']
-                    st.success('Spatial Thomson profile reconstruction completed within the measured radial interval.')
-                    st.caption(f"Method: {result['method']} · Smoothing selection: {result['smoothing_selection']} · Input points: {result['input_point_count']} · Output points: {result['reconstruction_point_count']} · Radius range: {result['radial_domain_m'][0]:.6g}–{result['radial_domain_m'][1]:.6g} m")
-                    if result['uncertainty_model']['reconstructed_profile_uncertainty_available']:
-                        st.info(f"Monte Carlo uncertainty bands available; successful density draws: {result['uncertainty_model']['density_mc_successful_draws']}, temperature draws: {result['uncertainty_model']['temperature_mc_successful_draws']}.")
-                    st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron density (m⁻³)']])
-                    st.line_chart(frame.set_index('Radius (m)')[['Reconstructed electron temperature (eV)']])
-                    st.markdown('**Reconstructed profiles and derivatives**')
-                    st.dataframe(frame,width="stretch",hide_index=True)
-                    download_df('Download reconstructed Thomson profiles (CSV)',frame,'tis_thomson_reconstructed_profiles.csv')
-                    json_download('Export reconstruction, method and limitations (JSON)',result,'tis_thomson_profile_reconstruction.json')
-                    with st.expander('Assumptions and limitations'):
-                        for item in result['limitations']:
-                            st.warning(item)
-                        st.write(result['uncertainty_model'])
-                except Exception as e:
-                    st.error(f'Thomson profile reconstruction failed: {e}')
+    elif workflow=='Thomson spatial profile reconstruction from calibrated spectra':
+        st.info('This subanalysis uses the canonical Thomson forward-inference engine. It accepts measured, calibrated spectra and returns channel-resolved radial physical-parameter profiles; it does not accept pre-derived ne/Te profile points.')
+        if st.button('Open canonical Thomson profile-inference workflow',type='primary',key='open_thomson_profile_inference_from_advanced'):
+            st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
+            st.session_state['jump']='Spectral Analysis'
+            st.rerun()
     elif workflow=='Flux-loop magnetic-flux reconstruction':
         st.markdown('Reconstruct poloidal magnetic-flux change from a calibrated flux-loop voltage using Faraday’s law.')
         st.caption('Time must be in seconds and voltage in volts. Correct calibration, loop polarity, turn count, and the initial-flux condition are experiment-specific inputs.')
