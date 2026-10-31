@@ -45,8 +45,8 @@ def test_cts_maxwellian_fast_ion_requires_explicit_temperature_initial_estimate(
 
 def test_cts_forward_model_is_finite_positive_and_geometry_sensitive():
     f0,f,g,ions,frac,_=_case()
-    a=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
-    b=cts_spectral_density(f,f0,{"scattering_angle_rad":np.deg2rad(70.)},electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
+    a=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=0.0)
+    b=cts_spectral_density(f,f0,{"scattering_angle_rad":np.deg2rad(70.)},electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=0.0)
     assert a.shape==f.shape and np.all(np.isfinite(a)) and np.all(a>=0) and not np.allclose(a,b,rtol=1e-8,atol=0.0)
 
 def test_cts_inversion_recovers_controlled_synthetic_parameters():
@@ -67,14 +67,14 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
 def test_cts_hot_ion_component_forward_model():
     f0,f,g,ions,frac,_=_case()
     z=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,
-      ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,fast_ion={"kind":"maxwellian","species_index":0,"fraction":.08,"temperature_eV":12000})
+      ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=0.0,fast_ion={"kind":"maxwellian","species_index":0,"fraction":.08,"temperature_eV":12000})
     assert np.all(np.isfinite(z)) and np.all(z>0)
 
 @pytest.mark.parametrize("g",[{},{"scattering_angle_rad":0.},{"scattering_angle_rad":4.}])
 def test_cts_rejects_invalid_geometry(g):
     f0,f,_,ions,frac,_=_case()
     with pytest.raises(ValueError):
-        cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
+        cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=0.0)
 
 
 def test_cts_tabulated_non_maxwellian_fast_ion_forward_model():
@@ -236,7 +236,7 @@ def test_cts_requires_an_explicit_electron_flow_projection():
         cts_spectral_density(
             f, f0, g, electron_density_m3=2e19,
             electron_temperature_eV=1200, ion_temperature_eV=800,
-            ion_species=ions, ion_fractions=frac,
+            ion_species=ions, ion_fractions=frac, ion_velocity_projection_m_s=0.0,
         )
     with pytest.raises(ValueError, match="electron_velocity_projection_m_s is required"):
         analyze_cts_spectrum(
@@ -253,7 +253,7 @@ def test_cts_forward_model_rejects_unknown_fast_ion_kind():
         cts_spectral_density(
             f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,
             ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,
-            electron_velocity_projection_m_s=0.0,
+            electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=0.0,
             fast_ion={"species_index":0,"fraction":0.1,"kind":"not-a-model","temperature_eV":10000},
         )
 
