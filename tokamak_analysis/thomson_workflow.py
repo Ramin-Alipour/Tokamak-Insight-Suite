@@ -252,5 +252,4 @@ def reconstruct_thomson_profile_from_spectra(*args, **kwargs):
     """
     result = analyze_thomson_spectra(*args, **kwargs)
     result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
-    result["profile_source"] = "physical inference from measured calibrated multi-channel Thomson spectra"
     return result
