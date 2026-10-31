@@ -873,8 +873,12 @@ elif page=='Spectral Analysis':
                     ion_temperature_unc_text=st.text_input('Ion-temperature 1σ uncertainties (eV; one per species; optional)',key='ts_infer_ion_temperature_unc')
                     ion_velocity_text=st.text_input('Ion velocity vectors (m/s; semicolon-separated 3-vectors)',key='ts_infer_ion_velocities')
                     ion_velocity_unc_text=st.text_input('Ion-velocity component 1σ uncertainties (m/s; semicolon-separated 3-vectors; optional)',key='ts_infer_ion_velocity_unc')
-                    collective_kappa_initial_text=st.text_input('Initial electron kappa index (collective-kappa model)',value='3.0',key='ts_infer_collective_kappa_initial')
-                    collective_kappa_bounds_text=st.text_input('Kappa-index bounds (min,max)',value='1.51,50',key='ts_infer_collective_kappa_bounds')
+                    collective_initial_density_text=st.text_input('Initial electron density (m⁻³; required)',value='',key='ts_infer_collective_initial_density')
+                    collective_initial_temperature_text=st.text_input('Initial electron temperature (eV; required)',value='',key='ts_infer_collective_initial_temperature')
+                    collective_density_bounds_text=st.text_input('Electron-density bounds (min,max; required for collective Maxwellian, optional for kappa)',value='',key='ts_infer_collective_density_bounds')
+                    collective_temperature_bounds_text=st.text_input('Electron-temperature bounds (min,max; required for collective Maxwellian, optional for kappa)',value='',key='ts_infer_collective_temperature_bounds')
+                    collective_kappa_initial_text=st.text_input('Initial electron kappa index (required for collective kappa)',value='',key='ts_infer_collective_kappa_initial')
+                    collective_kappa_bounds_text=st.text_input('Kappa-index bounds (min,max; optional)',value='',key='ts_infer_collective_kappa_bounds')
                 with c2:
                     electron_velocity_text=st.text_input('Electron velocity vector (m/s; x,y,z)',key='ts_infer_electron_velocity')
                     electron_velocity_unc_text=st.text_input('Electron-velocity component 1σ uncertainties (m/s; x,y,z; optional)',key='ts_infer_electron_velocity_unc')
@@ -1083,9 +1087,18 @@ elif page=='Spectral Analysis':
                             ],dtype=float)
                         if electron_velocity_unc_text.strip():
                             kwargs['electron_velocity_uncertainty_m_s']=_parse_ts_vector(electron_velocity_unc_text,'Electron-velocity uncertainties')
+                        kwargs['collective_initial_density_m3']=_parse_ts_scalar(collective_initial_density_text,'Initial collective electron density',minimum=1e-300)
+                        kwargs['collective_initial_temperature_eV']=_parse_ts_scalar(collective_initial_temperature_text,'Initial collective electron temperature',minimum=1e-300)
+                        if collective_density_bounds_text.strip():
+                            kwargs['collective_density_bounds_m3']=_parse_ts_float_list(collective_density_bounds_text,'Collective density bounds')
+                        if collective_temperature_bounds_text.strip():
+                            kwargs['collective_temperature_bounds_eV']=_parse_ts_float_list(collective_temperature_bounds_text,'Collective temperature bounds')
+                        if model=='collective_maxwellian' and ('collective_density_bounds_m3' not in kwargs or 'collective_temperature_bounds_eV' not in kwargs):
+                            raise ValueError('Collective Maxwellian requires explicit electron-density and electron-temperature bounds.')
                         if model=='collective_kappa':
                             kwargs['collective_kappa_initial']=_parse_ts_scalar(collective_kappa_initial_text,'Initial collective kappa',minimum=1.5000001)
-                            kwargs['collective_kappa_bounds']=_parse_ts_float_list(collective_kappa_bounds_text,'Collective kappa bounds')
+                            if collective_kappa_bounds_text.strip():
+                                kwargs['collective_kappa_bounds']=_parse_ts_float_list(collective_kappa_bounds_text,'Collective kappa bounds')
                     if absolute_density:
                         kwargs.update({
                             'incident_polarization':_parse_ts_vector(polarization_text,'Incident polarization'),
