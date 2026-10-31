@@ -828,17 +828,26 @@ def test_scattering_angle_uncertainty_is_not_dropped_with_density_relative_covar
 
 def test_joint_density_covariance_retains_common_scattering_angle_uncertainty():
     x, y, _ = _spectral_case(100.0, n=161)
+    response = np.eye(x.size)
+    density_covariance = np.eye(12) * 1e-6
+    density_power_indices = [0, 6]
+    density_covariance[density_power_indices, :] = 0.0
+    density_covariance[:, density_power_indices] = 0.0
     common = dict(
         wavelength_nm=x, spectra=np.vstack([y, y]) * 1e-18, radius_m=[0.1, 0.2],
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 3,
-        instrument_response=np.eye(x.size),
+        instrument_response=response,
+        instrument_response_uncertainty=np.full_like(response, 1e-8),
+        instrument_response_mc_samples=20,
+        instrument_response_mc_min_success_fraction=0.5,
+        joint_spectral_covariance=np.eye(2 * x.size) * 1e-36,
         laser_power_w=2.0, interaction_length_m=0.1,
         collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
         incident_polarization=[0.0, 1.0, 0.0],
         incident_direction=[1.0, 0.0, 0.0],
         scattered_direction=[0.5, np.sqrt(3.0) / 2.0, 0.0],
         spectral_power_density_calibrated=True,
-        joint_density_relative_covariance=np.eye(12) * 1e-6,
+        joint_density_relative_covariance=density_covariance,
     )
     without_angle = analyze_thomson_spectra(**common)
     with_angle = analyze_thomson_spectra(
