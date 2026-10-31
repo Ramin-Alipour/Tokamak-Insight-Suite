@@ -34,7 +34,7 @@ def test_thomson_geometry_dependent_workflows_are_not_in_analysis_1_ui():
     workflow = next(item for item in app.selectbox if item.label == "Select workflow")
     assert "Thomson downstream profile summary (pre-derived ne/Te)" not in workflow.options
     assert "Thomson downstream profile reconstruction (pre-derived ne/Te)" not in workflow.options
-    assert "Thomson spatial profile reconstruction from calibrated spectra" in workflow.options
+    assert "Analysis 1 / Spatial-profile reconstruction" in workflow.options
 
 
 
@@ -62,7 +62,7 @@ def test_thomson_profile_subanalysis_routes_to_canonical_spectral_inference():
     })
     app = _app_with_table(frame)
     workflow = next(item for item in app.selectbox if item.label == "Select workflow")
-    workflow.set_value("Thomson spatial profile reconstruction from calibrated spectra").run()
+    workflow.set_value("Analysis 1 / Spatial-profile reconstruction").run()
     next(item for item in app.button if item.label == "Open Thomson spectral-to-spatial-profile workflow").click().run()
 
     assert not app.exception, [str(error.value) for error in app.exception]
@@ -100,8 +100,8 @@ def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_rende
     })
     app = _app_with_table(frame)
     workflow = next(item for item in app.selectbox if item.label == "Select workflow")
-    assert "Thomson spectral distribution (independent)" in workflow.options
-    workflow.set_value("Thomson spectral distribution (independent)").run()
+    assert "Analysis 1 / Spectral-distribution subanalysis" in workflow.options
+    workflow.set_value("Analysis 1 / Spectral-distribution subanalysis").run()
     assert not app.exception, [str(error.value) for error in app.exception]
     assert any(item.label == "Background definition" for item in app.selectbox)
-    assert any(item.label == "Run independent Thomson spectral-distribution analysis" for item in app.button)
+    assert any(item.label == "Run Analysis 1 spectral-distribution subanalysis" for item in app.button)
