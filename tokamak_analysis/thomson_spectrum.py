@@ -79,15 +79,23 @@ def fit_thomson_spectrum(
     response = np.exp(-0.5 * (delta / float(instrument_sigma_nm)) ** 2)
     response /= response.sum(axis=0, keepdims=True)
     from .thomson_inference import analyze_thomson_spectra
-    result = analyze_thomson_spectra(
-        x, y[None, :], [0.0],
+    try:
+        result = analyze_thomson_spectra(
+            x, y[None, :], [0.0],
         laser_wavelength_nm=laser_wavelength_nm,
         scattering_angle_rad=scattering_angle_rad,
         instrument_response=response,
         signal_uncertainty=None if uncertainty is None else uncertainty[None, :],
-        spectral_power_density_calibrated=spectral_power_density_calibrated,
-    )["channels"][0]
+            spectral_power_density_calibrated=spectral_power_density_calibrated,
+        )["channels"][0]
+    except ValueError as exc:
+        if "Wavelength coverage must include" in str(exc):
+            raise ValueError("Wavelength window must cover the fitted Thomson spectral feature and its intrinsic wings.") from exc
+        raise
     intrinsic_sigma = float(result["intrinsic_sigma_nm"])
+    intrinsic_uncertainty = float(result.get("intrinsic_sigma_uncertainty_nm", np.inf))
+    if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0 or intrinsic_sigma <= intrinsic_uncertainty:
+        raise ValueError("Fitted physical width is not resolved: it is not larger than the instrumental-width uncertainty at the available spectral resolution.")
     fitted_sigma = float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2))
     residual = np.asarray(result["residual"], dtype=float)
     dof = max(1, y.size - 5)
@@ -120,7 +128,7 @@ def fit_thomson_spectrum(
         "model": "Canonical Thomson inference: non-collective Maxwellian convolved with a Gaussian response matrix",
         "assumptions": result["assumptions"] + ["Gaussian instrumental line-spread function represented on the measured wavelength grid"],
         "limitations": [
-            "Compatibility adapter; all fitting and physical inference are delegated to Analysis 1's canonical engine.",
+            "Does not infer electron density from spectral shape; all fitting and physical inference are delegated to Analysis 1's canonical engine.",
             "Absolute electron density still requires separately calibrated optical power and geometry.",
         ],
         "canonical_engine": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
