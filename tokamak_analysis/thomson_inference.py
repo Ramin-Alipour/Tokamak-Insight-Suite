@@ -648,17 +648,45 @@ def analyze_thomson_spectra(
     if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
         raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
 
-    if density_relative_covariance is not None and joint_spectral_covariance is not None:
-        raise ValueError("density_relative_covariance already contains the scattered-power uncertainty; do not combine it with joint_spectral_covariance. Use scalar optical-factor uncertainties with joint GLS, or use density_relative_covariance without joint GLS.")
+    def require_zero_scattered_power_covariance(covariance_value, name):
+        matrix = _finite_array(covariance_value, name)
+        if matrix.shape == (6, 6):
+            power_rows = [0]
+            row_check = matrix[0, :]
+            column_check = matrix[:, 0]
+        elif matrix.shape == (y.shape[0], 6, 6):
+            power_rows = None
+            row_check = matrix[:, 0, :]
+            column_check = matrix[:, :, 0]
+        elif matrix.shape == (6 * y.shape[0], 6 * y.shape[0]):
+            power_rows = np.arange(0, 6 * y.shape[0], 6, dtype=int)
+            row_check = matrix[power_rows, :]
+            column_check = matrix[:, power_rows]
+        else:
+            raise ValueError(
+                f"{name} must be 6x6, n_channels x 6 x 6, or (6*n_channels) x (6*n_channels)."
+            )
+        if not np.allclose(row_check, 0.0, rtol=0.0, atol=1e-14) or not np.allclose(
+            column_check, 0.0, rtol=0.0, atol=1e-14
+        ):
+            raise ValueError(
+                f"{name} must have zero scattered-power rows and columns when joint spectral "
+                "covariance or measured-response uncertainty is supplied; those independent "
+                "power uncertainties are propagated from the spectrum/response Monte Carlo."
+            )
+        return matrix
+
+    if density_relative_covariance is not None and (
+        joint_spectral_covariance is not None or lsf_unc is not None
+    ):
+        require_zero_scattered_power_covariance(
+            density_relative_covariance, "density_relative_covariance"
+        )
     if joint_density_relative_covariance is not None:
         if model in {"collective_maxwellian", "collective_kappa"}:
             raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective models infer density from the dielectric spectral shape.")
         if density_relative_covariance is not None:
             raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
-        if joint_spectral_covariance is not None:
-            raise ValueError("joint_density_relative_covariance already contains the full scattered-power covariance; do not combine it with joint_spectral_covariance.")
-        if instrument_response_uncertainty is not None:
-            raise ValueError("joint_density_relative_covariance must already include response-matrix uncertainty in its scattered-power blocks; do not also supply instrument_response_uncertainty.")
         if not spectral_power_density_calibrated or any(value is None for value in (
             laser_power_w, interaction_length_m, collection_solid_angle_sr, optical_efficiency
         )):
@@ -669,7 +697,7 @@ def analyze_thomson_spectra(
             polarization_factor_uncertainty,
         )
         if any(value is not None for value in scalar_density_uncertainties):
-            raise ValueError("joint_density_relative_covariance is the complete cross-channel density-input uncertainty model; do not also supply scalar optical-factor uncertainties.")
+            raise ValueError("joint_density_relative_covariance is the cross-channel optical-factor uncertainty model; do not also supply scalar optical-factor uncertainties.")
         joint_density_covariance = _finite_array(
             joint_density_relative_covariance, "joint_density_relative_covariance", 2
         )
@@ -680,6 +708,10 @@ def analyze_thomson_spectra(
             raise ValueError("joint_density_relative_covariance must be symmetric")
         if not _covariance_is_positive_semidefinite(joint_density_covariance):
             raise ValueError("joint_density_relative_covariance must be positive semidefinite")
+        if joint_spectral_covariance is not None or lsf_unc is not None:
+            require_zero_scattered_power_covariance(
+                joint_density_covariance, "joint_density_relative_covariance"
+            )
     else:
         joint_density_covariance = None
 
