@@ -110,3 +110,18 @@ These are mathematical and software regression tests using controlled synthetic 
 
 
 The regularized inversion option is intentionally restricted to the inferred tabulated fast-ion velocity-distribution workflow. It applies smoothness regularization to that inferred distribution only; user-supplied initial plasma values remain optimizer starting points, not implicit Bayesian priors. Response-matrix and external-parameter Monte Carlo refits use the same regularized residual as the central fit.
+
+
+## Cold-plasma propagation and finite-beam geometry
+
+`tokamak_analysis.cts_em_geometry` adds the high-frequency wave-propagation layer used by the CTS incident and receiver beams:
+
+- Stix (S,D,P) cold-plasma dielectric tensor in arbitrary laboratory-frame magnetic-field orientation, using signed species cyclotron frequencies and the `exp(-i omega t)` convention.
+- Cold-plasma Maxwell wave operator and its three Hermitian eigenbranches/electric eigenvectors.
+- Hamiltonian geometrical-optics ray tracing through an explicitly supplied 3-D equilibrium callback. The callback must return the local magnetic-field vector and every species density; no equilibrium is fabricated.
+- Analytic overlap integral for two normalized three-dimensional Gaussian beam-intensity distributions, including finite beam widths and non-coincident beam centres.
+
+These are separate high-frequency propagation/geometry components. They do not yet make the CTS forward model a complete Bindslev implementation: the low-frequency three-wave coupling tensor and its `X`/`Gamma` construction must still be integrated with the exact species-resolved unshielded current correlation and the complete (n,j,E,B) covariance contraction. The ray tracer is geometrical optics and does not model diffraction, mode conversion at branch degeneracies, or resonant absorption layers. It must not be interpreted as a full-wave solver.
+
+The cold-plasma tensor follows the Stix formulation documented by PlasmaPy and the high-frequency cold-wave / low-frequency hot-kinetic separation used by Fang et al. (2025). Software tests cover the vacuum limit, Hermiticity, Gaussian overlap normalization and straight-ray propagation in vacuum; they are numerical consistency tests, not experimental validation.
+
