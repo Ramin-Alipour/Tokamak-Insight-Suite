@@ -4537,8 +4537,9 @@
       "workflow_modes": [
         {
           "name": "unmagnetized_electrostatic_longitudinal_cts",
-          "function": "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
+          "function": "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
           "inputs": [
+            "model='electrostatic'",
             "frequency_shift_Hz",
             "spectrum",
             "probe_frequency_Hz",
@@ -4569,8 +4570,9 @@
         },
         {
           "name": "magnetized_full_electromagnetic_cts",
-          "function": "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+          "function": "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
           "inputs": [
+            "model='full_electromagnetic'",
             "frequency_shift_Hz",
             "spectrum (dispatcher maps to measured_spectrum)",
             "probe_frequency_Hz",
