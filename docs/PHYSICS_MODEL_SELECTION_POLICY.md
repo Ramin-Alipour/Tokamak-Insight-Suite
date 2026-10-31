@@ -24,7 +24,7 @@ Analysis 1's optical Thomson workflow starts from measured, wavelength-calibrate
 2. **Non-collective Kappa** — a finite-variance parameterized non-Maxwellian electron distribution for spectra where a Kappa representation is physically justified and identifiable.
 3. **Non-collective relativistic Maxwell-Juttner** — exact relativistic photon-frequency kinematics for high-temperature Maxwell-Juttner electrons within the Thomson limit.
 
-These models are not switched automatically. The non-relativistic Maxwellian/Kappa validity limits and the relativistic model's isotropy, flow-projection and recoil limitations are stated in the Analysis 1 documentation. Optical collective dielectric models are not part of this three-model shortlist. Microwave collective Thomson scattering is a separate registered CTS subanalysis and has its own model selection.
+These models are not switched automatically. The non-relativistic Maxwellian/Kappa validity limits and the relativistic model's isotropy, flow-projection and recoil limitations are stated in the Analysis 1 documentation. Optical collective dielectric models are not part of this three-model shortlist. Microwave collective Thomson scattering is a separate physical branch and registered subanalysis within the same primary Analysis 1 family; it has its own two-model CTS selection.
 
 Recent peer-reviewed sources informing the optical shortlist:
 
@@ -36,7 +36,7 @@ Recent peer-reviewed sources informing the optical shortlist:
 
 ## Collective Thomson / microwave CTS subanalysis
 
-The registered CTS subanalysis is separate from optical Analysis 1 and exposes exactly two physical forward-model choices:
+The registered CTS subanalysis belongs to primary Analysis 1 but remains physically distinct from optical Thomson inference. It exposes exactly two CTS physical forward-model choices:
 
 1. **Unmagnetized electrostatic longitudinal CTS** — a multi-species longitudinal dielectric-response model with explicit ion composition, flow projections and measured frequency-response operator.
 2. **Magnetized full-electromagnetic CTS** — a kinetic electromagnetic model with supplied magnetic field, vector geometry/polarization and species-resolved plasma inputs; optional relativistic gyrotropic populations and frequency-resolved ray/beam-overlap geometry are explicit model inputs.
@@ -51,4 +51,4 @@ Recent peer-reviewed sources informing the CTS model scope:
 - M. Nishiura et al., “Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device,” *Journal of Fusion Energy* **45** (2026), 55, DOI: [10.1007/s10894-026-00595-7](https://doi.org/10.1007/s10894-026-00595-7). Supports contemporary CTS kinetic inference for bulk and energetic ions.
 - J. L. Flocken, S. B. Korsholm and J. Rasmussen, “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026), 115845, DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845). Supports current forward modelling, ray tracing and Bayesian spectral inversion.
 
-The CTS implementation's remaining limits are stated in `docs/analyses/collective_thomson_scattering.md`; no experimental validation is claimed.
+The CTS implementation's remaining limits are stated in `docs/analyses/collective_thomson_scattering.md`. Optical Thomson and CTS remain separate model branches under the same primary Analysis 1; no experimental validation is claimed.
