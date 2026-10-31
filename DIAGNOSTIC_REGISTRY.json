@@ -4370,6 +4370,26 @@
         {
           "name": "fast_ion_populations",
           "unit": "explicit user-supplied distribution metadata"
+        },
+        {
+          "name": "bindslev_dielectric_form_factors",
+          "unit": "frequency x 10 x 10 complex tensor",
+          "description": "Bindslev Eq. (135) dielectric coupling form-factor matrix using cold local mode flux normalization."
+        },
+        {
+          "name": "bindslev_X_tensor",
+          "unit": "frequency x 3 x 3 x 3 complex tensor",
+          "description": "Rank-three magnetized Bindslev X pseudotensor."
+        },
+        {
+          "name": "bindslev_Gamma_inverse_tensor",
+          "unit": "frequency x 3 x 3 x 3 x 3 complex tensor",
+          "description": "Inverse rank-four Gamma tensor used to construct X."
+        },
+        {
+          "name": "fast_ion_kinetic_diagnostics",
+          "unit": "frequency-indexed species diagnostics",
+          "description": "Relativistic gyrotropic response flags, maximum speed fraction and bare Klimontovich current covariance."
         }
       ],
       "assumptions": [
