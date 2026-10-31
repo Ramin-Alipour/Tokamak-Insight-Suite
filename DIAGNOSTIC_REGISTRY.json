@@ -4285,6 +4285,20 @@
           "required": false,
           "description": "Number of incident-ray samples used for path-integrated Gaussian scattering-volume quadrature.",
           "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bindslev_validity_theta_e_limit",
+          "unit": "dimensionless positive limit on theta_e = T_e/(m_e c^2), below 1",
+          "required": false,
+          "description": "Full-EM only and only when electron_distribution is omitted. If supplied, the fitted theta_e above this researcher-selected asymptotic Bindslev screening limit is rejected. If omitted, validity is explicitly marked not_quantitatively_screened.",
+          "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "mode_index",
+          "unit": "integer cold-plasma propagation branch index",
+          "required": false,
+          "description": "Required explicitly when generating frequency_resolved_geometry with trace_cts_frequency_resolved_beams; select branch 0, 1 or 2. No default branch is assumed.",
+          "required_when_model": "full_electromagnetic"
         }
       ],
       "output_specs": [
@@ -4474,6 +4488,22 @@
           "name": "relativistic_electron_distribution",
           "unit": "explicit relativistic electron VDF metadata",
           "description": "Actual relativistic Maxwell-Juttner, bi-Gaussian or tabulated electron distribution used by the kinetic response."
+        },
+        {
+          "name": "electron_thermal_relativistic_parameter",
+          "unit": "dimensionless theta_e = T_e/(m_e c^2)",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bulk_electron_closure_validity_status",
+          "unit": "validity-screen status",
+          "description": "not_quantitatively_screened, within_researcher_supplied_asymptotic_screening_limit, or not_applicable_explicit_relativistic_electron_distribution.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "bulk_electron_closure_validity_theta_e_limit",
+          "unit": "dimensionless researcher-selected theta_e limit",
+          "available_when_model": "full_electromagnetic"
         }
       ],
       "assumptions": [
@@ -4504,7 +4534,8 @@
         "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
         "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model.",
         "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
-        "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided."
+        "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided.",
+        "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -4571,7 +4602,8 @@
           ],
           "scope": "Cold-plasma geometrical-optics ray tracing with caller-supplied local Gaussian beam covariance; no diffraction."
         }
-      ]
+      ],
+      "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened."
     },
     "scientific_references": [
       {
