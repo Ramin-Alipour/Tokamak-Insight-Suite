@@ -519,12 +519,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         # The second-derivative operator has an affine null space. A weak,
         # explicit reference-shape Tikhonov term on the supplied initial VDF
         # closes that null space without imposing a prior on plasma parameters.
+        reference_masses = (
+            fast["vdf"]["probability_density_m_s_inverse"]
+            * _trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
+        )
+        reference_masses = reference_masses / np.sum(reference_masses)
         initial_logits = np.clip(
-            np.log(np.maximum(
-                fast["vdf"]["probability_density_m_s_inverse"]
-                * _trapezoid_node_weights(fast["vdf"]["velocity_m_s"]), 1e-12
-            ) / max(float(fast["vdf"]["probability_density_m_s_inverse"][-1]
-                * _trapezoid_node_weights(fast["vdf"]["velocity_m_s"])[-1]), 1e-12)),
+            np.log(np.maximum(reference_masses[:-1], 1e-12)
+                   / max(float(reference_masses[-1]), 1e-12)),
             -19.0, 19.0,
         )
         reference_penalty = np.sqrt(strength) * (p[5:] - initial_logits)
