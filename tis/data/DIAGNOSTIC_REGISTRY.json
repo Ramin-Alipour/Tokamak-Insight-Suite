@@ -4572,7 +4572,8 @@
         "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
         "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
-        "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
+        "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response"
       ],
       "raw_data_to_physics": false,
       "note": "Full-EM CTS provides species-resolved thermal-ion temperature inference, relativistic Maxwell-Juttner or supplied non-Maxwellian gyrotropic electron/fast-ion response and second-order vertices, plus optional path-integrated cold-plasma ray tracing/Gaussian scattering-volume weighting. Maxwellian bulk-electron scattering retains the low-temperature Bindslev source. No experimental validation is claimed.",
