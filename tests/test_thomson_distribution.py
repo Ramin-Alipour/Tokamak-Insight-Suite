@@ -300,3 +300,22 @@ def test_spectral_distribution_rejects_multiple_background_specifications():
             analyze_thomson_spectral_distribution(
                 x, y, instrument_sigma_nm=0.06, **selection
             )
+
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        np.eye(9, dtype=bool),
+        np.full((9, 9), "1.0"),
+    ],
+)
+def test_spectral_distribution_rejects_non_real_numeric_response_matrix(response):
+    wavelength = np.linspace(531.0, 533.0, 9)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 0.3) ** 2)
+    with pytest.raises(ValueError, match="real numeric"):
+        analyze_thomson_spectral_distribution(
+            wavelength, signal,
+            instrument_response_matrix=response,
+            background_fraction=0.2,
+        )

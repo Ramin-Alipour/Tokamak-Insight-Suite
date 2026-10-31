@@ -149,7 +149,10 @@ def analyze_thomson_spectral_distribution(
 
     response = None
     if instrument_response_matrix is not None:
-        response = np.asarray(instrument_response_matrix, dtype=float)
+        raw_response = np.asarray(instrument_response_matrix)
+        if raw_response.dtype.kind not in "iuf":
+            raise ValueError("instrument_response_matrix must contain real numeric values, not booleans, strings or complex values")
+        response = raw_response.astype(float, copy=False)
         if response.shape != (x.size, x.size) or not np.all(np.isfinite(response)) or np.any(response < 0):
             raise ValueError("instrument_response_matrix must be a finite non-negative square matrix on the wavelength grid")
         column_sums = np.sum(response, axis=0)
