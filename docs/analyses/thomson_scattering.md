@@ -14,7 +14,7 @@ The model must be selected explicitly in both the dashboard and the public Pytho
 2. **Non-collective Kappa.** A finite-variance isotropic Kappa electron distribution represented by its one-dimensional Student-t projection. The analysis infers effective electron temperature and the Kappa index. This is a parameterized non-Maxwellian model, not an unrestricted multidimensional velocity-distribution reconstruction.
 3. **Non-collective relativistic Maxwell-Juttner.** An isotropic Maxwell-Juttner rest-frame electron distribution, Lorentz-boosted along the scattering vector. The forward model evaluates the exact elastic-Thomson photon-frequency ratio and Lorentz aberration, and transforms the supplied incident polarization into each electron rest frame before evaluating the polarized differential cross-section. It is the selected option for high-temperature regimes where the classical non-relativistic approximation is not appropriate. The code evaluates the maximum represented electron-rest-frame Compton correction fraction and rejects spectra exceeding the default 1% correction screen; the limit is configurable through the public spectrum model. This is an explicit numerical Thomson-limit screen, not a claim that recoil is modelled.
 
-Optical collective dielectric models are not part of this three-model Analysis 1 shortlist. Microwave collective Thomson scattering (CTS) is a separate registered subanalysis with its own explicitly selected electrostatic and magnetized full-electromagnetic forward models. No physical model is switched automatically.
+Optical collective dielectric models are not part of this three-model Analysis 1 shortlist. Microwave collective Thomson scattering (CTS) is another registered subanalysis within this same primary Analysis 1 family. It has its own explicitly selected electrostatic and magnetized full-electromagnetic forward models; these are CTS models, not additional optical models. No physical model is switched automatically.
 
 ## Input contract
 
@@ -38,7 +38,7 @@ Input spectra are assumed to be prepared and calibrated. The analysis does not p
 
 The supplied measured response is applied in the physical forward model. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, supporting nonuniform calibrated wavelength grids. No Gaussian line-spread function is imposed by the primary physical fit. Joint spectral GLS, optical-factor covariance and independent response-matrix Monte Carlo can be combined when the scattered-power component is excluded (zero first row/column) from the optical covariance to prevent double counting.
 
-For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. A shared 2-D response matrix uses the same perturbation realization across all channels, and the resulting cross-channel covariance of temperature, flow projection and integrated power is returned; channel-specific 3-D response matrices retain channel-local uncertainty. The spectral-distribution subanalysis is independently registered as entry 81 and can run directly from one calibrated measured spectrum even when the primary physical fit fails. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution.
+For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. A shared 2-D response matrix uses the same perturbation realization across all channels, and the resulting cross-channel covariance of temperature, flow projection and integrated power is returned; channel-specific 3-D response matrices retain channel-local uncertainty. The spectral-distribution subanalysis is separately callable (registry entry 81) but remains a child of primary Analysis 1; it can run directly from one calibrated measured spectrum even when the primary physical fit fails. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to reconstruct an arbitrary electron velocity distribution.
 
 ## Electron density and identifiability
 
@@ -64,7 +64,7 @@ The physical fit must pass its identifiability and fit-quality gates. Rank-defic
 - Kappa is a parameterized finite-variance distribution, not an unrestricted VDF inversion.
 - The relativistic Maxwell-Juttner model assumes an isotropic rest-frame distribution and bulk flow parallel to the scattering vector. It does not include recoil; it screens the maximum represented rest-frame Compton correction and rejects cases above the configured 1% default limit.
 - The non-relativistic Maxwellian and Kappa screens use Tₑ/(mₑc²) < 0.01 and |v_flow|/c < 0.1. These are conservative asymptotic error-budget screens (thermal relativistic corrections scale with θₑ; leading flow corrections scale with β²), not universal physical validity boundaries.
-- Optical collective dielectric inference is outside this Analysis 1 shortlist. Microwave CTS is covered by its separate registered workflow.
+- Optical collective dielectric inference is outside the three-model optical shortlist. Microwave CTS is covered by its dedicated subanalysis within Analysis 1, with two separately selected CTS models.
 - An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm.
 - No independent experimental validation is claimed. Automated tests are software/numerical consistency tests only.
 
@@ -90,12 +90,12 @@ These references motivate the selected physical scope; TIS does not claim to rep
 
 ## Dashboard access
 
-The Spectral Analysis workspace exposes the canonical multi-channel optical Thomson inference. Advanced Analysis exposes both the independent single-spectrum spectral-distribution workflow and the profile workflow, which routes to the same canonical engine. The microwave CTS workflow separately exposes electrostatic and magnetized full-electromagnetic forward models.
+The Analysis 1 family contains four callable subanalyses: canonical multi-channel optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. The Advanced Analysis selector labels each child explicitly as an Analysis 1 subanalysis. CTS exposes its electrostatic and magnetized full-electromagnetic models without mixing them into the optical model shortlist.
 
 
-## Independent spectral-distribution subanalysis (registry entry 81)
+## Single-spectrum spectral-distribution subanalysis (registry entry 81)
 
-The callable `tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution` is registered independently and accepts a single measured calibrated spectrum. It does not require a successful primary Maxwellian/Kappa/Maxwell-Juttner fit. The background must be explicitly supplied as `background_signal`, `background_mask`, or a researcher-selected `background_fraction`; the code does not silently designate the first/last 10% of the wavelength range as background. A measured response matrix is used directly. The legacy `thomson_spectrum.fit_thomson_spectrum` adapter also requires a measured response matrix and no longer synthesizes a Gaussian response from a scalar width.
+The callable `tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution` is registered as a distinct entry point under primary Analysis 1 and accepts a single measured calibrated spectrum. It does not require a successful primary Maxwellian/Kappa/Maxwell-Juttner fit. The background must be explicitly supplied as `background_signal`, `background_mask`, or a researcher-selected `background_fraction`; the code does not silently designate the first/last 10% of the wavelength range as background. A measured response matrix is used directly. The legacy `thomson_spectrum.fit_thomson_spectrum` adapter also requires a measured response matrix and no longer synthesizes a Gaussian response from a scalar width.
 
 The Kappa physical fit reports the Student-t probability captured by the measured wavelength window. It does not impose the Gaussian ±3σ coverage rule on a heavy-tailed distribution; if the fitted model has appreciable tails outside the measured window, the extrapolated full-model area is explicitly flagged.
 
