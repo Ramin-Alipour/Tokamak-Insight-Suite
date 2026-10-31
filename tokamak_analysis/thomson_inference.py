@@ -380,13 +380,13 @@ def analyze_thomson_spectra(
     density_relative_covariance=None, joint_density_relative_covariance=None,
     instrument_response_uncertainty=None, model="non_collective_maxwellian",
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
-    collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
+    collective_initial_density_m3=None, collective_initial_temperature_eV=None,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
     instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
     joint_spectral_covariance=None,
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=100,
-    collective_kappa_initial=3.0, collective_kappa_bounds=(1.51, 50.0),
+    collective_kappa_initial=None, collective_kappa_bounds=None,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -450,23 +450,46 @@ def analyze_thomson_spectra(
     if isinstance(instrument_response_mc_samples, (bool, np.bool_)) or not isinstance(instrument_response_mc_samples, (int, np.integer)) or instrument_response_mc_samples < 20:
         raise ValueError("instrument_response_mc_samples must be an integer >= 20")
     instrument_response_mc_min_success_fraction = _finite_scalar(instrument_response_mc_min_success_fraction, "instrument_response_mc_min_success_fraction", minimum=0.5, maximum=1.0)
-    collective_initial_density_m3 = _finite_scalar(collective_initial_density_m3, "collective_initial_density_m3", minimum=np.finfo(float).tiny)
-    collective_initial_temperature_eV = _finite_scalar(collective_initial_temperature_eV, "collective_initial_temperature_eV", minimum=np.finfo(float).tiny)
-    # When the caller does not provide priors, keep the search local to a
-    # configurable physical scale around the supplied starting estimates.
-    # This avoids the previous decade-spanning default box unrelated to the shot.
-    default_density_bounds, default_temperature_bounds = _default_collective_bounds(
-        collective_initial_density_m3, collective_initial_temperature_eV
-    )
-    density_bounds = (default_density_bounds if collective_density_bounds_m3 is None else
-                      _finite_array(collective_density_bounds_m3, "collective_density_bounds_m3", 1))
-    temperature_bounds = (default_temperature_bounds if collective_temperature_bounds_eV is None else
-                          _finite_array(collective_temperature_bounds_eV, "collective_temperature_bounds_eV", 1))
-    if density_bounds.shape != (2,) or temperature_bounds.shape != (2,) or np.any(density_bounds <= 0) or np.any(temperature_bounds <= 0) or density_bounds[0] >= density_bounds[1] or temperature_bounds[0] >= temperature_bounds[1]:
-        raise ValueError("Collective density and temperature bounds must be positive increasing pairs")
-    if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1] or not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:
-        raise ValueError("Collective initial density and temperature must lie within their supplied bounds")
     collective_models = {"collective_maxwellian", "collective_kappa"}
+    density_bounds = temperature_bounds = None
+    if model in collective_models:
+        if collective_initial_density_m3 is None or collective_initial_temperature_eV is None:
+            raise ValueError("Collective Thomson models require explicit initial electron density and temperature estimates.")
+        collective_initial_density_m3 = _finite_scalar(
+            collective_initial_density_m3, "collective_initial_density_m3",
+            minimum=np.finfo(float).tiny,
+        )
+        collective_initial_temperature_eV = _finite_scalar(
+            collective_initial_temperature_eV, "collective_initial_temperature_eV",
+            minimum=np.finfo(float).tiny,
+        )
+        if collective_density_bounds_m3 is not None:
+            density_bounds = _finite_array(collective_density_bounds_m3, "collective_density_bounds_m3", 1)
+            if density_bounds.shape != (2,) or np.any(density_bounds <= 0) or density_bounds[0] >= density_bounds[1]:
+                raise ValueError("collective_density_bounds_m3 must be a positive increasing pair")
+            if not density_bounds[0] <= collective_initial_density_m3 <= density_bounds[1]:
+                raise ValueError("collective_initial_density_m3 must lie within collective_density_bounds_m3")
+        if collective_temperature_bounds_eV is not None:
+            temperature_bounds = _finite_array(collective_temperature_bounds_eV, "collective_temperature_bounds_eV", 1)
+            if temperature_bounds.shape != (2,) or np.any(temperature_bounds <= 0) or temperature_bounds[0] >= temperature_bounds[1]:
+                raise ValueError("collective_temperature_bounds_eV must be a positive increasing pair")
+            if not temperature_bounds[0] <= collective_initial_temperature_eV <= temperature_bounds[1]:
+                raise ValueError("collective_initial_temperature_eV must lie within collective_temperature_bounds_eV")
+        if model == "collective_maxwellian" and (density_bounds is None or temperature_bounds is None):
+            raise ValueError("Collective Maxwellian inference requires explicit electron-density and electron-temperature bounds; no scientific range is assumed.")
+    if model == "collective_kappa":
+        if collective_kappa_initial is None:
+            raise ValueError("Collective kappa inference requires an explicit initial kappa index >1.5.")
+        collective_kappa_initial = _finite_scalar(
+            collective_kappa_initial, "collective_kappa_initial", minimum=1.5000001,
+        )
+        if collective_kappa_bounds is not None:
+            collective_kappa_bounds = _finite_array(collective_kappa_bounds, "collective_kappa_bounds", 1)
+            if (collective_kappa_bounds.shape != (2,) or collective_kappa_bounds[0] <= 1.5
+                    or collective_kappa_bounds[0] >= collective_kappa_bounds[1]):
+                raise ValueError("collective_kappa_bounds must be an increasing pair with lower bound >1.5")
+            if not collective_kappa_bounds[0] <= collective_kappa_initial <= collective_kappa_bounds[1]:
+                raise ValueError("collective_kappa_initial must lie within collective_kappa_bounds")
     probe_vec = scatter_vec = None
     if model in collective_models or model == "non_collective_relativistic_maxwell_juttner":
         if incident_direction is None or scattered_direction is None:
@@ -554,12 +577,6 @@ def analyze_thomson_spectra(
         ion_t = ion_fract = ion_v = electron_v = None
         ion_t_unc = ion_v_unc = electron_v_unc = None
 
-    collective_kappa_initial = _finite_scalar(collective_kappa_initial, "collective_kappa_initial", minimum=1.5000001)
-    collective_kappa_bounds = _finite_array(collective_kappa_bounds, "collective_kappa_bounds", 1)
-    if (collective_kappa_bounds.shape != (2,) or collective_kappa_bounds[0] <= 1.5
-            or collective_kappa_bounds[0] >= collective_kappa_bounds[1]
-            or not collective_kappa_bounds[0] <= collective_kappa_initial <= collective_kappa_bounds[1]):
-        raise ValueError("collective_kappa_bounds must be an increasing pair >1.5 containing collective_kappa_initial")
 
     unc = None if signal_uncertainty is None else _finite_array(signal_uncertainty, "signal_uncertainty", 2)
     if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
