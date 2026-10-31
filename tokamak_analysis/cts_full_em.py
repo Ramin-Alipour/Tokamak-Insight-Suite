@@ -790,7 +790,7 @@ def full_em_cts_spectral_density(
                                    if frequency_geometry is not None and all("scattering_location_m" in item for item in frequency_geometry)
                                    else None),
         "fast_ion_populations": fast_ion_populations or [],
-        "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic electron/fast-ion response and second-order kinetic vertices"
+        "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic non-Maxwellian electron and fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-electromagnetic CTS with Bindslev low-temperature bulk-electron coupling and optional relativistic gyrotropic fast-ion kinetics"),
         "kinetic_response": "Maxwellian thermal species: magnetized Vlasov gyro-harmonics; explicitly supplied relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic electrons/fast ions: relativistic momentum-space Vlasov Fourier collocation",
