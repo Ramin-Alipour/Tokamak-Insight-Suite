@@ -153,3 +153,19 @@ def test_relativistic_effective_cross_section_matches_polarized_thomson_limit():
     assert result["effective_differential_cross_section_m2_sr"] == pytest.approx(
         classical_radius**2, rel=2e-3
     )
+
+
+def test_relativistic_response_convolution_conserves_area_on_nonuniform_bins():
+    from tokamak_analysis.thomson_kinetic_models import _apply_response
+
+    wavelength = np.array([500.0, 501.0, 503.0, 506.0, 510.0, 515.0, 521.0])
+    edges = np.empty(wavelength.size+1)
+    edges[1:-1] = 0.5*(wavelength[:-1]+wavelength[1:])
+    edges[0] = wavelength[0]-0.5*(wavelength[1]-wavelength[0])
+    edges[-1] = wavelength[-1]+0.5*(wavelength[-1]-wavelength[-2])
+    widths = np.diff(edges)
+    signal = np.array([0.2, 0.8, 1.5, 2.0, 1.2, 0.5, 0.1])
+    response = np.eye(wavelength.size)*0.8
+    response += np.roll(np.eye(wavelength.size), 1, axis=0)*0.2
+    result = _apply_response(response, signal, wavelength)
+    assert np.sum(result*widths) == pytest.approx(np.sum(signal*widths), rel=1e-12)
