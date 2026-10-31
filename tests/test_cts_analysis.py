@@ -445,7 +445,7 @@ def test_full_em_cts_accepts_relativistic_anisotropic_fast_ion_population():
         harmonic_order=3,quadrature_order=4,
         fast_ion_populations=[{
             "name":"D_fast","charge_state":1,"mass_amu":2.014,
-            "density_m3":1e16,"flow_velocity_m_s":[0.0,0.0,0.0],
+            "density_m3":1e16,
             "distribution":{"kind":"relativistic_bigaussian",
                 "temperature_perpendicular_eV":8e5,
                 "temperature_parallel_eV":2e5}
