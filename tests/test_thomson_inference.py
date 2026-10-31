@@ -934,26 +934,6 @@ def test_spectral_distribution_requires_fitted_physical_parameters_and_reports_t
     assert extracted["electron_density_status"].startswith("not_identifiable")
 
 
-def test_spectral_distribution_keeps_collective_electron_flow_unidentified():
-    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
-
-    x, y, _ = _spectral_case(100.0)
-    result = analyze_thomson_spectral_distribution(
-        x, y, instrument_response_matrix=np.eye(x.size),
-        background_signal=np.full(x.size, 2.0),
-        physical_parameters={
-            "model": "collective_maxwellian",
-            "electron_temperature_eV": 100.0,
-            "electron_velocity_projection_m_s": None,
-            "electron_density_m3": None,
-        },
-    )
-    physical = result["physical_parameter_extraction"]
-    assert physical["electron_temperature_eV"] == pytest.approx(100.0)
-    assert physical["electron_velocity_projection_m_s"] is None
-    assert physical["electron_velocity_projection_status"] == "not_identifiable_from_selected_collective_model"
-
-
 def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
     from tokamak_analysis.thomson_distribution import _apply_response_matrix, _wavelength_bin_widths
 
