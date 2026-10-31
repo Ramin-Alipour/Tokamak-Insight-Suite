@@ -751,3 +751,10 @@ def test_full_em_cts_integrates_scattering_volume_samples():
     np.testing.assert_allclose(result["scattering_locations_m"], [[0.0075, 0.0, 0.0]])
     assert result["spectral_density"].shape == (1,)
     assert np.all(np.isfinite(result["spectral_density"]))
+
+
+def test_frequency_resolved_cts_ray_helper_has_no_implicit_propagation_branch():
+    from inspect import signature
+    from tokamak_analysis.cts_em_geometry import trace_cts_frequency_resolved_beams
+
+    assert signature(trace_cts_frequency_resolved_beams).parameters["mode_index"].default is None
