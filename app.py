@@ -3385,6 +3385,9 @@ elif page=='Advanced Analysis':
                         scattering_geometry=json.load(cts_geometry_upload)
                         if not isinstance(scattering_geometry,dict) or 'frequency_resolved_geometry' not in scattering_geometry:
                             raise ValueError('Ray geometry JSON must contain frequency_resolved_geometry from the CTS ray/beam helper.')
+                        selected_ray_branch=scattering_geometry.get('mode_index')
+                        if isinstance(selected_ray_branch,bool) or selected_ray_branch not in (0,1,2):
+                            raise ValueError('Ray geometry JSON must record an explicitly selected mode_index (0, 1 or 2); implicit propagation branches are not accepted.')
                     else:
                         scattering_geometry={
                             'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
