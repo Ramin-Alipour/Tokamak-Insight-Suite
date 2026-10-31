@@ -932,6 +932,7 @@ def test_spectral_distribution_requires_fitted_physical_parameters_and_reports_t
     assert extracted["electron_temperature_eV"] == pytest.approx(120.0)
     assert extracted["electron_velocity_projection_m_s"] == pytest.approx(0.0)
     assert extracted["electron_density_status"].startswith("not_identifiable")
+    assert result["gaussian_fit_uncertainty_scope"] == "conditional_on_fixed_supplied_response_matrix"
 
 
 def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
