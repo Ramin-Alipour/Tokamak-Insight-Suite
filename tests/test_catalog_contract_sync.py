@@ -60,7 +60,7 @@ def test_all_analysis_entry_points_declare_conservative_contracts():
             module_name, function_name = link.rsplit(".", 1)
             assert callable(getattr(importlib.import_module(module_name), function_name, None)), link
         if entry["name"].casefold() == "thomson scattering":
-            assert len(contract["function_links"]) == 2
+            assert len(contract["function_links"]) == 4
 
 
 def test_thomson_registry_links_resolve_to_real_callables():
@@ -82,7 +82,7 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
     assert len(DIAGNOSTICS) == 80
     assert levels == {"reference_only": 47, "limited_calculation": 16, "analysis_pipeline": 17}
-    assert completeness == {"incomplete": 63, "complete": 6, "complete_with_declared_scope": 11}
+    assert completeness == {"incomplete": 62, "complete": 6, "complete_with_declared_scope": 12}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.
@@ -149,7 +149,7 @@ def test_thomson_spatial_reconstruction_is_a_registered_measured_spectrum_subana
     )
     contract = entry["execution_contract"]
     assert contract["calibrated_measurements_to_physics"] is True
-    assert "measured calibrated spectra" in contract["note"].lower()
+    assert "measured calibrated optical Thomson spectra" in contract["note"].lower()
     module = importlib.import_module("tokamak_analysis.thomson_workflow")
     assert callable(module.reconstruct_thomson_profile_from_spectra)
 
