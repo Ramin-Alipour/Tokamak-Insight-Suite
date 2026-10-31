@@ -290,7 +290,15 @@ def reconstruct_thomson_profile_from_spectra(
         alpha_values = np.asarray([
             channel.get("scattering_parameter_alpha", np.nan) for channel in result["channels"]
         ], dtype=float)
-        candidates.append(("scattering_parameter_alpha", None, None, None, True))
+        alpha_uncertainties = np.asarray([
+            channel.get("scattering_parameter_alpha_uncertainty", np.nan)
+            for channel in result["channels"]
+        ], dtype=float)
+        alpha_covariance = (
+            np.diag(np.square(alpha_uncertainties))
+            if np.all(np.isfinite(alpha_uncertainties)) else None
+        )
+        candidates.append(("scattering_parameter_alpha", None, None, alpha_covariance, True))
     spectral_profile_inputs = {}
     power_values = np.asarray([
         channel.get(
@@ -348,7 +356,9 @@ def reconstruct_thomson_profile_from_spectra(
             uncertainty_values = np.sqrt(np.maximum(np.diag(covariance), 0.0)) if covariance is not None else None
         elif name == "scattering_parameter_alpha":
             values = alpha_values
-            uncertainty_values = None
+            uncertainty_values = (
+                alpha_uncertainties if np.all(np.isfinite(alpha_uncertainties)) else None
+            )
         elif name in {"integrated_scattered_power_W", "integrated_spectral_signal_input_units_nm"}:
             values = power_values
             uncertainty_values = power_sigma if np.all(np.isfinite(power_sigma)) else None
