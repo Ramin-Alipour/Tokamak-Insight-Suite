@@ -3301,6 +3301,13 @@ elif page=='Advanced Analysis':
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_full_response_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_full_covariance_upload')
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
+                cts_ray_mode_index=None
+                if cts_geometry_upload is not None:
+                    cts_ray_mode_index=st.selectbox(
+                        'Explicit cold-plasma propagation branch (mode_index)',
+                        [0,1,2],index=None,placeholder='Select the branch used to generate this ray geometry',
+                        key='cts_full_ray_mode_index',
+                    )
                 cts_electron_flow=st.text_input('Electron flow vector (m/s; x,y,z)',key='cts_full_electron_flow')
                 cts_ion_flow=st.text_area('Ion flow vectors (m/s; one x,y,z vector per species, separated by semicolons)',key='cts_full_ion_flow')
                 cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=2,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
@@ -3388,6 +3395,10 @@ elif page=='Advanced Analysis':
                         selected_ray_branch=scattering_geometry.get('mode_index')
                         if isinstance(selected_ray_branch,bool) or selected_ray_branch not in (0,1,2):
                             raise ValueError('Ray geometry JSON must record an explicitly selected mode_index (0, 1 or 2); implicit propagation branches are not accepted.')
+                        if cts_ray_mode_index is None:
+                            raise ValueError('Select the propagation branch explicitly in the Full-EM CTS interface.')
+                        if int(cts_ray_mode_index)!=int(selected_ray_branch):
+                            raise ValueError('Selected UI propagation branch does not match the branch recorded in the uploaded ray geometry JSON.')
                     else:
                         scattering_geometry={
                             'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
