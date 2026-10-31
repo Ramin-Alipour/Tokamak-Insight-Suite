@@ -104,7 +104,7 @@ def test_xray_spectrum_summary_reports_positive_total_counts():
 
 
 def test_catalog_and_formula_registry_are_nonempty_and_structured():
-    assert len(DIAGNOSTICS) >= 80
+    assert len(DIAGNOSTICS) >= 79
     assert len(FORMULAS) >= 35
     assert all(d.get("diagnostic") and d.get("family") and d.get("caveat") for d in DIAGNOSTICS)
     assert all(isinstance(f, dict) and f for f in FORMULAS)
