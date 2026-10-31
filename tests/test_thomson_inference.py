@@ -131,6 +131,7 @@ def test_collective_mode_never_runs_without_explicit_ion_species():
             scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), model="collective_maxwellian",
             collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
             collective_density_bounds_m3=[1e17,1e20], collective_temperature_bounds_eV=[1.0,1e4],
+            incident_direction=[1.0,0.0,0.0], scattered_direction=[0.0,1.0,0.0],
         )
 
 
