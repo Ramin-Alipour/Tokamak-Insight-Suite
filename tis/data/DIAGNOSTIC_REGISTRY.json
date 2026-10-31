@@ -4380,6 +4380,11 @@
           "name": "fast_ion_kinetic_diagnostics",
           "unit": "frequency-indexed species diagnostics",
           "description": "Relativistic gyrotropic response flags, maximum speed fraction and bare Klimontovich current covariance."
+        },
+        {
+          "name": "cold_mode_diagnostics",
+          "unit": "frequency-indexed mode metadata",
+          "description": "Selected incident/scattered cold-plasma branches, refractive indices, polarization matching and unit-flux mode diagnostics."
         }
       ],
       "assumptions": [
@@ -4391,7 +4396,8 @@
         "Gyro-harmonic and velocity-quadrature convergence must be checked.",
         "The Bindslev Gamma/X nonlinear source-current closure is the low-temperature magnetized formulation; it is not the fully relativistic second-order vertex.",
         "Optional fast-ion populations use relativistic gyrotropic momentum-space Vlasov response and Klimontovich orbit shot noise; the supplied distribution is external and not fitted.",
-        "Bulk thermal electrons and ions remain non-relativistic Maxwellian species."
+        "Bulk thermal electrons and ions remain non-relativistic Maxwellian species.",
+        "Incident and scattered mode seed polarizations are matched to cold-plasma eigenbranches and replaced with unit-Poynting-flux eigenpolarizations; magnetized modes may be longitudinal."
       ],
       "preprocessing": [
         "Validate calibrated frequency-shift and spectrum arrays, positive probe frequency, scattering geometry and normalized instrument response.",
