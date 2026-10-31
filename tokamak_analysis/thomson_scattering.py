@@ -167,18 +167,41 @@ def density_from_thomson_scattered_power(
                 optical_efficiency_uncertainty, polarization_factor_uncertainty)):
             raise ValueError("Use relative_input_covariance instead of separate scalar optical-factor uncertainties; do not double-count uncertainty inputs")
         gradient = np.array([1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
-        if power_cross_section_relative_covariance is not None:
-            covariance[0, 5] += float(power_cross_section_relative_covariance)
-            covariance[5, 0] += float(power_cross_section_relative_covariance)
+        covariance = covariance.copy()
+        cross_covariance = (
+            None if power_cross_section_relative_covariance is None
+            else float(power_cross_section_relative_covariance)
+        )
+        if cross_covariance is not None and not np.isfinite(cross_covariance):
+            raise ValueError("power_cross_section_relative_covariance must be finite")
+        if cross_covariance is not None and scattered_power_uncertainty_W is not None:
+            if not np.allclose(covariance[0, :], 0.0, rtol=0.0, atol=1e-14) or not np.allclose(
+                covariance[:, 0], 0.0, rtol=0.0, atol=1e-14
+            ):
+                raise ValueError(
+                    "A separate scattered_power_uncertainty_W can be combined with fitted "
+                    "power/cross-section covariance only when the supplied covariance has a zero power row and column."
+                )
+            sigma_power = _positive_finite_scalar(
+                scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
+            )
+            covariance[0, 0] += (sigma_power / ps) ** 2
+            scattered_power_uncertainty_W = None
+        if cross_covariance is not None:
+            covariance[0, 5] += cross_covariance
+            covariance[5, 0] += cross_covariance
         if effective_differential_cross_section_uncertainty_m2_sr is not None:
             sigma_cross_section = _positive_finite_scalar(
                 effective_differential_cross_section_uncertainty_m2_sr,
                 "effective_differential_cross_section_uncertainty_m2_sr",
                 allow_zero=True,
             )
-            covariance = covariance.copy()
             covariance[5, 5] += (sigma_cross_section / dsigma) ** 2
             uncertainty_supplied = True
+        if cross_covariance is not None and covariance[0, 0] <= 0.0:
+            raise ValueError(
+                "power/cross-section covariance requires a nonzero power variance in the supplied or fitted density covariance."
+            )
         if not _covariance_is_positive_semidefinite(covariance):
             raise ValueError("combined density covariance is not positive semidefinite after adding fitted power/cross-section covariance")
         rel_variance = float(gradient @ covariance @ gradient)
