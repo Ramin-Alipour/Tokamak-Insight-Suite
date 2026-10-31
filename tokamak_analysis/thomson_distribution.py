@@ -264,7 +264,10 @@ def analyze_thomson_spectral_distribution(
             or not isinstance(temperature, (int, float, np.integer, np.floating))
             or not np.isfinite(temperature) or temperature <= 0):
         raise ValueError("physical_parameters.electron_temperature_eV must be a finite positive fitted value")
-    model_name = physical_parameters["model"].strip()
+    model_value = physical_parameters["model"]
+    if not isinstance(model_value, str) or not model_value.strip():
+        raise ValueError("physical_parameters.model must be a non-empty supported model name")
+    model_name = model_value.strip()
     supported_models = {
         "non_collective_maxwellian", "non_collective_kappa",
         "non_collective_relativistic_maxwell_juttner",
