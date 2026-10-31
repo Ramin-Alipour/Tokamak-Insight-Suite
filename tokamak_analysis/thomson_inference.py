@@ -460,7 +460,7 @@ def analyze_thomson_spectra(
         if isinstance(collective_external_parameter_mc_samples,bool) or not isinstance(collective_external_parameter_mc_samples,(int,np.integer)) or collective_external_parameter_mc_samples<20:
             raise ValueError("collective_external_parameter_mc_samples must be an integer >= 20")
         if not ion_species or isinstance(ion_species, (str, bytes)):
-            raise ValueError("Collective Thomson inference requires an explicit non-empty ion-species list")
+            raise ValueError("Collective Thomson inference requires an explicit non-empty ion species list")
         if ion_velocity_m_s is None or electron_velocity_m_s is None:
             raise ValueError("Collective inference requires measured ion/electron flow vectors or explicit zero vectors to declare a stationary-flow assumption")
         if ion_temperature_eV is None:
@@ -1021,8 +1021,10 @@ def analyze_thomson_spectra(
         def joint_residual(parameters):
             return np.linalg.solve(joint_cholesky, (joint_forward(parameters)-y).ravel())
         joint_fit = least_squares(joint_residual, initial, bounds=(lower, upper), x_scale="jac", max_nfev=30000)
-        joint_rank = int(np.linalg.matrix_rank(joint_fit.jac))
-        joint_condition = float(np.linalg.cond(joint_fit.jac))
+        joint_column_norms = np.linalg.norm(joint_fit.jac, axis=0)
+        joint_scaled_jacobian = joint_fit.jac / np.maximum(joint_column_norms, np.finfo(float).tiny)[None, :]
+        joint_rank = int(np.linalg.matrix_rank(joint_scaled_jacobian))
+        joint_condition = float(np.linalg.cond(joint_scaled_jacobian))
         if not joint_fit.success or joint_rank < initial.size or not np.isfinite(joint_condition) or joint_condition > 1e12:
             raise ValueError("Joint Thomson GLS fit rejected: optimizer failure or non-identifiable channel parameters")
         parameter_covariance = np.linalg.pinv(joint_fit.jac.T @ joint_fit.jac)
@@ -1105,7 +1107,7 @@ def analyze_thomson_spectra(
             fit["fit_reduced_chi_square"] = channel_reduced_chi_square
             fit["fit_degrees_of_freedom"] = int(channel_dof)
             fit["joint_fit_reduced_chi_square"] = float(reduced_chi2_joint)
-            fit["joint_fit_degrees_of_freedom"] = int(dof)
+            fit["joint_fit_degrees_of_freedom"] = int(dof_joint)
             fit["joint_fit_accepted"] = True
             fit["fit_acceptance_basis"] = "accepted_joint_generalized_least_squares"
             fit["fit_accepted"] = True
