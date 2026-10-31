@@ -112,7 +112,7 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
 
 def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geometry,*,electron_density_m3,
     electron_temperature_eV,ion_temperature_eV,ion_species,ion_fractions,
-    ion_velocity_projection_m_s=0.,electron_velocity_projection_m_s=None,fast_ion=None):
+    ion_velocity_projection_m_s=None,electron_velocity_projection_m_s=None,fast_ion=None):
     """Evaluate the longitudinal multi-species S(k,omega); ion fractions are charge-density fractions.
 
     Electron flow is an explicit external input. Pass 0.0 only when a stationary
@@ -123,6 +123,8 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     ti=_positive(ion_temperature_eV,"ion_temperature_eV"); ions=_species(ion_species,ion_fractions)
     if electron_velocity_projection_m_s is None:
         raise ValueError("electron_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare a stationary-electron-flow assumption")
+    if ion_velocity_projection_m_s is None:
+        raise ValueError("ion_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare stationary ion flow")
     ui=float(_array([ion_velocity_projection_m_s],"ion_velocity_projection_m_s")[0]); ue=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
     if abs(ui)>=C or abs(ue)>=C: raise ValueError("flow projections must be subluminal")
     if np.any(f0+f<=0): raise ValueError("scattered frequencies must remain positive")
