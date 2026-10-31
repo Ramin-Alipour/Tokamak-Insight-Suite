@@ -578,3 +578,32 @@ def test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry(monkeypatch):
     np.testing.assert_allclose(
         result["frequency_resolved_geometry"][0]["magnetic_field_T"], [0.0, 0.0, 2.0]
     )
+
+
+def test_full_em_cts_relativistic_non_maxwellian_electron_uses_kinetic_vertex():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    result = full_em_cts_spectral_density(
+        [0.8e9, 1.0e9], 140e9,
+        {"incident_direction": [1.0, 0.0, 0.0],
+         "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0]},
+        electron_density_m3=2e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV={"D+": 800.0},
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+        electron_flow_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        harmonic_order=3, quadrature_order=4,
+        electron_distribution={
+            "kind": "relativistic_bigaussian",
+            "temperature_perpendicular_eV": 2.0e5,
+            "temperature_parallel_eV": 1.0e5,
+        },
+    )
+    assert result["relativistic_fast_ion_three_wave_vertex_used"] is True
+    assert len(result["relativistic_three_wave_vertex_diagnostics"]) == 2
+    assert result["relativistic_three_wave_vertex_diagnostics"][0][0]["population_role"] == "non-Maxwellian electron"
+    assert "non-Maxwellian electron" in result["model"]
+    assert np.all(np.isfinite(result["spectral_density"]))
