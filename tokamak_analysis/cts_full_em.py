@@ -940,14 +940,14 @@ def analyze_full_em_cts_spectrum(
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "optimizer_success": bool(fit.success),
-        "model": ("magnetized full-EM CTS with relativistic gyrotropic non-Maxwellian electron/fast-ion response and second-order kinetic vertices"
+        "model": ("magnetized full-EM CTS with relativistic gyrotropic electron/fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": [
             "magnetic_field_T", "electron_flow_velocity_m_s", "ion_flow_velocity_m_s",
             "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
         ],
-        "inversion_scope": "electron density, electron temperature and one independently fitted temperature per supplied thermal ion species; flow vectors, composition and the supplied non-Maxwellian distribution shape remain fixed external inputs",
+        "inversion_scope": "electron density, electron temperature and one independently fitted temperature per supplied thermal ion species; flow vectors, composition and supplied non-Maxwellian VDF shapes remain fixed external inputs; a Maxwell-Juttner electron VDF follows the fitted electron temperature",
         "fluctuation_covariance_density_current_E_B": forward_diagnostics["fluctuation_covariance_density_current_E_B"],
         "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
         "wave_tensor": forward_diagnostics["wave_tensor"],
