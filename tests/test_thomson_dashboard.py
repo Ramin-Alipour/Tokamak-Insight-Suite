@@ -81,6 +81,8 @@ def test_analysis_1_dashboard_exposes_only_three_selected_optical_models():
     })
     app = _app_with_table(frame)
     app.radio[0].set_value("Spectral Analysis").run()
+    workflow = next(item for item in app.radio if item.label == "Workflow")
+    workflow.set_value("Thomson multi-channel spectral inference").run()
     model = next(item for item in app.selectbox if item.label == "Physical spectral model")
     assert model.options == [
         "non_collective_maxwellian",
