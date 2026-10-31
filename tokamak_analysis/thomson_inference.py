@@ -1445,12 +1445,11 @@ def analyze_thomson_spectra(
     spectral_distribution_results = []
     for channel_index, channel_result in enumerate(results):
         channel_uncertainty = None if unc is None else unc[channel_index]
+        channel_covariance = None
         if joint_covariance is not None:
             channel_slice = slice(channel_index * y.shape[1], (channel_index + 1) * y.shape[1])
-            marginal = joint_covariance[channel_slice, channel_slice]
-            channel_uncertainty = np.sqrt(np.maximum(np.diag(marginal), 0.0))
-            if np.any(channel_uncertainty <= 0):
-                channel_uncertainty = None
+            channel_covariance = joint_covariance[channel_slice, channel_slice]
+            channel_uncertainty = None
         background_reference_nm = float(
             channel_result.get("fitted_center_nm", laser_wavelength_nm)
         )
@@ -1465,6 +1464,7 @@ def analyze_thomson_spectra(
                 y[channel_index],
                 instrument_response_matrix=channel_responses[channel_index],
                 signal_uncertainty=channel_uncertainty,
+                signal_covariance=channel_covariance,
                 background_signal=fitted_background,
             )
             distribution["analysis_status"] = "completed"
