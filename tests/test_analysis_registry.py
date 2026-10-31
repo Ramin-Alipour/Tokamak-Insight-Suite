@@ -135,7 +135,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
 
     cts = get_analysis(30)
     profile = get_analysis(46)
-    assert (cts["module"], cts["function"]) == ("cts_analysis", "analyze_cts_spectrum")
+    assert (cts["module"], cts["function"]) == ("cts_analysis", "analyze_cts_spectrum_model")
     assert (profile["module"], profile["function"]) == (
         "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
@@ -145,6 +145,9 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
         resolve_analysis(7)
     assert callable(resolve_analysis(30))
+    # CTS must require an explicit physical model; no electrostatic/full-EM fallback.
+    with pytest.raises(ValueError, match="Select model"):
+        resolve_analysis(30)()
     assert callable(resolve_analysis(46))
 
 
