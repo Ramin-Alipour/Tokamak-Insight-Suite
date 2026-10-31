@@ -78,7 +78,7 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
             raise ValueError("each ion species must be a mapping")
         z = _positive(item.get("charge_state"), f"ion_species[{i}].charge_state")
         mass = _positive(item.get("mass_amu"), f"ion_species[{i}].mass_amu") * AMU
-        flow = ion_flow_m_s.get(str(item.get("name", f"ion_{i}")), ion_flow_m_s.get("default"))
+        flow = ion_flow_m_s.get(str(item.get("name", f"ion_{i}")))
         if flow is None:
             raise ValueError(f"ion_flow_velocity_m_s must provide a vector for {item.get('name', f'ion_{i}')}")
         result.append({
@@ -195,17 +195,19 @@ def full_em_cts_spectral_density(
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ti,
                             electron_flow_velocity_m_s, ion_flow_velocity_m_s)
-    ei = np.asarray(incident_polarization, dtype=complex)
-    es = np.asarray(scattered_polarization, dtype=complex)
+    ei = np.asarray(incident_polarization, dtype=complex).copy()
+    es = np.asarray(scattered_polarization, dtype=complex).copy()
     if ei.shape != (3,) or es.shape != (3,) or np.any(~np.isfinite(ei)) or np.any(~np.isfinite(es)):
         raise ValueError("incident_polarization and scattered_polarization must be finite complex 3-vectors")
+    if np.linalg.norm(ei) <= 0 or np.linalg.norm(es) <= 0:
+        raise ValueError("incident_polarization and scattered_polarization must be non-zero")
     ei /= np.linalg.norm(ei)
     es /= np.linalg.norm(es)
     if abs(np.vdot(ei, ki_hat)) > 1e-6 or abs(np.vdot(es, ks_hat)) > 1e-6:
         raise ValueError("incident and scattered polarization vectors must be transverse to their beam directions")
-    if isinstance(harmonic_order, bool) or int(harmonic_order) < 2:
+    if isinstance(harmonic_order, bool) or not isinstance(harmonic_order, (int, np.integer)) or harmonic_order < 2:
         raise ValueError("harmonic_order must be an integer >= 2")
-    if isinstance(quadrature_order, bool) or int(quadrature_order) < 4:
+    if isinstance(quadrature_order, bool) or not isinstance(quadrature_order, (int, np.integer)) or quadrature_order < 4:
         raise ValueError("quadrature_order must be an integer >= 4")
     if damping_rate_rad_s is None:
         damping = max(2.0 * np.pi * f0 * 1e-7, 1.0)
