@@ -331,6 +331,7 @@ def full_em_cts_spectral_density(
     bindslev_x_tensors = []
     bindslev_gamma_inverse = []
     fast_ion_kinetic_diagnostics = []
+    relativistic_three_wave_vertex_diagnostics = []
     cold_mode_diagnostics = []
     local_magnetic_fields = []
     beam_overlap_weights = []
@@ -471,18 +472,46 @@ def full_em_cts_spectral_density(
         to_flux = np.eye(10, dtype=complex)
         to_flux[1:4, 1:4] /= -E_CHARGE
         covariance_n_v_E_B = to_flux @ state_cov @ to_flux.conj().T
+        total_source_operator = np.asarray(source["source_current_operator"], dtype=complex).copy()
+        relativistic_vertex_at_frequency = []
+        for fast_species in species:
+            if not fast_species.get("fast_ion", False):
+                continue
+            from .cts_relativistic import relativistic_gyrotropic_three_wave_vertex
+            vertex = relativistic_gyrotropic_three_wave_vertex(
+                omega_i, ki, ei_local,
+                omega, kvec, b_bin,
+                density_m3=fast_species["density"], mass_kg=fast_species["mass"],
+                charge_C=fast_species["charge"], distribution=fast_species["distribution"],
+                quadrature_order=int(quadrature_order),
+                gyrophase_points=max(16, 4*int(harmonic_order)),
+                resonance_width_rad_s=damping,
+            )
+            # The relativistic kinetic vertex is a map from the local fluctuation
+            # electric field to J^(2); embed it in the shared [n,j,E,B] state
+            # so all measured cross-correlations are retained in the contraction.
+            fast_operator = np.zeros((3, 10), dtype=complex)
+            fast_operator[:, 4:7] = vertex["current_vertex_A_m2_per_V_m"]
+            total_source_operator += fast_operator
+            relativistic_vertex_at_frequency.append({
+                "name": fast_species["name"],
+                "current_vertex_A_m2_per_V_m": vertex["current_vertex_A_m2_per_V_m"],
+                "distribution_kind": vertex["distribution_kind"],
+                "second_order_vlasov": vertex["second_order_vlasov"],
+            })
         transfer = bindslev_correlated_transfer_spectrum(
-            covariance_n_v_E_B, source["source_current_operator"], es
+            covariance_n_v_E_B, total_source_operator, es_local
         )
         form_factors = bindslev_dielectric_form_factors(
             source["dielectric_coupling_operator"], ei_local, es_local, ki, ks,
             omega_i, omega_s, ne,
         )
         spectra[index] = overlap_weight * transfer["received_source_current_spectral_power"]
-        bindslev_operators.append(source["source_current_operator"])
+        bindslev_operators.append(total_source_operator)
         bindslev_form_factors.append(form_factors["G_alpha_beta"])
         bindslev_x_tensors.append(source["X_tensor"])
         bindslev_gamma_inverse.append(source["Gamma_inverse_tensor"])
+        relativistic_three_wave_vertex_diagnostics.append(relativistic_vertex_at_frequency)
         projected = es_local.conj() @ source["dielectric_coupling_operator"]
         bindslev_coefficients.append({
             "N": projected[0],
@@ -506,7 +535,9 @@ def full_em_cts_spectral_density(
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
         "fast_ion_kinetic_diagnostics": fast_ion_kinetic_diagnostics,
-        "three_wave_coupling": "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms",
+        "three_wave_coupling": ("Bindslev low-temperature bulk-electron source-current tensor plus relativistic second-order gyrotropic Vlasov vertices for supplied fast-ion populations"
+                                if any(relativistic_three_wave_vertex_diagnostics)
+                                else "Bindslev low-temperature magnetized source-current tensor, including Gamma^{-1}, X and all n/v/E/B cross terms"),
         "magnetic_field_T": b,
         "frequency_resolved_magnetic_field_T": np.asarray(local_magnetic_fields),
         "relative_gaussian_beam_overlap": np.asarray(beam_overlap_weights),
@@ -525,7 +556,7 @@ def full_em_cts_spectral_density(
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Bulk thermal species use the non-relativistic isotropic Maxwellian solver; optional fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
-            "The Bindslev three-wave source-current closure is the low-temperature magnetized formulation; its relativistic kinetic generalization is not used for the fast-ion population.",
+            "The bulk-electron source remains the low-temperature Bindslev closure; supplied relativistic fast-ion populations additionally contribute an independently computed second-order relativistic Vlasov vertex driven by the same correlated fluctuation electric field.",
             "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
         ],
     }
