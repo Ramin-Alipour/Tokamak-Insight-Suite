@@ -159,6 +159,16 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
 
 
+def test_retired_relativistic_model_is_rejected():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="model must be non_collective_maxwellian"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.12], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            model="relativistic_maxwell_juttner",
+        )
+
+
 def test_nonrelativistic_flow_projection_uses_q_equals_ks_minus_ki_sign():
     x, y, _ = _spectral_case(100.0, center_nm=531.98)
     out = analyze_thomson_spectra(
