@@ -227,8 +227,8 @@ def test_particle_balance_reference():
 
 def test_all_formula_registry_mappings_resolve_and_have_reference_tests():
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(rows) == 42
-    assert len({row["name"] for row in rows}) == 42
+    assert len(rows) == 48
+    assert len({row["name"] for row in rows}) == 48
     for row in rows:
         contract = row["execution_contract"]
         assert contract["implementation_link_status"] == "mapped", row["name"]
@@ -327,12 +327,13 @@ def test_registry_and_packaged_registry_contract_outputs_cover_uncertainty_field
 
 
 def test_registry_output_specs_cover_all_statically_returned_keys():
-    source = (ROOT / "tokamak_analysis" / "formula_library.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
     rows = json.loads((ROOT / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
     for row in rows:
-        function_name = row["execution_contract"]["function_link"].rsplit(".", 1)[1]
+        module_name, function_name = row["execution_contract"]["function_link"].rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        functions = {node.name: node for node in tree.body if isinstance(node, ast.FunctionDef)}
         node = functions[function_name]
         returned = set()
         for child in ast.walk(node):
