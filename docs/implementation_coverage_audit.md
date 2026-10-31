@@ -1,21 +1,21 @@
 # Implementation coverage and scientific validation status
 
-**Status snapshot:** 2026-10-24  
+**Status snapshot:** 2026-10-31  
 **Scope:** the main-branch registries and the executable/validation contracts they declare.
 
 ## Diagnostic categories versus callable analysis entry points
 
-The canonical `DIAGNOSTIC_REGISTRY.json` and `tokamak_analysis.analysis_registry.ANALYSES` each contain 79 entries. Their IDs, titles, and ordering are required to match exactly. An analysis entry point is an executable software route, not proof that the associated diagnostic is fully modeled or independently validated; consult each execution contract for scope and limitations. CI checks the cross-registry title/order contract and resolves registered callables.
+The canonical `DIAGNOSTIC_REGISTRY.json` and `tokamak_analysis.analysis_registry.ANALYSES` each contain 80 entries. Their IDs, titles, and ordering are required to match exactly. An analysis entry point is an executable software route, not proof that the associated diagnostic is fully modeled or independently validated; consult each execution contract for scope and limitations. CI checks the cross-registry title/order contract and resolves registered callables.
 
-The 79 diagnostic contracts currently classify execution level as:
+The 80 diagnostic contracts currently classify execution level as:
 
 | Execution level | Count | What this means |
 |---|---:|---|
 | `reference_only` | 47 | The catalog entry is not evidence of an implemented callable numerical workflow. |
 | `limited_calculation` | 16 | A scoped numerical calculation exists, with assumptions and limitations. |
-| `analysis_pipeline` | 16 | A multi-step executable workflow exists; this does not imply independent experimental validation. |
+| `analysis_pipeline` | 17 | A multi-step executable workflow exists; this does not imply independent experimental validation. |
 
-Contract completeness is currently `incomplete` for 62 diagnostics, `complete` for 6 within the declared computational scope, and `complete_with_declared_scope` for 11. This count must be generated from the canonical registry; do not copy it from a stale dashboard or report. These are software-scope labels only. They do **not** certify device-specific calibration, agreement with experimental references, or independent scientific validation. Thomson scattering is implemented within its declared computational scope; device-specific calibration and independent experimental comparisons remain recommended research responsibilities, not release/completion gates under the open research beta policy.
+Contract completeness is currently `incomplete` for 62 diagnostics, `complete` for 6 within the declared computational scope, and `complete_with_declared_scope` for 12. This count must be generated from the canonical registry; do not copy it from a stale dashboard or report. These are software-scope labels only. They do **not** certify device-specific calibration, agreement with experimental references, or independent scientific validation. Thomson scattering is implemented within its declared computational scope; device-specific calibration and independent experimental comparisons remain recommended research responsibilities, not release/completion gates under the open research beta policy.
 
 
 A Python module existing somewhere in the repository does not by itself promote a diagnostic to implemented or experimentally validated.
@@ -48,7 +48,7 @@ An entry may be promoted only when all applicable gates below are reviewed and r
 
 ## Empirical validation policy
 
-The existing [external empirical validation protocol](external_empirical_validation_protocol.md) remains the acceptance authority for experimental comparisons. MAST integration verifies the explicitly documented data-import and signal-processing paths; it does not validate all 79 registered entries. A GOLEM retrieval/format failure is unresolved, not a successful scientific comparison. Digitized points from a published plot must never be described as raw detector data.
+The existing [external empirical validation protocol](external_empirical_validation_protocol.md) remains the acceptance authority for experimental comparisons. MAST integration verifies the explicitly documented data-import and signal-processing paths; it does not validate all 80 registered entries. A GOLEM retrieval/format failure is unresolved, not a successful scientific comparison. Digitized points from a published plot must never be described as raw detector data.
 
 ## Release gate
 
