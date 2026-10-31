@@ -245,3 +245,35 @@ def test_spectral_distribution_uses_explicit_physical_fit_background_without_edg
     assert out["background_estimation_method"] == "explicit_fitted_background_signal"
     assert out["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.01)
     assert out["instrument_corrected_sigma_nm"] is None
+
+
+
+def test_spectral_distribution_propagates_full_within_channel_signal_covariance():
+    x, y = _spectrum()
+    covariance = np.eye(x.size) * 0.25
+    out = analyze_thomson_spectral_distribution(
+        x, y,
+        instrument_response_matrix=np.eye(x.size),
+        background_signal=12.0 + 0.8 * (x - 500.0),
+        signal_covariance=covariance,
+        moment_mc_samples=40,
+    )
+    assert out["signal_uncertainty_model"] == "full_within_channel_spectral_covariance"
+    assert out["moment_uncertainty_successful_draws"] >= 20
+    assert out["spectral_centroid_uncertainty_nm"] > 0
+
+
+def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_covariance():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="not both"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_response_matrix=np.eye(x.size),
+            signal_uncertainty=np.ones(x.size),
+            signal_covariance=np.eye(x.size),
+        )
+    singular = np.ones((x.size, x.size))
+    with pytest.raises(ValueError, match="positive definite"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_response_matrix=np.eye(x.size),
+            signal_covariance=singular,
+        )
