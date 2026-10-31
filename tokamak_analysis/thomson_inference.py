@@ -511,7 +511,7 @@ def analyze_thomson_spectra(
     if any(value is not None for value in collective_only_inputs):
         raise ValueError(
             "Collective-only inputs are not accepted by optical Thomson Analysis 1; "
-            "use the separate registered microwave CTS workflow for collective Thomson data."
+            "use the dedicated microwave CTS subanalysis within primary Analysis 1 for collective Thomson data."
         )
     if not isinstance(spectral_power_density_calibrated, (bool, np.bool_)):
         raise ValueError("spectral_power_density_calibrated must be boolean")
