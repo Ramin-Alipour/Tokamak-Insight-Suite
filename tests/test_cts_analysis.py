@@ -395,6 +395,9 @@ def test_full_em_cts_exposes_bindslev_three_wave_coupling():
         harmonic_order=3, quadrature_order=4,
     )
     assert result["bindslev_source_current_operator"].shape == (3, 3, 10)
+    assert result["bindslev_X_tensor"].shape == (3, 3, 3, 3)
+    assert result["bindslev_Gamma_inverse_tensor"].shape == (3, 3, 3, 3, 3)
+    assert result["bindslev_dielectric_form_factors"].shape == (3, 10, 10)
     assert len(result["bindslev_coupling_coefficients"]) == 3
     assert "Gamma^{-1}" in result["three_wave_coupling"]
     assert np.all(np.isfinite(result["spectral_density"]))
@@ -449,6 +452,8 @@ def test_full_em_cts_accepts_relativistic_anisotropic_fast_ion_population():
         }],
     )
     assert len(result["fast_ion_populations"])==1
+    assert len(result["fast_ion_kinetic_diagnostics"])==2
+    assert result["fast_ion_kinetic_diagnostics"][0][0]["relativistic_kinematics"] is True
     assert result["spectral_density"].shape==(2,)
     assert np.all(np.isfinite(result["spectral_density"]))
 
