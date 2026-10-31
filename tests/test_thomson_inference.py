@@ -769,3 +769,42 @@ def test_relativistic_fit_does_not_mutate_caller_direction_arrays():
         )
     np.testing.assert_array_equal(incident, incident_before)
     np.testing.assert_array_equal(scattered, scattered_before)
+
+
+def test_shared_instrument_response_uncertainty_retains_cross_channel_covariance():
+    x, y, _ = _spectral_case(100.0, n=81)
+    response = np.eye(x.size)
+    response_uncertainty = np.full_like(response, 1e-8)
+    result = analyze_thomson_spectra(
+        x, np.vstack([y, y]), [0.1, 0.2],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+        instrument_response=response,
+        instrument_response_uncertainty=response_uncertainty,
+        instrument_response_mc_samples=20,
+    )
+    covariance = result["shared_instrument_response_parameter_covariance"]
+    assert result["shared_instrument_response_cross_channel_covariance_available"] is True
+    assert covariance.shape == (6, 6)
+    assert result["shared_instrument_response_parameter_covariance_order"][0] == (
+        "channel_0_electron_temperature_eV"
+    )
+    assert covariance[0, 3] > 0.0
+
+
+def test_scattering_angle_uncertainty_is_not_dropped_with_density_relative_covariance():
+    x, y, _ = _spectral_case(100.0, n=161)
+    common = dict(
+        wavelength_nm=x, spectra=(y * 1e-18)[None, :], radius_m=[0.1],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+        instrument_response=np.eye(x.size),
+        laser_power_w=2.0, interaction_length_m=0.1,
+        collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
+        incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
+        scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+        density_relative_covariance=np.eye(6) * 1e-6,
+    )
+    without_angle = analyze_thomson_spectra(**common)["channels"][0]
+    with_angle = analyze_thomson_spectra(
+        **common, scattering_angle_uncertainty_rad=0.01
+    )["channels"][0]
+    assert with_angle["electron_density_uncertainty_m3"] > without_angle["electron_density_uncertainty_m3"]
