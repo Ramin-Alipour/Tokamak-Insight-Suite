@@ -1396,9 +1396,17 @@ def analyze_thomson_spectra(
         "electron_velocity_projection_profile_m_s": np.array([r.get("electron_velocity_projection_m_s", np.nan) for r in results]),
         "electron_velocity_projection_uncertainty_profile_m_s": np.array([r.get("electron_velocity_projection_uncertainty_m_s", np.nan) for r in results]),
         "limitations": [
-            "Collective model uses PlasmaPy's Maxwellian kinetic dielectric response; collective non-Maxwellian kinetic inference is not implemented.",
-            "Absolute density in the non-collective model requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the user.",
-            "For non-collective fits, supplied LSF uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied independent optical-factor uncertainties, with correlations and model discrepancy excluded.",
+            *(
+                ["Collective Maxwellian inference uses PlasmaPy's Maxwellian kinetic dielectric response; ion temperatures, composition and flow vectors are fixed external inputs."]
+                if model == "collective_maxwellian" else
+                ["Collective kappa inference uses the implemented unmagnetized longitudinal dielectric response with projected isotropic kappa electrons and Maxwellian ions; complete external-parameter and response-matrix covariance propagation is not yet implemented."]
+                if model == "collective_kappa" else
+                ["Relativistic Maxwell-Juttner inference assumes an isotropic rest-frame electron distribution and bulk flow parallel to the scattering vector; external geometry and response-matrix uncertainty propagation is not yet complete."]
+                if model == "non_collective_relativistic_maxwell_juttner" else
+                []
+            ),
+            "Absolute non-collective density requires calibrated W/nm spectra and all listed optical geometry/polarization factors; first-order uncertainty propagation includes only uncertainty terms supplied by the researcher.",
+            "For non-collective Maxwellian/Kappa fits, supplied response-matrix uncertainty is propagated by Monte Carlo; absolute-density uncertainty includes only supplied optical-factor uncertainty terms and excludes unprovided correlations and model discrepancy.",
         ],
     }
     if model=="collective_maxwellian" and any(v is not None for v in (
