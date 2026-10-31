@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_ui_catalogue_is_loaded_from_canonical_diagnostic_registry():
     rows = json.loads((ROOT / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
-    assert len(DIAGNOSTICS) == 79
+    assert len(DIAGNOSTICS) == 80
     assert DIAGNOSTICS == rows
     assert all("execution_contract" in row for row in DIAGNOSTICS)
 
@@ -32,11 +32,11 @@ def test_package_and_runtime_versions_are_consistent():
     assert version_line.split("=", 1)[1].strip().strip('"') == __version__
 
 
-def test_analysis_titles_numbers_and_order_match_canonical_79_diagnostic_catalog():
+def test_analysis_titles_numbers_and_order_match_canonical_80_diagnostic_catalog():
     from tokamak_analysis.analysis_registry import ANALYSES
 
     expected = [row["diagnostic"] for row in DIAGNOSTICS]
-    assert [row["id"] for row in ANALYSES] == [entry_id for entry_id in range(1, 81) if entry_id != 7]
+    assert [row["id"] for row in ANALYSES] == [entry_id for entry_id in range(1, 82) if entry_id != 7]
     assert [row["name"] for row in ANALYSES] == expected
     assert [row["diagnostic"] for row in DIAGNOSTICS] == expected
 
@@ -44,7 +44,7 @@ def test_analysis_titles_numbers_and_order_match_canonical_79_diagnostic_catalog
 def test_all_analysis_entry_points_declare_conservative_contracts():
     import importlib
     from tokamak_analysis.analysis_registry import ANALYSES
-    assert len(ANALYSES) == 79
+    assert len(ANALYSES) == 80
     for entry in ANALYSES:
         contract = entry["execution_contract"]
         assert contract["execution_level"] in {"limited_calculation", "analysis_pipeline"}
@@ -80,9 +80,9 @@ def test_diagnostic_registry_reports_actual_execution_levels_and_conservative_sc
 
     levels = Counter(row["execution_contract"]["execution_level"] for row in DIAGNOSTICS)
     completeness = Counter(row["execution_contract"]["completeness"] for row in DIAGNOSTICS)
-    assert len(DIAGNOSTICS) == 79
-    assert levels == {"reference_only": 47, "limited_calculation": 16, "analysis_pipeline": 16}
-    assert completeness == {"incomplete": 62, "complete": 6, "complete_with_declared_scope": 11}
+    assert len(DIAGNOSTICS) == 80
+    assert levels == {"reference_only": 47, "limited_calculation": 16, "analysis_pipeline": 17}
+    assert completeness == {"incomplete": 63, "complete": 6, "complete_with_declared_scope": 11}
     assert all(row["implementation_status"] for row in DIAGNOSTICS)
     # "Complete" describes the declared computational scope, not empirical
     # validation of a particular machine or calibration.
@@ -154,16 +154,16 @@ def test_thomson_spatial_reconstruction_is_a_registered_measured_spectrum_subana
     assert callable(module.reconstruct_thomson_profile_from_spectra)
 
 
-def test_primary_analysis_registry_groups_all_79_registered_entry_points_into_20_families():
+def test_primary_analysis_registry_groups_all_80_registered_entry_points_into_20_families():
     from tokamak_analysis.analysis_registry import ANALYSIS_FAMILIES, get_analysis_family, get_family_entry_points
 
     assert len(ANALYSIS_FAMILIES) == 20
     assert [family["id"] for family in ANALYSIS_FAMILIES] == list(range(1, 21))
     mapped_ids = [entry_id for family in ANALYSIS_FAMILIES for entry_id in family["entry_ids"]]
-    assert sorted(mapped_ids) == [entry_id for entry_id in range(1, 81) if entry_id != 7]
-    assert len(set(mapped_ids)) == 79
+    assert sorted(mapped_ids) == [entry_id for entry_id in range(1, 82) if entry_id != 7]
+    assert len(set(mapped_ids)) == 80
     thomson = get_analysis_family(1)
-    assert {1, 30, 46} == set(thomson["entry_ids"])
+    assert {1, 30, 46, 81} == set(thomson["entry_ids"])
     support = get_analysis_family(20)
     assert support["category"] == "instrumentation_support"
     assert set(support["entry_ids"]) == {26, 27, 77, 78, 79, 80}
@@ -179,6 +179,7 @@ def test_thomson_family_callable_contracts_match_canonical_diagnostic_registry()
         "Thomson scattering",
         "Collective Thomson / coherent scattering (CTS)",
         "Thomson spatial profile reconstruction",
+        "Thomson spectral distribution",
     ):
         canonical = by_name[name]["execution_contract"]
         callable_contract = analysis_by_name[name]["execution_contract"]
