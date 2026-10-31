@@ -217,3 +217,47 @@ def test_cts_forward_model_rejects_unknown_fast_ion_kind():
             electron_velocity_projection_m_s=0.0,
             fast_ion={"species_index":0,"fraction":0.1,"kind":"not-a-model","temperature_eV":10000},
         )
+
+
+def test_full_em_cts_returns_hermitian_density_current_field_covariance():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    shifts = np.array([0.8e9, 1.0e9, 1.2e9])
+    result = full_em_cts_spectral_density(
+        shifts, 140e9,
+        {"incident_direction": [1.0, 0.0, 0.0],
+         "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0]},
+        electron_density_m3=2e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+        electron_flow_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        harmonic_order=3, quadrature_order=4,
+    )
+    covariance = result["fluctuation_covariance_density_current_E_B"]
+    assert result["spectral_density"].shape == shifts.shape
+    assert np.all(np.isfinite(result["spectral_density"]))
+    assert np.all(result["spectral_density"] >= 0.0)
+    assert covariance.shape == (shifts.size, 10, 10)
+    for matrix in covariance:
+        np.testing.assert_allclose(matrix, matrix.conj().T, rtol=1e-8, atol=1e-20)
+        assert np.min(np.linalg.eigvalsh(matrix)) >= -1e-12 * max(np.max(np.abs(matrix)), 1.0)
+
+
+def test_full_em_cts_requires_complete_vector_flow_and_polarization_metadata():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    with pytest.raises(ValueError, match="electron_flow_velocity_m_s"):
+        full_em_cts_spectral_density(
+            [1e9], 140e9,
+            {"incident_direction": [1, 0, 0], "scattered_direction": [0, 1, 0]},
+            electron_density_m3=2e19, electron_temperature_eV=1200,
+            ion_temperature_eV=800,
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], magnetic_field_T=[0, 0, 2],
+            electron_flow_velocity_m_s=None, ion_flow_velocity_m_s={"D+": [0, 0, 0]},
+            incident_polarization=[0, 0, 1], scattered_polarization=[0, 0, 1],
+        )
