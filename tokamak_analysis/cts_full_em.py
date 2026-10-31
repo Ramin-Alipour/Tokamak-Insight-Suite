@@ -153,7 +153,7 @@ def _species_conductivity(omega, k_vector, magnetic_field_T, species,
                 raise ValueError("singular magnetized kinetic response; increase harmonic_order or damping_rate_rad_s") from exc
             f0_weight = density / (np.pi ** 1.5 * vth ** 3)
             # d^3v = v_perp dv_perp dphi dv_parallel.
-            measure = (vth ** 3 / 2.0) * wp * wz * f0_weight * np.exp(-xz * xz)
+            measure = (vth ** 3 / 2.0) * wp * wz * f0_weight
             jx = np.pi * vperp * (response[n_h + 1] + response[n_h - 1])
             jy = np.pi * vperp * (response[n_h - 1] - response[n_h + 1]) / 1j
             jz = 2.0 * np.pi * vpar * response[n_h]
