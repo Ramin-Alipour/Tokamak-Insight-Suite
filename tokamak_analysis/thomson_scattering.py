@@ -104,8 +104,10 @@ def density_from_thomson_scattered_power(
 ):
     """Infer density from calibrated collected Thomson power.
 
-    P_s = n_e P_i L (d sigma/d Omega) DeltaOmega eta. Optional independent
-    1-sigma uncertainties are propagated with first-order derivatives.
+    P_s = n_e P_i L (d sigma_eff/d Omega) DeltaOmega eta. The effective
+    cross-section is either the stationary-electron polarized Thomson value
+    or a model-supplied velocity-averaged relativistic value. Optional
+    uncertainties and fitted power/cross-section covariance are propagated.
     """
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
@@ -314,11 +316,11 @@ def density_from_thomson_scattered_power(
         ),
         "assumptions": [
             "Absolutely calibrated scattered and incident laser power.",
-            "Optically thin, single-scattering Thomson relation; polarization dependence is included when incident polarization and scattered direction vectors are supplied, otherwise the unpolarized cross-section is used.",
+            "Optically thin, single-scattering Thomson relation; polarization dependence is included through supplied incident-polarization geometry or a model-supplied effective cross-section. The unpolarized stationary-electron cross-section is used only when neither is supplied.",
             "The returned density is the interaction-length-averaged effective density; it equals a local density only when density is uniform along the scattering path.",
             "A model-supplied effective differential cross-section may be used when relativistic electron kinematics and polarization are integrated over the electron distribution.",
             "Collection solid angle and optical efficiency describe the actual collection path.",
         ],
         "density_interpretation": "interaction_length_averaged_effective_density",
-        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty is added to its final diagonal term." if relative_input_covariance is not None else "Optional first-order independent-input propagation, including any supplied effective differential-cross-section model uncertainty; unprovided covariance and model discrepancy are not included."),
+        "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty and fitted power/cross-section covariance are added internally." if relative_input_covariance is not None else "Optional first-order independent-input propagation, including effective differential-cross-section model uncertainty and fitted power/cross-section covariance when supplied; unprovided covariance and model discrepancy are not included."),
     }
