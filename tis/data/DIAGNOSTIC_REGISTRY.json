@@ -389,7 +389,11 @@
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
-        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+        "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+        "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
+        "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+        "tokamak_analysis.thomson_kinetic_models.fit_collective_kappa"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 now includes a relativistic Maxwell-Juttner single-particle model and an unmagnetized collective kappa-electron dielectric model, in addition to the established Maxwellian/Kappa and collective Maxwellian paths. Declared model limits and unsupported uncertainty paths remain explicit.",
