@@ -917,6 +917,10 @@ def analyze_thomson_spectra(
                    "scattering_parameter_alpha": alpha_value,
                    "scattering_parameter_alpha_uncertainty": alpha_uncertainty,
                    "scattering_parameter_alpha_gradient_ne_te": alpha_gradient_ne_te,
+                   "scattering_parameter_alpha_laser_sensitivity_per_nm": float(alpha_value / float(laser_wavelength_nm)),
+                   "scattering_parameter_alpha_angle_sensitivity_per_rad": float(
+                       -0.5 * alpha_value / np.tan(float(scattering_angle_rad) / 2.0)
+                   ),
                    "scattering_parameter_alpha_uncertainty_model": (
                        "first-order propagation of the full fitted ne/Te covariance plus supplied independent laser-wavelength and scalar scattering-angle uncertainties"
                        if alpha_uncertainty is not None else "not_available_without_finite_fit_covariance"
