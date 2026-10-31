@@ -272,6 +272,12 @@
           "name": "shared_instrument_response_cross_channel_covariance_available",
           "unit": "boolean",
           "required": true
+        },
+        {
+          "name": "validity_screening",
+          "unit": "per-channel dimensionless validity parameters and screening limits",
+          "required": false,
+          "description": "Non-relativistic Maxwellian/Kappa: theta_e < 0.01 and |v_flow|/c < 0.1. Conservative asymptotic error-budget screens (thermal corrections scale with theta_e; leading bulk-flow corrections scale with beta^2), not universal validity boundaries."
         }
       ],
       "assumptions": [
@@ -294,7 +300,8 @@
         "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
         "A supplied density_relative_covariance is authoritative for its six optical inversion inputs; scalar scattering-angle uncertainty is additionally propagated as an independent geometry contribution, while other duplicate scalar factors remain prohibited.",
-        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow."
+        "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its separate registered workflow.",
+        "Non-relativistic Maxwellian and Kappa use explicit conservative screening limits theta_e < 0.01 and |v_flow|/c < 0.1; these are asymptotic error-budget screens, not universal physical validity boundaries."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
