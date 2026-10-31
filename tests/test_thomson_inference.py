@@ -129,17 +129,15 @@ def test_instrument_response_uncertainty_propagates_into_absolute_density():
     assert channel["electron_density_uncertainty_m3"] > 0.0
 
 
-def test_collective_mode_never_runs_without_explicit_ion_species():
+def test_optical_analysis_1_rejects_collective_dielectric_models():
     x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="ion species"):
-        analyze_thomson_spectra(
-            x, y[None,:], [0.1], laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), model="collective_maxwellian",
-            collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
-            collective_density_bounds_m3=[1e17,1e20], collective_temperature_bounds_eV=[1.0,1e4],
-            incident_direction=[1.0,0.0,0.0], scattered_direction=[0.0,1.0,0.0],
-        )
-
+    for model in ("collective_maxwellian", "collective_kappa"):
+        with pytest.raises(ValueError, match="Optical collective dielectric models are outside this shortlist"):
+            analyze_thomson_spectra(
+                x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+                scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+                model=model,
+            )
 
 def test_channel_specific_wavelength_axes_are_supported():
     x1, y1, _ = _spectral_case(100.0)
@@ -204,60 +202,18 @@ def test_collective_external_covariance_indices_use_full_channel_stride():
     assert _collective_external_parameter_indices(1, 2) == (5, 6, 7, (8, 9))
 
 
-def test_collective_kappa_external_parameter_mc_propagates_kappa_covariance(monkeypatch):
-    import tokamak_analysis.thomson_inference as inference
-
-    def fake_fit(wavelength, signal, *args, **kwargs):
-        signal = np.asarray(signal, dtype=float)
-        return {
-            "electron_density_m3": 4.0e18,
-            "electron_density_uncertainty_m3": 1.0e17,
-            "electron_temperature_eV": 160.0,
-            "electron_temperature_uncertainty_eV": 5.0,
-            "kappa_index": 4.0,
-            "kappa_index_uncertainty": 0.2,
-            "electron_velocity_projection_m_s": 0.0,
-            "ion_velocity_projection_m_s": [0.0],
-            "fitted_spectrum": signal.copy(),
-            "residual": np.zeros_like(signal),
-            "amplitude": 100.0,
-            "background_intercept": 2.0,
-            "background_slope_per_nm": 0.0,
-            "fit_covariance": np.diag([1.0e34, 25.0, 0.04]),
-            "optimizer_success": True,
-            "collective_parameter_jacobian_rank": 3,
-            "collective_parameter_jacobian_condition_number": 1.0,
-        }
-
-    monkeypatch.setattr(inference, "fit_collective_kappa", fake_fit)
-    wavelength = np.linspace(520.0, 544.0, 31)
-    signal = 100.0 * np.exp(-0.5 * ((wavelength - 532.0) / 2.0) ** 2) + 2.0
-    result = inference.analyze_thomson_spectra(
-        wavelength, signal[None, :], [0.1],
-        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
-        instrument_response=np.eye(wavelength.size),
-        instrument_response_uncertainty=np.zeros((wavelength.size, wavelength.size)),
-        model="collective_kappa",
-        incident_direction=[1.0, 0.0, 0.0],
-        scattered_direction=[0.0, 1.0, 0.0],
-        ion_species=["D+"], ion_fractions=[1.0],
-        ion_temperature_eV=[20.0], ion_temperature_uncertainty_eV=[1.0],
-        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
-        electron_velocity_m_s=[0.0, 0.0, 0.0],
-        laser_wavelength_uncertainty_nm=0.01,
-        scattering_angle_uncertainty_rad=1.0e-4,
-        collective_initial_density_m3=4.0e18,
-        collective_initial_temperature_eV=160.0,
-        collective_kappa_initial=4.0,
-        collective_external_parameter_mc_samples=20,
-    )
-    assert result["collective_external_uncertainty_propagated"] is True
-    assert result["collective_external_parameter_covariance"].shape == (5, 5)
-    assert "channel_0_kappa_index" in result["collective_external_parameter_covariance_order"]
-    assert result["channels"][0]["collective_external_parameter_uncertainty_propagated"] is True
-    assert result["channels"][0]["instrument_response_uncertainty_propagated"] is True
-    assert not any("not_implemented_for_collective_kappa" in item
-                   for item in result["channels"][0]["uncertainty_inputs_missing"])
+def test_relativistic_model_rejects_unpropagated_laser_and_angle_uncertainties():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="uncertainty propagation is not implemented"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            model="non_collective_relativistic_maxwell_juttner",
+            incident_direction=[1.0, 0.0, 0.0],
+            scattered_direction=[0.0, 1.0, 0.0],
+            incident_polarization=[0.0, 0.0, 1.0],
+            laser_wavelength_uncertainty_nm=0.01,
+        )
 
 
 def test_thomson_profile_subanalysis_resolves_to_measured_spectrum_inference():
@@ -390,20 +346,6 @@ def test_thomson_scalar_physical_inputs_reject_booleans():
         )
 
 
-def test_collective_mode_requires_explicit_beam_geometry_before_optional_backend_import():
-    x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="explicit incident_direction"):
-        analyze_thomson_spectra(
-            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
-            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
-            model="collective_maxwellian", ion_species=["D+"],
-            collective_initial_density_m3=1e18, collective_initial_temperature_eV=100.0,
-            collective_density_bounds_m3=[1e17,1e20], collective_temperature_bounds_eV=[1.0,1e4],
-            ion_temperature_eV=[100.0], ion_velocity_m_s=[[0.0, 0.0, 0.0]],
-            electron_velocity_m_s=[0.0, 0.0, 0.0],
-        )
-
-
 def test_descriptive_moments_report_negative_residual_clipping_caveat():
     from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
     x=np.linspace(500.0,564.0,401)
@@ -414,88 +356,15 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
 
-def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkeypatch):
-    import sys
-    import types
-
-    class _Spectrum:
-        def __init__(self, value):
-            self.value = np.asarray(value, dtype=float)
-
-    class _FakeThomson:
-        @staticmethod
-        def spectral_density(wavelength, laser_wavelength, density, **kwargs):
-            x = np.asarray(wavelength, dtype=float)
-            te = float(kwargs["T_e"])
-            ne = float(density)
-            sigma = 2.0 * np.sqrt(te / 100.0)
-            broad_fraction = 0.10 * (ne / 1e18) ** 0.30
-            spectrum = (
-                np.exp(-0.5 * ((x - 532.0) / sigma) ** 2)
-                + broad_fraction * np.exp(-0.5 * ((x - 532.0) / (4.0 * sigma)) ** 2)
-            )
-            return 2.0, _Spectrum(spectrum)
-
-    fake_astropy = types.ModuleType("astropy")
-    fake_astropy.units = types.SimpleNamespace(nm=1.0, eV=1.0, m=1.0, s=1.0)
-    fake_plasmapy = types.ModuleType("plasmapy")
-    fake_diagnostics = types.ModuleType("plasmapy.diagnostics")
-    fake_diagnostics.thomson = _FakeThomson
-    fake_plasmapy.diagnostics = fake_diagnostics
-    monkeypatch.setitem(sys.modules, "astropy", fake_astropy)
-    monkeypatch.setitem(sys.modules, "plasmapy", fake_plasmapy)
-    monkeypatch.setitem(sys.modules, "plasmapy.diagnostics", fake_diagnostics)
-
-    x = np.linspace(490.0, 574.0, 421)
-    true_density = 4.0e18
-    true_temperature = 160.0
-    _, physical_shape = _FakeThomson.spectral_density(
-        x, 532.0, true_density, T_e=true_temperature
-    )
-    y = 2400.0 * physical_shape.value + 18.0 + 0.015 * (x - 532.0)
-    y += 0.015 * np.sin(np.linspace(0.0, 18.0 * np.pi, x.size))
-
-    result = analyze_thomson_spectra(
-        x, y[None, :], [0.2],
-        laser_wavelength_nm=532.0,
-        scattering_angle_rad=np.pi / 2,
-        instrument_response=np.eye(x.size),
-        model="collective_maxwellian",
-        collective_initial_density_m3=true_density, collective_initial_temperature_eV=true_temperature,
-        collective_density_bounds_m3=[1e18,1e19], collective_temperature_bounds_eV=[50.0,300.0],
-        ion_species=["H+"],
-        ion_fractions=[1.0],
-        ion_temperature_eV=[20.0],
-        ion_velocity_m_s=[[0.0, 0.0, 0.0]],
-        electron_velocity_m_s=[0.0, 0.0, 0.0],
-        incident_direction=[1.0, 0.0, 0.0],
-        scattered_direction=[0.0, 1.0, 0.0],
-        signal_uncertainty=np.full_like(y, 0.02)[None, :],
-        ion_temperature_uncertainty_eV=[1.0],
-        ion_velocity_uncertainty_m_s=[[100.0,100.0,100.0]],
-        electron_velocity_uncertainty_m_s=[100.0,100.0,100.0],
-        instrument_response_uncertainty=np.zeros((x.size,x.size)),
-        collective_external_parameter_mc_samples=20,
-    )
-
-    assert result["collective_external_mc_successes"] >= 12
-    assert result["collective_external_uncertainty_propagated"] is True
-    assert result["collective_external_parameter_covariance"].shape == (4,4)
-    assert result["collective_external_parameter_covariance_order"] == [
-        "channel_0_electron_density_m3", "channel_0_electron_temperature_eV",
-        "channel_0_electron_velocity_projection_m_s", "channel_0_ion_0_velocity_projection_m_s",
-    ]
-    channel = result["channels"][0]
-    assert channel["optimizer_success"] is True
-    assert channel["collective_parameter_jacobian_rank"] == 2
-    assert channel["electron_density_m3"] == pytest.approx(true_density, rel=0.08)
-    assert channel["electron_temperature_eV"] == pytest.approx(true_temperature, rel=0.05)
-    assert np.allclose(channel["fitted_spectrum"], y, rtol=0.02, atol=0.03)
-    expected_dof = max(1, x.size - 5)
-    expected_chi_square = np.sum((channel["residual"] / 0.02) ** 2) / expected_dof
-    assert channel["reduced_chi_square"] == pytest.approx(expected_chi_square, rel=1e-8)
-
-
+def test_collective_only_inputs_are_rejected_in_optical_analysis_1():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="Collective-only inputs are not accepted"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+            model="non_collective_maxwellian", ion_species=["D+"],
+            ion_fractions=[1.0], collective_initial_density_m3=1.0e18,
+        )
 
 def test_nonrelativistic_maxwellian_rejects_temperature_outside_declared_regime():
     laser = 532.0
@@ -748,7 +617,7 @@ def test_joint_gls_preserves_laser_and_geometry_uncertainty_components():
 
 def test_beam_direction_component_uncertainty_is_rejected_outside_collective_model():
     x, y, _ = _spectral_case(100.0)
-    with pytest.raises(ValueError, match="only by collective dielectric"):
+    with pytest.raises(ValueError, match="not supported by the selected non-collective optical Thomson model"):
         analyze_thomson_spectra(
             x, y[None, :], [0.1], laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
