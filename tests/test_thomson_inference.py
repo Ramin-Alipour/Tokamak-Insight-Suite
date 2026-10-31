@@ -411,7 +411,11 @@ def test_collective_fit_reconstructs_spectrum_in_physical_parameter_space(monkey
 
     assert result["collective_external_mc_successes"] >= 12
     assert result["collective_external_uncertainty_propagated"] is True
-    assert result["collective_external_parameter_covariance"].shape == (2,2)
+    assert result["collective_external_parameter_covariance"].shape == (4,4)
+    assert result["collective_external_parameter_covariance_order"] == [
+        "channel_0_electron_density_m3", "channel_0_electron_temperature_eV",
+        "channel_0_electron_velocity_projection_m_s", "channel_0_ion_0_velocity_projection_m_s",
+    ]
     channel = result["channels"][0]
     assert channel["optimizer_success"] is True
     assert channel["collective_parameter_jacobian_rank"] == 2
