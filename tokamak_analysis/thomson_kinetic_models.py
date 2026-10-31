@@ -258,6 +258,7 @@ def relativistic_maxwell_juttner_spectrum(
     variance = float(np.sum((centers-centroid)**2*density*widths))
     return {
         "spectral_density_per_nm": density,
+        "wavelength_bin_widths_nm": widths,
         "integrated_probability": 1.0,
         "effective_differential_cross_section_m2_sr": float(effective_differential_cross_section),
         "fitted_centroid_nm": centroid,
@@ -417,7 +418,9 @@ def fit_relativistic_maxwell_juttner(
         )
         sampled_window_area = (
             float(np.exp(np.clip(parameters[2], -700.0, 700.0)))
-            * scale * _trapezoid(sampled_shape, x)
+            * scale * float(np.sum(
+                sampled_shape * sampled_physical["wavelength_bin_widths_nm"]
+            ))
         )
         captured_probability = float(sampled_physical["captured_probability"])
         if not np.isfinite(captured_probability) or captured_probability <= 0.0:
