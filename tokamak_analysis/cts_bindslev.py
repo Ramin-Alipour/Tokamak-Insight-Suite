@@ -270,6 +270,7 @@ def bindslev_dielectric_form_factors(
         "normalized_scattered_flux_S_s":ss,
         "plasma_frequency_squared_rad2_s2":omega_p2,
         "G_alpha_beta":factors,
+        "dielectric_coupling_operator":factors,
         "fluctuation_channel_order":["n","v_x","v_y","v_z","E_x","E_y","E_z","B_x","B_y","B_z"],
         "normalization":"Bindslev Eq. (135), with cold local no-spatial-dispersion flux normalization",
     }
