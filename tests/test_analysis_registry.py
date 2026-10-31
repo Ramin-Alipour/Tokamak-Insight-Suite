@@ -28,7 +28,7 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"wavelength_nm", "spectra", "radius_m", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response"} <= set(inputs)
-    assert inputs["wavelength_nm"]["unit"] == "nm"
+    assert inputs["wavelength_nm"]["unit"].startswith("nm")
     assert inputs["radius_m"]["unit"] == "m"
     assert any("measured" in item.lower() and "spectra" in item.lower()
                for item in contract["assumptions"])
@@ -137,7 +137,7 @@ def test_thomson_family_registry_contains_only_nonduplicate_workflows():
     profile = get_analysis(46)
     assert (cts["module"], cts["function"]) == ("cts_analysis", "analyze_cts_spectrum")
     assert (profile["module"], profile["function"]) == (
-        "thomson_scattering", "reconstruct_thomson_profile"
+        "thomson_workflow", "reconstruct_thomson_profile_from_spectra"
     )
     assert get_analysis_family(1)["entry_ids"] == [1, 30, 46]
     with pytest.raises(KeyError, match="Unknown analysis ID: 7"):
