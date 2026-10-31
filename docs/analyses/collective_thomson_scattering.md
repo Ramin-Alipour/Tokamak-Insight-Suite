@@ -9,6 +9,8 @@ Microwave CTS is a dedicated subanalysis within primary Analysis 1. It is physic
 
 The CTS model must be selected explicitly. The software never silently substitutes the electrostatic model for the magnetized full-EM model or vice versa, and neither CTS model is treated as an optical Thomson model.
 
+The public dispatcher uses one shared keyword contract for both branches: pass the calibrated measured power vector as `spectrum`. For the Full-EM branch, the dispatcher maps it to the internal `measured_spectrum` parameter. Full-EM incident and scattered beam directions are fields inside the `scattering_geometry` mapping (or its frequency-resolved geometry records), not separate keyword arguments. The optional `mode_index` belongs to the ray-tracing helper that creates frequency-resolved geometry; it is not an argument to the spectrum-inversion dispatcher.
+
 All spectra and frequency axes are assumed to be measured, prepared and calibrated. The CTS workflows do not calibrate the instrument, correct raw detector counts, infer a missing frequency axis, or perform experimental validation.
 
 ## Electrostatic longitudinal CTS
