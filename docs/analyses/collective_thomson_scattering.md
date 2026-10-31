@@ -73,7 +73,7 @@ Optional inputs include:
 
 - Relativistic electron distribution metadata.
 - Relativistic fast-ion population metadata.
-- Response-matrix uncertainty and positive-definite spectral covariance.
+- Positive-definite spectral covariance.
 - Frequency-resolved ray-traced scattering-volume geometry.
 - Explicit harmonic order, quadrature order and resonance damping.
 
