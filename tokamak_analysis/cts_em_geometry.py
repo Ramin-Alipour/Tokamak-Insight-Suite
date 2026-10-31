@@ -417,7 +417,7 @@ def trace_cts_frequency_resolved_beams(
 
 def solve_cold_plasma_propagating_modes(
     omega_rad_s, propagation_direction, magnetic_field_T, species, *,
-    mode_index=0, discriminant_tolerance=1e-10,
+    mode_index=None, discriminant_tolerance=1e-10,
 ):
     """Solve both cold-plasma refractive-index branches and flux-normalize one.
 
