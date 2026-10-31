@@ -231,8 +231,10 @@ def fit_relativistic_maxwell_juttner(
     wavelength_nm, signal, laser_wavelength_nm, scattering_angle_rad,
     response, uncertainty=None, *, incident_direction, scattered_direction,
     incident_polarization, radial_order=36, angular_order=18,
+    maximum_recoil_correction_fraction=0.01,
 ):
     """Fit relativistic Maxwell-Juttner Te and q-parallel bulk flow to one spectrum."""
+
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(signal, dtype=float)
     if x.ndim != 1 or y.shape != x.shape or x.size < 12:
@@ -297,6 +299,7 @@ def fit_relativistic_maxwell_juttner(
             flow_projection_m_s=beta_flow*C,
             incident_polarization=polarization_local,
             radial_order=radial_order, angular_order=angular_order,
+            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
         amplitude = float(np.exp(np.clip(parameters[2], -700.0, 700.0)))
@@ -357,6 +360,11 @@ def fit_relativistic_maxwell_juttner(
         "model": "relativistic non-collective Thomson scattering with Lorentz-boosted Maxwell-Juttner electrons",
         "relativistic_kinematics": True,
         "recoil_included": False,
+        "thomson_recoil_correction_fraction_max_on_quadrature_support": physical[
+            "thomson_recoil_correction_fraction_max_on_quadrature_support"
+        ],
+        "thomson_recoil_correction_fraction_limit": physical["thomson_recoil_correction_fraction_limit"],
+        "thomson_no_recoil_validity_status": physical["thomson_no_recoil_validity_status"],
         "quadrature_diagnostics": physical["quadrature"],
         "captured_spectral_probability": physical["captured_probability"],
         "assumptions": [
