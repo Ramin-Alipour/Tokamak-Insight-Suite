@@ -927,8 +927,10 @@ elif page=='Spectral Analysis':
                     use_angle_unc=st.checkbox('Supply scattering-angle uncertainty',value=False,key='ts_infer_use_angle_unc')
                     angle_unc_text=st.text_input('Scattering angle 1σ uncertainty (rad)',value='',key='ts_infer_angle_unc') if use_angle_unc else None
             with g3:
-                response_upload=st.file_uploader('Measured instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
-                response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
+                response_upload=st.file_uploader('Measured shared instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
+                response_channel_upload=st.file_uploader('Alternative: channel-specific measured response matrices JSON (Nchannel × Nλ × Nλ)',type=['json'],key='ts_infer_channel_response')
+                response_unc_upload=st.file_uploader('Optional shared response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
+                response_channel_unc_upload=st.file_uploader('Optional channel-specific response-matrix 1σ JSON',type=['json'],key='ts_infer_channel_response_unc')
                 if model in {'non_collective_maxwellian','non_collective_kappa'}:
                     joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')
                 else:
@@ -1022,7 +1024,12 @@ elif page=='Spectral Analysis':
                     wavelengths=np.vstack(wavelength_rows)
                     spectra=np.vstack(signal_rows)
                     signal_uncertainty=None if uncertainty_col=='<none>' else np.vstack(uncertainty_rows)
-                    if response_upload is not None:
+                    if response_channel_upload is not None:
+                        if response_upload is not None:
+                            raise ValueError('Upload either a shared response CSV or channel-specific response JSON, not both.')
+                        response_payload=json.load(response_channel_upload)
+                        instrument_response=np.asarray(response_payload.get('response_matrices',response_payload) if isinstance(response_payload,dict) else response_payload,dtype=float)
+                    elif response_upload is not None:
                         response_frame=pd.read_csv(response_upload,header=None)
                         instrument_response=response_frame.to_numpy(dtype=float)
                         if instrument_response.ndim==2 and 1 in instrument_response.shape:
@@ -1032,7 +1039,10 @@ elif page=='Spectral Analysis':
                     else:
                         raise ValueError('Upload the measured instrument-response kernel/matrix, or explicitly declare that the supplied spectra are already corrected and use the identity response.')
                     response_uncertainty=None
-                    if response_unc_upload is not None:
+                    if response_channel_unc_upload is not None:
+                        response_uncertainty_payload=json.load(response_channel_unc_upload)
+                        response_uncertainty=np.asarray(response_uncertainty_payload.get('response_matrices',response_uncertainty_payload) if isinstance(response_uncertainty_payload,dict) else response_uncertainty_payload,dtype=float)
+                    elif response_unc_upload is not None:
                         response_uncertainty=pd.read_csv(response_unc_upload,header=None).to_numpy(dtype=float)
                     joint_spectral_covariance=None
                     if joint_covariance_upload is not None:
