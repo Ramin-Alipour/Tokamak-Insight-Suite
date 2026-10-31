@@ -239,19 +239,26 @@ def trace_cts_frequency_resolved_beams(
     incident_ray, receiver_rays, equilibrium,
     incident_beam_covariance_m2, receiver_beam_covariances_m2,
     mode_index=1, path_parameter_max=1.0, sample_count=256,
+    scattering_sample_count=16,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
 ):
-    """Trace probe/receiver rays and return frequency-resolved CTS geometry.
+    """Trace probe/receiver rays and integrate Gaussian overlap along the scattering path.
 
     incident_ray and each receiver_rays item provide initial_position_m and
-    initial_wavevector_rad_m. The equilibrium callback is supplied by the
-    caller; this routine never invents equilibrium profiles. Beam covariance
-    matrices describe local 3-D Gaussian intensity ellipsoids at closest
-    approach. Their overlap is normalized across frequency bins and returned
-    as a dimensionless relative spectral-volume weighting.
+    initial_wavevector_rad_m. The equilibrium callback supplies magnetic field
+    and species densities at every ray point. Beam covariance matrices may be
+    constant 3x3 matrices or sampled local covariance arrays along each ray.
 
-    This is geometrical optics: diffraction and mode conversion are not
-    included. Use quasi-optical beam tracing upstream when material.
+    For each scattered frequency, nearest receiver-ray points are paired with
+    selected incident-ray samples. The local Gaussian overlap is multiplied by
+    the incident-path quadrature length, normalized to a unit-sum scattering
+    volume weight, and returned as scattering_samples. The full-EM CTS solver
+    evaluates each local sample and sums its spectrum with these weights.
+
+    This is cold-plasma geometrical optics with caller-supplied local Gaussian
+    covariance. It does not propagate diffraction or mode conversion, and
+    assumes uniform fitted ne/Te/Ti across the sampled volume while allowing
+    local ray directions and magnetic field to vary.
     """
     shifts = np.asarray(frequency_shift_Hz, dtype=float)
     if (shifts.ndim != 1 or shifts.size < 1 or np.any(~np.isfinite(shifts))
@@ -262,6 +269,8 @@ def trace_cts_frequency_resolved_beams(
         raise ValueError("incident_ray must provide initial position and wavevector")
     if not isinstance(receiver_rays, Sequence) or isinstance(receiver_rays, (str, bytes)) or len(receiver_rays) != shifts.size:
         raise ValueError("receiver_rays must contain one ray specification per scattered frequency")
+    if isinstance(scattering_sample_count, bool) or int(scattering_sample_count) < 2:
+        raise ValueError("scattering_sample_count must be an integer >=2")
     incident = trace_cold_plasma_ray(
         incident_ray["initial_position_m"], incident_ray["initial_wavevector_rad_m"],
         2.0*np.pi*f0, equilibrium=equilibrium, mode_index=mode_index,
@@ -269,14 +278,28 @@ def trace_cts_frequency_resolved_beams(
         sample_count=incident_ray.get("sample_count", sample_count),
         relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
     )
-    ci_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
-    receiver_covariances = np.asarray(receiver_beam_covariances_m2, dtype=float)
-    if receiver_covariances.shape == (3, 3):
-        receiver_covariances = np.broadcast_to(receiver_covariances, (shifts.size, 3, 3))
-    if ci_cov.shape != (3, 3) or receiver_covariances.shape != (shifts.size, 3, 3):
-        raise ValueError("beam covariance inputs must be (3,3) or receiver (n_frequency,3,3)")
+    incident_positions = np.asarray(incident["position_m"], dtype=float)
+    incident_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
+    if incident_cov.shape == (3, 3):
+        incident_cov = np.broadcast_to(incident_cov, (incident_positions.shape[0], 3, 3))
+    if incident_cov.shape != (incident_positions.shape[0], 3, 3):
+        raise ValueError("incident_beam_covariance_m2 must be (3,3) or (n_incident_ray,3,3)")
+    sample_indices = np.unique(np.linspace(
+        0, incident_positions.shape[0]-1,
+        min(int(scattering_sample_count), incident_positions.shape[0])
+    ).astype(int))
+    selected_positions = incident_positions[sample_indices]
+    segment_lengths = np.linalg.norm(np.diff(selected_positions, axis=0), axis=1)
+    path_weights = np.empty(sample_indices.size, dtype=float)
+    path_weights[0] = 0.5*segment_lengths[0]
+    path_weights[-1] = 0.5*segment_lengths[-1]
+    if sample_indices.size > 2:
+        path_weights[1:-1] = 0.5*(segment_lengths[:-1]+segment_lengths[1:])
+    if np.any(path_weights <= 0) or np.any(~np.isfinite(path_weights)):
+        raise ValueError("incident ray must span a non-zero physical path for scattering-volume integration")
+
     entries = []
-    overlaps = []
+    path_integrals = []
     for index, (shift, ray_spec) in enumerate(zip(shifts, receiver_rays)):
         if not isinstance(ray_spec, Mapping):
             raise ValueError(f"receiver_rays[{index}] must be a mapping")
@@ -287,45 +310,104 @@ def trace_cts_frequency_resolved_beams(
             sample_count=ray_spec.get("sample_count", sample_count),
             relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
         )
-        delta = incident["position_m"][:, None, :] - receiver["position_m"][None, :, :]
+        receiver_positions = np.asarray(receiver["position_m"], dtype=float)
+        receiver_cov = np.asarray(receiver_beam_covariances_m2, dtype=float)
+        if receiver_cov.shape == (3, 3):
+            receiver_cov_for_frequency = np.broadcast_to(receiver_cov, (receiver_positions.shape[0], 3, 3))
+        elif receiver_cov.shape == (shifts.size, 3, 3):
+            receiver_cov_for_frequency = np.broadcast_to(receiver_cov[index], (receiver_positions.shape[0], 3, 3))
+        elif receiver_cov.shape == (shifts.size, receiver_positions.shape[0], 3, 3):
+            receiver_cov_for_frequency = receiver_cov[index]
+        else:
+            raise ValueError("receiver_beam_covariances_m2 must be (3,3), (n_frequency,3,3), or (n_frequency,n_receiver_ray,3,3)")
+        delta = selected_positions[:, None, :] - receiver_positions[None, :, :]
         distance2 = np.einsum("ijk,ijk->ij", delta, delta)
-        ii, jj = np.unravel_index(int(np.argmin(distance2)), distance2.shape)
-        xi = incident["position_m"][ii]
-        xs = receiver["position_m"][jj]
-        location = 0.5*(xi+xs)
-        local = equilibrium(location)
-        if not isinstance(local, Mapping) or "magnetic_field_T" not in local:
-            raise ValueError("equilibrium callback must return magnetic_field_T at the scattering location")
-        b_local = _vector(local["magnetic_field_T"], "local magnetic_field_T")
-        ki = incident["wavevector_rad_m"][ii]
-        ks = receiver["wavevector_rad_m"][jj]
-        overlap = gaussian_beam_overlap(xi, ci_cov, xs, receiver_covariances[index])
-        overlaps.append(overlap)
+        nearest_receiver = np.argmin(distance2, axis=1)
+        samples = []
+        raw_weights = []
+        for local_index, incident_index in enumerate(sample_indices):
+            receiver_index = int(nearest_receiver[local_index])
+            xi = incident_positions[incident_index]
+            xs = receiver_positions[receiver_index]
+            location = 0.5*(xi+xs)
+            local = equilibrium(location)
+            if not isinstance(local, Mapping) or "magnetic_field_T" not in local or "species" not in local:
+                raise ValueError("equilibrium callback must return magnetic_field_T and species at every scattering location")
+            b_local = _vector(local["magnetic_field_T"], "local magnetic_field_T")
+            ki = np.asarray(incident["wavevector_rad_m"][incident_index], dtype=float)
+            ks = np.asarray(receiver["wavevector_rad_m"][receiver_index], dtype=float)
+            overlap = gaussian_beam_overlap(
+                xi, incident_cov[incident_index], xs,
+                receiver_cov_for_frequency[receiver_index],
+            )
+            raw_weight = overlap*path_weights[local_index]
+            raw_weights.append(raw_weight)
+            samples.append({
+                "incident_direction": ki/np.linalg.norm(ki),
+                "scattered_direction": ks/np.linalg.norm(ks),
+                "magnetic_field_T": b_local,
+                "scattering_location_m": location,
+                "beam_overlap_m_minus3": float(overlap),
+                "path_length_weight_m": float(path_weights[local_index]),
+                "ray_separation_m": float(np.sqrt(distance2[local_index, receiver_index])),
+                "incident_ray_index": int(incident_index),
+                "receiver_ray_index": receiver_index,
+                "sample_weight": float(raw_weight),
+            })
+        raw_weights = np.asarray(raw_weights, dtype=float)
+        path_integral = float(np.sum(raw_weights))
+        if not np.isfinite(path_integral) or path_integral <= 0:
+            raise ValueError(f"Gaussian beam overlap has zero scattering-volume integral at frequency bin {index}")
+        path_integrals.append(path_integral)
+        for sample in samples:
+            sample["sample_weight"] /= path_integral
+            sample["beam_overlap_relative"] = 1.0
+        mean_b = np.sum(
+            np.asarray([sample["magnetic_field_T"] for sample in samples])
+            *np.asarray([sample["sample_weight"] for sample in samples])[:,None],
+            axis=0,
+        )
+        mean_ki = np.sum(
+            np.asarray([sample["incident_direction"] for sample in samples])
+            *np.asarray([sample["sample_weight"] for sample in samples])[:,None],
+            axis=0,
+        )
+        mean_ks = np.sum(
+            np.asarray([sample["scattered_direction"] for sample in samples])
+            *np.asarray([sample["sample_weight"] for sample in samples])[:,None],
+            axis=0,
+        )
+        mean_location = np.sum(
+            np.asarray([sample["scattering_location_m"] for sample in samples])
+            *np.asarray([sample["sample_weight"] for sample in samples])[:,None],
+            axis=0,
+        )
         entries.append({
-            "incident_direction": ki/np.linalg.norm(ki),
-            "scattered_direction": ks/np.linalg.norm(ks),
-            "magnetic_field_T": b_local,
-            "scattering_location_m": location,
-            "beam_overlap_m_minus3": overlap,
-            "ray_separation_m": float(np.sqrt(distance2[ii, jj])),
-            "incident_ray_index": int(ii),
-            "receiver_ray_index": int(jj),
+            "incident_direction": mean_ki/np.linalg.norm(mean_ki),
+            "scattered_direction": mean_ks/np.linalg.norm(mean_ks),
+            "magnetic_field_T": mean_b,
+            "scattering_location_m": mean_location,
+            "beam_overlap_path_integral_m_minus2": path_integral,
+            "scattering_samples": samples,
         })
-    scale = max(overlaps)
+    scale = max(path_integrals)
     if not np.isfinite(scale) or scale <= 0:
         raise ValueError("Gaussian beam overlap is non-positive for all frequency bins")
-    for entry, overlap in zip(entries, overlaps):
-        entry["beam_overlap_relative"] = float(overlap/scale)
+    for entry, integral in zip(entries, path_integrals):
+        entry["beam_overlap_relative"] = float(integral/scale)
     return {
         "frequency_shift_Hz": shifts.copy(),
         "frequency_resolved_geometry": entries,
-        "relative_beam_overlap": np.asarray(overlaps, dtype=float)/scale,
-        "absolute_beam_overlap_m_minus3": np.asarray(overlaps, dtype=float),
+        "relative_beam_overlap": np.asarray(path_integrals, dtype=float)/scale,
+        "absolute_beam_overlap_path_integral_m_minus2": np.asarray(path_integrals, dtype=float),
         "incident_ray": incident,
-        "geometry_model": "cold-plasma Hamiltonian ray tracing with local Gaussian intensity overlap",
+        "geometry_model": "cold-plasma Hamiltonian ray tracing with path-integrated local Gaussian intensity overlap",
+        "scattering_volume_integration": "normalized Gaussian overlap times incident-ray path-length quadrature",
+        "scattering_sample_count": np.asarray([len(entry["scattering_samples"]) for entry in entries], dtype=int),
         "limitations": [
-            "Geometrical optics; diffraction and mode conversion are not included.",
-            "Beam covariance matrices are supplied at the local scattering points; their propagation is not inferred.",
+            "Cold-plasma geometrical optics; diffraction, quasi-optical beam evolution and mode conversion are not included.",
+            "Beam covariance matrices are supplied by the caller along the rays; covariance propagation is not inferred.",
+            "Fitted ne, Te and thermal-ion temperatures are treated as uniform across the sampled scattering volume; local ray directions and magnetic field vary.",
             "Ray branch continuity near eigenvalue crossings must be checked by the caller.",
             "The equilibrium callback supplies all magnetic and species profiles; no equilibrium is fabricated."
         ],
