@@ -70,6 +70,23 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
             or np.any(~np.isfinite(fractions)) or np.any(fractions <= 0)
             or not np.isclose(fractions.sum(), 1.0, rtol=1e-6, atol=1e-8)):
         raise ValueError("ion_species and positive ion_fractions summing to one are required")
+    names = [str(item.get("name", f"ion_{i}")) if isinstance(item, Mapping) else f"ion_{i}"
+             for i, item in enumerate(ion_species)]
+    if isinstance(ion_temperature_eV, Mapping):
+        missing = [name for name in names if name not in ion_temperature_eV]
+        extra = [name for name in ion_temperature_eV if name not in names]
+        if missing or extra:
+            raise ValueError(f"ion_temperature_eV mapping must contain exactly the ion species names; missing={missing}, extra={extra}")
+        temperatures = {name: _positive(ion_temperature_eV[name], f"ion_temperature_eV[{name}]")
+                        for name in names}
+    elif np.isscalar(ion_temperature_eV):
+        common = _positive(ion_temperature_eV, "ion_temperature_eV")
+        temperatures = {name: common for name in names}
+    else:
+        values = np.asarray(ion_temperature_eV, dtype=float)
+        if values.shape != (len(names),) or np.any(~np.isfinite(values)) or np.any(values <= 0):
+            raise ValueError("ion_temperature_eV must be a positive scalar, a species-name mapping, or one positive value per ion species")
+        temperatures = dict(zip(names, map(float, values)))
     result = [{
         "name": "e-", "density": electron_density_m3, "temperature": electron_temperature_eV,
         "mass": ME, "charge": -E_CHARGE, "flow": _finite_vec3(electron_flow_m_s, "electron_flow_velocity_m_s")
@@ -77,16 +94,16 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
     for i, item in enumerate(ion_species):
         if not isinstance(item, Mapping):
             raise ValueError("each ion species must be a mapping")
+        name = names[i]
         z = _positive(item.get("charge_state"), f"ion_species[{i}].charge_state")
         mass = _positive(item.get("mass_amu"), f"ion_species[{i}].mass_amu") * AMU
-        flow = ion_flow_m_s.get(str(item.get("name", f"ion_{i}")))
+        flow = ion_flow_m_s.get(name)
         if flow is None:
-            raise ValueError(f"ion_flow_velocity_m_s must provide a vector for {item.get('name', f'ion_{i}')}")
+            raise ValueError(f"ion_flow_velocity_m_s must provide a vector for {name}")
         result.append({
-            "name": str(item.get("name", f"ion_{i}")),
-            "density": fractions[i] * electron_density_m3 / z,
-            "temperature": ion_temperature_eV, "mass": mass,
-            "charge": z * E_CHARGE, "flow": _finite_vec3(flow, f"ion flow for species {i}")
+            "name": name, "density": fractions[i] * electron_density_m3 / z,
+            "temperature": temperatures[name], "mass": mass,
+            "charge": z * E_CHARGE, "flow": _finite_vec3(flow, f"ion flow for species {name}")
         })
     return result
 
@@ -222,7 +239,8 @@ def full_em_cts_spectral_density(
     f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
     ne = _positive(electron_density_m3, "electron_density_m3")
     te = _positive(electron_temperature_eV, "electron_temperature_eV")
-    ti = _positive(ion_temperature_eV, "ion_temperature_eV")
+    if ion_temperature_eV is None:
+        raise ValueError("ion_temperature_eV must be supplied for every thermal ion species")
     if not isinstance(scattering_geometry, Mapping):
         raise ValueError("scattering_geometry must be a mapping")
     ki_hat = _vec3(scattering_geometry.get("incident_direction"), "incident_direction")
@@ -232,7 +250,7 @@ def full_em_cts_spectral_density(
         raise ValueError("magnetic_field_T must be a finite non-zero 3-vector")
     if not isinstance(ion_flow_velocity_m_s, Mapping):
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
-    species = _species_list(ne, ion_species, ion_fractions, te, ti,
+    species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
                             electron_flow_velocity_m_s, ion_flow_velocity_m_s)
     if fast_ion_populations is not None:
         if not isinstance(fast_ion_populations, Sequence) or isinstance(fast_ion_populations, (str, bytes)):
@@ -476,11 +494,13 @@ def analyze_full_em_cts_spectrum(
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None,
 ):
-    """Fit n_e, T_e and common T_i using the magnetized full-EM forward model.
+    """Fit n_e, T_e and a separate T_i for every supplied thermal ion species.
 
     The instrument amplitude and constant background are profiled as nuisance
     parameters. Flow vectors, composition, magnetic field, geometry and mode
-    polarizations remain explicit external inputs.
+    polarizations remain explicit external inputs. A scalar ion-temperature
+    initial value is broadcast only as an optimizer start; each species
+    temperature remains an independent fitted parameter.
     """
     from scipy.optimize import least_squares
 
@@ -513,31 +533,52 @@ def analyze_full_em_cts_spectrum(
     else:
         raise ValueError("signal_uncertainty or spectral_covariance is required for full-EM inversion")
     bounds = parameter_bounds or {}
+    if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or len(ion_species) == 0:
+        raise ValueError("ion_species must be a non-empty sequence for species-resolved CTS inversion")
+    species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
+    if len(set(species_names)) != len(species_names):
+        raise ValueError("ion species names must be unique for species-resolved temperature inference")
+    if isinstance(ion_temperature_initial_eV, Mapping):
+        if set(ion_temperature_initial_eV) != set(species_names):
+            raise ValueError("ion_temperature_initial_eV mapping must contain exactly the supplied ion species names")
+        ion_initials = np.array([_positive(ion_temperature_initial_eV[name], f"ion_temperature_initial_eV[{name}]") for name in species_names])
+    elif np.isscalar(ion_temperature_initial_eV):
+        ion_initials = np.full(len(species_names), _positive(ion_temperature_initial_eV, "ion_temperature_initial_eV"))
+    else:
+        ion_initials = np.asarray(ion_temperature_initial_eV, dtype=float)
+        if ion_initials.shape != (len(species_names),) or np.any(~np.isfinite(ion_initials)) or np.any(ion_initials <= 0):
+            raise ValueError("ion_temperature_initial_eV must be a positive scalar, species-name mapping, or one positive value per species")
+    names = ("electron_density_m3", "electron_temperature_eV") + tuple(
+        f"ion_temperature_eV:{name}" for name in species_names
+    )
     defaults = {
         "electron_density_m3": (1e17, 1e22),
         "electron_temperature_eV": (10.0, 2e4),
-        "ion_temperature_eV": (1.0, 1e4),
     }
-    names = tuple(defaults)
-    initial = np.array([
-        _positive(electron_density_initial_m3, "electron_density_initial_m3"),
-        _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV"),
-        _positive(ion_temperature_initial_eV, "ion_temperature_initial_eV"),
-    ])
-    limits = np.array([bounds.get(name, defaults[name]) for name in names], dtype=float)
-    if limits.shape != (3, 2) or np.any(~np.isfinite(limits)) or np.any(limits[:, 0] <= 0) or np.any(limits[:, 0] >= limits[:, 1]):
-        raise ValueError("parameter_bounds must contain positive increasing pairs for density and temperatures")
+    initial = np.concatenate((
+        [_positive(electron_density_initial_m3, "electron_density_initial_m3"),
+         _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV")],
+        ion_initials,
+    ))
+    limit_rows = [bounds.get(name, defaults[name]) for name in names[:2]]
+    limit_rows.extend(bounds.get(name, bounds.get("ion_temperature_eV", (1.0, 1e4))) for name in names[2:])
+    limits = np.asarray(limit_rows, dtype=float)
+    if limits.shape != (len(names), 2) or np.any(~np.isfinite(limits)) or np.any(limits[:, 0] <= 0) or np.any(limits[:, 0] >= limits[:, 1]):
+        raise ValueError("parameter_bounds must contain positive increasing pairs for density, electron temperature and every ion species temperature")
     if np.any(initial <= limits[:, 0]) or np.any(initial >= limits[:, 1]):
         raise ValueError("initial density and temperatures must lie strictly inside parameter_bounds")
     lower, upper = np.log10(limits[:, 0]), np.log10(limits[:, 1])
     p0 = np.log10(initial)
+
+    def unpack_temperatures(p):
+        return {name: float(10.0**p[2+i]) for i, name in enumerate(species_names)}
 
     def model(p):
         result = full_em_cts_spectral_density(
             f, probe_frequency_Hz, scattering_geometry,
             electron_density_m3=10.0**p[0],
             electron_temperature_eV=10.0**p[1],
-            ion_temperature_eV=10.0**p[2],
+            ion_temperature_eV=unpack_temperatures(p),
             ion_species=ion_species, ion_fractions=ion_fractions,
             magnetic_field_T=magnetic_field_T,
             electron_flow_velocity_m_s=electron_flow_velocity_m_s,
@@ -571,8 +612,8 @@ def analyze_full_em_cts_spectrum(
         raise ValueError(f"full-EM CTS inversion failed: {fit.message}")
     rank = int(np.linalg.matrix_rank(fit.jac))
     condition = float(np.linalg.cond(fit.jac))
-    if rank < 3 or not np.isfinite(condition) or condition > 1e12:
-        raise ValueError("full-EM CTS fit rejected: density and temperatures are not jointly identifiable")
+    if rank < len(names) or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError("full-EM CTS fit rejected: density, electron temperature and all species-resolved ion temperatures are not jointly identifiable")
     r, amplitude, offset, convolved = residual(fit.x, return_profile=True)
     dof = max(1, f.size - 5)
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
@@ -585,7 +626,7 @@ def analyze_full_em_cts_spectrum(
         f, probe_frequency_Hz, scattering_geometry,
         electron_density_m3=float(values[0]),
         electron_temperature_eV=float(values[1]),
-        ion_temperature_eV=float(values[2]),
+        ion_temperature_eV=unpack_temperatures(fit.x),
         ion_species=ion_species, ion_fractions=ion_fractions,
         magnetic_field_T=magnetic_field_T,
         electron_flow_velocity_m_s=electron_flow_velocity_m_s,
@@ -599,7 +640,8 @@ def analyze_full_em_cts_spectrum(
     return {
         "electron_density_m3": float(values[0]),
         "electron_temperature_eV": float(values[1]),
-        "ion_temperature_eV": float(values[2]),
+        "ion_temperature_eV": (float(values[2]) if len(species_names) == 1 else unpack_temperatures(fit.x)),
+        "ion_temperature_eV_by_species": unpack_temperatures(fit.x),
         "parameter_names": list(names),
         "fit_covariance": covariance,
         "parameter_uncertainties": np.sqrt(np.maximum(np.diag(covariance), 0.0)),
@@ -616,7 +658,7 @@ def analyze_full_em_cts_spectrum(
             "magnetic_field_T", "electron_flow_velocity_m_s", "ion_flow_velocity_m_s",
             "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
         ],
-        "inversion_scope": "electron density, electron temperature and one common ion temperature; flow vectors and composition are not fitted",
+        "inversion_scope": "electron density, electron temperature and one independently fitted temperature per supplied thermal ion species; flow vectors and composition remain fixed external inputs",
         "fluctuation_covariance_density_current_E_B": forward_diagnostics["fluctuation_covariance_density_current_E_B"],
         "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
         "wave_tensor": forward_diagnostics["wave_tensor"],
