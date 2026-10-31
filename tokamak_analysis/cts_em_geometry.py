@@ -397,6 +397,7 @@ def trace_cts_frequency_resolved_beams(
         entry["beam_overlap_relative"] = float(integral/scale)
     return {
         "frequency_shift_Hz": shifts.copy(),
+        "mode_index": int(mode_index),
         "frequency_resolved_geometry": entries,
         "relative_beam_overlap": np.asarray(path_integrals, dtype=float)/scale,
         "absolute_beam_overlap_path_integral_m_minus2": np.asarray(path_integrals, dtype=float),
