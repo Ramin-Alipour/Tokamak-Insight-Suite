@@ -1,163 +1,106 @@
 # Microwave Collective Thomson Scattering (CTS)
 
-## Scope
+## Scope and model selection
 
-The CTS module is a frequency-domain microwave CTS analysis path. It is separate from optical Thomson-scattering Analysis 1 and must not be described as an optical spectral fit or a complete electromagnetic CTS simulator.
+The CTS family is separate from optical Thomson Analysis 1. Its public dispatcher is:
 
-The implemented forward model is an unmagnetized, electrostatic, longitudinal multi-species dielectric response. It computes the electron and ion susceptibilities, the longitudinal dielectric function, the dynamic spectral density and convolution with a measured frequency-response matrix.
+- \`tokamak_analysis.cts_analysis.analyze_cts_spectrum_model(model="electrostatic", ...)\`
+- \`tokamak_analysis.cts_analysis.analyze_cts_spectrum_model(model="full_electromagnetic", ...)\`
 
-It does not include a full magnetized electromagnetic scattering tensor, ray tracing, beam overlap, polarization coupling, receiver transfer function or absolute received-power calibration.
+The model must be selected explicitly. The software never silently substitutes the electrostatic model for the magnetized full-EM model or vice versa.
 
-## Inputs
+All spectra and frequency axes are assumed to be measured, prepared and calibrated. The CTS workflows do not calibrate the instrument, correct raw detector counts, infer a missing frequency axis, or perform experimental validation.
 
-- Calibrated frequency-shift axis in Hz.
-- Calibrated non-negative CTS spectrum.
-- Probe frequency in Hz.
-- Scattering geometry, either a scalar scattering angle or incident/scattered unit vectors.
-- Explicit ion species metadata (name, charge state and mass in amu).
-- Explicit ion charge-density fractions summing to unity.
-- Explicit electron-flow projection along the scattering wavevector. No stationary-electron-flow default is applied; enter 0 only when that assumption is intentionally selected.
-- Measured frequency-response matrix.
-- Optional per-bin 1-sigma uncertainty or a full positive-definite frequency-bin covariance matrix.
-- Optional response-matrix uncertainty.
-- Optional uncertainties for probe frequency, scalar scattering angle, electron-flow projection and ion fractions.
-- Optional fast-ion model.
+## Electrostatic longitudinal CTS
 
-The current background-ion model uses one common ion temperature and one common projected ion flow for all supplied ion species. Species-specific ion temperatures and species-specific flow inference are not implemented. Ion species, charge states, masses and fractions must be supplied explicitly; the interface does not prefill D+ or a unit fraction. The result returns the exact externally supplied electron-flow projection and its optional input uncertainty, explicitly marked as not fitted; inferred ion-flow uncertainty remains a separate fitted-parameter result.
+The electrostatic path remains an unmagnetized multi-species longitudinal dielectric model. It computes species susceptibilities, the longitudinal dielectric function, the dynamic structure factor and convolution with the supplied measured frequency-response matrix.
 
+It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses, charge-density fractions and the electron-flow projection are explicit inputs. The electrostatic model's common ion-temperature/projected-ion-flow assumptions remain part of that path; they are not silently transferred to full-EM.
 
-## Magnetized full-electromagnetic forward model
+## Magnetized full-electromagnetic CTS
 
-A separate forward model and inversion are available as `tokamak_analysis.cts_full_em.full_em_cts_spectral_density` and `tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum` (also re-exported by `tokamak_analysis.cts_analysis`). `analyze_cts_spectrum_model(model="electrostatic"|"full_electromagnetic", ...)` dispatches explicitly; it does not replace or silently alter the existing longitudinal electrostatic model.
+The full-EM path is implemented in \`tokamak_analysis.cts_full_em\`. It combines:
 
-The implemented local kinetic response solves the linearized, collisionless Vlasov equation for isotropic non-relativistic Maxwellian species in a uniform magnetic field. Gyro-harmonics are retained explicitly and the velocity integrals use Gauss-Laguerre (perpendicular) and Gauss-Hermite (parallel) quadrature. The species conductivity tensors are assembled into the dielectric tensor and Maxwell wave tensor. Independent-particle current fluctuations are generated species-by-species with the classical fluctuation-dissipation relation, screened through the inverse wave tensor, and propagated into a joint covariance of electron density, electron current, electric field and magnetic field. The returned covariance retains their cross-correlations rather than summing independent fluctuation powers. The inversion profiles a multiplicative spectral amplitude and constant background as nuisance parameters and reports a local Jacobian covariance.
+1. Magnetized Maxwellian kinetic conductivity and screened density/current/electric/magnetic fluctuation covariance, retaining all supplied auto- and cross-correlations.
+2. The low-temperature Bindslev \`Gamma^{-1}\` / \`X\` source-current closure for Maxwellian bulk-electron three-wave coupling.
+3. Species-resolved thermal-ion temperature inference. Each supplied ion species has its own fitted temperature; composition and flow vectors remain fixed external inputs.
+4. Optional relativistic gyrotropic electron and fast-ion populations, with relativistic Vlasov linear response, Klimontovich shot-noise covariance and a second-order relativistic Vlasov three-wave current vertex.
+5. Optional frequency-resolved cold-plasma ray tracing and path-integrated Gaussian beam-overlap weighting.
 
-Required inputs are the vector magnetic field, incident/scattered beam directions, complex transverse incident/scattered polarization vectors, electron flow vector, and a flow vector for every ion species. The inversion additionally requires measured spectral uncertainty or a full spectral covariance and a measured instrument-response matrix; it fits electron density, electron temperature and one common ion temperature, while all flow vectors and composition remain fixed external inputs. No vector direction, polarization, or ion flow is silently assumed. The harmonic order, velocity quadrature order and positive numerical damping rate are explicit numerical controls; the default damping is a numerical Landau-contour regularization, not a measured collision frequency.
+### Relativistic kinetic populations and three-wave vertex
 
-**Scope boundary:** this is a local magnetized electromagnetic kinetic fluctuation solver, not yet a reproduction of the complete Bindslev three-wave CTS transfer formulation. In particular, the receiver coupling currently projects the screened electron-current radiation with the supplied polarization factor; it does not yet include the complete density/current/E/B three-wave coupling tensors and their incident/scattered cold-plasma mode normalization. It also does not include ray tracing, finite beam overlap, relativistic or anisotropic fast-ion VDFs, or spatially varying magnetic geometry. These omissions are returned in the result metadata and must not be described as completed Full-EM diagnostic physics.
+Implemented in \`tokamak_analysis.cts_relativistic\`:
 
-Synthetic regression tests check finite non-negative spectra, covariance Hermiticity/positive semidefiniteness, and mandatory metadata errors. They are software consistency tests, not experimental validation.
+- Relativistic Maxwell-Juttner momentum distribution for a thermal relativistic electron population. Its temperature follows the fitted electron temperature when \`electron_distribution={"kind":"relativistic_maxwell_juttner"}\` is supplied without an explicit temperature.
+- Relativistic anisotropic bi-Gaussian momentum distributions with explicit perpendicular and parallel temperatures.
+- Caller-supplied tabulated gyrotropic distributions \(f(p_\perp,p_\parallel)\).
+- Relativistic linear Vlasov response using \(v=p/(\gamma m)\) and \(\Omega/\gamma\).
+- Klimontovich particle shot-noise covariance for the supplied relativistic populations.
+- A second-order relativistic Vlasov three-wave current vertex, evaluated from the first-order perturbations and momentum derivatives of the supplied VDF.
 
+When an electron distribution is explicitly supplied, the Maxwellian electron response and the Bindslev low-temperature electron nonlinear source are replaced by the relativistic kinetic electron response and second-order vertex. When no electron distribution is supplied, the Maxwellian bulk-electron Bindslev closure remains active. This is an explicit model choice, not an automatic relativistic correction to every Maxwellian run.
 
-## Inversion strategies
+The relativistic vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening. It does not include finite-orbit-width effects, collisions, spatially varying relativistic kinetic response or nonlinear equilibrium evolution. The relativistic distribution shape is supplied by the researcher; the software does not reconstruct an arbitrary multidimensional VDF from the CTS spectrum.
 
-### Differential evolution
+### Ray tracing and scattering-volume integration
 
-The default path uses differential evolution for global initialization followed by bounded least-squares refinement.
+Implemented in \`tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams\` and connected to \`full_em_cts_spectral_density\`:
 
-### Improved real-coded genetic search
+- Cold-plasma Stix dielectric tensor and Maxwell wave branches.
+- Hamiltonian geometrical-optics tracing of the incident beam and a receiver ray for each scattered-frequency bin.
+- Local Gaussian beam-intensity overlap evaluated between paired ray samples.
+- Path-length quadrature along the incident ray, with normalized weights proportional to local Gaussian overlap times path length.
+- Full-EM spectral evaluation at each returned scattering-volume sample and weighted summation of the local spectra.
 
-The improved_genetic option uses a deterministic seeded real-coded genetic search with elitism, tournament selection, blend crossover and an adaptive mutation scale, followed by bounded least-squares refinement.
+The equilibrium callback must supply the local magnetic field and all species density profiles. The ray geometry JSON must preserve the exact measured \`frequency_shift_Hz\` axis and contain one \`frequency_resolved_geometry\` record per measured bin, with \`scattering_samples\` and non-negative \`sample_weight\` values summing to one.
 
-This is an independent adaptive genetic implementation informed by Zhang et al., Review of Scientific Instruments 95, 093542 (2024), DOI 10.1063/5.0215734. It is not claimed to reproduce the exact paper-specific fitness function, parameter sensitivity calibration or genetic operators without the full article's implementation details.
+**Declared geometry limitations:** this is cold-plasma geometrical optics, not diffraction-resolved quasi-optical propagation. Beam covariance matrices are supplied along the rays; the software does not propagate them. The fitted electron density, electron temperature and thermal-ion temperatures are assumed uniform across the sampled scattering volume, while local magnetic field and ray directions may vary. Absolute beam-overlap path integrals are used as relative frequency-bin weights; absolute launcher/receiver power coupling is not calibrated or inferred. Mode conversion and branch tracking through degeneracies are not implemented.
 
-### Regularized inversion
+## Full-EM input contract
 
-The regularized option is restricted to inferred tabulated fast-ion VDF reconstruction. It adds a second-difference smoothness penalty to the normalized non-negative VDF only. It does **not** impose a prior or penalty around the initial electron density, electron temperature, ion temperature, ion flow, or fast-ion fraction; those initial values are optimizer starting points. The regularization strength and VDF smoothness scale are explicit user-supplied controls and should be varied in synthetic recovery and sensitivity tests; no universal default lambda is scientifically justified.
+Required inputs include:
 
-The 2026 regularized Thomson-inversion literature motivates regularization to suppress data-consistent but physically implausible oscillatory solutions. The TIS regularized CTS objective is a scoped implementation, not an exact reproduction of that optical Thomson time-series method.
+- Calibrated frequency-shift axis and calibrated CTS spectral power.
+- Probe frequency and measured instrument-response matrix.
+- Initial electron density and temperature.
+- Explicit ion species metadata, charge-density fractions and one initial temperature per ion species.
+- Magnetic-field vector.
+- Explicit electron-flow vector and one ion-flow vector per ion species.
+- Incident/scattered wave directions and polarization vectors.
+- Measured spectral uncertainty or a full frequency-bin covariance matrix.
 
-## Fast-ion representations
+Optional inputs include:
 
-- Hot Maxwellian: fits a fast-ion fraction and temperature using a two-population Maxwellian approximation.
-- Fixed tabulated 1-D VDF: accepts a supplied non-negative velocity distribution and fits its fraction; the VDF shape is external.
-- Inferred tabulated 1-D VDF: fits a non-negative normalized tabulated VDF using a softmax mass parameterization and second-difference regularization. The VDF-node covariance is obtained by transforming the local logit covariance.
+- Relativistic electron distribution metadata.
+- Relativistic fast-ion population metadata.
+- Response-matrix uncertainty and positive-definite spectral covariance.
+- Frequency-resolved ray-traced scattering-volume geometry.
+- Explicit harmonic order, quadrature order and resonance damping.
 
-The inferred VDF is a one-dimensional projection along the scattering wavevector. Its reconstruction depends on the selected velocity grid, initial seed distribution, noise covariance and regularization strength. It is not a unique unrestricted three-dimensional velocity-distribution measurement.
+No zero flow, ion composition, polarization, VDF or equilibrium profile is silently assumed. A zero vector is an explicit stationary-flow input.
 
-The tabulated susceptibility uses a Landau-contour evaluation of the longitudinal kinetic susceptibility, with PCHIP interpolation and principal-value quadrature for the supplied one-dimensional VDF.
+## Inversion and uncertainty
 
-## Uncertainty and model discrepancy
+The full-EM inversion uses bounded least-squares in logarithmic positive parameters, profiles spectral amplitude and constant background as nuisance parameters, and fits electron density, electron temperature and one temperature per supplied thermal-ion species. Flow vectors, species composition and supplied non-Maxwellian VDF shapes remain external inputs. The relativistic Maxwell-Juttner electron distribution follows the fitted electron temperature when no separate temperature is provided.
 
-When supplied, the full frequency-bin covariance is used to whiten residuals in the objective. Response-matrix uncertainty and supported external parameter uncertainties are propagated by Monte Carlo refits. The Monte Carlo success count and requested count are returned; the uncertainty contribution is not added when too few perturbation fits succeed. Ion-fraction uncertainties are currently perturbed independently by species and renormalized to sum to one; a full species-composition covariance matrix is not accepted, so correlations between fraction uncertainties cannot be represented.
+The local Jacobian covariance is reported with fit residuals, identifiability rank and condition number. Full spectral covariance is used for whitening when supplied. The full-EM path does not claim complete propagation of every uncertainty in the supplied equilibrium, ray geometry, beam covariance, VDF or numerical truncation. These are declared model/input uncertainties, not set to zero.
 
-Excess reduced chi-square above unity is exposed as a separate model-discrepancy covariance component. This is conditional on the supplied noise covariance and chosen forward model; it is not independent experimental validation.
+The electrostatic path retains its own differential-evolution, improved-genetic and regularized tabulated-VDF options. Those strategies are not silently applied to the full-EM solver.
 
-The output includes fit covariance, parameter provenance, Jacobian rank and condition number, response/external Monte Carlo success counts, model-discrepancy diagnostics and explicit model limitations.
+## Software tests and validation boundary
 
-## Synthetic software tests
+Regression tests cover electrostatic spectra, full-EM covariance structure, Bindslev tensors and correlated contraction, relativistic gyrotropic linear response and nonlinear vertices, species-resolved ion temperatures, cold-plasma ray tracing, Gaussian overlap, scattering-volume integration and explicit input validation.
 
-The CTS test suite covers:
-
-- Positive finite forward spectra and geometry sensitivity.
-- Recovery of known electron density, electron temperature, ion temperature and ion-flow projection from synthetic spectra.
-- Hot-Maxwellian and tabulated non-Maxwellian fast-ion forward models.
-- Deterministic and bounded genetic-search behavior.
-- Full frequency-bin covariance whitening.
-- Regularized inversion and regularized tabulated VDF reconstruction.
-- Response-matrix and supported external-parameter Monte Carlo propagation.
-
-These are mathematical and software regression tests using controlled synthetic spectra. They are not empirical validation of a physical CTS diagnostic.
+These tests are synthetic numerical/software consistency checks. **No independent experimental validation is claimed or performed.**
 
 ## Scientific references
 
 1. J. Sheffield, D. Froula, S. H. Glenzer and N. C. Luhmann Jr., *Plasma Scattering of Electromagnetic Radiation*, 2nd ed., Academic Press, 2011.
-2. J. Zhang et al., “Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm,” *Review of Scientific Instruments* 95, 093542 (2024), DOI: 10.1063/5.0215734.
-3. B. C. Foo et al., “Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution,” *Review of Scientific Instruments* 97, 103535 (2026), DOI: 10.1063/5.0350497.
-4. G. A. Baker et al., “Recovering Non-Maxwellian Velocity Distribution Functions from Collective Thomson Scattering Spectra Using Generalized Basis Representations,” arXiv:2610.37516 (2026). This preprint motivates flexible non-Maxwellian VDF inversion; TIS currently uses a tabulated 1-D projected VDF with explicit smoothness regularization.
-
-
-## Magnetized electromagnetic CTS references
-
-7. X. Fang, D. Xia, M. Huang, F. Zhang and Y. Ding, “Study on the Full Electromagnetic Model of Collective Thomson Scattering in Magnetic Confinement Fusion,” *Power Generation Technology* **46**(1), 200–208 (2025), DOI: [10.12096/j.2096-4528.pgt.24149](https://doi.org/10.12096/j.2096-4528.pgt.24149). This is the primary recent reference for the magnetized full-electromagnetic CTS formulation, including density, current, electric-field and magnetic-field fluctuations and their cross-correlations.
-
-8. H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58**(8–9), 983–989 (1996), DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8). Foundational transfer/coupling formulation for correlated electromagnetic plasma fluctuations.
-
-## Recent diagnostic and inversion literature
-
-5. T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513. DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948). This supports the importance of CTS background characterization; TIS does not perform automatic background estimation because the project input contract assumes prepared, calibrated measurement data.
-6. “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026). DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845). This recent work combines ray tracing, forward modelling and Bayesian spectral inversion for CTS diagnostic design. It is cited as current diagnostic/inversion context, not as a claim that TIS reproduces its full magnetized electromagnetic model.
-
-
-The regularized inversion option is intentionally restricted to the inferred tabulated fast-ion velocity-distribution workflow. It applies smoothness regularization to that inferred distribution only; user-supplied initial plasma values remain optimizer starting points, not implicit Bayesian priors. Response-matrix and external-parameter Monte Carlo refits use the same regularized residual as the central fit.
-
-
-## Cold-plasma propagation and finite-beam geometry
-
-`tokamak_analysis.cts_em_geometry` adds the high-frequency wave-propagation layer used by the CTS incident and receiver beams:
-
-- Stix (S,D,P) cold-plasma dielectric tensor in arbitrary laboratory-frame magnetic-field orientation, using signed species cyclotron frequencies and the `exp(-i omega t)` convention.
-- Cold-plasma Maxwell wave operator and its three Hermitian eigenbranches/electric eigenvectors.
-- Hamiltonian geometrical-optics ray tracing through an explicitly supplied 3-D equilibrium callback. The callback must return the local magnetic-field vector and every species density; no equilibrium is fabricated.
-- Analytic overlap integral for two normalized three-dimensional Gaussian beam-intensity distributions, including finite beam widths and non-coincident beam centres.
-
-These high-frequency propagation/geometry components are now accompanied by the Bindslev low-temperature three-wave source-current tensor and the full correlated (n,v,E,B) covariance contraction described below. The ray tracer is geometrical optics and does not model diffraction, mode conversion at branch degeneracies, or resonant absorption layers. It must not be interpreted as a full-wave solver. The relativistic fast-ion linear response is supported, but the nonlinear three-wave vertex itself remains the low-temperature Bindslev closure.
-
-The cold-plasma tensor follows the Stix formulation documented by PlasmaPy and the high-frequency cold-wave / low-frequency hot-kinetic separation used by Fang et al. (2025). Software tests cover the vacuum limit, Hermiticity, Gaussian overlap normalization and straight-ray propagation in vacuum; they are numerical consistency tests, not experimental validation.
-
-
-
-## Bindslev three-wave coupling and relativistic fast-ion extension
-
-The full-EM forward path now applies the magnetized low-temperature Bindslev source-current closure rather than projecting only the electron-current covariance onto the receiver polarization.
-
-Implemented in `tokamak_analysis/cts_bindslev.py`:
-
-- Rank-four `Gamma_{abij}` tensor and its explicit inverse, with the inverse identity checked numerically.
-- Rank-three `X_{ijk}` pseudotensor generated from the inverse-`Gamma` contraction in Bindslev's magnetized source-current formulation.
-- Incident-wave density, particle-flux and magnetic perturbations derived from the cold-plasma susceptibility and Maxwell-Faraday relations.
-- Full source-current map from the ten fluctuation components `[delta_n, delta_v(3), delta_E(3), delta_B(3)]`.
-- Receiver projection and contraction with the complete Hermitian covariance, retaining every auto-spectrum and complex cross-spectrum. The density, particle-flux, electric-field and magnetic-field contributions are separately returned for diagnostics.
-
-This implements the low-temperature magnetized three-wave closure represented by Bindslev JET-P(93)41 Eqs. (98)-(102), (111), and (114)-(136), consistent with the correlated electromagnetic fluctuation transfer principle of Bindslev (1996). The cold high-frequency susceptibilities are evaluated separately at incident and scattered frequencies. This is not a claim that the entire relativistic nonlinear three-wave vertex has been derived: the Bindslev low-temperature source-current closure remains the coupling approximation.
-
-Implemented in `tokamak_analysis/cts_relativistic.py`:
-
-- Relativistic gyrotropic momentum-space Vlasov response with exact (v=p/(\gamma m)) and Ω/γ gyrofrequency.
-- Anisotropic relativistic bi-Gaussian momentum distributions with independently specified perpendicular and parallel temperatures.
-- User-supplied tabulated gyrotropic distributions (f(p_\perp,p_\parallel)), normalized over momentum space.
-- Fourier-collocation solution in gyrophase, including the full relativistic Lorentz force.
-- Non-equilibrium fast-ion fluctuation source from the relativistic Klimontovich orbit shot-noise spectrum, rather than applying an equilibrium fluctuation-dissipation theorem to an anisotropic population.
-- Fast-ion populations enter the total dielectric response and the screened fluctuation covariance through the explicit `fast_ion_populations` input.
-
-Each fast-ion population requires its name, charge state, mass, density, flow vector and either a `relativistic_bigaussian` distribution (perpendicular/parallel temperatures) or a `tabulated_gyrotropic` distribution with momentum grids and a non-negative distribution array. No fast-ion density, anisotropy or shape is inferred by default. The inversion currently fits (n_e,T_e,T_i); fast-ion distribution parameters are supplied externally, not fitted.
-
-Important scientific boundary: the relativistic fast-ion *linear response and particle-noise spectrum* are implemented, but the nonlinear Bindslev source-current vertex itself remains the low-temperature closure. A relativistic second-order kinetic vertex, including relativistic momentum derivatives and all corresponding fluctuation cross-correlations, is not claimed as complete. Bulk thermal species also remain on the existing non-relativistic Maxwellian kinetic path. Tests are numerical consistency/regression tests, not experimental validation.
-
-References:
-- H. Bindslev, “Three Wave Mixing and Thomson Scattering in Plasmas,” JET-P(93)41 (1993), detailed kinetic source-current derivation, including the `Gamma` and `X` tensors and the microscopic-fluctuation transfer equation.
-- H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58** (1996), 983–989, DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8).
-- H. Bindslev, “Dielectric effects on Thomson scattering in a relativistic magnetized plasma,” *Plasma Physics and Controlled Fusion* **33** (1991), 1775–1804, DOI: [10.1088/0741-3335/33/14/005](https://doi.org/10.1088/0741-3335/33/14/005).
-
-
-The full-EM forward solver now selects the incident and scattered cold-plasma propagating branches by matching the supplied polarization seed, replaces each seed with the corresponding eigenpolarization, and normalizes each mode to unit longitudinal Poynting flux. Magnetized eigenmodes may contain a longitudinal electric-field component; the implementation does not impose a vacuum-transverse polarization constraint. This is local cold-plasma plane-wave normalization, not a ray-traced finite-beam absolute-power calculation.
+2. H. Bindslev, “Three Wave Mixing and Thomson Scattering in Plasmas,” JET-P(93)41, 1993.
+3. H. Bindslev, “A quantitative study of scattering from electromagnetic fluctuations in plasmas,” *Journal of Atmospheric and Terrestrial Physics* **58** (1996), 983–989, DOI: [10.1016/0021-9169(95)00129-8](https://doi.org/10.1016/0021-9169(95)00129-8).
+4. H. Bindslev, “Dielectric effects on Thomson scattering in a relativistic magnetized plasma,” *Plasma Physics and Controlled Fusion* **33** (1991), 1775–1804, DOI: [10.1088/0741-3335/33/14/005](https://doi.org/10.1088/0741-3335/33/14/005).
+5. X. Fang et al., “Study on the Full Electromagnetic Model of Collective Thomson Scattering in Magnetic Confinement Fusion,” *Power Generation Technology* **46**(1), 200–208 (2025), DOI: [10.12096/j.2096-4528.pgt.24149](https://doi.org/10.12096/j.2096-4528.pgt.24149).
+6. T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513, DOI: [10.1063/5.0238948](https://doi.org/10.1063/5.0238948).
+7. “Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks,” *Fusion Engineering and Design* **212** (2025), 114826, DOI: [10.1016/j.fusengdes.2025.114826](https://doi.org/10.1016/j.fusengdes.2025.114826). This is a diffraction-aware reference; TIS currently implements geometrical optics with supplied local Gaussian covariance.
+8. “Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device,” *Journal of Fusion Energy* **45** (2026), 55, DOI: [10.1007/s10894-026-00595-7](https://doi.org/10.1007/s10894-026-00595-7).
+9. J. L. Flocken, S. B. Korsholm and J. Rasmussen, “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026), 115845, DOI: [10.1016/j.fusengdes.2026.115845](https://doi.org/10.1016/j.fusengdes.2026.115845).
