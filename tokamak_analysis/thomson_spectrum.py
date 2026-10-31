@@ -93,7 +93,7 @@ def fit_thomson_spectrum(
             raise ValueError("Wavelength window must cover the fitted Thomson spectral feature and its intrinsic wings.") from exc
         raise
     intrinsic_sigma = float(result["intrinsic_sigma_nm"])
-    intrinsic_uncertainty = float(result.get("intrinsic_sigma_uncertainty_nm", np.inf))
+    intrinsic_uncertainty = float(np.sqrt(max(float(np.asarray(result["fit_covariance"])[2, 2]), 0.0)))
     if not np.isfinite(intrinsic_sigma) or intrinsic_sigma <= 0 or intrinsic_sigma <= intrinsic_uncertainty:
         raise ValueError("Fitted physical width is not resolved: it is not larger than the instrumental-width uncertainty at the available spectral resolution.")
     fitted_sigma = float(np.sqrt(intrinsic_sigma**2 + float(instrument_sigma_nm)**2))
