@@ -7,6 +7,42 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
+def test_cts_inversion_requires_explicit_optimizer_initial_estimates():
+    f0,f,g,ions,frac,response=_case()
+    with pytest.raises(ValueError, match="Explicit optimizer initial estimates are required"):
+        analyze_cts_spectrum(
+            f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
+            ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+            instrument_response=response,
+        )
+
+
+def test_cts_global_search_requires_explicit_finite_scientific_bounds():
+    f0,f,g,ions,frac,response=_case()
+    with pytest.raises(ValueError, match="Global search requires explicit finite parameter_bounds"):
+        analyze_cts_spectrum(
+            f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
+            ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+            instrument_response=response,electron_density_initial_m3=2e19,
+            electron_temperature_initial_eV=1200.0,ion_temperature_initial_eV=800.0,
+            ion_velocity_initial_m_s=0.0,global_search=True,
+        )
+
+
+def test_cts_maxwellian_fast_ion_requires_explicit_temperature_initial_estimate():
+    f0,f,g,ions,frac,response=_case()
+    with pytest.raises(ValueError, match="fast_ion.temperature_initial_eV is required"):
+        analyze_cts_spectrum(
+            f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
+            ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+            instrument_response=response,electron_density_initial_m3=2e19,
+            electron_temperature_initial_eV=1200.0,ion_temperature_initial_eV=800.0,
+            ion_velocity_initial_m_s=0.0,
+            fast_ion={"kind":"maxwellian","species_index":0,"fraction_initial":0.1},
+            global_search=False,
+        )
+
+
 def test_cts_forward_model_is_finite_positive_and_geometry_sensitive():
     f0,f,g,ions,frac,_=_case()
     a=cts_spectral_density(f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200,ion_temperature_eV=800,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0)
