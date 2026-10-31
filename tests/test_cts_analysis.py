@@ -375,6 +375,14 @@ def test_bindslev_source_current_operator_and_full_cross_spectrum_contraction():
     assert set(result["transfer_contributions"]) == {
         "density", "particle_flux", "electric_field", "magnetic_field"
     }
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        bindslev_correlated_transfer_spectrum(
+            np.diag([1.0] * 9 + [-1e-3]), operator, np.array([0.0, 0.0, 1.0])
+        )
+    with pytest.raises(ValueError, match="receiver_polarization must be non-zero"):
+        bindslev_correlated_transfer_spectrum(
+            covariance, operator, np.zeros(3)
+        )
 
 
 def test_full_em_cts_exposes_bindslev_three_wave_coupling():
