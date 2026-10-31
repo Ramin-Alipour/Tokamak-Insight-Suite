@@ -3144,7 +3144,7 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
       ],
-      "note": "Scoped unmagnetized electrostatic longitudinal microwave CTS; no full magnetized electromagnetic tensor, ray tracing, receiver coupling or absolute power transfer. The improved-genetic option is a real-coded adaptive GA implementation informed by Zhang et al. (2024), not a claim of exact reproduction of their published fitness function.",
+      "note": "This entry is the unmagnetized electrostatic longitudinal microwave CTS model. The separate full-electromagnetic workflow is dispatched explicitly through analyze_cts_spectrum_model(model='full_electromagnetic') and includes relativistic gyrotropic kinetic populations, second-order vertices and optional cold-plasma ray/Gaussian-overlap weighting; its limitations are recorded in DIAGNOSTIC_REGISTRY.json.",
       "function_links": [
         "tokamak_analysis.cts_analysis.cts_spectral_density",
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
@@ -3184,6 +3184,45 @@
         "year": 2026,
         "url": "https://docs.plasmapy.org/en/stable/notebooks/diagnostics/thomson.html",
         "type": "software documentation"
+      },
+      {
+        "title": "Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation",
+        "authors": "T. Verdier, J. Rasmussen, J. Stober, S. K. Nielsen, ASDEX Upgrade Team, EUROfusion Team",
+        "journal": "Review of Scientific Instruments",
+        "volume": "96",
+        "issue": "4",
+        "article": "043513",
+        "year": 2025,
+        "doi": "10.1063/5.0238948",
+        "scope": "Recent CTS spectral-background treatment and thermal/fast-ion inference context; not a replacement for the dielectric susceptibility derivation."
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "authors": "M. Nishiura et al.",
+        "journal": "Journal of Fusion Energy",
+        "volume": "45",
+        "article": "55",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7",
+        "scope": "Recent CTS diagnostic implementation and energetic/bulk-ion measurement context."
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "J. L. Flocken, S. B. Korsholm, J. Rasmussen",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent integration of ray tracing, CTS forward modelling and Bayesian spectral inversion; diagnostic design and inference context."
+      },
+      {
+        "title": "Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks",
+        "journal": "Fusion Engineering and Design",
+        "volume": "212",
+        "article": "114826",
+        "year": 2025,
+        "doi": "10.1016/j.fusengdes.2025.114826",
+        "scope": "Quasi-optical beam tracing including diffraction for high-k collective scattering; the present TIS helper is explicitly geometrical-optics with supplied local Gaussian covariance."
       }
     ]
   },
@@ -3347,6 +3386,606 @@
         "year": 2026,
         "url": "https://arxiv.org/abs/2610.37516",
         "type": "preprint"
+      }
+    ]
+  },
+  {
+    "name": "Relativistic gyrotropic second-order CTS current vertex",
+    "equation": "L_s f_s^(2) = -q[(E_i+v×B_i)·∇_p f_f^(1) + (E_f+v×B_f)·∇_p f_i^(1)]; J_s^(2)=q∫v f_s^(2)d³p",
+    "inputs": "Incident and fluctuation frequencies/wavevectors; incident electric field; local magnetic field; species charge, mass and density; relativistic gyrotropic momentum-space VDF",
+    "output": "3×3 complex current vertex mapping fluctuation electric field to second-order scattered current density",
+    "assumptions": "Collisionless homogeneous relativistic Vlasov equation; prescribed gyrotropic equilibrium distribution (Maxwell-Juttner, bi-Gaussian or tabulated); Faraday-consistent first-order waves; explicit Lorentzian resonance broadening; no finite-orbit-width or nonlinear equilibrium evolution",
+    "status": "D",
+    "category": "Magnetized relativistic collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+      "formula_key": "relativistic_gyrotropic_three_wave_vertex",
+      "input_specs": [
+        {
+          "name": "omega_incident_rad_s",
+          "unit": "rad s^-1",
+          "required": true
+        },
+        {
+          "name": "wavevector_incident_rad_m",
+          "unit": "m^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "incident_electric_field",
+          "unit": "V m^-1; complex 3-vector",
+          "required": true
+        },
+        {
+          "name": "omega_fluctuation_rad_s",
+          "unit": "rad s^-1; non-zero",
+          "required": true
+        },
+        {
+          "name": "wavevector_fluctuation_rad_m",
+          "unit": "m^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; 3-vector",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg",
+          "required": true
+        },
+        {
+          "name": "charge_C",
+          "unit": "C",
+          "required": true
+        },
+        {
+          "name": "distribution",
+          "unit": "relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic momentum-space VDF",
+          "required": true
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer >=4",
+          "required": false
+        },
+        {
+          "name": "gyrophase_points",
+          "unit": "even integer >=16",
+          "required": false
+        },
+        {
+          "name": "resonance_width_rad_s",
+          "unit": "rad s^-1",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "current_vertex_A_m2_per_V_m",
+          "unit": "A m^-2 per (V m^-1); 3×3 complex tensor"
+        },
+        {
+          "name": "scattered_frequency_rad_s",
+          "unit": "rad s^-1"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "boolean"
+        },
+        {
+          "name": "second_order_vlasov",
+          "unit": "boolean"
+        }
+      ],
+      "prerequisites": [
+        "Explicit gyrotropic momentum-space distribution",
+        "Incident and fluctuation wave geometry",
+        "Local magnetic field"
+      ],
+      "uncertainty_model": "No automatic experimental uncertainty is assigned to the VDF or model truncation. Numerical quadrature and resonance-width sensitivity must be assessed by varying supplied numerical controls; this is not experimental validation.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_relativistic_gyrotropic_three_wave_vertex_is_finite"
+      ],
+      "note": "The second-order source is computed directly from the relativistic Vlasov equation and is not obtained by applying a relativistic mass correction to the low-temperature Bindslev vertex. It is a homogeneous local kinetic model."
+    },
+    "references": [
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Relativistic magnetized plasma dielectric response; foundational context."
+      },
+      {
+        "title": "Three Wave Mixing and Thomson Scattering in Plasmas",
+        "authors": "H. Bindslev",
+        "year": 1993,
+        "type": "JET technical report JET-P(93)41",
+        "scope": "Foundational magnetized CTS three-wave coupling derivation; the new kinetic vertex is independently formulated from the relativistic Vlasov equation."
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "journal": "Journal of Fusion Energy",
+        "volume": "45",
+        "article": "55",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7",
+        "scope": "Recent CTS energetic-ion diagnostic application."
+      }
+    ]
+  },
+  {
+    "name": "Relativistic single-particle Thomson spectral density",
+    "equation": "ν_s/ν_i=(1−n_i·β)/(1−n_s·β); λ_s/λ_i=(1−n_s·β)/(1−n_i·β); f_J(p)∝exp(−γ/θ), θ=T_e/(m_ec²)",
+    "inputs": "Calibrated wavelength grid, laser wavelength, scattering geometry, electron temperature, scattering-vector bulk-flow projection",
+    "output": "Unit-area wavelength spectral density and fitted Te/flow projection",
+    "assumptions": "Isotropic Maxwell-Juttner rest-frame electron distribution; Lorentz boost along scattering vector; supplied incident polarization transformed into electron rest frame; Thomson limit; no recoil/Compton correction",
+    "status": "D",
+    "category": "Optical relativistic Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+      "formula_key": "relativistic_single_particle_thomson_spectrum",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "laser_wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "flow_projection_m_s",
+          "unit": "m s^-1; subluminal",
+          "required": false
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "transverse dimensionless 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "nm^-1; unit area"
+        },
+        {
+          "name": "fitted_centroid_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "spectral_rms_width_nm",
+          "unit": "nm"
+        },
+        {
+          "name": "captured_probability",
+          "unit": "dimensionless"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated wavelength axis",
+        "Laser wavelength and scattering geometry",
+        "Measured instrument response"
+      ],
+      "uncertainty_model": "Fit covariance is computed from the local least-squares Jacobian. Quadrature-order sensitivity is a numerical model-resolution issue and is not included as an experimental uncertainty term.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite"
+      ],
+      "note": "Uses exact relativistic photon-frequency kinematics for an isotropic Maxwell-Juttner rest-frame distribution Lorentz-boosted along q. Assumes the Thomson limit and omits photon recoil."
+    },
+    "references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent instrument-aware optical Thomson spectral modelling."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "issue": "10",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Recent optical Thomson spectral inversion methods."
+      },
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
+      }
+    ]
+  },
+  {
+    "name": "Collective kappa-electron Thomson dielectric spectrum",
+    "equation": "χ_s(k,ω)=−(ω_ps²/k²)∫_L [∂f_s(v)/∂v]/(v−ω/k) dv; ε=1+Σ_sχ_s; S=(2π/k){|1+Σ_iχ_i|² f_e/|ε|²+Σ_i(Z_i²n_i/n_e)|χ_e|²f_i/|ε|²}",
+    "inputs": "Wavelength spectrum, laser wavelength, scattering angle, electron density/temperature/kappa, fixed Maxwellian ion species/fractions/temperatures/flows, electron flow and beam directions",
+    "output": "Collective spectral density, electron/ion susceptibilities, dielectric function and fitted ne/Te/kappa",
+    "assumptions": "Unmagnetized electrostatic longitudinal response; isotropic 1-D projected kappa electron VDF; Maxwellian ions; Landau contour; fixed supplied ion composition and flow vectors",
+    "status": "D",
+    "category": "Collective non-Maxwellian Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+      "formula_key": "collective_kappa_electron_thomson_spectrum",
+      "input_specs": [
+        {
+          "name": "wavelength_nm",
+          "unit": "nm",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV",
+          "required": true
+        },
+        {
+          "name": "kappa",
+          "unit": "dimensionless; >1.5",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "charge-density fraction; sum to one",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; one per species",
+          "required": true
+        },
+        {
+          "name": "electron_velocity_m_s",
+          "unit": "m s^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "ion_velocity_m_s",
+          "unit": "m s^-1; species x 3",
+          "required": true
+        },
+        {
+          "name": "incident_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_direction",
+          "unit": "dimensionless 3-vector",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density_per_nm",
+          "unit": "model spectral density"
+        },
+        {
+          "name": "electron_susceptibility",
+          "unit": "complex"
+        },
+        {
+          "name": "ion_susceptibility",
+          "unit": "species x wavelength complex"
+        },
+        {
+          "name": "dielectric_function",
+          "unit": "complex"
+        },
+        {
+          "name": "dynamic_structure_factor",
+          "unit": "model dynamic structure factor"
+        }
+      ],
+      "prerequisites": [
+        "Calibrated wavelength spectrum",
+        "Explicit ion species/fractions/temperatures/flows",
+        "Explicit beam directions and scattering angle"
+      ],
+      "uncertainty_model": "Local Jacobian covariance for ne, Te and kappa. Supplied ion, flow, beam and instrument-response uncertainties are not yet fully propagated by this model and are reported as missing inputs in the analysis result.",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
+      ],
+      "note": "This is a collective dielectric model using a non-Maxwellian kappa electron VDF, not a non-collective Student-t profile fit. It is unmagnetized and uses Maxwellian ions."
+    },
+    "references": [
+      {
+        "title": "A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak",
+        "authors": "Carole et al.",
+        "journal": "Journal of Instrumentation",
+        "volume": "20",
+        "article": "P07014",
+        "year": 2025,
+        "doi": "10.1088/1748-0221/20/07/P07014",
+        "scope": "Recent instrument-aware optical Thomson spectral modelling."
+      },
+      {
+        "title": "Regularized inversion of optical Thomson scattering spectra for improved determination of plasma parameter evolution",
+        "authors": "B. C. Foo et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "97",
+        "issue": "10",
+        "article": "103535",
+        "year": 2026,
+        "doi": "10.1063/5.0350497",
+        "scope": "Recent optical Thomson spectral inversion methods."
+      },
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
+      }
+    ]
+  },
+  {
+    "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
+    "equation": "L_s f_s^(1)=−q_s(E+v×B)·∇_p f_{0s}; σ_s·E=q_s n_s∫v f_s^(1)d³p; Q_s∝q_s²n_s∫vv f_{0s}δ(ω−k·v−nΩ_s/γ)d³p",
+    "inputs": "Species density, mass and charge; local magnetic field; wave frequency/wavevector; prescribed relativistic gyrotropic VDF",
+    "output": "Complex kinetic conductivity and particle shot-noise fluctuation covariance",
+    "assumptions": "Relativistic kinematics v=p/(γm), gyrofrequency qB/(γm); gyrotropic VDF; collisionless homogeneous local plasma; Lorentzian resonance broadening",
+    "status": "D",
+    "category": "Magnetized relativistic collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
+      "formula_key": "relativistic_gyrotropic_linear_response",
+      "input_specs": [
+        {
+          "name": "omega_rad_s",
+          "unit": "rad s^-1",
+          "required": true
+        },
+        {
+          "name": "wavevector_rad_m",
+          "unit": "m^-1; 3-vector",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; 3-vector",
+          "required": true
+        },
+        {
+          "name": "density_m3",
+          "unit": "m^-3",
+          "required": true
+        },
+        {
+          "name": "mass_kg",
+          "unit": "kg",
+          "required": true
+        },
+        {
+          "name": "charge_C",
+          "unit": "C",
+          "required": true
+        },
+        {
+          "name": "distribution",
+          "unit": "relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic",
+          "required": true
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "conductivity_S_m",
+          "unit": "S m^-1; complex tensor"
+        },
+        {
+          "name": "fluctuation_covariance",
+          "unit": "state covariance"
+        },
+        {
+          "name": "relativistic_kinematics",
+          "unit": "boolean"
+        }
+      ],
+      "uncertainty_model": "No experimental uncertainty is assigned to the externally supplied VDF or truncation controls; numerical convergence must be assessed independently.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_relativistic_maxwell_juttner_momentum_grid_is_normalized"
+      ],
+      "note": "The linear conductivity integrates the first-order perturbation against momentum-space volume weights; it must not multiply by f0 a second time because the perturbation already contains ∇p f0."
+    },
+    "references": [
+      {
+        "title": "Dielectric effects on Thomson scattering in a relativistic magnetized plasma",
+        "authors": "H. Bindslev",
+        "journal": "Plasma Physics and Controlled Fusion",
+        "volume": "33",
+        "pages": "1775-1804",
+        "year": 1991,
+        "doi": "10.1088/0741-3335/33/14/005",
+        "scope": "Foundational relativistic magnetized plasma response."
+      },
+      {
+        "title": "Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device",
+        "journal": "Journal of Fusion Energy",
+        "volume": "45",
+        "article": "55",
+        "year": 2026,
+        "doi": "10.1007/s10894-026-00595-7",
+        "scope": "Recent energetic/bulk ion CTS diagnostic context."
+      }
+    ]
+  },
+  {
+    "name": "Path-integrated Gaussian beam overlap for CTS scattering volume",
+    "equation": "O_j=G(x_i,j,x_s,j;Σ_i,j,Σ_s,j); w_j=O_jΔs_j/Σ_l(O_lΔs_l); S_CTS(ω)=R(ω)Σ_jw_j S_CTS,j(ω)",
+    "inputs": "Incident and receiver cold-plasma ray paths; local Gaussian beam covariance matrices; equilibrium callback; frequency bins; local B and wave directions",
+    "output": "Frequency-resolved scattering-volume samples and normalized Gaussian-overlap/path-length weights",
+    "assumptions": "Cold-plasma geometrical optics; caller-supplied Gaussian covariance along rays; nearest receiver-ray pairing; fitted ne/Te/Ti uniform over sampled volume; local B and ray directions may vary",
+    "status": "D",
+    "category": "CTS beam geometry and spatial weighting",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+      "formula_key": "cts_path_integrated_gaussian_overlap",
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "incident_ray",
+          "unit": "initial position and wavevector",
+          "required": true
+        },
+        {
+          "name": "receiver_rays",
+          "unit": "one initial position/wavevector per frequency bin",
+          "required": true
+        },
+        {
+          "name": "equilibrium",
+          "unit": "callback returning local magnetic field and species",
+          "required": true
+        },
+        {
+          "name": "incident_beam_covariance_m2",
+          "unit": "3x3 or ray-sampled 3x3 covariance",
+          "required": true
+        },
+        {
+          "name": "receiver_beam_covariances_m2",
+          "unit": "3x3, frequency x 3x3, or frequency x ray x 3x3 covariance",
+          "required": true
+        },
+        {
+          "name": "scattering_sample_count",
+          "unit": "integer >=2",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "frequency_resolved_geometry",
+          "unit": "frequency-indexed scattering-volume samples"
+        },
+        {
+          "name": "sample_weight",
+          "unit": "dimensionless; non-negative; sums to one per frequency"
+        },
+        {
+          "name": "beam_overlap_path_integral_m_minus2",
+          "unit": "m^-2"
+        },
+        {
+          "name": "relative_beam_overlap",
+          "unit": "dimensionless; normalized across frequency bins"
+        }
+      ],
+      "prerequisites": [
+        "Cold-plasma equilibrium profiles and ray-launch conditions",
+        "Incident/receiver beam covariance along rays",
+        "Mode branch selection"
+      ],
+      "uncertainty_model": "Ray integration and Gaussian covariance are numerical/model inputs; no automatic uncertainty is assigned to equilibrium or beam covariance. Sample-count convergence must be assessed by increasing scattering_sample_count.",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry",
+        "tests/test_cts_analysis.py::test_full_em_cts_integrates_scattering_volume_samples"
+      ],
+      "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation."
+    },
+    "references": [
+      {
+        "title": "Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks",
+        "journal": "Fusion Engineering and Design",
+        "volume": "212",
+        "article": "114826",
+        "year": 2025,
+        "doi": "10.1016/j.fusengdes.2025.114826",
+        "scope": "Recent quasi-optical beam tracing and CTS scattering-volume geometry context; present implementation is geometrical optics without diffraction."
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "J. L. Flocken, S. B. Korsholm, J. Rasmussen",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent CTS diagnostic optimization combining beam/ray and spectral forward modelling."
       }
     ]
   }
