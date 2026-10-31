@@ -69,3 +69,21 @@ def test_thomson_profile_subanalysis_routes_to_canonical_spectral_inference():
     assert app.radio[0].value == "Spectral Analysis"
     spectral_workflow = next(item for item in app.radio if item.label == "Workflow")
     assert spectral_workflow.value == "Thomson multi-channel spectral inference"
+
+
+
+def test_analysis_1_dashboard_exposes_only_three_selected_optical_models():
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * 9,
+        "radius_m": [0.1] * 9,
+        "wavelength_nm": np.linspace(531.0, 533.0, 9),
+        "intensity": np.linspace(1.0, 2.0, 9),
+    })
+    app = _app_with_table(frame)
+    app.radio[0].set_value("Spectral Analysis").run()
+    model = next(item for item in app.selectbox if item.label == "Physical spectral model")
+    assert model.options == [
+        "non_collective_maxwellian",
+        "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+    ]
