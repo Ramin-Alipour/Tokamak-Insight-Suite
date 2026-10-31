@@ -728,6 +728,7 @@ def full_em_cts_spectral_density(
         "relativistic_kinetic_three_wave_vertex_used": any(relativistic_three_wave_vertex_diagnostics),
         "kinetic_population_diagnostics": fast_ion_kinetic_diagnostics,
         "nonthermal_electron_distribution": electron_distribution_used,
+        "relativistic_electron_distribution": electron_distribution_used,
         "bindslev_dielectric_form_factors": np.asarray(bindslev_form_factors),
         "bindslev_X_tensor": np.asarray(bindslev_x_tensors),
         "bindslev_Gamma_inverse_tensor": np.asarray(bindslev_gamma_inverse),
