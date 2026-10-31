@@ -3112,7 +3112,6 @@ elif page=='Advanced Analysis':
                     if cts_response_upload is None:
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
-                    cts_response_unc=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
                     if not cts_electron_flow.strip():
                         raise ValueError('Enter the electron-flow projection explicitly; enter 0 only if stationary electron flow is an intentional assumption.')
@@ -3150,7 +3149,6 @@ elif page=='Advanced Analysis':
                         'ion_species':ion_species,'ion_fractions':fractions,
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
-                        'instrument_response_uncertainty':cts_response_unc,
                         'electron_velocity_projection_m_s':float(cts_electron_flow),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
                     }
@@ -3189,7 +3187,6 @@ elif page=='Advanced Analysis':
                 cts_magnetic_field=st.text_input('Magnetic field vector (T; x,y,z)',key='cts_full_magnetic_field')
             with c2:
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_full_response_upload')
-                cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_full_response_unc_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_full_covariance_upload')
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
                 cts_electron_flow=st.text_input('Electron flow vector (m/s; x,y,z)',key='cts_full_electron_flow')
