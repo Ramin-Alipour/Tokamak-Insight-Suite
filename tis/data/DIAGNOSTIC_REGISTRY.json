@@ -4358,16 +4358,6 @@
           "description": "Receiver-projected density, flux, electric and magnetic coupling coefficients and transfer contributions."
         },
         {
-          "name": "Gamma_inverse_tensor",
-          "unit": "complex rank-four tensor",
-          "description": "Inverse Bindslev Gamma tensor used to construct X."
-        },
-        {
-          "name": "X_tensor",
-          "unit": "complex rank-three tensor",
-          "description": "Bindslev magnetized three-wave pseudotensor."
-        },
-        {
           "name": "fast_ion_populations",
           "unit": "explicit user-supplied distribution metadata"
         },
@@ -4410,7 +4400,7 @@
       "algorithm": "Electrostatic CTS retains its original longitudinal model. Magnetized full-EM evaluates species kinetic response, builds the dielectric and Maxwell wave tensors, screens the species fluctuation sources, constructs the joint n/v/E/B covariance, applies the Bindslev low-temperature Gamma/X source-current tensor and contracts all auto/cross spectra with the receiver polarization. Optional relativistic anisotropic fast-ion populations use momentum-space gyrophase Fourier collocation and Klimontovich orbit shot noise.",
       "uncertainty_model": "Local Jacobian covariance with optional full spectral covariance whitening. Supplied instrument-response uncertainty and supported probe-frequency, scattering-angle (scalar geometry), electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Excess reduced chi-square above unity is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Ion-fraction uncertainties are independently perturbed and renormalized; full species-composition covariance is not supported.",
       "limitations": [
-        "Not a full magnetized electromagnetic CTS scattering tensor, ray-tracing/beam-overlap model or receiver/absolute-power transfer model.",
+        "The low-temperature Bindslev magnetized source-current tensor and correlated n/v/E/B transfer contraction are implemented. The fully relativistic nonlinear vertex, ray-tracing/beam-overlap integration into the spectral transfer, and absolute received-power normalization remain outside the current solver scope.",
         "Ion composition is fixed externally; uncertainty can be supplied for charge-density fractions but the species identities are not inferred.",
         "The adaptive real-coded genetic option is an independent implementation informed by Zhang et al. (2024), not a claim of exact reproduction of their article-specific fitness function.",
         "A tabulated fast-ion VDF is a 1-D projected distribution. Its reconstruction is ill-posed and depends on velocity grid, initial distribution and regularization strength; it is not a unique unrestricted 3-D VDF measurement.",
@@ -4421,7 +4411,6 @@
         "Electron-flow projection must be supplied explicitly; zero is accepted only as an intentional stationary-flow assumption.",
         "Full covariance/correlation matrix for ion-composition fractions is not accepted; supplied per-species fraction uncertainties are perturbed independently and renormalized.",
         "Non-relativistic isotropic Maxwellians only; anisotropic/non-Maxwellian/relativistic fast ions not implemented.",
-        "Complete Bindslev three-wave density/current/E/B coupling tensors and cold-plasma mode-flux normalization not yet implemented.",
         "No ray tracing, finite beam overlap or spatially varying magnetic geometry.",
         "The Bindslev nonlinear three-wave source-current vertex is the low-temperature magnetized closure, not the fully relativistic second-order kinetic vertex.",
         "Relativistic gyrotropic fast-ion response/noise is supported only for explicitly supplied populations; fast-ion parameters are not inferred.",
@@ -4434,7 +4423,7 @@
         "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum"
       ],
       "raw_data_to_physics": false,
-      "note": "Microwave CTS frequency-domain spectral inversion, explicitly scoped to unmagnetized electrostatic longitudinal response. The model must not be described as a complete electromagnetic CTS simulator.",
+      "note": "CTS offers an explicitly selectable unmagnetized electrostatic workflow and a local magnetized full-electromagnetic workflow with low-temperature Bindslev three-wave coupling. Relativistic anisotropic fast-ion linear response and particle-noise are available when the distribution is supplied explicitly; the nonlinear three-wave vertex remains low-temperature.",
       "calibrated_measurements_to_physics": true,
       "workflow_modes": [
         {
