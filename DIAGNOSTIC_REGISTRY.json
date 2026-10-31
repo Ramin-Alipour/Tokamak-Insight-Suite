@@ -254,7 +254,7 @@
       "limitations": [
         "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
         "Relativistic optical model neglects photon recoil and Compton corrections and is limited to the Thomson regime.",
-        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; relativistic and collective-kappa models require dedicated joint forward models.",
+        "Joint full-covariance GLS is currently implemented for non-collective Maxwellian and Kappa projected spectra; the relativistic Maxwell-Juttner model currently uses channel-local fit covariance.",
         "Absolute density is not identifiable from normalized spectral shape alone.",
         "No independent experimental validation is claimed.",
         "A supplied density_relative_covariance is authoritative for all six optical inversion inputs and cannot be combined with separate scalar uncertainty inputs.",
@@ -5225,7 +5225,7 @@
         "Relativistic Maxwell-Juttner inference is restricted to an isotropic rest-frame distribution with bulk flow parallel to the scattering vector and neglects recoil/Compton corrections.",
         "Kappa models are parameterized distributions and do not reconstruct an unrestricted electron velocity distribution.",
         "Absolute density is not identifiable from normalized spectral shape alone; it requires W/nm intensity and complete optical geometry/polarization inputs.",
-        "Joint full-channel GLS is implemented for non-collective Maxwellian and kappa models only; relativistic and collective-kappa models use their declared model-specific covariance paths.",
+        "Joint full-channel GLS is implemented for non-collective Maxwellian and Kappa models only; the relativistic Maxwell-Juttner model uses its declared channel-local covariance path.",
         "Profile reconstruction does not extrapolate beyond the measured radial interval; unresolved or non-identifiable parameters are reported as such.",
         "No independent experimental validation is claimed.",
         "Optical collective dielectric inference is outside the current Analysis 1 model shortlist; microwave CTS is a separate registered subanalysis."
