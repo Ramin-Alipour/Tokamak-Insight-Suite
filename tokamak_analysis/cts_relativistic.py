@@ -140,7 +140,7 @@ def relativistic_gyrotropic_species_response(
                 force=charge*(efield[None,:]+np.cross(velocity,bfield))
                 rhs[:,col]=-np.sum(force*gradf,axis=1)
             streaming=width-1j*(omega-kpar*vpar-kperp*vperp*np.cos(phi))
-            operator=np.diag(streaming)+omega_g*derivative
+            operator=np.diag(streaming)-omega_g*derivative
             try:
                 delta_f=np.linalg.solve(operator,rhs)
             except np.linalg.LinAlgError as exc:
