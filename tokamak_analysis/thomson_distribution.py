@@ -1,10 +1,10 @@
-"""Model-independent diagnostics for calibrated Thomson-scattering spectra.
+"""Spectral-shape diagnostics linked to the canonical calibrated Thomson fit.
 
-This module characterizes the measured spectral distribution after local linear
-background removal and Gaussian instrument-width deconvolution. It does not
-pretend that arbitrary spectral moments uniquely recover an electron velocity
-distribution; physical distribution inference requires an experiment-appropriate
-collective/non-collective forward model and instrument response.
+This module characterizes the measured spectral distribution after an explicit
+background specification. A scalar Gaussian width may be used for moment
+deconvolution, or a measured response matrix may be used in the Gaussian shape
+fit. It does not infer an arbitrary electron velocity distribution from moments;
+fitted plasma parameters are supplied by the canonical physical forward model.
 """
 from __future__ import annotations
 
@@ -288,6 +288,29 @@ def analyze_thomson_spectral_distribution(
         or not np.isfinite(flow)
     ):
         raise ValueError("A supplied collective-model electron flow must be a finite fitted value; otherwise pass None as not identifiable")
+    def optional_uncertainty(name):
+        value = physical_parameters.get(name)
+        if value is None:
+            return None
+        if (isinstance(value, (bool, np.bool_))
+                or not isinstance(value, (int, float, np.integer, np.floating))
+                or not np.isfinite(value) or value < 0.0):
+            raise ValueError(f"physical_parameters.{name} must be finite and non-negative when supplied")
+        return float(value)
+    temperature_uncertainty = optional_uncertainty("electron_temperature_uncertainty_eV")
+    flow_uncertainty = optional_uncertainty("electron_velocity_projection_uncertainty_m_s")
+    density = physical_parameters.get("electron_density_m3")
+    if density is not None and (
+        isinstance(density, (bool, np.bool_))
+        or not isinstance(density, (int, float, np.integer, np.floating))
+        or not np.isfinite(density) or density <= 0.0
+    ):
+        raise ValueError("physical_parameters.electron_density_m3 must be finite and positive when supplied")
+    density_uncertainty = optional_uncertainty("electron_density_uncertainty_m3")
+    if flow is None and flow_uncertainty is not None:
+        raise ValueError("electron_velocity_projection_uncertainty_m_s cannot be supplied when electron flow is not identifiable")
+    if density is None and density_uncertainty is not None:
+        raise ValueError("electron_density_uncertainty_m3 cannot be supplied when electron density is unavailable")
 
     moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
     background = moments["background"]
@@ -488,20 +511,20 @@ def analyze_thomson_spectral_distribution(
             "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
             "model": model_name,
             "electron_temperature_eV": float(temperature),
-            "electron_temperature_uncertainty_eV": physical_parameters.get("electron_temperature_uncertainty_eV"),
+            "electron_temperature_uncertainty_eV": temperature_uncertainty,
             "electron_velocity_projection_m_s": None if flow is None else float(flow),
-            "electron_velocity_projection_uncertainty_m_s": physical_parameters.get("electron_velocity_projection_uncertainty_m_s"),
+            "electron_velocity_projection_uncertainty_m_s": flow_uncertainty,
             "electron_velocity_projection_status": (
                 "fitted" if flow is not None else
                 "not_identifiable_from_selected_collective_model"
             ),
-            "electron_density_m3": physical_parameters.get("electron_density_m3"),
-            "electron_density_uncertainty_m3": physical_parameters.get("electron_density_uncertainty_m3"),
-            "electron_density_status": "available" if physical_parameters.get("electron_density_m3") is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
+            "electron_density_m3": None if density is None else float(density),
+            "electron_density_uncertainty_m3": density_uncertainty,
+            "electron_density_status": "available" if density is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
             "unavailable_parameters": (
                 [] if flow is not None else ["electron_velocity_projection_m_s"]
             ) + (
-                [] if physical_parameters.get("electron_density_m3") is not None else ["electron_density_m3"]
+                [] if density is not None else ["electron_density_m3"]
             ),
         },
         "model": "canonical physical Thomson forward-fit parameters plus signed spectral moments and response-convolved Gaussian shape diagnostics",
