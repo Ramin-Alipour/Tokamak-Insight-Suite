@@ -136,9 +136,9 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         idx=int(idx)
         hf=float(fast_ion.get("fraction",0.))
         if not np.isfinite(hf) or not 0<=hf<1: raise ValueError("fast-ion fraction must lie in [0,1)")
-        kind=fast_ion.get("kind","maxwellian")
+        kind=fast_ion.get("kind")
         if kind not in {"maxwellian","tabulated_1d"}:
-            raise ValueError("cts_spectral_density fast_ion.kind must be maxwellian or tabulated_1d")
+            raise ValueError("cts_spectral_density requires explicit fast_ion.kind='maxwellian' or 'tabulated_1d'")
         if kind=="tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
@@ -469,7 +469,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     "probability_density_m_s_inverse":pdf,
                     "smoothness":fast["vdf"]["smoothness_parameter"]}
             else:
-                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"temperature_eV":10**p[5]}
+                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"kind":"maxwellian","temperature_eV":10**p[5]}
         return d
     def forward(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
         d=decode(p); z=cts_spectral_density(f,f0 if probe_frequency is None else probe_frequency,
