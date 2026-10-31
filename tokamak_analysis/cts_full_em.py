@@ -223,7 +223,7 @@ def full_em_cts_spectral_density(
     electron_flow_velocity_m_s, ion_flow_velocity_m_s,
     incident_polarization, scattered_polarization,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
-    fast_ion_populations=None,
+    fast_ion_populations=None, electron_distribution=None,
 ):
     """Return a local full-EM magnetized CTS spectrum and fluctuation diagnostics.
 
@@ -273,6 +273,16 @@ def full_em_cts_spectral_density(
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
                             electron_flow_velocity_m_s, ion_flow_velocity_m_s)
+    if electron_distribution is not None:
+        if not isinstance(electron_distribution, Mapping):
+            raise ValueError("electron_distribution must be an explicit relativistic gyrotropic distribution mapping")
+        if electron_distribution.get("kind") not in {"relativistic_bigaussian", "tabulated_gyrotropic"}:
+            raise ValueError("electron_distribution kind must be relativistic_bigaussian or tabulated_gyrotropic")
+        species[0].update({
+            "distribution": electron_distribution,
+            "fast_ion": True,
+            "nonthermal_electron": True,
+        })
     if fast_ion_populations is not None:
         if not isinstance(fast_ion_populations, Sequence) or isinstance(fast_ion_populations, (str, bytes)):
             raise ValueError("fast_ion_populations must be a sequence of explicit gyrotropic populations")
@@ -472,7 +482,11 @@ def full_em_cts_spectral_density(
         to_flux = np.eye(10, dtype=complex)
         to_flux[1:4, 1:4] /= -E_CHARGE
         covariance_n_v_E_B = to_flux @ state_cov @ to_flux.conj().T
-        total_source_operator = np.asarray(source["source_current_operator"], dtype=complex).copy()
+        total_source_operator = (
+            np.zeros_like(source["source_current_operator"], dtype=complex)
+            if electron_distribution is not None
+            else np.asarray(source["source_current_operator"], dtype=complex).copy()
+        )
         relativistic_vertex_at_frequency = []
         for fast_species in species:
             if not fast_species.get("fast_ion", False):
@@ -495,6 +509,7 @@ def full_em_cts_spectral_density(
             total_source_operator += fast_operator
             relativistic_vertex_at_frequency.append({
                 "name": fast_species["name"],
+                "population_role": ("non-Maxwellian electron" if fast_species.get("nonthermal_electron") else "fast ion"),
                 "current_vertex_A_m2_per_V_m": vertex["current_vertex_A_m2_per_V_m"],
                 "distribution_kind": vertex["distribution_kind"],
                 "second_order_vlasov": vertex["second_order_vlasov"],
@@ -546,7 +561,9 @@ def full_em_cts_spectral_density(
                                    if frequency_geometry is not None and all("scattering_location_m" in item for item in frequency_geometry)
                                    else None),
         "fast_ion_populations": fast_ion_populations or [],
-        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature three-wave coupling and optional relativistic gyrotropic fast-ion kinetics",
+        "model": ("magnetized full-electromagnetic CTS with relativistic gyrotropic non-Maxwellian electron/fast-ion response and second-order kinetic vertices"
+                  if electron_distribution is not None
+                  else "magnetized full-electromagnetic CTS with Bindslev low-temperature bulk-electron coupling and optional relativistic gyrotropic fast-ion kinetics"),
         "kinetic_response": "bulk species: magnetized Maxwellian Vlasov gyro-harmonics; optional fast ions: relativistic gyrotropic momentum-space Vlasov Fourier collocation",
         "fluctuation_source": "bulk thermal species: classical FDT; non-equilibrium fast-ion populations: relativistic Klimontovich orbit shot-noise covariance",
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
@@ -556,7 +573,7 @@ def full_em_cts_spectral_density(
         "limitations": [
             *( [] if frequency_geometry is not None else ["Homogeneous local geometry; supply trace_cts_frequency_resolved_beams output to include frequency-resolved ray paths and Gaussian overlap."] ),
             "Bulk thermal species use the non-relativistic isotropic Maxwellian solver; optional fast-ion populations use relativistic gyrotropic bi-Gaussian or tabulated momentum distributions.",
-            "The bulk-electron source remains the low-temperature Bindslev closure; supplied relativistic fast-ion populations additionally contribute an independently computed second-order relativistic Vlasov vertex driven by the same correlated fluctuation electric field.",
+            "When electron_distribution is supplied, the Maxwellian electron response and Bindslev electron nonlinear source are replaced by a relativistic gyrotropic electron Vlasov response and second-order kinetic vertex; supplied fast-ion populations add their own relativistic vertices.",
             "Classical FDT is applied only to bulk thermal Maxwellian species; non-equilibrium fast-ion noise uses the uncorrelated Klimontovich orbit spectrum."
         ],
     }
@@ -572,7 +589,7 @@ def analyze_full_em_cts_spectrum(
     incident_polarization, scattered_polarization,
     instrument_response, signal_uncertainty=None, spectral_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
-    damping_rate_rad_s=None, fast_ion_populations=None,
+    damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
 ):
     """Fit n_e, T_e and a separate T_i for every supplied thermal ion species.
 
@@ -668,6 +685,7 @@ def analyze_full_em_cts_spectrum(
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
             damping_rate_rad_s=damping_rate_rad_s,
             fast_ion_populations=fast_ion_populations,
+            electron_distribution=electron_distribution,
         )["spectral_density"]
         widths = np.empty_like(f)
         widths[0] = 0.5 * (f[1] - f[0])
@@ -716,6 +734,7 @@ def analyze_full_em_cts_spectrum(
         harmonic_order=harmonic_order, quadrature_order=quadrature_order,
         damping_rate_rad_s=damping_rate_rad_s,
         fast_ion_populations=fast_ion_populations,
+        electron_distribution=electron_distribution,
     )
     return {
         "electron_density_m3": float(values[0]),
@@ -733,12 +752,14 @@ def analyze_full_em_cts_spectrum(
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "optimizer_success": bool(fit.success),
-        "model": "magnetized full-electromagnetic CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations",
+        "model": ("magnetized full-EM CTS with relativistic gyrotropic non-Maxwellian electron/fast-ion response and second-order kinetic vertices"
+                  if electron_distribution is not None
+                  else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": [
             "magnetic_field_T", "electron_flow_velocity_m_s", "ion_flow_velocity_m_s",
             "ion_species", "ion_fractions", "incident_polarization", "scattered_polarization",
         ],
-        "inversion_scope": "electron density, electron temperature and one independently fitted temperature per supplied thermal ion species; flow vectors and composition remain fixed external inputs",
+        "inversion_scope": "electron density, electron temperature and one independently fitted temperature per supplied thermal ion species; flow vectors, composition and the supplied non-Maxwellian distribution shape remain fixed external inputs",
         "fluctuation_covariance_density_current_E_B": forward_diagnostics["fluctuation_covariance_density_current_E_B"],
         "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
         "wave_tensor": forward_diagnostics["wave_tensor"],
