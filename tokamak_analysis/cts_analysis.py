@@ -297,6 +297,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if unc is not None and (unc.shape!=y.shape or np.any(unc<=0)): raise ValueError("signal_uncertainty must match spectrum and be positive")
     if unc is not None and spectral_covariance is not None:
         raise ValueError("Supply either signal_uncertainty or spectral_covariance, not both")
+    if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
+        raise ValueError("parameter_bounds must be a mapping")
     b=parameter_bounds or {}
     def bounds(name,default):
         lo,hi=map(float,b.get(name,default))
@@ -315,16 +317,20 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if fast_ion is not None:
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
         idx=fast_ion.get("species_index")
-        if isinstance(idx,bool) or not isinstance(idx,int) or not 0<=idx<len(ions): raise ValueError("invalid fast-ion species_index")
+        if isinstance(idx,bool) or not isinstance(idx,(int,np.integer)) or not 0<=idx<len(ions): raise ValueError("invalid fast-ion species_index")
+        idx=int(idx)
+        kind=fast_ion.get("kind","maxwellian")
+        if kind not in {"maxwellian","tabulated_1d","infer_tabulated_1d"}:
+            raise ValueError("fast_ion.kind must be maxwellian, tabulated_1d or infer_tabulated_1d")
         flo,fhi=map(float,fast_ion.get("fraction_bounds",(.001,.5)))
         fi=float(fast_ion.get("fraction_initial",.05))
         if not 0<flo<fi<fhi<1: raise ValueError("invalid fast-ion fraction initial value or bounds")
-        if fast_ion.get("kind","maxwellian")=="tabulated_1d":
+        if kind=="tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",0.0))
             fast={"species_index":idx,"kind":"tabulated_1d","vdf":vdf}
             p0=np.r_[p0,fi]; lo=np.r_[lo,flo]; hi=np.r_[hi,fhi]
-        elif fast_ion.get("kind")=="infer_tabulated_1d":
+        elif kind=="infer_tabulated_1d":
             vdf=_regularized_tabulated_fast_ion(fast_ion.get("velocity_m_s"),fast_ion.get("initial_probability_density_m_s_inverse"),
                                                 smoothness=fast_ion.get("smoothness",1.0))
             weights=_trapezoid_node_weights(vdf["velocity_m_s"])
@@ -347,6 +353,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("regularization_strength must be finite and non-negative")
     if inversion_method=="regularized" and regularization_strength<=0:
         raise ValueError("regularized inversion requires regularization_strength > 0")
+    if inversion_method=="regularized" and (fast is None or fast["kind"]!="infer_tabulated_1d"):
+        raise ValueError("regularized inversion requires fast_ion.kind='infer_tabulated_1d'; initial plasma guesses are not regularization priors")
+    if fast and fast["kind"]=="infer_tabulated_1d" and fast["vdf"]["smoothness_parameter"]<=0:
+        raise ValueError("infer_tabulated_1d requires a positive VDF smoothness parameter")
     if spectral_covariance is not None:
         cov_y=_array(spectral_covariance,"spectral_covariance",2)
         if cov_y.shape!=(f.size,f.size) or not np.allclose(cov_y,cov_y.T,rtol=1e-9,atol=1e-12):
@@ -405,23 +415,30 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     def profile_amplitude(z):
         A=whiten(np.column_stack((z,np.ones_like(z))))
         amp,off=np.linalg.lstsq(A,whiten(y),rcond=None)[0]
-        if amp<0: amp,off=0.,float(np.mean(y))
+        if amp<0:
+            amp=0.0
+            whitened_one=whiten(np.ones_like(y))
+            whitened_y=whiten(y)
+            denominator=float(whitened_one@whitened_one)
+            off=float(whitened_one@whitened_y/denominator)
         return amp,off
     def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
         z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override); amp,off=profile_amplitude(z)
         return whiten(amp*z+off-y)
-    prior_scale=np.maximum(hi-lo,1e-12)
+    def regularization_terms(p):
+        if inversion_method!="regularized":
+            return []
+        masses=_softmax(np.r_[p[5:],0.0])
+        pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
+        d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])*float(np.ptp(fast["vdf"]["velocity_m_s"]))**2
+        scale=max(float(np.max(pdf)),np.finfo(float).tiny)
+        penalty=np.sqrt(regularization_strength)*np.sqrt(fast["vdf"]["smoothness_parameter"])*(d2@pdf)/scale
+        return [penalty]
+
     def residual(p):
         data=data_residual(p)
-        if inversion_method!="regularized": return data
-        penalties=[np.sqrt(regularization_strength)*(p-p0)/prior_scale]
-        if fast and fast["kind"]=="infer_tabulated_1d":
-            masses=_softmax(np.r_[p[5:],0.0])
-            pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
-            d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])*float(np.ptp(fast["vdf"]["velocity_m_s"]))**2
-            scale=max(float(np.max(pdf)),np.finfo(float).tiny)
-            penalties.append(np.sqrt(regularization_strength)*np.sqrt(max(fast["vdf"]["smoothness_parameter"],1e-12))*(d2@pdf)/scale)
-        return np.concatenate([data, *penalties])
+        penalties=regularization_terms(p)
+        return np.concatenate([data,*penalties]) if penalties else data
     score=None; genetic_history=None
     if global_search and inversion_method=="improved_genetic":
         start,score,genetic_history=_improved_genetic_search(
@@ -549,8 +566,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 sampled_fractions=sampled_fractions/sampled_fractions.sum()
             if sampled_f0<=0 or abs(sampled_electron_flow)>=C: continue
             try:
-                draw=least_squares(lambda p: data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions),
-                    fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
+                def sampled_residual(p):
+                    data=data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions)
+                    penalties=regularization_terms(p)
+                    return np.concatenate([data,*penalties]) if penalties else data
+                draw=least_squares(sampled_residual,fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
                 if draw.success and np.all(np.isfinite(draw.x)): draws.append(draw.x)
             except (ValueError,RuntimeError,np.linalg.LinAlgError):
                 continue

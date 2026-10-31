@@ -87,7 +87,7 @@ def test_cts_correlated_frequency_covariance_is_accepted_and_reported():
     assert out["inversion_method"]=="differential_evolution"
 
 
-def test_cts_regularized_inversion_requires_positive_strength_and_runs():
+def test_cts_regularized_inversion_requires_explicit_vdf_regularization_target():
     f0,f,g,ions,frac,response=_case()
     truth=(2e19,1200.,800.,1.5e4)
     z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],
@@ -98,13 +98,23 @@ def test_cts_regularized_inversion_requires_positive_strength_and_runs():
         analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
             ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,inversion_method="regularized",
             global_search=False)
-    out=analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
-        ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,inversion_method="regularized",
-        regularization_strength=0.01,global_search=False,
-        electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
-        ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3])
-    assert out["inversion_method"]=="regularized"
-    assert out["regularization_strength"]==pytest.approx(0.01)
+    with pytest.raises(ValueError,match="requires fast_ion.kind='infer_tabulated_1d'"):
+        analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+            ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,inversion_method="regularized",
+            regularization_strength=0.01,global_search=False,
+            electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
+            ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3])
+
+
+def test_cts_unknown_fast_ion_kind_is_rejected():
+    f0,f,g,ions,frac,response=_case()
+    with pytest.raises(ValueError,match="fast_ion.kind must be"):
+        analyze_cts_spectrum(
+            f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
+            ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+            instrument_response=response,fast_ion={"species_index":0,"kind":"not-a-model"},
+            global_search=False,
+        )
 
 
 def test_cts_response_and_external_geometry_uncertainties_are_monte_carlo_propagated():
