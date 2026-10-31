@@ -273,9 +273,9 @@ def full_em_cts_spectral_density(
             local_b = np.asarray(item.get("magnetic_field_T"), dtype=float)
             if local_b.shape != (3,) or np.any(~np.isfinite(local_b)) or np.linalg.norm(local_b) <= 0:
                 raise ValueError(f"frequency_resolved_geometry[{geometry_index}].magnetic_field_T must be a finite non-zero 3-vector")
-            overlap = _positive(item.get("beam_overlap_relative"), f"frequency_resolved_geometry[{geometry_index}].beam_overlap_relative")
-            if overlap > 1.0 + 1e-10:
-                raise ValueError("relative Gaussian beam-overlap weights must be <= 1")
+            overlap = float(item.get("beam_overlap_relative"))
+            if not np.isfinite(overlap) or overlap < 0.0 or overlap > 1.0 + 1e-10:
+                raise ValueError("relative Gaussian beam-overlap weights must be finite and lie in [0, 1]")
     if not isinstance(ion_flow_velocity_m_s, Mapping):
         raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
@@ -364,7 +364,9 @@ def full_em_cts_spectral_density(
             ki_hat_bin = _vec3(geometry_bin["incident_direction"], "frequency-resolved incident direction")
             ks_hat_bin = _vec3(geometry_bin["scattered_direction"], "frequency-resolved scattered direction")
             b_bin = np.asarray(geometry_bin["magnetic_field_T"], dtype=float)
-            overlap_weight = _positive(geometry_bin["beam_overlap_relative"], "beam_overlap_relative")
+            overlap_weight = float(geometry_bin["beam_overlap_relative"])
+            if not np.isfinite(overlap_weight) or overlap_weight < 0.0 or overlap_weight > 1.0 + 1e-10:
+                raise ValueError("beam_overlap_relative must be finite and lie in [0, 1]")
             incident_wavevector_bin, ei_bin, incident_diag_bin = _select_flux_normalized_cold_mode(
                 2.0*np.pi*f0, ki_hat_bin, b_bin, cold_wave_species, ei
             )
