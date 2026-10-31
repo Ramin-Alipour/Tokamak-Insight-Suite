@@ -8,7 +8,7 @@
       "id": 1,
       "name": "Thomson Scattering",
       "category": "physical_diagnostic",
-      "description": "Navigation family for measured, calibrated optical Thomson physical inference, microwave CTS physical inference, per-channel spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. Legacy ne/Te profile-point utilities remain downstream compatibility helpers.",
+      "description": "Navigation family for measured, calibrated optical Thomson physical inference, microwave CTS physical inference, per-channel spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction. Every registered physical workflow starts from measured diagnostic spectra; no pre-derived electron-density/electron-temperature profile entry point is provided.",
       "entry_ids": [
         1,
         30,
