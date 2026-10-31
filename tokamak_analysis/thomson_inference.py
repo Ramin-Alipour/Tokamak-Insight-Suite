@@ -871,12 +871,16 @@ def analyze_thomson_spectra(
                 -alpha_value / (2.0 * te_fit),
             ], dtype=float)
             alpha_variance = None
-            if parameter_covariance is not None:
-                alpha_variance = float(
-                    alpha_gradient_ne_te @ parameter_covariance @ alpha_gradient_ne_te
-                )
-                alpha_variance += (alpha_value * laser_wavelength_unc / float(laser_wavelength_nm)) ** 2
-                if scattering_angle_uncertainty_rad is not None:
+            if parameter_covariance is not None or laser_wavelength_unc > 0.0 or scattering_angle_unc > 0.0:
+                alpha_variance = 0.0
+                if parameter_covariance is not None:
+                    alpha_variance += float(
+                        alpha_gradient_ne_te @ parameter_covariance @ alpha_gradient_ne_te
+                    )
+                alpha_variance += (
+                    alpha_value * laser_wavelength_unc / float(laser_wavelength_nm)
+                ) ** 2
+                if scattering_angle_unc > 0.0:
                     alpha_angle_sensitivity = -0.5 * alpha_value / np.tan(
                         float(scattering_angle_rad) / 2.0
                     )
