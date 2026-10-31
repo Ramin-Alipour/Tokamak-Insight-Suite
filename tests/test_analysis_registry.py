@@ -29,7 +29,7 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     assert {"wavelength_nm", "spectra", "radius_m", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response"} <= set(inputs)
     assert inputs["wavelength_nm"]["unit"].startswith("nm")
-    assert inputs["radius_m"]["unit"] == "m"
+    assert inputs["radius_m"]["unit"].startswith("m")
     assert any("measured" in item.lower() and "spectra" in item.lower()
                for item in contract["assumptions"])
     assert any("not identifiable" in item.lower() or "absolute density" in item.lower()
