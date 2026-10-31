@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tokamak_analysis.thomson_kinetic_models import (
     relativistic_maxwell_juttner_spectrum,
@@ -54,3 +55,29 @@ def test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons(
         rtol=1e-3, atol=0.0,
     )
     assert low_kappa["model"].startswith("unmagnetized collective Thomson")
+
+
+def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters():
+    from tokamak_analysis.thomson_kinetic_models import fit_relativistic_maxwell_juttner
+
+    wavelength = np.linspace(800.0, 1328.0, 401)
+    angle = np.pi/2.0
+    laser = 1064.0
+    incident = np.array([-np.sin(angle/2), np.cos(angle/2), 0.0])
+    scattered = np.array([np.sin(angle/2), np.cos(angle/2), 0.0])
+    forward = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 500.0,
+        flow_projection_m_s=2.0e4,
+        radial_order=16, angular_order=8,
+    )
+    signal = 2.0e4*forward["spectral_density_per_nm"] + 10.0 + 0.001*(wavelength-laser)
+    result = fit_relativistic_maxwell_juttner(
+        wavelength, signal, laser, angle, np.eye(wavelength.size),
+        np.full(wavelength.size, 1.0),
+        incident_direction=incident, scattered_direction=scattered,
+        radial_order=16, angular_order=8,
+    )
+    assert result["electron_temperature_eV"] == pytest.approx(500.0, rel=0.15)
+    assert result["electron_velocity_projection_m_s"] == pytest.approx(2.0e4, abs=2.0e4)
+    assert result["relativistic_kinematics"] is True
+    assert result["fit_covariance"].shape == (5, 5)
