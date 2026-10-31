@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import curve_fit
-from scipy.special import gammaln
+from scipy.special import gammaln, stdtr
 
 from .thomson_scattering import density_from_thomson_scattered_power, _covariance_is_positive_semidefinite
 from .formula_library import (
@@ -302,8 +302,15 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     p=np.asarray(p,dtype=float)*parameter_scales
     cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
     amp,center,sigma,kappa,offset,slope=map(float,p)
-    if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
-        raise ValueError("Wavelength coverage must include at least ±3 fitted RMS widths")
+    # A kappa spectrum has power-law tails; Gaussian ±3-sigma coverage is not
+    # a valid universal truncation criterion. Report the actual Student-t
+    # probability captured by the measured wavelength window instead.
+    kappa_df = 2.0 * kappa - 1.0
+    kappa_scale = sigma * np.sqrt((kappa_df - 2.0) / kappa_df)
+    captured_probability = float(
+        stdtr(kappa_df, (wavelength[-1] - center) / kappa_scale)
+        - stdtr(kappa_df, (wavelength[0] - center) / kappa_scale)
+    )
     te=thomson_electron_temperature_from_spectral_width(
         sigma, laser_nm, angle
     )["electron_temperature_eV"]
@@ -341,6 +348,8 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "fit_parameters":np.asarray(p,dtype=float),
             "fit_parameter_names":["amplitude","center_nm","intrinsic_sigma_nm","kappa_index","background_intercept","background_slope_per_nm"],
             "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
+            "captured_spectral_probability":captured_probability,
+            "spectral_window_truncation_warning":("The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window." if captured_probability < 0.999 else None),
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
             "fitted_spectrum":observed(wavelength,*p),
             "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
