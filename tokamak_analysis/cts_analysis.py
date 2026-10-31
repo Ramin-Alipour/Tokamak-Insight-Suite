@@ -347,7 +347,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                                                 smoothness=fast_ion.get("smoothness",1.0))
             weights=_trapezoid_node_weights(vdf["velocity_m_s"])
             masses=vdf["probability_density_m_s_inverse"]*weights
-            logits=np.log(np.maximum(masses[:-1],1e-12)/max(masses[-1],1e-12))
+            logits=np.clip(np.log(np.maximum(masses[:-1],1e-12)/max(masses[-1],1e-12)),-19.0,19.0)
             if inversion_method!="regularized" or regularization_strength<=0:
                 raise ValueError("infer_tabulated_1d fast-ion VDF requires regularized inversion with positive regularization_strength")
             fast={"species_index":idx,"kind":"infer_tabulated_1d","vdf":vdf}
