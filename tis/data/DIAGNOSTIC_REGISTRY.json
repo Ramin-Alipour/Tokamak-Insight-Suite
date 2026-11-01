@@ -4294,16 +4294,14 @@
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
           "required": false,
-          "description": "Non-negative measured response-matrix 1-sigma uncertainty. Electrostatic and full-electromagnetic CTS sample and renormalize perturbed response matrices and refit the plasma parameters by Monte Carlo; response uncertainty is not an instrument calibration.",
-          "applies_when_model": "electrostatic"
+          "description": "Non-negative measured response-matrix 1-sigma uncertainty. Electrostatic and full-electromagnetic CTS sample and renormalize perturbed response matrices and refit the plasma parameters by Monte Carlo; response uncertainty is not an instrument calibration."
         },
         {
           "name": "response_mc_samples",
           "unit": "count",
           "required": false,
           "default": 100,
-          "description": "Electrostatic CTS only: number of Monte Carlo response-matrix perturbation/refit samples when instrument_response_uncertainty is supplied.",
-          "applies_when_model": "electrostatic"
+          "description": "Number of Monte Carlo response-matrix perturbation/refit samples when instrument_response_uncertainty is supplied; supported by both electrostatic and full-electromagnetic CTS."
         },
         {
           "name": "signal_uncertainty",
@@ -4971,6 +4969,36 @@
           "name": "mode_branch_tracking",
           "unit": "structured; per ray sample",
           "description": "Polarization-continuity branch assignment and degeneracy diagnostics from the local cold-plasma wave-operator sequence; the Hamiltonian ray still follows the fixed eigenvalue-order index."
+        },
+        {
+          "name": "instrument_response_uncertainty_supplied",
+          "unit": "boolean",
+          "description": "Full-EM: whether measured response-matrix uncertainty was supplied."
+        },
+        {
+          "name": "instrument_response_uncertainty_propagated",
+          "unit": "boolean",
+          "description": "Full-EM: whether response-matrix perturbation/refitting produced a usable covariance contribution."
+        },
+        {
+          "name": "instrument_response_mc_successes",
+          "unit": "integer",
+          "description": "Full-EM: successful response-matrix perturbation/refits."
+        },
+        {
+          "name": "instrument_response_mc_requested",
+          "unit": "integer",
+          "description": "Full-EM: requested response-matrix perturbation/refit count."
+        },
+        {
+          "name": "instrument_response_parameter_covariance",
+          "unit": "mixed physical parameter covariance",
+          "description": "Full-EM: parameter covariance contribution from supplied measured response-matrix uncertainty, conditional on fixed external magnetic field, geometry, composition and polarizations."
+        },
+        {
+          "name": "instrument_response_uncertainty_warning",
+          "unit": "text; conditional",
+          "description": "Full-EM: warning when too few response-matrix perturbation/refits succeed to estimate covariance."
         }
       ],
       "assumptions": [
@@ -4989,7 +5017,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
-      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; supplied measured response-matrix uncertainty is propagated by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance is not yet propagated. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -5000,7 +5028,7 @@
         "Ion species and charge-density fractions are fixed external inputs; only their temperatures are fitted.",
         "Non-Maxwellian electron and fast-ion distribution shapes are supplied externally and are not inferred by this model.",
         "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model.",
-        "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
+        "Full-electromagnetic CTS propagates supplied measured response-matrix uncertainty by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance remains unpropagated.",
         "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided.",
         "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed.",
         "Full-EM measured-spectrum inversion fits scalar electron- and per-species ion-flow projections along the scattering wavevector; it does not accept externally supplied 3-D flow vectors.",
@@ -5080,7 +5108,9 @@
             "scattered_polarization",
             "optional parameter_bounds, harmonic_order, quadrature_order and damping_rate_rad_s",
             "optional frequency_resolved_geometry nested inside scattering_geometry, generated by the CTS ray/beam helper",
-            "optional electron_flow_projection_initial_m_s and per-species ion_flow_projection_initial_m_s optimizer seeds; both projections are fitted from the measured spectrum"
+            "optional electron_flow_projection_initial_m_s and per-species ion_flow_projection_initial_m_s optimizer seeds; both projections are fitted from the measured spectrum",
+            "instrument_response_uncertainty (optional measured response-matrix 1-sigma)",
+            "response_mc_samples (optional Monte Carlo refit count; default 100)"
           ],
           "outputs": [
             "electron_density_m3",
