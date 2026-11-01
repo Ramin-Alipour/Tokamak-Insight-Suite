@@ -1247,8 +1247,12 @@ elif page=='Spectral Analysis':
                 if result.get('path_integrated_density'):
                     st.markdown('**Conditional path-integrated density result**')
                     st.json(result['path_integrated_density'])
+                if result.get('result_classification'):
+                    st.markdown('**Measured-spectrum result classification**')
+                    st.caption('Primary = identifiable from supplied calibrated measurements; Conditional = requires the listed auxiliary inputs; Non-identifiable = not uniquely recoverable from this measurement geometry/model.')
+                    st.json(result['result_classification'])
                 if result.get('parameter_identifiability'):
-                    st.markdown('**Primary, conditional and non-identifiable parameters**')
+                    st.markdown('**Model identifiability diagnostics**')
                     st.json(result['parameter_identifiability'])
                 if result.get('primary_outputs_reportable_as_identified') is False:
                     st.warning('The measured-data inverse is not identifiable at the requested profile resolution. Physical primary profile fields are withheld; the optimizer candidate is diagnostic only and is not a measured result.')
