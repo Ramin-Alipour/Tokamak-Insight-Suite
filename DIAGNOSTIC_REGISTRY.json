@@ -4685,7 +4685,8 @@
         "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
         "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
-        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response"
+        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
+        "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
       ],
       "raw_data_to_physics": false,
       "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
