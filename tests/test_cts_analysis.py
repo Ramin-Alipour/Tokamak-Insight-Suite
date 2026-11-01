@@ -1035,14 +1035,15 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     cts = next(item for item in ANALYSES if "collective" in item["name"].lower() and "thomson" in item["name"].lower())
     specs = {item["name"]: item for item in cts["execution_contract"]["input_specs"]}
 
-    # The electrostatic implementation rejects these when omitted, so the
-    # public contract must not advertise them as optional.
+    # Density and temperature starts are optional because the calibrated
+    # spectrum now supplies automatic numerical optimizer seeds.
     for name in (
         "electron_density_initial_m3",
         "electron_temperature_initial_eV",
         "ion_temperature_initial_eV",
     ):
-        assert specs[name]["required"] is True
+        assert specs[name]["required"] is False
+        assert "automatic numerical starting estimate" in specs[name]["description"]
 
     assert specs["electron_velocity_projection_m_s"]["required"] is False
     assert "optional optimizer initial seed" in specs["electron_velocity_projection_m_s"]["description"]
