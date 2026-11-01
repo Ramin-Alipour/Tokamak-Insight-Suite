@@ -6,7 +6,7 @@ This module does not calibrate detectors or repair/prepare measurements.
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, least_squares
 from scipy.special import gammaln, stdtr
 
 from .thomson_scattering import density_from_thomson_scattered_power, _covariance_is_positive_semidefinite
@@ -292,6 +292,66 @@ def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertaint
 
 
 
+
+def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
+    """Profile Kappa while re-optimizing amplitude, centroid, width and baseline."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    p = np.asarray(p, dtype=float)
+    spacing = float(np.median(np.diff(x)))
+    lower = np.array([0.0, x[0], max(spacing * 0.2, 1e-12), -np.inf, -np.inf])
+    upper = np.array([np.inf, x[-1], x[-1] - x[0], np.inf, np.inf])
+    kmin, kmax = 1.500001, max(20.0, float(p[3]) * 8.0)
+    grid = np.unique(np.r_[np.geomspace(kmin, kmax, 61), p[3]])
+    scale = np.ones_like(y) if sigma is None else np.asarray(sigma, dtype=float)
+
+    def forward(nuisance, kappa):
+        amp, center, width, offset, slope = nuisance
+        df = 2.0 * kappa - 1.0
+        student_scale = width * np.sqrt((df - 2.0) / df)
+        component = amp * (1.0 + ((x - center) / student_scale) ** 2 / df) ** (-kappa)
+        return _apply_response(response, component, x) + offset + slope * (x - center)
+
+    profile = np.full(grid.shape, np.inf)
+    for i, kappa in enumerate(grid):
+        objective = lambda z: (forward(z, kappa) - y) / scale
+        try:
+            fit = least_squares(objective, p[[0, 1, 2, 4, 5]], bounds=(lower, upper),
+                                x_scale="jac", max_nfev=3000)
+            if fit.success and np.all(np.isfinite(fit.fun)):
+                profile[i] = float(fit.fun @ fit.fun)
+        except (ValueError, FloatingPointError):
+            pass
+    finite = np.isfinite(profile)
+    if not np.any(finite):
+        return {"status": "unavailable", "reason": "All nuisance re-optimizations failed."}
+    delta = profile - np.min(profile[finite])
+    best = int(np.nanargmin(np.where(finite, profile, np.nan)))
+
+    def find_crossing(indices):
+        for a, b in zip(indices[:-1], indices[1:]):
+            if (delta[a] - 1.0) * (delta[b] - 1.0) <= 0.0:
+                if delta[b] == delta[a]:
+                    return float((grid[a] + grid[b]) / 2.0)
+                return float(grid[a] + (1.0 - delta[a]) * (grid[b] - grid[a]) / (delta[b] - delta[a]))
+        return None
+
+    lo = find_crossing(list(range(best, -1, -1)))
+    hi = find_crossing(list(range(best, len(grid))))
+    return {
+        "status": "finite_profile_interval" if lo is not None and hi is not None else "grid_censored",
+        "profile_interval_kappa": [lo, hi],
+        "lower_limit_grid_censored": lo is None,
+        "upper_limit_grid_censored": hi is None,
+        "delta_chi_square_threshold": 1.0,
+        "nominal_confidence_level": 0.6827,
+        "numerical_profile_domain": [kmin, kmax],
+        "profile_grid_kappa": grid,
+        "profile_delta_chi_square": delta,
+        "noise_scale": "supplied_pointwise_uncertainty" if sigma is not None else "unweighted_residual_scale_not_measurement_calibrated",
+        "interpretation": "Conditional one-parameter profile likelihood; a grid-censored limit is not a physical bound. The finite upper grid edge is numerical only."
+    }
+
 def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     """Fit the 1-D projection of an isotropic kappa VDF (Student-t form)."""
     signal_scale=float(np.max(np.abs(signal)))
@@ -409,6 +469,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         "threshold_semantics": "rank and floating-point conditioning diagnostics; not an empirical or universal physical threshold",
         "limitation": None if kappa_identifiable else "The measured spectral window and supplied response do not locally distinguish the Kappa shape parameter from the remaining fitted parameters; do not interpret the optimizer candidate as an identified physical Kappa index.",
     }
+    kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(wavelength, signal_scaled, response, p_scaled, uncertainty_scaled)
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
         a, cen, sig, kap, off, sl = values
@@ -428,7 +489,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "electron_temperature_uncertainty_eV":float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
             "electron_velocity_projection_m_s":float(velocity),
             "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
-            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,"kappa_index_identifiability":kappa_identifiability,
+            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,"kappa_index_identifiability":kappa_identifiability,"kappa_profile_likelihood":kappa_profile_likelihood,
             "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
             "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
             "fit_parameters":np.asarray(p,dtype=float),
