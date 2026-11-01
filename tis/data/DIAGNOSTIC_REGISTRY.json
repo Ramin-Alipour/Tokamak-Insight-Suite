@@ -457,7 +457,8 @@
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
     "calibrated_measurements_to_physics": true,
-    "primary_analysis_id": 1
+    "primary_analysis_id": 1,
+    "raw_data_to_physics": false
   },
   {
     "family": "Plasma parameters",
@@ -5497,7 +5498,8 @@
     "note": "This registered profile subanalysis consumes measured calibrated spectra (optical Thomson spectra) and delegates to the canonical physical forward model. It never accepts pre-derived ne/Te profiles.",
     "calibrated_measurements_to_physics": true,
     "completion_scope": "Profile-oriented output from the canonical measured, calibrated spectrum-to-physics inference, using the same physical models and uncertainty scope as Analysis 1. No pre-derived profile input, device calibration or independent experimental validation is performed.",
-    "primary_analysis_id": 1
+    "primary_analysis_id": 1,
+    "raw_data_to_physics": false
   },
   {
     "family": "Fast particles",
