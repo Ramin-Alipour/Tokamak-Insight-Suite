@@ -925,7 +925,7 @@ def analyze_full_em_cts_spectrum(
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None,
 ):
-    """Fit n_e, T_e and a separate T_i for every supplied thermal ion species.
+    """Fit n_e, T_e, electron flow, and each supplied ion species' T_i and flow projection.
 
     The instrument amplitude and constant background are profiled as nuisance
     parameters. The electron-flow component along the local scattering
@@ -1038,6 +1038,8 @@ def analyze_full_em_cts_spectrum(
         pair_value = bounds.get(name)
         if pair_value is None and name.startswith("ion_temperature_eV:"):
             pair_value = bounds.get("ion_temperature_eV")
+        if pair_value is None and name.startswith("ion_flow_projection_m_s:"):
+            pair_value = bounds.get("ion_flow_projection_m_s")
         if pair_value is None:
             continue
         pair = _real_array(pair_value, f"parameter_bounds[{name!r}]", 1)
@@ -1124,7 +1126,7 @@ def analyze_full_em_cts_spectrum(
     rank = int(np.linalg.matrix_rank(fit.jac))
     condition = float(np.linalg.cond(fit.jac))
     if rank < len(names) or not np.isfinite(condition) or condition > 1e12:
-        raise ValueError("full-EM CTS fit rejected: density, electron temperature and all species-resolved ion temperatures are not jointly identifiable")
+        raise ValueError("full-EM CTS fit rejected: density, electron temperature, electron-flow projection, species-resolved ion temperatures and ion-flow projections are not jointly identifiable from this spectrum")
     r, amplitude, offset, convolved = residual(fit.x, return_profile=True)
     dof = max(1, f.size - (len(names) + 2))
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
