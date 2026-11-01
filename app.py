@@ -3282,6 +3282,8 @@ elif page=='Advanced Analysis':
             with s3: cts_mass_text=st.text_input('Ion masses (amu; comma-separated; required)',key='cts_masses')
             cts_fraction_text=st.text_input('Charge-density fractions (comma-separated; required; sum to 1)',key='cts_fractions')
             cts_fraction_unc_text=st.text_input('Ion-fraction 1σ uncertainties (comma-separated; optional)',key='cts_fraction_unc')
+            cts_external_covariance_upload=st.file_uploader('Optional joint external-parameter covariance CSV (probe frequency, scattering angle, selected ion fractions)',type=['csv','txt'],key='cts_external_covariance_upload')
+            cts_external_covariance_order_text=st.text_input('Covariance parameter order (comma-separated; e.g. probe_frequency_Hz,scattering_angle_rad,ion_fraction_0)',value='',key='cts_external_covariance_order')
             cts_fast_mode=st.selectbox('Fast-ion model',['None','Hot Maxwellian component','Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'],key='cts_fast_mode')
             cts_fast_vdf_upload=None
             if cts_fast_mode in {'Fixed tabulated 1-D VDF','Infer regularized tabulated 1-D VDF'}:
@@ -3374,7 +3376,14 @@ elif page=='Advanced Analysis':
                     if cts_fraction_unc_text.strip():
                         fraction_unc=[float(v.strip()) for v in cts_fraction_unc_text.split(',') if v.strip()]
                         external_unc['ion_fractions']=fraction_unc
-                    if external_unc: kwargs_cts['external_parameter_uncertainties']=external_unc
+                    if cts_external_covariance_upload is not None:
+                        if external_unc:
+                            raise ValueError('Use either the joint external-parameter covariance file or separate scalar uncertainty inputs, not both.')
+                        if not cts_external_covariance_order_text.strip():
+                            raise ValueError('Enter the exact comma-separated covariance parameter order for the uploaded joint external covariance.')
+                        kwargs_cts['external_parameter_covariance']=pd.read_csv(cts_external_covariance_upload,header=None).to_numpy(dtype=float)
+                        kwargs_cts['external_parameter_order']=[item.strip() for item in cts_external_covariance_order_text.split(',') if item.strip()]
+                    elif external_unc: kwargs_cts['external_parameter_uncertainties']=external_unc
                     if cts_method=='regularized':
                         if not cts_regularization.strip():
                             raise ValueError('Enter the regularization strength explicitly for regularized inversion.')
