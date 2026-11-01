@@ -101,7 +101,7 @@
 | 67 | `implemented_and_tested` — input coordinate is radius, not flux coordinate. | No implicit equilibrium mapping. |
 | 68 | `outside_selected_model_with_reason` — no Grad–Shafranov/equilibrium reconstruction. | Requires an external equilibrium solution and separate mapping contract. |
 | 69 | `implemented_and_tested` — GCV spline requires at least five channels. | Preserve explicit insufficient-channel status. |
-| 70 | `partially_implemented` — full channel covariance is sampled for uncertainty, but spline weighting is diagonal/pointwise rather than a full-covariance GLS objective. | Implement correlated-error spatial objective and test against diagonal limit. |
+| 70 | `implemented_and_tested` — supplied positive-definite full cross-channel covariance enters a GLS natural-cubic smoothing-spline objective; GCV uses the GLS hat-matrix effective degrees of freedom. | Singular covariance is explicitly rejected rather than silently regularized; pointwise-only uncertainty retains the diagonal independent-error route. |
 | 71 | `implemented_and_tested` — invalid positive-profile draws discarded and success threshold reported. | Preserve warnings. |
 | 72 | `open_gap` — optional measured PSF/channel mixing operator not included. | Add a supplied fixed spatial mixing operator to a joint spectral-profile forward model; no estimation/calibration by TIS. |
 | 73 | `open_gap` — present workflow fits channels then reconstructs; no joint spatially regularized spectral inverse. | WP-P1 core development. |

@@ -91,3 +91,28 @@ def test_positive_thomson_profiles_remain_positive_under_gcv_smoothing_spline():
     assert np.all(np.isfinite(profile["values"]))
     assert np.all(profile["values"] > 0.0)
     assert np.all(np.isfinite(profile["gradient_per_m"]))
+
+
+def test_full_cross_channel_covariance_is_used_in_gls_smoothing_objective():
+    from tokamak_analysis.thomson_workflow import _reconstruct_inferred_parameter_profile
+
+    radius = np.linspace(0.0, 0.6, 7)
+    values = np.array([12.0, 18.0, 31.0, 44.0, 48.0, 43.0, 39.0])
+    sigma = np.array([0.8, 1.0, 1.1, 1.2, 1.1, 1.0, 0.9])
+    correlation = np.fromfunction(
+        lambda i, j: 0.35 ** np.abs(i - j), (radius.size, radius.size)
+    )
+    covariance = correlation * np.outer(sigma, sigma)
+    result = _reconstruct_inferred_parameter_profile(
+        radius, values, covariance=covariance, positive=True,
+        method="smoothing_spline", points=101,
+    )
+    profile = result["methods"]["smoothing_spline"]
+    assert profile["status"] == "completed"
+    assert np.all(np.isfinite(profile["values"]))
+    assert np.all(profile["values"] > 0.0)
+    diagnostics = profile["smoothing_diagnostics"]
+    assert diagnostics["selection_method"] == "generalized_cross_validation_with_full_GLS_covariance"
+    assert diagnostics["covariance_model"] == "researcher_supplied_full_cross_channel_covariance"
+    assert diagnostics["smoothing_parameter"] > 0.0
+    assert np.isfinite(diagnostics["effective_degrees_of_freedom"])

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import numpy as np
-from scipy.interpolate import PchipInterpolator, make_smoothing_spline
+from scipy.interpolate import CubicSpline, PchipInterpolator, make_smoothing_spline
 
 from .thomson_scattering import _covariance_is_positive_semidefinite
 
@@ -16,6 +16,90 @@ def analyze_thomson_spectra(*args, **kwargs):
     from .thomson_inference import analyze_thomson_spectra as _infer
     return _infer(*args, **kwargs)
 
+
+
+def _generalized_least_squares_smoothing_spline(
+    radius_m, values, covariance, evaluation_radius_m,
+):
+    """Fit a natural cubic smoothing spline with a full correlated-error GLS objective.
+
+    The supplied covariance is used as-is; no correlations are inferred. The
+    smoothing parameter is selected by generalized cross-validation using the
+    GLS hat-matrix effective degrees of freedom.
+    """
+    radius = np.asarray(radius_m, dtype=float)
+    observed = np.asarray(values, dtype=float)
+    covariance = np.asarray(covariance, dtype=float)
+    scale = max(float(np.max(np.abs(observed))), np.finfo(float).tiny)
+    y = observed / scale
+    cov = covariance / scale**2
+    eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (cov + cov.T))
+    tolerance = np.finfo(float).eps * max(cov.shape) * max(float(eigenvalues[-1]), 1.0)
+    if np.any(eigenvalues <= tolerance):
+        raise ValueError(
+            "Full-covariance GLS smoothing requires a positive-definite supplied "
+            "cross-channel covariance; singular covariance is not silently regularized."
+        )
+    inverse_covariance = (eigenvectors / eigenvalues) @ eigenvectors.T
+
+    n = radius.size
+    basis = CubicSpline(radius, np.eye(n), axis=0, bc_type="natural")
+    # Integrate the exact piecewise-polynomial roughness integrand with
+    # Gauss-Legendre quadrature on every measured-coordinate interval.
+    nodes, weights = np.polynomial.legendre.leggauss(max(8, n))
+    penalty = np.zeros((n, n), dtype=float)
+    for left, right in zip(radius[:-1], radius[1:]):
+        points = 0.5 * (right - left) * nodes + 0.5 * (right + left)
+        second_derivatives = np.asarray(basis(points, 2), dtype=float)
+        penalty += 0.5 * (right - left) * (
+            second_derivatives.T @ (weights[:, None] * second_derivatives)
+        )
+    penalty = 0.5 * (penalty + penalty.T)
+
+    covariance_scale = float(np.median(eigenvalues))
+    span = float(radius[-1] - radius[0])
+    lambda_scale = span**3 / covariance_scale
+    candidates = lambda_scale * np.logspace(-8.0, 8.0, 81)
+    best = None
+    for smoothing_parameter in candidates:
+        system = inverse_covariance + smoothing_parameter * penalty
+        try:
+            coefficients = np.linalg.solve(system, inverse_covariance @ y)
+            hat_matrix = np.linalg.solve(system, inverse_covariance)
+        except np.linalg.LinAlgError:
+            continue
+        residual = y - coefficients
+        effective_df = float(np.trace(hat_matrix))
+        denominator = 1.0 - effective_df / n
+        if denominator <= 1e-10:
+            continue
+        generalized_residual = float(residual @ inverse_covariance @ residual)
+        score = (generalized_residual / n) / denominator**2
+        if np.isfinite(score) and (best is None or score < best["score"]):
+            best = {
+                "score": score,
+                "smoothing_parameter": float(smoothing_parameter),
+                "effective_degrees_of_freedom": effective_df,
+                "generalized_residual_sum_squares": generalized_residual,
+                "system_condition_number": float(np.linalg.cond(system)),
+                "coefficients": coefficients,
+            }
+    if best is None:
+        raise ValueError("GLS smoothing-parameter selection failed for the supplied covariance.")
+    coefficients = best.pop("coefficients")
+    fitted = np.asarray(basis(evaluation_radius_m), dtype=float) @ coefficients
+    gradient = np.asarray(basis(evaluation_radius_m, 1), dtype=float) @ coefficients
+    diagnostics = {
+        "selection_method": "generalized_cross_validation_with_full_GLS_covariance",
+        "covariance_model": "researcher_supplied_full_cross_channel_covariance",
+        "smoothing_parameter": best["smoothing_parameter"],
+        "gcv_score": best["score"],
+        "effective_degrees_of_freedom": best["effective_degrees_of_freedom"],
+        "generalized_residual_sum_squares": best["generalized_residual_sum_squares"],
+        "system_condition_number": best["system_condition_number"],
+        "covariance_regularization": "none; non-positive-definite covariance is rejected",
+    }
+    return fitted * scale, gradient * scale, diagnostics
 
 
 def _reconstruct_inferred_parameter_profile(
@@ -49,6 +133,7 @@ def _reconstruct_inferred_parameter_profile(
     if isinstance(mc_samples, (bool, np.bool_)) or not isinstance(mc_samples, (int, np.integer)) or mc_samples < 20:
         raise ValueError("profile_reconstruction_mc_samples must be an integer >= 20.")
 
+    full_covariance_supplied = covariance is not None
     sigma = None
     if uncertainty is not None:
         sigma = np.asarray(uncertainty, dtype=float)
@@ -85,11 +170,28 @@ def _reconstruct_inferred_parameter_profile(
         "extrapolation": "forbidden; reconstruction is restricted to the measured channel-coordinate interval",
     }
 
+    spline_diagnostics = {}
+
     def fit_profile(sample, selected_method):
         if selected_method == "pchip":
             fit = PchipInterpolator(radius, sample, extrapolate=False)
             reconstructed = np.asarray(fit(grid), dtype=float)
             gradient = np.asarray(fit.derivative()(grid), dtype=float)
+        elif selected_method == "smoothing_spline" and full_covariance_supplied:
+            if positive:
+                if np.any(sample <= 0.0):
+                    raise ValueError("Positive profile samples must remain strictly positive.")
+                log_covariance = cov / np.outer(sample, sample)
+                log_profile, log_gradient, diagnostics = _generalized_least_squares_smoothing_spline(
+                    radius, np.log(sample), log_covariance, grid,
+                )
+                reconstructed = np.exp(log_profile)
+                gradient = reconstructed * log_gradient
+            else:
+                reconstructed, gradient, diagnostics = _generalized_least_squares_smoothing_spline(
+                    radius, sample, cov, grid,
+                )
+            spline_diagnostics[selected_method] = diagnostics
         elif positive:
             # An unconstrained smoothing spline in physical coordinates can
             # overshoot below zero between positive measured channels. Fit the
@@ -153,6 +255,8 @@ def _reconstruct_inferred_parameter_profile(
             ),
             "uncertainty_available": False,
         }
+        if selected_method in spline_diagnostics:
+            item["smoothing_diagnostics"] = spline_diagnostics[selected_method]
         if draws is not None:
             sampled_profiles, sampled_gradients = [], []
             for sample in draws:
