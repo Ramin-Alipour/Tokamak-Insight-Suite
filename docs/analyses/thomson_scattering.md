@@ -205,3 +205,8 @@ When physical inference supplies a full positive-definite cross-channel paramete
 +\lambda\int [f''(r)]^2\,dr,
 \]
 with the smoothing parameter selected by generalized cross-validation using the effective degrees of freedom of the GLS hat matrix. The full covariance is used directly; correlations are never inferred from pointwise uncertainties. Results report the selected smoothing parameter, GCV score, effective degrees of freedom, generalized residual sum of squares and system condition number. Singular/non-positive-definite covariance is rejected rather than silently regularized. For positive profiles, the objective is applied to log-parameters with a first-order covariance transformation based on the measured channel values. Monte Carlo profile bands remain conditional on the supplied/inferred covariance and selected smoothing procedure.
+
+
+### Kappa-shape identifiability
+
+The non-collective Kappa fit evaluates the finite-difference Jacobian of the actual measured-response-convolved six-parameter spectrum. It reports numerical rank, normalized Jacobian conditioning, and the Kappa-shape sensitivity remaining after projection against amplitude, centroid, width and linear-background nuisance directions. The result includes an explicit `reportable_as_inferred_parameter` flag and a reason when the Kappa index is weakly/non-identifiable. This is a local identifiability diagnostic, not a global profile-likelihood interval or empirical validation.

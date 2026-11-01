@@ -22,7 +22,7 @@
 | 8 | `non_identifiable_by_physics` — only scattering-vector flow projection is fitted. | Preserve scalar projection; no 3-D vector claim from one view. |
 | 9 | `implemented_and_tested` — finite-variance isotropic Kappa model. | Retain finite-variance domain and parameterization. |
 | 10 | `outside_selected_model_with_reason` — analytic Student-t projection is used, not Skolar generalized plasma-dispersion algorithm. | Do not relabel as generalized plasma-dispersion-function implementation; evaluate that algorithm separately before adoption. |
-| 11 | `partially_implemented` — Kappa shape parameter is fitted, but audit requires explicit information/identifiability diagnostics for spectral coverage and shape sensitivity. | Add profile-likelihood/rank/sensitivity test for Kappa index; return unavailable when not constrained. |
+| 11 | `partially_implemented` — added a response-convolved finite-difference Jacobian rank/conditioning diagnostic and Kappa sensitivity projected against nuisance parameters; a reportability flag is returned per channel. | A global profile-likelihood interval and stronger coverage/regularization sensitivity assessment remain open; do not treat an optimizer candidate as identified when the reportability flag is false. |
 | 12 | `implemented_and_tested` — relativistic isotropic Maxwell–Jüttner branch. | Retain explicit rest-frame distribution assumption. |
 | 13 | `non_identifiable_by_physics` — relativistic bulk flow restricted to scattering-vector direction. | Do not infer perpendicular/3-D flow from one view. |
 | 14 | `outside_selected_model_with_reason` — elastic Thomson kinematics; photon recoil/Compton effects excluded. | Keep model-domain statement and recoil screen. |

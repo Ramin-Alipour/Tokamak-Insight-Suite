@@ -392,6 +392,11 @@
           "name": "parameter_identifiability",
           "unit": "structured primary/conditional/non-identifiable classification",
           "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
+        },
+        {
+          "name": "kappa_index_identifiability",
+          "unit": "structured; per channel for non-collective Kappa",
+          "description": "Response-convolved Jacobian rank, normalized condition number and conditional Kappa sensitivity after projection against amplitude, centroid, width and linear-background nuisance parameters. Consumers must honor reportable_as_inferred_parameter; an optimizer candidate is not an identified result."
         }
       ],
       "assumptions": [

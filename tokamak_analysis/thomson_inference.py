@@ -384,9 +384,9 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     )
     kappa_column = weighted_jacobian[:, 3]
     nuisance_columns = weighted_jacobian[:, [0, 1, 2, 4, 5]]
-    nuisance_projection = nuisance_columns @ np.linalg.pinv(nuisance_columns)
+    nuisance_coefficients = np.linalg.lstsq(nuisance_columns, kappa_column, rcond=None)[0]
     conditional_kappa_sensitivity = float(
-        np.linalg.norm(kappa_column - nuisance_projection @ kappa_column)
+        np.linalg.norm(kappa_column - nuisance_columns @ nuisance_coefficients)
         / max(np.linalg.norm(kappa_column), np.finfo(float).tiny)
     )
     kappa_standard_uncertainty = float(np.sqrt(max(cov[3, 3], 0.0)))
