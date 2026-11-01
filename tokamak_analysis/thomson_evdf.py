@@ -44,7 +44,7 @@ def reconstruct_thomson_evdf(
     scattering_angle_rad,
     instrument_response_matrix,
     background_signal,
-    regularization_strength,
+    regularization_strength=None,
     velocity_grid_m_s=None,
     velocity_limit_m_s=8.0e6,
     velocity_points=241,
@@ -71,8 +71,12 @@ def reconstruct_thomson_evdf(
         raise ValueError("laser_wavelength_nm must be finite and positive")
     if isinstance(scattering_angle_rad, (bool, np.bool_)) or not np.isfinite(scattering_angle_rad) or not 0 < scattering_angle_rad < np.pi:
         raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
-    if isinstance(regularization_strength, (bool, np.bool_)) or not np.isfinite(regularization_strength) or regularization_strength <= 0:
-        raise ValueError("regularization_strength must be finite and positive; choose and report it explicitly")
+    if regularization_strength is not None and (
+        isinstance(regularization_strength, (bool, np.bool_))
+        or not np.isfinite(regularization_strength)
+        or regularization_strength <= 0
+    ):
+        raise ValueError("regularization_strength must be None for automatic GCV selection or a finite positive value")
     if isinstance(velocity_points, (bool, np.bool_)) or not isinstance(velocity_points, (int, np.integer)) or velocity_points < 41 or velocity_points > 2001:
         raise ValueError("velocity_points must be an integer from 41 to 2001")
     if isinstance(max_iter, (bool, np.bool_)) or not isinstance(max_iter, (int, np.integer)) or max_iter < 100:
@@ -154,17 +158,101 @@ def reconstruct_thomson_evdf(
     # Second-difference Tikhonov penalty suppresses oscillatory, unresolved modes.
     smooth = np.diff(np.eye(velocity.size), n=2, axis=0) / (spacing * spacing)
     smooth_scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(smooth, ord="fro"), np.finfo(float).tiny)
-    augmented_design = np.vstack([design, np.sqrt(float(regularization_strength)) * smooth_scale * smooth])
-    augmented_target = np.concatenate([target, np.zeros(smooth.shape[0])])
-    fit = lsq_linear(augmented_design, augmented_target, bounds=(0.0, np.inf), method="trf", max_iter=int(max_iter), tol=1e-10)
-    if not fit.success or not np.all(np.isfinite(fit.x)):
-        raise ValueError(f"EVDF non-negative regularized inversion failed: {fit.message}")
+    regularization_candidates = (
+        np.logspace(-8.0, 4.0, 13)
+        if regularization_strength is None
+        else np.asarray([float(regularization_strength)])
+    )
+    gcv_scores = []
+    candidate_fits = []
+    for candidate in regularization_candidates:
+        augmented_design = np.vstack([
+            design, np.sqrt(float(candidate)) * smooth_scale * smooth
+        ])
+        augmented_target = np.concatenate([target, np.zeros(smooth.shape[0])])
+        candidate_fit = lsq_linear(
+            augmented_design, augmented_target, bounds=(0.0, np.inf),
+            method="trf", max_iter=int(max_iter), tol=1e-10,
+        )
+        if not candidate_fit.success or not np.all(np.isfinite(candidate_fit.x)):
+            gcv_scores.append(float("inf"))
+            candidate_fits.append(None)
+            continue
+        active = candidate_fit.x > max(
+            float(np.max(candidate_fit.x)) * 1e-9, np.finfo(float).tiny
+        )
+        if not np.any(active):
+            gcv_scores.append(float("inf"))
+            candidate_fits.append(None)
+            continue
+        active_design = design[:, active]
+        active_penalty = smooth[:, active] * smooth_scale
+        hessian = (
+            active_design.T @ active_design
+            + float(candidate) * (active_penalty.T @ active_penalty)
+        )
+        try:
+            effective_df = float(np.trace(
+                np.linalg.solve(hessian, active_design.T @ active_design)
+            ))
+        except np.linalg.LinAlgError:
+            effective_df = float("inf")
+        residual_candidate = target - design @ candidate_fit.x
+        rss_candidate = float(residual_candidate @ residual_candidate)
+        denominator = max(float(target.size) - effective_df, 1e-9)
+        gcv_scores.append(float(target.size * rss_candidate / denominator**2))
+        candidate_fits.append(candidate_fit)
+
+    if not np.any(np.isfinite(gcv_scores)):
+        raise ValueError("EVDF regularization selection failed for every candidate; the measured spectrum does not constrain a stable non-negative solution")
+    selected_index = int(np.argmin(gcv_scores))
+    selected_regularization_strength = float(regularization_candidates[selected_index])
+    fit = candidate_fits[selected_index]
+    if fit is None or not fit.success or not np.all(np.isfinite(fit.x)):
+        raise ValueError("EVDF non-negative regularized inversion failed after GCV selection")
     coefficients = np.maximum(fit.x, 0.0)
     distribution = coefficients / spacing
     norm = float(np.trapz(distribution, velocity))
     if not np.isfinite(norm) or norm <= np.finfo(float).tiny:
         raise ValueError("EVDF inversion returned no positive integrated distribution")
     distribution /= norm
+
+    # Conditional active-set covariance. This is a local linear approximation
+    # to the constrained inverse, conditional on the selected regularization.
+    active = coefficients > max(float(np.max(coefficients)) * 1e-9, np.finfo(float).tiny)
+    active_design = design[:, active]
+    active_penalty = smooth[:, active] * smooth_scale
+    hessian = (
+        active_design.T @ active_design
+        + selected_regularization_strength * (active_penalty.T @ active_penalty)
+    )
+    covariance_scale = 1.0
+    if uncertainty_model == "not_supplied_unweighted_fit":
+        active_residual = target - design @ coefficients
+        covariance_scale = float(active_residual @ active_residual) / max(
+            1, target.size - int(np.count_nonzero(active))
+        )
+    coefficient_covariance = np.zeros((velocity.size, velocity.size), dtype=float)
+    try:
+        active_covariance = np.linalg.pinv(hessian, hermitian=True) * covariance_scale
+        active_indices = np.flatnonzero(active)
+        coefficient_covariance[np.ix_(active_indices, active_indices)] = active_covariance
+        coefficient_sum = float(np.sum(coefficients))
+        normalization_jacobian = (
+            np.eye(velocity.size) * coefficient_sum
+            - np.outer(coefficients, np.ones(velocity.size))
+        ) / (spacing * coefficient_sum**2)
+        evdf_covariance = (
+            normalization_jacobian @ coefficient_covariance @ normalization_jacobian.T
+        )
+        evdf_standard_uncertainty = np.sqrt(
+            np.maximum(np.diag(evdf_covariance), 0.0)
+        )
+        evdf_covariance_available = bool(np.all(np.isfinite(evdf_covariance)))
+    except (np.linalg.LinAlgError, FloatingPointError):
+        evdf_covariance = None
+        evdf_standard_uncertainty = None
+        evdf_covariance_available = False
 
     fitted = forward @ coefficients
     residual = residual_data - fitted
@@ -271,8 +359,21 @@ def reconstruct_thomson_evdf(
         "fitted_spectrum": fitted,
         "residual": residual,
         "residual_sum_squares": float(np.sum(residual**2)),
-        "regularization_strength": float(regularization_strength),
+        "regularization_strength": selected_regularization_strength,
+        "regularization_selection": (
+            "generalized_cross_validation_over_logarithmic_candidate_grid"
+            if regularization_strength is None else "explicit_researcher_supplied_value"
+        ),
+        "regularization_candidates": regularization_candidates.copy(),
+        "regularization_gcv_scores": np.asarray(gcv_scores, dtype=float),
         "regularization": "non-negative second-difference Tikhonov",
+        "evdf_covariance": evdf_covariance,
+        "evdf_standard_uncertainty_s_per_m": evdf_standard_uncertainty,
+        "evdf_covariance_available": evdf_covariance_available,
+        "evdf_uncertainty_interpretation": (
+            "local active-set covariance conditional on the selected grid, response, background, "
+            "regularization and active set; not a posterior or experimental validation"
+        ),
         "measurement_uncertainty_model": uncertainty_model,
         "forward_model": "non-relativistic single-particle Doppler projection with supplied measured response matrix",
         "scattering_vector_projection_only": True,
