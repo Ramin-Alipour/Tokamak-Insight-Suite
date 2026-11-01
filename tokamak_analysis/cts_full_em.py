@@ -1204,7 +1204,7 @@ def analyze_full_em_cts_spectrum(
         electron_distribution=electron_distribution,
         bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
     )
-    return {
+    out = {
         "optimizer_initial_estimates": {
             "electron_density_m3": float(initial[0]),
             "electron_temperature_eV": float(initial[1]),
@@ -1294,6 +1294,9 @@ def analyze_full_em_cts_spectrum(
         "wave_tensor": forward_diagnostics["wave_tensor"],
         "forward_model_diagnostics": forward_diagnostics,
     }
+    from .thomson_identifiability import cts_full_em_identifiability
+    out["parameter_identifiability"] = cts_full_em_identifiability(species_names)
+    return out
 
 
 def assess_full_em_cts_numerical_convergence(
