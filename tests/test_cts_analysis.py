@@ -312,7 +312,7 @@ def test_full_em_cts_forward_accepts_inferred_electron_flow_projection_without_v
         ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
         ion_fractions=[1.0], magnetic_field_T=[0, 0, 2],
         electron_flow_projection_m_s=1.5e5,
-        ion_flow_velocity_m_s={"D+": [0, 0, 0]},
+        ion_flow_projection_m_s={"D+": 0.0},
         incident_polarization=[0, 0, 1], scattered_polarization=[0, 0, 1],
         harmonic_order=3, quadrature_order=4,
     )
