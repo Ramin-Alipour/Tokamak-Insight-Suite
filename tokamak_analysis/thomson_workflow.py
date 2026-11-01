@@ -35,10 +35,11 @@ def _reconstruct_inferred_parameter_profile(
         raise ValueError("A profile requires at least two paired one-dimensional channel values.")
     if not np.all(np.isfinite(radius)) or not np.all(np.isfinite(value)):
         raise ValueError("Profile coordinates and inferred values must be finite.")
-    order = np.argsort(radius)
-    radius, value = radius[order], value[order]
     if np.any(np.diff(radius) <= 0):
-        raise ValueError("Spatial profile reconstruction requires unique, strictly increasing channel coordinates.")
+        raise ValueError(
+            "Spatial profile reconstruction requires the supplied channel coordinates "
+            "to be unique and strictly increasing; input order is preserved and never repaired."
+        )
     if positive and np.any(value <= 0):
         raise ValueError("Positive physical profile values must be strictly positive.")
     if method not in {"both", "pchip", "smoothing_spline"}:
@@ -53,7 +54,6 @@ def _reconstruct_inferred_parameter_profile(
         sigma = np.asarray(uncertainty, dtype=float)
         if sigma.shape != value.shape or not np.all(np.isfinite(sigma)) or np.any(sigma < 0):
             raise ValueError("Profile point uncertainties must be finite, non-negative and match the channel count.")
-        sigma = sigma[order]
     cov = None
     if covariance is not None:
         cov = np.asarray(covariance, dtype=float)
@@ -61,7 +61,6 @@ def _reconstruct_inferred_parameter_profile(
             raise ValueError("Profile covariance must be a finite square matrix matching the channel count.")
         if not np.allclose(cov, cov.T, rtol=1e-10, atol=0.0) or not _covariance_is_positive_semidefinite(cov):
             raise ValueError("Profile covariance must be symmetric and positive semidefinite.")
-        cov = cov[np.ix_(order, order)]
         diagonal_sigma = np.sqrt(np.maximum(np.diag(cov), 0.0))
         if sigma is not None and not np.allclose(sigma**2, diagonal_sigma**2, rtol=1e-6, atol=1e-24):
             raise ValueError("Point uncertainties must match the covariance diagonal.")
