@@ -4881,6 +4881,11 @@
           "name": "electron_thermal_relativistic_parameter",
           "unit": "dimensionless theta_e",
           "description": "Electron temperature divided by electron rest energy, T_e/(m_e c^2)."
+        },
+        {
+          "name": "three_wave_coupling",
+          "unit": "text",
+          "description": "Describes the Bindslev and/or relativistic second-order Vlasov source-current coupling used by the selected forward-model configuration."
         }
       ],
       "prerequisites": [
