@@ -1212,6 +1212,11 @@ elif page=='Spectral Analysis':
                     and saved_ts.get('analysis_signature')==analysis_signature):
                 result=saved_ts['result']
                 st.success('Thomson spectral inference completed within the selected physical model.')
+                if result.get('parameter_identifiability'):
+                    st.markdown('**Primary, conditional and non-identifiable parameters**')
+                    st.json(result['parameter_identifiability'])
+                if result.get('primary_outputs_reportable_as_identified') is False:
+                    st.warning('The measured-data inverse is not identifiable at the requested profile resolution. Physical primary profile fields are withheld; the optimizer candidate is diagnostic only and is not a measured result.')
                 profile=pd.DataFrame({
                     'radius_m':result['radius_m'],
                     'electron_temperature_eV':result['electron_temperature_profile_eV'],
