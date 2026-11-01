@@ -1143,6 +1143,28 @@ def analyze_thomson_spectra(
             fit["electron_density_m3"] = fit.get("electron_density_m3")
             if "density_status" not in fit:
                 fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
+        fit["spectral_weighting_status"] = (
+            "full_channel_major_generalized_least_squares"
+            if joint_covariance is not None else
+            "diagonal_pointwise_measurement_uncertainty_weighted"
+            if ui is not None else
+            "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        )
+        fit["fit_covariance_interpretation"] = (
+            "local_parameter_covariance_from_supplied_measurement_noise_model"
+            if joint_covariance is not None or ui is not None else
+            "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+        )
+        fit["background_model_status"] = (
+            "linear_intercept_and_slope_nuisance_background"
+            if model in {"non_collective_maxwellian", "non_collective_kappa"}
+            else "model_specific_background_treatment"
+        )
+        fit["background_model_limitation"] = (
+            "Curved, structured, line-contaminated or time-varying backgrounds are not represented by the two-parameter linear baseline."
+            if model in {"non_collective_maxwellian", "non_collective_kappa"} else
+            "Interpret the selected model's documented background treatment; no automatic physical background decomposition is claimed."
+        )
         fit["channel_index"] = int(i)
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
