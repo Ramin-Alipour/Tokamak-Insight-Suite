@@ -4479,6 +4479,36 @@
           "unit": "ordered names matching external_parameter_covariance rows and columns",
           "required": false,
           "description": "Required when external_parameter_covariance is supplied. Allowed names: probe_frequency_Hz, scattering_angle_rad, and ion_fraction_0 through ion_fraction_(N_species-1). Names must be unique and correspond exactly to covariance order."
+        },
+        {
+          "name": "numerical_convergence",
+          "unit": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Full-EM only: automatically assess paired harmonic/quadrature refinement at the fitted parameters. This is a numerical discretization check, not a physical uncertainty or experimental validation.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "convergence_harmonic_orders",
+          "unit": "paired increasing integer sequence >=2",
+          "required": false,
+          "description": "Full-EM only: optional explicit harmonic refinement levels. Must have the same length as convergence_quadrature_orders; omitted levels are derived from the selected harmonic_order.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "convergence_quadrature_orders",
+          "unit": "paired increasing integer sequence >=4",
+          "required": false,
+          "description": "Full-EM only: optional explicit quadrature refinement levels. Must have the same length as convergence_harmonic_orders; omitted levels are derived from the selected quadrature_order.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "convergence_relative_tolerance",
+          "unit": "dimensionless positive relative L2 and L-infinity tolerance",
+          "required": false,
+          "default": 0.001,
+          "description": "Full-EM only: both successive relative spectral changes must be below this tolerance for convergence_status=converged_at_final_refinement.",
+          "applies_when_model": "full_electromagnetic"
         }
       ],
       "output_specs": [
@@ -4999,6 +5029,11 @@
           "name": "instrument_response_uncertainty_warning",
           "unit": "text; conditional",
           "description": "Full-EM: warning when too few response-matrix perturbation/refits succeed to estimate covariance."
+        },
+        {
+          "name": "numerical_convergence",
+          "unit": "structured numerical convergence record",
+          "description": "Full-EM only: paired harmonic/quadrature refinement levels, relative L2 and L-infinity spectral changes, final refined spectrum, tolerance and convergence status; explicitly separate from physical uncertainty."
         }
       ],
       "assumptions": [
