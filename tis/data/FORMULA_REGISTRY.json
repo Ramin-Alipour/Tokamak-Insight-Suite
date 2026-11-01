@@ -3249,7 +3249,8 @@
         {
           "name": "fast_ion",
           "unit": "optional hot Maxwellian or tabulated one-dimensional fast-ion component",
-          "required": false
+          "required": false,
+          "description": "Optional hot Maxwellian or normalized tabulated one-dimensional fast-ion VDF; shape inference and regularization are controlled by the separate analyze_cts_spectrum inversion entry point."
         }
       ],
       "output_specs": [
