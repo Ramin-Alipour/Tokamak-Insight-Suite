@@ -138,6 +138,36 @@ def test_distribution_propagates_full_within_channel_covariance():
     assert out["spectral_centroid_uncertainty_nm"] > 0
 
 
+def test_distribution_propagates_joint_signal_background_cross_covariance():
+    x, y = _spectrum()
+    background = 12.0 + 0.8 * (x - 500.0)
+    result = analyze_thomson_spectral_distribution(
+        x, y, instrument_response_matrix=np.eye(x.size),
+        background_signal=background,
+        signal_covariance=np.eye(x.size) * 0.25,
+        background_signal_covariance=np.eye(x.size) * 0.04,
+        signal_background_cross_covariance=np.eye(x.size) * 0.05,
+        moment_mc_samples=40,
+    )
+    assert result["background_uncertainty_model"] == "joint_signal_background_covariance"
+    assert result["background_uncertainty_supplied"] is True
+    assert result["moment_uncertainty_successful_draws"] >= 20
+    assert result["spectral_centroid_uncertainty_nm"] > 0.0
+
+
+def test_distribution_rejects_non_positive_definite_joint_signal_background_covariance():
+    x, y = _spectrum()
+    with pytest.raises(ValueError, match="joint signal/background covariance"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_response_matrix=np.eye(x.size),
+            background_signal=12.0 + 0.8 * (x - 500.0),
+            signal_covariance=np.eye(x.size) * 0.25,
+            background_signal_covariance=np.eye(x.size) * 0.04,
+            signal_background_cross_covariance=np.eye(x.size) * 0.5,
+            moment_mc_samples=40,
+        )
+
+
 def test_distribution_rejects_conflicting_or_non_positive_definite_covariance():
     x, y = _spectrum()
     common = dict(
