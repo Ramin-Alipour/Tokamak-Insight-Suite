@@ -7367,15 +7367,16 @@
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
       ],
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false,
-      "note": "Descriptive spectral-shape diagnostics from calibrated measured data only; physical plasma parameters are provided by the parent Analysis 1 physical forward inference.",
+      "calibrated_measurements_to_physics": true,
+      "note": "Input is a measured, calibrated optical Thomson spectrum. This subanalysis reports wavelength-space spectral descriptors; physical plasma parameters are inferred by the parent Analysis 1 forward model.",
       "completion_scope": "Observed wavelength-space moments and response-convolved Gaussian shape diagnostics from calibrated measured spectra, without deconvolution or physical-parameter inference.",
       "test_links": [
         "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
         "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
         "tests/test_thomson_distribution.py::test_moments_use_signed_residuals_and_propagate_pointwise_uncertainty",
         "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics"
-      ]
+      ],
+      "input_data_level": "measured_calibrated_spectrum"
     },
     "scientific_references": [
       {
@@ -7401,7 +7402,7 @@
     "note": "Analysis 1 subanalysis: descriptive observed spectral moments and response-convolved Gaussian shape diagnostics only. Projected EVDF inference belongs to the primary Analysis 1 workflow and its own inverse routine.",
     "primary_analysis_id": 1,
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": false,
+    "calibrated_measurements_to_physics": true,
     "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction."
   }
 ]
