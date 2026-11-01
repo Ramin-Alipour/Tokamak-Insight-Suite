@@ -88,7 +88,7 @@ This review separates **actual repository inconsistencies** from **declared scie
 55. Exactly one background representation must be supplied: a background spectrum, a boolean background mask, or an explicitly selected edge fraction.
 56. The edge-fraction method is a researcher-selected heuristic and can subtract real Thomson signal if the physical spectrum reaches the selected edges.
 57. Background parameters and their shared systematic uncertainty are not jointly sampled with the moment Monte Carlo.
-58. Pointwise-noise Monte Carlo treats wavelength samples as independent; full within-channel covariance is required for correlated spectral noise.
+58. **Full within-channel spectral covariance is implemented.** When `signal_covariance` is supplied, the Gaussian fit uses the covariance-whitened objective and moment Monte Carlo draws correlated wavelength samples through the covariance Cholesky factor; the pointwise `signal_uncertainty` path remains independent-sample only. Signal/background cross-covariance is still not represented, so that shared covariance remains a declared limitation. Regression coverage: `tests/test_thomson_distribution.py::test_distribution_propagates_full_within_channel_covariance` and `test_distribution_rejects_conflicting_or_non_positive_definite_covariance`.
 59. Signed moments retain negative residuals; near-cancellation, small signed area or non-positive variance makes them unstable or undefined.
 60. The reported width is an observed wavelength-space width; it is not an instrument-corrected electron-temperature width.
 61. The measured response matrix is used as a forward operator for the Gaussian shape fit; the measured spectrum is not deconvolved.
