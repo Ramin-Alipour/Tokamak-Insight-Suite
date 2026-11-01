@@ -17,7 +17,7 @@ All spectra and frequency axes are assumed to be measured, prepared and calibrat
 
 The electrostatic path remains an unmagnetized multi-species longitudinal dielectric model. It computes species susceptibilities, the longitudinal dielectric function, the dynamic structure factor and convolution with the supplied measured frequency-response matrix.
 
-It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses and charge-density fractions are explicit external inputs. The inversion fits electron-flow and common projected ion-flow components from the measured CTS spectrum. `electron_velocity_projection_m_s` and `ion_velocity_initial_m_s` are optional numerical optimizer seeds; omission uses zero as a numerical starting value only. Neither is a fixed measured plasma parameter or a stationary-flow assumption. The dashboard labels the electron-flow value as an optional seed and no longer requires the user to enter zero to assert stationary flow.
+It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses and charge-density fractions are explicit external inputs. The inversion fits electron-flow and common projected ion-flow components from the measured CTS spectrum. Density and temperature optimizer seeds are optional: omitted values are initialized automatically from measured spectral shape and width, while the final parameters are determined by the full forward-model fit. `electron_velocity_projection_m_s` and `ion_velocity_initial_m_s` are optional numerical optimizer seeds; omission uses zero as a numerical starting value only. Neither is a fixed measured plasma parameter or a stationary-flow assumption. The dashboard labels the electron-flow value as an optional seed and no longer requires the user to enter zero to assert stationary flow.
 
 ## Magnetized full-electromagnetic CTS
 
@@ -64,8 +64,8 @@ Required inputs include:
 
 - Calibrated frequency-shift axis and calibrated CTS spectral power.
 - Probe frequency and measured instrument-response matrix.
-- Researcher-supplied initial electron density and temperature estimates.
-- Explicit ion species metadata, charge-density fractions and one initial temperature per ion species.
+- Optional researcher-supplied initial electron density, electron temperature and ion-temperature estimates. Any omitted seed is estimated automatically from the calibrated measured spectrum: electron temperature from the full-spectrum RMS width, common ion temperature from the central 68%-weight core width, and density from an explicitly labelled alpha=1 numerical seed. These are optimizer starts only, not reported measurements; supplied values override the corresponding automatic estimates.
+- Explicit ion species metadata and charge-density fractions.
 - Optional researcher-supplied parameter bounds keyed by electron density, electron temperature and species-specific ion temperatures. If omitted, the positive log-parameters are not restricted by default scientific ranges.
 - Magnetic-field vector.
 - Optional initial electron-flow projection seed and optional per-species ion-flow projection seeds along the scattering wavevector. The inversion fits these scalar projections from the measured spectrum; a single CTS geometry does not identify full three-dimensional flow vectors.
@@ -128,3 +128,10 @@ When `damping_rate_rad_s` is omitted, Full-EM uses the documented numerical regu
 This is not a physical collision frequency. The resolved value and whether it was caller-supplied or defaulted are returned in `numerical_controls`. Harmonic order, quadrature order and damping should be varied in numerical convergence studies before interpreting the result. Ray-tracing APIs require an explicit `mode_index`; no propagation branch is silently selected.
 
 If no pointwise uncertainty or spectral covariance is supplied to Electrostatic CTS, the fit is unweighted. The implementation does not invent a noise scale from the measured spectrum; the result reports `spectral_weighting_status=unweighted_no_measurement_uncertainty_supplied`, and reduced chi-square is unavailable.
+
+
+## Automatic optimizer initialization
+
+The electrostatic inversion does not require users to provide density or temperature starting guesses. For each omitted seed, the initializer uses the calibrated spectral power after subtracting a low-percentile baseline. The electron-temperature seed is derived from the full-spectrum RMS frequency width and the scattering wave number; the common ion-temperature seed uses the central 68%-weight spectral-core width and the charge-density-weighted ion mass. A density seed is constructed by setting the dimensionless collective parameter to alpha=1 solely for numerical initialization. This alpha value is not an inferred plasma measurement, a prior, or a constraint: the inversion fits density freely from the complete measured spectrum. Explicit researcher-supplied seeds override only their corresponding automatic estimates. The result records the initialization method and provenance separately from fitted physical outputs.
+
+The initializer is deterministic and does not perform instrument calibration, experimental validation, or detector correction. It operates on the calibrated CTS spectrum supplied to the analysis.
