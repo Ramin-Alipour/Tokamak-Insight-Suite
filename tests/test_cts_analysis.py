@@ -986,6 +986,8 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         incident_polarization=[0.0, 0.0, 1.0],
         scattered_polarization=[0.0, 0.0, 1.0],
         instrument_response=np.eye(frequency.size),
+        instrument_response_uncertainty=np.zeros((frequency.size, frequency.size)),
+        response_mc_samples=20,
         **uncertainty_kwargs,
         parameter_bounds={
             "electron_flow_projection_m_s": [1.0e5, 8.0e5],
@@ -1011,6 +1013,9 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
     )
     assert result["ion_flow_projection_is_fitted"] is True
     assert result["ion_flow_projection_uncertainty_m_s_by_species"]["D+"] >= 0.0
+    assert result["instrument_response_uncertainty_supplied"] is True
+    assert result["instrument_response_uncertainty_propagated"] is True
+    assert result["instrument_response_mc_successes"] >= 12
 
 def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
     from tokamak_analysis.cts_analysis import _convolve

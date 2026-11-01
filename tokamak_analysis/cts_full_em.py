@@ -241,7 +241,8 @@ def full_em_cts_spectral_density(
     electron_flow_projection_m_s=None, ion_flow_projection_m_s=None,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
     fast_ion_populations=None, electron_distribution=None,
-    bindslev_validity_theta_e_limit=None,
+    bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
+    response_mc_samples=100,
 ):
     """Return a local full-EM magnetized CTS spectrum and fluctuation diagnostics.
 
@@ -966,6 +967,13 @@ def analyze_full_em_cts_spectrum(
     if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
         raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
     response = response / response.sum(axis=0, keepdims=True)
+    response_sigma = None
+    if instrument_response_uncertainty is not None:
+        response_sigma = _real_array(instrument_response_uncertainty, "instrument_response_uncertainty", 2)
+        if response_sigma.shape != response.shape or np.any(~np.isfinite(response_sigma)) or np.any(response_sigma < 0):
+            raise ValueError("instrument_response_uncertainty must be finite, non-negative, and match instrument_response")
+        if isinstance(response_mc_samples, bool) or not isinstance(response_mc_samples, (int, np.integer)) or response_mc_samples < 20:
+            raise ValueError("response_mc_samples must be an integer >= 20 when response uncertainty is supplied")
     if signal_uncertainty is not None and spectral_covariance is not None:
         raise ValueError("supply signal_uncertainty or spectral_covariance, not both")
     if spectral_covariance is not None:
@@ -1129,7 +1137,7 @@ def analyze_full_em_cts_spectrum(
             for i, name in enumerate(species_names)
         }
 
-    def model(p):
+    def model(p, response_matrix=None):
         result = full_em_cts_spectral_density(
             f, probe_frequency_Hz, scattering_geometry,
             electron_density_m3=10.0**np.clip(p[0], -300.0, 300.0),
@@ -1147,10 +1155,10 @@ def analyze_full_em_cts_spectrum(
             electron_distribution=electron_distribution,
             bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
         )["spectral_density"]
-        return _apply_frequency_response(response, result, f)
+        return _apply_frequency_response(response if response_matrix is None else response_matrix, result, f)
 
-    def residual(p, return_profile=False):
-        z = model(p)
+    def residual(p, return_profile=False, response_matrix=None):
+        z = model(p, response_matrix=response_matrix)
         design = whiten(np.column_stack((z, np.ones_like(z))))
         target = whiten(y)
         amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
@@ -1173,12 +1181,14 @@ def analyze_full_em_cts_spectrum(
     covariance_log = np.linalg.pinv(fit.jac.T @ fit.jac)
     if spectral_covariance is None and signal_uncertainty is None:
         covariance_log *= float(r @ r / dof)
-    values = np.concatenate((
-        10.0**np.clip(fit.x[:2], -300.0, 300.0),
-        [electron_flow_projection(fit.x)],
-        10.0**np.clip(fit.x[3:3+n_species], -300.0, 300.0),
-        np.asarray(list(unpack_ion_flow_projections(fit.x).values()), dtype=float),
-    ))
+    def physical_parameter_values(parameters):
+        return np.concatenate((
+            10.0**np.clip(parameters[:2], -300.0, 300.0),
+            [electron_flow_projection(parameters)],
+            10.0**np.clip(parameters[3:3+n_species], -300.0, 300.0),
+            np.asarray(list(unpack_ion_flow_projections(parameters).values()), dtype=float),
+        ))
+    values = physical_parameter_values(fit.x)
     transform_diagonal = np.concatenate((
         np.log(10.0) * values[:2],
         [1.0e6],
@@ -1294,6 +1304,44 @@ def analyze_full_em_cts_spectrum(
         "wave_tensor": forward_diagnostics["wave_tensor"],
         "forward_model_diagnostics": forward_diagnostics,
     }
+    out["instrument_response_uncertainty_supplied"] = response_sigma is not None
+    out["instrument_response_uncertainty_propagated"] = False
+    if response_sigma is not None:
+        rng = np.random.default_rng(73129)
+        response_draws = []
+        for _ in range(int(response_mc_samples)):
+            sampled_response = np.maximum(response + rng.normal(0.0, response_sigma), 0.0)
+            column_sums = sampled_response.sum(axis=0)
+            if np.any(column_sums <= 0.0):
+                continue
+            sampled_response = sampled_response / column_sums[None, :]
+            try:
+                draw = least_squares(
+                    lambda parameters: residual(parameters, response_matrix=sampled_response),
+                    fit.x, bounds=(lower, upper), x_scale="jac", max_nfev=1200,
+                )
+                if draw.success and np.all(np.isfinite(draw.x)):
+                    response_draws.append(physical_parameter_values(draw.x))
+            except (ValueError, RuntimeError, np.linalg.LinAlgError):
+                continue
+        out["instrument_response_mc_successes"] = len(response_draws)
+        out["instrument_response_mc_requested"] = int(response_mc_samples)
+        if len(response_draws) >= max(12, int(np.ceil(0.7*response_mc_samples))):
+            response_covariance = np.cov(np.asarray(response_draws), rowvar=False, ddof=1)
+            covariance = covariance + response_covariance
+            out["instrument_response_parameter_covariance"] = response_covariance
+            out["fit_covariance"] = covariance
+            out["parameter_uncertainties"] = np.sqrt(np.maximum(np.diag(covariance), 0.0))
+            out["electron_flow_projection_uncertainty_m_s"] = float(np.sqrt(max(covariance[2,2], 0.0)))
+            out["ion_flow_projection_uncertainty_m_s_by_species"] = {
+                name: float(np.sqrt(max(covariance[3+n_species+i,3+n_species+i],0.0)))
+                for i, name in enumerate(species_names)
+            }
+            out["instrument_response_uncertainty_propagated"] = True
+        else:
+            out["instrument_response_uncertainty_warning"] = (
+                "Too few successful response-matrix perturbation refits; no response covariance was added."
+            )
     from .thomson_identifiability import cts_full_em_identifiability
     out["parameter_identifiability"] = cts_full_em_identifiability(species_names)
     return out

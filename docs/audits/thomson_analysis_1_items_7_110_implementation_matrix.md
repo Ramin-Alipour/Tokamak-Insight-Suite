@@ -142,7 +142,7 @@
 | 98 | `open_gap` — mode conversion and branch tracking through degeneracies absent. | Implement eigenmode continuation and crossing/degeneracy diagnostics. |
 | 99 | `partially_implemented` — local field/ray may vary; fitted plasma parameters uniform over sampled volume. | Spatially varying plasma response needs explicit profile/equilibrium input and volume quadrature. |
 | 100 | `implemented_and_tested` — beam-overlap integrals are relative spectral-bin weights. | Absolute coupling remains conditional on calibrated launcher/receiver data. |
-| 101 | `open_gap` — full-EM inversion does not propagate response-matrix uncertainty. | Add response uncertainty propagation through the full-EM forward/inverse model. |
+| 101 | `partially_implemented` — Full-EM CTS now accepts a supplied non-negative response-matrix uncertainty, samples column-renormalized response perturbations and repeats the complete parameter inversion; successful draw covariance is added to the conditional fit covariance. | Complete covariance cross terms with other uncertainty sources and add response-shape/strong-uncertainty convergence tests; this is Monte Carlo propagation, not response calibration. |
 | 102 | `open_gap` — no full external B/geometry/polarization/ray/equilibrium covariance propagation. | Add ordered joint external covariance and Monte Carlo/linear propagation with validated numerical stability. |
 | 103 | `implemented_and_tested` — covariance is conditional on fixed external inputs/settings. | Keep conditional uncertainty label. |
 | 104 | `implemented_and_tested` — unweighted covariance is residual-scaled, not measurement-noise calibrated. | Preserve semantics. |
