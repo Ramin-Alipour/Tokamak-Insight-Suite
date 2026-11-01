@@ -134,12 +134,13 @@ def test_instrument_response_uncertainty_propagates_into_absolute_density():
 def test_optical_analysis_1_rejects_collective_dielectric_models():
     x, y, _ = _spectral_case(100.0)
     for model in ("collective_maxwellian", "collective_kappa"):
-        with pytest.raises(ValueError, match="Optical collective dielectric models are outside this shortlist"):
+        with pytest.raises(ValueError, match="Optical collective dielectric models are outside this shortlist") as exc_info:
             analyze_thomson_spectra(
                 x, y[None, :], [0.1], laser_wavelength_nm=532.0,
                 scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
                 model=model,
             )
+        assert "child subanalysis of primary Analysis 1" in str(exc_info.value)
 
 def test_channel_specific_wavelength_axes_are_supported():
     x1, y1, _ = _spectral_case(100.0)
