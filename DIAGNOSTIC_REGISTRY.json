@@ -4647,6 +4647,101 @@
           "name": "scattering_volume_sample_diagnostics",
           "unit": "structured; frequency x sample",
           "description": "Per-sample locations, magnetic fields, sample weights and local spectral densities used in scattering-volume integration."
+        },
+        {
+          "name": "electron_density_uncertainty_m3",
+          "unit": "m^-3; 1-sigma",
+          "description": "Electrostatic fitted density uncertainty from the local fit covariance, optionally including model-discrepancy and response/external-parameter Monte Carlo contributions."
+        },
+        {
+          "name": "electron_temperature_uncertainty_eV",
+          "unit": "eV; 1-sigma",
+          "description": "Electrostatic fitted electron-temperature uncertainty from the local fit covariance and supported uncertainty propagation."
+        },
+        {
+          "name": "ion_temperature_uncertainty_eV",
+          "unit": "eV; 1-sigma",
+          "description": "Electrostatic common fitted ion-temperature uncertainty."
+        },
+        {
+          "name": "ion_velocity_projection_uncertainty_m_s",
+          "unit": "m s^-1; 1-sigma",
+          "description": "Electrostatic fitted common ion-flow projection uncertainty."
+        },
+        {
+          "name": "fast_ion_fraction_uncertainty",
+          "unit": "dimensionless; 1-sigma",
+          "description": "Uncertainty of the fitted fast-ion density fraction when a fast-ion component is enabled."
+        },
+        {
+          "name": "fast_ion_temperature_uncertainty_eV",
+          "unit": "eV; 1-sigma",
+          "description": "Uncertainty of the fitted Maxwellian fast-ion temperature when that component is selected."
+        },
+        {
+          "name": "fast_ion_vdf_provenance",
+          "unit": "text",
+          "description": "Distinguishes externally supplied tabulated fast-ion VDF shape from a regularized inferred one-dimensional VDF."
+        },
+        {
+          "name": "fast_ion_vdf_regularization",
+          "unit": "structured",
+          "description": "Normalized input tabulated VDF and its regularization metadata when the shape is fixed externally."
+        },
+        {
+          "name": "fast_ion_vdf_smoothness_parameter",
+          "unit": "dimensionless",
+          "description": "Researcher-supplied smoothness parameter used only for regularized tabulated VDF inference."
+        },
+        {
+          "name": "fast_ion_vdf_velocity_m_s",
+          "unit": "m s^-1",
+          "description": "Velocity grid for the inferred one-dimensional fast-ion VDF."
+        },
+        {
+          "name": "model_discrepancy_scale",
+          "unit": "dimensionless",
+          "description": "Excess reduced-chi-square scale used to form a separate model-discrepancy covariance component; not an empirical validation metric."
+        },
+        {
+          "name": "model_discrepancy_diagnostics",
+          "unit": "structured",
+          "description": "Residual-correlation and model-discrepancy interpretation diagnostics, kept separate from measurement-noise covariance."
+        },
+        {
+          "name": "parameter_names",
+          "unit": "text list",
+          "description": "Ordered names corresponding to the optimizer parameter vector and covariance matrix."
+        },
+        {
+          "name": "response_external_mc_requested",
+          "unit": "integer",
+          "description": "Number of response/external-parameter Monte Carlo refits requested in the electrostatic branch."
+        },
+        {
+          "name": "response_external_mc_successes",
+          "unit": "integer",
+          "description": "Number of successful response/external-parameter Monte Carlo refits."
+        },
+        {
+          "name": "response_uncertainty_propagated",
+          "unit": "boolean",
+          "description": "Whether supplied response-matrix uncertainty was successfully propagated by Monte Carlo refitting."
+        },
+        {
+          "name": "response_uncertainty_warning",
+          "unit": "text; conditional",
+          "description": "Warning when too few response/external-parameter perturbation refits succeed."
+        },
+        {
+          "name": "external_parameter_uncertainty_propagated",
+          "unit": "boolean",
+          "description": "Whether supported external parameter uncertainties were successfully propagated in the electrostatic branch."
+        },
+        {
+          "name": "total_fit_covariance_including_discrepancy",
+          "unit": "mixed physical parameter covariance",
+          "description": "Combined local fit covariance, successful supported external Monte Carlo contributions and separately reported model-discrepancy covariance."
         }
       ],
       "assumptions": [
