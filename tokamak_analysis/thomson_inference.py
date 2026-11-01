@@ -427,6 +427,8 @@ def analyze_thomson_spectra(
     collective_kappa_initial=None, collective_kappa_bounds=None,
     incident_polarization_uncertainty=None,
     maximum_recoil_correction_fraction=0.01,
+    enable_evdf_reconstruction=True,
+    evdf_velocity_points=121,
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -2300,7 +2302,13 @@ def analyze_thomson_spectra(
     # channel, using the background nuisance term already fitted by the selected
     # physical forward model. This avoids a second, unrelated edge-background fit.
     from .thomson_distribution import analyze_thomson_spectral_distribution
+    from .thomson_evdf import reconstruct_thomson_evdf
+    if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
+        raise ValueError("enable_evdf_reconstruction must be boolean")
+    if isinstance(evdf_velocity_points, (bool, np.bool_)) or not isinstance(evdf_velocity_points, (int, np.integer)) or not 41 <= evdf_velocity_points <= 2001:
+        raise ValueError("evdf_velocity_points must be an integer between 41 and 2001")
     spectral_distribution_results = []
+    evdf_results = []
     for channel_index, channel_result in enumerate(results):
         channel_uncertainty = None if unc is None else unc[channel_index]
         channel_covariance = None
@@ -2346,7 +2354,61 @@ def analyze_thomson_spectra(
             }
         channel_result["spectral_distribution"] = distribution
         spectral_distribution_results.append(distribution)
+
+        # Reconstruct the maximum identifiable 1-D velocity marginal directly
+        # from the same measured spectrum. The fitted physical-model background,
+        # measured response and supplied noise covariance are reused; regularization
+        # is selected by GCV rather than requested as an arbitrary user constant.
+        if enable_evdf_reconstruction:
+            try:
+                q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
+                velocity_axis = C_M_S * (
+                    1.0 - np.asarray(xs[channel_index], dtype=float) / float(laser_wavelength_nm)
+                ) / q_over_ki
+                velocity_low = max(float(np.min(velocity_axis)), -0.099 * C_M_S)
+                velocity_high = min(float(np.max(velocity_axis)), 0.099 * C_M_S)
+                if not velocity_high > velocity_low:
+                    raise ValueError("Measured wavelength coverage does not span a finite projected-velocity interval.")
+                velocity_grid = np.linspace(velocity_low, velocity_high, int(evdf_velocity_points))
+                evdf = reconstruct_thomson_evdf(
+                    xs[channel_index],
+                    y[channel_index],
+                    laser_wavelength_nm=float(laser_wavelength_nm),
+                    scattering_angle_rad=float(scattering_angle_rad),
+                    instrument_response_matrix=channel_responses[channel_index],
+                    background_signal=fitted_background,
+                    regularization_strength=None,
+                    velocity_grid_m_s=velocity_grid,
+                    velocity_points=int(evdf_velocity_points),
+                    signal_uncertainty=channel_uncertainty,
+                    signal_covariance=channel_covariance,
+                )
+                evdf["analysis_status"] = "completed"
+                evdf["background_source"] = "nuisance background fitted by the selected primary Thomson physical forward model"
+                evdf["interpretation"] = (
+                    "A normalized one-dimensional electron-velocity marginal along the scattering vector, "
+                    "inferred from the measured calibrated spectrum. It is not an unrestricted 3-D EVDF; "
+                    "directional equivalent temperature is not automatically the scalar electron temperature."
+                )
+            except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+                evdf = {
+                    "analysis_status": "unavailable_for_this_channel",
+                    "reason": str(exc),
+                    "identifiability": {
+                        "primary": [],
+                        "conditional": ["A stable projected EVDF requires sufficient measured wavelength coverage, response information and spectral signal-to-noise."],
+                        "non_identifiable": ["unrestricted three-dimensional EVDF from one scattering geometry"],
+                    },
+                }
+        else:
+            evdf = {
+                "analysis_status": "not_requested",
+                "reason": "EVDF reconstruction was explicitly disabled.",
+            }
+        channel_result["electron_velocity_distribution"] = evdf
+        evdf_results.append(evdf)
     output["spectral_distribution"] = spectral_distribution_results
+    output["electron_velocity_distribution"] = evdf_results
 
     # A fitted spectral integral is not a watt-valued scattered power unless the
     # measured spectral density is explicitly calibrated in W/nm. Preserve the
