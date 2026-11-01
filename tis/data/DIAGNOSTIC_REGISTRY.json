@@ -4472,7 +4472,7 @@
         },
         {
           "name": "parameter_uncertainties",
-          "unit": "m^-3, eV, eV; local Jacobian uncertainty for full-EM density and temperatures"
+          "unit": "m^-3, eV, m s^-1; species-resolved eV and m s^-1; local Full-EM Jacobian uncertainties conditional on fixed external inputs"
         },
         {
           "name": "bindslev_source_current_operator",
@@ -4618,8 +4618,7 @@
         {
           "name": "spectral_weighting_status",
           "unit": "text",
-          "description": "Identifies whether the fit used full spectral covariance whitening or diagonal pointwise measurement uncertainties; unweighted fitting is not used by Full-EM.",
-          "available_when_model": "full_electromagnetic"
+          "description": "Reports full spectral covariance whitening, diagonal pointwise uncertainty weighting, or unweighted fitting where permitted by the selected CTS inversion branch."
         },
         {
           "name": "parameter_covariance_scope",
@@ -4637,6 +4636,12 @@
           "name": "electron_flow_projection_is_fitted",
           "unit": "boolean",
           "description": "True for the electrostatic branch; the flow projection is fitted from the measured spectrum."
+        },
+        {
+          "name": "ion_flow_projection_is_fitted",
+          "unit": "boolean",
+          "description": "True for Full-EM: one projected ion-flow component per supplied species is fitted from the measured spectrum.",
+          "available_when_model": "full_electromagnetic"
         }
       ],
       "assumptions": [
