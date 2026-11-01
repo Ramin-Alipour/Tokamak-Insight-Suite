@@ -153,3 +153,11 @@ The method complements the ray/forward-modelling and Bayesian-inversion
 workflow discussed in recent CTS diagnostic design work (e.g. 2026 accuracy-
 driven CTS optimisation) and does not claim experimental validation.
 
+
+
+The cold-plasma ray result now also includes the polarization-continuity
+diagnostics from `track_cold_plasma_modes_from_operators`. It reports whether
+the fixed eigenvalue-order index used by the Hamiltonian ODE remains the same
+tracked polarization branch along the sampled ray. A branch permutation or
+near-degenerate subspace is reported explicitly; the ray solver does not
+silently claim coupled-mode conversion or continuity through a degeneracy.

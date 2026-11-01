@@ -17,6 +17,7 @@ from tokamak_analysis.poloidal_field_probes import analyze_poloidal_field_probes
 from tokamak_analysis.langmuir_probe import (analyze_langmuir_probe_array, analyze_langmuir_probe_series, fit_langmuir_electron_models, fit_langmuir_stretched_exponential, estimate_multispecies_ion_density, estimate_electron_density_from_saturation, estimate_ion_particle_flux, estimate_smoothed_plasma_potential_candidates, langmuir_fit_window_sensitivity)
 from tokamak_analysis.mirnov_analysis import analyze_mirnov_signal, magnetic_perturbation_from_mirnov_voltage, analyze_mirnov_array
 from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+from tokamak_analysis.thomson_scattering import infer_thomson_path_averaged_density
 from tokamak_analysis.thomson_workflow import reconstruct_thomson_profile_from_spectra
 from tokamak_analysis.cts_analysis import analyze_cts_spectrum, analyze_cts_spectrum_model
 from tokamak_analysis.ece_analysis import analyze_ece, reconstruct_ece_temperature_profile, convolve_ece_receiver_response, brightness_temperature_K
@@ -1011,6 +1012,11 @@ elif page=='Spectral Analysis':
                     joint_density_covariance_upload=st.file_uploader('Optional full cross-channel (6N)×(6N) density-input covariance CSV (non-collective only)',type=['csv','txt'],key='ts_infer_joint_density_covariance')
                     st.caption('A density covariance file describes external relative covariance of the six multiplicative density inputs. For relativistic Maxwell-Jüttner, the sixth factor is the velocity-averaged effective differential cross-section; fitted power/cross-section covariance and model-fit uncertainty are propagated internally, so do not duplicate them in this file. It may be combined with joint spectral covariance and/or measured-response uncertainty only when the scattered-power row and column are zero. Do not also enter duplicate scalar optical-factor uncertainties.')
                 density_kwargs={}
+            with st.expander('Optional path-integrated absolute-density inference (conditional)'):
+                st.caption('Upload a path-profile CSV with columns: path_coordinate_m, incident_power_profile_W, differential_cross_section_profile_m2_sr, collection_solid_angle_profile_sr, optical_efficiency_profile. These are fixed, already-characterized inputs. One integrated power measurement returns only a weighted path-average density, not a pointwise density profile.')
+                path_profile_upload=st.file_uploader('Path-dependent optical/geometry profiles CSV',type=['csv'],key='ts_path_density_profile')
+                path_scattered_power_text=st.text_input('Absolutely calibrated integrated scattered power (W)',value='',key='ts_path_density_power')
+                path_scattered_power_unc_text=st.text_input('Integrated scattered-power 1σ uncertainty (W; optional)',value='',key='ts_path_density_power_unc')
             analysis_signature_payload = {
                 'data_signature': data_signature,
                 'channel_col': channel_col, 'radius_col': radius_col,
@@ -1051,6 +1057,9 @@ elif page=='Spectral Analysis':
                 'density_polarization_uncertainty': locals().get('polarization_unc_text'),
                 'density_covariance_upload': _ts_upload_digest(density_covariance_upload),
                 'joint_density_covariance_upload': _ts_upload_digest(joint_density_covariance_upload),
+                'path_density_profile_upload': _ts_upload_digest(path_profile_upload),
+                'path_density_scattered_power': path_scattered_power_text,
+                'path_density_scattered_power_uncertainty': path_scattered_power_unc_text,
             }
             analysis_signature = hashlib.sha256(
                 json.dumps(analysis_signature_payload, sort_keys=True, default=str).encode('utf-8')
@@ -1198,6 +1207,27 @@ elif page=='Spectral Analysis':
                         result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
                     else:
                         result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
+                    if path_profile_upload is not None:
+                        path_profile=pd.read_csv(path_profile_upload)
+                        required_path_columns=[
+                            'path_coordinate_m','incident_power_profile_W',
+                            'differential_cross_section_profile_m2_sr',
+                            'collection_solid_angle_profile_sr','optical_efficiency_profile',
+                        ]
+                        missing_path=[column for column in required_path_columns if column not in path_profile.columns]
+                        if missing_path:
+                            raise ValueError('Path-profile CSV is missing required columns: '+', '.join(missing_path))
+                        path_density_result=infer_thomson_path_averaged_density(
+                            _parse_ts_scalar(path_scattered_power_text,'Integrated scattered power',minimum=0.0),
+                            path_profile['path_coordinate_m'].to_numpy(dtype=float),
+                            path_profile['incident_power_profile_W'].to_numpy(dtype=float),
+                            path_profile['differential_cross_section_profile_m2_sr'].to_numpy(dtype=float),
+                            path_profile['collection_solid_angle_profile_sr'].to_numpy(dtype=float),
+                            path_profile['optical_efficiency_profile'].to_numpy(dtype=float),
+                            scattered_power_uncertainty_W=_parse_ts_optional_scalar(
+                                path_scattered_power_unc_text,'Integrated scattered-power uncertainty'),
+                        )
+                        result['path_integrated_density']=path_density_result
                     st.session_state['tis_thomson_spectral_inference']={
                         'data_sha':data_signature,'analysis_signature':analysis_signature,
                         'channel_col':channel_col,'radius_col':radius_col,
@@ -1212,6 +1242,9 @@ elif page=='Spectral Analysis':
                     and saved_ts.get('analysis_signature')==analysis_signature):
                 result=saved_ts['result']
                 st.success('Thomson spectral inference completed within the selected physical model.')
+                if result.get('path_integrated_density'):
+                    st.markdown('**Conditional path-integrated density result**')
+                    st.json(result['path_integrated_density'])
                 if result.get('parameter_identifiability'):
                     st.markdown('**Primary, conditional and non-identifiable parameters**')
                     st.json(result['parameter_identifiability'])

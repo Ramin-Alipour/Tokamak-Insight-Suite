@@ -4964,6 +4964,11 @@
           "name": "parameter_identifiability",
           "unit": "structured primary/conditional/non-identifiable classification",
           "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
+        },
+        {
+          "name": "mode_branch_tracking",
+          "unit": "structured; per ray sample",
+          "description": "Polarization-continuity branch assignment and degeneracy diagnostics from the local cold-plasma wave-operator sequence; the Hamiltonian ray still follows the fixed eigenvalue-order index."
         }
       ],
       "assumptions": [
@@ -5012,7 +5017,8 @@
         "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
         "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
-        "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators"
+        "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators",
+        "tokamak_analysis.cts_em_geometry.trace_cold_plasma_ray"
       ],
       "raw_data_to_physics": false,
       "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
@@ -5253,6 +5259,17 @@
         "year": 2026,
         "doi": "10.1016/j.fusengdes.2026.115845",
         "scope": "Recent CTS design workflow combining ray tracing, forward modelling and Bayesian spectral inversion; context for geometry/mode-aware CTS analysis."
+      },
+      {
+        "title": "Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation",
+        "authors": "Verdier et al.",
+        "journal": "Review of Scientific Instruments",
+        "volume": "96",
+        "issue": "4",
+        "article": "043513",
+        "year": 2025,
+        "doi": "10.1063/5.0238948",
+        "scope": "Recent CTS spectral-analysis and background-estimation context; no data-driven background model is silently applied by this code."
       }
     ],
     "primary_analysis_id": 1,
@@ -5275,7 +5292,8 @@
       "tests/test_cts_analysis.py",
       "tests/test_cts_numerical_convergence.py",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
-      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous"
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous",
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing"
     ]
   },
   {

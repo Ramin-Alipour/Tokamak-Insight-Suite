@@ -243,3 +243,9 @@ power measurement does **not** identify an arbitrary pointwise density
 profile. The path-dependent inputs are treated as already characterized;
 instrument calibration and experimental validation are outside this API.
 
+
+
+The Streamlit Thomson workflow exposes this path-integrated capability as an
+optional conditional calculation. The user supplies a path-profile CSV with
+the named physical columns and an absolutely calibrated integrated scattered
+power. No path-profile factor is calibrated or estimated by the software.

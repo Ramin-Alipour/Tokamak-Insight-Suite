@@ -216,6 +216,16 @@ def trace_cold_plasma_ray(
         )
         eigenvalues[index] = modes["dispersion_eigenvalues"][int(mode_index)]
         polarizations[index] = modes["electric_polarizations"][:, int(mode_index)]
+    wave_operators = []
+    for position, wavevector in zip(positions, wavevectors):
+        state = equilibrium(position)
+        operator, _ = cold_plasma_wave_operator(
+            omega, wavevector, state["magnetic_field_T"], state["species"]
+        )
+        wave_operators.append(operator)
+    branch_tracking = track_cold_plasma_modes_from_operators(np.asarray(wave_operators))
+    selected_branch_order = branch_tracking["eigenvalue_order_permutation"][:, int(mode_index)]
+    fixed_order_branch_consistent = bool(np.all(selected_branch_order == int(mode_index)))
     return {
         "ray_parameter": solution.t,
         "position_m": positions,
@@ -223,10 +233,13 @@ def trace_cold_plasma_ray(
         "dispersion_eigenvalue": eigenvalues,
         "electric_polarization": polarizations,
         "mode_index": int(mode_index),
+        "mode_branch_tracking": branch_tracking,
+        "fixed_eigenvalue_order_tracks_initial_polarization_branch": fixed_order_branch_consistent,
         "parameterization": "Hamiltonian eigenvalue parameter; not physical time",
         "limitations": [
             "Cold, collisionless, local dielectric; not valid at unresolved resonant layers.",
-            "No mode conversion or branch tracking through degeneracies.",
+            "The ray ODE follows a fixed eigenvalue-order index. If the tracked eigenvalue-order permutation changes, the ray is not following one continuous polarization branch across the crossing.",
+            "Near-degenerate eigenspaces are flagged as ambiguous; coupled-mode conversion dynamics are not solved.",
             "Geometrical-optics approximation; diffraction and finite-beam evolution are not included.",
             "The equilibrium callback and its spatial derivatives are supplied by the caller."
         ],
