@@ -254,5 +254,7 @@ Commits:
 - `6c5ebff3dc6fe427871909b3e8cabbb68d6f525b` and `2306b6f51684ee34ea0163d9b632f9ab33a8d4be` — root/package JSON registries
 - `29fa2c2ae633e23e4e67bdd39f6f99f7f1aec562` — Python runtime registry
 - `25debe7cd0e5df8269e613f5ae55de6b4648b238` — scientific documentation
+- `e7e8088fd387f8d59acc0613f90035127ec41178` — explicit uncertainty-method provenance
+- `f31efd63019349b744e6e0a8bd7314a40b3e795c` — regression assertion for correlated-covariance provenance
 
 **Software CI status:** not yet confirmed for these direct-main commits. No experimental validation was performed or claimed.
