@@ -5585,6 +5585,31 @@
           "name": "spatial_profile_reconstruction",
           "unit": "structured",
           "description": "PCHIP and/or GCV smoothing-spline reconstructions of every identifiable spectrum-inferred parameter profile, including kappa index when supported; no extrapolation beyond measured channel coordinates."
+        },
+        {
+          "name": "methods",
+          "unit": "structured mapping",
+          "description": "Per-method result for PCHIP and/or GCV smoothing spline, including status, reconstructed values, gradients, uncertainty bands and method metadata."
+        },
+        {
+          "name": "covariance_model",
+          "unit": "text",
+          "description": "States full supplied cross-channel covariance, independent pointwise uncertainty fallback, or unavailable covariance."
+        },
+        {
+          "name": "extrapolation",
+          "unit": "text",
+          "description": "Explicitly reports that reconstruction is forbidden outside the measured coordinate interval."
+        },
+        {
+          "name": "uncertainty_mc_successful_samples",
+          "unit": "integer; per method",
+          "description": "Number of valid joint covariance draws used for each reconstructed profile."
+        },
+        {
+          "name": "uncertainty_warning",
+          "unit": "text; conditional",
+          "description": "Explains when too few valid covariance draws prevent uncertainty bands."
         }
       ],
       "assumptions": [
@@ -6988,6 +7013,31 @@
         {
           "name": "gaussian_fit_uncertainty_scope",
           "unit": "text"
+        },
+        {
+          "name": "background_identifiability_status",
+          "unit": "text",
+          "description": "Distinguishes researcher-supplied background from edge-fraction assumption; background is not independently identified."
+        },
+        {
+          "name": "background_confidence_note",
+          "unit": "text",
+          "description": "Explains that background is treated as fixed and its uncertainty/possible signal contamination is not independently inferred."
+        },
+        {
+          "name": "gaussian_fit_statistical_weighting_status",
+          "unit": "text",
+          "description": "Reports full within-channel covariance weighting, pointwise uncertainty weighting, or unweighted fitting."
+        },
+        {
+          "name": "gaussian_fit_covariance_interpretation",
+          "unit": "text",
+          "description": "States that Gaussian-fit covariance is conditional on fixed background/response and whether it is measurement-noise weighted."
+        },
+        {
+          "name": "moment_interpretation",
+          "unit": "text",
+          "description": "Signed moments retain negative background-subtracted residuals and are not an electron velocity distribution."
         }
       ],
       "assumptions": [
@@ -7000,13 +7050,14 @@
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
       "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the primary Thomson Analysis 1 forward model.",
-      "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance. Gaussian-fit covariance is conditional on the fixed supplied measured response matrix.",
+      "uncertainty_model": "Moment uncertainties are propagated separately by Monte Carlo from supplied pointwise uncertainty or full within-channel covariance. Gaussian shape-fit parameter covariance is conditional on the selected fixed background and measured response; no measurement-noise calibration is implied for unweighted fits.",
       "limitations": [
         "Spectral moments characterize the measured wavelength distribution and do not uniquely identify an electron velocity distribution.",
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
         "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in fitted background nuisance parameters is not jointly sampled.",
-        "No instrument-response deconvolution or instrument-corrected spectral width is calculated; reported widths describe the measured spectrum."
+        "No instrument-response deconvolution or instrument-corrected spectral width is calculated; reported widths describe the measured spectrum.",
+        "Edge-fraction background estimation is a researcher-selected heuristic, not an independently identified background; background uncertainty and possible signal contamination are not jointly inferred."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
