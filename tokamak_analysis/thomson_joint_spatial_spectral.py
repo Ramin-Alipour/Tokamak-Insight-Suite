@@ -224,6 +224,12 @@ def reconstruct_joint_thomson_spatial_spectra(
         "primary_outputs_reportable_as_identified": data_identifiable,
         "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
         "radius_m": r.copy(),
+        # Stable aliases keep the joint route compatible with the shared dashboard schema.
+        # Absolute density is unavailable because this shape inversion has no power normalization.
+        "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
+        "electron_density_profile_m3": np.full(n, np.nan, dtype=float),
+        "electron_density_uncertainty_profile_m3": np.full(n, np.nan, dtype=float),
+        "electron_velocity_projection_uncertainty_profile_m_s": uncertainties[2*n:3*n] if data_identifiable else None,
         # Numerical optimizer candidates are retained for diagnostics, but
         # they are not promoted to measured primary outputs when the data-only
         # inverse is rank deficient or the optimizer has not converged.
