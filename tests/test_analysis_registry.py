@@ -52,6 +52,20 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     assert callable(resolve_analysis(1))
 
 
+def test_thomson_relativistic_geometry_uncertainty_contract_matches_implementation():
+    inputs = {
+        item["name"]: item
+        for item in get_analysis(1)["execution_contract"]["input_specs"]
+    }
+    laser = inputs["laser_wavelength_uncertainty_nm"]["description"].lower()
+    angle = inputs["scattering_angle_uncertainty_rad"]
+    assert "relativistic maxwell-juttner" in laser
+    assert "monte carlo" in laser
+    assert "relativistic maxwell-juttner" in angle["unit"].lower()
+    assert "monte carlo" in angle["description"].lower()
+    assert "mutually exclusive" in angle["description"].lower()
+
+
 def test_get_analysis_returns_deep_copy_of_nested_contract():
     original = ANALYSES[0]["execution_contract"]["input_specs"][0]["name"]
     entry = get_analysis(1)
