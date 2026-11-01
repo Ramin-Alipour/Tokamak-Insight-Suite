@@ -4886,6 +4886,16 @@
           "name": "three_wave_coupling",
           "unit": "text",
           "description": "Describes the Bindslev and/or relativistic second-order Vlasov source-current coupling used by the selected forward-model configuration."
+        },
+        {
+          "name": "scattering_volume_sample_count",
+          "unit": "integer vector; one per frequency bin",
+          "description": "Number of local scattering samples integrated for each frequency bin when scattering-volume geometry is supplied."
+        },
+        {
+          "name": "scattering_volume_sample_diagnostics",
+          "unit": "structured; frequency x sample",
+          "description": "Per-sample scattering location, magnetic field, weight and local spectral density diagnostics returned by the scattering-volume integration branch."
         }
       ],
       "prerequisites": [
