@@ -104,6 +104,24 @@ def test_cts_improved_genetic_search_is_deterministic_and_bounded():
     assert np.all(first[0]<=np.array([1.0,1.0]))
 
 
+
+def test_cts_ion_flow_optimizer_seed_is_optional_and_not_fixed():
+    f0,f,g,ions,frac,response=_case()
+    truth=(2e19,1200.,800.,0.0)
+    z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],
+        ion_temperature_eV=truth[2],ion_species=ions,ion_fractions=frac,
+        electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=truth[3])
+    y=2.4e4*z+3.
+    out=analyze_cts_spectrum(
+        f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,instrument_response=response,
+        electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
+        ion_temperature_initial_eV=truth[2],
+        global_search=False,inversion_method="local_least_squares",
+    )
+    assert out["ion_velocity_projection_m_s"] == pytest.approx(0.0, abs=1e3)
+    assert "ion_velocity_projection_m_s" in out["parameter_names"]
+
 def test_cts_correlated_frequency_covariance_is_accepted_and_reported():
     f0,f,g,ions,frac,response=_case()
     truth=(2e19,1200.,800.,1.5e4)
