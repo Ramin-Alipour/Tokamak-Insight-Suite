@@ -991,7 +991,10 @@ def analyze_full_em_cts_spectrum(
             qualifier = "finite increasing" if is_flow else "positive finite increasing"
             raise ValueError(f"parameter_bounds[{name!r}] must be a {qualifier} pair")
         if not pair[0] < initial[index] < pair[1]:
-            raise ValueError(f"initial value for {name} must lie strictly inside its supplied parameter bounds")
+            if is_flow and electron_flow_projection_initial_m_s is None:
+                initial[index] = 0.5 * (pair[0] + pair[1])
+            else:
+                raise ValueError(f"initial value for {name} must lie strictly inside its supplied parameter bounds")
         if is_flow:
             lower[index], upper[index] = pair / 1.0e6
         else:
