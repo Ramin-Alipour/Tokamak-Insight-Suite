@@ -17,7 +17,7 @@ All spectra and frequency axes are assumed to be measured, prepared and calibrat
 
 The electrostatic path remains an unmagnetized multi-species longitudinal dielectric model. It computes species susceptibilities, the longitudinal dielectric function, the dynamic structure factor and convolution with the supplied measured frequency-response matrix.
 
-It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses and charge-density fractions are explicit external inputs. The inversion fits electron-flow and common projected ion-flow components from the measured CTS spectrum; `electron_velocity_projection_m_s` and `ion_velocity_initial_m_s` are optimizer seeds, not fixed measured plasma parameters.
+It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses and charge-density fractions are explicit external inputs. The inversion fits electron-flow and common projected ion-flow components from the measured CTS spectrum. `electron_velocity_projection_m_s` is an optional electron-flow optimizer seed (omission uses a numerical zero seed); `ion_velocity_initial_m_s` is a required ion-flow optimizer seed. Neither is a fixed measured plasma parameter. The dashboard labels the electron-flow value as an optional seed and no longer requires the user to enter zero to assert stationary flow.
 
 ## Magnetized full-electromagnetic CTS
 
@@ -26,7 +26,7 @@ The full-EM path is implemented in \`tokamak_analysis.cts_full_em\`. It combines
 1. Magnetized Maxwellian kinetic conductivity and screened density/current/electric/magnetic fluctuation covariance, retaining all supplied auto- and cross-correlations.
 2. The low-temperature Bindslev \`Gamma^{-1}\` / \`X\` source-current closure for Maxwellian bulk-electron three-wave coupling.
 3. Species-resolved thermal-ion inference. Each supplied ion species has its own fitted temperature and flow projection along the scattering wavevector; ion composition remains a fixed external input.
-4. Optional relativistic gyrotropic electron and fast-ion populations are supported by the forward spectral-density function. The current measured-spectrum inversion does not accept `electron_distribution`; it fits the Maxwellian bulk-electron branch and rejects that unsupported inversion option explicitly. Fast-ion populations, when supplied to inversion, remain fixed external distributions rather than fitted VDFs.
+4. Optional relativistic gyrotropic electron and fast-ion populations are supported by the forward spectral-density function. The current measured-spectrum inversion rejects non-null `electron_distribution`; it fits the Maxwellian bulk-electron branch because a drifted relativistic electron VDF fit is not implemented. The dashboard therefore does not offer the forward-only VDF input as an inversion control. Explicit relativistic gyrotropic electron distributions remain available to the forward spectral-density API, not to measured-spectrum inversion. Fast-ion population shapes supplied to Full-EM inversion likewise remain fixed external inputs. Fast-ion populations, when supplied to inversion, remain fixed external distributions rather than fitted VDFs.
 5. Optional frequency-resolved cold-plasma ray tracing and path-integrated Gaussian beam-overlap weighting.
 
 ### Relativistic kinetic populations and three-wave vertex
@@ -81,6 +81,12 @@ Optional inputs include:
 - Explicit harmonic order, quadrature order and resonance damping.
 
 Flow projections omitted from the inversion's optional seed inputs are initialized numerically at zero and then fitted; zero is not held fixed as a stationary-flow assumption. Ion composition, polarization, VDF shape and equilibrium profile are not silently inferred and must be supplied where required.
+
+## Numerical convergence and uncertainty scope
+
+A single Full-EM inversion does not establish convergence with respect to gyro-harmonic truncation or momentum/velocity quadrature. The opt-in API `tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence` evaluates a paired sequence of increasing `harmonic_order` and `quadrature_order` values while holding the physical inputs and damping prescription fixed. It reports successive relative L2 and L-infinity spectral changes and a tolerance-based convergence status. This is a numerical convergence check only; it is not experimental validation or a physical-model uncertainty estimate.
+
+The Full-EM inversion requires either pointwise spectral uncertainty or a full frequency-bin covariance. Its reported parameter covariance is a local Jacobian covariance conditional on fixed external inputs. It does not constitute a complete uncertainty budget for magnetic field, ion composition, beam directions, polarization, ray tracing, beam covariance propagation or supplied kinetic-distribution shape. Those fixed inputs and exclusions are exposed in the result provenance/scope fields. The damping default is a numerical resonance regularization, not a physical collision frequency.
 
 ## Inversion and uncertainty
 
