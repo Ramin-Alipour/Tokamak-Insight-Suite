@@ -87,6 +87,23 @@ def test_collective_thomson_contract_declares_calibrated_measurements():
     assert "electron_velocity_projection_m_s" in {spec.name for spec in contract.input_specs}
 
 
+def test_all_thomson_and_cts_contracts_declare_parameter_identifiability_output():
+    path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    names = {
+        "Thomson scattering",
+        "Collective Thomson / coherent scattering (CTS)",
+        "Thomson spatial profile reconstruction",
+        "Thomson spectral distribution",
+    }
+    selected = [row for row in rows if row["diagnostic"] in names]
+    assert len(selected) == len(names)
+    for row in selected:
+        outputs = {item["name"]: item for item in row["execution_contract"]["output_specs"]}
+        assert "parameter_identifiability" in outputs
+        assert "primary/conditional/non-identifiable" in outputs["parameter_identifiability"]["unit"]
+
+
 def test_thomson_spectral_distribution_contract_excludes_separate_evdf_inverse():
     path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
     rows = json.loads(path.read_text(encoding="utf-8"))
