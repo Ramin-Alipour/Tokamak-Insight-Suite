@@ -1,3 +1,4 @@
+import numpy as np
 """Regression tests for the canonical measured-spectrum Thomson workflow."""
 
 import pytest
