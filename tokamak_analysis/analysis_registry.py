@@ -129,11 +129,24 @@ def _sync_analysis_contracts_from_canonical_registry() -> None:
         for row in rows
         if isinstance(row, dict) and isinstance(row.get("execution_contract"), dict)
     }
-    missing = [entry["name"] for entry in ANALYSES if entry["name"] not in by_name]
+    analysis_one_names = {
+        "Thomson scattering",
+        "Collective Thomson / coherent scattering (CTS)",
+        "Thomson spatial profile reconstruction",
+        "Thomson spectral distribution",
+    }
+    missing = sorted(name for name in analysis_one_names if name not in by_name)
     if missing:
-        raise RuntimeError(f"Canonical diagnostic registry is missing execution contracts for: {missing}")
+        raise RuntimeError(f"Canonical diagnostic registry is missing Analysis 1 execution contracts for: {missing}")
     for entry in ANALYSES:
-        entry["execution_contract"] = deepcopy(by_name[entry["name"]])
+        if entry["name"] in analysis_one_names:
+            contract = deepcopy(by_name[entry["name"]])
+            primary = f"tokamak_analysis.{entry['module']}.{entry['function']}"
+            if not contract.get("function_links") or contract["function_links"][0] != primary:
+                raise RuntimeError(
+                    f"Canonical Analysis 1 contract for {entry['name']} does not resolve to its registered entry point."
+                )
+            entry["execution_contract"] = contract
 
 
 _sync_analysis_contracts_from_canonical_registry()
