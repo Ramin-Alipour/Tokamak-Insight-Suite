@@ -997,3 +997,28 @@ def test_optical_thomson_exposes_unweighted_fit_covariance_scope():
     assert channel["spectral_weighting_status"] == "unweighted_least_squares_no_measurement_uncertainty_supplied"
     assert channel["fit_covariance_interpretation"] == "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
     assert channel["background_model_status"] == "linear_intercept_and_slope_nuisance_background"
+
+
+def test_result_classification_separates_primary_conditional_and_non_identifiable_outputs():
+    x, y, _ = _spectral_case(100.0)
+    result = analyze_thomson_spectra(
+        x, y[None, :], [0.12], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        enable_evdf_reconstruction=False,
+    )
+    contract = result["result_classification"]
+    assert contract["contract_version"] == "1.0"
+    assert contract["input_contract"] == "measured_device_spectra_assumed_prepared_and_calibrated"
+    assert contract["instrument_calibration_or_correction_performed"] is False
+    assert contract["experimental_validation_claimed"] is False
+    channel = contract["channels"][0]
+    primary_names = {item["parameter"] for item in channel["primary"]}
+    conditional_names = {item["parameter"] for item in channel["conditional"]}
+    non_identifiable_names = {item["parameter"] for item in channel["non_identifiable"]}
+    assert "electron_temperature_eV" in primary_names
+    assert "electron_density_m3" in conditional_names
+    assert "unrestricted_three_dimensional_electron_velocity_distribution" in non_identifiable_names
+    density_requirement = next(
+        item for item in channel["conditional"] if item["parameter"] == "electron_density_m3"
+    )
+    assert "absolute spectral power density in W/nm" in density_requirement["required_auxiliary_inputs"]
