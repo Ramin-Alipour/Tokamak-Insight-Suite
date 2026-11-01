@@ -909,13 +909,15 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     # The electrostatic implementation rejects these when omitted, so the
     # public contract must not advertise them as optional.
     for name in (
-        "electron_velocity_projection_m_s",
         "electron_density_initial_m3",
         "electron_temperature_initial_eV",
         "ion_temperature_initial_eV",
-        "ion_velocity_initial_m_s",
     ):
         assert specs[name]["required"] is True
+
+    for name in ("electron_velocity_projection_m_s", "ion_velocity_initial_m_s"):
+        assert specs[name]["required"] is False
+        assert specs[name]["required_when_model"] == "electrostatic"
 
     # Full-EM inputs are branch-conditional because the electrostatic model
     # does not consume them.
