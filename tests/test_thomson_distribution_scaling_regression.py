@@ -3,6 +3,14 @@ import numpy as np
 from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 
 
+def _canonical_fit():
+    return {
+        "model": "non_collective_maxwellian",
+        "electron_temperature_eV": 100.0,
+        "electron_velocity_projection_m_s": 0.0,
+    }
+
+
 def test_distribution_gaussian_fit_is_returned_in_measured_intensity_units():
     wavelength = np.linspace(528.0, 536.0, 161)
     background = 15.0 + 0.4 * (wavelength - 532.0)
@@ -12,7 +20,7 @@ def test_distribution_gaussian_fit_is_returned_in_measured_intensity_units():
     )
     result = analyze_thomson_spectral_distribution(
         wavelength,
-        signal,
+        signal, physical_parameters=_canonical_fit(), 
         instrument_response_matrix=np.eye(wavelength.size),
         background_signal=background,
     )
