@@ -492,7 +492,7 @@ def analyze_thomson_spectra(
             "Unsupported optical Thomson model. Analysis 1 supports non_collective_maxwellian, "
             "non_collective_kappa and non_collective_relativistic_maxwell_juttner. "
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
-            "has its own registered workflow (analysis 30)."
+            "is implemented as a separate child subanalysis of primary Analysis 1."
         )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
