@@ -341,6 +341,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     eub=tuple(map(float,b.get("electron_velocity_projection_m_s",(-spectral_flow_limit,spectral_flow_limit))))
     if len(eub)!=2 or not np.all(np.isfinite(eub)) or eub[0]>=eub[1] or max(map(abs,eub))>=C:
         raise ValueError("electron-flow bounds must be finite, increasing and subluminal")
+    if electron_velocity_projection_m_s is None:
+        electron_flow_seed=float(np.clip(0.0,eub[0],eub[1]))
+    elif not eub[0]<=electron_flow_seed<=eub[1]:
+        raise ValueError("electron-flow optimizer seed must lie inside its supplied parameter_bounds")
     ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-physical_flow_limit,physical_flow_limit))))
     if len(ub)!=2 or not np.all(np.isfinite(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>=C:
         raise ValueError("ion-flow bounds must be finite, increasing and within the physical subluminal domain")
@@ -348,7 +352,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         electron_density_initial_m3,electron_temperature_initial_eV,
         ion_temperature_initial_eV,ion_velocity_initial_m_s
     )):
-        raise ValueError("Explicit optimizer initial estimates are required for density, both temperatures, electron flow and ion flow; no scientific defaults are assumed.")
+        raise ValueError("Explicit optimizer initial estimates are required for density, both temperatures and ion flow; electron flow is fitted from the spectrum.")
     us=1e6
     initial_density=_positive(electron_density_initial_m3,"initial density")
     initial_te=_positive(electron_temperature_initial_eV,"initial Te")
