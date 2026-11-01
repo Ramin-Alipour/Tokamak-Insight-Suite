@@ -282,3 +282,50 @@ def test_thomson_profile_json_registry_copies_match_runtime_uncertainty_contract
     assert "monte carlo" in inputs["laser_wavelength_uncertainty_nm"]["description"].lower()
     assert "relativistic maxwell-juttner" in inputs["scattering_angle_uncertainty_rad"]["unit"].lower()
     assert "mutually exclusive" in inputs["scattering_angle_uncertainty_rad"]["description"].lower()
+
+
+def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_contracts():
+    import json
+    from pathlib import Path
+
+    runtime = get_analysis(30)["execution_contract"]
+    runtime_inputs = {item["name"]: item for item in runtime["input_specs"]}
+    for name in ("instrument_response_uncertainty", "response_mc_samples"):
+        assert name in runtime_inputs
+        assert "both CTS branches" in runtime_inputs[name]["description"]
+        assert "required_when_model" not in runtime_inputs[name]
+    runtime_outputs = {item["name"] for item in runtime["output_specs"]}
+    assert {
+        "instrument_response_uncertainty_supplied",
+        "instrument_response_uncertainty_propagated",
+        "instrument_response_mc_successes",
+        "instrument_response_mc_requested",
+        "instrument_response_parameter_covariance",
+        "instrument_response_uncertainty_warning",
+    } <= runtime_outputs
+    full_mode = next(
+        item for item in runtime["workflow_modes"]
+        if item["name"] == "magnetized_full_electromagnetic_cts"
+    )
+    assert any("instrument_response_uncertainty" in item for item in full_mode["inputs"])
+    assert any("response_mc_samples" in item for item in full_mode["inputs"])
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+    entry = next(
+        item for item in root_registry
+        if item.get("diagnostic") == "Collective Thomson / coherent scattering (CTS)"
+    )
+    contract = entry["execution_contract"]
+    json_inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert "applies_when_model" not in json_inputs["instrument_response_uncertainty"]
+    assert "applies_when_model" not in json_inputs["response_mc_samples"]
+    assert "response-matrix uncertainty is propagated by Monte Carlo refitting" in contract["uncertainty_model"]
+    assert not any(
+        "measured response-matrix and external-geometry/parameter uncertainties are not propagated" in item
+        for item in contract["limitations"]
+    )
