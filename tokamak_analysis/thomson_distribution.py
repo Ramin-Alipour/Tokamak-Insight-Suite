@@ -356,6 +356,14 @@ def analyze_thomson_spectral_distribution(
         "moment_weighting_method": "signed_background_subtracted_spectral_measure",
         "moment_clipping_bias_warning": "No clipping is applied; signed moments require positive integrated area and variance and remain sensitive to the supplied background model.",
         "background_estimation_method": moments["background_source"],
+        "background_identifiability_status": (
+            "researcher_supplied_background"
+            if explicit_background is not None or mask is not None
+            else "edge_fraction_assumption_not_independently_identified"
+        ),
+        "background_confidence_note": (
+            "The supplied background is treated as fixed; its uncertainty and possible signal contamination are not independently identified by this subanalysis."
+        ),
         "background_mask": mask,
         "spectral_centroid_nm": center,
         "observed_sigma_nm": sigma_observed,
@@ -391,6 +399,21 @@ def analyze_thomson_spectral_distribution(
             "background_slope_per_nm": parameter_uncertainties[4],
         },
         "gaussian_fit_covariance_valid": covariance_valid,
+        "gaussian_fit_statistical_weighting_status": (
+            "weighted_by_full_within_channel_spectral_covariance"
+            if signal_covariance_matrix is not None else
+            "weighted_by_independent_pointwise_measurement_uncertainty"
+            if uncertainty is not None else
+            "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        ),
+        "gaussian_fit_covariance_interpretation": (
+            "conditional_local_covariance_for_fixed_background_and_fixed_measured_response"
+            if uncertainty is not None or signal_covariance_matrix is not None else
+            "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+        ),
+        "moment_interpretation": (
+            "Moments use signed background-subtracted spectral measure; negative residuals are retained, not clipped. They describe the measured wavelength distribution and are not an electron velocity distribution."
+        ),
         "gaussian_fit_covariance_correlation_condition_number": covariance_condition,
         "fitted_spectrum": fitted, "residual": residual,
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
