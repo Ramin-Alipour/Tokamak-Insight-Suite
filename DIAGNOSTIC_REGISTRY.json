@@ -7036,7 +7036,7 @@
     "quantities": "Observed wavelength-space centroid, variance and standard deviation, skewness, excess kurtosis, integrated spectral measures, Gaussian shape-fit parameters, residuals, fit quality and uncertainty diagnostics from calibrated measured spectra.",
     "status": "D",
     "method": "Analyze the calibrated measured wavelength-intensity spectrum using exactly one explicitly selected background representation, signed spectral moments and a Gaussian spectral-shape forward fit convolved with the supplied measured instrument-response matrix. This subanalysis provides descriptive wavelength-space diagnostics only; physical plasma parameters are extracted by the parent Thomson Analysis 1 forward fit.",
-    "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique electron velocity distribution from wavelength moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian shape fit. Background is treated as fixed; its uncertainty and possible signal contamination are not independently inferred.",
+    "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique electron velocity distribution from wavelength moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian shape fit. An explicitly supplied fitted background may carry a separate pointwise uncertainty or full covariance, propagated as independent of signal uncertainty unless a joint covariance is available. Possible signal contamination is not independently inferred.",
     "implementation_functions": [
       "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
     ],
@@ -7067,6 +7067,18 @@
           "unit": "same as signal; fitted background spectrum",
           "required": false,
           "description": "Finite fitted background spectrum matching wavelength_nm; exactly one background specification must be supplied."
+        },
+        {
+          "name": "background_signal_uncertainty",
+          "unit": "same as background_signal; pointwise 1-sigma",
+          "required": false,
+          "description": "Optional strictly positive pointwise uncertainty for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_covariance."
+        },
+        {
+          "name": "background_signal_covariance",
+          "unit": "full wavelength-space covariance of fitted background_signal",
+          "required": false,
+          "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. Signal/background cross-covariance is not currently represented."
         },
         {
           "name": "background_mask",
@@ -7310,6 +7322,14 @@
           "name": "parameter_identifiability",
           "unit": "structured primary/conditional/non-identifiable classification",
           "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
+        },
+        {
+          "name": "background_uncertainty_model",
+          "unit": "text"
+        },
+        {
+          "name": "background_uncertainty_supplied",
+          "unit": "boolean"
         }
       ],
       "assumptions": [
@@ -7323,14 +7343,14 @@
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
       "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model.",
-      "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance. Gaussian-fit covariance is conditional on the fixed supplied background and measured response; no measurement-noise calibration is implied for unweighted fits.",
+      "uncertainty_model": "Moment Monte Carlo propagates supplied signal uncertainty/covariance and, when an explicit fitted background is supplied, its separate pointwise uncertainty or full covariance. Signal/background cross-covariance is not currently represented; the two are treated as independent. Mask/fraction backgrounds are refitted in each perturbed signal draw.",
       "limitations": [
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
-        "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in fitted background nuisance parameters is not jointly sampled.",
         "No instrument-response deconvolution or instrument-corrected spectral width is calculated; reported widths describe the measured spectrum.",
         "Edge-fraction background estimation is a researcher-selected heuristic, not an independently identified background; background uncertainty and possible signal contamination are not jointly inferred.",
-        "The deterministic EVDF solver does not return posterior confidence intervals; uncertainty weighting is not equivalent to uncertainty propagation."
+        "The deterministic EVDF solver does not return posterior confidence intervals; uncertainty weighting is not equivalent to uncertainty propagation.",
+        "An explicitly supplied fitted background can include pointwise uncertainty or a full positive-definite covariance; in the absence of signal/background cross-covariance the two perturbations are assumed independent. Possible signal contamination in the background remains non-identifiable."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
