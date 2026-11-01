@@ -64,3 +64,20 @@ def test_joint_inverse_rejects_singular_mixing_and_invalid_covariance():
             x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
             joint_spectral_covariance=np.zeros((y.size,y.size)),
         )
+
+
+def test_regularization_does_not_manufacture_data_identifiability():
+    x, y, r, _, *_ = _synthetic_case()
+    # One detector channel observes three spatial nodes through one summed
+    # measurement. Curvature regularization may select a smooth solution, but
+    # it cannot create independent measured constraints for all node values.
+    mixing = np.ones((1, r.size), dtype=float)
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, y[:1], r, mixing, laser_wavelength_nm=532.,
+        scattering_angle_rad=np.pi/2, regularization_strength=1e-2,
+        signal_uncertainty=np.full((1, x.size), 0.01),
+    )
+    assert out["optimizer"]["regularization_rows_excluded_from_identifiability"] is True
+    assert out["optimizer"]["data_only_jacobian_rank"] < out["optimizer"]["parameter_count"]
+    assert out["primary_result_status"] == "not_identifiable_from_measured_data"
+    assert out["primary_outputs_reportable_as_identified"] is False

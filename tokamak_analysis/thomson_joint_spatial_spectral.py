@@ -173,10 +173,43 @@ def reconstruct_joint_thomson_spatial_spectra(
                         x_scale="jac", max_nfev=int(max_nfev))
     predicted, te, flow, amp = predict(fit.x)
     data_residual = whiten(y - predicted)
-    jac = np.asarray(fit.jac, dtype=float)
-    rank = int(np.linalg.matrix_rank(jac))
-    condition = float(np.linalg.cond(jac))
-    dof = max(1, data_residual.size - fit.x.size)
+    # Assess identifiability from measured spectral data alone.  The optimizer
+    # Jacobian also contains optional regularization rows; counting those rows
+    # as independent measurements would let smoothing manufacture rank.
+    def data_residual_only(parameters):
+        return whiten(y - predict(parameters)[0])
+
+    parameter_count = int(fit.x.size)
+    data_jacobian = np.empty((data_residual.size, parameter_count), dtype=float)
+    for column in range(parameter_count):
+        step = 1.0e-5 * max(1.0, abs(float(fit.x[column])))
+        plus = fit.x.copy()
+        minus = fit.x.copy()
+        plus[column] += step
+        minus[column] -= step
+        data_jacobian[:, column] = (
+            data_residual_only(plus) - data_residual_only(minus)
+        ) / (2.0 * step)
+    column_norms = np.linalg.norm(data_jacobian, axis=0)
+    scaled_data_jacobian = data_jacobian / np.maximum(
+        column_norms, np.finfo(float).tiny
+    )[None, :]
+    singular_values = np.linalg.svd(scaled_data_jacobian, compute_uv=False)
+    rank_tolerance = (
+        np.finfo(float).eps * max(scaled_data_jacobian.shape)
+        * (singular_values[0] if singular_values.size else 0.0)
+    )
+    data_rank = int(np.count_nonzero(singular_values > rank_tolerance))
+    data_condition = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values.size and singular_values[-1] > rank_tolerance
+        else float("inf")
+    )
+    optimizer_jacobian = np.asarray(fit.jac, dtype=float)
+    optimizer_rank = int(np.linalg.matrix_rank(optimizer_jacobian))
+    optimizer_condition = float(np.linalg.cond(optimizer_jacobian))
+    data_identifiable = bool(fit.success and data_rank == parameter_count)
+    dof = max(1, data_residual.size - parameter_count)
     covariance_p = np.linalg.pinv(jac.T @ jac)
     if joint_spectral_covariance is None and signal_uncertainty is None:
         covariance_p *= float(data_residual @ data_residual / dof)
@@ -187,6 +220,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     n = r.size
     return {
         "analysis_status": "completed" if fit.success else "optimizer_not_converged",
+        "primary_result_status": "identified_from_measured_data" if data_identifiable else "not_identifiable_from_measured_data",
+        "primary_outputs_reportable_as_identified": data_identifiable,
         "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
         "radius_m": r.copy(),
         "electron_temperature_profile_eV": te,
@@ -212,15 +247,22 @@ def reconstruct_joint_thomson_spatial_spectra(
         "noise_model": noise_model,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
                       "nfev": int(fit.nfev), "cost": float(fit.cost),
-                      "jacobian_rank": rank, "parameter_count": int(fit.x.size),
-                      "jacobian_condition_number": condition, "degrees_of_freedom": dof},
+                      "jacobian_rank": optimizer_rank, "parameter_count": parameter_count,
+                      "jacobian_condition_number": optimizer_condition,
+                      "data_only_jacobian_rank": data_rank,
+                      "data_only_scaled_jacobian_condition_number": data_condition,
+                      "regularization_rows_excluded_from_identifiability": True,
+                      "degrees_of_freedom": dof},
         "identifiability": {
+            "status": "identified_from_measured_data" if data_identifiable else "rank_deficient_or_optimizer_not_converged",
+            "data_only_jacobian_rank": data_rank,
+            "parameter_count": parameter_count,
             "primary": ["joint finite-dimensional Te(r), scattering-vector flow projection(r), and relative amplitude(r) under the supplied Maxwellian model and fixed operators"],
             "conditional": ["absolute density only if independent absolute-power and complete optical-geometry inputs are subsequently supplied; this function does not infer it"],
             "non_identifiable": ["flow components perpendicular to the scattering vector",
                                  "spatial structures in the null space of the supplied mixing operator",
                                  "sub-resolution spatial structure not encoded by the measured mixing operator",
                                  "unrestricted anisotropic or non-Maxwellian electron distributions"]},
-        "uncertainty_semantics": "local linearized covariance conditional on the selected Maxwellian model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization",
+        "uncertainty_semantics": "local linearized covariance conditional on the selected Maxwellian model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization; inspect primary_result_status because regularization is excluded from the data-only identifiability rank",
         "experimental_validation": "not_performed; numerical software inference only",
     }
