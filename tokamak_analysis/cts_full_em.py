@@ -472,9 +472,12 @@ def full_em_cts_spectral_density(
             raise ValueError(
                 "supply electron_flow_projection_m_s or electron_flow_velocity_m_s, not both"
             )
-        electron_flow_projection_m_s = float(_real_array(
+        electron_flow_projection_value = _real_array(
             electron_flow_projection_m_s, "electron_flow_projection_m_s"
-        ))
+        )
+        if electron_flow_projection_value.ndim != 0:
+            raise ValueError("electron_flow_projection_m_s must be a scalar")
+        electron_flow_projection_m_s = float(electron_flow_projection_value)
         if not np.isfinite(electron_flow_projection_m_s):
             raise ValueError("electron_flow_projection_m_s must be finite")
         electron_flow_seed = np.zeros(3, dtype=float)
@@ -498,10 +501,14 @@ def full_em_cts_spectral_density(
             raise ValueError(
                 f"ion_flow_projection_m_s must contain exactly the ion species names; missing={missing}, extra={extra}"
             )
-        ion_flow_projections = {
-            name: float(_real_array(ion_flow_projection_m_s[name], f"ion_flow_projection_m_s[{name}]"))
-            for name in ion_names
-        }
+        ion_flow_projections = {}
+        for name in ion_names:
+            projection = _real_array(
+                ion_flow_projection_m_s[name], f"ion_flow_projection_m_s[{name}]"
+            )
+            if projection.ndim != 0:
+                raise ValueError(f"ion_flow_projection_m_s[{name}] must be a scalar")
+            ion_flow_projections[name] = float(projection)
         if any(not np.isfinite(value) for value in ion_flow_projections.values()):
             raise ValueError("ion-flow projections must be finite")
         ion_flow_vectors = None
@@ -1004,9 +1011,15 @@ def analyze_full_em_cts_spectrum(
     unknown_bound_names = set(bounds)-allowed_bound_names
     if unknown_bound_names:
         raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
-    flow_seed = 0.0 if electron_flow_projection_initial_m_s is None else float(
-        _real_array(electron_flow_projection_initial_m_s, "electron_flow_projection_initial_m_s")
-    )
+    if electron_flow_projection_initial_m_s is None:
+        flow_seed = 0.0
+    else:
+        flow_seed_value = _real_array(
+            electron_flow_projection_initial_m_s, "electron_flow_projection_initial_m_s"
+        )
+        if flow_seed_value.ndim != 0:
+            raise ValueError("electron_flow_projection_initial_m_s must be a scalar")
+        flow_seed = float(flow_seed_value)
     if not np.isfinite(flow_seed):
         raise ValueError("electron_flow_projection_initial_m_s must be finite")
     if ion_flow_projection_initial_m_s is None:
@@ -1020,10 +1033,16 @@ def analyze_full_em_cts_spectrum(
             raise ValueError(
                 f"ion_flow_projection_initial_m_s must contain exactly the ion species names; missing={missing}, extra={extra}"
             )
-        ion_flow_seeds = np.array([
-            float(_real_array(ion_flow_projection_initial_m_s[name], f"ion_flow_projection_initial_m_s[{name}]"))
-            for name in species_names
-        ])
+        ion_flow_seed_values = []
+        for name in species_names:
+            seed = _real_array(
+                ion_flow_projection_initial_m_s[name],
+                f"ion_flow_projection_initial_m_s[{name}]",
+            )
+            if seed.ndim != 0:
+                raise ValueError(f"ion_flow_projection_initial_m_s[{name}] must be a scalar")
+            ion_flow_seed_values.append(float(seed))
+        ion_flow_seeds = np.asarray(ion_flow_seed_values, dtype=float)
         if np.any(~np.isfinite(ion_flow_seeds)):
             raise ValueError("ion-flow projection initial estimates must be finite")
     initial = np.concatenate((
