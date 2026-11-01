@@ -49,6 +49,11 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     assert "instrument_corrected_sigma_nm" not in distribution_outputs
     assert "instrument_width_resolved" not in distribution_outputs
     assert "moment_uncertainty_diagnostics" not in distribution_outputs
+    primary_outputs = {item["name"] for item in contract["output_specs"]}
+    primary_inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert "electron_velocity_distribution" in primary_outputs
+    assert primary_inputs["enable_evdf_reconstruction"]["default"] is True
+    assert primary_inputs["evdf_velocity_points"]["default"] == 121
     assert callable(resolve_analysis(1))
 
 
