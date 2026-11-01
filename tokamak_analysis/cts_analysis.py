@@ -856,6 +856,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     else:
         out["response_uncertainty_propagated"]=False
         out["external_parameter_uncertainty_propagated"]=False
+    from .thomson_identifiability import cts_electrostatic_identifiability
+    out["parameter_identifiability"] = cts_electrostatic_identifiability(
+        fast_ion_model=fast.get("kind") if fast else None
+    )
     return out
 
 
