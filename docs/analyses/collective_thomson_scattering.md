@@ -61,6 +61,10 @@ The equilibrium callback must supply the local magnetic field and all species de
 
 **Declared geometry limitations:** this is cold-plasma geometrical optics, not diffraction-resolved quasi-optical propagation. Beam covariance matrices are supplied along the rays; the software does not propagate them. The fitted electron density, electron temperature and thermal-ion temperatures are assumed uniform across the sampled scattering volume, while local magnetic field and ray directions may vary. Absolute beam-overlap path integrals are used as relative frequency-bin weights; absolute launcher/receiver power coupling is not calibrated or inferred. Mode conversion and branch tracking through degeneracies are not implemented.
 
+## Automatic numerical convergence assessment
+
+Every Full-EM measured-spectrum inversion now performs a paired harmonic-order / velocity-quadrature refinement study by default after the best-fit physical parameters have been obtained. The default levels begin at the inversion's selected `harmonic_order` and `quadrature_order`, then increase each by two documented increments; the default relative L2 and L-infinity tolerance is `1e-3`. Researchers may supply explicit paired refinement sequences and a different positive tolerance, or explicitly disable the assessment with `numerical_convergence=False`. The returned `numerical_convergence` record contains each level, both relative changes, the final refined spectrum and a pass/fail/not-assessed status. This is a numerical discretization check at fixed fitted parameters; it is not a physical uncertainty, optimizer-identifiability test, model-discrepancy estimate or experimental validation. A failed convergence check does not silently modify the fitted physical parameters.
+
 ## Full-EM input contract
 
 Required inputs include:
