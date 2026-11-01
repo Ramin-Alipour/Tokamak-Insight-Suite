@@ -155,6 +155,21 @@ def test_thomson_spectral_distribution_is_registered_as_entry_81():
     assert callable(resolve_analysis(81))
 
 
+
+def test_thomson_spectral_distribution_registry_declares_calibrated_measurement_input():
+    registry_path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    entry = next(item for item in registry
+                 if item["diagnostic"] == "Thomson spectral distribution")
+    assert entry["raw_data_to_physics"] is False
+    assert entry["calibrated_measurements_to_physics"] is True
+    contract = entry["execution_contract"]
+    assert contract["raw_data_to_physics"] is False
+    assert contract["calibrated_measurements_to_physics"] is True
+    assert contract["input_data_level"] == "measured_calibrated_spectrum"
+
+
+
 def test_primary_analysis_family_lookup_rejects_invalid_ids():
     import pytest
     from tokamak_analysis.analysis_registry import get_analysis_family
