@@ -105,5 +105,11 @@ def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_rende
     assert "Analysis 1 / Spectral-distribution subanalysis" in workflow.options
     workflow.set_value("Analysis 1 / Spectral-distribution subanalysis").run()
     assert not app.exception, [str(error.value) for error in app.exception]
-    assert any(item.label == "Background definition" for item in app.selectbox)
-    assert any(item.label == "Run Analysis 1 spectral-distribution subanalysis" for item in app.button)
+    assert any(
+        item.label == "Open canonical Thomson spectral-to-physics workflow"
+        for item in app.button
+    )
+    assert any(
+        "Run “Thomson multi-channel spectral inference” first" in item.value
+        for item in app.info
+    )
