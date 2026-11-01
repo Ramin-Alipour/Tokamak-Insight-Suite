@@ -382,20 +382,21 @@ def fit_relativistic_maxwell_juttner(
         objective, p0, x_scale="jac", max_nfev=1200, bounds=fit_bounds,
     )
     # A broad baseline slope can partially trade against a small Doppler shift.
-    # If the first refinement reverses the sign implied by the measured spectral
-    # centroid, retry from the opposite-flow basin and retain the lower-residual
-    # solution. This is a numerical multi-start, not a prior or a flow constraint.
+    # If refinement reverses the centroid-implied flow sign, retry from a
+    # smaller centroid-guided shift and from zero flow, retaining the best fit.
+    # These are numerical starts only, not priors or physical flow constraints.
     if abs(beta0) > 1e-8 and np.sign(np.tanh(fit.x[1])) != np.sign(beta0):
-        alternate_start = p0.copy()
-        alternate_start[1] = np.arctanh(-beta0)
-        alternate_fit = least_squares(
-            objective, alternate_start, x_scale="jac", max_nfev=1200,
-            bounds=fit_bounds,
-        )
-        if alternate_fit.success and (
-            not fit.success or alternate_fit.cost < fit.cost
-        ):
-            fit = alternate_fit
+        for alternate_beta in (0.5 * beta0, 0.0):
+            alternate_start = p0.copy()
+            alternate_start[1] = np.arctanh(alternate_beta)
+            alternate_fit = least_squares(
+                objective, alternate_start, x_scale="jac", max_nfev=1200,
+                bounds=fit_bounds,
+            )
+            if alternate_fit.success and (
+                not fit.success or alternate_fit.cost < fit.cost
+            ):
+                fit = alternate_fit
     if not fit.success:
         raise ValueError(f"relativistic Maxwell-Juttner Thomson fit failed: {fit.message}")
     jacobian = np.asarray(fit.jac, dtype=float)
