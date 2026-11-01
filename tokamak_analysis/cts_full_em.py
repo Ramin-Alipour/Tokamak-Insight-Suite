@@ -935,6 +935,8 @@ def analyze_full_em_cts_spectrum(
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
     response_mc_samples=100,
+    numerical_convergence=True, convergence_harmonic_orders=None,
+    convergence_quadrature_orders=None, convergence_relative_tolerance=1e-3,
 ):
     """Fit n_e, T_e, electron flow, and each supplied ion species' T_i and flow projection.
 
@@ -1343,6 +1345,45 @@ def analyze_full_em_cts_spectrum(
             out["instrument_response_uncertainty_warning"] = (
                 "Too few successful response-matrix perturbation refits; no response covariance was added."
             )
+    if not isinstance(numerical_convergence, (bool, np.bool_)):
+        raise ValueError("numerical_convergence must be boolean")
+    if numerical_convergence:
+        default_harmonics = (int(harmonic_order), int(harmonic_order) + 4, int(harmonic_order) + 8)
+        default_quadratures = (int(quadrature_order), int(quadrature_order) + 6, int(quadrature_order) + 12)
+        selected_harmonics = default_harmonics if convergence_harmonic_orders is None else convergence_harmonic_orders
+        selected_quadratures = default_quadratures if convergence_quadrature_orders is None else convergence_quadrature_orders
+        convergence = assess_full_em_cts_numerical_convergence(
+            f, probe_frequency_Hz, scattering_geometry,
+            harmonic_orders=selected_harmonics,
+            quadrature_orders=selected_quadratures,
+            relative_tolerance=convergence_relative_tolerance,
+            electron_density_m3=float(values[0]),
+            electron_temperature_eV=float(values[1]),
+            ion_temperature_eV=unpack_temperatures(fit.x),
+            ion_species=ion_species, ion_fractions=ion_fractions,
+            magnetic_field_T=magnetic_field_T,
+            electron_flow_projection_m_s=electron_flow_projection(fit.x),
+            ion_flow_projection_m_s=unpack_ion_flow_projections(fit.x),
+            incident_polarization=incident_polarization,
+            scattered_polarization=scattered_polarization,
+            damping_rate_rad_s=damping_rate_rad_s,
+            fast_ion_populations=fast_ion_populations,
+            electron_distribution=electron_distribution,
+            bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
+        )
+        out["numerical_convergence"] = convergence
+        out["numerical_convergence_status"] = convergence["convergence_status"]
+        out["numerical_convergence_is_uncertainty"] = False
+    else:
+        if convergence_harmonic_orders is not None or convergence_quadrature_orders is not None:
+            raise ValueError("convergence refinement orders cannot be supplied when numerical_convergence=False")
+        out["numerical_convergence"] = {
+            "convergence_status": "not_assessed_by_request",
+            "converged": None,
+            "interpretation": "Numerical convergence was explicitly disabled; no convergence claim is made.",
+        }
+        out["numerical_convergence_status"] = "not_assessed_by_request"
+        out["numerical_convergence_is_uncertainty"] = False
     from .thomson_identifiability import cts_full_em_identifiability
     out["parameter_identifiability"] = cts_full_em_identifiability(species_names)
     return out
