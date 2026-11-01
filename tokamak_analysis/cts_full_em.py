@@ -1201,11 +1201,21 @@ def analyze_full_em_cts_spectrum(
         bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
     )
     return {
-        "optimizer_initial_estimates": automatic_seeds or {
-            "electron_density_m3": float(electron_density_initial_m3),
-            "electron_temperature_eV": float(electron_temperature_initial_eV),
+        "optimizer_initial_estimates": {
+            "electron_density_m3": float(initial[0]),
+            "electron_temperature_eV": float(initial[1]),
             "ion_temperature_eV": ion_initials.tolist(),
-            "method": "researcher_supplied",
+            "method": automatic_seeds["method"] if automatic_seeds is not None else "researcher_supplied",
+            "automatically_estimated_parameters": [
+                name for name, value in (
+                    ("electron_density_m3", electron_density_initial_m3),
+                    ("electron_temperature_eV", electron_temperature_initial_eV),
+                    ("ion_temperature_eV", ion_temperature_initial_eV),
+                ) if value is None
+            ],
+            "density_seed_assumption": (
+                automatic_seeds["density_seed_assumption"] if automatic_seeds is not None else None
+            ),
             "role": "optimizer_initial_estimates_only",
         },
         "electron_density_m3": float(values[0]),
