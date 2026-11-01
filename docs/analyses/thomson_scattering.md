@@ -174,7 +174,7 @@ multiple views alone do not guarantee uniqueness. Absolute density requires
 calibrated absolute scattered power and complete optical collection geometry,
 which this normalized inversion does not calculate.
 
-The deterministic solver does not claim posterior confidence intervals. When
+Alongside the non-parametric reconstruction, the routine fits and compares three parameterized projected-marginal candidates: Maxwellian, finite-variance Kappa/Student-t, and super-Gaussian. It reports weighted residual sum of squares, AIC and BIC for each successful fit. These candidate fits are distinct from the regularized basis reconstruction; no candidate is selected as physically true by the software. Parameter confidence intervals are not currently returned.\n\nThe deterministic solver does not claim posterior confidence intervals. When
 measurement uncertainty is supplied it uses it in the weighted objective, but
 uncertainty intervals still require a separately validated constrained
 uncertainty workflow. The inversion is resolution-limited by the measured
