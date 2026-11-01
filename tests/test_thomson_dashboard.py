@@ -129,3 +129,26 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     assert any(item.label.startswith("Fixed measured/researcher-supplied spatial mixing matrix") for item in app.file_uploader)
     assert any(item.label.startswith("Spatial curvature regularization strength") for item in app.text_input)
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_dashboard_exposes_conditional_path_integrated_density_inputs():
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * 9,
+        "radius_m": [0.1] * 9,
+        "wavelength_nm": np.linspace(531.0, 533.0, 9),
+        "intensity": np.linspace(1.0, 2.0, 9),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.radio if item.label == "WORKSPACE").set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "Thomson multi-channel spectral inference"
+    ).run()
+    assert any(
+        item.label == "Path-dependent optical/geometry profiles CSV"
+        for item in app.file_uploader
+    )
+    assert any(
+        item.label == "Absolutely calibrated integrated scattered power (W)"
+        for item in app.text_input
+    )
+    assert not app.exception, [str(error.value) for error in app.exception]
