@@ -311,6 +311,9 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     )
     assert any("instrument_response_uncertainty" in item for item in full_mode["inputs"])
     assert any("response_mc_samples" in item for item in full_mode["inputs"])
+    assert any("numerical_convergence" in item for item in full_mode["inputs"])
+    assert any("convergence_harmonic_orders" in item for item in full_mode["inputs"])
+    assert any("numerical_convergence_status" in item for item in full_mode["outputs"])
     convergence_inputs = {
         "numerical_convergence", "convergence_harmonic_orders",
         "convergence_quadrature_orders", "convergence_relative_tolerance",
