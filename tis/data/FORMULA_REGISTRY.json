@@ -4746,6 +4746,116 @@
         {
           "name": "numerical_controls",
           "unit": "structured numerical settings"
+        },
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "description": "Input frequency-shift axis echoed in the model result."
+        },
+        {
+          "name": "total_three_wave_source_current_operator",
+          "unit": "frequency x 3 x 10 complex tensor",
+          "description": "Combined nonlinear source-current operator used in the correlated transfer contraction."
+        },
+        {
+          "name": "bindslev_coupling_coefficients",
+          "unit": "frequency-indexed complex coefficients",
+          "description": "Receiver-projected density, flux, electric and magnetic coupling coefficients and transfer contributions."
+        },
+        {
+          "name": "relativistic_fast_ion_three_wave_vertex_used",
+          "unit": "boolean",
+          "description": "Whether a supplied fast-ion population contributes a relativistic second-order vertex."
+        },
+        {
+          "name": "relativistic_kinetic_three_wave_vertex_used",
+          "unit": "boolean",
+          "description": "Whether any supplied non-Maxwellian population contributes a relativistic second-order vertex."
+        },
+        {
+          "name": "nonthermal_electron_distribution",
+          "unit": "structured or null",
+          "description": "Explicit relativistic nonthermal electron distribution used by the forward model, when supplied."
+        },
+        {
+          "name": "relativistic_electron_distribution",
+          "unit": "structured or null",
+          "description": "Alias for the explicit relativistic electron distribution used by the forward model."
+        },
+        {
+          "name": "fast_ion_kinetic_diagnostics",
+          "unit": "frequency-indexed species diagnostics",
+          "description": "Relativistic fast-ion response and fluctuation diagnostics."
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; 3-vector",
+          "description": "Supplied laboratory magnetic-field vector."
+        },
+        {
+          "name": "frequency_resolved_magnetic_field_T",
+          "unit": "T; frequency-indexed vectors",
+          "description": "Local magnetic field sampled from frequency-resolved geometry."
+        },
+        {
+          "name": "ray_tracing_geometry_used",
+          "unit": "boolean",
+          "description": "Whether frequency-resolved ray geometry was supplied and used."
+        },
+        {
+          "name": "scattering_volume_integration_used",
+          "unit": "boolean",
+          "description": "Whether path-integrated scattering-volume quadrature was used."
+        },
+        {
+          "name": "scattering_volume_weighting",
+          "unit": "text",
+          "description": "Description of local or path-integrated scattering-volume weighting."
+        },
+        {
+          "name": "fast_ion_populations",
+          "unit": "structured list",
+          "description": "Externally supplied relativistic fast-ion population metadata."
+        },
+        {
+          "name": "model",
+          "unit": "text",
+          "description": "Selected physical Full-EM model description."
+        },
+        {
+          "name": "kinetic_response",
+          "unit": "text",
+          "description": "Description of the kinetic response used for Maxwellian and explicitly supplied relativistic populations."
+        },
+        {
+          "name": "fluctuation_source",
+          "unit": "text",
+          "description": "Description of FDT and/or Klimontovich fluctuation source treatment."
+        },
+        {
+          "name": "retained_cross_correlations",
+          "unit": "text list",
+          "description": "Density-current-field cross-correlations retained by the model."
+        },
+        {
+          "name": "bulk_electron_closure",
+          "unit": "text",
+          "description": "Maxwellian Bindslev or explicit relativistic gyrotropic electron closure."
+        },
+        {
+          "name": "bulk_electron_closure_validity_theta_e_limit",
+          "unit": "dimensionless or null",
+          "description": "Researcher-supplied theta_e screening limit for the Maxwellian Bindslev closure."
+        },
+        {
+          "name": "bulk_electron_closure_validity_note",
+          "unit": "text",
+          "description": "Interpretation of the Bindslev asymptotic validity screen."
+        },
+        {
+          "name": "limitations",
+          "unit": "text list",
+          "description": "Runtime limitations for the selected forward-model configuration."
         }
       ],
       "prerequisites": [
