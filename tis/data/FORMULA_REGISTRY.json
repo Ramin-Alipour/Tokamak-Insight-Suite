@@ -3325,7 +3325,10 @@
         "doi": "10.1016/j.fusengdes.2025.114826",
         "scope": "Quasi-optical beam tracing including diffraction for high-k collective scattering; the present TIS helper is explicitly geometrical-optics with supplied local Gaussian covariance."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "note": " This formula contract describes physical inference from measured, calibrated CTS spectral power; it does not imply detector calibration or empirical validation."
   },
   {
     "name": "Joint multi-channel Thomson generalized least-squares covariance",
