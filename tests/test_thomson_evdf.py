@@ -70,6 +70,25 @@ def test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance()
     assert "conditional on the selected grid" in out["evdf_uncertainty_interpretation"]
 
 
+def test_evdf_parametric_comparison_reports_conditional_parameter_uncertainty():
+    wavelength, signal, background = _case()
+    out = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 1.0),
+    )
+    fit = out["parametric_model_comparison"]["maxwellian"]
+    assert fit["success"] is True
+    assert fit["parameter_covariance"].shape == (3, 3)
+    assert fit["parameter_standard_uncertainty"].shape == (3,)
+    assert np.all(np.isfinite(fit["parameter_standard_uncertainty"]))
+    assert fit["parameter_uncertainty_status"] in {
+        "conditional_local_gaussian_covariance",
+        "boundary_limited_for_some_parameters",
+    }
+    assert fit["parameter_covariance_interpretation"].startswith("Local linearized covariance")
+    assert fit["parameter_one_sigma_intervals"]["mean_velocity_parallel_m_s"] is not None
+
+
 def test_evdf_requires_explicit_positive_regularization_and_response():
     wavelength, signal, background = _case()
     with pytest.raises(ValueError, match="regularization_strength"):
