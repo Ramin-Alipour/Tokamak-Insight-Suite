@@ -4642,6 +4642,11 @@
           "unit": "boolean",
           "description": "True for Full-EM: one projected ion-flow component per supplied species is fitted from the measured spectrum.",
           "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "scattering_volume_sample_diagnostics",
+          "unit": "structured; frequency x sample",
+          "description": "Per-sample locations, magnetic fields, sample weights and local spectral densities used in scattering-volume integration."
         }
       ],
       "assumptions": [
