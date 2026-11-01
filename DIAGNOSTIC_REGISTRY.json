@@ -4742,6 +4742,131 @@
           "name": "total_fit_covariance_including_discrepancy",
           "unit": "mixed physical parameter covariance",
           "description": "Combined local fit covariance, successful supported external Monte Carlo contributions and separately reported model-discrepancy covariance."
+        },
+        {
+          "name": "fast_ion",
+          "unit": "structured; optional electrostatic fast-ion component",
+          "description": "Decoded fast-ion component including kind, species index, inferred fraction and either fitted Maxwellian temperature or one-dimensional tabulated VDF."
+        },
+        {
+          "name": "parameter_provenance",
+          "unit": "structured",
+          "description": "Per-parameter provenance distinguishing spectrum-inferred quantities from externally fixed ion composition and supplied VDF shape."
+        },
+        {
+          "name": "uncertainty_model",
+          "unit": "text",
+          "description": "Describes local fit covariance, optional noise weighting, response/external Monte Carlo and separate model-discrepancy covariance."
+        },
+        {
+          "name": "limitations",
+          "unit": "text list",
+          "description": "Runtime limitations and non-identifiability statements for the selected electrostatic or Full-EM branch."
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata list",
+          "description": "Externally supplied fixed ion species metadata used by the electrostatic model."
+        },
+        {
+          "name": "ion_fractions_charge_density",
+          "unit": "dimensionless vector",
+          "description": "Externally supplied fixed charge-density fractions used by the electrostatic model."
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz",
+          "description": "Probe frequency used in the CTS inversion."
+        },
+        {
+          "name": "scattering_wave_number_m-1",
+          "unit": "m^-1",
+          "description": "Magnitude of the local scattering wavevector."
+        },
+        {
+          "name": "scattering_wavevector_direction",
+          "unit": "dimensionless 3-vector",
+          "description": "Unit direction of the scattering wavevector."
+        },
+        {
+          "name": "scattering_angle_rad",
+          "unit": "rad",
+          "description": "Scattering angle used by the selected CTS branch."
+        },
+        {
+          "name": "collective_parameter_alpha",
+          "unit": "dimensionless",
+          "description": "Ratio of inverse scattering wavenumber to electron Debye length used to classify the scattering regime."
+        },
+        {
+          "name": "scattering_regime",
+          "unit": "text",
+          "description": "Collective or weakly-collective/non-collective classification from the fitted parameter state."
+        },
+        {
+          "name": "global_search_score",
+          "unit": "objective value or null",
+          "description": "Best objective value from the selected global search, when global search is enabled."
+        },
+        {
+          "name": "genetic_best_score_history",
+          "unit": "objective history or null",
+          "description": "Generation-wise best objective values from the improved-genetic optimizer, when selected."
+        },
+        {
+          "name": "inversion_method",
+          "unit": "text",
+          "description": "Explicit electrostatic optimizer choice."
+        },
+        {
+          "name": "regularization_strength",
+          "unit": "dimensionless",
+          "description": "Researcher-selected regularization strength; only applies to inferred tabulated fast-ion VDF shape."
+        },
+        {
+          "name": "spectral_uncertainty_supplied",
+          "unit": "boolean",
+          "description": "Whether pointwise spectral uncertainty or full spectral covariance was supplied to the electrostatic inversion."
+        },
+        {
+          "name": "regularization_scope",
+          "unit": "text",
+          "description": "Declares that regularization acts on fast-ion VDF shape only and not on plasma-parameter estimates."
+        },
+        {
+          "name": "jacobian_rank",
+          "unit": "integer",
+          "description": "Numerical rank of the scaled local fit Jacobian used for identifiability checks."
+        },
+        {
+          "name": "jacobian_condition_number",
+          "unit": "dimensionless",
+          "description": "Condition number of the scaled local fit Jacobian."
+        },
+        {
+          "name": "degrees_of_freedom",
+          "unit": "integer",
+          "description": "Residual degrees of freedom after fitting plasma and nuisance amplitude/background parameters."
+        },
+        {
+          "name": "fit_residual_rms",
+          "unit": "same as spectrum",
+          "description": "Root-mean-square measured-minus-fitted spectral residual."
+        },
+        {
+          "name": "optimizer_success",
+          "unit": "boolean",
+          "description": "Optimizer convergence status."
+        },
+        {
+          "name": "reduced_chi_square",
+          "unit": "dimensionless or null",
+          "description": "Noise-weighted reduced chi-square; null when no measurement-noise model was supplied."
+        },
+        {
+          "name": "electron_velocity_projection_uncertainty_m_s",
+          "unit": "m s^-1; 1-sigma",
+          "description": "Local-fit and supported additional uncertainty of the fitted electron-flow projection."
         }
       ],
       "assumptions": [
