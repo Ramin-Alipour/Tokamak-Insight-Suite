@@ -489,6 +489,12 @@ def full_em_cts_spectral_density(
                             electron_flow_seed, ion_flow_velocity_m_s)
     electron_distribution_used = None
     if electron_distribution is not None:
+        if electron_flow_projection_m_s is not None and abs(electron_flow_projection_m_s) > 0.0:
+            raise ValueError(
+                "Full-EM electron-flow inference with an explicit relativistic electron distribution "
+                "requires a drifted relativistic VDF model; this solver does not silently approximate "
+                "that distribution by a frequency shift"
+            )
         if not isinstance(electron_distribution, Mapping):
             raise ValueError("electron_distribution must be an explicit relativistic gyrotropic distribution mapping")
         if electron_distribution.get("kind") not in {"relativistic_maxwell_juttner", "relativistic_bigaussian", "tabulated_gyrotropic"}:
