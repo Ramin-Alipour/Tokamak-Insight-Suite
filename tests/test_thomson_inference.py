@@ -173,6 +173,12 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     assert diagnostic["jacobian_rank"] == diagnostic["parameter_count"] == 6
     assert np.isfinite(diagnostic["normalized_jacobian_condition_number"])
     assert diagnostic["conditional_kappa_sensitivity"] > 1e-8
+    profile = out["channels"][0]["kappa_profile_likelihood"]
+    assert profile["status"] in {"finite_profile_interval", "grid_censored"}
+    assert profile["delta_chi_square_threshold"] == pytest.approx(1.0)
+    assert profile["noise_scale"] == "unweighted_residual_scale_not_measurement_calibrated"
+    assert profile["numerical_profile_domain"][0] > 1.5
+    assert profile["numerical_profile_domain"][1] >= 20.0
     assert 0.0 < out["channels"][0]["captured_spectral_probability"] <= 1.0
 
 
