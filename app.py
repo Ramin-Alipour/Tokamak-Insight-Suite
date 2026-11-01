@@ -3347,9 +3347,10 @@ elif page=='Advanced Analysis':
                 cts_spectrum_col=col_select('Calibrated CTS spectral power',[x for x in numeric if x!=cts_frequency_col] or numeric,'cts_full_spectrum_col')
                 cts_uncertainty_col=st.selectbox('Spectral 1σ uncertainty column (required unless covariance is supplied)',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_full_uncertainty_col')
                 cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_full_probe_frequency')
-                cts_density_initial=st.text_input('Initial electron density (m⁻³)',key='cts_full_density_initial')
-                cts_temperature_initial=st.text_input('Initial electron temperature (eV)',key='cts_full_temperature_initial')
-                cts_ion_temperature_initial=st.text_input('Initial ion temperatures (eV; one per species, comma-separated)',key='cts_full_ion_temperature_initial')
+                cts_density_initial=st.text_input('Initial electron density (m⁻³; optional; blank = automatic spectral seed)',key='cts_full_density_initial')
+                cts_temperature_initial=st.text_input('Initial electron temperature (eV; optional; blank = automatic spectral seed)',key='cts_full_temperature_initial')
+                cts_ion_temperature_initial=st.text_input('Initial ion temperatures (eV; optional; one per species, comma-separated)',key='cts_full_ion_temperature_initial')
+                st.caption('Omitted density and temperature seeds are estimated from the calibrated CTS spectral shape and width. They initialize the optimizer only; the full magnetized-CTS fit determines reported parameters.')
                 cts_magnetic_field=st.text_input('Magnetic field vector (T; x,y,z)',key='cts_full_magnetic_field')
             with c2:
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_full_response_upload')
@@ -3426,10 +3427,13 @@ elif page=='Advanced Analysis':
                     if not species_names or not (len(species_names)==len(charges)==len(masses)==len(fractions)):
                         raise ValueError('Ion names, charge states, masses and fractions must have equal non-zero lengths.')
                     ion_species=[{'name':name,'charge_state':charge,'mass_amu':mass} for name,charge,mass in zip(species_names,charges,masses)]
-                    ion_temperatures=_parse_ts_float_list(cts_ion_temperature_initial,'Initial ion temperatures')
-                    if len(ion_temperatures)!=len(species_names):
-                        raise ValueError('Enter one initial ion temperature per supplied ion species.')
-                    ion_temperature_initial={name:value for name,value in zip(species_names,ion_temperatures)}
+                    if cts_ion_temperature_initial.strip():
+                        ion_temperatures=_parse_ts_float_list(cts_ion_temperature_initial,'Initial ion temperatures')
+                        if len(ion_temperatures)!=len(species_names):
+                            raise ValueError('Enter one initial ion temperature per supplied ion species, or leave blank for automatic spectral initialization.')
+                        ion_temperature_initial={name:value for name,value in zip(species_names,ion_temperatures)}
+                    else:
+                        ion_temperature_initial=None
                     if cts_geometry_upload is not None:
                         scattering_geometry=json.load(cts_geometry_upload)
                         if not isinstance(scattering_geometry,dict) or 'frequency_resolved_geometry' not in scattering_geometry:
@@ -3453,8 +3457,8 @@ elif page=='Advanced Analysis':
                         'measured_spectrum':spectrum,
                         'probe_frequency_Hz':float(cts_probe_frequency),
                         'scattering_geometry':scattering_geometry,
-                        'electron_density_initial_m3':float(cts_density_initial),
-                        'electron_temperature_initial_eV':float(cts_temperature_initial),
+                        'electron_density_initial_m3':None if not cts_density_initial.strip() else float(cts_density_initial),
+                        'electron_temperature_initial_eV':None if not cts_temperature_initial.strip() else float(cts_temperature_initial),
                         'ion_temperature_initial_eV':ion_temperature_initial,
                         'ion_species':ion_species,
                         'ion_fractions':fractions,
