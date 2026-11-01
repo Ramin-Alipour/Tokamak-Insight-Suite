@@ -329,3 +329,86 @@ def density_from_thomson_scattered_power(
         "density_interpretation": "interaction_length_averaged_effective_density",
         "uncertainty_model": ("First-order propagation with a supplied 6x6 relative covariance matrix for scattered power, incident power, interaction length, collection solid angle, optical efficiency and differential-cross-section factor; independent effective-cross-section model uncertainty and fitted power/cross-section covariance are added internally." if relative_input_covariance is not None else "Optional first-order independent-input propagation, including effective differential-cross-section model uncertainty and fitted power/cross-section covariance when supplied; unprovided covariance and model discrepancy are not included."),
     }
+
+
+def infer_thomson_path_averaged_density(
+    scattered_power_W,
+    path_coordinate_m,
+    incident_power_profile_W,
+    differential_cross_section_profile_m2_sr,
+    collection_solid_angle_profile_sr,
+    optical_efficiency_profile,
+    *,
+    scattered_power_uncertainty_W=None,
+):
+    """Infer the measurement-kernel-weighted electron density along a sightline.
+
+    This is the path-integrated single-scattering relation
+        P_s = integral[n_e(s) P_i(s) (d sigma/d Omega)(s)
+                       DeltaOmega(s) eta(s) ds].
+    A single measured P_s identifies only the weighted path average, not an
+    arbitrary spatial density profile. The supplied path-dependent factors
+    are fixed, already-characterized inputs; this routine does not calibrate
+    an instrument or infer missing geometry/optical factors.
+
+    All profile arrays are sampled at the same strictly increasing path
+    coordinate. Cross-section units are m^2 sr^-1, solid angle is sr,
+    path is m, and incident/scattered powers are W.
+    """
+    ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
+    s = np.asarray(path_coordinate_m, dtype=float)
+    if s.ndim != 1 or s.size < 2 or not np.all(np.isfinite(s)) or np.any(np.diff(s) <= 0):
+        raise ValueError("path_coordinate_m must be a finite strictly increasing vector with at least two samples")
+    profiles = {}
+    for name, value in (
+        ("incident_power_profile_W", incident_power_profile_W),
+        ("differential_cross_section_profile_m2_sr", differential_cross_section_profile_m2_sr),
+        ("collection_solid_angle_profile_sr", collection_solid_angle_profile_sr),
+        ("optical_efficiency_profile", optical_efficiency_profile),
+    ):
+        arr = np.asarray(value, dtype=float)
+        if arr.shape != s.shape or not np.all(np.isfinite(arr)):
+            raise ValueError(f"{name} must be finite and match path_coordinate_m")
+        profiles[name] = arr
+    pi = profiles["incident_power_profile_W"]
+    dsigma = profiles["differential_cross_section_profile_m2_sr"]
+    omega = profiles["collection_solid_angle_profile_sr"]
+    eta = profiles["optical_efficiency_profile"]
+    if np.any(pi <= 0) or np.any(dsigma <= 0) or np.any(omega <= 0) or np.any(eta <= 0) or np.any(eta > 1):
+        raise ValueError("incident power, cross-section, solid angle and efficiency must be positive; efficiency must not exceed one")
+    kernel = pi * dsigma * omega * eta
+    denominator = float(np.trapz(kernel, s))
+    if not np.isfinite(denominator) or denominator <= 0:
+        raise ValueError("path-integrated optical sensitivity must be positive and finite")
+    density = ps / denominator
+    sigma_ps = None
+    if scattered_power_uncertainty_W is not None:
+        sigma_ps = _positive_finite_scalar(
+            scattered_power_uncertainty_W, "scattered_power_uncertainty_W", allow_zero=True
+        )
+    return {
+        "electron_density_path_averaged_m3": float(density),
+        "electron_density_path_averaged_uncertainty_m3": (
+            None if sigma_ps is None else float(sigma_ps / denominator)
+        ),
+        "path_integrated_sensitivity_W_m3": denominator,
+        "path_coordinate_m": s.copy(),
+        "normalized_path_weight": kernel / np.trapz(kernel, s),
+        "path_weighting_model": "incident_power_times_differential_cross_section_times_collection_solid_angle_times_optical_efficiency",
+        "density_interpretation": "measurement_kernel_weighted_path_average",
+        "identifiability": {
+            "status": "weighted_path_average_identifiable",
+            "not_identifiable": ["arbitrary pointwise electron_density_profile_m3"],
+            "reason": "One integrated power measurement constrains one weighted path integral; it cannot uniquely recover an unconstrained spatial density function.",
+            "profile_reconstruction_requires": [
+                "multiple independent spatially resolved scattering measurements or an explicitly parameterized density profile",
+                "the corresponding spatial response/kernel and any cross-channel covariance",
+            ],
+        },
+        "assumptions": [
+            "Input scattered power and all path-dependent optical/geometry profiles are measured or independently characterized and already calibrated.",
+            "Optically thin single scattering; no multiple-scattering contribution.",
+            "The supplied path-dependent factors are fixed and are not calibrated or corrected by this function.",
+        ],
+        "uncertainty_model": "First-order propagation of supplied scattered-power uncertainty only; uncertainty/covariance of path-dependent factors is not included unless separately propagated by the caller.",
+    }

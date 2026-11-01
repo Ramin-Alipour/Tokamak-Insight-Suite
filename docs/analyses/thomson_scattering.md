@@ -226,3 +226,20 @@ The non-collective Kappa fit evaluates the finite-difference Jacobian of the act
 The joint Maxwellian mode is exposed in the **Spectral Analysis → Thomson multi-channel spectral inference** dashboard. Select `non_collective_maxwellian`, enable the joint wavelength-resolved spatial option, upload the fixed detector-channel × radial-node spatial mixing matrix, and enter the numerical curvature-regularization strength explicitly. The matrix is a supplied forward operator; TIS does not estimate or calibrate it. The dashboard routes this selection through `reconstruct_thomson_profile_from_spectra` and exports the same profile-field names as the channel-wise workflow. Absolute density is returned as unavailable (`NaN`) in this shape-only joint inverse; it must not be inferred from relative spectral amplitude. Laser-wavelength, scattering-angle and spatial/spectral response uncertainty inputs are not propagated by this joint route; if supplied, the dashboard rejects the combination rather than silently dropping them. The result also exposes `parameter_identifiability`, and physical profile fields are withheld when the data-only Jacobian is rank deficient or the optimizer fails. A regularized optimizer candidate is retained separately for diagnostics and is never promoted to a measured result.
 
 The optional `joint_spatial_spectral=True` mode fits the measured channel-by-wavelength spectra through a researcher-supplied fixed spatial mixing matrix and the supplied fixed spectral-response operator. It currently implements the isotropic, non-relativistic Maxwellian single-particle Thomson forward model; it does not estimate a point-spread function or calibrate either operator. The returned primary status is based on a finite-difference Jacobian of the whitened measured-data residual. Optional curvature-regularization rows are deliberately excluded from this rank test: regularization may select a smooth numerical solution, but it cannot create independent measurement information. Inspect `primary_result_status`, `primary_outputs_reportable_as_identified`, and `optimizer.data_only_jacobian_rank` before interpreting a reconstructed profile. If the data-only inverse is rank deficient or the optimizer does not converge, the physical profile and covariance fields are withheld (`null`); the optimizer's numerical candidate is retained separately under `optimizer_candidate` and explicitly marked as not a measured result. Perpendicular flow, null-space spatial structure, sub-resolution structure, and unrestricted anisotropic/non-Maxwellian distributions remain non-identifiable in this model.
+
+
+## Path-integrated absolute-density inference
+
+For a measured, absolutely calibrated scattered power and explicitly supplied
+path-dependent optical factors, the API
+`tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density`
+evaluates
+
+`P_s = integral n_e(s) P_i(s) [d sigma/d Omega](s) DeltaOmega(s) eta(s) ds`.
+
+The output is the measurement-kernel-weighted path-average density, with
+uncertainty from supplied scattered-power uncertainty. A single integrated
+power measurement does **not** identify an arbitrary pointwise density
+profile. The path-dependent inputs are treated as already characterized;
+instrument calibration and experimental validation are outside this API.
+

@@ -1,0 +1,64 @@
+"""Independent regression tests for new Thomson path and CTS mode utilities."""
+import numpy as np
+import pytest
+
+from tokamak_analysis.thomson_scattering import infer_thomson_path_averaged_density
+from tokamak_analysis.cts_em_geometry import track_cold_plasma_modes_from_operators
+
+
+def test_path_integrated_density_recovers_weighted_uniform_density():
+    s = np.linspace(0.0, 0.4, 101)
+    incident = np.linspace(1.0, 0.8, s.size)
+    cross = np.full(s.size, 6.0e-29)
+    solid_angle = np.linspace(0.02, 0.03, s.size)
+    efficiency = np.linspace(0.4, 0.5, s.size)
+    truth = 2.5e19
+    denominator = np.trapz(incident * cross * solid_angle * efficiency, s)
+    measured_power = truth * denominator
+    result = infer_thomson_path_averaged_density(
+        measured_power, s, incident, cross, solid_angle, efficiency,
+        scattered_power_uncertainty_W=0.02 * measured_power,
+    )
+    assert result["electron_density_path_averaged_m3"] == pytest.approx(truth, rel=1e-12)
+    assert result["electron_density_path_averaged_uncertainty_m3"] == pytest.approx(0.02 * truth)
+    assert result["identifiability"]["status"] == "weighted_path_average_identifiable"
+    assert "arbitrary pointwise electron_density_profile_m3" in result["identifiability"]["not_identifiable"]
+
+
+def test_path_integrated_density_rejects_unmatched_or_unphysical_profiles():
+    s = np.linspace(0.0, 1.0, 5)
+    with pytest.raises(ValueError, match="must be finite and match"):
+        infer_thomson_path_averaged_density(1.0, s, np.ones(4), np.ones(5), np.ones(5), np.ones(5))
+    with pytest.raises(ValueError, match="efficiency must not exceed one"):
+        infer_thomson_path_averaged_density(1.0, s, np.ones(5), np.ones(5), np.ones(5), np.full(5, 1.1))
+
+
+def test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing():
+    angle = np.linspace(0.0, np.pi / 2.0, 31)
+    operators = []
+    for a in angle:
+        rotation = np.array([
+            [np.cos(a), -np.sin(a), 0.0],
+            [np.sin(a), np.cos(a), 0.0],
+            [0.0, 0.0, 1.0],
+        ])
+        diagonal = np.diag([-1.0 + 2.0 * a / np.pi, 1.0 - 2.0 * a / np.pi, 3.0])
+        operators.append(rotation @ diagonal @ rotation.T)
+    result = track_cold_plasma_modes_from_operators(np.asarray(operators))
+    permutations = result["eigenvalue_order_permutation"]
+    assert np.any(np.diff(permutations[:, 0]) != 0)
+    overlap = result["adjacent_sample_polarization_overlap_squared"]
+    assert np.min(overlap) > 0.99
+    assert result["branch_identifiability"] == "locally_continuous_eigenvector_branches"
+    assert not np.any(result["degenerate_subspace_detected"])
+
+
+def test_mode_tracking_reports_exact_degeneracy_as_ambiguous():
+    operators = np.asarray([
+        np.diag([0.0, 1.0, 2.0]),
+        np.diag([0.0, 0.0, 2.0]),
+        np.diag([0.0, 1.0, 2.0]),
+    ], dtype=complex)
+    result = track_cold_plasma_modes_from_operators(operators)
+    assert result["degenerate_subspace_detected"].tolist() == [False, True, False]
+    assert result["branch_identifiability"] == "ambiguous_at_one_or_more_degenerate_samples"

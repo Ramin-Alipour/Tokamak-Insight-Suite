@@ -138,3 +138,18 @@ If no pointwise uncertainty or spectral covariance is supplied to Electrostatic 
 The electrostatic inversion does not require users to provide density or temperature starting guesses. For each omitted seed, the initializer uses the calibrated spectral power after subtracting a low-percentile baseline. The electron-temperature seed is derived from the full-spectrum RMS frequency width and the scattering wave number; the common ion-temperature seed uses the central 68%-weight spectral-core width and the charge-density-weighted ion mass. A density seed is constructed by setting the dimensionless collective parameter to alpha=1 solely for numerical initialization. This alpha value is not an inferred plasma measurement, a prior, or a constraint: the inversion fits density freely from the complete measured spectrum. Explicit researcher-supplied seeds override only their corresponding automatic estimates. The result records the initialization method and provenance separately from fitted physical outputs.
 
 The initializer is deterministic and does not perform instrument calibration, experimental validation, or detector correction. It operates on the calibrated CTS spectrum supplied to the analysis.
+
+
+## Cold-plasma eigenmode branch tracking
+
+`tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators`
+tracks eigenpolarization branches along an ordered sequence of cold-plasma
+wave operators using maximum squared polarization overlap, a global
+Hungarian assignment, and phase alignment. It explicitly flags near-degenerate
+eigenvalue subspaces, where an individual eigenvector is not uniquely
+defined.
+This is branch-continuity bookkeeping, not a coupled-mode conversion solver.
+The method complements the ray/forward-modelling and Bayesian-inversion
+workflow discussed in recent CTS diagnostic design work (e.g. 2026 accuracy-
+driven CTS optimisation) and does not claim experimental validation.
+

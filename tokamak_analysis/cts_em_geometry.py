@@ -515,3 +515,90 @@ def solve_cold_plasma_propagating_modes(
             "The selected branch must be real and propagating; resonant and evanescent branches are rejected."
         ],
     }
+
+
+def track_cold_plasma_modes_from_operators(
+    wave_operator_sequence,
+    *,
+    degeneracy_relative_tolerance=1e-7,
+):
+    """Track cold-plasma eigenmode branches by eigenvector continuity.
+
+    Parameters
+    ----------
+    wave_operator_sequence:
+        Complex (n_sample, 3, 3) Hermitian cold-plasma wave operators sampled
+        along a frequency or ray coordinate. Each operator is constructed by
+        :func:`cold_plasma_wave_operator` from the supplied local B field and
+        species state.
+    degeneracy_relative_tolerance:
+        Relative eigenvalue-gap threshold at which an individual eigenvector
+        branch is reported as ambiguous.
+
+    Eigenvectors are matched between adjacent samples by maximizing total
+    squared polarization overlap (Hungarian assignment), then phase-aligned.
+    At an exact/near degeneracy the basis inside the degenerate subspace is not
+    unique; the function reports that ambiguity rather than inventing a branch.
+    """
+    from scipy.optimize import linear_sum_assignment
+
+    operators = np.asarray(wave_operator_sequence, dtype=complex)
+    if operators.ndim != 3 or operators.shape[0] < 1 or operators.shape[1:] != (3, 3):
+        raise ValueError("wave_operator_sequence must have shape (n_sample, 3, 3)")
+    if not np.all(np.isfinite(operators)):
+        raise ValueError("wave_operator_sequence must be finite")
+    tolerance = float(degeneracy_relative_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("degeneracy_relative_tolerance must be positive and finite")
+
+    values = []
+    vectors = []
+    permutations = []
+    overlaps = []
+    ambiguous = []
+    previous = None
+    for sample_index, operator in enumerate(operators):
+        hermitian = 0.5 * (operator + operator.conj().T)
+        eigenvalues, eigenvectors = np.linalg.eigh(hermitian)
+        scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        gaps = np.abs(np.diff(eigenvalues))
+        is_degenerate = bool(np.any(gaps <= tolerance * scale))
+        if previous is None:
+            order = np.arange(3)
+            matched = eigenvectors.copy()
+            sample_overlap = np.ones(3, dtype=float)
+        else:
+            overlap_matrix = np.abs(previous.conj().T @ eigenvectors) ** 2
+            rows, columns = linear_sum_assignment(-overlap_matrix)
+            order = columns[np.argsort(rows)]
+            matched = eigenvectors[:, order].copy()
+            sample_overlap = np.empty(3, dtype=float)
+            for mode in range(3):
+                inner = np.vdot(previous[:, mode], matched[:, mode])
+                sample_overlap[mode] = float(np.abs(inner) ** 2)
+                if abs(inner) > 0:
+                    matched[:, mode] *= np.exp(-1j * np.angle(inner))
+        values.append(eigenvalues[order])
+        vectors.append(matched)
+        permutations.append(order.astype(int))
+        overlaps.append(sample_overlap)
+        ambiguous.append(is_degenerate)
+        previous = matched
+
+    return {
+        "tracked_eigenvalues": np.asarray(values, dtype=float),
+        "tracked_electric_polarizations": np.asarray(vectors, dtype=complex),
+        "eigenvalue_order_permutation": np.asarray(permutations, dtype=int),
+        "adjacent_sample_polarization_overlap_squared": np.asarray(overlaps, dtype=float),
+        "degenerate_subspace_detected": np.asarray(ambiguous, dtype=bool),
+        "branch_tracking_method": "maximum_squared_eigenvector_overlap_with_Hungarian_assignment_and_phase_alignment",
+        "branch_identifiability": (
+            "ambiguous_at_one_or_more_degenerate_samples"
+            if any(ambiguous) else "locally_continuous_eigenvector_branches"
+        ),
+        "limitations": [
+            "At an exact or near eigenvalue degeneracy, individual eigenvectors within the degenerate subspace are not unique; only the subspace is physically well-defined.",
+            "This tracks eigenvectors of the supplied sequence of local wave operators; it does not add mode-conversion coupling or solve a coupled-mode propagation equation.",
+            "The sequence ordering must correspond to the physical frequency/ray sampling order.",
+        ],
+    }
