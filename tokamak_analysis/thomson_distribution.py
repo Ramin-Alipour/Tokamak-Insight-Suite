@@ -11,6 +11,8 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import curve_fit
 
+from .thomson_identifiability import spectral_distribution_identifiability
+
 
 def _vector(values, name, *, minimum=9):
     raw = np.asarray(values)
@@ -419,7 +421,7 @@ def analyze_thomson_spectral_distribution(
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square, "r_squared": r_squared,
         "model": "observed Thomson spectral moments and response-convolved Gaussian shape diagnostics",
-        "parameter_identifiability": __import__("tokamak_analysis.thomson_identifiability", fromlist=["spectral_distribution_identifiability"]).spectral_distribution_identifiability(),
+        "parameter_identifiability": spectral_distribution_identifiability(),
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
             "A measured instrument-response matrix is used only in the forward shape fit; measured input data are not corrected",
