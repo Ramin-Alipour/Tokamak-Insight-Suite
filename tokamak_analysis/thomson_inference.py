@@ -346,6 +346,69 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
     fitted_spectrum=signal_scale*observed(wavelength,*p_scaled)
     residual=signal-fitted_spectrum
+
+    # Diagnose whether the extra Kappa shape parameter is distinguishable
+    # from amplitude, centroid, width and the local linear background.  The
+    # diagnostic uses the Jacobian of the actual response-convolved forward
+    # model, not the optimizer's covariance alone.
+    jacobian = np.empty((wavelength.size, p_scaled.size), dtype=float)
+    for parameter_index in range(p_scaled.size):
+        step = np.cbrt(np.finfo(float).eps) * max(abs(float(p_scaled[parameter_index])), 1.0)
+        plus = p_scaled.copy()
+        minus = p_scaled.copy()
+        plus[parameter_index] += step
+        minus[parameter_index] -= step
+        jacobian[:, parameter_index] = (
+            observed(wavelength, *plus) - observed(wavelength, *minus)
+        ) / (2.0 * step)
+    if uncertainty_scaled is not None:
+        weighted_jacobian = jacobian / uncertainty_scaled[:, None]
+    else:
+        weighted_jacobian = jacobian
+    column_norms = np.linalg.norm(weighted_jacobian, axis=0)
+    nonzero_columns = column_norms > np.finfo(float).tiny
+    normalized_jacobian = np.zeros_like(weighted_jacobian)
+    normalized_jacobian[:, nonzero_columns] = (
+        weighted_jacobian[:, nonzero_columns] / column_norms[nonzero_columns]
+    )
+    singular_values = np.linalg.svd(normalized_jacobian, compute_uv=False)
+    rank_tolerance = (
+        np.finfo(float).eps * max(normalized_jacobian.shape)
+        * (float(singular_values[0]) if singular_values.size else 0.0)
+    )
+    jacobian_rank = int(np.sum(singular_values > rank_tolerance))
+    jacobian_condition = (
+        float(singular_values[0] / singular_values[-1])
+        if singular_values.size and singular_values[-1] > rank_tolerance
+        else float("inf")
+    )
+    kappa_column = weighted_jacobian[:, 3]
+    nuisance_columns = weighted_jacobian[:, [0, 1, 2, 4, 5]]
+    nuisance_projection = nuisance_columns @ np.linalg.pinv(nuisance_columns)
+    conditional_kappa_sensitivity = float(
+        np.linalg.norm(kappa_column - nuisance_projection @ kappa_column)
+        / max(np.linalg.norm(kappa_column), np.finfo(float).tiny)
+    )
+    kappa_standard_uncertainty = float(np.sqrt(max(cov[3, 3], 0.0)))
+    kappa_identifiable = bool(
+        jacobian_rank == p_scaled.size
+        and np.isfinite(jacobian_condition)
+        and jacobian_condition <= 1e12
+        and conditional_kappa_sensitivity > 1e-8
+        and np.isfinite(kappa_standard_uncertainty)
+    )
+    kappa_identifiability = {
+        "status": "locally_identifiable" if kappa_identifiable else "weak_or_non_identifiable",
+        "reportable_as_inferred_parameter": kappa_identifiable,
+        "jacobian_rank": jacobian_rank,
+        "parameter_count": int(p_scaled.size),
+        "normalized_jacobian_condition_number": jacobian_condition,
+        "conditional_kappa_sensitivity": conditional_kappa_sensitivity,
+        "kappa_index_standard_uncertainty": kappa_standard_uncertainty,
+        "diagnostic_basis": "finite-difference Jacobian of the response-convolved six-parameter Kappa spectrum; Kappa sensitivity is projected orthogonally to nuisance-parameter sensitivities",
+        "threshold_semantics": "rank and floating-point conditioning diagnostics; not an empirical or universal physical threshold",
+        "limitation": None if kappa_identifiable else "The measured spectral window and supplied response do not locally distinguish the Kappa shape parameter from the remaining fitted parameters; do not interpret the optimizer candidate as an identified physical Kappa index.",
+    }
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
         a, cen, sig, kap, off, sl = values
@@ -365,7 +428,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "electron_temperature_uncertainty_eV":float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
             "electron_velocity_projection_m_s":float(velocity),
             "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
-            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,
+            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,"kappa_index_identifiability":kappa_identifiability,
             "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
             "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
             "fit_parameters":np.asarray(p,dtype=float),

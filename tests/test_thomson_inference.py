@@ -167,6 +167,12 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     )
     assert out["electron_temperature_profile_eV"][0] == pytest.approx(te,rel=0.05)
     assert out["channels"][0]["kappa_index"] == pytest.approx(kappa,rel=0.05)
+    diagnostic = out["channels"][0]["kappa_index_identifiability"]
+    assert diagnostic["status"] == "locally_identifiable"
+    assert diagnostic["reportable_as_inferred_parameter"] is True
+    assert diagnostic["jacobian_rank"] == diagnostic["parameter_count"] == 6
+    assert np.isfinite(diagnostic["normalized_jacobian_condition_number"])
+    assert diagnostic["conditional_kappa_sensitivity"] > 1e-8
     assert 0.0 < out["channels"][0]["captured_spectral_probability"] <= 1.0
 
 
