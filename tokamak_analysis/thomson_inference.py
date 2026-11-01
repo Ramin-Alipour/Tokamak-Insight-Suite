@@ -302,13 +302,18 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
     lower = np.array([0.0, x[0], max(spacing * 0.2, 1e-12), -np.inf, -np.inf])
     upper = np.array([np.inf, x[-1], x[-1] - x[0], np.inf, np.inf])
     kmin, kmax = 1.500001, max(20.0, float(p[3]) * 8.0)
-    grid = np.unique(np.r_[np.geomspace(kmin, kmax, 61), p[3]])
+    grid = np.unique(np.r_[np.geomspace(kmin, kmax, 41), p[3]])
+    response_is_identity = response.shape == (x.size, x.size) and np.array_equal(
+        response, np.eye(x.size)
+    )
+
     def forward(nuisance, kappa):
         amp, center, width, offset, slope = nuisance
         df = 2.0 * kappa - 1.0
         student_scale = width * np.sqrt((df - 2.0) / df)
         component = amp * (1.0 + ((x - center) / student_scale) ** 2 / df) ** (-kappa)
-        return _apply_response(response, component, x) + offset + slope * (x - center)
+        convolved = component if response_is_identity else _apply_response(response, component, x)
+        return convolved + offset + slope * (x - center)
 
     if sigma is None:
         best_residual = forward(p[[0, 1, 2, 4, 5]], p[3]) - y
