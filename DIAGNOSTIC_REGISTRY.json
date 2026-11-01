@@ -12,7 +12,7 @@
       "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
       "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
     ],
-    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis.",
+    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
