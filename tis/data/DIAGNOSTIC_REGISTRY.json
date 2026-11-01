@@ -5034,6 +5034,16 @@
           "name": "numerical_convergence",
           "unit": "structured numerical convergence record",
           "description": "Full-EM only: paired harmonic/quadrature refinement levels, relative L2 and L-infinity spectral changes, final refined spectrum, tolerance and convergence status; explicitly separate from physical uncertainty."
+        },
+        {
+          "name": "numerical_convergence_status",
+          "unit": "text status",
+          "description": "Full-EM only: converged_at_final_refinement, not_converged_at_final_refinement or not_assessed_by_request."
+        },
+        {
+          "name": "numerical_convergence_is_uncertainty",
+          "unit": "boolean; always false",
+          "description": "Explicitly marks numerical discretization assessment as separate from physical uncertainty."
         }
       ],
       "assumptions": [
