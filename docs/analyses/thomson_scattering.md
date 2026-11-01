@@ -70,6 +70,14 @@ The physical fit must pass its identifiability and fit-quality gates. Rank-defic
 - An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm.
 - No independent experimental validation is claimed. Automated tests are software/numerical consistency tests only.
 
+## Statistical weighting, background and spectral-distribution interpretation
+
+Every fitted optical Thomson channel now reports `spectral_weighting_status` and `fit_covariance_interpretation`. A supplied pointwise uncertainty produces diagonal weighted least squares; a supplied channel-major covariance produces joint generalized least squares for Maxwellian/Kappa models. If neither is supplied, the fit is unweighted and its local covariance is residual-variance-scaled; it is **not** a measurement-noise-calibrated uncertainty. Do not interpret that covariance as a complete experimental uncertainty budget.
+
+The Maxwellian and Kappa physical fits use a two-parameter linear nuisance baseline (intercept and slope). Curved, structured, line-contaminated or time-varying backgrounds are outside that model. This is a declared model limitation, not an automatic background-separation capability.
+
+The spectral-distribution subanalysis is deliberately descriptive. It uses signed background-subtracted spectral measure for moments, retains negative residuals rather than clipping them, and reports the negative-area fraction. The moments require a positive signed integrated area and variance; strong cancellation or background error can make them unstable. Its Gaussian shape-fit covariance is conditional on the selected fixed background and fixed measured response. The result now explicitly reports whether the background was researcher-supplied or estimated from a selected edge fraction, and whether Gaussian fitting was weighted by measurement uncertainties. Edge-fraction estimation is a heuristic assumption, not an independently identified background. Moment uncertainty and Gaussian shape-fit uncertainty are separate from the physical parameter covariance of the parent Thomson fit.
+
 ## Spatial profile reconstruction
 
 The registered “Thomson spatial profile reconstruction” subanalysis starts from measured calibrated multi-channel spectra, runs the canonical physical inference, and reconstructs every identifiable radial parameter profile using shape-preserving PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived \(n_e/T_e\) profile points and never extrapolates beyond the measured radial interval. The Kappa-index profile is included only for the non-collective Kappa model.
