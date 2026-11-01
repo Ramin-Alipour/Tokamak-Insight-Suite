@@ -3370,7 +3370,7 @@ elif page=='Advanced Analysis':
                         key='cts_full_ray_mode_index',
                     )
                 cts_electron_flow=st.text_input('Electron-flow projection initial estimate (m/s; optional; fitted from the CTS spectrum)',key='cts_full_electron_flow')
-                cts_ion_flow=st.text_area('Ion flow vectors (m/s; one x,y,z vector per species, separated by semicolons)',key='cts_full_ion_flow')
+                st.caption('Ion-flow projections for each supplied species are fitted from the measured CTS spectrum; no ion-flow vector or numerical seed is required.')
                 cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=2,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
                 cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
                 cts_damping=st.text_input('Resonance damping rate (rad/s; blank uses the documented numerical default)',key='cts_full_damping')
@@ -3445,10 +3445,6 @@ elif page=='Advanced Analysis':
                     if len(ion_temperatures)!=len(species_names):
                         raise ValueError('Enter one initial ion temperature per supplied ion species.')
                     ion_temperature_initial={name:value for name,value in zip(species_names,ion_temperatures)}
-                    ion_flow_parts=[v.strip() for v in cts_ion_flow.split(';') if v.strip()]
-                    if len(ion_flow_parts)!=len(species_names):
-                        raise ValueError('Enter one ion flow vector per supplied ion species, separated by semicolons.')
-                    ion_flows={name:_parse_ts_vector(value,f'Ion flow for {name}') for name,value in zip(species_names,ion_flow_parts)}
                     if cts_geometry_upload is not None:
                         scattering_geometry=json.load(cts_geometry_upload)
                         if not isinstance(scattering_geometry,dict) or 'frequency_resolved_geometry' not in scattering_geometry:
@@ -3479,7 +3475,6 @@ elif page=='Advanced Analysis':
                         'ion_species':ion_species,
                         'ion_fractions':fractions,
                         'magnetic_field_T':_parse_ts_vector(cts_magnetic_field,'Magnetic field'),
-                        'ion_flow_velocity_m_s':ion_flows,
                         'incident_polarization':_parse_ts_complex_vector(cts_incident_polarization,'Incident polarization'),
                         'scattered_polarization':_parse_ts_complex_vector(cts_scattered_polarization,'Scattered polarization'),
                         'instrument_response':cts_response,
