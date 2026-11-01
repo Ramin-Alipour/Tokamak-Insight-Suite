@@ -133,3 +133,56 @@ The selected optical forward-model family remains deliberately limited to three 
 5. “The potential of collective Thomson scattering measurements in burning-plasma devices,” *Journal of Instrumentation* **21** (2026), C04045. DOI: [10.1088/1748-0221/21/04/C04045](https://doi.org/10.1088/1748-0221/21/04/C04045). Recent fusion CTS application reference covering thermal and energetic confined-ion measurements.
 
 These recent papers are used as current application/model-scope references, not as a claim that every underlying classical Thomson or dielectric-response equation was first derived in 2024–2026. The implemented physical equations retain their established theoretical provenance; no new physical model is inferred from a recent application paper alone.
+
+
+## One-dimensional electron velocity-distribution reconstruction (EVDF)
+
+The spectral-distribution subanalysis now also exposes
+`tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf`. This is a
+non-negative, second-difference Tikhonov inversion of the calibrated measured
+spectrum. It maps a trial electron velocity component along the scattering
+vector to its Doppler-shifted wavelength, applies the supplied measured
+wavelength-response matrix as a forward operator, and fits the measured
+spectrum after subtraction of the explicitly supplied background.
+
+### Required inputs
+
+- Measured, strictly increasing `wavelength_nm` and calibrated `signal`.
+- `laser_wavelength_nm` and `scattering_angle_rad`.
+- The measured `instrument_response_matrix`.
+- An explicit `background_signal` on the same wavelength grid.
+- An explicit positive `regularization_strength`; it is never silently selected.
+- Optionally, pointwise `signal_uncertainty` or a full within-spectrum
+  `signal_covariance` (mutually exclusive).
+- Optionally, a velocity grid; otherwise the caller supplies its limit and
+  point count.
+
+### Identifiability and interpretation
+
+For one optical scattering geometry, the primary reconstructed quantity is
+the **normalized one-dimensional electron-velocity marginal along the
+scattering vector**. The routine also reports its projected mean velocity,
+variance, skewness, excess kurtosis and the directional equivalent temperature
+\(m_e\,\mathrm{Var}(v_\parallel)/k_B\). This directional quantity is not
+reported as scalar \(T_e\) unless isotropy is independently justified.
+
+The inversion does **not** identify an unrestricted three-dimensional EVDF,
+perpendicular velocity components, anisotropy, or absolute electron density
+from one view. A multi-view reconstruction would require independent
+scattering geometries and a separately validated tomographic forward model;
+multiple views alone do not guarantee uniqueness. Absolute density requires
+calibrated absolute scattered power and complete optical collection geometry,
+which this normalized inversion does not calculate.
+
+The deterministic solver does not claim posterior confidence intervals. When
+measurement uncertainty is supplied it uses it in the weighted objective, but
+uncertainty intervals still require a separately validated constrained
+uncertainty workflow. The inversion is resolution-limited by the measured
+spectral window, response matrix, velocity grid and regularization strength.
+Residuals, design-matrix rank and condition number are returned as diagnostics.
+Sensitivity to the regularization and velocity grid must be assessed before
+interpreting fine velocity-space structure.
+
+The present inversion uses the non-relativistic single-particle Doppler
+mapping. It is not applicable to relativistic electron populations. It does
+not calibrate, correct, deconvolve, or otherwise prepare measured inputs.
