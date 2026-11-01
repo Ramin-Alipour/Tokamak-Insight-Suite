@@ -3166,11 +3166,27 @@ elif page=='Advanced Analysis':
                         + str((distribution or {}).get('reason','No spectral-distribution result was returned.'))
                     )
                 else:
-                    physical=distribution.get('physical_parameter_extraction') or {}
-                    if physical.get('status')!='completed':
-                        st.warning('Physical-parameter extraction is incomplete; the subanalysis is not marked complete.')
-                    else:
+                    te_value=channel_result.get('electron_temperature_eV')
+                    flow_value=channel_result.get('electron_velocity_projection_m_s')
+                    physical_complete=(
+                        te_value is not None and np.isfinite(te_value)
+                        and flow_value is not None and np.isfinite(flow_value)
+                    )
+                    physical={
+                        'model':channel_result.get('model',saved_ts.get('model')),
+                        'electron_temperature_eV':te_value,
+                        'electron_temperature_uncertainty_eV':channel_result.get('electron_temperature_uncertainty_eV'),
+                        'electron_density_m3':channel_result.get('electron_density_m3'),
+                        'electron_density_uncertainty_m3':channel_result.get('electron_density_uncertainty_m3'),
+                        'electron_velocity_projection_m_s':flow_value,
+                        'electron_velocity_projection_uncertainty_m_s':channel_result.get('electron_velocity_projection_uncertainty_m_s'),
+                    }
+                    if physical_complete:
                         st.success('Spectral-distribution diagnostics and physical parameters are available from the same calibrated measured spectrum.')
+                        st.markdown('**Physical parameters from the canonical Thomson fit**')
+                        st.json(physical)
+                    else:
+                        st.warning('The canonical fit did not return identifiable electron temperature and scattering-vector flow for this channel; spectral-distribution descriptors remain separate from physical-parameter extraction.')
                     st.json(distribution)
                     json_download('Export Analysis 1 spectral-distribution diagnostics',distribution,'tis_thomson_spectral_distribution.json')
                     add_report_section('Analysis 1 spectral-distribution subanalysis',distribution)
