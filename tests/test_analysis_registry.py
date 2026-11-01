@@ -245,6 +245,6 @@ def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract()
             "spatial_regularization_strength"} <= inputs
     outputs = {item["name"] for item in contract["output_specs"]}
     assert {"primary_result_status", "primary_outputs_reportable_as_identified",
-            "optimizer"} <= outputs
+            "optimizer", "optimizer_candidate"} <= outputs
     assert any("regularization rows do not count" in item.lower()
                for item in contract["limitations"])

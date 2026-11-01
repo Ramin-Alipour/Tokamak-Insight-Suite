@@ -5941,6 +5941,11 @@
           "name": "optimizer",
           "unit": "structured",
           "description": "Includes optimizer convergence, data-only Jacobian rank and conditioning; regularization rows are excluded from the identifiability rank."
+        },
+        {
+          "name": "optimizer_candidate",
+          "unit": "structured; non-primary diagnostic result",
+          "description": "Numerical candidate profiles and regularized covariance retained only for troubleshooting when the data-only inverse is rank deficient or the optimizer fails; these values are explicitly not measured primary outputs."
         }
       ],
       "assumptions": [
