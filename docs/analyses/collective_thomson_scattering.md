@@ -74,7 +74,7 @@ Required inputs include:
 
 Optional inputs include:
 
-- Relativistic electron distribution metadata.
+- No relativistic electron-distribution input is accepted by the current measured-spectrum inversion; explicit relativistic electron distributions are forward-model-only until a drifted relativistic VDF inversion is implemented.
 - Relativistic fast-ion population metadata.
 - Positive-definite spectral covariance.
 - Frequency-resolved ray-traced scattering-volume geometry.
