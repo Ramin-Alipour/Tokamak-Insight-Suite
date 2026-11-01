@@ -290,3 +290,16 @@ flagged as ambiguous. This does not solve coupled-mode conversion.
 
 These are software capabilities with independent unit/regression tests. They
 do not constitute empirical validation.
+
+
+## Q. Additional confirmed registry defect corrected on 2026-11-01
+
+116. **The spatial-profile reconstruction execution contract contradicted the implemented relativistic geometry-uncertainty path.** The canonical Python registry entry 46 and both JSON diagnostic-registry copies still described laser-wavelength uncertainty as rejected for the relativistic Maxwell-Juttner model, and described scalar scattering-angle uncertainty as non-relativistic-only. The profile workflow forwards these inputs to the canonical inference engine, whose relativistic branch propagates laser-wavelength and scalar-angle uncertainty by Monte Carlo; scalar-angle and beam-direction-component uncertainty representations are mutually exclusive. **Fixed directly on main:** synchronized the entry-46 Python runtime contract and both root/packaged JSON registry copies with the implemented model-specific propagation. Added an independent registry regression test for entry 46, parallel to the existing primary-entry regression. This is a metadata/API consistency correction; it does not add a new physical model or claim experimental validation.
+
+Commits:
+- `3b70ab9cba11c715cb9b5cbf4e0f78d7c71f9a6a` — Python execution registry
+- `467e3e6f6eee7fa6ecd0a794bead9366a9445433` — root JSON registry
+- `b77647415444564fe0c43f8d3a2faf855e712157` — packaged JSON registry
+- `549ea6baac866f0e4998648519f43145842f9644` — regression test
+
+**Experimental validation:** not performed and not claimed. The exact final software commit must pass GitHub Actions before software-test success is reported.
