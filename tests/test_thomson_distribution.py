@@ -229,3 +229,14 @@ def test_thomson_distribution_is_independently_registered():
     assert len(ANALYSES) >= 81
     assert get_analysis(81)["name"] == "Thomson spectral distribution"
     assert get_analysis(81)["function"] == "analyze_thomson_spectral_distribution"
+
+
+def test_distribution_exposes_background_and_statistical_interpretation():
+    x, y = _spectrum()
+    weighted = _run(x, y, signal_uncertainty=np.full(x.size, 1.0))
+    assert weighted["background_identifiability_status"] == "edge_fraction_assumption_not_independently_identified"
+    assert weighted["gaussian_fit_statistical_weighting_status"] == "weighted_by_independent_pointwise_measurement_uncertainty"
+    assert "negative residuals" in weighted["moment_interpretation"]
+    unweighted = _run(x, y)
+    assert unweighted["gaussian_fit_statistical_weighting_status"] == "unweighted_least_squares_no_measurement_uncertainty_supplied"
+    assert unweighted["gaussian_fit_covariance_interpretation"] == "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
