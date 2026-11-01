@@ -3225,7 +3225,6 @@ elif page=='Advanced Analysis':
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
                 cts_electron_flow=st.text_input('Electron-flow projection initial estimate (m/s; optional optimizer seed; blank uses a numerical zero seed)',key='cts_electron_flow')
-                cts_electron_flow_unc=st.text_input('Electron-flow projection 1σ uncertainty (m/s; optional)',key='cts_electron_flow_unc')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
             with s1: cts_species_text=st.text_input('Ion species names (comma-separated; required)',key='cts_species')
@@ -3324,7 +3323,6 @@ elif page=='Advanced Analysis':
                     external_unc={}
                     if cts_probe_frequency_unc.strip(): external_unc['probe_frequency_Hz']=float(cts_probe_frequency_unc)
                     if cts_angle_unc.strip(): external_unc['scattering_angle_rad']=float(cts_angle_unc)
-                    if cts_electron_flow_unc.strip(): external_unc['electron_velocity_projection_m_s']=float(cts_electron_flow_unc)
                     if cts_fraction_unc_text.strip():
                         fraction_unc=[float(v.strip()) for v in cts_fraction_unc_text.split(',') if v.strip()]
                         external_unc['ion_fractions']=fraction_unc
