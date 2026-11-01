@@ -150,6 +150,7 @@ def test_distribution_propagates_joint_signal_background_cross_covariance():
         moment_mc_samples=40,
     )
     assert result["background_uncertainty_model"] == "joint_signal_background_covariance"
+    assert result["moment_uncertainty_method"] == "parametric Monte Carlo from the correlated joint signal/background block covariance"
     assert result["background_uncertainty_supplied"] is True
     assert result["moment_uncertainty_successful_draws"] >= 20
     assert result["spectral_centroid_uncertainty_nm"] > 0.0
