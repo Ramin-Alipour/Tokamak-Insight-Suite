@@ -927,7 +927,8 @@ def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(ar
 
 
 
-def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(monkeypatch):
+@pytest.mark.parametrize("use_uncertainty", [True, False])
+def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(monkeypatch, use_uncertainty):
     import tokamak_analysis.cts_full_em as full_em
 
     frequency = np.linspace(-1.0, 1.0, 41) * 1.0e8
@@ -967,6 +968,10 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
     )["spectral_density"]
     measured = 2.4 * synthetic + 0.7
 
+    uncertainty_kwargs = (
+        {"signal_uncertainty": np.full(frequency.size, 0.01)}
+        if use_uncertainty else {}
+    )
     result = full_em.analyze_full_em_cts_spectrum(
         frequency, measured,
         probe_frequency_Hz=140.0e9,
@@ -981,7 +986,7 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         incident_polarization=[0.0, 0.0, 1.0],
         scattered_polarization=[0.0, 0.0, 1.0],
         instrument_response=np.eye(frequency.size),
-        signal_uncertainty=np.full(frequency.size, 0.01),
+        **uncertainty_kwargs,
         parameter_bounds={
             "electron_flow_projection_m_s": [1.0e5, 8.0e5],
             "ion_flow_projection_m_s:D+": [1.0e5, 8.0e5],
@@ -992,6 +997,14 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
     )
     assert result["electron_flow_projection_is_fitted"] is True
     assert result["electron_flow_projection_uncertainty_m_s"] >= 0.0
+    assert result["spectral_uncertainty_supplied"] is use_uncertainty
+    if use_uncertainty:
+        assert result["spectral_weighting_status"] == "diagonal_pointwise_measurement_uncertainty_weighted"
+        assert result["reduced_chi_square"] is not None
+    else:
+        assert result["spectral_weighting_status"] == "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        assert result["parameter_covariance_interpretation"] == "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+        assert result["reduced_chi_square"] is None
     assert "electron_flow_projection_m_s" in result["parameter_names"]
     assert result["ion_flow_projection_m_s_by_species"]["D+"] == pytest.approx(
         truth["ion_flow_projection_m_s"], rel=2e-3
