@@ -7,7 +7,7 @@ the marginal along the scattering vector, never an unrestricted 3-D EVDF.
 from __future__ import annotations
 
 import numpy as np
-from scipy.optimize import lsq_linear
+from scipy.optimize import lsq_linear, least_squares
 
 
 _C = 299_792_458.0
@@ -182,6 +182,80 @@ def reconstruct_thomson_evdf(
     threshold = np.finfo(float).eps * max(design.shape) * singular_values[0]
     numerical_rank = int(np.count_nonzero(singular_values > threshold))
     condition = float(singular_values[0] / singular_values[-1]) if singular_values[-1] > 0 else None
+
+    # Compare three compact projected-marginal families against the same
+    # measured-spectrum forward operator. These are candidate models, not
+    # assumptions imposed on the non-parametric reconstruction.
+    def projected_pdf(model_name, parameters):
+        mean = float(parameters[0])
+        scale = float(parameters[1])
+        z = (velocity - mean) / scale
+        if model_name == "maxwellian":
+            raw_pdf = np.exp(-0.5 * z**2)
+        elif model_name == "kappa_student_t":
+            nu = float(parameters[2])
+            raw_pdf = (1.0 + z**2 / nu) ** (-(nu + 1.0) / 2.0)
+        else:
+            exponent = float(parameters[2])
+            raw_pdf = np.exp(-np.abs(z) ** exponent)
+        area_pdf = float(np.trapz(raw_pdf, velocity))
+        if not np.isfinite(area_pdf) or area_pdf <= 0:
+            return np.zeros_like(velocity)
+        return raw_pdf / area_pdf
+
+    parametric_comparison = {}
+    for model_name in ("maxwellian", "kappa_student_t", "super_gaussian"):
+        if model_name == "maxwellian":
+            initial = [float(np.max(np.abs(target))), mean_v, max(sigma_v, spacing)]
+            lower_bounds = [0.0, float(velocity[0]), spacing]
+            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0])]
+        elif model_name == "kappa_student_t":
+            initial = [float(np.max(np.abs(target))), mean_v, max(sigma_v, spacing), 5.0]
+            lower_bounds = [0.0, float(velocity[0]), spacing, 2.05]
+            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), 100.0]
+        else:
+            initial = [float(np.max(np.abs(target))), mean_v, max(sigma_v, spacing), 2.0]
+            lower_bounds = [0.0, float(velocity[0]), spacing, 1.2]
+            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), 8.0]
+
+        def model_residual(parameters):
+            pdf = projected_pdf(model_name, parameters[1:])
+            probability = pdf * spacing
+            probability /= max(float(np.sum(probability)), np.finfo(float).tiny)
+            return design @ (probability * parameters[0]) - target
+
+        try:
+            model_fit = least_squares(
+                model_residual, initial, bounds=(lower_bounds, upper_bounds),
+                max_nfev=4000, xtol=1e-10, ftol=1e-10, gtol=1e-10,
+            )
+            model_resid = model_residual(model_fit.x)
+            rss = float(model_resid @ model_resid)
+            sample_count = int(target.size)
+            parameter_count = int(model_fit.x.size)
+            safe_rss = max(rss, np.finfo(float).tiny)
+            parametric_comparison[model_name] = {
+                "parameters": {
+                    "amplitude_scaled": float(model_fit.x[0]),
+                    "mean_velocity_parallel_m_s": float(model_fit.x[1]),
+                    "scale_velocity_m_s": float(model_fit.x[2]),
+                    **({"kappa_degrees_of_freedom": float(model_fit.x[3])} if model_name == "kappa_student_t" else {}),
+                    **({"super_gaussian_exponent": float(model_fit.x[3])} if model_name == "super_gaussian" else {}),
+                },
+                "weighted_residual_sum_squares": rss,
+                "aic": float(sample_count * np.log(safe_rss / sample_count) + 2 * parameter_count),
+                "bic": float(sample_count * np.log(safe_rss / sample_count) + parameter_count * np.log(sample_count)),
+                "success": bool(model_fit.success),
+                "message": str(model_fit.message),
+                "uncertainty_intervals": None,
+            }
+        except (ValueError, FloatingPointError) as exc:
+            parametric_comparison[model_name] = {
+                "success": False, "message": str(exc),
+                "weighted_residual_sum_squares": None, "aic": None, "bic": None,
+                "uncertainty_intervals": None,
+            }
+
     return {
         "velocity_parallel_m_s": velocity,
         "evdf_parallel_s_per_m": distribution,
@@ -203,6 +277,8 @@ def reconstruct_thomson_evdf(
         "numerical_design_rank": numerical_rank,
         "velocity_grid_points": int(velocity.size),
         "design_matrix_condition_number": condition,
+        "parametric_model_comparison": parametric_comparison,
+        "parametric_models": ["maxwellian", "kappa_student_t", "super_gaussian"],
         "fit_success": bool(fit.success),
         "fit_status": int(fit.status),
         "fit_message": str(fit.message),
