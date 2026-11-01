@@ -4103,7 +4103,7 @@
       "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
       "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
     ],
-    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. The public dispatcher accepts the same `spectrum` keyword for both branches and adapts it to the Full-EM implementation. Optional relativistic gyrotropic populations and frequency-resolved ray/beam overlap remain scoped capabilities of Full-EM.",
+    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4259,24 +4259,24 @@
           "description": "Explicitly select electrostatic or full_electromagnetic; no automatic model selection or substitution."
         },
         {
+          "name": "electron_flow_projection_initial_m_s",
+          "unit": "m s^-1; scalar projection along the scattering wavevector",
+          "required": false,
+          "description": "Full-EM only: optional optimizer initial seed; the electron-flow projection is fitted from the measured CTS spectrum, not held fixed. A single geometry does not identify a 3-D flow vector.",
+          "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "ion_flow_projection_initial_m_s",
+          "unit": "m s^-1; mapping from every ion species name to a scalar projection along the scattering wavevector",
+          "required": false,
+          "description": "Full-EM only: optional per-species optimizer initial seeds; each ion-flow projection is fitted from the measured spectrum. A single geometry does not identify 3-D flow vectors.",
+          "required_when_model": "full_electromagnetic"
+        },
+        {
           "name": "magnetic_field_T",
           "unit": "T; non-zero vector in the common laboratory coordinate frame",
           "required": false,
           "description": "Required non-zero vector for model='full_electromagnetic'; not used by the electrostatic branch.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "electron_flow_velocity_m_s",
-          "unit": "m s^-1; explicit 3-vector",
-          "required": false,
-          "description": "Required 3-vector for model='full_electromagnetic'; the electrostatic branch instead requires electron_velocity_projection_m_s.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "ion_flow_velocity_m_s",
-          "unit": "m s^-1; mapping from every ion species name to a 3-vector",
-          "required": false,
-          "description": "Required per-species 3-vector mapping for model='full_electromagnetic'; the electrostatic branch instead requires ion_velocity_initial_m_s as an optimizer seed for its common projected ion flow.",
           "required_when_model": "full_electromagnetic"
         },
         {
@@ -4319,13 +4319,6 @@
           "unit": "sequence of explicit relativistic gyrotropic populations",
           "required": false,
           "description": "Each item requires name, charge_state, mass_amu, density_m3 and distribution. Distribution kind is relativistic_bigaussian (temperature_perpendicular_eV, temperature_parallel_eV) or tabulated_gyrotropic (p_perpendicular_kg_m_s, p_parallel_kg_m_s, distribution_kg_m_s_inverse3). Any fast-ion drift must be represented in the supplied asymmetric tabulated momentum distribution.",
-          "required_when_model": "full_electromagnetic"
-        },
-        {
-          "name": "electron_distribution",
-          "unit": "relativistic gyrotropic momentum-space distribution",
-          "required": false,
-          "description": "When supplied, replaces the Maxwellian electron kinetic response and Bindslev electron nonlinear source with relativistic gyrotropic Vlasov linear/noise response and a second-order kinetic vertex. Supports relativistic_maxwell_juttner (temperature follows fitted electron_temperature_eV unless explicitly matched), relativistic_bigaussian or tabulated_gyrotropic.",
           "required_when_model": "full_electromagnetic"
         },
         {
@@ -4576,7 +4569,9 @@
         "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
         "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided.",
         "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed.",
-        "The shared CTS registry contract documents branch-conditional inputs: electrostatic requires electron_velocity_projection_m_s and ion_velocity_initial_m_s; full-electromagnetic requires magnetic_field_T, electron_flow_velocity_m_s, ion_flow_velocity_m_s and both mode-polarization vectors."
+        "Full-EM measured-spectrum inversion fits scalar electron- and per-species ion-flow projections along the scattering wavevector; it does not accept externally supplied 3-D flow vectors.",
+        "Explicit relativistic gyrotropic electron distributions are supported by full_em_cts_spectral_density as a forward model, but are rejected by analyze_full_em_cts_spectrum; no relativistic-electron inversion is claimed.",
+        "The fast-ion population shapes supplied to Full-EM inversion are fixed external inputs and are not inferred from the measured CTS spectrum."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -4641,13 +4636,11 @@
             "electron_temperature_initial_eV",
             "ion_temperature_initial_eV",
             "magnetic_field_T",
-            "electron_flow_velocity_m_s",
-            "ion_flow_velocity_m_s",
             "incident_polarization",
             "scattered_polarization",
             "optional parameter_bounds, harmonic_order, quadrature_order and damping_rate_rad_s",
-            "optional electron_distribution and fast_ion_populations",
-            "optional frequency_resolved_geometry nested inside scattering_geometry, generated by the CTS ray/beam helper"
+            "optional frequency_resolved_geometry nested inside scattering_geometry, generated by the CTS ray/beam helper",
+            "optional electron_flow_projection_initial_m_s and per-species ion_flow_projection_initial_m_s optimizer seeds; both projections are fitted from the measured spectrum"
           ],
           "outputs": [
             "electron_density_m3",
@@ -4661,7 +4654,7 @@
             "wave_tensor",
             "parameter_uncertainties"
           ],
-          "scope": "Magnetized full-electromagnetic kinetic CTS forward model and inversion. Optional relativistic gyrotropic populations and frequency-resolved cold-plasma ray/beam-overlap geometry are capabilities within this model, not additional CTS model choices."
+          "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. Explicit relativistic gyrotropic electron distributions are forward-model capabilities only and are not accepted by the current inversion."
         }
       ],
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
