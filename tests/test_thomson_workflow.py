@@ -26,3 +26,9 @@ def test_profile_reconstruction_rejects_unordered_channel_coordinates_without_re
         workflow._reconstruct_inferred_parameter_profile(
             [0.2, 0.1], [2.0, 1.0], method="pchip"
         )
+
+
+def test_joint_spatial_spectral_thomson_workflow_is_exposed():
+    assert callable(workflow.reconstruct_thomson_joint_spatial_spectra)
+    from tokamak_analysis.thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+    assert workflow.reconstruct_thomson_joint_spatial_spectra is not reconstruct_joint_thomson_spatial_spectra

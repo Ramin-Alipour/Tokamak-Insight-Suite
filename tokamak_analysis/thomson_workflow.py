@@ -648,3 +648,10 @@ def reconstruct_thomson_profile_from_spectra(
     result["parameter_identifiability"] = spatial_profile_identifiability()
     result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
     return result
+
+
+
+def reconstruct_thomson_joint_spatial_spectra(*args, **kwargs):
+    """Run joint wavelength-resolved spatial Thomson inversion with fixed mixing."""
+    from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+    return reconstruct_joint_thomson_spatial_spectra(*args, **kwargs)
