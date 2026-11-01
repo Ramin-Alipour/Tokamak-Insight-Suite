@@ -301,16 +301,17 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     fast_ion=None,global_search=False,random_seed=1729, inversion_method=None,
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None):
-    """Infer CTS plasma parameters with selectable genetic, differential-evolution or regularized inversion."""
+    """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
+    electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
+    Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
+    """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); y=_array(spectrum,"spectrum",1)
     if f.size!=y.size or f.size<12 or np.any(np.diff(f)<=0): raise ValueError("frequency and spectrum must match, have >=12 samples and increase strictly")
     if np.any(y<0): raise ValueError("calibrated CTS power spectrum must be non-negative")
     f0=_positive(probe_frequency_Hz,"probe_frequency_Hz"); _geometry(scattering_geometry,f0); ions=_species(ion_species,ion_fractions)
-    if electron_velocity_projection_m_s is None:
-        raise ValueError("electron_velocity_projection_m_s is required. Enter a measured/provided projection, or explicitly enter 0.0 to declare stationary electron flow.")
-    electron_velocity_projection_m_s=float(_array([electron_velocity_projection_m_s],"electron_velocity_projection_m_s")[0])
-    if abs(electron_velocity_projection_m_s)>=C:
-        raise ValueError("electron_velocity_projection_m_s must be subluminal")
+    electron_flow_seed = 0.0 if electron_velocity_projection_m_s is None else float(_array([electron_velocity_projection_m_s], "electron-flow optimizer seed")[0])
+    if abs(electron_flow_seed) >= C:
+        raise ValueError("electron-flow optimizer seed must be subluminal")
     response=_array(instrument_response,"instrument_response",2)
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
     unc=None if signal_uncertainty is None else _array(signal_uncertainty,"signal_uncertainty",1)
@@ -320,7 +321,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping")
     b=parameter_bounds or {}
-    allowed_bound_names={"electron_density_m3","electron_temperature_eV","ion_temperature_eV","ion_velocity_projection_m_s"}
+    allowed_bound_names={"electron_density_m3","electron_temperature_eV","ion_temperature_eV","electron_velocity_projection_m_s","ion_velocity_projection_m_s"}
     unknown_bound_names=set(b)-allowed_bound_names
     if unknown_bound_names:
         raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
@@ -335,6 +336,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     tb=positive_bounds("electron_temperature_eV")
     ib=positive_bounds("ion_temperature_eV")
     physical_flow_limit=float(np.nextafter(C,0.0))
+    q_fit, _, _ = _geometry(scattering_geometry, f0)
+    spectral_flow_limit = min(physical_flow_limit, 2.0*np.pi*float(np.max(np.abs(f)))/q_fit)
+    eub=tuple(map(float,b.get("electron_velocity_projection_m_s",(-spectral_flow_limit,spectral_flow_limit))))
+    if len(eub)!=2 or not np.all(np.isfinite(eub)) or eub[0]>=eub[1] or max(map(abs,eub))>=C:
+        raise ValueError("electron-flow bounds must be finite, increasing and subluminal")
     ub=tuple(map(float,b.get("ion_velocity_projection_m_s",(-physical_flow_limit,physical_flow_limit))))
     if len(ub)!=2 or not np.all(np.isfinite(ub)) or ub[0]>=ub[1] or max(map(abs,ub))>=C:
         raise ValueError("ion-flow bounds must be finite, increasing and within the physical subluminal domain")
@@ -342,8 +348,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         electron_density_initial_m3,electron_temperature_initial_eV,
         ion_temperature_initial_eV,ion_velocity_initial_m_s
     )):
-        raise ValueError("Explicit optimizer initial estimates are required for electron density, electron temperature, ion temperature and ion flow; no scientific defaults are assumed.")
-    us=1e5
+        raise ValueError("Explicit optimizer initial estimates are required for density, both temperatures, electron flow and ion flow; no scientific defaults are assumed.")
+    us=1e6
     initial_density=_positive(electron_density_initial_m3,"initial density")
     initial_te=_positive(electron_temperature_initial_eV,"initial Te")
     initial_ti=_positive(ion_temperature_initial_eV,"initial Ti")
@@ -359,7 +365,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             raise ValueError(f"initial value for {name} must lie inside its supplied parameter_bounds")
     if not ub[0]<=initial_ion_flow<=ub[1]:
         raise ValueError("initial ion flow must lie inside its supplied parameter_bounds")
-    p0=np.array([np.log10(initial_density),np.log10(initial_te),np.log10(initial_ti),initial_ion_flow/us])
+    p0=np.array([np.log10(initial_density),np.log10(initial_te),np.log10(initial_ti),electron_flow_seed/us,initial_ion_flow/us])
     # Finite numerical guards prevent 10**p from underflowing to zero or
     # overflowing during unconstrained local optimization. These are machine-
     # representability limits, not scientific plasma-parameter bounds.
@@ -369,23 +375,26 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         np.log10(nb[0]) if nb is not None else log10_min,
         np.log10(tb[0]) if tb is not None else log10_min,
         np.log10(ib[0]) if ib is not None else log10_min,
+        eub[0]/us,
         ub[0]/us,
     ])
     hi=np.array([
         np.log10(nb[1]) if nb is not None else log10_max,
         np.log10(tb[1]) if tb is not None else log10_max,
         np.log10(ib[1]) if ib is not None else log10_max,
+        eub[1]/us,
         ub[1]/us,
     ])
     if not isinstance(global_search,(bool,np.bool_)):
         raise ValueError("global_search must be boolean")
     if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
         nb is None or tb is None or ib is None
+        or "electron_velocity_projection_m_s" not in b
         or "ion_velocity_projection_m_s" not in b
     ):
         raise ValueError(
             "Global search requires explicit finite parameter_bounds supplied by the researcher "
-            "for electron density, electron temperature, ion temperature and ion flow; "
+            "for density, both temperatures, electron flow and ion flow; "
             "local least-squares inference uses numerical representability guards only."
         )
     fast=None
@@ -468,7 +477,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ext_unc=external_parameter_uncertainties or {}
     if not isinstance(ext_unc,Mapping):
         raise ValueError("external_parameter_uncertainties must be a mapping")
-    allowed_external={"probe_frequency_Hz","electron_velocity_projection_m_s","scattering_angle_rad","ion_fractions"}
+    allowed_external={"probe_frequency_Hz","scattering_angle_rad","ion_fractions"}
     if set(ext_unc)-allowed_external:
         raise ValueError(f"unsupported external uncertainty keys: {sorted(set(ext_unc)-allowed_external)}")
     for key,value in ext_unc.items():
@@ -483,21 +492,21 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if isinstance(response_mc_samples,bool) or not isinstance(response_mc_samples,(int,np.integer)) or response_mc_samples<20:
         raise ValueError("response_mc_samples must be an integer >= 20")
     def decode(p):
-        d={"electron_density_m3":10**p[0],"electron_temperature_eV":10**p[1],"ion_temperature_eV":10**p[2],"ion_velocity_projection_m_s":p[3]*us}
+        d={"electron_density_m3":10**p[0],"electron_temperature_eV":10**p[1],"ion_temperature_eV":10**p[2],"electron_velocity_projection_m_s":p[3]*us,"ion_velocity_projection_m_s":p[4]*us}
         if fast:
             if fast["kind"] in {"tabulated_1d","infer_tabulated_1d"}:
                 if fast["kind"]=="infer_tabulated_1d":
-                    masses=_softmax(np.r_[p[5:],0.0])
+                    masses=_softmax(np.r_[p[6:],0.0])
                     weights=_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
                     pdf=masses/weights
                 else:
                     pdf=fast["vdf"]["probability_density_m_s_inverse"]
-                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"kind":"tabulated_1d",
+                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[5],"kind":"tabulated_1d",
                     "velocity_m_s":fast["vdf"]["velocity_m_s"],
                     "probability_density_m_s_inverse":pdf,
                     "smoothness":fast["vdf"]["smoothness_parameter"]}
             else:
-                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[4],"kind":"maxwellian","temperature_eV":10**p[5]}
+                d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[5],"kind":"maxwellian","temperature_eV":10**p[6]}
         return d
     def forward(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
         d=decode(p); z=cts_spectral_density(f,f0 if probe_frequency is None else probe_frequency,
@@ -505,7 +514,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
           electron_temperature_eV=d["electron_temperature_eV"],ion_temperature_eV=d["ion_temperature_eV"],
           ion_species=ion_species,ion_fractions=ion_fractions if fractions_override is None else fractions_override,
           ion_velocity_projection_m_s=d["ion_velocity_projection_m_s"],
-          electron_velocity_projection_m_s=electron_velocity_projection_m_s if electron_flow is None else electron_flow,
+          electron_velocity_projection_m_s=d["electron_velocity_projection_m_s"] if electron_flow is None else electron_flow,
           fast_ion=d.get("fast_ion"))
         return _convolve(response if response_matrix is None else response_matrix,z,f)
     def profile_amplitude(z):
@@ -524,7 +533,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     def regularization_terms(p):
         if inversion_method!="regularized":
             return []
-        masses=_softmax(np.r_[p[5:],0.0])
+        masses=_softmax(np.r_[p[6:],0.0])
         pdf=masses/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
         d2=_second_derivative_matrix(fast["vdf"]["velocity_m_s"])*float(np.ptp(fast["vdf"]["velocity_m_s"]))**2
         scale=max(float(np.max(pdf)),np.finfo(float).tiny)
@@ -543,7 +552,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                    / max(float(reference_masses[-1]), 1e-12)),
             -19.0, 19.0,
         )
-        reference_penalty = np.sqrt(strength) * (p[5:] - initial_logits)
+        reference_penalty = np.sqrt(strength) * (p[6:] - initial_logits)
         return [curvature_penalty, reference_penalty]
 
     def residual(p):
@@ -596,18 +605,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
     trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]
-    if fast and fast["kind"]=="maxwellian": trans[5,5]=np.log(10)*d["fast_ion"]["temperature_eV"]
+    if fast and fast["kind"]=="maxwellian": trans[6,6]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
-    names=["electron_density_m3","electron_temperature_eV","ion_temperature_eV","ion_velocity_projection_m_s"]
-    out={**d,"electron_velocity_projection_m_s":float(electron_velocity_projection_m_s),
-      "electron_velocity_projection_is_fitted":False,
-      "electron_velocity_projection_input_uncertainty_m_s":(
-          float(ext_unc["electron_velocity_projection_m_s"])
-          if "electron_velocity_projection_m_s" in ext_unc else None
-      ),
+    names=["electron_density_m3","electron_temperature_eV","ion_temperature_eV","electron_velocity_projection_m_s","ion_velocity_projection_m_s"]
+    out={**d,"electron_velocity_projection_is_fitted":True,"electron_velocity_projection_uncertainty_m_s":float(su[3]),
       "electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
-      "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[3]),
+      "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[4]),
       "parameter_names":names,"fit_covariance":cov,"fitted_spectrum":fitted,"residual":res,
       "reduced_chi_square":float(data_fit_residual@data_fit_residual/dof) if (unc is not None or spectral_covariance is not None) else None,"fit_residual_rms":float(np.sqrt(np.mean(res**2))),
       "optimizer_success":bool(fit.success),"global_search_score":score,"genetic_best_score_history":genetic_history,"inversion_method":inversion_method,"regularization_strength":regularization_strength,"spectral_weighting_status":weighting_status,"spectral_uncertainty_supplied":bool(unc is not None or spectral_covariance is not None),"regularization_scope":"fast-ion VDF curvature and supplied reference-shape regularization only; no plasma-parameter prior","jacobian_rank":rank,"jacobian_condition_number":cond,
@@ -619,12 +623,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "ion_temperature":"one common ion temperature inferred from the measured ion feature and shared by all supplied species",
        "ion_velocity_projection":"one common projected ion flow inferred from the measured ion-feature Doppler shift and shared by all supplied species",
        "ion_composition":"externally supplied fixed composition",
-       "electron_velocity_projection":"externally supplied fixed scalar projection; no stationary-flow default is imposed"},
+       "electron_velocity_projection":"fitted scalar projection along the scattering wavevector from the measured CTS spectrum"},
       "uncertainty_model":"Local Jacobian covariance with optional full spectral covariance whitening; response-matrix uncertainty is propagated by Monte Carlo when supplied.",
       "limitations":["Not a full magnetized electromagnetic CTS tensor or ray-tracing model.","Absolute power transfer and polarization coupling are not inverted.",
        "Ion composition is fixed externally.",
        "The current Maxwellian background model has one common ion temperature and one common projected ion flow for all species; species-specific Ti and flow inference is not implemented.",
-       "Electron flow is a required external scalar projection; enter zero explicitly only when a stationary-electron-flow assumption is intended.",
+       "Only the electron-flow component projected along the scattering wavevector is inferred; transverse vector components are not identifiable from one scattering geometry.",
        "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
     if out["reduced_chi_square"] is not None:
@@ -637,7 +641,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["electron_density_uncertainty_m3"]=float(total_sigma[0])
         out["electron_temperature_uncertainty_eV"]=float(total_sigma[1])
         out["ion_temperature_uncertainty_eV"]=float(total_sigma[2])
-        out["ion_velocity_projection_uncertainty_m_s"]=float(total_sigma[3])
+        out["electron_velocity_projection_uncertainty_m_s"]=float(total_sigma[3])
+        out["ion_velocity_projection_uncertainty_m_s"]=float(total_sigma[4])
         out["model_discrepancy_diagnostics"]={
             "whitened_residual_lag1_correlation":float(np.corrcoef(data_fit_residual[:-1],data_fit_residual[1:])[0,1])
                 if data_fit_residual.size>2 and np.std(data_fit_residual[:-1])>0 and np.std(data_fit_residual[1:])>0 else None,
@@ -665,9 +670,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         else:
             out["parameter_provenance"]["fast_ion_fraction"]="inferred jointly with a regularized tabulated 1-D fast-ion VDF shape"
             out["parameter_provenance"]["fast_ion_vdf"]="inferred from CTS spectrum with non-negative softmax representation and second-difference regularization"
-        out["fast_ion_fraction_uncertainty"]=float(total_sigma[4] if out.get("model_discrepancy_scale") is not None else su[4])
+        out["fast_ion_fraction_uncertainty"]=float(total_sigma[5] if out.get("model_discrepancy_scale") is not None else su[5])
         if fast["kind"]=="maxwellian":
-            out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[5] if out.get("model_discrepancy_scale") is not None else su[5])
+            out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[6] if out.get("model_discrepancy_scale") is not None else su[6])
         elif fast["kind"]=="infer_tabulated_1d":
             logits=fit.x[5:]
             def decode_pdf(values):
@@ -678,9 +683,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 plus=logits.copy(); minus=logits.copy()
                 plus[j]+=step; minus[j]-=step
                 pdf_jac[:,j]=(decode_pdf(plus)-decode_pdf(minus))/(2.0*step)
-            vdf_parameter_covariance=cov[5:,5:]
+            vdf_parameter_covariance=cov[6:,6:]
             if out.get("model_discrepancy_scale") is not None:
-                vdf_parameter_covariance=(cov+discrepancy_covariance)[5:,5:]
+                vdf_parameter_covariance=(cov+discrepancy_covariance)[6:,6:]
             vdf_covariance=pdf_jac@vdf_parameter_covariance@pdf_jac.T
             out["fast_ion_vdf_covariance"]=vdf_covariance
             out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(vdf_covariance),0.0))
@@ -694,7 +699,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 if np.any(sums<=0): continue
                 sampled=sampled/sums[None,:]
             sampled_f0=f0+rng.normal(0.0,float(ext_unc.get("probe_frequency_Hz",0.0)))
-            sampled_electron_flow=electron_velocity_projection_m_s+rng.normal(0.0,float(ext_unc.get("electron_velocity_projection_m_s",0.0)))
+            sampled_electron_flow=None
             sampled_geometry=scattering_geometry
             if "scattering_angle_rad" in ext_unc:
                 sampled_geometry=dict(scattering_geometry)
@@ -704,7 +709,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             if "ion_fractions" in ext_unc:
                 sampled_fractions=np.maximum(np.asarray(ion_fractions,dtype=float)+rng.normal(0.0,np.asarray(ext_unc["ion_fractions"],dtype=float)),1e-12)
                 sampled_fractions=sampled_fractions/sampled_fractions.sum()
-            if sampled_f0<=0 or abs(sampled_electron_flow)>=C: continue
+            if sampled_f0<=0: continue
             try:
                 def sampled_residual(p):
                     data=data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions)
@@ -727,13 +732,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["electron_density_uncertainty_m3"]=float(total[0])
             out["electron_temperature_uncertainty_eV"]=float(total[1])
             out["ion_temperature_uncertainty_eV"]=float(total[2])
-            out["ion_velocity_projection_uncertainty_m_s"]=float(total[3])
+            out["electron_velocity_projection_uncertainty_m_s"]=float(total[3])
+            out["ion_velocity_projection_uncertainty_m_s"]=float(total[4])
             if fast:
-                out["fast_ion_fraction_uncertainty"]=float(total[4])
+                out["fast_ion_fraction_uncertainty"]=float(total[5])
                 if fast["kind"]=="maxwellian":
-                    out["fast_ion_temperature_uncertainty_eV"]=float(total[5])
+                    out["fast_ion_temperature_uncertainty_eV"]=float(total[6])
                 elif fast["kind"]=="infer_tabulated_1d":
-                    response_vdf_covariance=pdf_jac@response_cov[5:,5:]@pdf_jac.T
+                    response_vdf_covariance=pdf_jac@response_cov[6:,6:]@pdf_jac.T
                     out["fast_ion_vdf_covariance"]=out["fast_ion_vdf_covariance"]+response_vdf_covariance
                     out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(out["fast_ion_vdf_covariance"]),0.0))
             out["response_uncertainty_propagated"]=response_sigma is not None
