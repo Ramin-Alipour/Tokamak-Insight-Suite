@@ -13,6 +13,7 @@
 - Extended the Thomson dashboard to accept channel-major spectral covariance and Collective external-parameter uncertainty inputs.
 
 ### Microwave Collective Thomson Scattering
+- Exposed the automatic Full-EM harmonic/quadrature convergence assessment and its paired refinement/tolerance controls in the dashboard; synchronized the Python execution registry and both JSON registry copies with all convergence inputs and outputs.
 - Full-EM CTS measured-spectrum inversion now runs a paired harmonic/quadrature convergence assessment by default at the fitted physical parameters, reports the refined spectra and relative L2/L-infinity changes, and keeps numerical convergence separate from physical uncertainty. Explicit refinement sequences/tolerance and an opt-out are available.
 
 - Added covariance-aware CTS residual whitening, response/external-parameter Monte Carlo propagation and separate model-discrepancy covariance reporting.
