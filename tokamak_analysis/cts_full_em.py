@@ -924,8 +924,8 @@ def _apply_frequency_response(response, spectrum, frequency):
 
 def analyze_full_em_cts_spectrum(
     frequency_shift_Hz, measured_spectrum, *, probe_frequency_Hz,
-    scattering_geometry, electron_density_initial_m3,
-    electron_temperature_initial_eV, ion_temperature_initial_eV,
+    scattering_geometry, electron_density_initial_m3=None,
+    electron_temperature_initial_eV=None, ion_temperature_initial_eV=None,
     ion_species, ion_fractions, magnetic_field_T,
     incident_polarization, scattered_polarization, ion_flow_projection_initial_m_s=None,
     instrument_response, electron_flow_projection_initial_m_s=None,
@@ -946,6 +946,7 @@ def analyze_full_em_cts_spectrum(
     from a single CTS geometry. Each species temperature is also fitted.
     """
     from scipy.optimize import least_squares
+    from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
 
     if electron_distribution is not None:
         raise ValueError(
@@ -988,6 +989,21 @@ def analyze_full_em_cts_spectrum(
     species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
     if len(set(species_names)) != len(species_names):
         raise ValueError("ion species names must be unique for species-resolved temperature inference")
+    automatic_seeds = estimate_cts_optimizer_initial_parameters(
+        f, y, probe_frequency_Hz=probe_frequency_Hz,
+        scattering_geometry=scattering_geometry, ion_species=ion_species,
+        ion_fractions=ion_fractions,
+    ) if any(value is None for value in (
+        electron_density_initial_m3, electron_temperature_initial_eV, ion_temperature_initial_eV
+    )) else None
+    if electron_density_initial_m3 is None:
+        electron_density_initial_m3 = automatic_seeds["electron_density_m3"]
+    if electron_temperature_initial_eV is None:
+        electron_temperature_initial_eV = automatic_seeds["electron_temperature_eV"]
+    if ion_temperature_initial_eV is None:
+        ion_temperature_initial_eV = {
+            name: automatic_seeds["ion_temperature_eV"] for name in species_names
+        }
     if isinstance(ion_temperature_initial_eV, Mapping):
         if set(ion_temperature_initial_eV) != set(species_names):
             raise ValueError("ion_temperature_initial_eV mapping must contain exactly the supplied ion species names")
@@ -1185,6 +1201,13 @@ def analyze_full_em_cts_spectrum(
         bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
     )
     return {
+        "optimizer_initial_estimates": automatic_seeds or {
+            "electron_density_m3": float(electron_density_initial_m3),
+            "electron_temperature_eV": float(electron_temperature_initial_eV),
+            "ion_temperature_eV": ion_initials.tolist(),
+            "method": "researcher_supplied",
+            "role": "optimizer_initial_estimates_only",
+        },
         "electron_density_m3": float(values[0]),
         "electron_temperature_eV": float(values[1]),
         "electron_flow_projection_m_s": float(values[2]),
