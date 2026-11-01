@@ -263,3 +263,14 @@ rather than assigned an invented covariance.
 ### Conditional uncertainty for projected-EVDF candidate models
 
 Each successful Maxwellian, finite-variance Kappa/Student-t and super-Gaussian candidate fit now reports its local parameter covariance and 1-sigma parameter uncertainties when the fitted residual Jacobian has full column rank. If pointwise measurement uncertainty or a full spectral covariance is supplied, the covariance is conditional on that supplied noise model. Without measurement uncertainty, the covariance is residual-scaled and explicitly **not measurement-noise calibrated**. Parameters at an active physical/numerical bound have no symmetric interval and are marked boundary-limited; rank-deficient fits do not receive fabricated covariance values. These are local linearized uncertainties conditional on the selected candidate, velocity grid, measured response and fixed background, not model-selection uncertainty, posterior intervals, or experimental validation.
+
+
+## Machine-readable Primary / Conditional / Non-identifiable result contract
+
+The canonical optical Thomson API now includes a top-level `result_classification` object for every channel. It records the calibrated measured-spectrum input contract, explicitly states that no instrument calibration/correction or experimental validation was performed, and separates:
+
+- **Primary:** electron temperature and scattering-vector velocity projection when returned by the selected physical fit; absolute density only when the calibrated absolute-power and optical-factor requirements are met.
+- **Conditional:** absolute electron density when the required absolute spectral-power calibration, laser power, interaction length, collection solid angle, optical efficiency, beam geometry and polarization factors are not yet supplied; projected 1-D EVDF inference when the measured coverage/response/noise/model conditions do not permit it.
+- **Non-identifiable:** unrestricted 3-D electron velocity distribution from a single scattering geometry. The measured spectrum constrains a projection along the scattering vector, not arbitrary perpendicular velocity structure.
+
+Each classification entry includes the parameter name, dimensional unit where applicable, status/reason, and explicit auxiliary-input requirements. Numerical values remain in the existing channel/profile fields; the classification object does not duplicate or manufacture parameter values. This is a machine-readable scientific status contract, not a claim of experimental validation.
