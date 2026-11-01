@@ -68,13 +68,13 @@
           "name": "laser_wavelength_uncertainty_nm",
           "unit": "nm; 1-sigma",
           "required": false,
-          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated for non-collective Maxwellian/Kappa fits and rejected for relativistic Maxwell-Juttner."
+          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner and collective CTS fits."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
           "unit": "rad; 1-sigma; supported for non-collective Maxwellian/Kappa only",
           "required": false,
-          "description": "Optional scalar scattering-angle uncertainty; analytic propagation is implemented for non-collective Maxwellian/Kappa fits. Relativistic Maxwell-Juttner uncertainty input is rejected rather than ignored."
+          "description": "Optional scalar scattering-angle uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner and collective CTS fits. Mutually exclusive with beam-direction component uncertainties."
         },
         {
           "name": "instrument_response_uncertainty",
@@ -5723,13 +5723,13 @@
           "name": "density_relative_covariance",
           "unit": "6x6 relative covariance",
           "required": false,
-          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. Mutually exclusive with scalar optical uncertainties and joint_spectral_covariance."
+          "description": "Per-channel (shared 6x6 or channel-specific N x 6 x 6) covariance for scattered power and five optical inputs. It does not imply cross-channel correlations; use joint_density_relative_covariance for those. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when its scattered-power row/column is zero; measured-power uncertainty is then supplied by spectral/response propagation. Mutually exclusive with duplicate scalar optical-factor uncertainties."
         },
         {
           "name": "joint_density_relative_covariance",
           "unit": "(6*n_channels) x (6*n_channels) relative covariance",
           "required": false,
-          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. Mutually exclusive with density_relative_covariance, joint_spectral_covariance, instrument_response_uncertainty and scalar optical-factor uncertainties."
+          "description": "Complete channel-major covariance for the six absolute-density inversion inputs per channel, including cross-channel correlations. Available to all three Analysis 1 models when absolute-density inference is selected. It may be combined with joint_spectral_covariance and/or instrument_response_uncertainty only when all scattered-power rows/columns are zero; otherwise those sources would be double-counted. Mutually exclusive with density_relative_covariance and duplicate scalar optical-factor uncertainties."
         },
         {
           "name": "maximum_recoil_correction_fraction",
@@ -5856,7 +5856,7 @@
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
       "algorithm": "Infer per-channel electron temperature and supported scattering-vector flow from measured calibrated optical Thomson spectra using the selected non-collective Maxwellian, Kappa or relativistic Maxwell-Juttner forward model. Infer absolute density only when calibrated W/nm intensity and complete optical geometry are supplied; reconstruct identifiable radial profiles only within the measured channel interval.",
-      "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance and measured-response Monte Carlo; full channel-major spectral GLS and external laser-wavelength/scattering-angle/polarization uncertainty propagation are not implemented. Absolute-density uncertainty uses the supplied optical-factor uncertainty model. Profile covariance is propagated from the available fit and input covariance only; no experimental validation is claimed.",
+      "uncertainty_model": "The wrapper forwards the measured spectra and all supported uncertainty inputs to the canonical Thomson inference engine. Non-collective Maxwellian and Kappa fits support local covariance and full channel-major GLS; relativistic Maxwell-Juttner uses channel-local covariance plus Monte Carlo propagation of laser-wavelength, scalar-angle or beam-direction, incident-polarization and response-matrix uncertainties, but not full channel-major spectral GLS. Collective CTS retains its own branch-specific uncertainty contract. Absolute-density uncertainty combines the supported spectral/response and optical-factor covariance sources without double counting when scattered-power covariance rows/columns are zero. Profile covariance is propagated from the available fit and input covariance only; no experimental validation is claimed.",
       "limitations": [
         "Relativistic Maxwell-Juttner inference is restricted to an isotropic rest-frame distribution with bulk flow parallel to the scattering vector and neglects recoil/Compton corrections.",
         "Kappa models are parameterized distributions and do not reconstruct an unrestricted electron velocity distribution.",
