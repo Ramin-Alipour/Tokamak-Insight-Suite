@@ -5016,8 +5016,102 @@
     "input_data_level": "measured_calibrated_integrated_scattered_power_plus_fixed_path_metadata",
     "execution_scope": "conditional_path_integrated_physical_inference",
     "analysis_family": "Thomson Scattering",
-    "implementation_trace": [
-      "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
-    ]
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "function_links": [
+        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+      ],
+      "formula_key": "thomson_path_integrated_density",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
+      ]
+    },
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "function_links": [
+        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+      ],
+      "formula_key": "thomson_path_integrated_density",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson scattering — path-integrated absolute-density inference",
+      "execution_scope": "conditional_path_integrated_physical_inference",
+      "input_data_level": "measured_calibrated_integrated_scattered_power_plus_fixed_path_metadata",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": true,
+      "input_specs": [
+        {
+          "name": "scattered_power_W",
+          "unit": "W",
+          "required": true
+        },
+        {
+          "name": "path_coordinate_m",
+          "unit": "m; strictly increasing",
+          "required": true
+        },
+        {
+          "name": "incident_power_profile_W",
+          "unit": "W; path samples",
+          "required": true
+        },
+        {
+          "name": "differential_cross_section_profile_m2_sr",
+          "unit": "m² sr⁻¹; path samples",
+          "required": true
+        },
+        {
+          "name": "collection_solid_angle_profile_sr",
+          "unit": "sr; path samples",
+          "required": true
+        },
+        {
+          "name": "optical_efficiency_profile",
+          "unit": "dimensionless; path samples",
+          "required": true
+        },
+        {
+          "name": "scattered_power_uncertainty_W",
+          "unit": "W; 1-sigma",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "electron_density_path_averaged_m3",
+          "unit": "m⁻³"
+        },
+        {
+          "name": "electron_density_path_averaged_uncertainty_m3",
+          "unit": "m⁻³; optional"
+        },
+        {
+          "name": "path_integrated_sensitivity_W_m3",
+          "unit": "W m³"
+        },
+        {
+          "name": "normalized_path_weight",
+          "unit": "m⁻¹"
+        },
+        {
+          "name": "identifiability",
+          "unit": "structured primary/conditional/non-identifiable classification"
+        }
+      ],
+      "prerequisites": [
+        "Absolute calibrated integrated scattered power.",
+        "All path-dependent optical/geometry factors are explicitly supplied and already characterized.",
+        "Optically thin single scattering."
+      ],
+      "uncertainty_model": "First-order propagation of supplied scattered-power uncertainty only. Uncertainty and covariance of path-dependent optical factors are not included.",
+      "test_links": [
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
+      ],
+      "note": "Numerical integration of the single-scattering sightline kernel; the output is a weighted path-average density, not a reconstructed arbitrary spatial profile."
+    }
   }
 ]

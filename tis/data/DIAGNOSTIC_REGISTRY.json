@@ -442,7 +442,8 @@
         "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
         "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
         "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
-        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+        "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
@@ -476,7 +477,9 @@
       "test_links": [
         "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties",
         "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
-        "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins"
+        "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
@@ -5008,7 +5011,8 @@
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
         "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
-        "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
+        "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
+        "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators"
       ],
       "raw_data_to_physics": false,
       "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
@@ -5088,7 +5092,9 @@
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
       "test_links": [
         "tests/test_cts_analysis.py::test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins",
-        "tests/test_cts_analysis.py::test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins"
+        "tests/test_cts_analysis.py::test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
