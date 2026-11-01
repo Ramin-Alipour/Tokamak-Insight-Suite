@@ -156,7 +156,7 @@ def test_thomson_spectral_distribution_is_registered_as_entry_81():
 
 
 
-def test_thomson_spectral_distribution_registry_declares_calibrated_measurement_input():
+def test_thomson_spectral_distribution_registry_is_descriptive_only_for_calibrated_measurements():
     registry_path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     entry = next(item for item in registry
@@ -167,6 +167,7 @@ def test_thomson_spectral_distribution_registry_declares_calibrated_measurement_
     assert contract["raw_data_to_physics"] is False
     assert contract["calibrated_measurements_to_physics"] is True
     assert contract["input_data_level"] == "measured_calibrated_spectrum"
+    assert "spectral descriptors only" in contract["note"]
 
 
 
