@@ -43,6 +43,9 @@ def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     assert out["absolute_density_identified"] is False
     assert out["directional_equivalent_temperature_eV"] > 0
     assert out["fitted_spectrum"].shape == signal.shape
+    assert set(out["parametric_model_comparison"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
+    assert set(out["parametric_models"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
+    assert all("aic" in item and "bic" in item for item in out["parametric_model_comparison"].values())
 
 
 def test_evdf_requires_explicit_positive_regularization_and_response():
