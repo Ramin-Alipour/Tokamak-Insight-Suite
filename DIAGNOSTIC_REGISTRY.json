@@ -4225,7 +4225,7 @@
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
-          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
+          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', either signal_uncertainty or spectral_covariance may be supplied, but not both. If neither is supplied, the fit is unweighted and its residual-scaled covariance is not measurement-noise-calibrated."
         },
         {
           "name": "fast_ion",
@@ -4244,7 +4244,7 @@
           "name": "spectral_covariance",
           "unit": "frequency-bin covariance matrix",
           "required": false,
-          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
+          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply at most one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
         },
         {
           "name": "external_parameter_uncertainties",
@@ -5036,7 +5036,7 @@
             "signal_uncertainty",
             "spectral_covariance"
           ],
-          "reason": "The Full-EM inversion requires a supplied spectral noise model and rejects both missing and simultaneously supplied alternatives."
+          "reason": "The Full-EM inversion accepts a supplied spectral noise model when available; without one it uses unweighted least squares and residual-scaled covariance."
         },
         {
           "when_model": "electrostatic",
