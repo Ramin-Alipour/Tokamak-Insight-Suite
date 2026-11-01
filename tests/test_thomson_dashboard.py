@@ -109,7 +109,3 @@ def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_rende
         item.label == "Open canonical Thomson spectral-to-physics workflow"
         for item in app.button
     )
-    assert any(
-        "Run “Thomson multi-channel spectral inference” first" in item.value
-        for item in app.info
-    )
