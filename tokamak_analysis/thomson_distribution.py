@@ -133,6 +133,8 @@ def analyze_thomson_spectral_distribution(
     background_fraction: float | None = None,
     background_mask=None,
     background_signal=None,
+    background_signal_uncertainty=None,
+    background_signal_covariance=None,
     moment_mc_samples: int = 200,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
@@ -184,6 +186,32 @@ def analyze_thomson_spectral_distribution(
         explicit_background = _vector(background_signal, "background_signal")
         if explicit_background.size != x.size:
             raise ValueError("background_signal must have the same length as wavelength_nm")
+
+    if background_signal_uncertainty is not None and background_signal_covariance is not None:
+        raise ValueError("Supply background_signal_uncertainty or background_signal_covariance, not both.")
+    background_uncertainty = None
+    background_covariance_matrix = None
+    background_covariance_cholesky = None
+    if background_signal_uncertainty is not None or background_signal_covariance is not None:
+        if explicit_background is None:
+            raise ValueError("Background uncertainty is supported only with an explicitly supplied background_signal; mask/fraction backgrounds are refitted within each signal draw.")
+        if background_signal_uncertainty is not None:
+            background_uncertainty = _vector(background_signal_uncertainty, "background_signal_uncertainty")
+            if background_uncertainty.size != x.size or np.any(background_uncertainty <= 0.0):
+                raise ValueError("background_signal_uncertainty must be strictly positive and match wavelength_nm")
+        else:
+            raw_background_covariance = np.asarray(background_signal_covariance)
+            if raw_background_covariance.dtype.kind not in "iuf":
+                raise ValueError("background_signal_covariance must contain real numeric values")
+            background_covariance_matrix = raw_background_covariance.astype(float, copy=False)
+            if background_covariance_matrix.shape != (x.size, x.size) or not np.all(np.isfinite(background_covariance_matrix)):
+                raise ValueError("background_signal_covariance must be a finite square matrix matching wavelength_nm")
+            if not np.allclose(background_covariance_matrix, background_covariance_matrix.T, rtol=1e-10, atol=0.0):
+                raise ValueError("background_signal_covariance must be symmetric")
+            try:
+                background_covariance_cholesky = np.linalg.cholesky(background_covariance_matrix)
+            except np.linalg.LinAlgError as exc:
+                raise ValueError("background_signal_covariance must be positive definite") from exc
 
     background_selection_count = sum(
         value is not None for value in (explicit_background, mask, background_fraction)
@@ -312,17 +340,24 @@ def analyze_thomson_spectral_distribution(
 
     moment_uncertainties = {}
     successful_draws = 0
-    if uncertainty is not None or signal_covariance_matrix is not None:
+    if (uncertainty is not None or signal_covariance_matrix is not None
+            or background_uncertainty is not None or background_covariance_matrix is not None):
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
             sampled_signal = (
                 y + rng.normal(0.0, uncertainty)
-                if uncertainty is not None
-                else y + covariance_cholesky @ rng.normal(size=y.size)
+                if uncertainty is not None else
+                y + covariance_cholesky @ rng.normal(size=y.size)
+                if signal_covariance_matrix is not None else y.copy()
             )
+            sampled_background = explicit_background
+            if background_uncertainty is not None:
+                sampled_background = explicit_background + rng.normal(0.0, background_uncertainty)
+            elif background_covariance_matrix is not None:
+                sampled_background = explicit_background + background_covariance_cholesky @ rng.normal(size=x.size)
             try:
-                sample = _moment_statistics(x, sampled_signal, background_fraction, mask, explicit_background)
+                sample = _moment_statistics(x, sampled_signal, background_fraction, mask, sampled_background)
                 draws.append(sample)
             except ValueError:
                 continue
@@ -366,8 +401,16 @@ def analyze_thomson_spectral_distribution(
             else "edge_fraction_assumption_not_independently_identified"
         ),
         "background_confidence_note": (
-            "The supplied background is treated as fixed; its uncertainty and possible signal contamination are not independently identified by this subanalysis."
+            "Supplied background uncertainty is propagated as an independent nuisance covariance; possible signal contamination is not independently identified."
+            if background_uncertainty is not None or background_covariance_matrix is not None
+            else "The supplied background is treated as fixed; its uncertainty and possible signal contamination are not independently identified by this subanalysis."
         ),
+        "background_uncertainty_model": (
+            "independent_pointwise_background_signal_uncertainty" if background_uncertainty is not None else
+            "independent_full_background_signal_covariance" if background_covariance_matrix is not None else
+            "fixed_background_no_background_uncertainty_supplied"
+        ),
+        "background_uncertainty_supplied": bool(background_uncertainty is not None or background_covariance_matrix is not None),
         "background_mask": mask,
         "spectral_centroid_nm": center,
         "observed_sigma_nm": sigma_observed,
@@ -378,11 +421,9 @@ def analyze_thomson_spectral_distribution(
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
         "moment_uncertainty_method": (
-            "parametric Monte Carlo from full within-channel signal covariance"
-            if signal_covariance_matrix is not None else
-            "parametric Monte Carlo from independent pointwise signal uncertainty"
-            if uncertainty is not None else
-            "not_available"
+            "parametric Monte Carlo from signal and/or independent fitted-background uncertainty"
+            if (signal_covariance_matrix is not None or uncertainty is not None or background_uncertainty is not None or background_covariance_matrix is not None)
+            else "not_available"
         ),
         "signal_uncertainty_model": (
             "full_within_channel_spectral_covariance"
