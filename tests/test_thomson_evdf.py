@@ -8,7 +8,7 @@ def _case():
     wavelength = np.linspace(499.8, 500.2, 401)
     laser = 500.0
     theta = np.pi / 2
-    velocity = 1.8e5
+    velocity = 2.0e4
     sigma_v = 2.5e4
     q_over_ki = 2 * np.sin(theta / 2)
     centre = laser * (1 - q_over_ki * velocity / 299_792_458.0)
@@ -26,7 +26,7 @@ def _run(wavelength, signal, background, **kwargs):
         instrument_response_matrix=np.eye(wavelength.size),
         background_signal=background,
         regularization_strength=1e-3,
-        velocity_limit_m_s=2.0e5,
+        velocity_limit_m_s=8.0e4,
         velocity_points=161,
         **kwargs,
     )
