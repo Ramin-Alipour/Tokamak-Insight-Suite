@@ -470,7 +470,9 @@ def analyze_thomson_spectral_distribution(
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
         "moment_uncertainty_method": (
-            "parametric Monte Carlo from the joint signal/background covariance including cross-covariance when supplied"
+            "parametric Monte Carlo from the correlated joint signal/background block covariance"
+            if joint_signal_background_cholesky is not None else
+            "parametric Monte Carlo from signal and independent fitted-background uncertainty"
             if (signal_covariance_matrix is not None or uncertainty is not None or background_uncertainty is not None or background_covariance_matrix is not None)
             else "not_available"
         ),
