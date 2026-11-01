@@ -1,0 +1,46 @@
+import numpy as np
+import pytest
+
+from tokamak_analysis.cts_external_uncertainty import (
+    validate_external_input_covariance,
+    sample_external_input_vectors,
+)
+
+
+def test_local_full_em_covariance_contract_and_order_are_preserved():
+    order = ("magnetic_field_T_x", "magnetic_field_T_y")
+    covariance = np.array([[0.04, 0.01], [0.01, 0.09]])
+    returned_order, returned = validate_external_input_covariance(covariance, order)
+    assert returned_order == order
+    np.testing.assert_allclose(returned, covariance)
+
+
+def test_covariance_accepts_singular_positive_semidefinite_matrix():
+    _, returned = validate_external_input_covariance(
+        np.array([[1.0, 1.0], [1.0, 1.0]]),
+        ("magnetic_field_T_x", "magnetic_field_T_y"),
+    )
+    assert np.linalg.eigvalsh(returned).min() >= -1e-12
+
+
+@pytest.mark.parametrize("matrix,order,match", [
+    (np.eye(2), ("magnetic_field_T_x",), "match"),
+    (np.array([[1.0, 2.0], [0.0, 1.0]]),
+     ("magnetic_field_T_x", "magnetic_field_T_y"), "symmetric"),
+    (np.array([[1.0, 2.0], [2.0, 1.0]]),
+     ("magnetic_field_T_x", "magnetic_field_T_y"), "positive semidefinite"),
+    (np.eye(1), ("not_supported",), "unsupported"),
+    (np.eye(2), ("magnetic_field_T_x", "magnetic_field_T_x"), "unique"),
+])
+def test_invalid_covariance_contracts_are_rejected(matrix, order, match):
+    with pytest.raises(ValueError, match=match):
+        validate_external_input_covariance(matrix, order)
+
+
+def test_local_external_covariance_sampling_is_reproducible():
+    base = np.array([2.0, -1.0])
+    covariance = np.array([[0.04, 0.01], [0.01, 0.09]])
+    first = sample_external_input_vectors(base, covariance, samples=24, seed=17)
+    second = sample_external_input_vectors(base, covariance, samples=24, seed=17)
+    assert first.shape == (24, 2)
+    np.testing.assert_array_equal(first, second)
