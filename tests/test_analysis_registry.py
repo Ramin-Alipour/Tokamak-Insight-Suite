@@ -292,7 +292,9 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     runtime_inputs = {item["name"]: item for item in runtime["input_specs"]}
     for name in ("instrument_response_uncertainty", "response_mc_samples"):
         assert name in runtime_inputs
-        assert "both CTS branches" in runtime_inputs[name]["description"]
+        description = runtime_inputs[name]["description"].lower()
+        assert "both" in description
+        assert "full-electromagnetic" in description or "both cts branches" in description
         assert "required_when_model" not in runtime_inputs[name]
     runtime_outputs = {item["name"] for item in runtime["output_specs"]}
     assert {
