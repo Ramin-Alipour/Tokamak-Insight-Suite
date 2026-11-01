@@ -6997,8 +6997,8 @@
     "diagnostic": "Thomson spectral distribution",
     "quantities": "Observed wavelength-space centroid, variance and standard deviation, skewness, excess kurtosis, integrated spectral measures, Gaussian shape-fit parameters, residuals, fit quality and uncertainty diagnostics from calibrated measured spectra. Also supports a regularized normalized 1-D electron-velocity marginal along the optical scattering vector through a separate inversion function.",
     "status": "D",
-    "method": "Analyze the calibrated measured wavelength-intensity spectrum using an explicitly selected background representation, signed spectral moments, and a Gaussian spectral-shape forward fit convolved with the supplied measured instrument-response matrix. Physical plasma parameters are extracted separately by the primary Thomson Analysis 1 forward fit. A separate non-negative second-difference Tikhonov inverse routine maps projected electron velocity to Doppler wavelength, applies the supplied measured response as a forward operator, and fits the background-subtracted calibrated spectrum.",
-    "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique arbitrary electron velocity distribution from moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian fit. The EVDF inversion is non-relativistic, normalized and one-dimensional along the scattering vector; it does not identify unrestricted 3-D EVDF, anisotropy or absolute density from one view. Regularization strength, velocity grid, supplied background and response condition the result; no posterior intervals are claimed.",
+    "method": "Analyze the calibrated measured wavelength-intensity spectrum using an explicitly selected background representation, signed spectral moments, and a Gaussian spectral-shape forward fit convolved with the supplied measured instrument-response matrix. Physical plasma parameters are extracted separately by the primary Thomson Analysis 1 forward fit. A separate non-negative second-difference Tikhonov inverse routine maps projected electron velocity to Doppler wavelength, applies the supplied measured response as a forward operator, and fits the background-subtracted calibrated spectrum. The EVDF routine also compares Maxwellian, finite-variance Kappa/Student-t and super-Gaussian projected marginal candidates using weighted residuals, AIC and BIC.",
+    "caveat": "This subanalysis characterizes measured spectral shape only. It accepts no pre-extracted plasma parameters, does not infer a unique arbitrary electron velocity distribution from moments, does not deconvolve the measured spectrum, and does not calculate instrument-corrected widths. The measured response matrix is used only as a forward operator in the Gaussian fit. The EVDF inversion is non-relativistic, normalized and one-dimensional along the scattering vector; it does not identify unrestricted 3-D EVDF, anisotropy or absolute density from one view. Regularization strength, velocity grid, supplied background and response condition the result; no posterior intervals are claimed. Parametric candidate comparison does not establish which distribution is physically true; no candidate parameter confidence intervals are returned.",
     "implementation_functions": [
       "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
       "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
@@ -7368,6 +7368,14 @@
         {
           "name": "identifiability",
           "unit": "structured primary/conditional/non-identifiable classification"
+        },
+        {
+          "name": "parametric_model_comparison",
+          "unit": "structured Maxwellian/Kappa/super-Gaussian fits with weighted residual sum of squares, AIC, BIC and convergence status"
+        },
+        {
+          "name": "parametric_models",
+          "unit": "list of tested projected-marginal model families"
         }
       ],
       "assumptions": [
@@ -7391,7 +7399,8 @@
         "Edge-fraction background estimation is a researcher-selected heuristic, not an independently identified background; background uncertainty and possible signal contamination are not jointly inferred.",
         "The regularized EVDF inverse returns only a normalized 1-D marginal along the scattering vector; an unrestricted 3-D EVDF, perpendicular components and anisotropy are non-identifiable from one view.",
         "The EVDF inverse is non-relativistic and does not infer absolute density; its fine structure depends on velocity grid, response matrix, background and explicit regularization strength.",
-        "The deterministic EVDF solver does not return posterior confidence intervals; uncertainty weighting is not equivalent to uncertainty propagation."
+        "The deterministic EVDF solver does not return posterior confidence intervals; uncertainty weighting is not equivalent to uncertainty propagation.",
+        "Parametric Maxwellian, Kappa/Student-t and super-Gaussian comparisons return point estimates and information criteria only; parameter confidence intervals and Bayesian model probabilities are not implemented."
       ],
       "function_links": [
         "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution",
