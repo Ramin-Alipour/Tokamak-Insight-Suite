@@ -2302,15 +2302,6 @@ def analyze_thomson_spectra(
                 signal_uncertainty=channel_uncertainty,
                 signal_covariance=channel_covariance,
                 background_signal=fitted_background,
-                physical_parameters={
-                    "model": model,
-                    "electron_temperature_eV": channel_result.get("electron_temperature_eV"),
-                    "electron_temperature_uncertainty_eV": channel_result.get("electron_temperature_uncertainty_eV"),
-                    "electron_velocity_projection_m_s": channel_result.get("electron_velocity_projection_m_s"),
-                    "electron_velocity_projection_uncertainty_m_s": channel_result.get("electron_velocity_projection_uncertainty_m_s"),
-                    "electron_density_m3": channel_result.get("electron_density_m3"),
-                    "electron_density_uncertainty_m3": channel_result.get("electron_density_uncertainty_m3"),
-                },
             )
             distribution["analysis_status"] = "completed"
             distribution["background_source"] = (
