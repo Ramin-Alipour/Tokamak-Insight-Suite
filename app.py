@@ -3369,7 +3369,7 @@ elif page=='Advanced Analysis':
                         [0,1,2],index=None,placeholder='Select the branch used to generate this ray geometry',
                         key='cts_full_ray_mode_index',
                     )
-                cts_electron_flow=st.text_input('Electron flow vector (m/s; x,y,z)',key='cts_full_electron_flow')
+                cts_electron_flow=st.text_input('Electron-flow projection initial estimate (m/s; optional; fitted from the CTS spectrum)',key='cts_full_electron_flow')
                 cts_ion_flow=st.text_area('Ion flow vectors (m/s; one x,y,z vector per species, separated by semicolons)',key='cts_full_ion_flow')
                 cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=2,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
                 cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
@@ -3479,7 +3479,6 @@ elif page=='Advanced Analysis':
                         'ion_species':ion_species,
                         'ion_fractions':fractions,
                         'magnetic_field_T':_parse_ts_vector(cts_magnetic_field,'Magnetic field'),
-                        'electron_flow_velocity_m_s':_parse_ts_vector(cts_electron_flow,'Electron flow'),
                         'ion_flow_velocity_m_s':ion_flows,
                         'incident_polarization':_parse_ts_complex_vector(cts_incident_polarization,'Incident polarization'),
                         'scattered_polarization':_parse_ts_complex_vector(cts_scattered_polarization,'Scattered polarization'),
@@ -3492,6 +3491,8 @@ elif page=='Advanced Analysis':
                         'harmonic_order':int(cts_harmonic_order),
                         'quadrature_order':int(cts_quadrature_order),
                     }
+                    if cts_electron_flow.strip():
+                        kwargs_cts['electron_flow_projection_initial_m_s']=float(cts_electron_flow)
                     if cts_damping.strip():
                         kwargs_cts['damping_rate_rad_s']=float(cts_damping)
                     if cts_bindslev_theta_limit.strip():
