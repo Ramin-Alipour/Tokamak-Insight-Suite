@@ -106,6 +106,39 @@ def _synchronize_execution_contracts():
 
 _synchronize_execution_contracts()
 
+def _sync_analysis_contracts_from_canonical_registry() -> None:
+    """Use DIAGNOSTIC_REGISTRY.json as the single source of execution contracts.
+
+    ANALYSES retains the stable IDs and Python entry-point mapping, while all
+    input/output, uncertainty, provenance and branch-specific contracts are
+    loaded from the canonical registry. This prevents dashboard/API metadata
+    from drifting away from the public diagnostic catalogue.
+    """
+    import json
+    from pathlib import Path
+
+    root_registry = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+    packaged_registry = Path(__file__).resolve().parents[1] / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json"
+    registry_path = root_registry if root_registry.is_file() else packaged_registry
+    try:
+        rows = json.loads(registry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Cannot load canonical diagnostic execution contracts: {exc}") from exc
+    by_name = {
+        row.get("diagnostic"): row.get("execution_contract")
+        for row in rows
+        if isinstance(row, dict) and isinstance(row.get("execution_contract"), dict)
+    }
+    missing = [entry["name"] for entry in ANALYSES if entry["name"] not in by_name]
+    if missing:
+        raise RuntimeError(f"Canonical diagnostic registry is missing execution contracts for: {missing}")
+    for entry in ANALYSES:
+        entry["execution_contract"] = deepcopy(by_name[entry["name"]])
+
+
+_sync_analysis_contracts_from_canonical_registry()
+
+
 
 def get_analysis(analysis_id: int) -> dict:
     """Return a copy of a registered analysis entry by ordered list ID."""
