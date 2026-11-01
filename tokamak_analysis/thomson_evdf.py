@@ -325,6 +325,59 @@ def reconstruct_thomson_evdf(
             sample_count = int(target.size)
             parameter_count = int(model_fit.x.size)
             safe_rss = max(rss, np.finfo(float).tiny)
+            # Local parameter covariance for each candidate model. The residual
+            # vector is already whitened when a measurement uncertainty/covariance
+            # was supplied; otherwise its residual variance provides only a
+            # residual-scaled, non-measurement-calibrated estimate.
+            jacobian = np.asarray(model_fit.jac, dtype=float)
+            jacobian_rank = int(np.linalg.matrix_rank(jacobian))
+            parameter_covariance = None
+            parameter_standard_uncertainty = None
+            parameter_one_sigma_intervals = None
+            parameter_uncertainty_status = "unavailable_rank_deficient_jacobian"
+            if jacobian_rank == parameter_count and np.all(np.isfinite(jacobian)):
+                try:
+                    parameter_covariance = np.linalg.pinv(
+                        jacobian.T @ jacobian, hermitian=True
+                    )
+                    if uncertainty_model == "not_supplied_unweighted_fit":
+                        parameter_covariance *= rss / max(1, sample_count - parameter_count)
+                    diagonal = np.maximum(np.diag(parameter_covariance), 0.0)
+                    parameter_standard_uncertainty = np.sqrt(diagonal)
+                    parameter_names = [
+                        "amplitude_scaled", "mean_velocity_parallel_m_s",
+                        "scale_velocity_m_s",
+                    ]
+                    if model_name == "kappa_student_t":
+                        parameter_names.append("kappa_degrees_of_freedom")
+                    elif model_name == "super_gaussian":
+                        parameter_names.append("super_gaussian_exponent")
+                    intervals = {}
+                    boundary_limited = []
+                    for index, name in enumerate(parameter_names):
+                        value = float(model_fit.x[index])
+                        sigma_value = float(parameter_standard_uncertainty[index])
+                        lower_gap = value - float(lower_bounds[index])
+                        upper_gap = (
+                            float(upper_bounds[index]) - value
+                            if np.isfinite(upper_bounds[index]) else np.inf
+                        )
+                        tolerance = 1e-7 * max(1.0, abs(value))
+                        if lower_gap <= tolerance or upper_gap <= tolerance:
+                            intervals[name] = None
+                            boundary_limited.append(name)
+                        else:
+                            intervals[name] = [value - sigma_value, value + sigma_value]
+                    parameter_one_sigma_intervals = intervals
+                    parameter_uncertainty_status = (
+                        "boundary_limited_for_some_parameters"
+                        if boundary_limited else "conditional_local_gaussian_covariance"
+                    )
+                except (np.linalg.LinAlgError, FloatingPointError):
+                    parameter_covariance = None
+                    parameter_standard_uncertainty = None
+                    parameter_one_sigma_intervals = None
+                    parameter_uncertainty_status = "unavailable_covariance_factorization"
             parametric_comparison[model_name] = {
                 "parameters": {
                     "amplitude_scaled": float(model_fit.x[0]),
@@ -338,7 +391,16 @@ def reconstruct_thomson_evdf(
                 "bic": float(sample_count * np.log(safe_rss / sample_count) + parameter_count * np.log(sample_count)),
                 "success": bool(model_fit.success),
                 "message": str(model_fit.message),
-                "uncertainty_intervals": None,
+                "parameter_covariance": parameter_covariance,
+                "parameter_standard_uncertainty": parameter_standard_uncertainty,
+                "parameter_one_sigma_intervals": parameter_one_sigma_intervals,
+                "parameter_uncertainty_status": parameter_uncertainty_status,
+                "parameter_covariance_interpretation": (
+                    "Local linearized covariance conditional on the selected projected-marginal model, "
+                    "velocity grid, measured response, background and residual/noise representation. "
+                    "It excludes model discrepancy and unprovided systematic uncertainty."
+                ),
+                "uncertainty_intervals": parameter_one_sigma_intervals,
             }
         except (ValueError, FloatingPointError) as exc:
             parametric_comparison[model_name] = {
