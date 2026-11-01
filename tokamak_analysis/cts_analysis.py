@@ -429,6 +429,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     initial_ion_flow=0.0 if ion_velocity_initial_m_s is None else float(_array([ion_velocity_initial_m_s],"ion_velocity_initial_m_s")[0])
     if abs(initial_ion_flow)>=C:
         raise ValueError("ion_velocity_initial_m_s must be subluminal")
+    if automatic_seeds is not None:
+        if electron_density_initial_m3 is None and nb is not None:
+            initial_density=float(np.clip(initial_density,nb[0],nb[1]))
+        if electron_temperature_initial_eV is None and tb is not None:
+            initial_te=float(np.clip(initial_te,tb[0],tb[1]))
+        if ion_temperature_initial_eV is None and ib is not None:
+            initial_ti=float(np.clip(initial_ti,ib[0],ib[1]))
     for name,value,pair in (
         ("electron_density_m3",initial_density,nb),
         ("electron_temperature_eV",initial_te,tb),
