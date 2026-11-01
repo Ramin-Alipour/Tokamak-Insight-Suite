@@ -334,7 +334,7 @@ def estimate_cts_optimizer_initial_parameters(
     core_total = float(np.sum(core_weights))
     core_variance = float(np.sum(core_weights * offsets[selected]**2) / core_total)
     ions = _species(ion_species, ion_fractions)
-    ion_spectral_weights = np.asarray([item["charge_state"] * item["fraction"] for item in ions], dtype=float)
+    ion_spectral_weights = np.asarray([item["Z"] * item["fraction"] for item in ions], dtype=float)
     effective_ion_mass = float(np.sum(ion_spectral_weights * np.asarray([item["mass"] for item in ions])) / np.sum(ion_spectral_weights))
     ion_velocity_rms = 2.0 * np.pi * np.sqrt(max(core_variance, variance * 1e-6)) / q
     ti_seed = effective_ion_mass * ion_velocity_rms**2 / (2.0 * E)
