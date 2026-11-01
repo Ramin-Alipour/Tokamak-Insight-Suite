@@ -219,3 +219,8 @@ with the smoothing parameter selected by generalized cross-validation using the 
 ### Kappa-shape identifiability
 
 The non-collective Kappa fit evaluates the finite-difference Jacobian of the actual measured-response-convolved six-parameter spectrum. It reports numerical rank, normalized Jacobian conditioning, and the Kappa-shape sensitivity remaining after projection against amplitude, centroid, width and linear-background nuisance directions. The result includes an explicit `reportable_as_inferred_parameter` flag and a reason when the Kappa index is weakly/non-identifiable. This is a local identifiability diagnostic, not a global profile-likelihood interval or empirical validation.
+
+
+## Joint wavelength-resolved spatial inference
+
+The optional `joint_spatial_spectral=True` mode fits the measured channel-by-wavelength spectra through a researcher-supplied fixed spatial mixing matrix and the supplied fixed spectral-response operator. It currently implements the isotropic, non-relativistic Maxwellian single-particle Thomson forward model; it does not estimate a point-spread function or calibrate either operator. The returned primary status is based on a finite-difference Jacobian of the whitened measured-data residual. Optional curvature-regularization rows are deliberately excluded from this rank test: regularization may select a smooth numerical solution, but it cannot create independent measurement information. Inspect `primary_result_status`, `primary_outputs_reportable_as_identified`, and `optimizer.data_only_jacobian_rank` before interpreting a reconstructed profile. Perpendicular flow, null-space spatial structure, sub-resolution structure, and unrestricted anisotropic/non-Maxwellian distributions remain non-identifiable in this model.
