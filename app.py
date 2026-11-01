@@ -943,6 +943,13 @@ elif page=='Spectral Analysis':
                     joint_covariance_upload=None
                     st.caption('Full cross-channel spectral GLS is currently supported for the Maxwellian and Kappa fits, not the relativistic Maxwell-Juttner fit.')
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
+            joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (Maxwellian only)',value=False,disabled=model!='non_collective_maxwellian',key='ts_infer_joint_spatial')
+            spatial_mixing_upload=None
+            spatial_regularization_text='0'
+            if joint_spatial_spectral:
+                spatial_mixing_upload=st.file_uploader('Fixed measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
+                spatial_regularization_text=st.text_input('Spatial curvature regularization strength (dimensionless numerical control; explicit)',value='0',key='ts_infer_spatial_regularization')
+                st.caption('The matrix is treated as a fixed forward operator, never estimated or calibrated by TIS. Data-only Jacobian rank determines whether profiles are reportable; regularization cannot create measurement information. Absolute density is not inferred in this joint mode.')
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
             relativistic_polarization_text=None
@@ -1016,6 +1023,9 @@ elif page=='Spectral Analysis':
                 'response_uncertainty_upload': _ts_upload_digest(response_unc_upload),
                 'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
+                'joint_spatial_spectral': joint_spatial_spectral,
+                'spatial_mixing_upload': _ts_upload_digest(spatial_mixing_upload),
+                'spatial_regularization_strength': spatial_regularization_text,
                 'identity_response': identity_response,
                 'relativistic_incident_direction': relativistic_incident_direction_text,
                 'relativistic_incident_direction_uncertainty': relativistic_incident_direction_unc_text,
@@ -1125,6 +1135,15 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
+                    if joint_spatial_spectral:
+                        if spatial_mixing_upload is None:
+                            raise ValueError('Upload the fixed spatial mixing matrix to run joint spatial-spectral inversion.')
+                        spatial_mixing_matrix=pd.read_csv(spatial_mixing_upload,header=None).to_numpy(dtype=float)
+                        kwargs.update({
+                            'joint_spatial_spectral':True,
+                            'spatial_mixing_matrix':spatial_mixing_matrix,
+                            'spatial_regularization_strength':_parse_ts_scalar(spatial_regularization_text,'Spatial regularization strength',minimum=0.0),
+                        })
                     if density_covariance_upload is not None:
                         kwargs['density_relative_covariance']=pd.read_csv(density_covariance_upload,header=None).to_numpy(dtype=float)
                     if joint_density_covariance_upload is not None:
@@ -1167,7 +1186,7 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
-                    if st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
+                    if joint_spatial_spectral or st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
                         result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
                     else:
                         result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
