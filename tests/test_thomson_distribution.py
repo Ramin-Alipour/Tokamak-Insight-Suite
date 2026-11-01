@@ -22,7 +22,7 @@ def _spectrum(sigma=0.18):
 
 def test_spectral_distribution_recovers_gaussian_width_and_reports_shape():
     x, y = _spectrum()
-    out = analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
+    out = analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1,
                                                 signal_uncertainty=np.full(x.size, 1.0))
     expected = np.sqrt(0.18**2 - 0.06**2)
     assert out["instrument_width_resolved"] is True
@@ -36,7 +36,7 @@ def test_spectral_distribution_recovers_gaussian_width_and_reports_shape():
 
 def test_spectral_distribution_flags_unresolved_instrument_width():
     x, y = _spectrum(sigma=0.03)
-    out = analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+    out = analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
     assert out["instrument_width_resolved"] is False
     assert out["instrument_corrected_sigma_nm"] is None
 
@@ -49,16 +49,16 @@ def test_spectral_distribution_flags_unresolved_instrument_width():
 ])
 def test_spectral_distribution_rejects_invalid_inputs(x, y, kwargs, match):
     with pytest.raises(ValueError, match=match):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  **kwargs)
+        analyze_thomson_spectral_distribution(x, y,  **kwargs)
 
 
 def test_spectral_distribution_rejects_invalid_uncertainty_and_background_fraction():
     x, y = _spectrum()
     with pytest.raises(ValueError, match="strictly positive"):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
+        analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1,
                                               signal_uncertainty=np.zeros_like(y))
     with pytest.raises(ValueError, match="background_fraction"):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06,
+        analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size),
                                               background_fraction=0.9)
 
 @pytest.mark.parametrize("bad_values", [
@@ -68,7 +68,7 @@ def test_spectral_distribution_rejects_invalid_uncertainty_and_background_fracti
 def test_spectral_distribution_rejects_boolean_and_string_arrays(bad_values):
     with pytest.raises(ValueError, match="real numeric values"):
         analyze_thomson_spectral_distribution(
-            bad_values, np.ones(9), physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.1, background_fraction=0.1,
+            bad_values, np.ones(9),  instrument_response_matrix=np.eye(len(x)), background_fraction=0.1,
         )
 
 
@@ -81,7 +81,7 @@ def test_spectral_distribution_rejects_boolean_and_string_arrays(bad_values):
 def test_spectral_distribution_rejects_boolean_and_string_scalar_parameters(kwargs):
     x, y = _spectrum()
     with pytest.raises(ValueError):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  **kwargs)
+        analyze_thomson_spectral_distribution(x, y,  **kwargs)
 
 
 def test_moments_are_correct_on_nonuniform_wavelength_grid():
@@ -91,7 +91,7 @@ def test_moments_are_correct_on_nonuniform_wavelength_grid():
     right = np.linspace(500.2, 501.0, 90)
     x = np.unique(np.concatenate([left, center, right]))
     y = 1000.0 * np.exp(-0.5 * ((x - 500.0) / 0.18) ** 2) + 12.0
-    out = analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+    out = analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
     assert out["spectral_centroid_nm"] == pytest.approx(500.0, abs=0.003)
     assert out["instrument_corrected_sigma_nm"] == pytest.approx(
         np.sqrt(0.18**2 - 0.06**2), rel=0.04
@@ -105,25 +105,25 @@ def test_spectral_distribution_handles_constant_signal_without_nonfinite_json_va
     y = np.full_like(x, 7.0)
     # A zero net spectral area must be rejected clearly rather than producing NaN metrics.
     with pytest.raises(ValueError, match="positive spectral area"):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.05, background_fraction=0.1)
+        analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
 
 
 def test_spectral_distribution_validates_uncertainty_length_and_nonfinite_values():
     x, y = _spectrum()
     with pytest.raises(ValueError, match="same length"):
         analyze_thomson_spectral_distribution(
-            x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1, signal_uncertainty=np.ones(10)
+            x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1, signal_uncertainty=np.ones(10)
         )
     bad = y.copy()
     bad[20] = np.nan
     with pytest.raises(ValueError, match="finite"):
-        analyze_thomson_spectral_distribution(x, bad, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+        analyze_thomson_spectral_distribution(x, bad,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
 
 
 def test_spectral_distribution_result_is_json_safe_for_degenerate_r_squared():
     # A valid peaked signal has nonzero variance and finite fit metrics.
     x, y = _spectrum()
-    out = analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+    out = analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
     assert np.isfinite(out["r_squared"])
 
 def test_complete_result_can_be_exported_as_strict_json_including_spectral_arrays():
@@ -131,7 +131,7 @@ def test_complete_result_can_be_exported_as_strict_json_including_spectral_array
 
     x, y = _spectrum()
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
+        x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1,
         signal_uncertainty=np.full(x.size, 1.0),
     )
     payload = {
@@ -155,7 +155,7 @@ def test_fit_uncertainties_and_goodness_metrics_remain_strict_json_safe():
 
     x, y = _spectrum()
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
+        x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1,
         signal_uncertainty=np.full(x.size, 1.0),
     )
     # Covariance-derived values may be unavailable for ill-conditioned fits, but
@@ -177,8 +177,8 @@ def test_thomson_distribution_moments_are_independently_registered():
 @pytest.mark.parametrize("scale", [1e-20, 1e-12, 1.0, 1e12])
 def test_spectral_distribution_is_invariant_to_signal_units(scale):
     x, y = _spectrum()
-    baseline = analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
-    scaled = analyze_thomson_spectral_distribution(x, y * scale, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+    baseline = analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
+    scaled = analyze_thomson_spectral_distribution(x, y * scale,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
     assert scaled["spectral_centroid_nm"] == pytest.approx(baseline["spectral_centroid_nm"], abs=1e-8)
     assert scaled["gaussian_fit_parameters"]["center_nm"] == pytest.approx(
         baseline["gaussian_fit_parameters"]["center_nm"], abs=1e-6
@@ -205,7 +205,7 @@ def test_spectral_distribution_reports_optimizer_failure_as_actionable_value_err
 
     monkeypatch.setattr(module, "curve_fit", fail_fit)
     with pytest.raises(ValueError, match="Gaussian spectral-shape fit failed"):
-        module.analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1)
+        module.analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1)
 
 
 def test_moments_use_signed_residuals_and_propagate_uncertainty():
@@ -213,7 +213,7 @@ def test_moments_use_signed_residuals_and_propagate_uncertainty():
     y = y.copy()
     y[0] -= 2.0
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06,
+        x, y,  instrument_response_matrix=np.eye(x.size),
         signal_uncertainty=np.full(x.size, 0.5),
         background_mask=(x < 499.2) | (x > 500.8),
         moment_mc_samples=40,
@@ -232,7 +232,7 @@ def test_distribution_uses_general_instrument_response_matrix_without_gaussian_d
     x, y = _spectrum()
     response = np.eye(x.size)
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(),  instrument_response_matrix=response,
+        x, y,  instrument_response_matrix=response,
         background_mask=(x < 499.2) | (x > 500.8),
     )
     assert out["instrument_response_model"] == "general_measured_response_matrix"
@@ -245,7 +245,7 @@ def test_spectral_distribution_uses_explicit_physical_fit_background_without_edg
     x, y = _spectrum()
     fitted_background = 12.0 + 0.8 * (x - 500.0)
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(), 
+        x, y, 
         instrument_response_matrix=np.eye(x.size),
         background_signal=fitted_background,
         signal_uncertainty=np.full(x.size, 1.0),
@@ -260,7 +260,7 @@ def test_spectral_distribution_propagates_full_within_channel_signal_covariance(
     x, y = _spectrum()
     covariance = np.eye(x.size) * 0.25
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(), 
+        x, y, 
         instrument_response_matrix=np.eye(x.size),
         background_signal=12.0 + 0.8 * (x - 500.0),
         signal_covariance=covariance,
@@ -275,7 +275,7 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
     x, y = _spectrum()
     with pytest.raises(ValueError, match="not both"):
         analyze_thomson_spectral_distribution(
-            x, y, physical_parameters=_canonical_fit(),  instrument_response_matrix=np.eye(x.size),
+            x, y,  instrument_response_matrix=np.eye(x.size),
             background_signal=12.0 + 0.8 * (x - 500.0),
             signal_uncertainty=np.ones(x.size),
             signal_covariance=np.eye(x.size),
@@ -283,7 +283,7 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
     singular = np.ones((x.size, x.size))
     with pytest.raises(ValueError, match="positive definite"):
         analyze_thomson_spectral_distribution(
-            x, y, physical_parameters=_canonical_fit(),  instrument_response_matrix=np.eye(x.size),
+            x, y,  instrument_response_matrix=np.eye(x.size),
             background_signal=12.0 + 0.8 * (x - 500.0),
             signal_covariance=singular,
         )
@@ -292,7 +292,7 @@ def test_spectral_distribution_rejects_conflicting_or_non_positive_definite_cova
 def test_spectral_distribution_requires_explicit_background_selection():
     x, y = _spectrum()
     with pytest.raises(ValueError, match="Background is not inferred automatically"):
-        analyze_thomson_spectral_distribution(x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06)
+        analyze_thomson_spectral_distribution(x, y,  instrument_response_matrix=np.eye(x.size))
 
 
 def test_spectral_distribution_rejects_multiple_background_specifications():
@@ -308,7 +308,7 @@ def test_spectral_distribution_rejects_multiple_background_specifications():
     for selection in conflicting:
         with pytest.raises(ValueError, match="Supply exactly one background specification"):
             analyze_thomson_spectral_distribution(
-                x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, **selection
+                x, y,  instrument_response_matrix=np.eye(x.size), **selection
             )
 
 
@@ -325,7 +325,7 @@ def test_spectral_distribution_rejects_non_real_numeric_response_matrix(response
     signal = np.exp(-0.5 * ((wavelength - 532.0) / 0.3) ** 2)
     with pytest.raises(ValueError, match="real numeric"):
         analyze_thomson_spectral_distribution(
-            wavelength, signal, physical_parameters=_canonical_fit(), 
+            wavelength, signal, 
             instrument_response_matrix=response,
             background_fraction=0.2,
         )
@@ -343,7 +343,7 @@ def test_spectral_distribution_exposes_canonical_physical_parameters():
         "electron_density_uncertainty_m3": None,
     }
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=physical, instrument_sigma_nm=0.06,
+        x, y, instrument_response_matrix=np.eye(x.size),
         background_fraction=0.1,
     )
     extracted = out["physical_parameter_extraction"]
@@ -357,6 +357,6 @@ def test_spectral_distribution_rejects_incomplete_physical_parameter_contract():
     x, y = _spectrum()
     with pytest.raises(ValueError, match="missing canonical fit fields"):
         analyze_thomson_spectral_distribution(
-            x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
+            x, y,  instrument_response_matrix=np.eye(x.size), background_fraction=0.1,
             physical_parameters={"model": "non_collective_maxwellian"},
         )
