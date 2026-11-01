@@ -81,3 +81,7 @@ def test_regularization_does_not_manufacture_data_identifiability():
     assert out["optimizer"]["data_only_jacobian_rank"] < out["optimizer"]["parameter_count"]
     assert out["primary_result_status"] == "not_identifiable_from_measured_data"
     assert out["primary_outputs_reportable_as_identified"] is False
+    assert out["electron_temperature_profile_eV"] is None
+    assert out["electron_velocity_projection_profile_m_s"] is None
+    assert out["parameter_covariance"] is None
+    assert out["optimizer_candidate"]["role"] == "numerical_candidate_not_a_measured_result"

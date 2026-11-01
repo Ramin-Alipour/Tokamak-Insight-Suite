@@ -224,15 +224,25 @@ def reconstruct_joint_thomson_spatial_spectra(
         "primary_outputs_reportable_as_identified": data_identifiable,
         "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
         "radius_m": r.copy(),
-        "electron_temperature_profile_eV": te,
-        "electron_temperature_uncertainty_eV": uncertainties[n:2*n],
-        "electron_velocity_projection_profile_m_s": flow,
-        "electron_velocity_projection_uncertainty_m_s": uncertainties[2*n:3*n],
-        "relative_spectral_amplitude_profile": amp,
-        "relative_spectral_amplitude_uncertainty": uncertainties[:n],
+        # Numerical optimizer candidates are retained for diagnostics, but
+        # they are not promoted to measured primary outputs when the data-only
+        # inverse is rank deficient or the optimizer has not converged.
+        "electron_temperature_profile_eV": te if data_identifiable else None,
+        "electron_temperature_uncertainty_eV": uncertainties[n:2*n] if data_identifiable else None,
+        "electron_velocity_projection_profile_m_s": flow if data_identifiable else None,
+        "electron_velocity_projection_uncertainty_m_s": uncertainties[2*n:3*n] if data_identifiable else None,
+        "relative_spectral_amplitude_profile": amp if data_identifiable else None,
+        "relative_spectral_amplitude_uncertainty": uncertainties[:n] if data_identifiable else None,
+        "optimizer_candidate": {
+            "role": "numerical_candidate_not_a_measured_result",
+            "electron_temperature_profile_eV": te,
+            "electron_velocity_projection_profile_m_s": flow,
+            "relative_spectral_amplitude_profile": amp,
+            "regularized_local_parameter_covariance": physical_covariance,
+        },
         "fitted_spectra": predicted,
         "residuals": y-predicted,
-        "parameter_covariance": physical_covariance,
+        "parameter_covariance": physical_covariance if data_identifiable else None,
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                             [f"Te_{i}_eV" for i in range(n)] +
                             [f"flow_projection_{i}_m_s" for i in range(n)] +
