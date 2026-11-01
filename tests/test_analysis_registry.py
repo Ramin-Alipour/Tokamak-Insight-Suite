@@ -317,7 +317,7 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     }
     assert convergence_inputs <= set(runtime_inputs)
     assert runtime_inputs["numerical_convergence"]["default"] is True
-    assert runtime_inputs["convergence_relative_tolerance"]["default"] == pytest.approx(1e-3)
+    assert runtime_inputs["convergence_relative_tolerance"]["default"] == 1e-3
     assert {
         "numerical_convergence", "numerical_convergence_status",
         "numerical_convergence_is_uncertainty",
