@@ -2369,4 +2369,15 @@ def analyze_thomson_spectra(
                     channel_result[new_key] = channel_result.pop(old_key)
             channel_result["integrated_spectral_signal_unit"] = "input spectral-intensity unit × nm"
             channel_result["absolute_scattered_power_available"] = False
+    from .thomson_identifiability import optical_thomson_identifiability
+    output["parameter_identifiability"] = optical_thomson_identifiability(
+        model,
+        absolute_density_available=any(
+            channel_result.get("electron_density_m3") is not None
+            for channel_result in results
+        ),
+    )
+    output["parameter_identifiability"]["profile_scope"] = (
+        "Per-channel physical inference only; spatial interpolation is a separate child subanalysis."
+    )
     return output
