@@ -391,7 +391,10 @@
         "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties",
         "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
         "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins"
-      ]
+      ],
+      "input_data_level": "measured_calibrated_measurements_only",
+      "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
+      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation."
     },
     "scientific_references": [
       {
@@ -4101,7 +4104,8 @@
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
       "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
       "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
-      "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams"
+      "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+      "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
     ],
     "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs.",
     "execution_contract": {
@@ -4211,32 +4215,32 @@
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
           "required": false,
-          "description": "Required for the electrostatic branch as an explicit projected electron-flow input; supply 0.0 only when stationary electron flow is the intended physical assumption. The full-electromagnetic branch instead requires electron_flow_velocity_m_s.",
+          "description": "Optional initial optimizer seed for the electron-flow projection. The electrostatic inversion fits the final projection from the measured CTS spectrum; omission uses zero only as a numerical seed and does not impose stationary flow. The Full-EM branch uses electron_flow_projection_initial_m_s instead.",
           "required_when_model": "electrostatic"
         },
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
           "required": true,
-          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value."
+          "description": "Required numerical optimizer starting estimate for both inversion branches; the final density is fitted from the measured CTS spectrum and is not fixed to this value."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
           "required": true,
-          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value."
+          "description": "Required numerical optimizer starting estimate for both inversion branches; the final electron temperature is fitted from the measured CTS spectrum."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
           "required": true,
-          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value. Full-EM fits one final temperature per supplied ion species."
+          "description": "Required numerical optimizer starting estimate for both inversion branches; the final ion temperature(s) are fitted from the measured CTS spectrum. Electrostatic CTS fits one common ion temperature; Full-EM fits one temperature per supplied species."
         },
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": false,
-          "description": "Required optimizer initial estimate for the electrostatic branch; it is not a fixed inferred flow. The full-electromagnetic branch instead requires ion_flow_velocity_m_s.",
+          "required": true,
+          "description": "Required initial optimizer estimate for the common ion-flow projection in electrostatic CTS; the final projection is fitted from the measured spectrum and is not held fixed. Full-EM uses optional per-species ion_flow_projection_initial_m_s seeds.",
           "required_when_model": "electrostatic"
         },
         {
@@ -4381,13 +4385,13 @@
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
-          "description": "Explicit externally supplied electron-flow projection used in the CTS forward model; not fitted.",
+          "description": "Electrostatic CTS fitted scalar electron-flow projection along the scattering wavevector; it is inferred from the measured spectrum, not supplied as a fixed physical input.",
           "available_when_model": "electrostatic"
         },
         {
           "name": "electron_velocity_projection_is_fitted",
           "unit": "boolean",
-          "description": "Always false; electron-flow projection is an external fixed input.",
+          "description": "True: the electrostatic CTS electron-flow projection is an optimizer-fitted parameter. The optional input of the same physical quantity is only an initial seed.",
           "available_when_model": "electrostatic"
         },
         {
@@ -4537,6 +4541,42 @@
           "name": "mode_index",
           "unit": "integer cold-plasma propagation branch index",
           "available_when_model": "full_electromagnetic_ray_geometry"
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1",
+          "description": "Full-EM fitted scalar electron-flow projection along the local scattering wavevector; transverse components are not identifiable from one geometry.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "electron_flow_projection_uncertainty_m_s",
+          "unit": "m s^-1",
+          "description": "Local Jacobian 1-sigma uncertainty conditional on fixed external inputs; it is not a complete uncertainty including geometry, field, composition, polarization, ray and beam inputs.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "ion_flow_projection_m_s_by_species",
+          "unit": "m s^-1; mapping by species",
+          "description": "Full-EM fitted projected ion-flow component for each supplied species.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "spectral_weighting_status",
+          "unit": "text",
+          "description": "Identifies whether the fit used full spectral covariance whitening or diagonal pointwise measurement uncertainties; unweighted fitting is not used by Full-EM.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "parameter_covariance_scope",
+          "unit": "text",
+          "description": "Explicit scope of the local Jacobian covariance and excluded external systematic uncertainties.",
+          "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "numerical_convergence_status",
+          "unit": "text",
+          "description": "Single inversions do not establish harmonic/quadrature convergence; use assess_full_em_cts_numerical_convergence for a paired refinement study.",
+          "available_when_model": "full_electromagnetic"
         }
       ],
       "assumptions": [
@@ -4661,7 +4701,44 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins",
         "tests/test_cts_analysis.py::test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins"
-      ]
+      ],
+      "input_data_level": "measured_calibrated_measurements_only",
+      "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
+      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation.",
+      "output_provenance_contract": {
+        "fitted_from_measured_spectrum": [
+          "electron_density_m3",
+          "electron_temperature_eV",
+          "electron_flow_projection_m_s",
+          "ion_temperature_eV",
+          "ion_temperature_eV_by_species",
+          "ion_flow_projection_m_s_by_species"
+        ],
+        "fixed_external_inputs": [
+          "ion_species",
+          "ion_fractions",
+          "magnetic_field_T",
+          "scattering_geometry",
+          "incident_polarization",
+          "scattered_polarization",
+          "fast_ion_populations"
+        ],
+        "optimizer_seeds_not_fixed_measurements": [
+          "electron_density_initial_m3",
+          "electron_temperature_initial_eV",
+          "ion_temperature_initial_eV",
+          "ion_velocity_initial_m_s",
+          "electron_velocity_projection_m_s",
+          "electron_flow_projection_initial_m_s",
+          "ion_flow_projection_initial_m_s"
+        ],
+        "non_identifiable_from_single_geometry": [
+          "transverse_electron_flow",
+          "transverse_ion_flow",
+          "arbitrary_three_dimensional_velocity_vectors"
+        ],
+        "uncertainty_scope": "Full-EM parameter covariance is local-Jacobian covariance conditional on fixed external inputs; it is not a complete uncertainty budget for geometry, field, composition, polarization, ray tracing or beam overlap."
+      }
     },
     "scientific_references": [
       {
@@ -4731,7 +4808,12 @@
     "primary_analysis_id": 1,
     "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed.",
     "raw_data_to_physics": false,
-    "calibrated_measurements_to_physics": true
+    "calibrated_measurements_to_physics": true,
+    "model_branch_contract": {
+      "electrostatic": "Unmagnetized electrostatic longitudinal dielectric CTS; does not include magnetized tensor response, EM mode propagation or ray tracing.",
+      "full_electromagnetic": "Magnetized full-EM kinetic CTS with explicit cold-plasma geometrical-optics ray tracing and relative Gaussian beam-overlap weighting; not interchangeable with electrostatic CTS.",
+      "automatic_substitution": false
+    }
   },
   {
     "family": "Density and refractive diagnostics",
