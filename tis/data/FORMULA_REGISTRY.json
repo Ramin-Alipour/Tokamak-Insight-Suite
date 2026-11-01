@@ -2852,7 +2852,21 @@
         "year": 2025,
         "doi": "10.1088/1748-0221/20/07/P07014"
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_electron_temperature_from_spectral_width",
+      "function_links": [],
+      "formula_key": "thomson_electron_temperature_from_spectral_width",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
+      ]
+    }
   },
   {
     "name": "Thomson electron-flow projection from spectral centroid",
@@ -2943,7 +2957,21 @@
         "year": 2025,
         "doi": "10.1088/1748-0221/20/07/P07014"
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_velocity_projection",
+      "function_links": [],
+      "formula_key": "thomson_velocity_projection",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_velocity_formula_reference"
+      ]
+    }
   },
   {
     "name": "Thomson electron density from calibrated scattered power",
@@ -3135,7 +3163,24 @@
         "doi": "10.1088/1748-0221/21/01/C01002",
         "scope": "Recent relativistic Maxwellian and Kappa Thomson spectral treatment; the TIS effective cross-section is computed by deterministic quadrature over the same Lorentz-transformed polarized scattering kernel."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.thomson_density_from_scattered_power",
+      "function_links": [],
+      "formula_key": "thomson_density_from_scattered_power",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_formula_reference",
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_uses_supplied_effective_relativistic_cross_section",
+        "tests/test_thomson_formula_contracts.py::test_thomson_density_propagates_fitted_power_cross_section_covariance",
+        "tests/test_thomson_inference.py::test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties"
+      ]
+    }
   },
   {
     "name": "Microwave collective Thomson spectral density",
@@ -3348,7 +3393,22 @@
     ],
     "raw_data_to_physics": false,
     "calibrated_measurements_to_physics": true,
-    "note": " This formula contract describes physical inference from measured, calibrated CTS spectral power; it does not imply detector calibration or empirical validation."
+    "note": " This formula contract describes physical inference from measured, calibrated CTS spectral power; it does not imply detector calibration or empirical validation.",
+    "input_data_level": "calibrated_CTS_measurement_workflow_and_physical_model_parameters",
+    "execution_scope": "CTS physical forward model used by the calibrated measured-spectrum inference workflow; receives physical parameter candidates during fitting rather than raw detector values.",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_analysis.cts_spectral_density",
+      "function_links": [
+        "tokamak_analysis.cts_analysis.cts_spectral_density",
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      ],
+      "formula_key": "microwave_cts_spectral_density",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_forward_model_is_finite_positive_and_geometry_sensitive"
+      ]
+    }
   },
   {
     "name": "Joint multi-channel Thomson generalized least-squares covariance",
@@ -3436,7 +3496,23 @@
         "doi": "10.1063/5.0350497",
         "scope": "Motivates regularized inference over spatial/time series; this registry entry documents the TIS joint GLS covariance relation."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_spectra_and_measured_response",
+    "execution_scope": "measured_calibrated_spectrum_to_physical_inference",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
+      "function_links": [
+        "tokamak_analysis.thomson_inference.analyze_thomson_spectra"
+      ],
+      "formula_key": "thomson_joint_generalized_least_squares",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_inference.py::test_joint_multi_channel_gls_propagates_cross_channel_spectral_covariance"
+      ]
+    }
   },
   {
     "name": "CTS longitudinal susceptibility for a tabulated non-Maxwellian fast-ion VDF",
@@ -3523,7 +3599,24 @@
         "url": "https://arxiv.org/abs/2610.37516",
         "type": "preprint"
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_analysis._component_tabulated",
+      "function_links": [
+        "tokamak_analysis.cts_analysis._component_tabulated",
+        "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
+      ],
+      "formula_key": "cts_tabulated_fast_ion_susceptibility",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_cts_tabulated_non_maxwellian_fast_ion_forward_model"
+      ]
+    }
   },
   {
     "name": "Relativistic gyrotropic second-order CTS current vertex",
@@ -3700,7 +3793,21 @@
         "doi": "10.1007/s10894-026-00595-7",
         "scope": "Recent CTS energetic-ion diagnostic application."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+      "function_links": [],
+      "formula_key": "relativistic_gyrotropic_three_wave_vertex",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_relativistic_gyrotropic_three_wave_vertex_is_finite"
+      ]
+    }
   },
   {
     "name": "Relativistic single-particle Thomson spectral density",
@@ -3882,7 +3989,21 @@
         "doi": "10.1088/0741-3335/33/14/005",
         "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
+      "function_links": [],
+      "formula_key": "relativistic_single_particle_thomson_spectrum",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_relativistic_maxwell_juttner_spectrum_is_normalized_and_finite"
+      ]
+    }
   },
   {
     "name": "Collective kappa-electron Thomson dielectric spectrum",
@@ -4083,7 +4204,24 @@
         "scope": "Foundational relativistic plasma-scattering context; not a direct derivation of the unmagnetized optical Maxwell-Juttner approximation."
       }
     ],
-    "description": "Reference-only low-level optical collective Kappa spectral model retained for reproducibility; it is not exposed by the current Analysis 1 model selector. The active optical Analysis 1 shortlist contains three non-collective models."
+    "description": "Reference-only low-level optical collective Kappa spectral model retained for reproducibility; it is not exposed by the current Analysis 1 model selector. The active optical Analysis 1 shortlist contains three non-collective models.",
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+      "function_links": [
+        "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
+        "tokamak_analysis.thomson_kinetic_models.fit_collective_kappa"
+      ],
+      "formula_key": "collective_kappa_electron_thomson_spectrum",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_kinetic_models.py::test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons"
+      ]
+    }
   },
   {
     "name": "Relativistic gyrotropic Vlasov linear response and Klimontovich noise",
@@ -4182,7 +4320,21 @@
         "doi": "10.1007/s10894-026-00595-7",
         "scope": "Recent energetic/bulk ion CTS diagnostic context."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
+      "function_links": [],
+      "formula_key": "relativistic_gyrotropic_linear_response",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_relativistic_maxwell_juttner_momentum_grid_is_normalized"
+      ]
+    }
   },
   {
     "name": "Path-integrated Gaussian beam overlap for CTS scattering volume",
@@ -4290,7 +4442,22 @@
         "doi": "10.1016/j.fusengdes.2026.115845",
         "scope": "Recent CTS diagnostic optimization combining beam/ray and spectral forward modelling."
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+      "function_links": [],
+      "formula_key": "cts_path_integrated_gaussian_overlap",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py::test_frequency_resolved_cts_ray_and_gaussian_overlap_geometry",
+        "tests/test_cts_analysis.py::test_full_em_cts_integrates_scattering_volume_samples"
+      ]
+    }
   },
   {
     "name": "Relativistic Maxwell-Juttner effective Thomson differential cross-section",
@@ -4399,7 +4566,22 @@
         "publisher": "Cambridge University Press",
         "type": "textbook"
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+    "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.formula_library.relativistic_mj_effective_differential_cross_section",
+      "function_links": [],
+      "formula_key": "relativistic_mj_effective_differential_cross_section",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_thomson_formula_contracts.py::test_relativistic_mj_effective_cross_section_formula_library_link",
+        "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit"
+      ]
+    }
   },
   {
     "name": "Magnetized full-electromagnetic collective Thomson spectral transfer",
@@ -4614,6 +4796,27 @@
         "year": 2025,
         "doi": "10.1016/j.fusengdes.2025.114826"
       }
-    ]
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": false,
+    "input_data_level": "measured_calibrated_CTS_spectrum_plus_external_physical_model_inputs",
+    "execution_scope": "magnetized_full_electromagnetic_forward_model_and_spectrum_inversion",
+    "analysis_family": "Analysis 1 — Thomson scattering",
+    "implementation_trace": {
+      "function_link": "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+      "function_links": [
+        "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+        "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+        "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+        "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
+      ],
+      "formula_key": "magnetized_full_em_cts_spectral_transfer",
+      "implementation_link_status": "mapped",
+      "test_links": [
+        "tests/test_cts_analysis.py",
+        "tests/test_cts_numerical_convergence.py"
+      ]
+    }
   }
 ]
