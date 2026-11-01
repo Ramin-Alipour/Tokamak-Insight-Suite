@@ -327,6 +327,46 @@
           "name": "integrated_scattered_power_window_W",
           "unit": "W",
           "description": "Relativistic Maxwell-Juttner only: fitted scattered power within the recorded wavelength window before captured-probability correction."
+        },
+        {
+          "name": "spectral_weighting_status",
+          "unit": "text",
+          "description": "Per-channel statistical weighting: full channel-major GLS, diagonal pointwise uncertainty weighting, or unweighted least squares when no measurement uncertainty is supplied."
+        },
+        {
+          "name": "fit_covariance_interpretation",
+          "unit": "text",
+          "description": "Distinguishes measurement-noise-based local covariance from residual-variance-scaled covariance in unweighted fits."
+        },
+        {
+          "name": "background_model_status",
+          "unit": "text",
+          "description": "Identifies the physical-fit baseline model used in the channel fit."
+        },
+        {
+          "name": "background_model_limitation",
+          "unit": "text",
+          "description": "States that the non-collective Maxwellian/Kappa physical fits use a linear intercept-and-slope nuisance baseline, not general background separation."
+        },
+        {
+          "name": "spectral_distribution",
+          "unit": "structured",
+          "description": "Same-spectrum descriptive moments and response-convolved Gaussian shape diagnostics; not an electron velocity distribution and not a substitute for the physical fit."
+        },
+        {
+          "name": "background_identifiability_status",
+          "unit": "text",
+          "description": "Reports researcher-supplied background versus edge-fraction assumption for spectral-distribution moments."
+        },
+        {
+          "name": "gaussian_fit_statistical_weighting_status",
+          "unit": "text",
+          "description": "Reports full within-channel covariance, pointwise uncertainty weighting, or unweighted Gaussian shape fitting."
+        },
+        {
+          "name": "moment_interpretation",
+          "unit": "text",
+          "description": "Signed background-subtracted moments retain negative residuals and are sensitive to background selection."
         }
       ],
       "assumptions": [
@@ -461,7 +501,21 @@
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
     "calibrated_measurements_to_physics": true,
     "primary_analysis_id": 1,
-    "raw_data_to_physics": false
+    "raw_data_to_physics": false,
+    "formula_links": [
+      "thomson_electron_temperature_from_spectral_width",
+      "thomson_velocity_projection",
+      "thomson_density_from_scattered_power",
+      "relativistic_single_particle_thomson_spectrum",
+      "thomson_joint_generalized_least_squares"
+    ],
+    "test_links": [
+      "tests/test_thomson_inference.py",
+      "tests/test_thomson_distribution.py",
+      "tests/test_thomson_profile_reconstruction.py",
+      "tests/test_thomson_workflow.py",
+      "tests/test_thomson_dashboard.py"
+    ]
   },
   {
     "family": "Plasma parameters",
@@ -4577,6 +4631,11 @@
           "unit": "text",
           "description": "Single inversions do not establish harmonic/quadrature convergence; use assess_full_em_cts_numerical_convergence for a paired refinement study.",
           "available_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "electron_flow_projection_is_fitted",
+          "unit": "boolean",
+          "description": "True for the electrostatic branch; the flow projection is fitted from the measured spectrum."
         }
       ],
       "assumptions": [
@@ -4813,7 +4872,17 @@
       "electrostatic": "Unmagnetized electrostatic longitudinal dielectric CTS; does not include magnetized tensor response, EM mode propagation or ray tracing.",
       "full_electromagnetic": "Magnetized full-EM kinetic CTS with explicit cold-plasma geometrical-optics ray tracing and relative Gaussian beam-overlap weighting; not interchangeable with electrostatic CTS.",
       "automatic_substitution": false
-    }
+    },
+    "formula_links": [
+      "microwave_cts_spectral_density",
+      "cts_tabulated_fast_ion_susceptibility",
+      "relativistic_gyrotropic_three_wave_vertex",
+      "cts_path_integrated_gaussian_overlap"
+    ],
+    "test_links": [
+      "tests/test_cts_analysis.py",
+      "tests/test_cts_numerical_convergence.py"
+    ]
   },
   {
     "family": "Density and refractive diagnostics",
