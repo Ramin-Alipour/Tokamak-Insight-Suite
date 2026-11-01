@@ -350,14 +350,16 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("ion-flow bounds must be finite, increasing and within the physical subluminal domain")
     if any(value is None for value in (
         electron_density_initial_m3,electron_temperature_initial_eV,
-        ion_temperature_initial_eV,ion_velocity_initial_m_s
+        ion_temperature_initial_eV
     )):
-        raise ValueError("Explicit optimizer initial estimates are required for density, both temperatures and ion flow; electron flow is fitted from the spectrum.")
+        raise ValueError("Optimizer starting estimates are required for density and both temperatures; ion and electron flow projections are fitted from the measured spectrum.")
     us=1e6
     initial_density=_positive(electron_density_initial_m3,"initial density")
     initial_te=_positive(electron_temperature_initial_eV,"initial Te")
     initial_ti=_positive(ion_temperature_initial_eV,"initial Ti")
-    initial_ion_flow=float(_array([ion_velocity_initial_m_s],"ion_velocity_initial_m_s")[0])
+    # A zero flow value is only a numerical optimizer seed. The flow remains
+    # an unconstrained fitted parameter and is not fixed to a stationary state.
+    initial_ion_flow=0.0 if ion_velocity_initial_m_s is None else float(_array([ion_velocity_initial_m_s],"ion_velocity_initial_m_s")[0])
     if abs(initial_ion_flow)>=C:
         raise ValueError("ion_velocity_initial_m_s must be subluminal")
     for name,value,pair in (
