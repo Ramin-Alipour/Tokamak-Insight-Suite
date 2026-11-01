@@ -1197,6 +1197,23 @@ elif page=='Spectral Analysis':
                 if model=='non_collective_kappa':
                     profile['electron_kappa_index']=[channel.get('kappa_index',np.nan) for channel in result['channels']]
                     profile['electron_kappa_index_uncertainty']=[channel.get('kappa_index_uncertainty',np.nan) for channel in result['channels']]
+                    kappa_profile_rows=[]
+                    for channel in result['channels']:
+                        diagnostic=channel.get('kappa_profile_likelihood',{})
+                        interval=diagnostic.get('profile_interval_kappa',[None,None])
+                        kappa_profile_rows.append({
+                            'channel_index':channel.get('channel_index'),
+                            'radius_m':channel.get('radius_m'),
+                            'profile_status':diagnostic.get('status','unavailable'),
+                            'kappa_lower_68pct':interval[0] if len(interval)>0 else None,
+                            'kappa_upper_68pct':interval[1] if len(interval)>1 else None,
+                            'lower_grid_censored':diagnostic.get('lower_limit_grid_censored'),
+                            'upper_grid_censored':diagnostic.get('upper_limit_grid_censored'),
+                            'noise_scale_semantics':diagnostic.get('noise_scale'),
+                        })
+                    st.markdown('**Kappa-index profile-likelihood identifiability**')
+                    st.dataframe(pd.DataFrame(kappa_profile_rows),width="stretch")
+                    st.caption('Intervals are conditional on the selected Kappa forward model. Grid-censored limits are not physical bounds; when no measurement uncertainty is supplied, the profile uses residual-scaled noise and is not measurement-noise calibrated.')
                 if result.get('absolute_scattered_power_available'):
                     profile['integrated_scattered_power_W']=[channel.get('integrated_scattered_power_W',np.nan) for channel in result['channels']]
                 else:
