@@ -59,8 +59,7 @@ def _apply_response_matrix(response, spectrum, wavelength_nm):
 
 
 def _moment_statistics(
-    x, y, instrument_sigma_nm, background_fraction, background_mask,
-    background_signal=None,
+    x, y, background_fraction, background_mask, background_signal=None,
 ):
     if background_signal is not None:
         background = np.asarray(background_signal, dtype=float)
@@ -105,14 +104,6 @@ def _moment_statistics(
     if not np.isfinite(variance) or variance <= 0:
         raise ValueError("Signed spectral measure has non-positive observed variance; inspect background selection and signal uncertainty")
     sigma_observed = float(np.sqrt(variance))
-    if instrument_sigma_nm is None:
-        variance_physical = None
-        resolved = None
-        sigma_physical = None
-    else:
-        variance_physical = variance - float(instrument_sigma_nm)**2
-        resolved = bool(variance_physical > 0)
-        sigma_physical = float(np.sqrt(variance_physical)) if resolved else None
     skewness = float(np.sum(normalized * centered**3) / variance**1.5)
     kurtosis = float(np.sum(normalized * centered**4) / variance**2 - 3.0)
     total_absolute = positive_area + abs(negative_area)
@@ -122,8 +113,7 @@ def _moment_statistics(
         "negative_area": negative_area, "positive_area": positive_area,
         "signed_area": signed_area, "quadrature": quadrature, "measure": measure,
         "center": center, "variance": variance, "sigma_observed": sigma_observed,
-        "variance_physical": variance_physical, "resolved": resolved,
-        "sigma_physical": sigma_physical, "skewness": skewness,
+        "skewness": skewness,
         "kurtosis": kurtosis, "negative_fraction": negative_fraction,
         "background_source": background_source,
     }
@@ -133,31 +123,23 @@ def analyze_thomson_spectral_distribution(
     wavelength_nm,
     signal,
     *,
-    instrument_sigma_nm: float | None = None,
-    instrument_sigma_uncertainty_nm: float | None = None,
     instrument_response_matrix=None,
     signal_uncertainty=None,
     signal_covariance=None,
     background_fraction: float | None = None,
     background_mask=None,
     background_signal=None,
-    physical_parameters: dict | None = None,
     moment_mc_samples: int = 200,
 ) -> dict:
-    """Return spectral-shape diagnostics and physical parameters from the selected fit.
+    """Characterize the measured, calibrated Thomson spectrum without refitting physics.
 
-    The canonical Thomson inference pipeline must supply physical_parameters from
-    its forward fit of this same calibrated measured spectrum. This subanalysis
-    exposes those fitted plasma quantities alongside wavelength-space moments; it
-    does not independently refit a second physical model or infer a unique electron
-    velocity distribution from moments. Shape-only execution is deliberately
-    rejected so this Analysis 1 entry point cannot report completion without physical
-    parameter extraction from the calibrated measurement.
-
-    Supply either a scalar Gaussian instrument sigma or a general measured response
-    matrix. A general response matrix is used in the Gaussian forward fit; no scalar
-    Gaussian deconvolution is then claimed. Signed, background-subtracted samples
-    (including negative noise residuals) are used for moments; clipping is forbidden.
+    This subanalysis reports observed wavelength-space moments and a Gaussian
+    shape fit. Physical plasma parameters are extracted by the canonical Analysis 1
+    forward model from the same measured spectrum; they are not accepted here as
+    externally supplied inputs. The measured response matrix is used only as a
+    forward operator in the shape fit; the measured spectrum is never deconvolved
+    or otherwise corrected. Signed background-subtracted samples, including
+    negative noise residuals, are retained for moment calculations.
     """
     x = _vector(wavelength_nm, "wavelength_nm")
     y = _vector(signal, "signal")
@@ -165,16 +147,8 @@ def analyze_thomson_spectral_distribution(
         raise ValueError("wavelength_nm and signal must have equal lengths")
     if np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm must be strictly increasing")
-    if (instrument_sigma_nm is None) == (instrument_response_matrix is None):
-        raise ValueError("Provide exactly one of instrument_sigma_nm or instrument_response_matrix")
-    if instrument_sigma_nm is not None:
-        if isinstance(instrument_sigma_nm, (bool, np.bool_)) or not isinstance(instrument_sigma_nm, (int, float, np.integer, np.floating)) or not np.isfinite(instrument_sigma_nm) or instrument_sigma_nm <= 0:
-            raise ValueError("instrument_sigma_nm must be positive and finite (a real number)")
-    if instrument_sigma_uncertainty_nm is not None:
-        if instrument_sigma_nm is None:
-            raise ValueError("instrument_sigma_uncertainty_nm requires scalar instrument_sigma_nm")
-        if isinstance(instrument_sigma_uncertainty_nm, (bool, np.bool_)) or not isinstance(instrument_sigma_uncertainty_nm, (int, float, np.integer, np.floating)) or not np.isfinite(instrument_sigma_uncertainty_nm) or instrument_sigma_uncertainty_nm < 0:
-            raise ValueError("instrument_sigma_uncertainty_nm must be finite and non-negative")
+    if instrument_response_matrix is None:
+        raise ValueError("A measured instrument_response_matrix is required for the forward shape fit; no scalar-width correction is supported.")
     if background_fraction is not None and (isinstance(background_fraction, (bool, np.bool_)) or not isinstance(background_fraction, (int, float, np.integer, np.floating)) or not np.isfinite(background_fraction) or not (0.0 < background_fraction < 0.5)):
         raise ValueError("background_fraction must be None or an explicitly selected finite real number strictly between 0 and 0.5")
     if isinstance(moment_mc_samples, (bool, np.bool_)) or not isinstance(moment_mc_samples, (int, np.integer)) or moment_mc_samples < 20:
@@ -246,62 +220,7 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
-    if physical_parameters is None:
-        raise ValueError(
-            "physical_parameters is required: run the canonical Thomson physical forward fit "
-            "on this same calibrated measured spectrum and pass its fitted plasma parameters."
-        )
-    if not isinstance(physical_parameters, dict):
-        raise ValueError("physical_parameters must be a mapping from the canonical Thomson physical fit")
-    required_physical_keys = ("model", "electron_temperature_eV", "electron_velocity_projection_m_s")
-    missing_physical_keys = [key for key in required_physical_keys if key not in physical_parameters]
-    if missing_physical_keys:
-        raise ValueError("physical_parameters is missing canonical fit fields: " + ", ".join(missing_physical_keys))
-    if not isinstance(physical_parameters["model"], str) or not physical_parameters["model"].strip():
-        raise ValueError("physical_parameters.model must identify the selected physical forward model")
-    temperature = physical_parameters["electron_temperature_eV"]
-    if (isinstance(temperature, (bool, np.bool_))
-            or not isinstance(temperature, (int, float, np.integer, np.floating))
-            or not np.isfinite(temperature) or temperature <= 0):
-        raise ValueError("physical_parameters.electron_temperature_eV must be a finite positive fitted value")
-    model_value = physical_parameters["model"]
-    if not isinstance(model_value, str) or not model_value.strip():
-        raise ValueError("physical_parameters.model must be a non-empty supported model name")
-    model_name = model_value.strip()
-    supported_models = {
-        "non_collective_maxwellian", "non_collective_kappa",
-        "non_collective_relativistic_maxwell_juttner",
-    }
-    if model_name not in supported_models:
-        raise ValueError("physical_parameters.model must identify one of the three supported non-collective optical Thomson fits")
-    flow = physical_parameters["electron_velocity_projection_m_s"]
-    if (isinstance(flow, (bool, np.bool_))
-            or not isinstance(flow, (int, float, np.integer, np.floating))
-            or not np.isfinite(flow)):
-        raise ValueError("physical_parameters.electron_velocity_projection_m_s must be a finite fitted value for the selected non-collective model")
-    def optional_uncertainty(name):
-        value = physical_parameters.get(name)
-        if value is None:
-            return None
-        if (isinstance(value, (bool, np.bool_))
-                or not isinstance(value, (int, float, np.integer, np.floating))
-                or not np.isfinite(value) or value < 0.0):
-            raise ValueError(f"physical_parameters.{name} must be finite and non-negative when supplied")
-        return float(value)
-    temperature_uncertainty = optional_uncertainty("electron_temperature_uncertainty_eV")
-    flow_uncertainty = optional_uncertainty("electron_velocity_projection_uncertainty_m_s")
-    density = physical_parameters.get("electron_density_m3")
-    if density is not None and (
-        isinstance(density, (bool, np.bool_))
-        or not isinstance(density, (int, float, np.integer, np.floating))
-        or not np.isfinite(density) or density <= 0.0
-    ):
-        raise ValueError("physical_parameters.electron_density_m3 must be finite and positive when supplied")
-    density_uncertainty = optional_uncertainty("electron_density_uncertainty_m3")
-    if density is None and density_uncertainty is not None:
-        raise ValueError("electron_density_uncertainty_m3 cannot be supplied when electron density is unavailable")
-
-    moments = _moment_statistics(x, y, instrument_sigma_nm, background_fraction, mask, explicit_background)
+    moments = _moment_statistics(x, y, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
     weights = moments["positive"]
@@ -310,9 +229,6 @@ def analyze_thomson_spectral_distribution(
     center = moments["center"]
     variance_observed = moments["variance"]
     sigma_observed = moments["sigma_observed"]
-    variance_physical = moments["variance_physical"]
-    resolved = moments["resolved"]
-    sigma_physical = moments["sigma_physical"]
     skewness = moments["skewness"]
     excess_kurtosis = moments["kurtosis"]
     quadrature = moments["quadrature"]
@@ -401,11 +317,8 @@ def analyze_thomson_spectral_distribution(
                 if uncertainty is not None
                 else y + covariance_cholesky @ rng.normal(size=y.size)
             )
-            sampled_sigma = instrument_sigma_nm
-            if instrument_sigma_nm is not None and instrument_sigma_uncertainty_nm is not None and instrument_sigma_uncertainty_nm > 0:
-                sampled_sigma = max(np.finfo(float).tiny, float(rng.normal(instrument_sigma_nm, instrument_sigma_uncertainty_nm)))
             try:
-                sample = _moment_statistics(x, sampled_signal, sampled_sigma, background_fraction, mask, explicit_background)
+                sample = _moment_statistics(x, sampled_signal, background_fraction, mask, explicit_background)
                 draws.append(sample)
             except ValueError:
                 continue
@@ -420,15 +333,8 @@ def analyze_thomson_spectral_distribution(
                 ("kurtosis", "spectral_excess_kurtosis_uncertainty"),
             ):
                 moment_uncertainties[out_key] = float(np.std([item[key] for item in draws], ddof=1))
-            if instrument_sigma_nm is not None and moments["resolved"] and all(item["resolved"] for item in draws):
-                moment_uncertainties["instrument_corrected_sigma_uncertainty_nm"] = float(np.std([item["sigma_physical"] for item in draws], ddof=1))
         else:
             moment_uncertainties["moment_uncertainty_warning"] = "Too few valid signal/background Monte Carlo draws to estimate moment uncertainty."
-    elif instrument_sigma_uncertainty_nm is not None and instrument_sigma_uncertainty_nm > 0 and resolved:
-        moment_uncertainties["instrument_corrected_sigma_uncertainty_nm"] = float(
-            instrument_sigma_nm / sigma_physical * instrument_sigma_uncertainty_nm
-        )
-
     covariance_valid = bool(np.all(np.isfinite(covariance)) and np.all(np.diag(covariance) > 0))
     covariance_condition = None
     if covariance_valid:
@@ -454,27 +360,16 @@ def analyze_thomson_spectral_distribution(
         "spectral_centroid_nm": center,
         "observed_sigma_nm": sigma_observed,
         "observed_variance_nm2": variance_observed,
-        "instrument_sigma_nm": None if instrument_sigma_nm is None else float(instrument_sigma_nm),
-        "instrument_sigma_uncertainty_nm": None if instrument_sigma_uncertainty_nm is None else float(instrument_sigma_uncertainty_nm),
-        "instrument_corrected_sigma_nm": sigma_physical,
-        "instrument_corrected_variance_nm2": float(variance_physical) if variance_physical is not None and resolved else None,
-        "instrument_width_resolved": resolved,
-        "instrument_response_model": "general_measured_response_matrix" if response is not None else "gaussian_scalar_width",
-        "gaussian_fit_uncertainty_scope": (
-            "conditional_on_fixed_supplied_response_matrix"
-            if response is not None else
-            "signal_fit_covariance_with_optional_scalar_instrument_width_uncertainty"
-        ),
+        "instrument_response_model": "measured_response_matrix_used_in_forward_shape_fit",
+        "gaussian_fit_uncertainty_scope": "conditional_on_fixed_supplied_measured_response_matrix",
         "spectral_skewness": float(skewness),
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
         "moment_uncertainty_method": (
-            "parametric Monte Carlo from full within-channel signal covariance and optional instrument-width uncertainty"
+            "parametric Monte Carlo from full within-channel signal covariance"
             if signal_covariance_matrix is not None else
-            "parametric Monte Carlo from independent pointwise signal uncertainty and optional instrument-width uncertainty"
+            "parametric Monte Carlo from independent pointwise signal uncertainty"
             if uncertainty is not None else
-            "instrument-width-only propagation"
-            if instrument_sigma_uncertainty_nm is not None else
             "not_available"
         ),
         "signal_uncertainty_model": (
@@ -500,35 +395,19 @@ def analyze_thomson_spectral_distribution(
         "fitted_spectrum": fitted, "residual": residual,
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square, "r_squared": r_squared,
-        "physical_parameter_extraction": {
-            "status": "completed",
-            "source": "canonical selected Thomson physical forward fit of the same calibrated measured spectrum",
-            "model": model_name,
-            "electron_temperature_eV": float(temperature),
-            "electron_temperature_uncertainty_eV": temperature_uncertainty,
-            "electron_velocity_projection_m_s": float(flow),
-            "electron_velocity_projection_uncertainty_m_s": flow_uncertainty,
-            "electron_velocity_projection_status": "fitted",
-            "electron_density_m3": None if density is None else float(density),
-            "electron_density_uncertainty_m3": density_uncertainty,
-            "electron_density_status": "available" if density is not None else "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs",
-            "unavailable_parameters": (
-                [] if density is not None else ["electron_density_m3"]
-            ),
-        },
-        "model": "canonical physical Thomson forward-fit parameters plus signed spectral moments and response-convolved Gaussian shape diagnostics",
+        "model": "observed Thomson spectral moments and response-convolved Gaussian shape diagnostics",
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
-            "A supplied Gaussian width or measured instrument-response matrix describes the spectral response",
+            "A measured instrument-response matrix is used only in the forward shape fit; measured input data are not corrected",
             "Background moments use an explicitly supplied fitted background, a user mask, or spectral-edge estimation in that order",
             "Signed background-subtracted signal is used for moments without clipping negative residuals",
         ],
         "limitations": [
             "Spectral moments characterize measured wavelength distribution and are not a unique electron velocity distribution",
             "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive",
-            "A scalar Gaussian deconvolution is not applied to a general response matrix",
+            "No instrument-width deconvolution or correction of the measured spectrum is performed",
             "The edge-background fallback can remove real signal if the physical spectrum extends into both edges; supply background_mask to identify background-only samples",
-            "Physical plasma parameters are taken from the canonical selected Thomson forward fit of the same calibrated measured spectrum; moments are not used as a surrogate electron velocity distribution",
+            "Physical plasma parameters are extracted separately by the canonical Analysis 1 forward fit from the same calibrated measured spectrum; moments are not used as a surrogate electron velocity distribution",
             "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in the fitted background nuisance parameters is not jointly sampled.",
         ],
     }
