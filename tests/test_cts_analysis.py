@@ -286,11 +286,11 @@ def test_cts_requires_an_explicit_electron_flow_projection():
             electron_temperature_eV=1200, ion_temperature_eV=800,
             ion_species=ions, ion_fractions=frac, ion_velocity_projection_m_s=0.0,
         )
-    with pytest.raises(ValueError, match="Explicit optimizer initial estimates are required"):
+    with pytest.raises(ValueError, match="no positive contrast"):
         analyze_cts_spectrum(
             f, np.ones_like(f), probe_frequency_Hz=f0,
             scattering_geometry=g, ion_species=ions, ion_fractions=frac,
-            instrument_response=np.eye(f.size),
+            instrument_response=np.eye(f.size), inversion_method="local_least_squares",
         )
 
 
