@@ -13,6 +13,8 @@
 - Extended the Thomson dashboard to accept channel-major spectral covariance and Collective external-parameter uncertainty inputs.
 
 ### Microwave Collective Thomson Scattering
+- Full-EM CTS measured-spectrum inversion now runs a paired harmonic/quadrature convergence assessment by default at the fitted physical parameters, reports the refined spectra and relative L2/L-infinity changes, and keeps numerical convergence separate from physical uncertainty. Explicit refinement sequences/tolerance and an opt-out are available.
+
 - Added covariance-aware CTS residual whitening, response/external-parameter Monte Carlo propagation and separate model-discrepancy covariance reporting.
 - Added differential-evolution, adaptive real-coded genetic and regularized inversion modes. The genetic implementation is informed by Zhang et al. (2024), not an exact reproduction of the paper-specific fitness function.
 - Added tabulated 1-D fast-ion susceptibility and regularized non-negative tabulated VDF inversion with softmax parameterization, second-difference regularization and propagated VDF-node covariance.
