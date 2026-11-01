@@ -174,15 +174,8 @@ multiple views alone do not guarantee uniqueness. Absolute density requires
 calibrated absolute scattered power and complete optical collection geometry,
 which this normalized inversion does not calculate.
 
-Alongside the non-parametric reconstruction, the routine fits and compares three parameterized projected-marginal candidates: Maxwellian, finite-variance Kappa/Student-t, and super-Gaussian. It reports weighted residual sum of squares, AIC and BIC for each successful fit. These candidate fits are distinct from the regularized basis reconstruction; no candidate is selected as physically true by the software. Parameter confidence intervals are not currently returned.\n\nThe deterministic solver does not claim posterior confidence intervals. When
-measurement uncertainty is supplied it uses it in the weighted objective, but
-uncertainty intervals still require a separately validated constrained
-uncertainty workflow. The inversion is resolution-limited by the measured
-spectral window, response matrix, velocity grid and regularization strength.
-Residuals, design-matrix rank and condition number are returned as diagnostics.
-Sensitivity to the regularization and velocity grid must be assessed before
-interpreting fine velocity-space structure.
+Alongside the non-parametric reconstruction, the routine fits and compares three parameterized projected-marginal candidates: Maxwellian, finite-variance Kappa/Student-t, and super-Gaussian. It reports weighted residual sum of squares, AIC and BIC for each successful fit. These candidate fits are distinct from the regularized basis reconstruction; no candidate is selected as physically true by the software.
 
-The present inversion uses the non-relativistic single-particle Doppler
-mapping. It is not applicable to relativistic electron populations. It does
-not calibrate, correct, deconvolve, or otherwise prepare measured inputs.
+When no regularization strength is supplied, the solver selects a value by generalized cross-validation (GCV) over a documented logarithmic candidate grid. The selected value, candidates and GCV scores are returned. An explicitly supplied positive value remains supported. A local active-set covariance is also estimated for the normalized EVDF and its pointwise standard uncertainty is returned. This is a conditional linearized covariance given the selected grid, response, background, regularization and active set; it is not a posterior distribution and does not include model-selection or unprovided systematic uncertainty. Sensitivity to the regularization and velocity grid must still be assessed before interpreting fine velocity-space structure.
+
+The primary Thomson spectrum-to-physics workflow now automatically attempts this projected EVDF reconstruction for each channel, using the same measured calibrated spectrum, fitted background nuisance component, measured response and supplied spectral uncertainty/covariance. The velocity interval is derived from the measured wavelength coverage and the supplied laser wavelength/scattering geometry; the grid size is configurable. A channel-level unavailable status and reason are returned if the spectrum does not support a stable inversion. The present inversion uses the non-relativistic single-particle Doppler mapping and is not applicable to relativistic electron populations. It does not calibrate, correct, deconvolve, or otherwise prepare measured inputs.
