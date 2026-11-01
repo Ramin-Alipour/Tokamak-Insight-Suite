@@ -886,11 +886,14 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         "electron_temperature_eV": 1200.0,
         "ion_temperature_eV": 700.0,
         "electron_flow_projection_m_s": 2.2e5,
+        "ion_flow_projection_m_s": 1.6e5,
     }
 
     def synthetic_forward(*args, **kwargs):
         assert "electron_flow_velocity_m_s" not in kwargs
+        assert "ion_flow_velocity_m_s" not in kwargs
         flow = kwargs["electron_flow_projection_m_s"]
+        ion_flow = kwargs["ion_flow_projection_m_s"]["D+"]
         ion_temperature = kwargs["ion_temperature_eV"]["D+"]
         spectrum = (
             1.0
@@ -898,6 +901,7 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
             + 0.11 * np.log(kwargs["electron_temperature_eV"] / 1000.0) * x**2
             + 0.09 * np.log(ion_temperature / 500.0) * x**3
             + 0.17 * (flow / 1.0e6) * x**4
+            + 0.14 * (ion_flow / 1.0e6) * x**5
         )
         return {"spectral_density": spectrum}
 
@@ -908,6 +912,7 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         electron_temperature_eV=truth["electron_temperature_eV"],
         ion_temperature_eV={"D+": truth["ion_temperature_eV"]},
         electron_flow_projection_m_s=truth["electron_flow_projection_m_s"],
+        ion_flow_projection_m_s={"D+": truth["ion_flow_projection_m_s"]},
     )["spectral_density"]
     measured = 2.4 * synthetic + 0.7
 
@@ -921,12 +926,15 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
         ion_fractions=[1.0],
         magnetic_field_T=[0.0, 0.0, 2.0],
-        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+
         incident_polarization=[0.0, 0.0, 1.0],
         scattered_polarization=[0.0, 0.0, 1.0],
         instrument_response=np.eye(frequency.size),
         signal_uncertainty=np.full(frequency.size, 0.01),
-        parameter_bounds={"electron_flow_projection_m_s": [1.0e5, 8.0e5]},
+        parameter_bounds={
+            "electron_flow_projection_m_s": [1.0e5, 8.0e5],
+            "ion_flow_projection_m_s:D+": [1.0e5, 8.0e5],
+        },
     )
     assert result["electron_flow_projection_m_s"] == pytest.approx(
         truth["electron_flow_projection_m_s"], rel=2e-3
@@ -934,6 +942,11 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
     assert result["electron_flow_projection_is_fitted"] is True
     assert result["electron_flow_projection_uncertainty_m_s"] >= 0.0
     assert "electron_flow_projection_m_s" in result["parameter_names"]
+    assert result["ion_flow_projection_m_s_by_species"]["D+"] == pytest.approx(
+        truth["ion_flow_projection_m_s"], rel=2e-3
+    )
+    assert result["ion_flow_projection_is_fitted"] is True
+    assert result["ion_flow_projection_uncertainty_m_s_by_species"]["D+"] >= 0.0
 
 def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
     from tokamak_analysis.cts_analysis import _convolve
