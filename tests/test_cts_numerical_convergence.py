@@ -34,3 +34,13 @@ def test_full_em_convergence_requires_paired_increasing_refinement_levels():
             np.array([-1.0, 0.0, 1.0]), 1.0e9, {},
             harmonic_orders=(4, 4), quadrature_orders=(4, 8),
         )
+
+
+def test_full_em_inversion_enables_automatic_convergence_by_default():
+    import inspect
+
+    parameters = inspect.signature(cts_full_em.analyze_full_em_cts_spectrum).parameters
+    assert parameters["numerical_convergence"].default is True
+    assert parameters["convergence_harmonic_orders"].default is None
+    assert parameters["convergence_quadrature_orders"].default is None
+    assert parameters["convergence_relative_tolerance"].default == pytest.approx(1e-3)
