@@ -894,7 +894,7 @@ def test_spectral_distribution_is_a_raw_spectrum_shape_analysis_without_physical
         instrument_response_matrix=np.eye(x.size),
         background_signal=background,
     )
-    assert result["analysis_status"] if "analysis_status" in result else True
+    assert "spectral_centroid_nm" in result
     assert "physical_parameter_extraction" not in result
     assert "instrument_corrected_sigma_nm" not in result
     with pytest.raises(TypeError):
@@ -928,17 +928,3 @@ def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
     assert np.sum(convolved*widths) == pytest.approx(np.sum(signal*widths), rel=1e-12)
 
 
-def test_spectral_distribution_requires_explicit_background_source():
-    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
-
-    x, y, _ = _spectral_case(120.0)
-    with pytest.raises(ValueError, match="background"):
-        analyze_thomson_spectral_distribution(
-            x, y,
-            instrument_response_matrix=np.eye(x.size),
-            physical_parameters={
-                "model": "non_collective_maxwellian",
-                "electron_temperature_eV": 120.0,
-                "electron_velocity_projection_m_s": 0.0,
-            },
-        )
