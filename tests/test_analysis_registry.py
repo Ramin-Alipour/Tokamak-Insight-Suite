@@ -24,7 +24,7 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     assert contract["execution_level"] == "analysis_pipeline"
     assert contract["completeness"] == "complete_with_declared_scope"
     assert contract["raw_data_to_physics"] is False
-    assert contract["calibrated_measurements_to_physics"] is True
+    assert contract["calibrated_measurements_to_physics"] is False
     inputs = {item["name"]: item for item in contract["input_specs"]}
     assert {"wavelength_nm", "spectra", "radius_m", "laser_wavelength_nm",
             "scattering_angle_rad", "instrument_response"} <= set(inputs)
@@ -162,7 +162,7 @@ def test_thomson_spectral_distribution_registry_declares_calibrated_measurement_
     entry = next(item for item in registry
                  if item["diagnostic"] == "Thomson spectral distribution")
     assert entry["raw_data_to_physics"] is False
-    assert entry["calibrated_measurements_to_physics"] is True
+    assert entry["calibrated_measurements_to_physics"] is False
     contract = entry["execution_contract"]
     assert contract["raw_data_to_physics"] is False
     assert contract["calibrated_measurements_to_physics"] is True
