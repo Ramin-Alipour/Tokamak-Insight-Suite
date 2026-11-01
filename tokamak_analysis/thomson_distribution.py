@@ -135,6 +135,7 @@ def analyze_thomson_spectral_distribution(
     background_signal=None,
     background_signal_uncertainty=None,
     background_signal_covariance=None,
+    signal_background_cross_covariance=None,
     moment_mc_samples: int = 200,
 ) -> dict:
     """Characterize the measured, calibrated Thomson spectrum without refitting physics.
@@ -252,6 +253,48 @@ def analyze_thomson_spectral_distribution(
         except np.linalg.LinAlgError as exc:
             raise ValueError("signal_covariance must be positive definite") from exc
 
+    joint_signal_background_cholesky = None
+    if signal_background_cross_covariance is not None:
+        if explicit_background is None:
+            raise ValueError(
+                "signal_background_cross_covariance requires an explicitly supplied background_signal."
+            )
+        if signal_covariance_matrix is None and uncertainty is None:
+            raise ValueError(
+                "signal_background_cross_covariance requires signal_uncertainty or signal_covariance."
+            )
+        if background_covariance_matrix is None and background_uncertainty is None:
+            raise ValueError(
+                "signal_background_cross_covariance requires background_signal_uncertainty or background_signal_covariance."
+            )
+        raw_cross_covariance = np.asarray(signal_background_cross_covariance)
+        if raw_cross_covariance.dtype.kind not in "iuf":
+            raise ValueError("signal_background_cross_covariance must contain real numeric values")
+        cross_covariance = raw_cross_covariance.astype(float, copy=False)
+        if cross_covariance.shape != (x.size, x.size) or not np.all(np.isfinite(cross_covariance)):
+            raise ValueError(
+                "signal_background_cross_covariance must be a finite square wavelength-space matrix."
+            )
+        signal_covariance_for_joint = (
+            signal_covariance_matrix if signal_covariance_matrix is not None
+            else np.diag(uncertainty**2)
+        )
+        background_covariance_for_joint = (
+            background_covariance_matrix if background_covariance_matrix is not None
+            else np.diag(background_uncertainty**2)
+        )
+        joint_covariance = np.block([
+            [signal_covariance_for_joint, cross_covariance],
+            [cross_covariance.T, background_covariance_for_joint],
+        ])
+        joint_covariance = 0.5 * (joint_covariance + joint_covariance.T)
+        try:
+            joint_signal_background_cholesky = np.linalg.cholesky(joint_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError(
+                "The joint signal/background covariance, including signal_background_cross_covariance, must be positive definite."
+            ) from exc
+
     moments = _moment_statistics(x, y, background_fraction, mask, explicit_background)
     background = moments["background"]
     corrected = moments["corrected"]
@@ -345,17 +388,22 @@ def analyze_thomson_spectral_distribution(
         rng = np.random.default_rng(58123)
         draws = []
         for _ in range(int(moment_mc_samples)):
-            sampled_signal = (
-                y + rng.normal(0.0, uncertainty)
-                if uncertainty is not None else
-                y + covariance_cholesky @ rng.normal(size=y.size)
-                if signal_covariance_matrix is not None else y.copy()
-            )
             sampled_background = explicit_background
-            if background_uncertainty is not None:
-                sampled_background = explicit_background + rng.normal(0.0, background_uncertainty)
-            elif background_covariance_matrix is not None:
-                sampled_background = explicit_background + background_covariance_cholesky @ rng.normal(size=x.size)
+            if joint_signal_background_cholesky is not None:
+                joint_noise = joint_signal_background_cholesky @ rng.normal(size=2 * x.size)
+                sampled_signal = y + joint_noise[:x.size]
+                sampled_background = explicit_background + joint_noise[x.size:]
+            else:
+                sampled_signal = (
+                    y + rng.normal(0.0, uncertainty)
+                    if uncertainty is not None else
+                    y + covariance_cholesky @ rng.normal(size=y.size)
+                    if signal_covariance_matrix is not None else y.copy()
+                )
+                if background_uncertainty is not None:
+                    sampled_background = explicit_background + rng.normal(0.0, background_uncertainty)
+                elif background_covariance_matrix is not None:
+                    sampled_background = explicit_background + background_covariance_cholesky @ rng.normal(size=x.size)
             try:
                 sample = _moment_statistics(x, sampled_signal, background_fraction, mask, sampled_background)
                 draws.append(sample)
@@ -401,12 +449,13 @@ def analyze_thomson_spectral_distribution(
             else "edge_fraction_assumption_not_independently_identified"
         ),
         "background_confidence_note": (
-            "Supplied background uncertainty is propagated as an independent nuisance covariance; possible signal contamination is not independently identified."
+            "Supplied background uncertainty is propagated with the supplied signal/background cross-covariance when present; otherwise signal and background errors are treated as independent. Possible signal contamination is not independently identified."
             if background_uncertainty is not None or background_covariance_matrix is not None
             else "The supplied background is treated as fixed; its uncertainty and possible signal contamination are not independently identified by this subanalysis."
         ),
         "background_uncertainty_model": (
             "independent_pointwise_background_signal_uncertainty" if background_uncertainty is not None else
+            "joint_signal_background_covariance" if joint_signal_background_cholesky is not None else
             "independent_full_background_signal_covariance" if background_covariance_matrix is not None else
             "fixed_background_no_background_uncertainty_supplied"
         ),
@@ -421,7 +470,7 @@ def analyze_thomson_spectral_distribution(
         "spectral_excess_kurtosis": float(excess_kurtosis),
         **moment_uncertainties,
         "moment_uncertainty_method": (
-            "parametric Monte Carlo from signal and/or independent fitted-background uncertainty"
+            "parametric Monte Carlo from the joint signal/background covariance including cross-covariance when supplied"
             if (signal_covariance_matrix is not None or uncertainty is not None or background_uncertainty is not None or background_covariance_matrix is not None)
             else "not_available"
         ),
@@ -477,6 +526,6 @@ def analyze_thomson_spectral_distribution(
             "No instrument-width deconvolution or correction of the measured spectrum is performed",
             "The edge-background fallback can remove real signal if the physical spectrum extends into both edges; supply background_mask to identify background-only samples",
             "Physical plasma parameters are extracted separately by the canonical Analysis 1 forward fit from the same calibrated measured spectrum; moments are not used as a surrogate electron velocity distribution",
-            "Pointwise-noise Monte Carlo treats wavelength samples as independent; a supplied full within-channel covariance is sampled jointly. Shared systematic uncertainty in the fitted background nuisance parameters is not jointly sampled.",
+            "Pointwise-noise Monte Carlo treats wavelength samples as independent; supplied full within-channel covariance is sampled jointly. Signal/background cross-covariance is sampled jointly when supplied as a positive-definite block covariance; without it, the two are treated as independent. Possible signal contamination in the supplied background remains non-identifiable.",
         ],
     }
