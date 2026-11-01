@@ -13,7 +13,8 @@ def test_path_integrated_density_recovers_weighted_uniform_density():
     solid_angle = np.linspace(0.02, 0.03, s.size)
     efficiency = np.linspace(0.4, 0.5, s.size)
     truth = 2.5e19
-    denominator = np.trapz(incident * cross * solid_angle * efficiency, s)
+    integrate = getattr(np, "trapezoid", None) or np.trapz
+    denominator = integrate(incident * cross * solid_angle * efficiency, s)
     measured_power = truth * denominator
     result = infer_thomson_path_averaged_density(
         measured_power, s, incident, cross, solid_angle, efficiency,
@@ -62,3 +63,36 @@ def test_mode_tracking_reports_exact_degeneracy_as_ambiguous():
     result = track_cold_plasma_modes_from_operators(operators)
     assert result["degenerate_subspace_detected"].tolist() == [False, True, False]
     assert result["branch_identifiability"] == "ambiguous_at_one_or_more_degenerate_samples"
+
+
+
+def test_cold_plasma_ray_includes_branch_tracking_diagnostics(monkeypatch):
+    from types import SimpleNamespace
+    import tokamak_analysis.cts_em_geometry as geometry
+
+    omega = 2.0 * np.pi * 140.0e9
+    k0 = omega / 299792458.0
+    positions = np.array([[0.0, 0.0, 0.0], [0.01, 0.0, 0.0], [0.02, 0.0, 0.0]])
+    wavevectors = np.array([[k0, 0.0, 0.0], [k0, 0.01 * k0, 0.0], [k0, 0.02 * k0, 0.0]])
+    fake_solution = SimpleNamespace(
+        success=True,
+        message="synthetic solver path for software unit test",
+        t=np.array([0.0, 0.5, 1.0]),
+        y=np.vstack((positions.T, wavevectors.T)),
+    )
+    monkeypatch.setattr(geometry, "solve_ivp", lambda *args, **kwargs: fake_solution)
+    equilibrium = lambda position: {
+        "magnetic_field_T": np.array([0.0, 0.0, 2.0]),
+        "species": [{
+            "density_m3": 1.0e19,
+            "charge_C": -1.602176634e-19,
+            "mass_kg": 9.1093837015e-31,
+        }],
+    }
+    result = geometry.trace_cold_plasma_ray(
+        positions[0], wavevectors[0], omega,
+        equilibrium=equilibrium, mode_index=0, sample_count=3,
+    )
+    assert result["mode_branch_tracking"]["tracked_eigenvalues"].shape == (3, 3)
+    assert isinstance(result["fixed_eigenvalue_order_tracks_initial_polarization_branch"], bool)
+    assert "mode conversion" in " ".join(result["limitations"]).lower()

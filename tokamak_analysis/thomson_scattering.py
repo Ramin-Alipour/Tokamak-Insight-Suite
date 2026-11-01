@@ -377,7 +377,10 @@ def infer_thomson_path_averaged_density(
     if np.any(pi <= 0) or np.any(dsigma <= 0) or np.any(omega <= 0) or np.any(eta <= 0) or np.any(eta > 1):
         raise ValueError("incident power, cross-section, solid angle and efficiency must be positive; efficiency must not exceed one")
     kernel = pi * dsigma * omega * eta
-    denominator = float(np.trapz(kernel, s))
+    integrate = getattr(np, "trapezoid", None)
+    if integrate is None:  # NumPy < 2.0
+        integrate = np.trapz
+    denominator = float(integrate(kernel, s))
     if not np.isfinite(denominator) or denominator <= 0:
         raise ValueError("path-integrated optical sensitivity must be positive and finite")
     density = ps / denominator
@@ -393,7 +396,7 @@ def infer_thomson_path_averaged_density(
         ),
         "path_integrated_sensitivity_W_m3": denominator,
         "path_coordinate_m": s.copy(),
-        "normalized_path_weight": kernel / np.trapz(kernel, s),
+        "normalized_path_weight": kernel / denominator,
         "path_weighting_model": "incident_power_times_differential_cross_section_times_collection_solid_angle_times_optical_efficiency",
         "density_interpretation": "measurement_kernel_weighted_path_average",
         "identifiability": {
