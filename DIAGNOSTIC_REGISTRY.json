@@ -507,7 +507,8 @@
       "thomson_velocity_projection",
       "thomson_density_from_scattered_power",
       "relativistic_single_particle_thomson_spectrum",
-      "thomson_joint_generalized_least_squares"
+      "thomson_joint_generalized_least_squares",
+      "relativistic_mj_effective_differential_cross_section"
     ],
     "test_links": [
       "tests/test_thomson_inference.py",
@@ -4908,7 +4909,8 @@
       "microwave_cts_spectral_density",
       "cts_tabulated_fast_ion_susceptibility",
       "relativistic_gyrotropic_three_wave_vertex",
-      "cts_path_integrated_gaussian_overlap"
+      "cts_path_integrated_gaussian_overlap",
+      "magnetized_full_em_cts_spectral_transfer"
     ],
     "test_links": [
       "tests/test_cts_analysis.py",
