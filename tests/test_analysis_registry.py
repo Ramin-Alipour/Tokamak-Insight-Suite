@@ -358,3 +358,34 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
         "measured response-matrix and external-geometry/parameter uncertainties are not propagated" in item
         for item in contract["limitations"]
     )
+
+def test_all_thomson_subanalyses_share_calibrated_measurement_and_identifiability_contract():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+
+    expected = {
+        "Thomson scattering": "measured_calibrated_spectrum",
+        "Collective Thomson / coherent scattering (CTS)": "measured_calibrated_spectrum",
+        "Thomson spatial profile reconstruction": "measured_calibrated_spectrum",
+        "Thomson spectral distribution": "measured_calibrated_spectrum",
+    }
+    for name, input_level in expected.items():
+        entry = next(item for item in root_registry if item["diagnostic"] == name)
+        contract = entry["execution_contract"]
+        assert contract["input_data_level"] == input_level, name
+        assert contract["raw_data_to_physics"] is False, name
+        assert contract["calibrated_measurements_to_physics"] is True, name
+        output_names = {item["name"] for item in contract["output_specs"]}
+        assert "parameter_identifiability" in output_names, name
+        assert any(
+            "no independent experimental validation" in item.lower()
+            or "experimental validation is not" in item.lower()
+            for item in contract.get("limitations", [])
+        ) or "no independent experimental validation" in contract.get("note", "").lower(), name
