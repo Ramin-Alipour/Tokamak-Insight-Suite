@@ -26,7 +26,7 @@ The full-EM path is implemented in \`tokamak_analysis.cts_full_em\`. It combines
 1. Magnetized Maxwellian kinetic conductivity and screened density/current/electric/magnetic fluctuation covariance, retaining all supplied auto- and cross-correlations.
 2. The low-temperature Bindslev \`Gamma^{-1}\` / \`X\` source-current closure for Maxwellian bulk-electron three-wave coupling.
 3. Species-resolved thermal-ion temperature inference. Each supplied ion species has its own fitted temperature; composition and flow vectors remain fixed external inputs.
-4. Optional relativistic gyrotropic electron and fast-ion populations, with relativistic Vlasov linear response, Klimontovich shot-noise covariance and a second-order relativistic Vlasov three-wave current vertex.
+4. Optional relativistic gyrotropic electron and fast-ion populations are supported by the forward spectral-density function. The current measured-spectrum inversion does not accept `electron_distribution`; it fits the Maxwellian bulk-electron branch and rejects that unsupported inversion option explicitly. Fast-ion populations, when supplied to inversion, remain fixed external distributions rather than fitted VDFs.
 5. Optional frequency-resolved cold-plasma ray tracing and path-integrated Gaussian beam-overlap weighting.
 
 ### Relativistic kinetic populations and three-wave vertex
@@ -68,7 +68,7 @@ Required inputs include:
 - Explicit ion species metadata, charge-density fractions and one initial temperature per ion species.
 - Optional researcher-supplied parameter bounds keyed by electron density, electron temperature and species-specific ion temperatures. If omitted, the positive log-parameters are not restricted by default scientific ranges.
 - Magnetic-field vector.
-- Explicit electron-flow vector and one ion-flow vector per ion species.
+- Optional initial electron-flow projection seed and optional per-species ion-flow projection seeds along the scattering wavevector. The inversion fits these scalar projections from the measured spectrum; a single CTS geometry does not identify full three-dimensional flow vectors.
 - Incident/scattered wave directions and polarization vectors.
 - Measured spectral uncertainty or a full frequency-bin covariance matrix.
 
@@ -84,7 +84,7 @@ No zero flow, ion composition, polarization, VDF or equilibrium profile is silen
 
 ## Inversion and uncertainty
 
-The full-EM inversion uses least-squares in logarithmic positive parameters, profiles spectral amplitude and constant background as nuisance parameters, and fits electron density, electron temperature and one temperature per supplied thermal-ion species. No scientific parameter bounds are imposed by default; optional bounds must be supplied explicitly by the researcher. Flow vectors, species composition and supplied non-Maxwellian VDF shapes remain external inputs. The relativistic Maxwell-Juttner electron distribution follows the fitted electron temperature when no separate temperature is provided.
+The full-EM inversion uses least-squares in logarithmic positive parameters, profiles spectral amplitude and constant background as nuisance parameters, and fits electron density, electron temperature, the electron-flow projection, and one temperature plus one flow projection per supplied thermal-ion species. The optional flow-projection inputs are optimizer seeds, not fixed flow vectors. No scientific parameter bounds are imposed by default; optional bounds must be supplied explicitly by the researcher. Species composition and supplied fast-ion VDF shapes remain external inputs. Although the forward spectral-density function supports explicit relativistic gyrotropic electron distributions, the current measured-spectrum inversion rejects `electron_distribution` because a drifted relativistic VDF is not implemented; it does not silently assume zero flow or claim a relativistic-electron inversion.
 
 The local Jacobian covariance is reported with fit residuals, identifiability rank and condition number. Full spectral covariance is used for whitening when supplied. The full-EM path does not claim complete propagation of every uncertainty in the supplied equilibrium, ray geometry, beam covariance, VDF or numerical truncation. These are declared model/input uncertainties, not set to zero.
 
@@ -111,7 +111,7 @@ These tests are synthetic numerical/software consistency checks. **No independen
 
 ## Model-conditional inputs and numerical provenance
 
-The public contract distinguishes Electrostatic and Full-EM inputs. The Electrostatic path alone consumes the scalar electron-flow projection, common projected ion-flow initial estimate, Electrostatic inversion-method/global-search controls, Electrostatic response-matrix Monte Carlo controls and its supported external-parameter uncertainty mapping. The Full-EM path alone consumes the magnetic-field vector, electron/ion flow vectors, incident/scattered directions and complex polarizations, harmonic/quadrature orders, optional relativistic distributions, frequency-resolved ray geometry and scattering-volume sample controls. Density/temperature initial estimates, ion species/composition, measured frequency axis/spectrum, probe frequency and measured response are shared. These conditions are encoded in `DIAGNOSTIC_REGISTRY.json` using `required_when_model`; a single flat list of mandatory inputs must not be used for both models.
+The public contract distinguishes Electrostatic and Full-EM inputs. The Electrostatic path alone consumes the scalar electron-flow projection, common projected ion-flow initial estimate, Electrostatic inversion-method/global-search controls, Electrostatic response-matrix Monte Carlo controls and its supported external-parameter uncertainty mapping. The Full-EM inversion consumes the magnetic-field vector, incident/scattered directions and complex polarizations, harmonic/quadrature orders, optional electron/ion flow-projection initial seeds, fixed fast-ion populations, frequency-resolved ray geometry and scattering-volume sample controls. Full three-dimensional flow vectors are accepted by the forward spectral-density function, not by the spectrum-inversion dispatcher. Explicit relativistic electron distributions are likewise a forward-model capability only and are rejected by the current inversion. Density/temperature initial estimates, ion species/composition, measured frequency axis/spectrum, probe frequency and measured response are shared. These conditions are encoded in `DIAGNOSTIC_REGISTRY.json` using `required_when_model`; a single flat list of mandatory inputs must not be used for both models.
 
 When `damping_rate_rad_s` is omitted, Full-EM uses the documented numerical regularization
 
