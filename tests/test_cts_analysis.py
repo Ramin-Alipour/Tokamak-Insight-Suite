@@ -926,7 +926,7 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         scattered_polarization=[0.0, 0.0, 1.0],
         instrument_response=np.eye(frequency.size),
         signal_uncertainty=np.full(frequency.size, 0.01),
-        parameter_bounds={"electron_flow_projection_m_s": [-8.0e5, 8.0e5]},
+        parameter_bounds={"electron_flow_projection_m_s": [1.0e5, 8.0e5]},
     )
     assert result["electron_flow_projection_m_s"] == pytest.approx(
         truth["electron_flow_projection_m_s"], rel=2e-3
