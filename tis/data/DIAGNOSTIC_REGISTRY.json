@@ -4269,7 +4269,7 @@
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
           "required": false,
-          "description": "Optional initial optimizer seed for the electron-flow projection. The electrostatic inversion fits the final projection from the measured CTS spectrum; omission uses zero only as a numerical seed and does not impose stationary flow. The Full-EM branch uses electron_flow_projection_initial_m_s instead.",
+          "description": "Optional optimizer initial seed only; omission uses zero as a numerical starting value, not a stationary-flow assumption. The final electron-flow projection is fitted freely from the measured CTS spectrum.",
           "applies_when_model": "electrostatic"
         },
         {
@@ -4293,8 +4293,8 @@
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": true,
-          "description": "Required initial optimizer estimate for the common ion-flow projection in electrostatic CTS; the final projection is fitted from the measured spectrum and is not held fixed. Full-EM uses optional per-species ion_flow_projection_initial_m_s seeds.",
+          "required": false,
+          "description": "Required optimizer initial estimate only for the electrostatic branch; the final common ion-flow projection is fitted from the measured CTS spectrum. Full-EM uses optional per-species ion-flow projection seeds.",
           "required_when_model": "electrostatic"
         },
         {
