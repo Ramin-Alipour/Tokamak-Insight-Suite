@@ -1207,6 +1207,16 @@ def analyze_full_em_cts_spectrum(
         "profiled_amplitude": float(amplitude),
         "profiled_offset": float(offset),
         "reduced_chi_square": float(r @ r / dof),
+        "spectral_weighting_status": (
+            "full_frequency_bin_covariance_whitened"
+            if spectral_covariance is not None else
+            "diagonal_pointwise_measurement_uncertainty_weighted"
+        ),
+        "parameter_covariance_scope": (
+            "local_jacobian_covariance_conditional_on_fixed_external_inputs; "
+            "does_not_include_external_geometry_field_composition_polarization_ray_or_beam_covariance_uncertainty"
+        ),
+        "numerical_convergence_status": "not_assessed_in_single_inversion; use assess_full_em_cts_numerical_convergence",
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "optimizer_success": bool(fit.success),
@@ -1231,4 +1241,73 @@ def analyze_full_em_cts_spectrum(
         "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
         "wave_tensor": forward_diagnostics["wave_tensor"],
         "forward_model_diagnostics": forward_diagnostics,
+    }
+
+
+def assess_full_em_cts_numerical_convergence(
+    frequency_shift_Hz, probe_frequency_Hz, scattering_geometry, *,
+    harmonic_orders=(4, 6, 8), quadrature_orders=(6, 8, 10),
+    relative_tolerance=1e-3, **model_kwargs,
+):
+    """Run a paired harmonic/quadrature refinement study for the Full-EM forward model.
+
+    This is an explicit numerical sensitivity study, not an experimental
+    validation or a substitute for physical-model uncertainty. The same
+    physical inputs and damping prescription are held fixed at every level.
+    """
+    harmonics = np.asarray(harmonic_orders)
+    quadratures = np.asarray(quadrature_orders)
+    if harmonics.ndim != 1 or quadratures.ndim != 1 or harmonics.size != quadratures.size or harmonics.size < 2:
+        raise ValueError("harmonic_orders and quadrature_orders must be paired 1-D sequences with at least two levels")
+    if harmonics.dtype.kind not in "iu" or quadratures.dtype.kind not in "iu":
+        raise ValueError("harmonic_orders and quadrature_orders must contain integers")
+    if np.any(harmonics < 2) or np.any(np.diff(harmonics) <= 0):
+        raise ValueError("harmonic_orders must be strictly increasing integers >=2")
+    if np.any(quadratures < 4) or np.any(np.diff(quadratures) <= 0):
+        raise ValueError("quadrature_orders must be strictly increasing integers >=4")
+    if isinstance(relative_tolerance, (bool, np.bool_)) or not isinstance(relative_tolerance, (int, float, np.integer, np.floating)):
+        raise ValueError("relative_tolerance must be a positive finite real scalar")
+    tolerance = float(relative_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("relative_tolerance must be a positive finite real scalar")
+    if "harmonic_order" in model_kwargs or "quadrature_order" in model_kwargs:
+        raise ValueError("Set refinement levels through harmonic_orders and quadrature_orders, not model_kwargs")
+    levels = []
+    previous = None
+    for harmonic_order, quadrature_order in zip(harmonics, quadratures):
+        result = full_em_cts_spectral_density(
+            frequency_shift_Hz, probe_frequency_Hz, scattering_geometry,
+            harmonic_order=int(harmonic_order), quadrature_order=int(quadrature_order),
+            **model_kwargs,
+        )
+        spectrum = _real_array(result["spectral_density"], "spectral_density", 1)
+        if previous is None:
+            relative_l2 = None
+            relative_linf = None
+        else:
+            difference = spectrum - previous
+            relative_l2 = float(np.linalg.norm(difference) / max(float(np.linalg.norm(spectrum)), np.finfo(float).tiny))
+            relative_linf = float(np.max(np.abs(difference)) / max(float(np.max(np.abs(spectrum))), np.finfo(float).tiny))
+        levels.append({
+            "harmonic_order": int(harmonic_order),
+            "quadrature_order": int(quadrature_order),
+            "relative_l2_change_from_previous": relative_l2,
+            "relative_linf_change_from_previous": relative_linf,
+        })
+        previous = spectrum
+    final = levels[-1]
+    converged = (
+        final["relative_l2_change_from_previous"] <= tolerance
+        and final["relative_linf_change_from_previous"] <= tolerance
+    )
+    return {
+        "levels": levels,
+        "relative_tolerance": tolerance,
+        "converged": bool(converged),
+        "convergence_status": "converged_at_final_refinement" if converged else "not_converged_at_final_refinement",
+        "final_spectrum": previous,
+        "interpretation": (
+            "Numerical convergence under the tested paired harmonic/quadrature refinements only; "
+            "does not quantify physical-model discrepancy or external-input uncertainty."
+        ),
     }
