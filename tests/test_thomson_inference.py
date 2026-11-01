@@ -122,6 +122,7 @@ def test_instrument_response_uncertainty_propagates_into_absolute_density():
         collection_solid_angle_sr=1e-3, optical_efficiency=0.5,
         incident_polarization=[0, 0, 1], incident_direction=[1, 0, 0],
         scattered_direction=[0, 1, 0], spectral_power_density_calibrated=True,
+        model="non_collective_relativistic_maxwell_juttner",
     )
     channel = out["channels"][0]
     assert channel["instrument_response_density_uncertainty_propagated"] is True
