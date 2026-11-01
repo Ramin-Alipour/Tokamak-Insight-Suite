@@ -262,3 +262,23 @@ def test_thomson_spatial_profile_relativistic_geometry_uncertainty_contract_matc
     assert "relativistic maxwell-juttner" in angle["unit"].lower()
     assert "monte carlo" in angle["description"].lower()
     assert "mutually exclusive" in angle["description"].lower()
+
+
+def test_thomson_profile_json_registry_copies_match_runtime_uncertainty_contract():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+    entry = next(item for item in root_registry if item.get("id") == 46)
+    inputs = {
+        item["name"]: item
+        for item in entry["execution_contract"]["input_specs"]
+    }
+    assert "monte carlo" in inputs["laser_wavelength_uncertainty_nm"]["description"].lower()
+    assert "relativistic maxwell-juttner" in inputs["scattering_angle_uncertainty_rad"]["unit"].lower()
+    assert "mutually exclusive" in inputs["scattering_angle_uncertainty_rad"]["description"].lower()
