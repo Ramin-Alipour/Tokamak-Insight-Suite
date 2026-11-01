@@ -851,7 +851,7 @@ def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(ar
         "ion_fractions": [1.0],
         "magnetic_field_T": [0.0, 0.0, 2.0],
         "electron_flow_projection_initial_m_s": 0.0,
-        "ion_flow_velocity_m_s": {"D+": [0.0, 0.0, 0.0]},
+        "ion_flow_projection_initial_m_s": {"D+": 0.0},
         "incident_polarization": [0.0, 0.0, 1.0],
         "scattered_polarization": [0.0, 0.0, 1.0],
         "instrument_response": response,
@@ -1007,12 +1007,15 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     # does not consume them.
     for name in (
         "magnetic_field_T",
-        "ion_flow_velocity_m_s",
+        "ion_flow_projection_initial_m_s",
         "incident_polarization",
         "scattered_polarization",
     ):
         assert specs[name]["required"] is False
         assert "full_electromagnetic" in specs[name].get("description", "")
+    assert specs["ion_flow_projection_initial_m_s"]["required"] is False
+    assert "fitted from the measured spectrum" in specs["ion_flow_projection_initial_m_s"]["description"]
+    assert "ion_flow_velocity_m_s" not in specs
 
 
 def test_cts_formula_contract_is_calibrated_measurement_to_physics():
