@@ -50,8 +50,8 @@ def test_cts_forward_model_is_finite_positive_and_geometry_sensitive():
     assert a.shape==f.shape and np.all(np.isfinite(a)) and np.all(a>=0) and not np.allclose(a,b,rtol=1e-8,atol=0.0)
 
 def test_cts_inversion_recovers_controlled_synthetic_parameters():
-    f0,f,g,ions,frac,response=_case(); truth=(2e19,1200.,800.,1.5e4)
-    z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],ion_temperature_eV=truth[2],ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=truth[3])
+    f0,f,g,ions,frac,response=_case(); truth=(2e19,1200.,800.,1.5e4,2.5e5)
+    z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],ion_temperature_eV=truth[2],ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=truth[4],ion_velocity_projection_m_s=truth[3])
     y=2.4e4*z+3.
     out=analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,
       signal_uncertainty=np.full_like(y,.02*np.max(y)),electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
@@ -60,9 +60,9 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
     assert out["electron_temperature_eV"]==pytest.approx(truth[1],rel=.08)
     assert out["ion_temperature_eV"]==pytest.approx(truth[2],rel=.08)
     assert out["ion_velocity_projection_m_s"]==pytest.approx(truth[3],rel=.08)
-    assert out["electron_velocity_projection_m_s"] == 0.0
-    assert out["electron_velocity_projection_is_fitted"] is False
-    assert out["electron_velocity_projection_input_uncertainty_m_s"] is None
+    assert out["electron_velocity_projection_m_s"] == pytest.approx(truth[4],rel=0.12)
+    assert out["electron_velocity_projection_is_fitted"] is True
+    assert out["electron_velocity_projection_uncertainty_m_s"] >= 0.0
 
 def test_cts_hot_ion_component_forward_model():
     f0,f,g,ions,frac,_=_case()
@@ -169,13 +169,13 @@ def test_cts_response_and_external_geometry_uncertainties_are_monte_carlo_propag
         electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
         ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],
         global_search=False,inversion_method="local_least_squares",instrument_response_uncertainty=np.zeros_like(response),
-        external_parameter_uncertainties={"scattering_angle_rad":1e-4,"electron_velocity_projection_m_s":50.0},
+        external_parameter_uncertainties={"scattering_angle_rad":1e-4},
         response_mc_samples=20,
     )
     assert out["response_external_mc_successes"] >= 12
     assert out["response_uncertainty_propagated"] is True
     assert out["external_parameter_uncertainty_propagated"] is True
-    assert out["fit_covariance"].shape[0]==4
+    assert out["fit_covariance"].shape[0]==5
 
 
 def test_cts_analysis_can_fit_fraction_of_fixed_tabulated_fast_ion_vdf():
@@ -252,7 +252,7 @@ def test_cts_requires_an_explicit_electron_flow_projection():
             electron_temperature_eV=1200, ion_temperature_eV=800,
             ion_species=ions, ion_fractions=frac, ion_velocity_projection_m_s=0.0,
         )
-    with pytest.raises(ValueError, match="electron_velocity_projection_m_s is required"):
+    with pytest.raises(ValueError, match="Explicit optimizer initial estimates are required"):
         analyze_cts_spectrum(
             f, np.ones_like(f), probe_frequency_Hz=f0,
             scattering_geometry=g, ion_species=ions, ion_fractions=frac,
