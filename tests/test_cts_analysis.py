@@ -915,9 +915,11 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     ):
         assert specs[name]["required"] is True
 
-    for name in ("electron_velocity_projection_m_s", "ion_velocity_initial_m_s"):
-        assert specs[name]["required"] is False
-        assert specs[name]["required_when_model"] == "electrostatic"
+    assert specs["electron_velocity_projection_m_s"]["required"] is False
+    assert "optional optimizer initial seed" in specs["electron_velocity_projection_m_s"]["description"]
+    assert "fitted freely from the measured CTS spectrum" in specs["electron_velocity_projection_m_s"]["description"]
+    assert specs["ion_velocity_initial_m_s"]["required"] is False
+    assert specs["ion_velocity_initial_m_s"]["required_when_model"] == "electrostatic"
 
     # Full-EM inputs are branch-conditional because the electrostatic model
     # does not consume them.
