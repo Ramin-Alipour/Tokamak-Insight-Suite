@@ -303,14 +303,21 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
     upper = np.array([np.inf, x[-1], x[-1] - x[0], np.inf, np.inf])
     kmin, kmax = 1.500001, max(20.0, float(p[3]) * 8.0)
     grid = np.unique(np.r_[np.geomspace(kmin, kmax, 61), p[3]])
-    scale = np.ones_like(y) if sigma is None else np.asarray(sigma, dtype=float)
-
     def forward(nuisance, kappa):
         amp, center, width, offset, slope = nuisance
         df = 2.0 * kappa - 1.0
         student_scale = width * np.sqrt((df - 2.0) / df)
         component = amp * (1.0 + ((x - center) / student_scale) ** 2 / df) ** (-kappa)
         return _apply_response(response, component, x) + offset + slope * (x - center)
+
+    if sigma is None:
+        best_residual = forward(p[[0, 1, 2, 4, 5]], p[3]) - y
+        residual_scale = float(np.sqrt(np.sum(best_residual ** 2) / max(1, y.size - p.size)))
+        scale = np.full_like(y, max(residual_scale, np.finfo(float).tiny))
+        noise_semantics = "unweighted_fit_residual_variance_estimated_from_best_fit; not_measurement_noise_calibrated"
+    else:
+        scale = np.asarray(sigma, dtype=float)
+        noise_semantics = "researcher_supplied_pointwise_measurement_uncertainty"
 
     profile = np.full(grid.shape, np.inf)
     for i, kappa in enumerate(grid):
@@ -348,7 +355,7 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
         "numerical_profile_domain": [kmin, kmax],
         "profile_grid_kappa": grid,
         "profile_delta_chi_square": delta,
-        "noise_scale": "supplied_pointwise_uncertainty" if sigma is not None else "unweighted_residual_scale_not_measurement_calibrated",
+        "noise_scale": noise_semantics,
         "interpretation": "Conditional one-parameter profile likelihood; a grid-censored limit is not a physical bound. The finite upper grid edge is numerical only."
     }
 
