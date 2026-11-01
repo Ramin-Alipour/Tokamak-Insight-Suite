@@ -3464,6 +3464,11 @@ elif page=='Advanced Analysis':
                 st.caption('Ion-flow projections for each supplied species are fitted from the measured CTS spectrum; no ion-flow vector or numerical seed is required.')
                 cts_harmonic_order=st.number_input('Gyro-harmonic truncation order',min_value=2,max_value=64,value=8,step=1,key='cts_full_harmonic_order')
                 cts_quadrature_order=st.number_input('Momentum/velocity quadrature order',min_value=4,max_value=64,value=12,step=1,key='cts_full_quadrature_order')
+                cts_numerical_convergence=st.checkbox('Assess harmonic/quadrature convergence after the fit',value=True,key='cts_full_numerical_convergence')
+                cts_convergence_harmonics=st.text_input('Optional paired convergence harmonic orders (comma-separated integers)',value='',key='cts_full_convergence_harmonics')
+                cts_convergence_quadratures=st.text_input('Optional paired convergence quadrature orders (comma-separated integers)',value='',key='cts_full_convergence_quadratures')
+                cts_convergence_tolerance=st.number_input('Convergence relative L2 and L-infinity tolerance',min_value=1e-8,max_value=1.0,value=1e-3,format='%.3g',key='cts_full_convergence_tolerance')
+                st.caption('Convergence is assessed at the fitted parameters and is a numerical discretization check, not a physical uncertainty or experimental validation. Custom harmonic and quadrature sequences must be paired and strictly increasing.')
                 cts_damping=st.text_input('Resonance damping rate (rad/s; blank uses the documented numerical default)',key='cts_full_damping')
                 st.caption('Blank damping uses max(2π × probe frequency × 10⁻⁷, 1 rad/s). This is numerical Landau-contour regularization, not a physical collision frequency; the selected value and its source are recorded in the result.')
                 cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV:D+":[10,200]}',key='cts_full_parameter_bounds')
@@ -3572,7 +3577,18 @@ elif page=='Advanced Analysis':
                         'fast_ion_populations':fast_ions,
                         'harmonic_order':int(cts_harmonic_order),
                         'quadrature_order':int(cts_quadrature_order),
+                        'numerical_convergence':bool(cts_numerical_convergence),
+                        'convergence_relative_tolerance':float(cts_convergence_tolerance),
                     }
+                    for raw_orders, keyword, label in (
+                        (cts_convergence_harmonics, 'convergence_harmonic_orders', 'harmonic'),
+                        (cts_convergence_quadratures, 'convergence_quadrature_orders', 'quadrature'),
+                    ):
+                        if raw_orders.strip():
+                            tokens=[part.strip() for part in raw_orders.split(',') if part.strip()]
+                            if not tokens or any(not token.isdigit() for token in tokens):
+                                raise ValueError(f'Convergence {label} orders must be comma-separated integers.')
+                            kwargs_cts[keyword]=[int(token) for token in tokens]
                     if cts_electron_flow.strip():
                         kwargs_cts['electron_flow_projection_initial_m_s']=float(cts_electron_flow)
                     if cts_damping.strip():
