@@ -1104,3 +1104,50 @@ def test_cts_formula_contract_is_calibrated_measurement_to_physics():
     cts = next(item for item in registry if item["name"] == "Microwave collective Thomson spectral density")
     assert cts["raw_data_to_physics"] is False
     assert cts["calibrated_measurements_to_physics"] is True
+
+
+def test_cts_full_external_parameter_covariance_propagates_correlations():
+    f0,f,g,ions,frac,response=_case()
+    truth=(2e19,1200.,800.,1.5e4)
+    z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],
+        ion_temperature_eV=truth[2],ion_species=ions,ion_fractions=frac,
+        electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=truth[3])
+    y=2.4e4*z+3.
+    sig_f=1.0e6
+    sig_angle=1.0e-4
+    covariance=np.array([[sig_f**2,0.6*sig_f*sig_angle],
+                         [0.6*sig_f*sig_angle,sig_angle**2]])
+    out=analyze_cts_spectrum(
+        f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+        instrument_response=response,signal_uncertainty=np.full_like(y,.02*np.max(y)),
+        electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
+        ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],
+        global_search=False,inversion_method="local_least_squares",
+        external_parameter_covariance=covariance,
+        external_parameter_order=["probe_frequency_Hz","scattering_angle_rad"],
+        response_mc_samples=20,
+    )
+    assert out["external_parameter_covariance_supplied"] is True
+    assert out["external_parameter_covariance_order"] == ["probe_frequency_Hz","scattering_angle_rad"]
+    assert out["external_parameter_covariance_propagated"] is True
+    assert out["external_parameter_uncertainty_propagated"] is True
+    assert out["response_external_mc_successes"] >= 12
+
+
+def test_cts_external_parameter_covariance_rejects_invalid_order_or_non_psd_matrix():
+    f0,f,g,ions,frac,response=_case()
+    common=dict(probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,
+        electron_density_initial_m3=2e19,electron_temperature_initial_eV=1200.,
+        ion_temperature_initial_eV=800.,ion_velocity_initial_m_s=0.,
+        global_search=False,inversion_method="local_least_squares")
+    trial_spectrum=np.exp(-0.5*(f/1.0e9)**2)+0.1
+    with pytest.raises(ValueError,match="positive semidefinite"):
+        analyze_cts_spectrum(trial_spectrum,**common,
+            external_parameter_covariance=np.array([[1.,2.],[2.,1.]]),
+            external_parameter_order=["probe_frequency_Hz","scattering_angle_rad"])
+    with pytest.raises(ValueError,match="unsupported names"):
+        analyze_cts_spectrum(trial_spectrum,**common,
+            external_parameter_covariance=np.eye(2),
+            external_parameter_order=["probe_frequency_Hz","not_supported"])

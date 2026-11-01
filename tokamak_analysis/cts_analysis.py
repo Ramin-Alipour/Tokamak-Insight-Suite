@@ -374,7 +374,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_velocity_initial_m_s=None,parameter_bounds=None,electron_velocity_projection_m_s=None,
     fast_ion=None,global_search=False,random_seed=1729, inversion_method=None,
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
-    regularization_strength=0.0, external_parameter_uncertainties=None):
+    regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None):
     """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
     electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
     Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
@@ -579,6 +579,32 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if response_sigma is not None and (response_sigma.shape!=response.shape or np.any(response_sigma<0)):
         raise ValueError("instrument_response_uncertainty must match the response matrix and be non-negative")
     ext_unc=external_parameter_uncertainties or {}
+    if external_parameter_covariance is None and external_parameter_order is not None:
+        raise ValueError("external_parameter_order is only valid with external_parameter_covariance")
+    if external_parameter_covariance is not None and ext_unc:
+        raise ValueError("external_parameter_covariance and external_parameter_uncertainties are mutually exclusive")
+    external_covariance = None
+    external_order = []
+    external_root = None
+    if external_parameter_covariance is not None:
+        if not isinstance(external_parameter_order, (list, tuple)) or not external_parameter_order:
+            raise ValueError("external_parameter_order is required with external_parameter_covariance")
+        external_order = [str(item) for item in external_parameter_order]
+        allowed_covariance_names = {"probe_frequency_Hz", "scattering_angle_rad"} | {
+            f"ion_fraction_{i}" for i in range(len(ions))
+        }
+        if len(set(external_order)) != len(external_order) or set(external_order)-allowed_covariance_names:
+            raise ValueError("external_parameter_order contains duplicate or unsupported names")
+        external_covariance = _array(external_parameter_covariance, "external_parameter_covariance", 2)
+        if external_covariance.shape != (len(external_order), len(external_order)) or not np.allclose(external_covariance, external_covariance.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("external_parameter_covariance must be symmetric and match external_parameter_order")
+        eigenvalues, eigenvectors = np.linalg.eigh(external_covariance)
+        covariance_scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        if float(np.min(eigenvalues)) < -1e-10*covariance_scale:
+            raise ValueError("external_parameter_covariance must be positive semidefinite")
+        external_root = eigenvectors @ np.diag(np.sqrt(np.maximum(eigenvalues, 0.0)))
+        if "scattering_angle_rad" in external_order and ("incident_direction" in scattering_geometry or "scattered_direction" in scattering_geometry):
+            raise ValueError("scattering_angle_rad covariance requires scalar-angle geometry, not fixed beam-direction vectors")
     if not isinstance(ext_unc,Mapping):
         raise ValueError("external_parameter_uncertainties must be a mapping")
     allowed_external={"probe_frequency_Hz","scattering_angle_rad","ion_fractions"}
@@ -794,8 +820,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             vdf_covariance=pdf_jac@vdf_parameter_covariance@pdf_jac.T
             out["fast_ion_vdf_covariance"]=vdf_covariance
             out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(vdf_covariance),0.0))
-    if response_sigma is not None or ext_unc:
+    if response_sigma is not None or ext_unc or external_covariance is not None:
         rng=np.random.default_rng(int(random_seed)+991); draws=[]
+        out["external_parameter_covariance_supplied"] = external_covariance is not None
+        if external_covariance is not None:
+            out["external_parameter_covariance_order"] = list(external_order)
+            out["external_parameter_covariance"] = external_covariance.copy()
         for _ in range(int(response_mc_samples)):
             sampled=response
             if response_sigma is not None:
@@ -806,14 +836,32 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             sampled_f0=f0+rng.normal(0.0,float(ext_unc.get("probe_frequency_Hz",0.0)))
             sampled_electron_flow=None
             sampled_geometry=scattering_geometry
-            if "scattering_angle_rad" in ext_unc:
-                sampled_geometry=dict(scattering_geometry)
-                sampled_geometry["scattering_angle_rad"]=float(scattering_geometry["scattering_angle_rad"])+rng.normal(0.0,float(ext_unc["scattering_angle_rad"]))
-                if not 0<sampled_geometry["scattering_angle_rad"]<=np.pi: continue
-            sampled_fractions=ion_fractions
-            if "ion_fractions" in ext_unc:
-                sampled_fractions=np.maximum(np.asarray(ion_fractions,dtype=float)+rng.normal(0.0,np.asarray(ext_unc["ion_fractions"],dtype=float)),1e-12)
+            sampled_fractions=np.asarray(ion_fractions,dtype=float).copy()
+            if external_covariance is not None:
+                external_draw=external_root @ rng.normal(size=len(external_order))
+                sampled_angle=None
+                for key, perturbation in zip(external_order, external_draw):
+                    if key == "probe_frequency_Hz":
+                        sampled_f0 += float(perturbation)
+                    elif key == "scattering_angle_rad":
+                        sampled_angle=float(scattering_geometry["scattering_angle_rad"])+float(perturbation)
+                    elif key.startswith("ion_fraction_"):
+                        index=int(key.rsplit("_",1)[1])
+                        sampled_fractions[index] += float(perturbation)
+                if sampled_angle is not None:
+                    if not 0<sampled_angle<=np.pi: continue
+                    sampled_geometry=dict(scattering_geometry)
+                    sampled_geometry["scattering_angle_rad"]=sampled_angle
+                sampled_fractions=np.maximum(sampled_fractions,1e-12)
                 sampled_fractions=sampled_fractions/sampled_fractions.sum()
+            else:
+                if "scattering_angle_rad" in ext_unc:
+                    sampled_geometry=dict(scattering_geometry)
+                    sampled_geometry["scattering_angle_rad"]=float(scattering_geometry["scattering_angle_rad"])+rng.normal(0.0,float(ext_unc["scattering_angle_rad"]))
+                    if not 0<sampled_geometry["scattering_angle_rad"]<=np.pi: continue
+                if "ion_fractions" in ext_unc:
+                    sampled_fractions=np.maximum(sampled_fractions+rng.normal(0.0,np.asarray(ext_unc["ion_fractions"],dtype=float)),1e-12)
+                    sampled_fractions=sampled_fractions/sampled_fractions.sum()
             if sampled_f0<=0: continue
             try:
                 def sampled_residual(p):
@@ -849,6 +897,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(out["fast_ion_vdf_covariance"]),0.0))
             out["response_uncertainty_propagated"]=response_sigma is not None
             out["external_parameter_uncertainty_propagated"]=bool(ext_unc) or external_covariance is not None
+            out["external_parameter_covariance_propagated"]=external_covariance is not None or external_covariance is not None
             out["external_parameter_covariance_propagated"]=external_covariance is not None
         else:
             out["response_uncertainty_propagated"]=False
