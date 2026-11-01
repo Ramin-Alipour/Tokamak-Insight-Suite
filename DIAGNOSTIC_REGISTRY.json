@@ -68,13 +68,13 @@
           "name": "laser_wavelength_uncertainty_nm",
           "unit": "nm; 1-sigma",
           "required": false,
-          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner and collective CTS fits."
+          "description": "Optional 1-sigma laser-wavelength uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner fits. Collective CTS uses its own dedicated uncertainty contract."
         },
         {
           "name": "scattering_angle_uncertainty_rad",
-          "unit": "rad; 1-sigma; supported for non-collective Maxwellian/Kappa only",
+          "unit": "rad; 1-sigma; supported for non-collective Maxwellian/Kappa and relativistic Maxwell-Juttner; mutually exclusive with beam-direction component uncertainties",
           "required": false,
-          "description": "Optional scalar scattering-angle uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner and collective CTS fits. Mutually exclusive with beam-direction component uncertainties."
+          "description": "Optional scalar scattering-angle uncertainty; propagated analytically for non-collective Maxwellian/Kappa fits and by Monte Carlo for relativistic Maxwell-Juttner fits. It is mutually exclusive with incident/scattered beam-direction component uncertainties."
         },
         {
           "name": "instrument_response_uncertainty",
