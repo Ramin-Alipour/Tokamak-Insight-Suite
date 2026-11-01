@@ -7,13 +7,29 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
-def test_cts_inversion_requires_explicit_optimizer_initial_estimates():
+def test_cts_automatic_optimizer_seed_estimation_from_calibrated_spectral_shape():
+    from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
     f0,f,g,ions,frac,response=_case()
-    with pytest.raises(ValueError, match="Explicit optimizer initial estimates are required"):
-        analyze_cts_spectrum(
+    center=1.7e8
+    spectrum=0.03+np.exp(-0.5*((f-center)/1.1e9)**2)+0.22*np.exp(-0.5*((f-center)/1.7e8)**2)
+    seeds=estimate_cts_optimizer_initial_parameters(
+        f,spectrum,probe_frequency_Hz=f0,scattering_geometry=g,
+        ion_species=ions,ion_fractions=frac,
+    )
+    assert seeds["electron_density_m3"]>0
+    assert seeds["electron_temperature_eV"]>0
+    assert seeds["ion_temperature_eV"]>0
+    assert seeds["role"]=="optimizer_initial_estimates_only"
+    assert "alpha=1" in seeds["density_seed_assumption"]
+
+
+def test_cts_automatic_optimizer_seed_rejects_spectrum_without_contrast():
+    from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
+    f0,f,g,ions,frac,response=_case()
+    with pytest.raises(ValueError, match="no positive contrast"):
+        estimate_cts_optimizer_initial_parameters(
             f,np.ones_like(f),probe_frequency_Hz=f0,scattering_geometry=g,
-            ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,
-            instrument_response=response,
+            ion_species=ions,ion_fractions=frac,
         )
 
 
