@@ -4210,33 +4210,33 @@
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
-          "required": false,
-          "description": "Explicit externally supplied electron-flow projection. Supply 0 only when stationary electron flow is intentionally assumed.",
+          "required": true,
+          "description": "Required for the electrostatic branch as an explicit projected electron-flow input; supply 0.0 only when stationary electron flow is the intended physical assumption. The full-electromagnetic branch instead requires electron_flow_velocity_m_s.",
           "required_when_model": "electrostatic"
         },
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
           "required": true,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
+          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
           "required": true,
-          "description": "Required positive optimizer initial estimate; no default value or scientific range is assumed."
+          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
           "required": true,
-          "description": "Required positive optimizer start for ion temperatures. Accepts a scalar (broadcast as the same initial guess), one value per species, or a species-name mapping; Full-EM fits an independent final temperature for every supplied species."
+          "description": "Required numerical optimizer initial estimate for both inversion branches; it is not a fixed inferred value. Full-EM fits one final temperature per supplied ion species."
         },
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": false,
-          "description": "Required common projected ion-flow optimizer initial estimate; no zero-flow initial value is assumed.",
+          "required": true,
+          "description": "Required optimizer initial estimate for the electrostatic branch; it is not a fixed inferred flow. The full-electromagnetic branch instead requires ion_flow_velocity_m_s.",
           "required_when_model": "electrostatic"
         },
         {
@@ -4262,35 +4262,35 @@
           "name": "magnetic_field_T",
           "unit": "T; non-zero vector in the common laboratory coordinate frame",
           "required": false,
-          "description": "Mandatory for full_electromagnetic.",
+          "description": "Required non-zero vector for model='full_electromagnetic'; not used by the electrostatic branch.",
           "required_when_model": "full_electromagnetic"
         },
         {
           "name": "electron_flow_velocity_m_s",
           "unit": "m s^-1; explicit 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; no scalar projection is substituted.",
+          "description": "Required 3-vector for model='full_electromagnetic'; the electrostatic branch instead requires electron_velocity_projection_m_s.",
           "required_when_model": "full_electromagnetic"
         },
         {
           "name": "ion_flow_velocity_m_s",
           "unit": "m s^-1; mapping from every ion species name to a 3-vector",
           "required": false,
-          "description": "Mandatory for full_electromagnetic; every ion species needs an explicit vector.",
+          "description": "Required per-species 3-vector mapping for model='full_electromagnetic'; the electrostatic branch instead requires ion_velocity_initial_m_s as an optimizer seed for its common projected ion flow.",
           "required_when_model": "full_electromagnetic"
         },
         {
           "name": "incident_polarization",
           "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed.",
+          "description": "Required for model='full_electromagnetic' to select the incident cold-plasma eigenmode.",
           "required_when_model": "full_electromagnetic"
         },
         {
           "name": "scattered_polarization",
           "unit": "complex dimensionless 3-vector used to select a cold-plasma eigenmode",
           "required": false,
-          "description": "The solver selects the matching propagating cold-plasma branch and replaces this seed with its flux-normalized eigenpolarization; longitudinal E components are allowed.",
+          "description": "Required for model='full_electromagnetic' to select the scattered cold-plasma eigenmode.",
           "required_when_model": "full_electromagnetic"
         },
         {
@@ -4575,7 +4575,8 @@
         "The electrostatic CTS path remains separate and does not automatically switch to the magnetized full-EM model.",
         "Full-electromagnetic CTS currently propagates only the supplied spectral noise/covariance through local Jacobian covariance; measured response-matrix and external-geometry/parameter uncertainties are not propagated.",
         "Electrostatic CTS requires explicit optimizer initial estimates, imposes no default scientific bounds on positive plasma parameters, and permits global search only when finite researcher-supplied bounds are provided.",
-        "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed."
+        "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed.",
+        "The shared CTS registry contract documents branch-conditional inputs: electrostatic requires electron_velocity_projection_m_s and ion_velocity_initial_m_s; full-electromagnetic requires magnetic_field_T, electron_flow_velocity_m_s, ion_flow_velocity_m_s and both mode-polarization vectors."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
