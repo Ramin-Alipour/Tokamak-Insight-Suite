@@ -311,6 +311,17 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     )
     assert any("instrument_response_uncertainty" in item for item in full_mode["inputs"])
     assert any("response_mc_samples" in item for item in full_mode["inputs"])
+    convergence_inputs = {
+        "numerical_convergence", "convergence_harmonic_orders",
+        "convergence_quadrature_orders", "convergence_relative_tolerance",
+    }
+    assert convergence_inputs <= set(runtime_inputs)
+    assert runtime_inputs["numerical_convergence"]["default"] is True
+    assert runtime_inputs["convergence_relative_tolerance"]["default"] == pytest.approx(1e-3)
+    assert {
+        "numerical_convergence", "numerical_convergence_status",
+        "numerical_convergence_is_uncertainty",
+    } <= runtime_outputs
 
     root = Path(__file__).resolve().parents[1]
     root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
@@ -324,6 +335,11 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     )
     contract = entry["execution_contract"]
     json_inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert convergence_inputs <= set(json_inputs)
+    assert json_inputs["numerical_convergence"]["default"] is True
+    json_outputs = {item["name"] for item in contract["output_specs"]}
+    assert {"numerical_convergence", "numerical_convergence_status",
+            "numerical_convergence_is_uncertainty"} <= json_outputs
     assert "applies_when_model" not in json_inputs["instrument_response_uncertainty"]
     assert "applies_when_model" not in json_inputs["response_mc_samples"]
     assert "response-matrix uncertainty is propagated by Monte Carlo refitting" in contract["uncertainty_model"]
