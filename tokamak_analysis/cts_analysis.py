@@ -445,6 +445,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             raise ValueError(f"initial value for {name} must lie inside its supplied parameter_bounds")
     if not ub[0]<=initial_ion_flow<=ub[1]:
         raise ValueError("initial ion flow must lie inside its supplied parameter_bounds")
+    initialization_record = {
+        "electron_density_m3": initial_density,
+        "electron_temperature_eV": initial_te,
+        "ion_temperature_eV": initial_ti,
+        "method": automatic_seeds["method"] if automatic_seeds is not None else "researcher_supplied",
+        "automatically_estimated_parameters": [
+            name for name, value in (
+                ("electron_density_m3", electron_density_initial_m3),
+                ("electron_temperature_eV", electron_temperature_initial_eV),
+                ("ion_temperature_eV", ion_temperature_initial_eV),
+            ) if value is None
+        ],
+        "role": "optimizer_initial_estimates_only",
+    }
+    if automatic_seeds is not None:
+        initialization_record["density_seed_assumption"] = automatic_seeds["density_seed_assumption"]
     p0=np.array([np.log10(initial_density),np.log10(initial_te),np.log10(initial_ti),electron_flow_seed/us,initial_ion_flow/us])
     # Finite numerical guards prevent 10**p from underflowing to zero or
     # overflowing during unconstrained local optimization. These are machine-
@@ -689,9 +705,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
     names=["electron_density_m3","electron_temperature_eV","ion_temperature_eV","electron_velocity_projection_m_s","ion_velocity_projection_m_s"]
-    out={**d,"optimizer_initial_estimates":automatic_seeds or {
-        "electron_density_m3":initial_density,"electron_temperature_eV":initial_te,"ion_temperature_eV":initial_ti,
-        "method":"researcher_supplied","role":"optimizer_initial_estimates_only"},
+    out={**d,"optimizer_initial_estimates":initialization_record,
       "electron_velocity_projection_is_fitted":True,"electron_velocity_projection_uncertainty_m_s":float(su[3]),
       "electron_density_uncertainty_m3":float(su[0]),"electron_temperature_uncertainty_eV":float(su[1]),
       "ion_temperature_uncertainty_eV":float(su[2]),"ion_velocity_projection_uncertainty_m_s":float(su[4]),
