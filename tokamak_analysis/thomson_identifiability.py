@@ -165,9 +165,9 @@ def spatial_profile_identifiability() -> dict:
         "primary": [
             {"parameter": "channel_resolved_electron_temperature", "unit": "eV", "basis": "inferred from each measured calibrated spectrum by the parent physical model"},
             {"parameter": "channel_resolved_scattering_vector_flow_projection", "unit": "m s^-1", "basis": "inferred from each measured calibrated spectrum where identifiable"},
-            {"parameter": "channel_resolved_electron_density", "unit": "m^-3", "basis": "inferred only where absolute optical inputs make density identifiable"},
         ],
         "conditional": [
+            {"parameter": "channel_resolved_electron_density", "unit": "m^-3", "status": "computed_only_where_absolute_W_per_nm_intensity_and_complete_optical_inputs_identify_density"},
             {"parameter": "continuous_radial_profile", "status": "numerical_interpolation_or_smoothing_of_identifiable_channel_estimates_only", "required_additional_inputs": ["at least two distinct measured spatial coordinates", "selected profile representation"]},
             {"parameter": "profile_uncertainty_band", "status": "requires available channel covariance; independent-channel fallback is explicitly labelled"},
         ],
