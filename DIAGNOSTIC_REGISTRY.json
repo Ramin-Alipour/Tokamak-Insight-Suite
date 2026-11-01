@@ -387,6 +387,11 @@
           "name": "electron_velocity_distribution",
           "unit": "per-channel structured EVDF inference",
           "description": "Per-channel normalized 1-D electron-velocity marginal along the scattering vector, attempted only for non-relativistic Maxwellian/Kappa optical fits; for relativistic Maxwell-Juttner the inverse is explicitly unavailable pending a matching relativistic inverse operator."
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "structured primary/conditional/non-identifiable classification",
+          "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
         }
       ],
       "assumptions": [
@@ -4888,6 +4893,11 @@
           "name": "model",
           "unit": "text",
           "description": "Selected electrostatic or Full-EM CTS physical forward model."
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "structured primary/conditional/non-identifiable classification",
+          "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
         }
       ],
       "assumptions": [
@@ -5862,6 +5872,11 @@
           "name": "uncertainty_warning",
           "unit": "text; conditional",
           "description": "Explains when too few valid covariance draws prevent uncertainty bands."
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "structured primary/conditional/non-identifiable classification",
+          "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
         }
       ],
       "assumptions": [
@@ -7290,6 +7305,11 @@
           "name": "moment_interpretation",
           "unit": "text",
           "description": "Signed moments retain negative background-subtracted residuals and are not an electron velocity distribution."
+        },
+        {
+          "name": "parameter_identifiability",
+          "unit": "structured primary/conditional/non-identifiable classification",
+          "description": "Explicitly separates parameters identifiable directly from this calibrated measurement, parameters conditional on additional supplied quantities, and parameters non-identifiable under the selected model."
         }
       ],
       "assumptions": [
