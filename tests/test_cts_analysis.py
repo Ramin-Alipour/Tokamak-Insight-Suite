@@ -898,3 +898,45 @@ def test_full_em_cts_response_conserves_area_on_nonuniform_frequency_bins():
     response = 0.85*np.eye(frequency.size) + 0.15*np.roll(np.eye(frequency.size), 1, axis=0)
     convolved = _apply_frequency_response(response, spectrum, frequency)
     assert np.sum(convolved*widths) == pytest.approx(np.sum(spectrum*widths), rel=1e-12)
+
+
+def test_cts_registry_declares_required_branch_specific_inputs():
+    from tokamak_analysis.analysis_registry import ANALYSES
+
+    cts = next(item for item in ANALYSES if "collective" in item["name"].lower() and "thomson" in item["name"].lower())
+    specs = {item["name"]: item for item in cts["execution_contract"]["input_specs"]}
+
+    # The electrostatic implementation rejects these when omitted, so the
+    # public contract must not advertise them as optional.
+    for name in (
+        "electron_velocity_projection_m_s",
+        "electron_density_initial_m3",
+        "electron_temperature_initial_eV",
+        "ion_temperature_initial_eV",
+        "ion_velocity_initial_m_s",
+    ):
+        assert specs[name]["required"] is True
+
+    # Full-EM inputs are branch-conditional because the electrostatic model
+    # does not consume them.
+    for name in (
+        "magnetic_field_T",
+        "electron_flow_velocity_m_s",
+        "ion_flow_velocity_m_s",
+        "incident_polarization",
+        "scattered_polarization",
+    ):
+        assert specs[name]["required"] is False
+        assert "full_electromagnetic" in specs[name].get("description", "")
+
+
+def test_cts_formula_contract_is_calibrated_measurement_to_physics():
+    import json
+    from pathlib import Path
+
+    registry = json.loads(
+        (Path(__file__).resolve().parents[1] / "tis" / "data" / "FORMULA_REGISTRY.json").read_text()
+    )
+    cts = next(item for item in registry if item["name"] == "Microwave collective Thomson spectral density")
+    assert cts["raw_data_to_physics"] is False
+    assert cts["calibrated_measurements_to_physics"] is True
