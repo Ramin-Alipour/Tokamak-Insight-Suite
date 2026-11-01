@@ -983,7 +983,11 @@ def analyze_full_em_cts_spectrum(
             raise ValueError("signal_uncertainty must be positive and match measured_spectrum")
         whiten = lambda value: value / unc
     else:
-        raise ValueError("signal_uncertainty or spectral_covariance is required for full-EM inversion")
+        # Calibrated spectra remain analyzable when pointwise measurement
+        # uncertainty is unavailable. Use unweighted least squares; the local
+        # Jacobian covariance is residual-variance-scaled below and explicitly
+        # labelled as not measurement-noise-calibrated.
+        whiten = lambda value: value
     if not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes)) or len(ion_species) == 0:
         raise ValueError("ion_species must be a non-empty sequence for species-resolved CTS inversion")
     species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
@@ -1239,11 +1243,26 @@ def analyze_full_em_cts_spectrum(
         "residual": y - (amplitude * convolved + offset),
         "profiled_amplitude": float(amplitude),
         "profiled_offset": float(offset),
-        "reduced_chi_square": float(r @ r / dof),
+        "reduced_chi_square": (
+            float(r @ r / dof)
+            if spectral_covariance is not None or signal_uncertainty is not None
+            else None
+        ),
+        "fit_residual_rms": float(np.sqrt(np.mean((y - (amplitude * convolved + offset)) ** 2))),
+        "spectral_uncertainty_supplied": bool(
+            spectral_covariance is not None or signal_uncertainty is not None
+        ),
         "spectral_weighting_status": (
             "full_frequency_bin_covariance_whitened"
             if spectral_covariance is not None else
             "diagonal_pointwise_measurement_uncertainty_weighted"
+            if signal_uncertainty is not None else
+            "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        ),
+        "parameter_covariance_interpretation": (
+            "local_jacobian_covariance_from_supplied_spectral_uncertainty"
+            if spectral_covariance is not None or signal_uncertainty is not None
+            else "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         ),
         "parameter_covariance_scope": (
             "local_jacobian_covariance_conditional_on_fixed_external_inputs; "
