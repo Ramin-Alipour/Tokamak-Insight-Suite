@@ -933,7 +933,8 @@ def analyze_full_em_cts_spectrum(
     signal_uncertainty=None, spectral_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
-    bindslev_validity_theta_e_limit=None,
+    bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
+    response_mc_samples=100,
 ):
     """Fit n_e, T_e, electron flow, and each supplied ion species' T_i and flow projection.
 
