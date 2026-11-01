@@ -343,8 +343,8 @@ def test_spectral_distribution_exposes_canonical_physical_parameters():
         "electron_density_uncertainty_m3": None,
     }
     out = analyze_thomson_spectral_distribution(
-        x, y, physical_parameters=_canonical_fit(),  instrument_sigma_nm=0.06, background_fraction=0.1,
-        physical_parameters=physical,
+        x, y, physical_parameters=physical, instrument_sigma_nm=0.06,
+        background_fraction=0.1,
     )
     extracted = out["physical_parameter_extraction"]
     assert extracted["status"] == "completed"
