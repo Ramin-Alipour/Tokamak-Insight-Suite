@@ -110,6 +110,28 @@ def test_absolute_density_and_uncertainty_are_reported_when_full_geometry_is_sup
     assert channel["density_method"].startswith("absolute integrated")
 
 
+
+def test_one_dimensional_response_kernel_uncertainty_is_monte_carlo_propagated():
+    x, intrinsic, _ = _spectral_case(100.0, n=161)
+    kernel = np.array([0.2, 0.6, 0.2])
+    kernel_uncertainty = np.array([0.005, 0.01, 0.005])
+    from tokamak_analysis.thomson_inference import _response_for_channel
+    response = _response_for_channel(kernel, 0, 1, x.size, x)
+    measured = response @ (intrinsic - 25.0) + 25.0
+    result = analyze_thomson_spectra(
+        x, measured[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=kernel,
+        instrument_response_uncertainty=kernel_uncertainty,
+        instrument_response_mc_samples=20,
+        instrument_response_mc_min_success_fraction=0.5,
+    )
+    channel = result["channels"][0]
+    assert channel["instrument_response_uncertainty_supplied"] is True
+    assert channel["instrument_response_uncertainty_propagated"] is True
+    assert channel["instrument_response_mc_successful_samples"] >= 10
+    assert channel["electron_temperature_uncertainty_eV"] > 0.0
+
+
 def test_instrument_response_uncertainty_propagates_into_absolute_density():
     x, y, _ = _spectral_case(100.0, n=161)
     response = np.eye(x.size)

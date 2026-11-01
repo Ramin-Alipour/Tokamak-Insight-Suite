@@ -80,9 +80,9 @@
         },
         {
           "name": "instrument_response_uncertainty",
-          "unit": "response-matrix 1-sigma",
+          "unit": "non-negative 1-D kernel, shared 2-D matrix, or channel-specific 3-D matrix; 1-sigma",
           "required": false,
-          "description": "Non-negative 2-D common response-matrix uncertainty (same instrument realization across all channels) or 3-D channel-specific uncertainty. Propagated by Monte Carlo; may be combined with density covariance when its scattered-power rows/columns are zero."
+          "description": "A 1-D uncertainty matching a supplied 1-D response kernel is propagated by Monte Carlo for non-collective optical fits. Shared 2-D response-matrix uncertainty is sampled as one common instrument realization across channels; 3-D uncertainty is channel-specific. Callable-response uncertainty is not inferred."
         },
         {
           "name": "instrument_response_mc_samples",
@@ -435,7 +435,8 @@
         "Non-relativistic Maxwellian and Kappa use explicit conservative screening limits theta_e < 0.01 and |v_flow|/c < 0.1; these are asymptotic error-budget screens, not universal physical validity boundaries.",
         "The projected EVDF is a regularized one-dimensional inverse estimate conditional on the velocity grid, measured response, fitted background and GCV selection; unresolved velocity-space detail is not identifiable, and a single view cannot recover unrestricted 3-D anisotropy.",
         "The projected EVDF inverse uses non-relativistic Doppler kinematics and is attempted only for non-collective Maxwellian and Kappa fits; for the relativistic Maxwell-Juttner model it is explicitly withheld until a relativistically consistent inverse operator is implemented.",
-        "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline."
+        "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline.",
+        "Response uncertainty for callable response functions is not supported; provide an explicit 1-D kernel or 2-D/3-D matrix uncertainty representation."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -596,7 +597,8 @@
       "tests/test_thomson_workflow.py",
       "tests/test_thomson_dashboard.py",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
-      "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles",
+      "tests/test_thomson_inference.py::test_one_dimensional_response_kernel_uncertainty_is_monte_carlo_propagated"
     ]
   },
   {

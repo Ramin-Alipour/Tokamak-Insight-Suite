@@ -797,8 +797,27 @@ def analyze_thomson_spectra(
     if unc is not None and (unc.shape != y.shape or np.any(unc <= 0)):
         raise ValueError("signal_uncertainty must match spectra and be strictly positive")
     lsf_unc = None if instrument_response_uncertainty is None else _finite_array(instrument_response_uncertainty, "instrument_response_uncertainty")
-    if lsf_unc is not None and (np.any(lsf_unc < 0) or instrument_response is None or lsf_unc.ndim not in (2,3) or lsf_unc.shape[-2:] != (y.shape[1],y.shape[1]) or (lsf_unc.ndim == 3 and lsf_unc.shape[0] != y.shape[0])):
-        raise ValueError("instrument_response_uncertainty must be a non-negative 2-D/3-D matrix uncertainty on the measured wavelength grid")
+    kernel_uncertainty = False
+    matrix_uncertainty = False
+    if lsf_unc is not None:
+        response_array = None if callable(instrument_response) else np.asarray(instrument_response)
+        kernel_uncertainty = bool(
+            lsf_unc.ndim == 1 and response_array is not None
+            and response_array.ndim == 1 and response_array.shape == lsf_unc.shape
+        )
+        matrix_uncertainty = bool(
+            lsf_unc.ndim in (2, 3)
+            and lsf_unc.shape[-2:] == (y.shape[1], y.shape[1])
+            and (lsf_unc.ndim != 3 or lsf_unc.shape[0] == y.shape[0])
+        )
+        if np.any(lsf_unc < 0) or instrument_response is None or not (kernel_uncertainty or matrix_uncertainty):
+            raise ValueError(
+                "instrument_response_uncertainty must be a non-negative 1-D uncertainty matching a supplied 1-D response kernel, "
+                "a shared 2-D response-matrix uncertainty, or a channel-specific 3-D response-matrix uncertainty"
+            )
+        if kernel_uncertainty and model in {"collective_maxwellian", "collective_kappa"}:
+            raise ValueError("A 1-D response-kernel uncertainty is currently supported only by the non-collective optical Maxwellian, Kappa and relativistic Maxwell-Juttner fits; collective CTS requires matrix uncertainty.")
+
 
     def require_zero_scattered_power_covariance(covariance_value, name):
         matrix = _finite_array(covariance_value, name)
@@ -1335,14 +1354,29 @@ def analyze_thomson_spectra(
         fit["uncertainty_inputs_missing"] = missing_uncertainties
         fit["uncertainty_completeness"] = "partial" if missing_uncertainties else "all_supported_inputs_supplied"
         if lsf_unc is not None and model in {"non_collective_maxwellian", "non_collective_kappa", "non_collective_relativistic_maxwell_juttner"}:
-            lsf_sigma = lsf_unc if lsf_unc.ndim == 2 else lsf_unc[i]
+            lsf_sigma = lsf_unc if lsf_unc.ndim in (1, 2) else lsf_unc[i]
             # A shared 2-D response matrix represents one common instrument
             # realization for every channel. Reuse the same random stream and
             # retain failed draw slots so cross-channel samples stay aligned.
-            rng = np.random.default_rng(7319 if lsf_unc.ndim == 2 else 7319 + i)
+            rng = np.random.default_rng(7319 if lsf_unc.ndim in (1, 2) else 7319 + i)
             te_samples, velocity_samples, area_samples, cross_section_samples = [], [], [], []
             for _ in range(int(instrument_response_mc_samples)):
-                sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
+                if lsf_unc.ndim == 1:
+                    sampled_kernel = np.maximum(
+                        np.asarray(instrument_response, dtype=float)
+                        + rng.normal(0.0, lsf_sigma), 0.0
+                    )
+                    if not np.isfinite(sampled_kernel.sum()) or sampled_kernel.sum() <= 0:
+                        te_samples.append(np.nan)
+                        velocity_samples.append(np.nan)
+                        area_samples.append(np.nan)
+                        cross_section_samples.append(np.nan)
+                        continue
+                    sampled = _response_for_channel(
+                        sampled_kernel, i, y.shape[0], y.shape[1], xi
+                    )
+                else:
+                    sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                 colsum = sampled.sum(axis=0)
                 if np.any(colsum <= 0):
                     te_samples.append(np.nan)
@@ -1411,7 +1445,7 @@ def analyze_thomson_spectra(
                         fit["power_cross_section_relative_covariance"] = float(
                             fit.get("power_cross_section_relative_covariance") or 0.0
                         ) + lsf_power_cross_covariance
-                if lsf_unc.ndim == 2:
+                if lsf_unc.ndim in (1, 2):
                     fit["_shared_lsf_temperature_draws"] = np.asarray(te_samples, dtype=float)
                     fit["_shared_lsf_velocity_draws"] = np.asarray(velocity_samples, dtype=float)
                     fit["_shared_lsf_area_draws"] = np.asarray(area_samples, dtype=float)
@@ -1684,7 +1718,7 @@ def analyze_thomson_spectra(
         results.append(fit)
     shared_lsf_covariance = None
     shared_lsf_covariance_order = []
-    if lsf_unc is not None and lsf_unc.ndim == 2 and results and all(
+    if lsf_unc is not None and lsf_unc.ndim in (1, 2) and results and all(
         "_shared_lsf_temperature_draws" in item for item in results
     ):
         # Same draw index is the same shared instrument-response realization.

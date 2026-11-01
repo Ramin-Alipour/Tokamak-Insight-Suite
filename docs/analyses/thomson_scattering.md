@@ -249,3 +249,12 @@ The Streamlit Thomson workflow exposes this path-integrated capability as an
 optional conditional calculation. The user supplies a path-profile CSV with
 the named physical columns and an absolutely calibrated integrated scattered
 power. No path-profile factor is calibrated or estimated by the software.
+
+
+Instrument-response uncertainty may be supplied either as a non-negative 1-D
+standard-uncertainty vector matching an explicit 1-D response kernel, a shared
+2-D response-matrix uncertainty, or a channel-specific 3-D matrix uncertainty.
+The 1-D kernel is perturbed, re-normalized through the same measured-response
+forward operator, and the physical fit is repeated by Monte Carlo. An arbitrary
+callable response has no supported uncertainty representation and is rejected
+rather than assigned an invented covariance.

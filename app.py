@@ -936,7 +936,7 @@ elif page=='Spectral Analysis':
             with g3:
                 response_upload=st.file_uploader('Measured shared instrument-response CSV (kernel or square matrix)',type=['csv','txt'],key='ts_infer_response')
                 response_channel_upload=st.file_uploader('Alternative: channel-specific measured response matrices JSON (Nchannel × Nλ × Nλ)',type=['json'],key='ts_infer_channel_response')
-                response_unc_upload=st.file_uploader('Optional shared response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
+                response_unc_upload=st.file_uploader('Optional shared response-kernel or response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
                 response_channel_unc_upload=st.file_uploader('Optional channel-specific response-matrix 1σ JSON',type=['json'],key='ts_infer_channel_response_unc')
                 if model in {'non_collective_maxwellian','non_collective_kappa'}:
                     joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')

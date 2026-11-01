@@ -118,7 +118,7 @@
 | 79 | `non_identifiable_by_physics` — only scattering-wavevector flow projection. | Multi-view geometry required for vector recovery. |
 | 80 | `implemented_and_tested` — tabulated fast-ion branch is projected 1-D VDF. | Preserve projection limitation. |
 | 81 | `implemented_and_tested` — electrostatic CTS accepts a researcher-supplied ordered positive-semidefinite joint covariance over probe frequency, scalar scattering angle and individual ion fractions; the dashboard now exposes the covariance upload and explicit parameter order. | Preserve the mutually exclusive scalar-uncertainty route and covariance validation; Full-EM external covariance is tracked separately under item 102. |
-| 82 | `partially_implemented` — response uncertainty supports measured 2-D/3-D forms, not interchangeable 1-D kernel/callable representation. | Complete response covariance contract or explicitly reject unsupported form. |
+| 82 | `partially_implemented` — measured 1-D kernel uncertainty is now sampled and propagated for the three non-collective optical fits; shared 2-D and channel-specific 3-D matrix uncertainty remain supported. | Callable-response uncertainty is explicitly unsupported because no covariance representation for an arbitrary callable is defined; do not silently synthesize one. |
 | 83 | `implemented_and_tested` — global search requires finite supplied bounds. | Never invent scientific bounds. |
 | 84 | `conditional_on_explicit_inputs` — tabulated fast-ion inverse requires explicit regularization choice. | Distinguish numerical regularizer from physical parameter. |
 | 85 | `implemented_and_tested` — ion-flow parameter is common projected component. | Do not report species-resolved 3-D flows. |
