@@ -280,5 +280,11 @@ def reconstruct_joint_thomson_spatial_spectra(
                                  "sub-resolution spatial structure not encoded by the measured mixing operator",
                                  "unrestricted anisotropic or non-Maxwellian electron distributions"]},
         "uncertainty_semantics": "local linearized covariance conditional on the selected Maxwellian model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization; inspect primary_result_status because regularization is excluded from the data-only identifiability rank",
+        "parameter_identifiability": {
+            "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
+            "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
+            "non_identifiable": ["perpendicular flow components", "spatial null-space and sub-resolution structures", "unrestricted anisotropic or non-Maxwellian electron distributions"],
+            "status": "identified_from_measured_data" if data_identifiable else "not_identifiable_from_measured_data",
+        },
         "experimental_validation": "not_performed; numerical software inference only",
     }
