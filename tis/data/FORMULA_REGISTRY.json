@@ -2828,7 +2828,12 @@
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -2914,7 +2919,12 @@
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -3091,7 +3101,12 @@
       ],
       "note": "Analytic software calculation with numerical tests; not empirical validation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -3249,7 +3264,12 @@
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
     },
     "references": [
       {
@@ -3398,7 +3418,12 @@
       "test_links": [
         "tests/test_thomson_inference.py::test_joint_multi_channel_gls_propagates_cross_channel_spectral_covariance"
       ],
-      "calibrated_measurements_to_physics": true
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "measured_calibrated_spectrum_to_physical_inference",
+      "input_data_level": "measured_calibrated_spectra_and_measured_response",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -3477,7 +3502,12 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_cts_tabulated_non_maxwellian_fast_ion_forward_model"
       ],
-      "calibrated_measurements_to_physics": false
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
     },
     "references": [
       {
@@ -3634,7 +3664,14 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_relativistic_gyrotropic_three_wave_vertex_is_finite"
       ],
-      "note": "The second-order source is computed directly from the relativistic Vlasov equation and is not obtained by applying a relativistic mass correction to the low-temperature Bindslev vertex. It is a homogeneous local kinetic model."
+      "note": "The second-order source is computed directly from the relativistic Vlasov equation and is not obtained by applying a relativistic mass correction to the low-temperature Bindslev vertex. It is a homogeneous local kinetic model.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
     },
     "references": [
       {
@@ -3799,7 +3836,12 @@
       ],
       "note": "Uses exact relativistic photon-frequency kinematics for an isotropic Maxwell-Juttner rest-frame distribution Lorentz-boosted along q. Assumes the Thomson limit and omits photon recoil.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -3994,7 +4036,12 @@
       "function_links": [
         "tokamak_analysis.thomson_kinetic_models.collective_kappa_spectral_density",
         "tokamak_analysis.thomson_kinetic_models.fit_collective_kappa"
-      ]
+      ],
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
@@ -4106,7 +4153,14 @@
       "test_links": [
         "tests/test_cts_analysis.py::test_relativistic_maxwell_juttner_momentum_grid_is_normalized"
       ],
-      "note": "The linear conductivity integrates the first-order perturbation against momentum-space volume weights; it must not multiply by f0 a second time because the perturbation already contains ∇p f0."
+      "note": "The linear conductivity integrates the first-order perturbation against momentum-space volume weights; it must not multiply by f0 a second time because the perturbation already contains ∇p f0.",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
     },
     "references": [
       {
@@ -4210,7 +4264,12 @@
       ],
       "note": "The helper integrates local Gaussian overlap times incident-ray path-length quadrature. The full-EM solver evaluates the spectrum at every returned local sample and sums with normalized weights. This is not diffraction-resolved quasi-optical propagation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering"
     },
     "references": [
       {
@@ -4316,7 +4375,12 @@
       ],
       "note": "Numerical deterministic quadrature and synthetic/limiting-case software tests; not empirical validation.",
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false
+      "calibrated_measurements_to_physics": false,
+      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
+      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Optical Thomson inference or derived Thomson formula, as identified by function_link"
     },
     "references": [
       {
