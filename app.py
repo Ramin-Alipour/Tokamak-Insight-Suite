@@ -3209,10 +3209,11 @@ elif page=='Advanced Analysis':
                 cts_uncertainty_col=st.selectbox('Optional spectral 1σ uncertainty column',['<none>']+[x for x in numeric if x not in {cts_frequency_col,cts_spectrum_col}],key='cts_uncertainty_col')
                 cts_probe_frequency=st.text_input('Probe frequency (Hz)',key='cts_probe_frequency')
                 cts_angle=st.text_input('Scattering angle (rad)',key='cts_scattering_angle')
-                cts_density_initial=st.text_input('Initial electron density (m⁻³; required optimizer start)',key='cts_density_initial')
-                cts_temperature_initial=st.text_input('Initial electron temperature (eV; required optimizer start)',key='cts_temperature_initial')
-                cts_ion_temperature_initial=st.text_input('Initial common ion temperature (eV; required optimizer start)',key='cts_ion_temperature_initial')
-                cts_ion_flow_initial=st.text_input('Initial common ion-flow projection (m/s; required optimizer start)',key='cts_ion_flow_initial')
+                cts_density_initial=st.text_input('Initial electron density (m⁻³; optional; blank = automatic spectral seed)',key='cts_density_initial')
+                cts_temperature_initial=st.text_input('Initial electron temperature (eV; optional; blank = automatic spectral seed)',key='cts_temperature_initial')
+                cts_ion_temperature_initial=st.text_input('Initial common ion temperature (eV; optional; blank = automatic spectral seed)',key='cts_ion_temperature_initial')
+                cts_ion_flow_initial=st.text_input('Initial common ion-flow projection (m/s; optional numerical seed)',key='cts_ion_flow_initial')
+                st.caption('Blank density/temperature seeds are estimated automatically from the calibrated CTS spectral width and shape. These estimates initialize the optimizer only; fitted values come from the full spectral inversion.')
             with c2:
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_response_upload')
                 cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
@@ -3300,10 +3301,6 @@ elif page=='Advanced Analysis':
                             fast_ion['smoothness']=float(cts_fast_smoothness)
                     if cts_method is None:
                         raise ValueError('Select the CTS inversion method explicitly.')
-                    if any(not value.strip() for value in (
-                        cts_density_initial,cts_temperature_initial,cts_ion_temperature_initial,cts_ion_flow_initial
-                    )):
-                        raise ValueError('Enter all four physical optimizer initial estimates explicitly.')
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
                     kwargs_cts={
                         'probe_frequency_Hz':float(cts_probe_frequency),
@@ -3311,10 +3308,10 @@ elif page=='Advanced Analysis':
                         'ion_species':ion_species,'ion_fractions':fractions,
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
-                        'electron_density_initial_m3':float(cts_density_initial),
-                        'electron_temperature_initial_eV':float(cts_temperature_initial),
-                        'ion_temperature_initial_eV':float(cts_ion_temperature_initial),
-                        'ion_velocity_initial_m_s':float(cts_ion_flow_initial),
+                        'electron_density_initial_m3':None if not cts_density_initial.strip() else float(cts_density_initial),
+                        'electron_temperature_initial_eV':None if not cts_temperature_initial.strip() else float(cts_temperature_initial),
+                        'ion_temperature_initial_eV':None if not cts_ion_temperature_initial.strip() else float(cts_ion_temperature_initial),
+                        'ion_velocity_initial_m_s':None if not cts_ion_flow_initial.strip() else float(cts_ion_flow_initial),
                         'parameter_bounds':parameter_bounds,
                         'electron_velocity_projection_m_s':None if not cts_electron_flow.strip() else float(cts_electron_flow),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
