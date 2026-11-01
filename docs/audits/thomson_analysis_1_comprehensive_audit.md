@@ -1,7 +1,7 @@
 # Thomson Scattering (Analysis 1) — Comprehensive main-branch audit
 
 **Audit date:** 2026-11-01  
-**Reviewed baseline:** `main` at `c07bf416c8c54a9baaffa3e40de987c22fbcd158`  
+**Reviewed baseline:** `main` at `ecf4242b25b613afabe15177f9edd542e8a6f1d8`  
 **Scope:** primary optical Thomson inference, spectral-distribution subanalysis, spatial-profile reconstruction, microwave CTS electrostatic and full-electromagnetic branches, registry/API/tests/documentation.  
 **Method:** direct GitHub source and registry inspection. No local checkout or local edits were used. GitHub Actions are the software-test route; this audit does not claim experimental validation.
 
@@ -211,3 +211,9 @@ Follow-on commit heads include:
 - cc0e199224f4dfadc4744010a1d11a1c787764b1
 
 **Validation status:** no experimental validation was performed or claimed. GitHub Actions software tests are separate from experimental validation. The latest Actions run for the final source/documentation commit must complete before describing this work as software-test-clean. The EVDF covariance is a conditional local approximation, not a posterior or experimental uncertainty validation.
+
+
+## L. Additional confirmed implementation defect found in the 2026-11-01 review
+
+111. **Relativistic primary inference incorrectly invoked the non-relativistic projected-EVDF inverse.** The primary workflow called `reconstruct_thomson_evdf` for every selected optical model. That inverse uses the first-order non-relativistic Doppler mapping `delta_omega = q·v`, while the relativistic Maxwell-Juttner primary model uses Lorentz-transformed photon-frequency kinematics and polarization-dependent cross-sections. A successful numerical fit therefore did not establish a physically consistent relativistic EVDF. **Fixed on main:** the non-relativistic EVDF inverse is now withheld for `non_collective_relativistic_maxwell_juttner`, with an explicit `unavailable_for_selected_physical_model` status and a conditional identifiability explanation. The primary Maxwell-Juttner fit and its density/uncertainty outputs are unaffected. Added a regression assertion to the relativistic inference test and updated the analysis documentation. A relativistically consistent EVDF inverse remains future work and is not claimed as implemented.
+
