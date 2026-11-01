@@ -4744,12 +4744,6 @@
           "available_when_model": "full_electromagnetic"
         },
         {
-          "name": "numerical_convergence_status",
-          "unit": "text",
-          "description": "Single inversions do not establish harmonic/quadrature convergence; use assess_full_em_cts_numerical_convergence for a paired refinement study.",
-          "available_when_model": "full_electromagnetic"
-        },
-        {
           "name": "electron_flow_projection_is_fitted",
           "unit": "boolean",
           "description": "True for the electrostatic branch; the flow projection is fitted from the measured spectrum."
