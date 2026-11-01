@@ -320,3 +320,16 @@ Commits:
 - `b4c201179780b39e35b58a46e565669b6aa73a29` and `f2c7a2de925282a5b21a8fa08987c357770291f2` — registry/API regression coverage
 
 **Experimental validation:** not performed and not claimed.
+
+
+## P. Full-EM convergence execution-contract synchronization
+
+On 2026-11-01, the Full-EM measured-spectrum inversion's automatic paired gyro-harmonic / momentum-quadrature convergence assessment was synchronized across the user interface and all executable contracts:
+
+- The dashboard now exposes the default-enabled convergence assessment, optional paired increasing harmonic/quadrature refinement sequences, and the relative L2/L-infinity tolerance.
+- The Python runtime analysis registry now declares the four convergence inputs and all three returned convergence fields, matching the callable signature and result structure.
+- Both root and packaged diagnostic JSON registries declare the same convergence input/output contract.
+- Regression coverage checks the Python and JSON contracts, default-enabled behavior, and the explicit separation of numerical convergence from physical uncertainty.
+- The CTS scientific note no longer describes the automatic post-fit assessment as opt-in.
+
+This is a numerical discretization assessment at fixed fitted parameters. It does not add a physical uncertainty term, change fitted parameters, or constitute experimental validation. GitHub Actions must complete successfully before this source change is described as software-test-clean.
