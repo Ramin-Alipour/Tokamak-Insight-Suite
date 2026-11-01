@@ -87,6 +87,36 @@ def test_collective_thomson_contract_declares_calibrated_measurements():
     assert "electron_velocity_projection_m_s" in {spec.name for spec in contract.input_specs}
 
 
+def test_thomson_spectral_distribution_contract_excludes_separate_evdf_inverse():
+    path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
+    rows = json.loads(path.read_text(encoding="utf-8"))
+    entry = next(row for row in rows if row["diagnostic"] == "Thomson spectral distribution")
+    contract = entry["execution_contract"]
+    input_names = [item["name"] for item in contract["input_specs"]]
+    output_names = {item["name"] for item in contract["output_specs"]}
+    assert len(input_names) == len(set(input_names))
+    assert set(input_names) == {
+        "wavelength_nm", "signal", "instrument_response_matrix",
+        "background_signal", "background_mask", "background_fraction",
+        "signal_uncertainty", "signal_covariance", "moment_mc_samples",
+    }
+    assert not output_names.intersection({
+        "velocity_parallel_m_s", "evdf_parallel_s_per_m",
+        "regularization_strength", "parametric_model_comparison",
+    })
+    assert contract["calibrated_measurements_to_physics"] is False
+    assert contract["function_links"] == [
+        "tokamak_analysis.thomson_distribution.analyze_thomson_spectral_distribution"
+    ]
+    primary = rows[0]
+    assert "electron_velocity_distribution" in {
+        item["name"] for item in primary["execution_contract"]["output_specs"]
+    }
+    assert "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf" in (
+        primary["execution_contract"]["function_links"]
+    )
+
+
 def test_all_thomson_and_cts_entry_points_are_subanalyses_of_primary_analysis_1():
     path = Path(__file__).resolve().parents[1] / "DIAGNOSTIC_REGISTRY.json"
     rows = json.loads(path.read_text(encoding="utf-8"))
