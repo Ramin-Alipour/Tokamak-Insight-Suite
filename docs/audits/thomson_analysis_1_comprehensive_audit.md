@@ -88,7 +88,7 @@ This review separates **actual repository inconsistencies** from **declared scie
 55. Exactly one background representation must be supplied: a background spectrum, a boolean background mask, or an explicitly selected edge fraction.
 56. The edge-fraction method is a researcher-selected heuristic and can subtract real Thomson signal if the physical spectrum reaches the selected edges.
 57. Background parameters and their shared systematic uncertainty are not jointly sampled with the moment Monte Carlo.
-58. **Full within-channel spectral covariance is implemented.** When `signal_covariance` is supplied, the Gaussian fit uses the covariance-whitened objective and moment Monte Carlo draws correlated wavelength samples through the covariance Cholesky factor; the pointwise `signal_uncertainty` path remains independent-sample only. Signal/background cross-covariance is still not represented, so that shared covariance remains a declared limitation. Regression coverage: `tests/test_thomson_distribution.py::test_distribution_propagates_full_within_channel_covariance` and `test_distribution_rejects_conflicting_or_non_positive_definite_covariance`.
+58. **Full within-channel spectral covariance and conditional signal/background cross-covariance are implemented.** When `signal_covariance` is supplied, the Gaussian fit uses the covariance-whitened objective and moment Monte Carlo draws correlated wavelength samples through the covariance Cholesky factor; the pointwise `signal_uncertainty` path remains independent-sample only. An optional `signal_background_cross_covariance` now propagates the cross-correlation between the measured signal and an explicitly supplied fitted background. It requires both marginal covariance models and a positive-definite joint block covariance; absent that input, signal and background errors remain independent. Regression coverage includes `test_distribution_propagates_full_within_channel_covariance`, `test_distribution_propagates_joint_signal_background_cross_covariance`, and rejection of non-positive-definite joint covariance.
 59. Signed moments retain negative residuals; near-cancellation, small signed area or non-positive variance makes them unstable or undefined.
 60. The reported width is an observed wavelength-space width; it is not an instrument-corrected electron-temperature width.
 61. The measured response matrix is used as a forward operator for the Gaussian shape fit; the measured spectrum is not deconvolved.
@@ -234,3 +234,25 @@ Follow-on commit heads include:
 
 Fix commit: `a5305b23000522cf17c4f2c244801ba150747c74`.
 
+
+
+## O. Additional conditional uncertainty capability implemented on 2026-11-01
+
+The spectral-distribution subanalysis now accepts `signal_background_cross_covariance` for the covariance block \(\operatorname{Cov}(s_i,b_j)\), where \(s\) is the measured calibrated spectrum and \(b\) is the explicitly supplied fitted background. The feature:
+
+- requires signal and background marginal covariance models (pointwise 1-sigma inputs are converted to diagonal covariance matrices);
+- constructs the full \(2N\times2N\) block covariance and rejects it unless it is positive definite;
+- samples signal and background perturbations jointly, preserving their supplied cross-correlation in moment uncertainty propagation;
+- leaves the measured spectrum unchanged and does not modify the signal-only Gaussian-fit weighting;
+- does not apply to mask- or edge-fitted backgrounds, whose background is re-fitted in each signal draw.
+
+The Python callable, Python execution registry, root and packaged JSON registries, scientific documentation and independent software regression tests were updated directly on `main`. This is a conditional software capability, not an inference of missing covariance and not experimental validation.
+
+Commits:
+- `fdbcecdf3800b4e60e16778b47a0d08c6f7e7d0f` — implementation
+- `0efbb8d9f08fca807973714459bfffe8c0adfcbb` — regression tests
+- `6c5ebff3dc6fe427871909b3e8cabbb68d6f525b` and `2306b6f51684ee34ea0163d9b632f9ab33a8d4be` — root/package JSON registries
+- `29fa2c2ae633e23e4e67bdd39f6f99f7f1aec562` — Python runtime registry
+- `25debe7cd0e5df8269e613f5ae55de6b4648b238` — scientific documentation
+
+**Software CI status:** not yet confirmed for these direct-main commits. No experimental validation was performed or claimed.
