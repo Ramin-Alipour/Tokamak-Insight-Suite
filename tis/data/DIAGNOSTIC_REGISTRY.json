@@ -7097,6 +7097,12 @@
           "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. Signal/background cross-covariance is not currently represented."
         },
         {
+          "name": "signal_background_cross_covariance",
+          "unit": "wavelength-space covariance Cov(signal_i, background_j)",
+          "required": false,
+          "description": "Optional full cross-covariance between the measured signal and the explicitly supplied fitted background. Requires signal uncertainty/covariance and background uncertainty/covariance; the complete 2N x 2N block covariance must be positive definite and is sampled jointly for moment uncertainty. It is not used to alter the measured spectrum or the Gaussian fit's signal-only weighting."
+        },
+        {
           "name": "background_mask",
           "unit": "boolean mask identifying background samples",
           "required": false,
@@ -7359,7 +7365,7 @@
         "Validate finite samples and strictly increasing wavelength without sorting, repairing or dropping source samples."
       ],
       "algorithm": "Compute signed wavelength-space spectral moments and fit a Gaussian spectral-shape model convolved with the supplied measured instrument-response matrix. The measured calibrated spectrum is not modified; physical plasma parameters are extracted separately by the parent Thomson Analysis 1 forward model.",
-      "uncertainty_model": "Moment Monte Carlo propagates supplied signal uncertainty/covariance and, when an explicit fitted background is supplied, its separate pointwise uncertainty or full covariance. Signal/background cross-covariance is not currently represented; the two are treated as independent. Mask/fraction backgrounds are refitted in each perturbed signal draw.",
+      "uncertainty_model": "Spectral-moment uncertainties are propagated by Monte Carlo from supplied pointwise signal uncertainty or full within-channel covariance and supplied background uncertainty. When signal_background_cross_covariance is supplied with both marginal covariance models, the complete positive-definite joint signal/background covariance is sampled jointly; otherwise signal and background errors are treated as independent. Gaussian-fit covariance is conditional on the fixed supplied measured response matrix.",
       "limitations": [
         "Signed moments can become unstable when the background-subtracted integrated area is small or the variance is non-positive.",
         "An explicitly selected spectral-edge background fraction can remove real signal if the physical spectrum extends into both edges; use background_mask to identify background-only samples.",
@@ -7379,7 +7385,9 @@
         "tests/test_thomson_distribution.py::test_distribution_extracts_observed_spectral_moments_and_gaussian_shape",
         "tests/test_thomson_distribution.py::test_distribution_does_not_accept_pre_extracted_physical_parameters_or_width_corrections",
         "tests/test_thomson_distribution.py::test_moments_use_signed_residuals_and_propagate_pointwise_uncertainty",
-        "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics"
+        "tests/test_thomson_inference.py::test_primary_thomson_inference_includes_spectral_distribution_diagnostics",
+        "tests/test_thomson_distribution.py::test_distribution_propagates_joint_signal_background_cross_covariance",
+        "tests/test_thomson_distribution.py::test_distribution_rejects_non_positive_definite_joint_signal_background_covariance"
       ],
       "input_data_level": "measured_calibrated_spectrum"
     },
