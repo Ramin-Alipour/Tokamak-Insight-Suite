@@ -360,16 +360,21 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if not ub[0]<=initial_ion_flow<=ub[1]:
         raise ValueError("initial ion flow must lie inside its supplied parameter_bounds")
     p0=np.array([np.log10(initial_density),np.log10(initial_te),np.log10(initial_ti),initial_ion_flow/us])
+    # Finite numerical guards prevent 10**p from underflowing to zero or
+    # overflowing during unconstrained local optimization. These are machine-
+    # representability limits, not scientific plasma-parameter bounds.
+    log10_min = float(np.log10(np.finfo(float).tiny) + 2.0)
+    log10_max = float(np.log10(np.finfo(float).max) - 2.0)
     lo=np.array([
-        np.log10(nb[0]) if nb is not None else -np.inf,
-        np.log10(tb[0]) if tb is not None else -np.inf,
-        np.log10(ib[0]) if ib is not None else -np.inf,
+        np.log10(nb[0]) if nb is not None else log10_min,
+        np.log10(tb[0]) if tb is not None else log10_min,
+        np.log10(ib[0]) if ib is not None else log10_min,
         ub[0]/us,
     ])
     hi=np.array([
-        np.log10(nb[1]) if nb is not None else np.inf,
-        np.log10(tb[1]) if tb is not None else np.inf,
-        np.log10(ib[1]) if ib is not None else np.inf,
+        np.log10(nb[1]) if nb is not None else log10_max,
+        np.log10(tb[1]) if tb is not None else log10_max,
+        np.log10(ib[1]) if ib is not None else log10_max,
         ub[1]/us,
     ])
     if not isinstance(global_search,(bool,np.bool_)):
