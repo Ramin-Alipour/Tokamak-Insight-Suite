@@ -271,3 +271,22 @@ Commits:
 - Updated the item-by-item matrix: items 72–73 are implemented/tested within the declared Maxwellian joint scope; item 81 is implemented/tested for its declared electrostatic external covariance scope. Items 20, 30, 37, 43, 44, 50, 72–73 (model extensions), 82, 89, 91, 97–99, 101–102 and 106 retain their explicit open/partial or model-boundary dispositions as recorded in the matrix.
 
 Relevant direct-main commits include `d3fdb8f`, `ef39793`, `e04726d`, `be8a094`, `95966fb`, `5656d20`, `f677d2b`, `b736ed8`, `33e5f84`, `af97009`, and `1a760c6`. GitHub Actions must complete successfully for the exact final commit before software-test success is claimed. Experimental validation remains not performed.
+
+
+## Subsequent main-branch implementation: path-integrated density and CTS mode tracking
+
+The calibrated optical Thomson API now includes the conditional helper
+`infer_thomson_path_averaged_density`. It evaluates the single-scattering
+sightline integral with explicitly supplied path-dependent incident power,
+effective differential cross-section, collection solid angle and optical
+efficiency. It reports a weighted path-average density only; a single
+integrated measurement cannot recover an arbitrary pointwise density profile.
+
+The CTS geometry API now includes
+`track_cold_plasma_modes_from_operators`, which follows polarization branches
+by maximum-overlap assignment and phase alignment along an ordered sequence of
+cold-plasma wave operators. Exact/near-degenerate eigenspaces are explicitly
+flagged as ambiguous. This does not solve coupled-mode conversion.
+
+These are software capabilities with independent unit/regression tests. They
+do not constitute empirical validation.

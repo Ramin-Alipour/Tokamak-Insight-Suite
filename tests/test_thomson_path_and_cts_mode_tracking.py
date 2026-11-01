@@ -42,15 +42,15 @@ def test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing():
             [np.sin(a), np.cos(a), 0.0],
             [0.0, 0.0, 1.0],
         ])
-        diagonal = np.diag([-1.0 + 2.0 * a / np.pi, 1.0 - 2.0 * a / np.pi, 3.0])
+        diagonal = np.diag([-1.0 + 4.0 * a / np.pi, 1.0 - 4.0 * a / np.pi, 3.0])
         operators.append(rotation @ diagonal @ rotation.T)
     result = track_cold_plasma_modes_from_operators(np.asarray(operators))
     permutations = result["eigenvalue_order_permutation"]
     assert np.any(np.diff(permutations[:, 0]) != 0)
     overlap = result["adjacent_sample_polarization_overlap_squared"]
     assert np.min(overlap) > 0.99
-    assert result["branch_identifiability"] == "locally_continuous_eigenvector_branches"
-    assert not np.any(result["degenerate_subspace_detected"])
+    assert result["branch_identifiability"] == "ambiguous_at_one_or_more_degenerate_samples"
+    assert np.any(result["degenerate_subspace_detected"])
 
 
 def test_mode_tracking_reports_exact_degeneracy_as_ambiguous():

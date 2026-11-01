@@ -4955,5 +4955,69 @@
         "tests/test_cts_numerical_convergence.py"
       ]
     }
+  },
+  {
+    "name": "Path-integrated Thomson density from calibrated scattered power",
+    "equation": "P_s = integral[n_e(s) P_i(s) (d sigma_eff/d Omega)(s) DeltaOmega(s) eta(s) ds]; n_eff = P_s / integral[P_i(s) (d sigma_eff/d Omega)(s) DeltaOmega(s) eta(s) ds]",
+    "inputs": [
+      {
+        "name": "scattered_power_W",
+        "unit": "W",
+        "role": "measured absolutely calibrated integrated scattered power"
+      },
+      {
+        "name": "path_coordinate_m",
+        "unit": "m",
+        "role": "strictly increasing sightline coordinate"
+      },
+      {
+        "name": "incident_power_profile_W",
+        "unit": "W",
+        "role": "known incident power along sightline"
+      },
+      {
+        "name": "differential_cross_section_profile_m2_sr",
+        "unit": "m^2 sr^-1",
+        "role": "known local effective differential Thomson cross-section"
+      },
+      {
+        "name": "collection_solid_angle_profile_sr",
+        "unit": "sr",
+        "role": "known local collection solid angle"
+      },
+      {
+        "name": "optical_efficiency_profile",
+        "unit": "dimensionless",
+        "role": "known local optical efficiency"
+      }
+    ],
+    "output": {
+      "name": "electron_density_path_averaged_m3",
+      "unit": "m^-3"
+    },
+    "assumptions": [
+      "Optically thin single scattering.",
+      "All path-dependent optical/geometry factors are supplied and already characterized.",
+      "The result is a kernel-weighted path-average density; one integrated power does not identify an arbitrary pointwise density profile."
+    ],
+    "status": "implemented_and_tested",
+    "category": "Thomson scattering",
+    "references": [
+      {
+        "title": "LHD Thomson Scattering Diagnostics",
+        "authors": "Yamada et al.",
+        "journal": "Journal of Fusion Energy",
+        "year": 2025,
+        "doi": "10.1007/s10894-025-00520-4"
+      }
+    ],
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true,
+    "input_data_level": "measured_calibrated_integrated_scattered_power_plus_fixed_path_metadata",
+    "execution_scope": "conditional_path_integrated_physical_inference",
+    "analysis_family": "Thomson Scattering",
+    "implementation_trace": [
+      "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+    ]
   }
 ]

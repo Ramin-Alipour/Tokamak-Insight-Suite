@@ -9,7 +9,8 @@
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
-      "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf"
+      "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+      "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis.",
     "execution_contract": {
@@ -402,6 +403,11 @@
           "name": "kappa_profile_likelihood",
           "unit": "structured; per channel for non-collective Kappa",
           "description": "Conditional one-parameter profile likelihood with nuisance re-optimization and nominal Δχ²=1 interval. Grid-censored limits are numerical diagnostics, not physical bounds; unweighted intervals use residual-scaled noise and are not measurement-noise calibrated."
+        },
+        {
+          "name": "electron_density_path_averaged_m3",
+          "unit": "m^-3; conditional path-integrated weighted average",
+          "description": "Computed by the separate path-integrated helper when all path-dependent optical factors and the absolutely calibrated integrated scattered power are supplied."
         }
       ],
       "assumptions": [
@@ -410,7 +416,8 @@
         "Non-collective Maxwellian and Kappa models use isotropic non-relativistic projected velocity distributions.",
         "Relativistic Maxwell-Juttner model uses an isotropic rest-frame distribution and a bulk velocity parallel to the scattering vector.",
         "Relativistic optical model uses elastic Thomson scattering; recoil/Compton corrections are neglected.",
-        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs."
+        "Absolute density requires W/nm spectral intensity and complete optical geometry/polarization inputs.",
+        "Path-integrated density inference treats all supplied path-dependent optical and geometric factors as already characterized and reports only the identifiable weighted path average."
       ],
       "preprocessing": [
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
@@ -427,7 +434,8 @@
         "Optical collective dielectric inference is not exposed by this entry point; microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1.",
         "Non-relativistic Maxwellian and Kappa use explicit conservative screening limits theta_e < 0.01 and |v_flow|/c < 0.1; these are asymptotic error-budget screens, not universal physical validity boundaries.",
         "The projected EVDF is a regularized one-dimensional inverse estimate conditional on the velocity grid, measured response, fitted background and GCV selection; unresolved velocity-space detail is not identifiable, and a single view cannot recover unrestricted 3-D anisotropy.",
-        "The projected EVDF inverse uses non-relativistic Doppler kinematics and is attempted only for non-collective Maxwellian and Kappa fits; for the relativistic Maxwell-Juttner model it is explicitly withheld until a relativistically consistent inverse operator is implemented."
+        "The projected EVDF inverse uses non-relativistic Doppler kinematics and is attempted only for non-collective Maxwellian and Kappa fits; for the relativistic Maxwell-Juttner model it is explicitly withheld until a relativistically consistent inverse operator is implemented.",
+        "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -472,7 +480,27 @@
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
-      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation."
+      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation.",
+      "conditional_capabilities": [
+        {
+          "name": "Path-integrated absolute-density inference",
+          "function": "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+          "required_inputs": [
+            "scattered_power_W",
+            "path_coordinate_m",
+            "incident_power_profile_W",
+            "differential_cross_section_profile_m2_sr",
+            "collection_solid_angle_profile_sr",
+            "optical_efficiency_profile"
+          ],
+          "outputs": [
+            "electron_density_path_averaged_m3",
+            "electron_density_path_averaged_uncertainty_m3",
+            "path_integrated_sensitivity_W_m3"
+          ],
+          "identifiability": "A single integrated power measurement identifies only the optical-kernel-weighted path-average density, not an arbitrary pointwise density profile."
+        }
+      ]
     },
     "scientific_references": [
       {
@@ -534,6 +562,16 @@
         "year": 2026,
         "doi": "10.1088/1748-0221/21/01/C01002",
         "scope": "Reference spectra for arbitrary electron distributions, including relativistic Maxwellian and Kappa cases; TIS uses deterministic quadrature and does not claim to reproduce the paper's Monte Carlo algorithm."
+      },
+      {
+        "title": "LHD Thomson Scattering Diagnostics",
+        "authors": "Yamada et al.",
+        "journal": "Journal of Fusion Energy",
+        "volume": "44",
+        "article": "54",
+        "year": 2025,
+        "doi": "10.1007/s10894-025-00520-4",
+        "scope": "Recent tokamak Thomson-scattering system and multi-point profile measurement context; does not replace the single-scattering path-integral relation."
       }
     ],
     "note": "Primary Analysis 1 accepts measured, calibrated multi-channel Thomson spectra and infers physical parameters. No pre-derived ne/Te profile input, detector calibration or independent experimental validation is part of this analysis.",
@@ -553,7 +591,9 @@
       "tests/test_thomson_distribution.py",
       "tests/test_thomson_profile_reconstruction.py",
       "tests/test_thomson_workflow.py",
-      "tests/test_thomson_dashboard.py"
+      "tests/test_thomson_dashboard.py",
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
     ]
   },
   {
@@ -4198,7 +4238,8 @@
       "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
       "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
       "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
-      "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
+      "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
+      "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators"
     ],
     "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs.",
     "execution_contract": {
@@ -4956,7 +4997,8 @@
         "Explicit relativistic gyrotropic electron distributions are supported by full_em_cts_spectral_density as a forward model, but are rejected by analyze_full_em_cts_spectrum; no relativistic-electron inversion is claimed.",
         "The fast-ion population shapes supplied to Full-EM inversion are fixed external inputs and are not inferred from the measured CTS spectrum.",
         "The general external covariance route currently covers electrostatic CTS probe frequency, scalar scattering angle and ion fractions; it does not yet cover the full electromagnetic magnetic-field, polarization, ray, equilibrium and spatial-geometry covariance.",
-        "Full-EM response-matrix Monte Carlo covariance is conditional on fixed external magnetic field, geometry, species composition and mode polarizations; those external-input covariances remain unpropagated."
+        "Full-EM response-matrix Monte Carlo covariance is conditional on fixed external magnetic field, geometry, species composition and mode polarizations; those external-input covariances remain unpropagated.",
+        "Cold-plasma eigenmode branch tracking is performed by polarization-overlap continuation on an ordered operator sequence; exact/near degeneracies are flagged as ambiguous. Coupled-mode conversion dynamics are not solved."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
@@ -5115,7 +5157,24 @@
           "scattering_sample_count"
         ],
         "no_implicit_model_substitution": true
-      }
+      },
+      "conditional_capabilities": [
+        {
+          "name": "Cold-plasma eigenmode branch tracking",
+          "function": "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators",
+          "required_inputs": [
+            "wave_operator_sequence (ordered Hermitian 3x3 cold-plasma wave operators)"
+          ],
+          "outputs": [
+            "tracked_eigenvalues",
+            "tracked_electric_polarizations",
+            "eigenvalue_order_permutation",
+            "adjacent_sample_polarization_overlap_squared",
+            "degenerate_subspace_detected"
+          ],
+          "identifiability": "Eigenvector branches are trackable by polarization continuity away from degeneracies; at a degenerate subspace individual eigenvectors are not uniquely identifiable."
+        }
+      ]
     },
     "scientific_references": [
       {
@@ -5180,6 +5239,14 @@
         "pages": "1775-1804",
         "year": 1991,
         "doi": "10.1088/0741-3335/33/14/005"
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "Author list as published in Fusion Engineering and Design",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "doi": "10.1016/j.fusengdes.2026.115845",
+        "scope": "Recent CTS design workflow combining ray tracing, forward modelling and Bayesian spectral inversion; context for geometry/mode-aware CTS analysis."
       }
     ],
     "primary_analysis_id": 1,
@@ -5200,7 +5267,9 @@
     ],
     "test_links": [
       "tests/test_cts_analysis.py",
-      "tests/test_cts_numerical_convergence.py"
+      "tests/test_cts_numerical_convergence.py",
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
+      "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous"
     ]
   },
   {
