@@ -3264,9 +3264,9 @@
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum"
       ],
       "raw_data_to_physics": false,
-      "calibrated_measurements_to_physics": false,
-      "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
-      "input_data_level": "model_parameters_or_derived_calibrated_quantities",
+      "calibrated_measurements_to_physics": true,
+      "execution_scope": "CTS physical forward model used by the calibrated measured-spectrum inference workflow; receives physical parameter candidates during fitting rather than raw detector values.",
+      "input_data_level": "calibrated_CTS_measurement_workflow_and_physical_model_parameters",
       "raw_data_to_physics_semantics": "Uncalibrated detector/raw acquisition values are outside the function contract; this flag is not a statement that calibrated measured spectra cannot be analyzed.",
       "analysis_family": "Analysis 1 — Thomson scattering",
       "subanalysis": "Microwave collective Thomson scattering"
