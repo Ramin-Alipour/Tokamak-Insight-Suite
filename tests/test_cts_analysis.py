@@ -301,20 +301,23 @@ def test_full_em_cts_returns_hermitian_density_current_field_covariance():
         assert np.min(np.linalg.eigvalsh(matrix)) >= -1e-12 * max(np.max(np.abs(matrix)), 1.0)
 
 
-def test_full_em_cts_requires_complete_vector_flow_and_polarization_metadata():
+def test_full_em_cts_forward_accepts_inferred_electron_flow_projection_without_vector():
     from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
 
-    with pytest.raises(ValueError, match="electron_flow_velocity_m_s"):
-        full_em_cts_spectral_density(
-            [1e9], 140e9,
-            {"incident_direction": [1, 0, 0], "scattered_direction": [0, 1, 0]},
-            electron_density_m3=2e19, electron_temperature_eV=1200,
-            ion_temperature_eV=800,
-            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
-            ion_fractions=[1.0], magnetic_field_T=[0, 0, 2],
-            electron_flow_velocity_m_s=None, ion_flow_velocity_m_s={"D+": [0, 0, 0]},
-            incident_polarization=[0, 0, 1], scattered_polarization=[0, 0, 1],
-        )
+    result = full_em_cts_spectral_density(
+        [1e9], 140e9,
+        {"incident_direction": [1, 0, 0], "scattered_direction": [0, 1, 0]},
+        electron_density_m3=2e19, electron_temperature_eV=1200,
+        ion_temperature_eV=800,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0], magnetic_field_T=[0, 0, 2],
+        electron_flow_projection_m_s=1.5e5,
+        ion_flow_velocity_m_s={"D+": [0, 0, 0]},
+        incident_polarization=[0, 0, 1], scattered_polarization=[0, 0, 1],
+        harmonic_order=3, quadrature_order=4,
+    )
+    assert np.all(np.isfinite(result["spectral_density"]))
+    assert result["spectral_density"].shape == (1,)
 
 
 def test_cts_cold_plasma_dielectric_vacuum_limit_and_hermiticity():
@@ -847,7 +850,7 @@ def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(ar
         "ion_species": [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
         "ion_fractions": [1.0],
         "magnetic_field_T": [0.0, 0.0, 2.0],
-        "electron_flow_velocity_m_s": [0.0, 0.0, 0.0],
+        "electron_flow_projection_initial_m_s": 0.0,
         "ion_flow_velocity_m_s": {"D+": [0.0, 0.0, 0.0]},
         "incident_polarization": [0.0, 0.0, 1.0],
         "scattered_polarization": [0.0, 0.0, 1.0],
@@ -869,6 +872,68 @@ def test_full_em_cts_rejects_non_real_numeric_measurement_and_response_inputs(ar
     with pytest.raises(ValueError, match="real numeric"):
         analyze_full_em_cts_spectrum(frequency, spectrum, **kwargs)
 
+
+
+
+
+def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(monkeypatch):
+    import tokamak_analysis.cts_full_em as full_em
+
+    frequency = np.linspace(-1.0, 1.0, 41) * 1.0e8
+    x = np.linspace(-1.0, 1.0, frequency.size)
+    truth = {
+        "electron_density_m3": 2.2e19,
+        "electron_temperature_eV": 1200.0,
+        "ion_temperature_eV": 700.0,
+        "electron_flow_projection_m_s": 2.2e5,
+    }
+
+    def synthetic_forward(*args, **kwargs):
+        assert "electron_flow_velocity_m_s" not in kwargs
+        flow = kwargs["electron_flow_projection_m_s"]
+        ion_temperature = kwargs["ion_temperature_eV"]["D+"]
+        spectrum = (
+            1.0
+            + 0.13 * np.log(kwargs["electron_density_m3"] / 2.0e19) * x
+            + 0.11 * np.log(kwargs["electron_temperature_eV"] / 1000.0) * x**2
+            + 0.09 * np.log(ion_temperature / 500.0) * x**3
+            + 0.17 * (flow / 1.0e6) * x**4
+        )
+        return {"spectral_density": spectrum}
+
+    monkeypatch.setattr(full_em, "full_em_cts_spectral_density", synthetic_forward)
+    synthetic = synthetic_forward(
+        frequency, 140.0e9, {},
+        electron_density_m3=truth["electron_density_m3"],
+        electron_temperature_eV=truth["electron_temperature_eV"],
+        ion_temperature_eV={"D+": truth["ion_temperature_eV"]},
+        electron_flow_projection_m_s=truth["electron_flow_projection_m_s"],
+    )["spectral_density"]
+    measured = 2.4 * synthetic + 0.7
+
+    result = full_em.analyze_full_em_cts_spectrum(
+        frequency, measured,
+        probe_frequency_Hz=140.0e9,
+        scattering_geometry={},
+        electron_density_initial_m3=2.0e19,
+        electron_temperature_initial_eV=1000.0,
+        ion_temperature_initial_eV=500.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        instrument_response=np.eye(frequency.size),
+        signal_uncertainty=np.full(frequency.size, 0.01),
+        parameter_bounds={"electron_flow_projection_m_s": [-8.0e5, 8.0e5]},
+    )
+    assert result["electron_flow_projection_m_s"] == pytest.approx(
+        truth["electron_flow_projection_m_s"], rel=2e-3
+    )
+    assert result["electron_flow_projection_is_fitted"] is True
+    assert result["electron_flow_projection_uncertainty_m_s"] >= 0.0
+    assert "electron_flow_projection_m_s" in result["parameter_names"]
 
 def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
     from tokamak_analysis.cts_analysis import _convolve
@@ -921,11 +986,14 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     assert specs["ion_velocity_initial_m_s"]["required"] is False
     assert specs["ion_velocity_initial_m_s"]["required_when_model"] == "electrostatic"
 
+    assert specs["electron_flow_projection_initial_m_s"]["required"] is False
+    assert "fitted from the measured CTS spectrum" in specs["electron_flow_projection_initial_m_s"]["description"]
+    assert "electron_flow_velocity_m_s" not in specs
+
     # Full-EM inputs are branch-conditional because the electrostatic model
     # does not consume them.
     for name in (
         "magnetic_field_T",
-        "electron_flow_velocity_m_s",
         "ion_flow_velocity_m_s",
         "incident_polarization",
         "scattered_polarization",
