@@ -2,6 +2,17 @@
 
 **Python toolkit for tokamak plasma diagnostics, data processing, and physics-oriented analysis.** Current source version: **v0.5.1**. See `docs/architecture/` for execution contracts, the canonical measurement model and reproducible project persistence.
 
+## Governing scientific-analysis input contract
+
+All physical-analysis workflows consume **measured diagnostic data that have already been prepared and calibrated by the instrument/operator**. The software uses the supplied measurements, declared physical models, and explicitly supplied fixed geometry/diagnostic metadata to infer identifiable physical quantities. It does not calibrate instruments, correct detector outputs, estimate missing calibration, or silently repair or preprocess measurements. Data-import and quality-inspection utilities are separate support functions and do not change this input contract for physical inference.
+
+Every physical workflow must distinguish:
+- **Primary outputs:** parameters identifiable from the calibrated measured data and the explicitly selected model.
+- **Conditional outputs:** parameters that become identifiable only when named auxiliary measurements or fixed metadata are supplied; the required inputs and resulting outputs must be stated.
+- **Non-identifiable quantities:** parameters not uniquely determined by the supplied measurement and model; these must be reported as unavailable with a physical reason, never fabricated.
+
+Uncertainty estimates are conditional on the supplied measurement-noise and auxiliary-input uncertainty models. Missing uncertainty or covariance is not inferred. Automated tests establish software behavior only. **No independent experimental validation is claimed or required as part of the current development scope.**
+
 ## Open research beta policy
 
 TIS is developed as an openly usable research toolkit. **Independent scientific validation is not a prerequisite for publishing, installing, running, or contributing analysis modules.** Development prioritizes implementation coverage, reproducibility, software correctness, explicit assumptions, and community feedback. Automated software tests remain in place; they check software behavior, not scientific truth. Researchers must judge whether a method, calibration, units, geometry, and uncertainty model are appropriate for their experiment. See [`docs/OPEN_RESEARCH_BETA.md`](docs/OPEN_RESEARCH_BETA.md).
