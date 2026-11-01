@@ -4400,5 +4400,220 @@
         "type": "textbook"
       }
     ]
+  },
+  {
+    "name": "Magnetized full-electromagnetic collective Thomson spectral transfer",
+    "equation": "S_sc(ω) ∝ ∫_V W_beam(r,ω) ⟨J^(2)(r,ω) C_fluct(r,ω) J^(2)†(r,ω)⟩ dV; local response combines the magnetized kinetic dielectric/wave tensors with the selected nonlinear source-current closure.",
+    "inputs": "Frequency shift [Hz], probe frequency [Hz], measured geometry and polarization, magnetic field [T], electron density/temperature, ion species/fractions/temperatures/flows, optional supplied gyrotropic populations, harmonic and quadrature orders, damping regularization, optional frequency-resolved ray/beam geometry.",
+    "output": "Full-EM model spectral density, dielectric and wave tensors, fluctuation covariance, source-current and coupling diagnostics, and optional scattering-volume integration diagnostics.",
+    "assumptions": "Magnetized kinetic response; Maxwellian thermal species unless explicit gyrotropic kinetic populations are supplied; Maxwellian bulk-electron nonlinear source uses the low-temperature Bindslev closure; cold-plasma geometrical optics and supplied local Gaussian beam covariance for optional ray/beam integration.",
+    "status": "D",
+    "category": "Microwave collective Thomson scattering",
+    "execution_contract": {
+      "schema_version": "1.0",
+      "implementation_link_status": "mapped",
+      "function_link": "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+      "function_links": [
+        "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
+        "tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum",
+        "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_three_wave_vertex",
+        "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+        "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence"
+      ],
+      "formula_key": "magnetized_full_em_cts_spectral_transfer",
+      "analysis_family": "Analysis 1 — Thomson scattering",
+      "subanalysis": "Microwave collective Thomson scattering — Full-EM branch",
+      "execution_scope": "magnetized_full_electromagnetic_forward_model_and_spectrum_inversion",
+      "input_data_level": "measured_calibrated_CTS_spectrum_plus_external_physical_model_inputs",
+      "raw_data_to_physics": false,
+      "calibrated_measurements_to_physics": false,
+      "input_specs": [
+        {
+          "name": "frequency_shift_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "probe_frequency_Hz",
+          "unit": "Hz",
+          "required": true
+        },
+        {
+          "name": "scattering_geometry",
+          "unit": "local directions or frequency-resolved geometry",
+          "required": true
+        },
+        {
+          "name": "electron_density_m3",
+          "unit": "m^-3; forward model input",
+          "required": true
+        },
+        {
+          "name": "electron_temperature_eV",
+          "unit": "eV; forward model input",
+          "required": true
+        },
+        {
+          "name": "ion_species",
+          "unit": "species metadata",
+          "required": true
+        },
+        {
+          "name": "ion_fractions",
+          "unit": "charge-density fractions",
+          "required": true
+        },
+        {
+          "name": "ion_temperature_eV",
+          "unit": "eV; scalar, species mapping or per-species vector",
+          "required": true
+        },
+        {
+          "name": "magnetic_field_T",
+          "unit": "T; non-zero vector",
+          "required": true
+        },
+        {
+          "name": "incident_polarization",
+          "unit": "complex 3-vector",
+          "required": true
+        },
+        {
+          "name": "scattered_polarization",
+          "unit": "complex 3-vector",
+          "required": true
+        },
+        {
+          "name": "electron_flow_velocity_m_s",
+          "unit": "m s^-1; 3-vector for forward model",
+          "required": false
+        },
+        {
+          "name": "ion_flow_velocity_m_s",
+          "unit": "m s^-1; species vectors for forward model",
+          "required": false
+        },
+        {
+          "name": "electron_distribution",
+          "unit": "explicit relativistic gyrotropic VDF metadata; forward model only in current inversion implementation",
+          "required": false
+        },
+        {
+          "name": "fast_ion_populations",
+          "unit": "explicit external gyrotropic populations",
+          "required": false
+        },
+        {
+          "name": "harmonic_order",
+          "unit": "integer >=2",
+          "required": false
+        },
+        {
+          "name": "quadrature_order",
+          "unit": "integer >=4",
+          "required": false
+        },
+        {
+          "name": "damping_rate_rad_s",
+          "unit": "rad s^-1; numerical resonance regularization, not collision rate",
+          "required": false
+        },
+        {
+          "name": "frequency_resolved_geometry",
+          "unit": "frequency-resolved ray/beam scattering samples",
+          "required": false
+        }
+      ],
+      "output_specs": [
+        {
+          "name": "spectral_density",
+          "unit": "model spectral density"
+        },
+        {
+          "name": "dielectric_tensor",
+          "unit": "complex 3x3 tensor per frequency"
+        },
+        {
+          "name": "wave_tensor",
+          "unit": "complex 3x3 tensor per frequency"
+        },
+        {
+          "name": "fluctuation_covariance_density_current_E_B",
+          "unit": "complex covariance tensor"
+        },
+        {
+          "name": "bindslev_source_current_operator",
+          "unit": "complex tensor"
+        },
+        {
+          "name": "relativistic_three_wave_vertex_diagnostics",
+          "unit": "complex kinetic vertex diagnostics"
+        },
+        {
+          "name": "relative_gaussian_beam_overlap",
+          "unit": "dimensionless relative weighting"
+        },
+        {
+          "name": "scattering_locations_m",
+          "unit": "m"
+        },
+        {
+          "name": "bulk_electron_closure_validity_status",
+          "unit": "status string"
+        },
+        {
+          "name": "numerical_controls",
+          "unit": "structured numerical settings"
+        }
+      ],
+      "prerequisites": [
+        "Measured calibrated CTS frequency axis, spectral power and measured instrument response for inversion.",
+        "External ion composition, magnetic field, geometry and mode polarizations.",
+        "Researcher-supplied Bindslev asymptotic screening limit if a quantitative Maxwellian-closure screen is required."
+      ],
+      "uncertainty_model": "Forward model has no automatic uncertainty budget. The measured-spectrum inversion reports local Jacobian covariance conditional on fixed external inputs; magnetic field, ion composition, geometry, polarization, ray tracing, beam covariance and supplied VDF shape uncertainties are not fully propagated.",
+      "limitations": [
+        "Measured-spectrum inversion currently rejects explicit relativistic electron_distribution because a drifted relativistic VDF fit is not implemented; the relativistic VDF remains a forward-model capability.",
+        "Supplied fast-ion population shapes and composition are external fixed inputs, not reconstructed from the measured spectrum.",
+        "Only velocity projections along the scattering wavevector are identifiable from one geometry.",
+        "Cold-plasma geometrical optics does not include diffraction or propagated quasi-optical beams; supplied beam covariance is not propagated along the ray.",
+        "Plasma density and thermal temperatures are uniform over the sampled scattering volume.",
+        "Mode conversion and branch tracking through degeneracies are not implemented.",
+        "Absolute transmitter/receiver coupling is not inferred; scattering-volume weighting is relative.",
+        "The Maxwellian Bindslev closure is not quantitatively screened unless a researcher-selected theta_e limit is supplied; damping is numerical regularization, not a physical collision frequency.",
+        "Harmonic/quadrature convergence is not established by one inversion; use assess_full_em_cts_numerical_convergence.",
+        "No independent experimental validation is claimed."
+      ],
+      "test_links": [
+        "tests/test_cts_analysis.py",
+        "tests/test_cts_numerical_convergence.py"
+      ],
+      "note": "This is a forward physical model and Full-EM inversion branch, not a raw-detector calibration workflow. Its capabilities are not interchangeable with the unmagnetized electrostatic CTS branch."
+    },
+    "references": [
+      {
+        "title": "Plasma Scattering of Electromagnetic Radiation",
+        "authors": "J. Sheffield, D. Froula, S. H. Glenzer, N. C. Luhmann Jr.",
+        "year": 2011,
+        "publisher": "Academic Press",
+        "type": "textbook"
+      },
+      {
+        "title": "Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas",
+        "authors": "J. L. Flocken, S. B. Korsholm, J. Rasmussen",
+        "journal": "Fusion Engineering and Design",
+        "year": 2026,
+        "article": "115845",
+        "doi": "10.1016/j.fusengdes.2026.115845"
+      },
+      {
+        "title": "Quasi-optical beam tracing module development for millimeter-wave high-wavenumber collective scattering on the NSTX-U and EAST tokamaks",
+        "journal": "Fusion Engineering and Design",
+        "volume": "212",
+        "article": "114826",
+        "year": 2025,
+        "doi": "10.1016/j.fusengdes.2025.114826"
+      }
+    ]
   }
 ]
