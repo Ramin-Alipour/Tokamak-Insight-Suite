@@ -48,6 +48,28 @@ def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     assert all("aic" in item and "bic" in item for item in out["parametric_model_comparison"].values())
 
 
+def test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance():
+    wavelength, signal, background = _case()
+    out = reconstruct_thomson_evdf(
+        wavelength, signal,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        regularization_strength=None,
+        velocity_limit_m_s=8.0e4,
+        velocity_points=81,
+        signal_uncertainty=np.full(signal.size, 1.0),
+    )
+    assert out["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
+    assert np.isfinite(out["regularization_strength"]) and out["regularization_strength"] > 0
+    assert out["regularization_gcv_scores"].shape == out["regularization_candidates"].shape
+    assert out["evdf_covariance_available"] is True
+    assert out["evdf_covariance"].shape == (81, 81)
+    assert out["evdf_standard_uncertainty_s_per_m"].shape == (81,)
+    assert "conditional on the selected grid" in out["evdf_uncertainty_interpretation"]
+
+
 def test_evdf_requires_explicit_positive_regularization_and_response():
     wavelength, signal, background = _case()
     with pytest.raises(ValueError, match="regularization_strength"):
