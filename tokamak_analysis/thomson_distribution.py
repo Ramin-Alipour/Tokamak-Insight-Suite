@@ -419,6 +419,7 @@ def analyze_thomson_spectral_distribution(
         "degrees_of_freedom": int(dof), "chi_square": chi_square,
         "reduced_chi_square": reduced_chi_square, "r_squared": r_squared,
         "model": "observed Thomson spectral moments and response-convolved Gaussian shape diagnostics",
+        "parameter_identifiability": __import__("tokamak_analysis.thomson_identifiability", fromlist=["spectral_distribution_identifiability"]).spectral_distribution_identifiability(),
         "assumptions": [
             "Calibrated, strictly increasing wavelength axis",
             "A measured instrument-response matrix is used only in the forward shape fit; measured input data are not corrected",
