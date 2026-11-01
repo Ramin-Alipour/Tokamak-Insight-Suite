@@ -540,5 +540,7 @@ def reconstruct_thomson_profile_from_spectra(
             "No equilibrium mapping, flux-surface mapping or tomographic inversion is inferred from radius alone.",
         ],
     }
+    from .thomson_identifiability import spatial_profile_identifiability
+    result["parameter_identifiability"] = spatial_profile_identifiability()
     result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
     return result
