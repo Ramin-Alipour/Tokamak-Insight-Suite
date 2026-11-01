@@ -6913,6 +6913,8 @@
       }
     ],
     "note": "Analysis 1 subanalysis: single-spectrum spectral-shape diagnostics plus physical parameters from the canonical selected Thomson fit of the same calibrated measured spectrum; no arbitrary electron velocity-distribution reconstruction is claimed.",
-    "primary_analysis_id": 1
+    "primary_analysis_id": 1,
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true
   }
 ]
