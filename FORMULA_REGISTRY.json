@@ -4856,6 +4856,31 @@
           "name": "limitations",
           "unit": "text list",
           "description": "Runtime limitations for the selected forward-model configuration."
+        },
+        {
+          "name": "kinetic_population_diagnostics",
+          "unit": "frequency-indexed kinetic population diagnostics",
+          "description": "Alias containing relativistic gyrotropic conductivity/noise diagnostics for supplied non-Maxwellian populations."
+        },
+        {
+          "name": "bindslev_dielectric_form_factors",
+          "unit": "frequency x 10 x 10 complex tensor",
+          "description": "Bindslev dielectric coupling form-factor matrix."
+        },
+        {
+          "name": "bindslev_X_tensor",
+          "unit": "frequency x 3 x 3 x 3 complex tensor",
+          "description": "Magnetized Bindslev rank-three X pseudotensor."
+        },
+        {
+          "name": "bindslev_Gamma_inverse_tensor",
+          "unit": "frequency x 3 x 3 x 3 x 3 complex tensor",
+          "description": "Inverse rank-four Gamma tensor used to construct the Bindslev X tensor."
+        },
+        {
+          "name": "electron_thermal_relativistic_parameter",
+          "unit": "dimensionless theta_e",
+          "description": "Electron temperature divided by electron rest energy, T_e/(m_e c^2)."
         }
       ],
       "prerequisites": [
