@@ -180,10 +180,34 @@ Relevant commits:
 - `180d20ae2415ff2ce69f935f634df757e027392e`
 - `d0432837e40a5ef9b043edbf964bc9e30dfc5661`
 
-## J. Items deliberately not changed without a scientific decision
+## J. EVDF extraction decision and implementation status
 
-The most important unresolved scope question is the meaning of **“Thomson spectral distribution analysis.”** The current entry 81 is a descriptive wavelength-space moment/shape analysis, not an electron VDF inversion. Turning it into an inferred electron distribution would require selecting a parameterized VDF family (or a regularized non-parametric inverse problem), declaring the information content and identifiability conditions, and specifying what prior/regularization is scientifically acceptable. A single spectrum does not uniquely determine an arbitrary multidimensional VDF. This must not be silently changed.
+The spectral-distribution subanalysis (registry entry 81) remains a descriptive wavelength-space moment/shape analysis. It is not conflated with electron velocity-space inference. The separate thomson_evdf.py inverse solver now has automatic generalized-cross-validation (GCV) selection of the second-difference Tikhonov regularization strength when no explicit value is supplied. It reports the candidate grid and GCV scores, plus a local active-set covariance and pointwise standard uncertainty conditional on the selected grid, response, fitted background, regularization and active set.
 
-Likewise, extending full-EM CTS uncertainty propagation, adding spatially regularized joint optical inversion, or adding collision/finite-orbit-width physics changes the computational scope and requires explicit model/parameter choices. These are recorded as development gaps, not falsely reported as already fixed.
+The primary measured-spectrum inference now automatically attempts a one-dimensional normalized electron-velocity marginal along the scattering vector for each channel. It reuses the same calibrated measured spectrum, fitted physical-model background nuisance component, measured response matrix and supplied spectral uncertainty/covariance. Its velocity interval is derived from the measured wavelength coverage and scattering geometry. Channel-level failures are reported as unavailable with a reason; they do not invalidate the primary physical Thomson fit. The result is not an unrestricted 3-D EVDF, does not infer anisotropy or perpendicular velocity components from one view, and does not independently identify absolute density. Its directional equivalent temperature is not substituted for the scalar physical electron temperature.
 
-**Validation status:** no experimental validation was performed or claimed. GitHub Actions software tests are separate from experimental validation; their final status must be checked against the resulting main-branch commit before calling the code changes software-test-clean.
+The previous uncertainty-registry wording that incorrectly restricted scalar scattering-angle uncertainty to only non-relativistic models has also been corrected in both canonical registry copies. A regression test now guards the relativistic Maxwell-Juttner uncertainty contract.
+
+## K. Follow-on changes applied directly to main
+
+- Corrected primary Thomson registry metadata for laser-wavelength and scalar scattering-angle uncertainty propagation, including the mutually exclusive beam-direction uncertainty representation.
+- Added automatic GCV regularization selection to the projected EVDF inverse solver while preserving explicit positive regularization as an override.
+- Added conditional active-set EVDF covariance and pointwise standard uncertainty, with its scope stated explicitly.
+- Integrated per-channel projected EVDF extraction into the primary Thomson measured-spectrum workflow; it is enabled by default and can be explicitly disabled. The workflow returns the EVDF result or a channel-specific unavailable status.
+- Added the enable_evdf_reconstruction and evdf_velocity_points input contract and the electron_velocity_distribution output contract.
+- Added regression coverage for GCV selection, conditional covariance, primary-workflow integration and explicit opt-out.
+- Updated the Thomson analysis documentation and synchronized both root and packaged diagnostic registries.
+
+Follow-on commit heads include:
+- a3215471279c4bbf4d7c4400a0c262a694a56736
+- fd2762f3e7ef088d7443e6c26a80629877c383ff
+- 4e67b7b71a6eec776054bdcd74b6f45c7dd40e3b
+- b208a5f9155dc0868527f550011721b9ca559207
+- 3265202783422767255065611ea023da27da3048
+- 22b44d11c2b30d3f93c6104ae9197c0db99190ba
+- aa4b8f1718194d5ca2671dea2abd67d3c306fd14
+- 2c0a85b998072becf59977fe0243a3ef671a6071
+- 52a31fb8f1a581d59f5a8a4d393a25f1d78c0ed6
+- cc0e199224f4dfadc4744010a1d11a1c787764b1
+
+**Validation status:** no experimental validation was performed or claimed. GitHub Actions software tests are separate from experimental validation. The latest Actions run for the final source/documentation commit must complete before describing this work as software-test-clean. The EVDF covariance is a conditional local approximation, not a posterior or experimental uncertainty validation.
