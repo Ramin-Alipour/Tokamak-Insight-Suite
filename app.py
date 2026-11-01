@@ -3504,6 +3504,9 @@ elif page=='Advanced Analysis':
                     st.success('Magnetized full-EM CTS inversion completed within the declared model scope.')
                     st.metric('Electron density',f"{result_cts['electron_density_m3']:.5g} m⁻³")
                     st.metric('Electron temperature',f"{result_cts['electron_temperature_eV']:.5g} eV")
+                    st.metric('Electron-flow projection along scattering wavevector',
+                              f"{result_cts['electron_flow_projection_m_s']:.5g} ± {result_cts['electron_flow_projection_uncertainty_m_s']:.2g} m/s")
+                    st.caption('Only the component along the local scattering wavevector is inferred; a single CTS geometry does not determine the transverse velocity components.')
                     st.json(result_cts)
                     json_download('Export full-EM CTS inversion and uncertainty diagnostics',result_cts,'tis_cts_full_em_inversion.json')
                     add_report_section('Magnetized full-EM CTS inversion',result_cts)
