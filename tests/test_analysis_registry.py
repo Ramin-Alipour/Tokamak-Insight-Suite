@@ -274,7 +274,7 @@ def test_thomson_profile_json_registry_copies_match_runtime_uncertainty_contract
         (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
     )
     assert root_registry == packaged_registry
-    entry = next(item for item in root_registry if item.get("id") == 46)
+    entry = next(item for item in root_registry if item.get("diagnostic") == "Thomson spatial profile reconstruction")
     inputs = {
         item["name"]: item
         for item in entry["execution_contract"]["input_specs"]
