@@ -37,7 +37,7 @@ def _response_stack(response, n_channels, n_wavelengths):
         raise ValueError("instrument_response must be (n_lambda,n_lambda) or (n_channels,n_lambda,n_lambda)")
     if not np.all(np.isfinite(value)) or np.any(value < 0):
         raise ValueError("instrument_response must be finite and non-negative")
-    sums = value.sum(axis=1)
+    sums = value.sum(axis=0)
     if np.any(sums <= 0) or not np.allclose(sums, 1.0, rtol=1e-6, atol=1e-9):
         raise ValueError("instrument_response columns must sum to one")
     return value
@@ -119,7 +119,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     span = float(x[-1] - x[0])
     spectral_spacing = float(np.min(np.diff(x)))
     peak_scale = max(float(np.max(y) - np.median(y)), np.finfo(float).tiny)
-    initial_sigma = max(span / 12.0, spectral_spacing)
+    initial_sigma = max(span / 3.0, spectral_spacing)
     initial_te = max(_MEC2_EV * (initial_sigma / (2.0 * laser * np.sin(angle/2.0)))**2, 0.05)
     initial_te = float(np.clip(initial_te, 0.05, 1e5))
     initial_amp = peak_scale / max(float(np.max(h.sum(axis=1))), 1.0)
