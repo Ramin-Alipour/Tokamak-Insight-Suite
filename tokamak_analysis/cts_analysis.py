@@ -608,7 +608,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         )
     cov0=np.linalg.pinv(fit.jac.T@fit.jac)
     if unc is None and spectral_covariance is None: cov0*=float(data_fit_residual@data_fit_residual/dof)
-    trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]
+    trans=np.eye(len(fit.x)); trans[0,0]=np.log(10)*d["electron_density_m3"]; trans[1,1]=np.log(10)*d["electron_temperature_eV"]; trans[2,2]=np.log(10)*d["ion_temperature_eV"]; trans[3,3]=us; trans[4,4]=us
     if fast and fast["kind"]=="maxwellian": trans[6,6]=np.log(10)*d["fast_ion"]["temperature_eV"]
     cov=trans@cov0@trans.T; su=np.sqrt(np.maximum(np.diag(cov),0)); q,qhat,angle=_geometry(scattering_geometry,f0)
     alpha=1/(q*np.sqrt(EPS0*d["electron_temperature_eV"]*E/(d["electron_density_m3"]*E**2)))
