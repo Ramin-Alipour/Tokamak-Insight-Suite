@@ -674,7 +674,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if fast["kind"]=="maxwellian":
             out["fast_ion_temperature_uncertainty_eV"]=float(total_sigma[6] if out.get("model_discrepancy_scale") is not None else su[6])
         elif fast["kind"]=="infer_tabulated_1d":
-            logits=fit.x[5:]
+            logits=fit.x[6:]
             def decode_pdf(values):
                 return _softmax(np.r_[values,0.0])/_trapezoid_node_weights(fast["vdf"]["velocity_m_s"])
             pdf_jac=np.empty((fast["vdf"]["velocity_m_s"].size,logits.size))
