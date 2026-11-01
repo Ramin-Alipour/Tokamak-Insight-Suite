@@ -4642,12 +4642,14 @@
         {
           "name": "electron_distribution",
           "unit": "explicit relativistic gyrotropic VDF metadata; forward model only in current inversion implementation",
-          "required": false
+          "required": false,
+          "description": "Optional explicit relativistic gyrotropic electron VDF for the forward model only. The current measured-spectrum inversion rejects this option because a drifted relativistic VDF fit is not implemented."
         },
         {
           "name": "fast_ion_populations",
           "unit": "explicit external gyrotropic populations",
-          "required": false
+          "required": false,
+          "description": "Optional externally supplied gyrotropic fast-ion population shapes. The measured-spectrum inversion holds these shapes fixed; it does not infer arbitrary fast-ion VDF shapes."
         },
         {
           "name": "harmonic_order",
@@ -4668,6 +4670,24 @@
           "name": "frequency_resolved_geometry",
           "unit": "frequency-resolved ray/beam scattering samples",
           "required": false
+        },
+        {
+          "name": "electron_flow_projection_m_s",
+          "unit": "m s^-1; scalar component along local scattering wavevector",
+          "required": false,
+          "description": "Optional projected electron-flow component for local or frequency-resolved forward calculations; not a full three-dimensional vector."
+        },
+        {
+          "name": "ion_flow_projection_m_s",
+          "unit": "m s^-1; scalar or species mapping",
+          "required": false,
+          "description": "Optional per-species projected ion-flow components along the local scattering wavevector."
+        },
+        {
+          "name": "bindslev_validity_theta_e_limit",
+          "unit": "dimensionless theta_e threshold, 0<limit<1",
+          "required": false,
+          "description": "Optional researcher-selected low-temperature screening threshold for the Maxwellian Bindslev closure; not a universal physical constant."
         }
       ],
       "output_specs": [
