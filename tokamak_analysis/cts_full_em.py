@@ -902,6 +902,14 @@ def analyze_full_em_cts_spectrum(
     """
     from scipy.optimize import least_squares
 
+    if electron_distribution is not None:
+        raise ValueError(
+            "Full-EM spectrum inversion cannot currently fit electron flow with an explicit "
+            "relativistic electron distribution because a drifted relativistic VDF is not "
+            "implemented; use the Maxwellian bulk-electron branch rather than fixing or "
+            "silently assuming an electron-flow vector"
+        )
+
     f = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
     y = _real_array(measured_spectrum, "measured_spectrum", 1)
     if f.ndim != 1 or y.shape != f.shape or f.size < 8:
