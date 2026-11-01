@@ -291,7 +291,8 @@ def _reconstruct_inferred_parameter_profile(
 def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
-    **kwargs,
+    joint_spatial_spectral=False, spatial_mixing_matrix=None,
+    spatial_regularization_strength=0.0, **kwargs,
 ):
     """Infer physical parameters from calibrated spectra, then reconstruct profiles.
 
@@ -300,6 +301,28 @@ def reconstruct_thomson_profile_from_spectra(
     beyond the measured channel coordinates.
     """
     selected_model = kwargs.get("model")
+    if joint_spatial_spectral:
+        if spatial_mixing_matrix is None:
+            raise ValueError("spatial_mixing_matrix is required when joint_spatial_spectral=True")
+        if selected_model not in (None, "non_collective_maxwellian"):
+            raise ValueError("joint spatial-spectral reconstruction currently supports only non_collective_maxwellian")
+        if len(args) < 3:
+            raise ValueError("joint spatial-spectral reconstruction requires wavelength_nm, measured spectra and radius_m")
+        allowed_joint = {"model", "laser_wavelength_nm", "scattering_angle_rad",
+                         "instrument_response", "signal_uncertainty", "joint_spectral_covariance"}
+        unsupported = set(kwargs)-allowed_joint
+        if unsupported:
+            raise ValueError(f"unsupported joint spatial-spectral inputs: {sorted(unsupported)}")
+        from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
+        return reconstruct_joint_thomson_spatial_spectra(
+            args[0], args[1], args[2], spatial_mixing_matrix,
+            laser_wavelength_nm=kwargs["laser_wavelength_nm"],
+            scattering_angle_rad=kwargs["scattering_angle_rad"],
+            instrument_response=kwargs.get("instrument_response"),
+            signal_uncertainty=kwargs.get("signal_uncertainty"),
+            joint_spectral_covariance=kwargs.get("joint_spectral_covariance"),
+            regularization_strength=spatial_regularization_strength,
+        )
     if selected_model not in {
         "non_collective_maxwellian",
         "non_collective_kappa",
