@@ -3311,7 +3311,7 @@ elif page=='Advanced Analysis':
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
-                    cts_response_uncertainty=None if cts_response_uncertainty_upload is None else pd.read_csv(cts_response_uncertainty_upload,header=None).to_numpy(dtype=float)
+                    cts_response_uncertainty=None if cts_response_unc_upload is None else pd.read_csv(cts_response_unc_upload,header=None).to_numpy(dtype=float)
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
@@ -3358,6 +3358,7 @@ elif page=='Advanced Analysis':
                         'ion_species':ion_species,'ion_fractions':fractions,
                         'instrument_response':cts_response,'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
+                        'instrument_response_uncertainty':cts_response_uncertainty,
                         'electron_density_initial_m3':None if not cts_density_initial.strip() else float(cts_density_initial),
                         'electron_temperature_initial_eV':None if not cts_temperature_initial.strip() else float(cts_temperature_initial),
                         'ion_temperature_initial_eV':None if not cts_ion_temperature_initial.strip() else float(cts_ion_temperature_initial),
@@ -3470,6 +3471,7 @@ elif page=='Advanced Analysis':
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    cts_response_uncertainty=None if cts_response_uncertainty_upload is None else pd.read_csv(cts_response_uncertainty_upload,header=None).to_numpy(dtype=float)
                     if cts_uncertainty is None and cts_spectral_cov is None:
                         raise ValueError('Full-EM CTS requires either a positive spectral 1σ uncertainty column or a full frequency-bin covariance matrix.')
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
