@@ -4166,7 +4166,7 @@
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
-          "description": "Optional pointwise 1-sigma uncertainty for electrostatic CTS. Full-electromagnetic CTS requires exactly one of signal_uncertainty or spectral_covariance."
+          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
         },
         {
           "name": "fast_ion",
@@ -4185,7 +4185,7 @@
           "name": "spectral_covariance",
           "unit": "frequency-bin covariance matrix",
           "required": false,
-          "description": "Optional frequency-bin covariance for electrostatic CTS. Full-electromagnetic CTS requires exactly one of spectral_covariance or signal_uncertainty; the two are mutually exclusive."
+          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
         },
         {
           "name": "external_parameter_uncertainties",
@@ -4210,7 +4210,7 @@
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
-          "required": true,
+          "required": false,
           "description": "Required for the electrostatic branch as an explicit projected electron-flow input; supply 0.0 only when stationary electron flow is the intended physical assumption. The full-electromagnetic branch instead requires electron_flow_velocity_m_s.",
           "required_when_model": "electrostatic"
         },
@@ -4235,7 +4235,7 @@
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
-          "required": true,
+          "required": false,
           "description": "Required optimizer initial estimate for the electrostatic branch; it is not a fixed inferred flow. The full-electromagnetic branch instead requires ion_flow_velocity_m_s.",
           "required_when_model": "electrostatic"
         },
