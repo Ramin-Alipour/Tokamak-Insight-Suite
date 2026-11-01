@@ -248,3 +248,17 @@ def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract()
             "optimizer", "optimizer_candidate"} <= outputs
     assert any("regularization rows do not count" in item.lower()
                for item in contract["limitations"])
+
+
+def test_thomson_spatial_profile_relativistic_geometry_uncertainty_contract_matches_implementation():
+    inputs = {
+        item["name"]: item
+        for item in get_analysis(46)["execution_contract"]["input_specs"]
+    }
+    laser = inputs["laser_wavelength_uncertainty_nm"]["description"].lower()
+    angle = inputs["scattering_angle_uncertainty_rad"]
+    assert "relativistic maxwell-juttner" in laser
+    assert "monte carlo" in laser
+    assert "relativistic maxwell-juttner" in angle["unit"].lower()
+    assert "monte carlo" in angle["description"].lower()
+    assert "mutually exclusive" in angle["description"].lower()
