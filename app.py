@@ -3201,7 +3201,7 @@ elif page=='Advanced Analysis':
         elif cts_model is None:
             st.info('Select the CTS physical model explicitly. No model is selected automatically.')
         elif cts_model=='electrostatic':
-            st.caption('This workflow uses the unmagnetized electrostatic longitudinal dielectric model. Electron flow is explicit; one common ion temperature and projected ion flow are fitted across supplied background species.')
+            st.caption('This workflow uses the unmagnetized electrostatic longitudinal dielectric model. Electron-flow projection is fitted from the spectrum; the optional value below is only an optimizer seed. One common ion temperature and projected ion flow are fitted across supplied background species.')
             c1,c2=st.columns(2)
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_frequency_col')
@@ -3224,7 +3224,7 @@ elif page=='Advanced Analysis':
                 cts_regularization=st.text_input('Regularization strength (required only for regularized mode)',value='',key='cts_regularization')
                 cts_probe_frequency_unc=st.text_input('Probe-frequency 1σ uncertainty (Hz; optional)',key='cts_probe_frequency_unc')
                 cts_angle_unc=st.text_input('Scattering-angle 1σ uncertainty (rad; optional)',key='cts_angle_unc')
-                cts_electron_flow=st.text_input('Electron-flow projection (m/s; required; enter 0 only to assume stationary flow)',key='cts_electron_flow')
+                cts_electron_flow=st.text_input('Electron-flow projection initial estimate (m/s; optional optimizer seed; blank uses a numerical zero seed)',key='cts_electron_flow')
                 cts_electron_flow_unc=st.text_input('Electron-flow projection 1σ uncertainty (m/s; optional)',key='cts_electron_flow_unc')
             st.markdown('**Ion composition (externally supplied)**')
             s1,s2,s3=st.columns(3)
@@ -3262,8 +3262,6 @@ elif page=='Advanced Analysis':
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
-                    if not cts_electron_flow.strip():
-                        raise ValueError('Enter the electron-flow projection explicitly; enter 0 only if stationary electron flow is an intentional assumption.')
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
@@ -3319,7 +3317,7 @@ elif page=='Advanced Analysis':
                         'ion_temperature_initial_eV':float(cts_ion_temperature_initial),
                         'ion_velocity_initial_m_s':float(cts_ion_flow_initial),
                         'parameter_bounds':parameter_bounds,
-                        'electron_velocity_projection_m_s':float(cts_electron_flow),
+                        'electron_velocity_projection_m_s':None if not cts_electron_flow.strip() else float(cts_electron_flow),
                         'fast_ion':fast_ion,'inversion_method':cts_method,
                         'global_search':bool(cts_global_search),
                     }
@@ -3347,7 +3345,7 @@ elif page=='Advanced Analysis':
                     st.error(f'CTS inversion failed: {e}')
 
         else:
-            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev Maxwellian-electron vertex or an explicitly supplied relativistic electron VDF, and species-resolved ion temperatures. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
+            st.caption('Full-EM CTS uses magnetized kinetic response, the Bindslev low-temperature Maxwellian-electron vertex, and species-resolved ion temperatures. Relativistic gyrotropic electron VDFs are supported by the forward model only; measured-spectrum inversion currently rejects them because a drifted relativistic electron VDF fit is not implemented. Optional ray-geometry JSON enables path-integrated Gaussian scattering-volume weighting.')
             c1,c2=st.columns(2)
             with c1:
                 cts_frequency_col=col_select('Frequency shift (Hz)',numeric,'cts_full_frequency_col')
@@ -3398,19 +3396,11 @@ elif page=='Advanced Analysis':
                 cts_scattered_polarization=st.text_input('Scattered polarization (x,y,z or complex JSON vector)',key='cts_full_scattered_polarization')
             if cts_geometry_upload is not None:
                 st.caption('Incident/scattered directions are taken exclusively from the uploaded frequency-resolved geometry.')
-            cts_electron_distribution_json=st.text_area(
-                'Optional relativistic electron distribution JSON',
-                placeholder='{"kind":"relativistic_maxwell_juttner"}',
-                key='cts_full_electron_distribution_json',
+            cts_bindslev_theta_limit=st.text_input(
+                'Optional researcher-defined Bindslev validity limit θₑ = Tₑ/(mₑc²) (dimensionless, 0 < limit < 1)',
+                value='', key='cts_full_bindslev_theta_limit',
             )
-            if not cts_electron_distribution_json.strip():
-                cts_bindslev_theta_limit=st.text_input(
-                    'Optional researcher-defined Bindslev validity limit θₑ = Tₑ/(mₑc²) (dimensionless, 0 < limit < 1)',
-                    value='', key='cts_full_bindslev_theta_limit',
-                )
-                st.caption('If blank, the result is explicitly marked not quantitatively screened; if supplied, fitted θₑ above this limit is rejected. No universal cutoff is imposed.')
-            else:
-                cts_bindslev_theta_limit=''
+            st.caption('If blank, the result is explicitly marked not quantitatively screened; if supplied, fitted θₑ above this limit is rejected. No universal cutoff is imposed. The Maxwellian Bindslev closure is used in inversion.')
             cts_fast_ions_json=st.text_area(
                 'Optional relativistic fast-ion populations JSON',
                 placeholder='[{"name":"fast D+","charge_state":1,"mass_amu":2.014,"density_m3":1e17,"flow_velocity_m_s":[0,0,0],"distribution":{"kind":"relativistic_bigaussian","temperature_perpendicular_eV":2e5,"temperature_parallel_eV":1e5}}]',
@@ -3461,7 +3451,6 @@ elif page=='Advanced Analysis':
                             'incident_direction':_parse_ts_vector(cts_incident_direction,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(cts_scattered_direction,'Scattered direction'),
                         }
-                    electron_distribution=None if not cts_electron_distribution_json.strip() else json.loads(cts_electron_distribution_json)
                     fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
                     kwargs_cts={
@@ -3482,7 +3471,6 @@ elif page=='Advanced Analysis':
                         'spectral_covariance':cts_spectral_cov,
                         'parameter_bounds':parameter_bounds,
                         'fast_ion_populations':fast_ions,
-                        'electron_distribution':electron_distribution,
                         'harmonic_order':int(cts_harmonic_order),
                         'quadrature_order':int(cts_quadrature_order),
                     }
