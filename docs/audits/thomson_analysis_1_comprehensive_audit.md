@@ -258,3 +258,16 @@ Commits:
 - `f31efd63019349b744e6e0a8bd7314a40b3e795c` — regression assertion for correlated-covariance provenance
 
 **Software CI status:** not yet confirmed for these direct-main commits. No experimental validation was performed or claimed.
+
+
+## P. Dashboard/API integration updates applied directly to `main` on 2026-11-01
+
+- Exposed the fixed-operator joint wavelength-resolved Maxwellian spatial-spectral inverse from the primary Thomson dashboard, with explicit spatial-mixing-matrix upload and numerical curvature-regularization input.
+- Aligned the joint-inverse result with the shared profile schema while explicitly returning absolute density as unavailable; added the structured `parameter_identifiability` result and dashboard warnings when data-only identifiability fails. Optimizer candidates remain non-primary diagnostics.
+- The dashboard rejects laser-wavelength, scattering-angle or response-matrix uncertainty inputs in this joint route because those uncertainty paths are not propagated there; it does not silently discard them. Absolute-density input is disabled for this shape-only joint route.
+- Added software regression coverage for the shared result schema, identifiability classification and dashboard controls. No experimental validation was performed or claimed.
+- Exposed the already-implemented electrostatic CTS joint external-parameter covariance upload and explicit parameter order in the dashboard; documented supported names and mutual exclusivity with scalar uncertainty inputs.
+- Exposed Full-EM CTS response-matrix uncertainty and Monte Carlo refit-count controls in the dashboard, and documented the conditional response-uncertainty semantics. The electrostatic and Full-EM response representations remain distinct.
+- Updated the item-by-item matrix: items 72–73 are implemented/tested within the declared Maxwellian joint scope; item 81 is implemented/tested for its declared electrostatic external covariance scope. Items 20, 30, 37, 43, 44, 50, 72–73 (model extensions), 82, 89, 91, 97–99, 101–102 and 106 retain their explicit open/partial or model-boundary dispositions as recorded in the matrix.
+
+Relevant direct-main commits include `d3fdb8f`, `ef39793`, `e04726d`, `be8a094`, `95966fb`, `5656d20`, `f677d2b`, `b736ed8`, `33e5f84`, `af97009`, and `1a760c6`. GitHub Actions must complete successfully for the exact final commit before software-test success is claimed. Experimental validation remains not performed.
