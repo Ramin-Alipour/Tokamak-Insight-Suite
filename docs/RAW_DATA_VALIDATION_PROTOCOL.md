@@ -1,53 +1,44 @@
-# Raw-Data Scientific Validation Protocol
+# Calibrated-Input and Software-Verification Contract
 
-## Mandatory acceptance rule
+## Binding input assumption
 
-From this point forward, a diagnostic/analysis feature is not considered independently validated merely because it passes a formula test or fits synthetic data. A qualifying benchmark must provide:
+Every diagnostic analysis receives measured data from the instrument that are already prepared, calibrated, ordered and suitable for the selected analysis. The software's scientific task is to infer physical parameters from those measured data using documented physical models.
 
-1. **Accessible experimental input**: the rawest available measured data, with units, timebase/wavelength/voltage axes, instrument metadata, and calibration details where published.
-2. **An independent reference result**: a value, fitted curve, spectrum, table, or figure reported by the authors or supplied analysis pipeline.
-3. **A reproducible comparison**: a scripted download or documented source URL, immutable shot/dataset identifier, file checksum where practical, exact preprocessing and fitting settings, output metrics, tolerances justified by uncertainty/resolution, and saved machine-readable results.
-4. **Provenance classification**: explicitly label inputs as raw, calibrated, level-1, or already analysed. Never call processed data raw.
-5. **Honest limits**: if the input or reference result is unavailable, classify the feature as synthetic/unit-tested or not independently validated; do not imply experimental validation.
+The software does **not**:
+- calibrate an instrument or detector;
+- correct raw counts, detector response, wavelength axes, gain, offsets or acquisition timing;
+- repair, reorder, normalize or otherwise prepare the supplied measurements;
+- infer an unprovided instrument response or silently invent geometry, species composition, boundary conditions or other physical metadata;
+- perform or claim experimental validation as part of the current development scope.
 
-## Candidate public sources to screen first
+A measured response operator or other fixed instrument metadata may be supplied by the researcher and used as part of a forward model. It is not estimated or calibrated by the analysis unless a separate, explicit feature request authorizes that work.
 
-### 1. GOLEM tokamak — shot 27546
+## Physical-result classification
 
-- Shot data page: https://golem.fjfi.cvut.cz/shots/27546/Data.php
-- The shot catalogue lists spectrometer-related products including residual spectra, temperature, and other derived outputs. Inspect the actual files and their metadata before selecting a benchmark.
-- Priority use: test whether a spectrum/line-analysis workflow can be run from downloadable measured spectra and compared with the supplied temperature or spectral-analysis reference.
-- Acceptance gate: verify that a measured spectrum file is directly downloadable, identify whether it is raw or processed, and establish compatible calibration/line-identification information. A catalogue entry alone does not pass this gate.
+Every physical output must be placed in exactly one of these categories:
 
-### 2. FAIR-MAST public diagnostic archive
+1. **Primary** — uniquely identifiable from the supplied measured data and explicitly supplied fixed model metadata. Compute automatically; do not ask the researcher to provide an initial guess as though it were a measurement.
+2. **Conditional** — potentially identifiable only after named auxiliary inputs are supplied. Report the missing inputs, the physical reason they are needed, and the conditional output that becomes available.
+3. **Non-identifiable** — not uniquely recoverable from the supplied measurement geometry and selected physical model. Do not report a fabricated, regularization-selected or optimizer-selected value as a measured result.
 
-- Overview and access: https://www.ukaea.org/service/fair-mast/
-- Data catalogue and level-1 examples: https://mastapp.site/level1-data.html
-- Example shot: 30421, described in the catalogue's level-1 tutorial.
-- The archive exposes experimental diagnostic signals in Zarr through a public API/S3 endpoint. The catalogue distinguishes level-1 signals from higher-level products; preserve that distinction in each benchmark.
-- Priority use: reproducible time-series, FFT/PSD, cross-signal, event-timing, and equilibrium-grid checks where an independently reported or archive-supplied reference exists.
-- Acceptance gate: record the shot, signal names, units, sample rate, time window, archive level, reference source, and exact comparison metrics. A successful download or plausible plot alone is not validation.
+Numerical regularization, optimizer initialization, bounds and statistical priors are computational choices, not measured physical parameters. Any output that depends on them must expose that dependence.
 
-## Required benchmark record
+## Uncertainty and provenance
 
-Every benchmark added to the repository must record:
+- Report units for every dimensional physical parameter.
+- Propagate supplied measurement uncertainty/covariance and supplied auxiliary-input uncertainty where implemented.
+- State when uncertainty is unavailable, conditional, local, approximate, or excludes unprovided correlations/model discrepancy.
+- Preserve the distinction between measured quantities, inferred physical parameters, numerical representations and non-identifiable quantities.
+- Synthetic and unit tests verify software behavior only. They are not experimental validation.
 
-- benchmark ID and diagnostic/analysis feature;
-- paper/data citation and stable URL;
-- device, shot/pulse, diagnostic, data level, and file names;
-- raw-data and reference-result availability;
-- units, calibration, uncertainty/resolution, and preprocessing;
-- independent implementation and software version;
-- comparison metrics, acceptance threshold, observed error, and pass/fail;
-- limitations and whether the benchmark can run offline in CI.
+## Software verification policy
 
-## Validation status vocabulary
+The development gate is software verification: independent unit tests for physical formulas, forward models, inverse routines, uncertainty propagation, identifiability, API contracts, registry synchronization and user-interface integration. GitHub Actions should run the relevant software tests on changes to the main branch.
 
-- **independently-reproduced**: measured input and independent reference result were both obtained and quantitatively compared.
-- **partially-reproduced**: some published numbers/derived tables were reconstructed, but raw measurements or a direct refit were unavailable.
-- **processed-data-check**: data were already calibrated/processed by the source archive.
-- **synthetic-benchmark**: algorithm checked only against generated data.
-- **unit-tested**: formula or software behavior tested without an experimental reference.
-- **not-validated**: insufficient data or reference evidence.
+No experimental validation, benchmark reproduction against measured-device reference results, or agreement with published experimental outcomes is required or claimed during this development phase. Such work can only be introduced under a separate explicit authorization and must not be silently mixed into feature implementation.
 
-Do not upgrade a status without adding the source data/reference and a repeatable test.
+## Thomson Analysis 1
+
+For Optical Thomson Scattering, Thomson Spectral Distribution, Thomson Spatial Profile Reconstruction and Collective Thomson Scattering (electrostatic and full-EM), use the same calibrated measured-input contract and the same Primary / Conditional / Non-identifiable classification. Optical Thomson and CTS remain physically distinct model branches. A single scattering geometry cannot identify an unrestricted three-dimensional electron velocity distribution; a projected one-dimensional marginal must be labelled as such.
+
+The physical model shortlist and literature provenance are maintained in `docs/PHYSICS_MODEL_SELECTION_POLICY.md`. The engineering scope for audit items 7–110 is maintained in `docs/analyses/thomson_scattering_gap_closure_plan.md`.
