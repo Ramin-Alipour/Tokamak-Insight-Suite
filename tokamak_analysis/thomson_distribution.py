@@ -1,10 +1,12 @@
 """Spectral-shape diagnostics linked to the canonical calibrated Thomson fit.
 
 This module characterizes the measured spectral distribution after an explicit
-background specification. A scalar Gaussian width may be used for moment
-deconvolution, or a measured response matrix may be used in the Gaussian shape
-fit. It does not infer an arbitrary electron velocity distribution from moments;
-fitted plasma parameters are supplied by the canonical physical forward model.
+background specification. A measured response matrix is used as a forward
+operator in the Gaussian shape fit. Reported moments and widths describe the
+measured spectrum; no scalar-width deconvolution, instrument-width subtraction,
+or response correction is performed. The module does not infer an arbitrary
+electron velocity distribution from moments; physical plasma parameters are
+extracted by the canonical physical forward model.
 """
 from __future__ import annotations
 
