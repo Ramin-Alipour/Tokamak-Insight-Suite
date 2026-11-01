@@ -928,3 +928,16 @@ def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
     assert np.sum(convolved*widths) == pytest.approx(np.sum(signal*widths), rel=1e-12)
 
 
+
+
+def test_optical_thomson_exposes_unweighted_fit_covariance_scope():
+    x, y, _ = _spectral_case(100.0)
+    out = _analyze_thomson_spectra(
+        x, y[None, :], [0.12], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        model="non_collective_maxwellian",
+    )
+    channel = out["channels"][0]
+    assert channel["spectral_weighting_status"] == "unweighted_least_squares_no_measurement_uncertainty_supplied"
+    assert channel["fit_covariance_interpretation"] == "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+    assert channel["background_model_status"] == "linear_intercept_and_slope_nuisance_background"
