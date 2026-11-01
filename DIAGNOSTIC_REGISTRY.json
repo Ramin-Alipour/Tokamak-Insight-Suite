@@ -397,6 +397,11 @@
           "name": "kappa_index_identifiability",
           "unit": "structured; per channel for non-collective Kappa",
           "description": "Response-convolved Jacobian rank, normalized condition number and conditional Kappa sensitivity after projection against amplitude, centroid, width and linear-background nuisance parameters. Consumers must honor reportable_as_inferred_parameter; an optimizer candidate is not an identified result."
+        },
+        {
+          "name": "kappa_profile_likelihood",
+          "unit": "structured; per channel for non-collective Kappa",
+          "description": "Conditional one-parameter profile likelihood with nuisance re-optimization and nominal Δχ²=1 interval. Grid-censored limits are numerical diagnostics, not physical bounds; unweighted intervals use residual-scaled noise and are not measurement-noise calibrated."
         }
       ],
       "assumptions": [
