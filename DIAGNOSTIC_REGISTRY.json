@@ -4734,7 +4734,9 @@
       }
     ],
     "primary_analysis_id": 1,
-    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed."
+    "note": "Analysis 1 subanalysis: microwave Collective Thomson Scattering. Select exactly one CTS physical forward model explicitly: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both consume measured calibrated frequency-shift spectra; no device calibration or independent experimental validation is performed.",
+    "raw_data_to_physics": false,
+    "calibrated_measurements_to_physics": true
   },
   {
     "family": "Density and refractive diagnostics",
