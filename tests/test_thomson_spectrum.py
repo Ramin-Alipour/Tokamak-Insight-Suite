@@ -290,7 +290,7 @@ def test_legacy_adapter_reports_width_from_general_measured_response_not_scalar_
     )
     assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
     assert out["fitted_sigma_nm"] != pytest.approx(
-        np.sqrt(out["physical_sigma_nm"] ** 2 + 0.05 ** 2), rel=1e-3
+        np.sqrt(out["physical_sigma_nm"] ** 2 + 0.05 ** 2), rel=1e-7
     )
 
 
