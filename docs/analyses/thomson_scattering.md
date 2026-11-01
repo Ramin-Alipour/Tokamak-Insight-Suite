@@ -258,3 +258,8 @@ The 1-D kernel is perturbed, re-normalized through the same measured-response
 forward operator, and the physical fit is repeated by Monte Carlo. An arbitrary
 callable response has no supported uncertainty representation and is rejected
 rather than assigned an invented covariance.
+
+
+### Conditional uncertainty for projected-EVDF candidate models
+
+Each successful Maxwellian, finite-variance Kappa/Student-t and super-Gaussian candidate fit now reports its local parameter covariance and 1-sigma parameter uncertainties when the fitted residual Jacobian has full column rank. If pointwise measurement uncertainty or a full spectral covariance is supplied, the covariance is conditional on that supplied noise model. Without measurement uncertainty, the covariance is residual-scaled and explicitly **not measurement-noise calibrated**. Parameters at an active physical/numerical bound have no symmetric interval and are marked boundary-limited; rank-deficient fits do not receive fabricated covariance values. These are local linearized uncertainties conditional on the selected candidate, velocity grid, measured response and fixed background, not model-selection uncertainty, posterior intervals, or experimental validation.
