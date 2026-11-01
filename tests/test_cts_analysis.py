@@ -1033,6 +1033,11 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     assert specs["ion_flow_projection_initial_m_s"]["required"] is False
     assert "fitted from the measured spectrum" in specs["ion_flow_projection_initial_m_s"]["description"]
     assert "ion_flow_velocity_m_s" not in specs
+    # Relativistic gyrotropic electron distributions are forward-model-only;
+    # the current measured-spectrum inversion rejects this keyword explicitly.
+    assert "electron_distribution" not in specs
+    full_em_inputs = cts["execution_contract"]["workflow_modes"][1]["inputs"]
+    assert not any("electron_distribution" in item for item in full_em_inputs)
 
 
 def test_cts_formula_contract_is_calibrated_measurement_to_physics():
