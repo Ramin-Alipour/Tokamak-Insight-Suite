@@ -248,6 +248,8 @@ def full_em_cts_spectral_density(
     Geometry may be supplied as local incident/scattered unit vectors or as
     frequency_resolved_geometry records produced by trace_cts_frequency_resolved_beams.
     Polarizations are complex 3-vectors supplied by the diagnostic mode definition.
+    Electron and per-ion-species flow projections can be supplied as scalar
+    components along the scattering wavevector; these are not 3-D flow vectors.
     Fluctuation covariance includes electron density/current/E/B cross-correlations.
     """
     shifts = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
@@ -930,9 +932,9 @@ def analyze_full_em_cts_spectrum(
     The instrument amplitude and constant background are profiled as nuisance
     parameters. The electron-flow component along the local scattering
     wavevector is fitted from the measured spectrum; transverse components
-    are not identifiable from a single geometry. Ion flow, composition,
-    magnetic field, geometry and mode polarizations remain external inputs.
-    The flow projection of every supplied ion species is independently fitted
+    are not identifiable from a single geometry. Ion composition, magnetic
+    field, geometry and mode polarizations remain external inputs. The flow
+    projection of every supplied ion species is independently fitted
     from the measured spectrum; transverse components are not identifiable
     from a single CTS geometry. Each species temperature is also fitted.
     """
@@ -996,7 +998,7 @@ def analyze_full_em_cts_spectrum(
         f"ion_flow_projection_m_s:{name}" for name in species_names
     )
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
-        raise ValueError("parameter_bounds must be a mapping from parameter names to positive increasing pairs")
+        raise ValueError("parameter_bounds must map parameter names to finite increasing pairs (positive for density and temperatures)")
     bounds = {} if parameter_bounds is None else dict(parameter_bounds)
     allowed_bound_names = set(names) | {"ion_temperature_eV", "ion_flow_projection_m_s"}
     unknown_bound_names = set(bounds)-allowed_bound_names
