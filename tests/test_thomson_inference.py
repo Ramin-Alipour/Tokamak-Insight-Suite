@@ -241,6 +241,9 @@ def test_relativistic_model_propagates_laser_angle_and_polarization_uncertaintie
     assert channel["relativistic_external_temperature_uncertainty_eV"] > 0.0
     assert channel["effective_differential_cross_section_m2_sr"] > 0.0
     assert channel["effective_differential_cross_section_uncertainty_m2_sr"] > 0.0
+    evdf = channel["electron_velocity_distribution"]
+    assert evdf["analysis_status"] == "unavailable_for_selected_physical_model"
+    assert "non-relativistic" in evdf["reason"]
     expected_density = channel["integrated_scattered_power_W"] / (
         2.0 * 0.1 * channel["effective_differential_cross_section_m2_sr"] * 0.01 * 0.5
     )
