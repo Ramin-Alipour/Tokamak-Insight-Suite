@@ -973,7 +973,9 @@ elif page=='Spectral Analysis':
                     value='0.01',key='ts_infer_rel_recoil_limit',
                 )
                 st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. It evaluates the maximum represented electron-rest-frame Compton correction and rejects spectra above this explicit fractional limit. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
-            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,key='ts_infer_absolute_density')
+            absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,disabled=joint_spatial_spectral,key='ts_infer_absolute_density')
+            if joint_spatial_spectral:
+                absolute_density=False
             density_kwargs={}
             density_covariance_upload=None
             joint_density_covariance_upload=None
@@ -1186,7 +1188,13 @@ elif page=='Spectral Analysis':
                             'incident_direction':_parse_ts_vector(incident_direction_text,'Incident direction'),
                             'scattered_direction':_parse_ts_vector(scattered_direction_text,'Scattered direction'),
                         })
-                    if joint_spatial_spectral or st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
+                    if joint_spatial_spectral:
+                        if laser_unc_value is not None or angle_unc_value is not None or response_uncertainty is not None:
+                            raise ValueError('The current joint spatial-spectral Maxwellian inverse treats laser geometry and the supplied response operator as fixed; omit their uncertainty inputs rather than having them silently ignored.')
+                        for unsupported_key in ('laser_wavelength_uncertainty_nm','scattering_angle_uncertainty_rad','instrument_response_uncertainty'):
+                            kwargs.pop(unsupported_key,None)
+                        result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
+                    elif st.session_state.pop('tis_thomson_profile_reconstruction_requested',False):
                         result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
                     else:
                         result=analyze_thomson_spectra(wavelengths,spectra,radii,**kwargs)
