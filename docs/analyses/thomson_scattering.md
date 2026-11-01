@@ -179,3 +179,19 @@ Alongside the non-parametric reconstruction, the routine fits and compares three
 When no regularization strength is supplied, the solver selects a value by generalized cross-validation (GCV) over a documented logarithmic candidate grid. The selected value, candidates and GCV scores are returned. An explicitly supplied positive value remains supported. A local active-set covariance is also estimated for the normalized EVDF and its pointwise standard uncertainty is returned. This is a conditional linearized covariance given the selected grid, response, background, regularization and active set; it is not a posterior distribution and does not include model-selection or unprovided systematic uncertainty. Sensitivity to the regularization and velocity grid must still be assessed before interpreting fine velocity-space structure.
 
 The primary Thomson spectrum-to-physics workflow automatically attempts this projected EVDF reconstruction only for the non-relativistic Maxwellian and Kappa optical models, using the same measured calibrated spectrum, fitted background nuisance component, measured response and supplied spectral uncertainty/covariance. The velocity interval is derived from the measured wavelength coverage and the supplied laser wavelength/scattering geometry; the grid size is configurable. A channel-level unavailable status and reason are returned if the spectrum does not support a stable inversion. When the relativistic Maxwell-Juttner model is selected, this non-relativistic inverse is explicitly withheld and the result is marked `unavailable_for_selected_physical_model`; a relativistically consistent projected-EVDF inverse is not implemented. This prevents a numerically converged but physically inconsistent non-relativistic inversion from being presented alongside relativistic primary results. It does not calibrate, correct, deconvolve, or otherwise prepare measured inputs.
+
+
+### Fitted-background uncertainty in spectral moments
+
+The descriptive spectral-distribution routine accepts either
+`background_signal_uncertainty` (pointwise 1-sigma values) or
+`background_signal_covariance` (a full positive-definite wavelength-space
+covariance) when an explicit fitted `background_signal` is supplied. These
+background nuisance perturbations are propagated jointly with any supplied
+signal uncertainty through the moment Monte Carlo. Unless a joint
+signal/background covariance is supplied (not currently supported by this
+routine), signal and background perturbations are treated as independent.
+For mask- or edge-fitted backgrounds, the linear background is re-fitted in
+each perturbed signal draw instead, so a separate background covariance input
+is rejected. Possible signal contamination in a supplied background remains
+non-identifiable from this subanalysis alone.
