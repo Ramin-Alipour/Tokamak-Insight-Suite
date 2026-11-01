@@ -4225,7 +4225,7 @@
           "name": "signal_uncertainty",
           "unit": "same as spectrum, 1-sigma",
           "required": false,
-          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
+          "description": "Optional for both branches. For Full-EM, supply either signal_uncertainty or spectral_covariance, not both. If neither is supplied, inference is unweighted and covariance is residual-variance-scaled, not measurement-noise-calibrated."
         },
         {
           "name": "fast_ion",
@@ -4244,7 +4244,7 @@
           "name": "spectral_covariance",
           "unit": "frequency-bin covariance matrix",
           "required": false,
-          "description": "Optional for the electrostatic branch. For model='full_electromagnetic', supply exactly one of signal_uncertainty or spectral_covariance; the full-EM implementation rejects runs with neither or with both."
+          "description": "Optional for both branches. For Full-EM, supply either signal_uncertainty or spectral_covariance, not both. If neither is supplied, inference is unweighted and covariance is residual-variance-scaled, not measurement-noise-calibrated."
         },
         {
           "name": "external_parameter_uncertainties",
@@ -4276,27 +4276,26 @@
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final density is fitted from the measured CTS spectrum and is not fixed to this value."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final electron temperature is fitted from the measured CTS spectrum."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final ion temperature(s) are fitted from the measured CTS spectrum. Electrostatic CTS fits one common ion temperature; Full-EM fits one temperature per supplied species."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "ion_velocity_initial_m_s",
           "unit": "m s^-1; common projected ion-flow optimizer initial estimate",
           "required": false,
-          "description": "Required optimizer initial estimate only for the electrostatic branch; the final common ion-flow projection is fitted from the measured CTS spectrum. Full-EM uses optional per-species ion-flow projection seeds.",
-          "required_when_model": "electrostatic"
+          "description": "Optional numerical optimizer seed for the electrostatic common ion-flow projection; omission uses zero only as a starting value, and the flow is fitted freely from the measured CTS spectrum. Full-EM independently fits one projection per supplied species."
         },
         {
           "name": "global_search",
@@ -4884,7 +4883,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
-      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from the supplied signal uncertainty or spectral covariance only; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -4928,11 +4927,11 @@
             "ion_species",
             "ion_fractions",
             "instrument_response",
-            "electron_velocity_projection_m_s",
-            "electron_density_initial_m3",
-            "electron_temperature_initial_eV",
-            "ion_temperature_initial_eV",
-            "ion_velocity_initial_m_s",
+            "electron_velocity_projection_m_s (optional optimizer seed only)",
+            "electron_density_initial_m3 (optional optimizer seed; automatic initialization if omitted)",
+            "electron_temperature_initial_eV (optional optimizer seed; automatic initialization if omitted)",
+            "ion_temperature_initial_eV (optional optimizer seed; automatic initialization if omitted)",
+            "ion_velocity_initial_m_s (optional optimizer seed only)",
             "optional signal_uncertainty or spectral_covariance",
             "optional fast_ion model and researcher-supplied parameter bounds"
           ],
@@ -4959,12 +4958,12 @@
             "probe_frequency_Hz",
             "scattering_geometry (beam directions are nested here)",
             "instrument_response",
-            "exactly one of signal_uncertainty or spectral_covariance",
+            "optional signal_uncertainty or spectral_covariance (at most one; unweighted fallback if neither)",
             "ion_species",
             "ion_fractions",
-            "electron_density_initial_m3",
-            "electron_temperature_initial_eV",
-            "ion_temperature_initial_eV",
+            "electron_density_initial_m3 (optional optimizer seed; automatic initialization if omitted)",
+            "electron_temperature_initial_eV (optional optimizer seed; automatic initialization if omitted)",
+            "ion_temperature_initial_eV (optional optimizer seed; automatic initialization if omitted)",
             "magnetic_field_T",
             "incident_polarization",
             "scattered_polarization",
@@ -5032,11 +5031,11 @@
       "input_exclusivity_contracts": [
         {
           "when_model": "full_electromagnetic",
-          "exactly_one_of": [
+          "reason": "A supplied spectral noise model is optional; if neither is supplied, use unweighted least squares and residual-variance-scaled covariance.",
+          "at_most_one_of": [
             "signal_uncertainty",
             "spectral_covariance"
-          ],
-          "reason": "The Full-EM inversion requires a supplied spectral noise model and rejects both missing and simultaneously supplied alternatives."
+          ]
         },
         {
           "when_model": "electrostatic",
