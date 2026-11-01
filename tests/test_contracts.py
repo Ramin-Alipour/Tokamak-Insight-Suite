@@ -115,6 +115,17 @@ def test_thomson_spectral_distribution_contract_excludes_separate_evdf_inverse()
     assert "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf" in (
         primary["execution_contract"]["function_links"]
     )
+    primary_contract = primary["execution_contract"]
+    evdf_input = next(
+        item for item in primary_contract["input_specs"]
+        if item["name"] == "enable_evdf_reconstruction"
+    )
+    evdf_output = next(
+        item for item in primary_contract["output_specs"]
+        if item["name"] == "electron_velocity_distribution"
+    )
+    assert "only for the non-collective Maxwellian and Kappa" in evdf_input["description"]
+    assert "explicitly unavailable" in evdf_output["description"]
 
 
 def test_all_thomson_and_cts_entry_points_are_subanalyses_of_primary_analysis_1():
