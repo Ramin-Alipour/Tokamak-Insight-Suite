@@ -2635,4 +2635,84 @@ def analyze_thomson_spectra(
     output["parameter_identifiability"]["profile_scope"] = (
         "Per-channel physical inference only; spatial interpolation is a separate child subanalysis."
     )
+
+    # Machine-readable result contract: measured-spectrum inference is separated
+    # from conditional quantities and fundamental single-view degeneracies.
+    # Values remain in the channel/profile result fields above; this block only
+    # classifies their evidential status and states the auxiliary inputs needed.
+    channel_classification = []
+    for channel_index, channel_result in enumerate(results):
+        primary = []
+        conditional = []
+        non_identifiable = [
+            {
+                "parameter": "unrestricted_three_dimensional_electron_velocity_distribution",
+                "reason": "A single Thomson scattering geometry measures a projection along its scattering vector; perpendicular velocity structure is not uniquely identifiable.",
+            }
+        ]
+        for parameter, unit in (
+            ("electron_temperature_eV", "eV"),
+            ("electron_velocity_projection_m_s", "m s^-1"),
+        ):
+            value = channel_result.get(parameter)
+            if value is not None and np.isfinite(value):
+                primary.append({"parameter": parameter, "unit": unit, "status": "identified_from_measured_spectrum"})
+        density_value = channel_result.get("electron_density_m3")
+        if density_value is not None and np.isfinite(density_value):
+            primary.append({
+                "parameter": "electron_density_m3",
+                "unit": "m^-3",
+                "status": "identified_from_absolute_calibrated_scattered_power",
+            })
+        else:
+            conditional.append({
+                "parameter": "electron_density_m3",
+                "unit": "m^-3",
+                "required_auxiliary_inputs": [
+                    "absolute spectral power density in W/nm",
+                    "laser power",
+                    "interaction length",
+                    "collection solid angle",
+                    "optical efficiency",
+                    "incident/scattered beam geometry and polarization factors required by the selected cross-section",
+                ],
+                "reason": "Spectral shape alone does not determine absolute electron density.",
+            })
+        evdf = channel_result.get("electron_velocity_distribution", {})
+        if evdf.get("analysis_status") == "completed":
+            primary.append({
+                "parameter": "projected_one_dimensional_electron_velocity_distribution",
+                "unit": "normalized probability density per (m s^-1)",
+                "status": "inferred_from_measured_spectrum_conditional_on_selected_nonrelativistic_inverse",
+            })
+        elif evdf.get("analysis_status") not in {"not_requested"}:
+            conditional.append({
+                "parameter": "projected_one_dimensional_electron_velocity_distribution",
+                "unit": "normalized probability density per (m s^-1)",
+                "required_auxiliary_inputs": [
+                    "sufficient measured wavelength coverage",
+                    "measured spectral response operator",
+                    "spectral uncertainty or covariance",
+                    "a physical forward model compatible with the selected Thomson model",
+                ],
+                "reason": evdf.get("reason", "The projected inverse is unavailable for this channel/model."),
+            })
+        channel_classification.append({
+            "channel_index": int(channel_index),
+            "primary": primary,
+            "conditional": conditional,
+            "non_identifiable": non_identifiable,
+        })
+    output["result_classification"] = {
+        "contract_version": "1.0",
+        "input_contract": "measured_device_spectra_assumed_prepared_and_calibrated",
+        "instrument_calibration_or_correction_performed": False,
+        "experimental_validation_claimed": False,
+        "channels": channel_classification,
+        "classification_semantics": {
+            "primary": "Identifiable from the supplied measured spectrum and explicitly supplied fixed model metadata.",
+            "conditional": "Not emitted as a measured result until the listed auxiliary inputs or compatible conditions are supplied.",
+            "non_identifiable": "Not uniquely recoverable from the supplied measurement geometry/model; no synthetic value is reported.",
+        },
+    }
     return output
