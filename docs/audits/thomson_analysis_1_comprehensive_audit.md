@@ -140,7 +140,7 @@ This review separates **actual repository inconsistencies** from **declared scie
 98. Mode conversion and branch tracking through degeneracies are not implemented.
 99. Scattering-volume integration assumes fitted ne, Te and thermal-ion temperatures are uniform over the sampled volume while local field and ray directions may vary.
 100. Beam-overlap path integrals are relative spectral-bin weights; absolute launcher/receiver power coupling is not inferred.
-101. Full-EM inversion does not propagate measured response-matrix uncertainty.
+101. Full-EM inversion accepts a supplied measured response-matrix 1σ uncertainty, samples non-negative column-renormalized response operators, refits the complete physical parameter vector, and adds the successful-draw covariance to the conditional fit covariance. This propagation is conditional on fixed external magnetic field, geometry, species composition and polarizations; it is not response calibration.
 102. Full-EM inversion does not propagate the full external magnetic-field, geometry, polarization, ray or equilibrium covariance.
 103. Full-EM covariance is conditional on fixed external inputs and the selected damping/quadrature/harmonic settings.
 104. If no spectral noise/covariance is supplied, its unweighted-fit covariance is residual-scaled and not measurement-noise-calibrated.
@@ -303,3 +303,20 @@ Commits:
 - `549ea6baac866f0e4998648519f43145842f9644` — regression test
 
 **Experimental validation:** not performed and not claimed. The exact final software commit must pass GitHub Actions before software-test success is reported.
+
+
+## R. Full-EM CTS response-uncertainty registry integration corrected on 2026-11-01
+
+The executable `tokamak_analysis.cts_full_em.analyze_full_em_cts_spectrum` already accepted `instrument_response_uncertainty` and `response_mc_samples`, performed non-negative column-renormalized response perturbations, repeated the full least-squares parameter inversion, and added successful-draw parameter covariance to the conditional fit covariance. Direct numerical tests in `tests/test_cts_analysis.py` exercise the supplied response-uncertainty route and assert successful propagation.
+
+The CTS registry had drifted from that implementation: the Python runtime registry incorrectly restricted both inputs to electrostatic CTS, and the JSON registry combined a Full-EM-supported description with an electrostatic-only applicability flag. Its uncertainty-model prose also contained contradictory statements, and the Full-EM output contract omitted the actual response Monte Carlo result keys. **Fixed directly on main:** removed the electrostatic-only applicability restriction, synchronized both JSON copies and the Python runtime registry, declared the Full-EM response uncertainty outputs, and included the controls in the Full-EM workflow-mode input list. Added a registry/API integration regression that checks runtime metadata, JSON parity, branch availability and declared outputs.
+
+The separate full external magnetic-field, geometry, polarization, ray and equilibrium covariance remains unimplemented. Response-matrix Monte Carlo is not instrument calibration and is not experimental validation.
+
+Commits:
+- `ed937e735a2f20f30e033197aa591f3648399e09` — root diagnostic registry
+- `d185fb499cd2b30176511ddaef403ff6c5f28d93` — Python runtime registry
+- `0ae638ce1a8448b3c22f8c2a63223f6ea6068bf2` — packaged diagnostic registry
+- `b4c201179780b39e35b58a46e565669b6aa73a29` and `f2c7a2de925282a5b21a8fa08987c357770291f2` — registry/API regression coverage
+
+**Experimental validation:** not performed and not claimed.
