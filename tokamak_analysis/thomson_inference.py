@@ -2359,7 +2359,35 @@ def analyze_thomson_spectra(
         # from the same measured spectrum. The fitted physical-model background,
         # measured response and supplied noise covariance are reused; regularization
         # is selected by GCV rather than requested as an arbitrary user constant.
-        if enable_evdf_reconstruction:
+        if not enable_evdf_reconstruction:
+            evdf = {
+                "analysis_status": "not_requested",
+                "reason": "EVDF reconstruction was explicitly disabled.",
+            }
+        elif model == "non_collective_relativistic_maxwell_juttner":
+            # The current inverse operator uses first-order non-relativistic
+            # Doppler kinematics. Never run it under a relativistic forward fit:
+            # a converged optimizer would not make the inferred velocity marginal
+            # physically consistent with the selected scattering model.
+            evdf = {
+                "analysis_status": "unavailable_for_selected_physical_model",
+                "reason": (
+                    "The available projected-EVDF inverse uses non-relativistic "
+                    "single-particle Doppler kinematics and is not applicable to "
+                    "the relativistic Maxwell-Juttner forward model. A relativistic "
+                    "EVDF inverse is not implemented."
+                ),
+                "identifiability": {
+                    "primary": [],
+                    "conditional": [
+                        "A relativistically consistent projected EVDF requires a relativistic inverse operator using the same photon-frequency and angular kinematics as the selected Maxwell-Juttner forward model."
+                    ],
+                    "non_identifiable": [
+                        "An unrestricted three-dimensional relativistic EVDF from one scattering geometry."
+                    ],
+                },
+            }
+        else:
             try:
                 q_over_ki = 2.0 * np.sin(float(scattering_angle_rad) / 2.0)
                 velocity_axis = C_M_S * (
@@ -2400,11 +2428,6 @@ def analyze_thomson_spectra(
                         "non_identifiable": ["unrestricted three-dimensional EVDF from one scattering geometry"],
                     },
                 }
-        else:
-            evdf = {
-                "analysis_status": "not_requested",
-                "reason": "EVDF reconstruction was explicitly disabled.",
-            }
         channel_result["electron_velocity_distribution"] = evdf
         evdf_results.append(evdf)
     output["spectral_distribution"] = spectral_distribution_results
