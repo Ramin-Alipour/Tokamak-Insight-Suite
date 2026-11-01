@@ -331,7 +331,7 @@ def estimate_cts_optimizer_initial_parameters(
         raise ValueError("CTS spectral-shape seed estimation failed: spectrum has no resolvable frequency width")
     q, _, _ = _geometry(scattering_geometry, _positive(probe_frequency_Hz, "probe_frequency_Hz"))
     electron_velocity_rms = 2.0 * np.pi * np.sqrt(variance) / q
-    te_seed = ME * electron_velocity_rms**2 / (2.0 * E)
+    te_seed = ME * electron_velocity_rms**2 / E
     # The central 68% of spectral weight supplies a robust ion-feature width.
     order = np.argsort(np.abs(offsets))
     cumulative = np.cumsum(weights[order]) / total
@@ -345,7 +345,7 @@ def estimate_cts_optimizer_initial_parameters(
     ion_spectral_weights = np.asarray([item["Z"] * item["fraction"] for item in ions], dtype=float)
     effective_ion_mass = float(np.sum(ion_spectral_weights * np.asarray([item["mass"] for item in ions])) / np.sum(ion_spectral_weights))
     ion_velocity_rms = 2.0 * np.pi * np.sqrt(max(core_variance, variance * 1e-6)) / q
-    ti_seed = effective_ion_mass * ion_velocity_rms**2 / (2.0 * E)
+    ti_seed = effective_ion_mass * ion_velocity_rms**2 / E
     # alpha=1 is an explicitly labelled dimensionless optimizer seed, not an
     # inferred density. The fit subsequently determines density from the full spectrum.
     density_seed = EPS0 * (te_seed * E) * q**2 / E**2
