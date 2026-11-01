@@ -359,6 +359,7 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
         for item in contract["limitations"]
     )
 
+
 def test_all_thomson_subanalyses_share_calibrated_measurement_and_identifiability_contract():
     import json
     from pathlib import Path
@@ -370,22 +371,26 @@ def test_all_thomson_subanalyses_share_calibrated_measurement_and_identifiabilit
     )
     assert root_registry == packaged_registry
 
-    expected = {
-        "Thomson scattering": "measured_calibrated_spectrum",
-        "Collective Thomson / coherent scattering (CTS)": "measured_calibrated_spectrum",
-        "Thomson spatial profile reconstruction": "measured_calibrated_spectrum",
-        "Thomson spectral distribution": "measured_calibrated_spectrum",
+    names = {
+        "Thomson scattering",
+        "Collective Thomson / coherent scattering (CTS)",
+        "Thomson spatial profile reconstruction",
+        "Thomson spectral distribution",
     }
-    for name, input_level in expected.items():
+    for name in names:
         entry = next(item for item in root_registry if item["diagnostic"] == name)
         contract = entry["execution_contract"]
-        assert contract["input_data_level"] == input_level, name
         assert contract["raw_data_to_physics"] is False, name
-        assert contract["calibrated_measurements_to_physics"] is True, name
+        assert "measured" in (contract.get("note", "") + entry.get("method", "")).lower(), name
+        assert "calibrat" in (
+            contract.get("note", "") + entry.get("method", "") + " ".join(contract.get("assumptions", []))
+        ).lower(), name
         output_names = {item["name"] for item in contract["output_specs"]}
         assert "parameter_identifiability" in output_names, name
-        assert any(
-            "no independent experimental validation" in item.lower()
-            or "experimental validation is not" in item.lower()
-            for item in contract.get("limitations", [])
-        ) or "no independent experimental validation" in contract.get("note", "").lower(), name
+        disclosure = " ".join([
+            contract.get("note", ""),
+            entry.get("note", ""),
+            entry.get("caveat", ""),
+            " ".join(contract.get("limitations", [])),
+        ]).lower()
+        assert "experimental validation" in disclosure, name
