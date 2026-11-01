@@ -188,13 +188,22 @@ The descriptive spectral-distribution routine accepts either
 `background_signal_covariance` (a full positive-definite wavelength-space
 covariance) when an explicit fitted `background_signal` is supplied. These
 background nuisance perturbations are propagated jointly with any supplied
-signal uncertainty through the moment Monte Carlo. Unless a joint
-signal/background covariance is supplied (not currently supported by this
-routine), signal and background perturbations are treated as independent.
+signal uncertainty through the moment Monte Carlo. The optional
+`signal_background_cross_covariance` input represents
+\(\operatorname{Cov}(s_i,b_j)\) for the measured signal and explicitly
+supplied fitted background. It requires both marginal covariance models
+(pointwise uncertainties are converted to diagonal covariance matrices) and
+the complete \(2N\times2N\) block covariance must be positive definite.
+Signal and background perturbations are then drawn jointly, preserving their
+cross-correlation. If the cross-covariance is omitted, the two uncertainty
+sources are treated as independent. The cross-covariance affects moment
+uncertainty propagation only; the Gaussian shape fit remains weighted by the
+signal covariance alone and the measured spectrum is not modified.
 For mask- or edge-fitted backgrounds, the linear background is re-fitted in
-each perturbed signal draw instead, so a separate background covariance input
-is rejected. Possible signal contamination in a supplied background remains
-non-identifiable from this subanalysis alone.
+each perturbed signal draw instead, so a separate background covariance or
+signal/background cross-covariance input is rejected. Possible signal
+contamination in a supplied background remains non-identifiable from this
+subanalysis alone.
 
 
 ### Correlated-covariance spatial smoothing
