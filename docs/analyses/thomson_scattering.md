@@ -70,6 +70,10 @@ The physical fit must pass its identifiability and fit-quality gates. Rank-defic
 - An integrated spectral integral is reported in watts only when the calibrated spectral-density unit is explicitly W/nm.
 - No independent experimental validation is claimed. Automated tests are software/numerical consistency tests only.
 
+### Input-data level and execution contract
+
+The registry deliberately distinguishes `raw_data_to_physics=false` from `calibrated_measurements_to_physics=true`: the former excludes uncalibrated detector counts and raw acquisition signals; the latter describes inference from measured, calibrated spectra. These flags refer to different data levels and are not contradictory. The same rule applies to the microwave CTS subanalysis. The analysis does not calibrate the instrument or convert raw detector counts into calibrated spectra.
+
 ## Statistical weighting, background and spectral-distribution interpretation
 
 Every fitted optical Thomson channel now reports `spectral_weighting_status` and `fit_covariance_interpretation`. A supplied pointwise uncertainty produces diagonal weighted least squares; a supplied channel-major covariance produces joint generalized least squares for Maxwellian/Kappa models. If neither is supplied, the fit is unweighted and its local covariance is residual-variance-scaled; it is **not** a measurement-noise-calibrated uncertainty. Do not interpret that covariance as a complete experimental uncertainty budget.
