@@ -4209,16 +4209,16 @@
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
           "required": false,
-          "required_when_model": "electrostatic",
-          "description": "Electrostatic CTS only: optional uncertainty of the supplied measured frequency-response matrix, propagated through response perturbation/refitting."
+          "description": "Electrostatic CTS only: optional uncertainty of the supplied measured frequency-response matrix, propagated through response perturbation/refitting.",
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "response_mc_samples",
           "unit": "count",
           "required": false,
-          "required_when_model": "electrostatic",
           "default": 100,
-          "description": "Electrostatic CTS only: number of Monte Carlo response-matrix perturbation/refit samples when instrument_response_uncertainty is supplied."
+          "description": "Electrostatic CTS only: number of Monte Carlo response-matrix perturbation/refit samples when instrument_response_uncertainty is supplied.",
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "signal_uncertainty",
@@ -4231,7 +4231,7 @@
           "unit": "structured",
           "required": false,
           "description": "If supplied, kind and fraction_initial are mandatory. Maxwellian fast ions additionally require temperature_initial_eV; temperature_bounds_eV is optional. Inferred tabulated VDFs require explicit smoothness and regularized inversion. Fraction bounds default only to the physical interval (0,1).",
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "parameter_bounds",
@@ -4250,27 +4250,27 @@
           "unit": "structured 1-sigma mapping",
           "required": false,
           "description": "Electrostatic path only: supported independent 1-sigma marginals for probe frequency, electron-flow projection, scalar scattering angle and ion fractions. Full cross-parameter covariance is not supported.",
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "inversion_method",
           "unit": "text",
           "required": false,
           "description": "Explicit selection: local_least_squares, differential_evolution, improved_genetic or regularized. Global-search methods require global_search=true and finite explicit bounds; regularized is only for inferred tabulated fast-ion VDF.",
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "regularization_strength",
           "unit": "dimensionless",
           "required": false,
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "electron_velocity_projection_m_s",
           "unit": "m s^-1",
           "required": false,
           "description": "Optional initial optimizer seed for the electron-flow projection. The electrostatic inversion fits the final projection from the measured CTS spectrum; omission uses zero only as a numerical seed and does not impose stationary flow. The Full-EM branch uses electron_flow_projection_initial_m_s instead.",
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "electron_density_initial_m3",
@@ -4302,13 +4302,13 @@
           "unit": "boolean; enables differential-evolution global initialization",
           "required": false,
           "description": "Boolean. True only for differential_evolution or improved_genetic; local_least_squares and regularized require false.",
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "random_seed",
           "unit": "integer; deterministic search seed",
           "required": false,
-          "required_when_model": "electrostatic"
+          "applies_when_model": "electrostatic"
         },
         {
           "name": "model",
@@ -4797,6 +4797,37 @@
           "arbitrary_three_dimensional_velocity_vectors"
         ],
         "uncertainty_scope": "Full-EM parameter covariance is local-Jacobian covariance conditional on fixed external inputs; it is not a complete uncertainty budget for geometry, field, composition, polarization, ray tracing or beam overlap."
+      },
+      "input_exclusivity_contracts": [
+        {
+          "when_model": "full_electromagnetic",
+          "exactly_one_of": [
+            "signal_uncertainty",
+            "spectral_covariance"
+          ],
+          "reason": "The Full-EM inversion requires a supplied spectral noise model and rejects both missing and simultaneously supplied alternatives."
+        },
+        {
+          "when_model": "electrostatic",
+          "at_most_one_of": [
+            "signal_uncertainty",
+            "spectral_covariance"
+          ],
+          "reason": "The electrostatic path accepts either pointwise uncertainty or full spectral covariance, not both."
+        }
+      ],
+      "workflow_argument_mapping": {
+        "dispatcher": "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
+        "shared_spectrum_argument": "spectrum",
+        "full_electromagnetic_spectrum_mapping": "spectrum -> measured_spectrum",
+        "electrostatic_seed_mapping": "electron_velocity_projection_m_s is an optional optimizer seed; ion_velocity_initial_m_s is a required optimizer seed",
+        "full_electromagnetic_seed_mapping": "electron_flow_projection_initial_m_s and ion_flow_projection_initial_m_s are optional optimizer seeds",
+        "ray_geometry_helper": "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
+        "ray_geometry_helper_only_arguments": [
+          "mode_index",
+          "scattering_sample_count"
+        ],
+        "no_implicit_model_substitution": true
       }
     },
     "scientific_references": [
