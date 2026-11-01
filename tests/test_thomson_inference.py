@@ -389,7 +389,7 @@ def test_descriptive_moments_report_negative_residual_clipping_caveat():
         scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
     )
     out = result["channels"][0]["spectral_distribution"]
-    assert out["physical_parameter_extraction"]["status"] == "completed"
+    assert "physical_parameter_extraction" not in out
     assert "negative_area_fraction_removed_by_clipping" in out
     assert "clipping" in out["moment_clipping_bias_warning"].lower()
 
@@ -752,14 +752,7 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     distribution = out["channels"][0]["spectral_distribution"]
     assert distribution["analysis_status"] == "completed"
     assert distribution["background_source"].startswith("background nuisance")
-    physical = distribution["physical_parameter_extraction"]
-    assert physical["status"] == "completed"
-    assert physical["source"].startswith("canonical selected Thomson physical forward fit")
-    assert physical["model"] == out["model"]
-    assert physical["electron_temperature_eV"] == pytest.approx(out["channels"][0]["electron_temperature_eV"])
-    assert physical["electron_velocity_projection_m_s"] == pytest.approx(out["channels"][0]["electron_velocity_projection_m_s"])
-    assert physical["electron_density_m3"] is None
-    assert physical["electron_density_status"] == "not_identifiable_from_supplied_calibrated_spectrum_and_absolute_optical_inputs"
+    assert "physical_parameter_extraction" not in distribution
     assert "spectral_distribution" in out
 
 
@@ -891,46 +884,37 @@ def test_joint_density_covariance_retains_common_scattering_angle_uncertainty():
     assert covariance[0, 1] > 0.0
 
 
-def test_spectral_distribution_rejects_shape_only_execution():
+def test_spectral_distribution_is_a_raw_spectrum_shape_analysis_without_physical_parameter_injection():
     from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
 
     x, y, _ = _spectral_case(120.0)
     background = 25.0 + 0.1 * (x - 532.0)
-    with pytest.raises(ValueError, match="physical_parameters is required"):
-        analyze_thomson_spectral_distribution(
-            x, y,
-            instrument_response_matrix=np.eye(x.size),
-            background_signal=background,
-        )
-
-
-def test_spectral_distribution_requires_fitted_physical_parameters_and_reports_them():
-    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
-
-    x, y, _ = _spectral_case(120.0)
-    background = 25.0 + 0.1 * (x - 532.0)
-    physical = {
-        "model": "non_collective_maxwellian",
-        "electron_temperature_eV": 120.0,
-        "electron_temperature_uncertainty_eV": 2.0,
-        "electron_velocity_projection_m_s": 0.0,
-        "electron_velocity_projection_uncertainty_m_s": 100.0,
-        "electron_density_m3": None,
-        "electron_density_uncertainty_m3": None,
-    }
     result = analyze_thomson_spectral_distribution(
         x, y,
         instrument_response_matrix=np.eye(x.size),
         background_signal=background,
-        physical_parameters=physical,
     )
-    extracted = result["physical_parameter_extraction"]
-    assert extracted["status"] == "completed"
-    assert extracted["model"] == "non_collective_maxwellian"
-    assert extracted["electron_temperature_eV"] == pytest.approx(120.0)
-    assert extracted["electron_velocity_projection_m_s"] == pytest.approx(0.0)
-    assert extracted["electron_density_status"].startswith("not_identifiable")
-    assert result["gaussian_fit_uncertainty_scope"] == "conditional_on_fixed_supplied_response_matrix"
+    assert result["analysis_status"] if "analysis_status" in result else True
+    assert "physical_parameter_extraction" not in result
+    assert "instrument_corrected_sigma_nm" not in result
+    with pytest.raises(TypeError):
+        analyze_thomson_spectral_distribution(
+            x, y,
+            instrument_response_matrix=np.eye(x.size),
+            background_signal=background,
+            physical_parameters={"electron_temperature_eV": 120.0},
+        )
+
+
+def test_spectral_distribution_requires_explicit_background_source():
+    from tokamak_analysis.thomson_distribution import analyze_thomson_spectral_distribution
+
+    x, y, _ = _spectral_case(120.0)
+    with pytest.raises(ValueError, match="background"):
+        analyze_thomson_spectral_distribution(
+            x, y,
+            instrument_response_matrix=np.eye(x.size),
+        )
 
 
 def test_spectral_distribution_response_conserves_area_on_nonuniform_bins():
