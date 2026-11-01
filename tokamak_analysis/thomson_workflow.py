@@ -181,7 +181,7 @@ def _reconstruct_inferred_parameter_profile(
             if positive:
                 if np.any(sample <= 0.0):
                     raise ValueError("Positive profile samples must remain strictly positive.")
-                log_covariance = cov / np.outer(sample, sample)
+                log_covariance = cov / np.outer(value, value)
                 log_profile, log_gradient, diagnostics = _generalized_least_squares_smoothing_spline(
                     radius, np.log(sample), log_covariance, grid,
                 )

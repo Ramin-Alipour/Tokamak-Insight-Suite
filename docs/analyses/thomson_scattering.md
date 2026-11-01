@@ -195,3 +195,13 @@ For mask- or edge-fitted backgrounds, the linear background is re-fitted in
 each perturbed signal draw instead, so a separate background covariance input
 is rejected. Possible signal contamination in a supplied background remains
 non-identifiable from this subanalysis alone.
+
+
+### Correlated-covariance spatial smoothing
+
+When physical inference supplies a full positive-definite cross-channel parameter covariance, spatial reconstruction uses a natural-cubic smoothing-spline GLS objective,
+\[
+(\mathbf y-\mathbf f)^T\mathbf C^{-1}(\mathbf y-\mathbf f)
++\lambda\int [f''(r)]^2\,dr,
+\]
+with the smoothing parameter selected by generalized cross-validation using the effective degrees of freedom of the GLS hat matrix. The full covariance is used directly; correlations are never inferred from pointwise uncertainties. Results report the selected smoothing parameter, GCV score, effective degrees of freedom, generalized residual sum of squares and system condition number. Singular/non-positive-definite covariance is rejected rather than silently regularized. For positive profiles, the objective is applied to log-parameters with a first-order covariance transformation based on the measured channel values. Monte Carlo profile bands remain conditional on the supplied/inferred covariance and selected smoothing procedure.

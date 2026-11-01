@@ -83,7 +83,7 @@
 | 54 | `implemented_and_tested` — centroid/variance/skewness/kurtosis from calibrated measured spectrum. | Retain explicit background treatment. |
 | 55 | `implemented_and_tested` — exactly one background representation required. | Preserve strict validation. |
 | 56 | `implemented_and_tested` — edge fraction is explicit heuristic. | Warn that signal can occupy spectral edges. |
-| 57 | `open_gap` — fitted-background parameter uncertainty is not jointly sampled with moment MC. | Add optional background covariance/uncertainty model with explicit parameterization and regression tests. |
+| 57 | `implemented_and_tested` — when an explicit measured background spectrum is supplied, its pointwise uncertainty or full positive-definite wavelength covariance is sampled jointly with signal uncertainty in moment Monte Carlo. | Signal/background cross-covariance is not accepted; background-mask and edge-fitted nuisance parameters are re-fitted within each signal draw, with their own limitations stated. |
 | 58 | `implemented_and_tested` — full within-channel covariance is accepted and sampled jointly; independent pointwise uncertainty is separately labelled. | Retain covariance route; ensure documentation does not imply independence when full covariance supplied. |
 | 59 | `implemented_and_tested` — signed residuals retained; area/variance instability rejected. | Preserve rejection and warnings. |
 | 60 | `implemented_and_tested` — observed wavelength width only. | No instrument-corrected temperature width. |

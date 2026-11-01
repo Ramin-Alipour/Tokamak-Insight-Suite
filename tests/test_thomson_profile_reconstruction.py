@@ -115,4 +115,6 @@ def test_full_cross_channel_covariance_is_used_in_gls_smoothing_objective():
     assert diagnostics["selection_method"] == "generalized_cross_validation_with_full_GLS_covariance"
     assert diagnostics["covariance_model"] == "researcher_supplied_full_cross_channel_covariance"
     assert diagnostics["smoothing_parameter"] > 0.0
+    assert diagnostics["covariance_regularization"] == "none; non-positive-definite covariance is rejected"
+    assert np.isfinite(diagnostics["system_condition_number"])
     assert np.isfinite(diagnostics["effective_degrees_of_freedom"])
