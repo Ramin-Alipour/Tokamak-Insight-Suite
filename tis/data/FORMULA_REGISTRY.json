@@ -4767,8 +4767,8 @@
         "No independent experimental validation is claimed."
       ],
       "test_links": [
-        "tests/test_cts_analysis.py",
-        "tests/test_cts_numerical_convergence.py"
+        "tests/test_cts_analysis.py::test_full_em_cts_returns_hermitian_density_current_field_covariance",
+        "tests/test_cts_numerical_convergence.py::test_full_em_convergence_reports_paired_harmonic_quadrature_refinement"
       ],
       "note": "This is a forward physical model and Full-EM inversion branch, not a raw-detector calibration workflow. Its capabilities are not interchangeable with the unmagnetized electrostatic CTS branch."
     },
