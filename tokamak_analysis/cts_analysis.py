@@ -848,14 +848,17 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     out["fast_ion_vdf_covariance"]=out["fast_ion_vdf_covariance"]+response_vdf_covariance
                     out["fast_ion_vdf_uncertainty_m_s_inverse"]=np.sqrt(np.maximum(np.diag(out["fast_ion_vdf_covariance"]),0.0))
             out["response_uncertainty_propagated"]=response_sigma is not None
-            out["external_parameter_uncertainty_propagated"]=bool(ext_unc)
+            out["external_parameter_uncertainty_propagated"]=bool(ext_unc) or external_covariance is not None
+            out["external_parameter_covariance_propagated"]=external_covariance is not None
         else:
             out["response_uncertainty_propagated"]=False
             out["external_parameter_uncertainty_propagated"]=False
+            out["external_parameter_covariance_propagated"]=False
             out["response_uncertainty_warning"]="Too few successful response/external perturbation refits; no Monte Carlo contribution was added."
     else:
         out["response_uncertainty_propagated"]=False
         out["external_parameter_uncertainty_propagated"]=False
+        out["external_parameter_covariance_propagated"]=False
     from .thomson_identifiability import cts_electrostatic_identifiability
     out["parameter_identifiability"] = cts_electrostatic_identifiability(
         fast_ion_model=fast.get("kind") if fast else None

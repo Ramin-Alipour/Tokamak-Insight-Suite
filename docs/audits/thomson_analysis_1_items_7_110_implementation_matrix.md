@@ -117,7 +117,7 @@
 | 78 | `conditional_on_explicit_inputs` — species/charge states/masses/fractions supplied externally. | Keep composition fixed, not inferred. |
 | 79 | `non_identifiable_by_physics` — only scattering-wavevector flow projection. | Multi-view geometry required for vector recovery. |
 | 80 | `implemented_and_tested` — tabulated fast-ion branch is projected 1-D VDF. | Preserve projection limitation. |
-| 81 | `open_gap` — external uncertainty covariance does not cover all cross-parameter correlations. | Add general supplied external covariance with parameter ordering and PSD validation. |
+| 81 | `partially_implemented` — electrostatic CTS now accepts a researcher-supplied ordered positive-semidefinite joint covariance over probe frequency, scalar scattering angle and individual ion fractions, and samples the correlated external inputs jointly through Monte Carlo refits. | Add analogous complete covariance propagation for all external geometry/field/polarization/ray/equilibrium parameters in Full-EM CTS; extend species-fraction covariance and boundary tests. |
 | 82 | `partially_implemented` — response uncertainty supports measured 2-D/3-D forms, not interchangeable 1-D kernel/callable representation. | Complete response covariance contract or explicitly reject unsupported form. |
 | 83 | `implemented_and_tested` — global search requires finite supplied bounds. | Never invent scientific bounds. |
 | 84 | `conditional_on_explicit_inputs` — tabulated fast-ion inverse requires explicit regularization choice. | Distinguish numerical regularizer from physical parameter. |
