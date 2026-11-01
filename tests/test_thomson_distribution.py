@@ -240,3 +240,31 @@ def test_distribution_exposes_background_and_statistical_interpretation():
     unweighted = _run(x, y)
     assert unweighted["gaussian_fit_statistical_weighting_status"] == "unweighted_least_squares_no_measurement_uncertainty_supplied"
     assert unweighted["gaussian_fit_covariance_interpretation"] == "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+
+
+def test_explicit_background_uncertainty_is_propagated_into_moment_uncertainty():
+    x = np.linspace(500.0, 564.0, 161)
+    signal = 100.0 * np.exp(-0.5 * ((x - 532.0) / 7.0) ** 2) + 12.0
+    background = np.full_like(x, 12.0)
+    background_covariance = np.eye(x.size) * 0.04
+    result = analyze_thomson_spectral_distribution(
+        x, signal, instrument_response_matrix=np.eye(x.size),
+        background_signal=background,
+        background_signal_covariance=background_covariance,
+        moment_mc_samples=40,
+    )
+    assert result["background_uncertainty_supplied"] is True
+    assert result["background_uncertainty_model"] == "independent_full_background_signal_covariance"
+    assert result["moment_uncertainty_successful_draws"] >= 20
+    assert result["spectral_centroid_uncertainty_nm"] > 0.0
+
+
+def test_background_uncertainty_requires_explicit_background_signal():
+    x = np.linspace(500.0, 564.0, 81)
+    signal = 100.0 * np.exp(-0.5 * ((x - 532.0) / 7.0) ** 2) + 12.0
+    with pytest.raises(ValueError, match="only with an explicitly supplied background_signal"):
+        analyze_thomson_spectral_distribution(
+            x, signal, instrument_response_matrix=np.eye(x.size),
+            background_fraction=0.1,
+            background_signal_uncertainty=np.full(x.size, 0.1),
+        )
