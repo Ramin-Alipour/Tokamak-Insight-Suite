@@ -53,7 +53,7 @@ def test_cts_inversion_recovers_controlled_synthetic_parameters():
     f0,f,g,ions,frac,response=_case(); truth=(2e19,1200.,800.,1.5e4,2.5e5)
     z=cts_spectral_density(f,f0,g,electron_density_m3=truth[0],electron_temperature_eV=truth[1],ion_temperature_eV=truth[2],ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=truth[4],ion_velocity_projection_m_s=truth[3])
     y=2.4e4*z+3.
-    out=analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,ion_fractions=frac,electron_velocity_projection_m_s=0.0,instrument_response=response,
+    out=analyze_cts_spectrum(f,y,probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,ion_fractions=frac,instrument_response=response,
       signal_uncertainty=np.full_like(y,.02*np.max(y)),electron_density_initial_m3=truth[0],electron_temperature_initial_eV=truth[1],
       ion_temperature_initial_eV=truth[2],ion_velocity_initial_m_s=truth[3],global_search=False,inversion_method="local_least_squares")
     assert out["electron_density_m3"]==pytest.approx(truth[0],rel=.08)
