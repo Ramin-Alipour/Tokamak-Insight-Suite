@@ -79,7 +79,7 @@ def _hermitian_psd(matrix, name, tolerance=1e-9):
 
 def _species_list(electron_density_m3, ion_species, ion_fractions,
                   electron_temperature_eV, ion_temperature_eV,
-                  electron_flow_m_s, ion_flow_m_s):
+                  electron_flow_m_s, ion_flow_m_s=None):
     fractions = _real_array(ion_fractions, "ion_fractions", 1)
     if (not isinstance(ion_species, Sequence) or isinstance(ion_species, (str, bytes))
             or len(ion_species) == 0 or fractions.shape != (len(ion_species),)
@@ -113,7 +113,7 @@ def _species_list(electron_density_m3, ion_species, ion_fractions,
         name = names[i]
         z = _positive(item.get("charge_state"), f"ion_species[{i}].charge_state")
         mass = _positive(item.get("mass_amu"), f"ion_species[{i}].mass_amu") * AMU
-        flow = ion_flow_m_s.get(name)
+        flow = np.zeros(3, dtype=float) if ion_flow_m_s is None else ion_flow_m_s.get(name)
         if flow is None:
             raise ValueError(f"ion_flow_velocity_m_s must provide a vector for {name}")
         result.append({
@@ -238,7 +238,7 @@ def full_em_cts_spectral_density(
     ion_species, ion_fractions, magnetic_field_T,
     electron_flow_velocity_m_s=None, ion_flow_velocity_m_s=None,
     incident_polarization=None, scattered_polarization=None,
-    electron_flow_projection_m_s=None,
+    electron_flow_projection_m_s=None, ion_flow_projection_m_s=None,
     harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
     fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None,
@@ -350,6 +350,7 @@ def full_em_cts_spectral_density(
                     electron_flow_velocity_m_s=electron_flow_velocity_m_s,
                     electron_flow_projection_m_s=electron_flow_projection_m_s,
                     ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+                    ion_flow_projection_m_s=ion_flow_projection_m_s,
                     incident_polarization=incident_polarization,
                     scattered_polarization=scattered_polarization,
                     harmonic_order=harmonic_order, quadrature_order=quadrature_order,
@@ -483,10 +484,40 @@ def full_em_cts_spectral_density(
         electron_flow_seed = _finite_vec3(
             electron_flow_velocity_m_s, "electron_flow_velocity_m_s"
         )
-    if not isinstance(ion_flow_velocity_m_s, Mapping):
-        raise ValueError("ion_flow_velocity_m_s must map every ion species name to a 3-vector")
+    ion_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
+    if ion_flow_projection_m_s is not None:
+        if ion_flow_velocity_m_s is not None:
+            raise ValueError("supply ion_flow_projection_m_s or ion_flow_velocity_m_s, not both")
+        if not isinstance(ion_flow_projection_m_s, Mapping):
+            raise ValueError("ion_flow_projection_m_s must map every ion species name to a scalar projection")
+        missing = [name for name in ion_names if name not in ion_flow_projection_m_s]
+        extra = [name for name in ion_flow_projection_m_s if name not in ion_names]
+        if missing or extra:
+            raise ValueError(
+                f"ion_flow_projection_m_s must contain exactly the ion species names; missing={missing}, extra={extra}"
+            )
+        ion_flow_projections = {
+            name: float(_real_array(ion_flow_projection_m_s[name], f"ion_flow_projection_m_s[{name}]"))
+            for name in ion_names
+        }
+        if any(not np.isfinite(value) for value in ion_flow_projections.values()):
+            raise ValueError("ion-flow projections must be finite")
+        ion_flow_vectors = None
+    else:
+        if not isinstance(ion_flow_velocity_m_s, Mapping):
+            raise ValueError(
+                "ion_flow_projection_m_s is required when ion flow is to be inferred from the measured spectrum"
+            )
+        missing = [name for name in ion_names if name not in ion_flow_velocity_m_s]
+        extra = [name for name in ion_flow_velocity_m_s if name not in ion_names]
+        if missing or extra:
+            raise ValueError(
+                f"ion_flow_velocity_m_s must contain exactly the ion species names; missing={missing}, extra={extra}"
+            )
+        ion_flow_projections = None
+        ion_flow_vectors = ion_flow_velocity_m_s
     species = _species_list(ne, ion_species, ion_fractions, te, ion_temperature_eV,
-                            electron_flow_seed, ion_flow_velocity_m_s)
+                            electron_flow_seed, ion_flow_vectors)
     electron_distribution_used = None
     if electron_distribution is not None:
         if electron_flow_projection_m_s is not None and abs(electron_flow_projection_m_s) > 0.0:
@@ -607,13 +638,17 @@ def full_em_cts_spectral_density(
             "scattered": scattered_mode_diagnostics,
         })
         kvec = ks - ki
-        if electron_flow_projection_m_s is not None:
-            kvec_norm_for_flow = float(np.linalg.norm(kvec))
+        kvec_norm_for_flow = float(np.linalg.norm(kvec))
+        if (electron_flow_projection_m_s is not None or ion_flow_projections is not None):
             if not np.isfinite(kvec_norm_for_flow) or kvec_norm_for_flow <= 0.0:
-                raise ValueError("scattering wavevector must be non-zero to infer electron-flow projection")
-            # The fitted scalar is the component along the local scattering
-            # wavevector. A single CTS geometry cannot identify transverse flow.
-            species[0]["flow"] = electron_flow_projection_m_s * kvec / kvec_norm_for_flow
+                raise ValueError("scattering wavevector must be non-zero to infer flow projections")
+            khat_flow = kvec / kvec_norm_for_flow
+            if electron_flow_projection_m_s is not None:
+                # One geometry identifies only the projection along k, not a 3-D vector.
+                species[0]["flow"] = electron_flow_projection_m_s * khat_flow
+            if ion_flow_projections is not None:
+                for ion_index, ion_name in enumerate(ion_names, start=1):
+                    species[ion_index]["flow"] = ion_flow_projections[ion_name] * khat_flow
         omega = 2.0 * np.pi * shift
         if abs(omega) < damping:
             omega = np.copysign(damping, omega if omega else 1.0)
@@ -883,8 +918,7 @@ def analyze_full_em_cts_spectrum(
     scattering_geometry, electron_density_initial_m3,
     electron_temperature_initial_eV, ion_temperature_initial_eV,
     ion_species, ion_fractions, magnetic_field_T,
-    ion_flow_velocity_m_s,
-    incident_polarization, scattered_polarization,
+    incident_polarization, scattered_polarization, ion_flow_projection_initial_m_s=None,
     instrument_response, electron_flow_projection_initial_m_s=None,
     signal_uncertainty=None, spectral_covariance=None,
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
@@ -898,7 +932,9 @@ def analyze_full_em_cts_spectrum(
     wavevector is fitted from the measured spectrum; transverse components
     are not identifiable from a single geometry. Ion flow, composition,
     magnetic field, geometry and mode polarizations remain external inputs.
-    Each species temperature remains an independent fitted parameter.
+    The flow projection of every supplied ion species is independently fitted
+    from the measured spectrum; transverse components are not identifiable
+    from a single CTS geometry. Each species temperature is also fitted.
     """
     from scipy.optimize import least_squares
 
@@ -956,11 +992,13 @@ def analyze_full_em_cts_spectrum(
     names = (
         "electron_density_m3", "electron_temperature_eV",
         "electron_flow_projection_m_s",
-    ) + tuple(f"ion_temperature_eV:{name}" for name in species_names)
+    ) + tuple(f"ion_temperature_eV:{name}" for name in species_names) + tuple(
+        f"ion_flow_projection_m_s:{name}" for name in species_names
+    )
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping from parameter names to positive increasing pairs")
     bounds = {} if parameter_bounds is None else dict(parameter_bounds)
-    allowed_bound_names = set(names) | {"ion_temperature_eV"}
+    allowed_bound_names = set(names) | {"ion_temperature_eV", "ion_flow_projection_m_s"}
     unknown_bound_names = set(bounds)-allowed_bound_names
     if unknown_bound_names:
         raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
@@ -969,11 +1007,29 @@ def analyze_full_em_cts_spectrum(
     )
     if not np.isfinite(flow_seed):
         raise ValueError("electron_flow_projection_initial_m_s must be finite")
+    if ion_flow_projection_initial_m_s is None:
+        ion_flow_seeds = np.zeros(len(species_names), dtype=float)
+    else:
+        if not isinstance(ion_flow_projection_initial_m_s, Mapping):
+            raise ValueError("ion_flow_projection_initial_m_s must map every ion species name to an optional numerical seed")
+        missing = [name for name in species_names if name not in ion_flow_projection_initial_m_s]
+        extra = [name for name in ion_flow_projection_initial_m_s if name not in species_names]
+        if missing or extra:
+            raise ValueError(
+                f"ion_flow_projection_initial_m_s must contain exactly the ion species names; missing={missing}, extra={extra}"
+            )
+        ion_flow_seeds = np.array([
+            float(_real_array(ion_flow_projection_initial_m_s[name], f"ion_flow_projection_initial_m_s[{name}]"))
+            for name in species_names
+        ])
+        if np.any(~np.isfinite(ion_flow_seeds)):
+            raise ValueError("ion-flow projection initial estimates must be finite")
     initial = np.concatenate((
         [_positive(electron_density_initial_m3, "electron_density_initial_m3"),
          _positive(electron_temperature_initial_eV, "electron_temperature_initial_eV"),
          flow_seed],
         ion_initials,
+        ion_flow_seeds,
     ))
     lower = np.full(len(names), -np.inf, dtype=float)
     upper = np.full(len(names), np.inf, dtype=float)
@@ -985,7 +1041,7 @@ def analyze_full_em_cts_spectrum(
         if pair_value is None:
             continue
         pair = _real_array(pair_value, f"parameter_bounds[{name!r}]", 1)
-        is_flow = name == "electron_flow_projection_m_s"
+        is_flow = "flow_projection_m_s" in name
         if (pair.shape != (2,) or np.any(~np.isfinite(pair))
                 or (not is_flow and np.any(pair <= 0)) or pair[0] >= pair[1]):
             qualifier = "finite increasing" if is_flow else "positive finite increasing"
@@ -1000,10 +1056,12 @@ def analyze_full_em_cts_spectrum(
         else:
             lower[index], upper[index] = np.log10(pair)
         applied_bounds[name] = pair.tolist()
+    n_species = len(species_names)
     p0 = np.concatenate((
         np.log10(initial[:2]),
         [initial[2] / 1.0e6],
-        np.log10(initial[3:]),
+        np.log10(initial[3:3+n_species]),
+        initial[3+n_species:] / 1.0e6,
     ))
 
     def electron_flow_projection(p):
@@ -1012,6 +1070,12 @@ def analyze_full_em_cts_spectrum(
     def unpack_temperatures(p):
         return {
             name: float(10.0**np.clip(p[3+i], -300.0, 300.0))
+            for i, name in enumerate(species_names)
+        }
+
+    def unpack_ion_flow_projections(p):
+        return {
+            name: float(p[3+n_species+i] * 1.0e6)
             for i, name in enumerate(species_names)
         }
 
@@ -1024,7 +1088,7 @@ def analyze_full_em_cts_spectrum(
             ion_species=ion_species, ion_fractions=ion_fractions,
             magnetic_field_T=magnetic_field_T,
             electron_flow_projection_m_s=electron_flow_projection(p),
-            ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+            ion_flow_projection_m_s=unpack_ion_flow_projections(p),
             incident_polarization=incident_polarization,
             scattered_polarization=scattered_polarization,
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
@@ -1062,12 +1126,14 @@ def analyze_full_em_cts_spectrum(
     values = np.concatenate((
         10.0**np.clip(fit.x[:2], -300.0, 300.0),
         [electron_flow_projection(fit.x)],
-        10.0**np.clip(fit.x[3:], -300.0, 300.0),
+        10.0**np.clip(fit.x[3:3+n_species], -300.0, 300.0),
+        np.asarray(list(unpack_ion_flow_projections(fit.x).values()), dtype=float),
     ))
     transform_diagonal = np.concatenate((
         np.log(10.0) * values[:2],
         [1.0e6],
-        np.log(10.0) * values[3:],
+        np.log(10.0) * values[3:3+n_species],
+        np.full(n_species, 1.0e6),
     ))
     transform = np.diag(transform_diagonal)
     covariance = transform @ covariance_log @ transform.T
@@ -1079,7 +1145,7 @@ def analyze_full_em_cts_spectrum(
         ion_species=ion_species, ion_fractions=ion_fractions,
         magnetic_field_T=magnetic_field_T,
         electron_flow_projection_m_s=electron_flow_projection(fit.x),
-        ion_flow_velocity_m_s=ion_flow_velocity_m_s,
+        ion_flow_projection_m_s=unpack_ion_flow_projections(fit.x),
         incident_polarization=incident_polarization,
         scattered_polarization=scattered_polarization,
         harmonic_order=harmonic_order, quadrature_order=quadrature_order,
@@ -1096,6 +1162,12 @@ def analyze_full_em_cts_spectrum(
         "electron_flow_projection_is_fitted": True,
         "ion_temperature_eV": (float(values[3]) if len(species_names) == 1 else unpack_temperatures(fit.x)),
         "ion_temperature_eV_by_species": unpack_temperatures(fit.x),
+        "ion_flow_projection_m_s_by_species": unpack_ion_flow_projections(fit.x),
+        "ion_flow_projection_uncertainty_m_s_by_species": {
+            name: float(np.sqrt(max(covariance[3+n_species+i, 3+n_species+i], 0.0)))
+            for i, name in enumerate(species_names)
+        },
+        "ion_flow_projection_is_fitted": True,
         "parameter_names": list(names),
         "parameter_bounds": applied_bounds,
         "fit_covariance": covariance,
@@ -1112,14 +1184,19 @@ def analyze_full_em_cts_spectrum(
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": [
-            "ion_flow_velocity_m_s", "magnetic_field_T", "ion_species",
-            "ion_fractions", "incident_polarization", "scattered_polarization",
+            "magnetic_field_T", "ion_species", "ion_fractions",
+            "incident_polarization", "scattered_polarization",
         ],
         "electron_flow_inference": (
             "fitted scalar component along the local scattering wavevector; "
             "transverse components are not identifiable from a single CTS geometry"
         ),
-        "inversion_scope": "electron density, electron temperature, the electron-flow projection along the local scattering wavevector, and one independently fitted temperature per supplied thermal ion species; ion flow, composition and supplied non-Maxwellian VDF shapes remain fixed external inputs; a Maxwell-Juttner electron VDF follows the fitted electron temperature",
+        "ion_flow_inference": (
+            "one fitted scalar projection per supplied ion species along the local "
+            "scattering wavevector; transverse components are not identifiable "
+            "from a single CTS geometry"
+        ),
+        "inversion_scope": "electron density, electron temperature, electron-flow projection, one ion-temperature and one ion-flow projection per supplied thermal ion species are fitted from the measured spectrum; composition, magnetic field, geometry, mode polarizations and supplied non-Maxwellian VDF shapes remain fixed external inputs",
         "fluctuation_covariance_density_current_E_B": forward_diagnostics["fluctuation_covariance_density_current_E_B"],
         "dielectric_tensor": forward_diagnostics["dielectric_tensor"],
         "wave_tensor": forward_diagnostics["wave_tensor"],
