@@ -754,6 +754,25 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
     assert distribution["background_source"].startswith("background nuisance")
     assert "physical_parameter_extraction" not in distribution
     assert "spectral_distribution" in out
+    evdf = out["channels"][0]["electron_velocity_distribution"]
+    assert evdf["analysis_status"] in {"completed", "unavailable_for_this_channel"}
+    assert "electron_velocity_distribution" in out
+    if evdf["analysis_status"] == "completed":
+        assert evdf["scattering_vector_projection_only"] is True
+        assert evdf["absolute_density_identified"] is False
+        assert np.trapz(evdf["evdf_parallel_s_per_m"], evdf["velocity_parallel_m_s"]) == pytest.approx(1.0, rel=2e-5)
+        assert evdf["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
+
+
+def test_thomson_evdf_can_be_explicitly_disabled_without_changing_primary_physics_fit():
+    x, y, _ = _spectral_case(100.0)
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        enable_evdf_reconstruction=False,
+    )
+    assert out["channels"][0]["electron_velocity_distribution"]["analysis_status"] == "not_requested"
+    assert np.isfinite(out["electron_temperature_profile_eV"][0])
 
 
 def test_thomson_spatial_subanalysis_reconstructs_all_identifiable_spectral_profiles():
