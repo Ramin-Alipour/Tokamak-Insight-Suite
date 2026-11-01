@@ -343,6 +343,14 @@ def test_full_em_cts_response_uncertainty_matches_runtime_json_and_callable_cont
     json_outputs = {item["name"] for item in contract["output_specs"]}
     assert {"numerical_convergence", "numerical_convergence_status",
             "numerical_convergence_is_uncertainty"} <= json_outputs
+    json_output_specs = contract["output_specs"]
+    assert sum(item["name"] == "numerical_convergence_status" for item in json_output_specs) == 1
+    convergence_status_description = next(
+        item["description"] for item in json_output_specs
+        if item["name"] == "numerical_convergence_status"
+    ).lower()
+    assert "not_converged_at_final_refinement" in convergence_status_description
+    assert "single inversions do not establish" not in convergence_status_description
     assert "applies_when_model" not in json_inputs["instrument_response_uncertainty"]
     assert "applies_when_model" not in json_inputs["response_mc_samples"]
     assert "response-matrix uncertainty is propagated by Monte Carlo refitting" in contract["uncertainty_model"]
