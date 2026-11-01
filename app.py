@@ -1128,6 +1128,8 @@ elif page=='Spectral Analysis':
                         response_uncertainty=np.asarray(response_uncertainty_payload.get('response_matrices',response_uncertainty_payload) if isinstance(response_uncertainty_payload,dict) else response_uncertainty_payload,dtype=float)
                     elif response_unc_upload is not None:
                         response_uncertainty=pd.read_csv(response_unc_upload,header=None).to_numpy(dtype=float)
+                        if response_uncertainty.ndim==2 and 1 in response_uncertainty.shape:
+                            response_uncertainty=response_uncertainty.reshape(-1)
                     joint_spectral_covariance=None
                     if joint_covariance_upload is not None:
                         joint_spectral_covariance=pd.read_csv(joint_covariance_upload,header=None).to_numpy(dtype=float)
