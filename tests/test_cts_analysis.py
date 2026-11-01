@@ -1065,6 +1065,11 @@ def test_cts_registry_declares_required_branch_specific_inputs():
     assert "required_when_model" not in specs["ion_velocity_initial_m_s"]
     assert "optional numerical optimizer seed" in specs["ion_velocity_initial_m_s"]["description"]
 
+    assert specs["external_parameter_covariance"]["required"] is False
+    assert "positive-semidefinite" in specs["external_parameter_covariance"]["description"]
+    assert specs["external_parameter_order"]["required"] is False
+    assert "Required when external_parameter_covariance is supplied" in specs["external_parameter_order"]["description"]
+
     assert specs["electron_flow_projection_initial_m_s"]["required"] is False
     assert "fitted from the measured CTS spectrum" in specs["electron_flow_projection_initial_m_s"]["description"]
     assert "electron_flow_velocity_m_s" not in specs

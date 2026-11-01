@@ -4423,6 +4423,18 @@
           "required": false,
           "description": "Full-EM only and only when electron_distribution is omitted. If supplied, the fitted theta_e above this researcher-selected asymptotic Bindslev screening limit is rejected. If omitted, validity is explicitly marked not_quantitatively_screened.",
           "required_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "external_parameter_covariance",
+          "unit": "joint covariance of ordered external electrostatic-CTS inputs",
+          "required": false,
+          "description": "Optional positive-semidefinite covariance propagated by joint Monte Carlo refits. Supported external variables are probe_frequency_Hz, scattering_angle_rad for scalar-angle geometry, and ion_fraction_i for each supplied ion species. Mutually exclusive with external_parameter_uncertainties."
+        },
+        {
+          "name": "external_parameter_order",
+          "unit": "ordered names matching external_parameter_covariance rows and columns",
+          "required": false,
+          "description": "Required when external_parameter_covariance is supplied. Allowed names: probe_frequency_Hz, scattering_angle_rad, and ion_fraction_0 through ion_fraction_(N_species-1). Names must be unique and correspond exactly to covariance order."
         }
       ],
       "output_specs": [
@@ -4926,7 +4938,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
-      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; response-matrix and external-parameter uncertainty propagation is not implemented. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -4942,7 +4954,8 @@
         "The Maxwellian Bindslev bulk-electron closure is asymptotic at low theta_e; a researcher-selected theta_e screening limit can be enforced, and no universal cutoff is presumed.",
         "Full-EM measured-spectrum inversion fits scalar electron- and per-species ion-flow projections along the scattering wavevector; it does not accept externally supplied 3-D flow vectors.",
         "Explicit relativistic gyrotropic electron distributions are supported by full_em_cts_spectral_density as a forward model, but are rejected by analyze_full_em_cts_spectrum; no relativistic-electron inversion is claimed.",
-        "The fast-ion population shapes supplied to Full-EM inversion are fixed external inputs and are not inferred from the measured CTS spectrum."
+        "The fast-ion population shapes supplied to Full-EM inversion are fixed external inputs and are not inferred from the measured CTS spectrum.",
+        "The general external covariance route currently covers electrostatic CTS probe frequency, scalar scattering angle and ion fractions; it does not yet cover the full electromagnetic magnetic-field, polarization, ray, equilibrium and spatial-geometry covariance."
       ],
       "function_links": [
         "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
