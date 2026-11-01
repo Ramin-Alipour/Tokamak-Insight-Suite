@@ -3311,6 +3311,7 @@ elif page=='Advanced Analysis':
                         raise ValueError('Upload the measured frequency-response matrix.')
                     cts_response=pd.read_csv(cts_response_upload,header=None).to_numpy(dtype=float)
                     cts_spectral_cov=None if cts_covariance_upload is None else pd.read_csv(cts_covariance_upload,header=None).to_numpy(dtype=float)
+                    cts_response_uncertainty=None if cts_response_uncertainty_upload is None else pd.read_csv(cts_response_uncertainty_upload,header=None).to_numpy(dtype=float)
                     species_names=[v.strip() for v in cts_species_text.split(',') if v.strip()]
                     charges=[float(v.strip()) for v in cts_charge_text.split(',') if v.strip()]
                     masses=[float(v.strip()) for v in cts_mass_text.split(',') if v.strip()]
@@ -3404,6 +3405,8 @@ elif page=='Advanced Analysis':
             with c2:
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_full_response_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_full_covariance_upload')
+                cts_response_uncertainty_upload=st.file_uploader('Optional measured frequency-response matrix 1σ uncertainty CSV',type=['csv','txt'],key='cts_full_response_uncertainty_upload')
+                cts_response_mc_samples=int(st.number_input('Response-uncertainty Monte Carlo refits',min_value=20,max_value=2000,value=100,step=20,key='cts_full_response_mc_samples'))
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
                 cts_ray_mode_index=None
                 if cts_geometry_upload is not None:
@@ -3517,6 +3520,8 @@ elif page=='Advanced Analysis':
                         'instrument_response':cts_response,
                         'signal_uncertainty':cts_uncertainty,
                         'spectral_covariance':cts_spectral_cov,
+                        'instrument_response_uncertainty':cts_response_uncertainty,
+                        'response_mc_samples':cts_response_mc_samples,
                         'parameter_bounds':parameter_bounds,
                         'fast_ion_populations':fast_ions,
                         'harmonic_order':int(cts_harmonic_order),
