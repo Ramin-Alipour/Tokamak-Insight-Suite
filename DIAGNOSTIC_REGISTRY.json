@@ -4276,20 +4276,20 @@
         {
           "name": "electron_density_initial_m3",
           "unit": "m^-3; optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final density is fitted from the measured CTS spectrum and is not fixed to this value."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "electron_temperature_initial_eV",
           "unit": "eV; optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final electron temperature is fitted from the measured CTS spectrum."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "ion_temperature_initial_eV",
           "unit": "eV; common ion-temperature optimizer initial estimate",
-          "required": true,
-          "description": "Required numerical optimizer starting estimate for both inversion branches; the final ion temperature(s) are fitted from the measured CTS spectrum. Electrostatic CTS fits one common ion temperature; Full-EM fits one temperature per supplied species."
+          "required": false,
+          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
         },
         {
           "name": "ion_velocity_initial_m_s",
