@@ -44,6 +44,14 @@ def _geometry(g,f0):
         a=_array(g["incident_direction"],"incident_direction",1); b=_array(g["scattered_direction"],"scattered_direction",1)
         if a.shape!=(3,) or b.shape!=(3,) or np.linalg.norm(a)==0 or np.linalg.norm(b)==0: raise ValueError("beam directions must be nonzero 3-vectors")
         a=a/np.linalg.norm(a); b=b/np.linalg.norm(b); angle=float(np.arccos(np.clip(a@b,-1,1)))
+    elif isinstance(g.get("frequency_resolved_geometry"), Sequence) and g["frequency_resolved_geometry"]:
+        entries=g["frequency_resolved_geometry"]
+        entry=entries[len(entries)//2]
+        if not isinstance(entry, Mapping) or "incident_direction" not in entry or "scattered_direction" not in entry:
+            raise ValueError("frequency_resolved_geometry must contain per-frequency incident_direction and scattered_direction vectors")
+        a=_array(entry["incident_direction"],"incident_direction",1); b=_array(entry["scattered_direction"],"scattered_direction",1)
+        if a.shape!=(3,) or b.shape!=(3,) or np.linalg.norm(a)==0 or np.linalg.norm(b)==0: raise ValueError("frequency-resolved beam directions must be nonzero 3-vectors")
+        a=a/np.linalg.norm(a); b=b/np.linalg.norm(b); angle=float(np.arccos(np.clip(a@b,-1,1)))
     else:
         angle=_positive(g.get("scattering_angle_rad"),"scattering_angle_rad")
         if angle>np.pi: raise ValueError("scattering_angle_rad must lie in (0, pi]")
