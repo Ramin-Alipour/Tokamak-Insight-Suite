@@ -380,9 +380,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if not isinstance(global_search,(bool,np.bool_)):
         raise ValueError("global_search must be boolean")
     if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
-        not np.all(np.isfinite(lo)) or not np.all(np.isfinite(hi))
+        nb is None or tb is None or ib is None
+        or "ion_velocity_projection_m_s" not in b
     ):
-        raise ValueError("Global search requires explicit finite parameter_bounds for electron density, electron temperature and ion temperature; local least-squares inference supports unbounded positive log-parameters.")
+        raise ValueError(
+            "Global search requires explicit finite parameter_bounds supplied by the researcher "
+            "for electron density, electron temperature, ion temperature and ion flow; "
+            "local least-squares inference uses numerical representability guards only."
+        )
     fast=None
     if fast_ion is not None:
         if not isinstance(fast_ion,Mapping): raise ValueError("fast_ion must be a mapping")
