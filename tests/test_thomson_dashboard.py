@@ -109,3 +109,23 @@ def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_rende
         item.label == "Open canonical Thomson spectral-to-physics workflow"
         for item in app.button
     )
+
+
+def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
+    wavelength = np.linspace(531.0, 533.0, 9)
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * wavelength.size + ["ch1"] * wavelength.size,
+        "radius_m": [0.1] * wavelength.size + [0.2] * wavelength.size,
+        "wavelength_nm": np.tile(wavelength, 2),
+        "intensity": np.tile(np.exp(-0.5 * ((wavelength - 532.0) / 0.2) ** 2), 2),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.radio if item.label == "WORKSPACE").set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value("Thomson multi-channel spectral inference").run()
+    next(item for item in app.selectbox if item.label == "Physical spectral model").set_value("non_collective_maxwellian").run()
+    joint = next(item for item in app.checkbox if item.label.startswith("Use joint wavelength-resolved spatial inversion"))
+    assert joint.disabled is False
+    joint.set_value(True).run()
+    assert any(item.label.startswith("Fixed measured/researcher-supplied spatial mixing matrix") for item in app.file_uploader)
+    assert any(item.label.startswith("Spatial curvature regularization strength") for item in app.text_input)
+    assert not app.exception, [str(error.value) for error in app.exception]
