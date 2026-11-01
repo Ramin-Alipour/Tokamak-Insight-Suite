@@ -4450,12 +4450,6 @@
           "available_when_model": "electrostatic"
         },
         {
-          "name": "electron_velocity_projection_input_uncertainty_m_s",
-          "unit": "m s^-1; optional 1-sigma",
-          "description": "User-supplied uncertainty for the external electron-flow projection.",
-          "available_when_model": "electrostatic"
-        },
-        {
           "name": "fluctuation_covariance_density_current_E_B",
           "unit": "frequency x 10 x 10 complex covariance",
           "description": "Joint electron density/current/electric-field/magnetic-field covariance including cross-correlations."
