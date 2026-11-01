@@ -17,7 +17,7 @@ All spectra and frequency axes are assumed to be measured, prepared and calibrat
 
 The electrostatic path remains an unmagnetized multi-species longitudinal dielectric model. It computes species susceptibilities, the longitudinal dielectric function, the dynamic structure factor and convolution with the supplied measured frequency-response matrix.
 
-It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses, charge-density fractions and the electron-flow projection are explicit inputs. The electrostatic model's common ion-temperature/projected-ion-flow assumptions remain part of that path; they are not silently transferred to full-EM.
+It supports the declared Maxwellian background and fast-ion options, including a one-dimensional projected tabulated fast-ion VDF. Ion species, charge states, masses and charge-density fractions are explicit external inputs. The inversion fits electron-flow and common projected ion-flow components from the measured CTS spectrum; `electron_velocity_projection_m_s` and `ion_velocity_initial_m_s` are optimizer seeds, not fixed measured plasma parameters.
 
 ## Magnetized full-electromagnetic CTS
 
@@ -25,7 +25,7 @@ The full-EM path is implemented in \`tokamak_analysis.cts_full_em\`. It combines
 
 1. Magnetized Maxwellian kinetic conductivity and screened density/current/electric/magnetic fluctuation covariance, retaining all supplied auto- and cross-correlations.
 2. The low-temperature Bindslev \`Gamma^{-1}\` / \`X\` source-current closure for Maxwellian bulk-electron three-wave coupling.
-3. Species-resolved thermal-ion temperature inference. Each supplied ion species has its own fitted temperature; composition and flow vectors remain fixed external inputs.
+3. Species-resolved thermal-ion inference. Each supplied ion species has its own fitted temperature and flow projection along the scattering wavevector; ion composition remains a fixed external input.
 4. Optional relativistic gyrotropic electron and fast-ion populations are supported by the forward spectral-density function. The current measured-spectrum inversion does not accept `electron_distribution`; it fits the Maxwellian bulk-electron branch and rejects that unsupported inversion option explicitly. Fast-ion populations, when supplied to inversion, remain fixed external distributions rather than fitted VDFs.
 5. Optional frequency-resolved cold-plasma ray tracing and path-integrated Gaussian beam-overlap weighting.
 
@@ -40,7 +40,7 @@ Implemented in \`tokamak_analysis.cts_relativistic\`:
 - Klimontovich particle shot-noise covariance for the supplied relativistic populations.
 - A second-order relativistic Vlasov three-wave current vertex, evaluated from the first-order perturbations and momentum derivatives of the supplied VDF.
 
-When an electron distribution is explicitly supplied, the Maxwellian electron response and the Bindslev low-temperature electron nonlinear source are replaced by the relativistic kinetic electron response and second-order vertex. When no electron distribution is supplied, the Maxwellian bulk-electron Bindslev closure remains active. The fitted dimensionless theta_e = T_e/(m_e c²) is reported. A researcher may supply `bindslev_validity_theta_e_limit`; the fit is rejected if theta_e exceeds that explicitly selected asymptotic screening limit. If no limit is supplied, the result is marked `not_quantitatively_screened`; the software does not invent a universal cutoff. This is an explicit model choice, not an automatic relativistic correction to every Maxwellian run.
+When an electron distribution is explicitly supplied to the forward model, the Maxwellian electron response and the Bindslev low-temperature electron nonlinear source are replaced by the relativistic kinetic electron response and second-order vertex. When no electron distribution is supplied, the Maxwellian bulk-electron Bindslev closure remains active. The dimensionless theta_e = T_e/(m_e c²) is reported. In measured-spectrum inversion, `bindslev_validity_theta_e_limit` applies to the Maxwellian Bindslev closure; the inversion rejects explicit `electron_distribution` input rather than claiming a relativistic-electron fit. If no screening limit is supplied, the Maxwellian result is marked `not_quantitatively_screened`; the software does not invent a universal cutoff.
 
 The relativistic vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening. It does not include finite-orbit-width effects, collisions, spatially varying relativistic kinetic response or nonlinear equilibrium evolution. The relativistic distribution shape is supplied by the researcher; the software does not reconstruct an arbitrary multidimensional VDF from the CTS spectrum.
 
@@ -80,7 +80,7 @@ Optional inputs include:
 - Frequency-resolved ray-traced scattering-volume geometry.
 - Explicit harmonic order, quadrature order and resonance damping.
 
-No zero flow, ion composition, polarization, VDF or equilibrium profile is silently assumed. A zero vector is an explicit stationary-flow input.
+Flow projections omitted from the inversion's optional seed inputs are initialized numerically at zero and then fitted; zero is not held fixed as a stationary-flow assumption. Ion composition, polarization, VDF shape and equilibrium profile are not silently inferred and must be supplied where required.
 
 ## Inversion and uncertainty
 
