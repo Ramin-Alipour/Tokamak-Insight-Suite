@@ -38,6 +38,10 @@ def test_joint_spatial_spectral_inverse_recovers_synthetic_te_and_flow_profiles(
     assert out["parameter_covariance"].shape == (3*r.size+2*y.shape[0],)*2
     assert out["spatial_mixing_operator"] == "researcher_supplied_fixed_forward_operator"
     assert out["experimental_validation"] == "not_performed; numerical software inference only"
+    assert out["electron_temperature_uncertainty_profile_eV"].shape == (r.size,)
+    assert out["electron_velocity_projection_uncertainty_profile_m_s"].shape == (r.size,)
+    assert np.all(np.isnan(out["electron_density_profile_m3"]))
+    assert out["parameter_identifiability"]["status"] == "identified_from_measured_data"
 
 
 def test_joint_inverse_accepts_full_channel_major_covariance():
