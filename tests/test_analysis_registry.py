@@ -394,3 +394,57 @@ def test_all_thomson_subanalyses_share_calibrated_measurement_and_identifiabilit
             " ".join(contract.get("limitations", [])),
         ]).lower()
         assert "experimental validation" in disclosure, name
+
+
+def test_thomson_cts_and_spectral_distribution_contracts_match_fixed_operator_and_covariance_apis():
+    import json
+    from pathlib import Path
+
+    import numpy as np
+    import pytest
+
+    from tokamak_analysis.cts_analysis import _convolve
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+
+    cts = next(
+        item for item in root_registry
+        if item.get("diagnostic") == "Collective Thomson / coherent scattering (CTS)"
+    )["execution_contract"]
+    cts_inputs = {item["name"]: item for item in cts["input_specs"]}
+    response_description = cts_inputs["instrument_response"]["description"].lower()
+    assert "already" in response_description and "unit-sum columns" in response_description
+    assert "applied unchanged" in response_description
+    assert "normalized as a redistribution probability by the forward model" not in response_description
+    uncertainty_description = cts_inputs["instrument_response_uncertainty"]["description"].lower()
+    assert "base matrix" in uncertainty_description and "used unchanged" in uncertainty_description
+    assert "perturbed" in uncertainty_description
+
+    frequency = np.linspace(-2.0, 2.0, 9)
+    response = np.eye(frequency.size)
+    response[0, 0] = 0.8
+    response[1, 0] = 0.2
+    supplied = response.copy()
+    _convolve(response, np.ones(frequency.size), frequency)
+    np.testing.assert_array_equal(response, supplied)
+    invalid = response.copy()
+    invalid[:, 0] *= 0.5
+    with pytest.raises(ValueError, match="already sum to one"):
+        _convolve(invalid, np.ones(frequency.size), frequency)
+
+    distribution = next(
+        item for item in root_registry
+        if item.get("diagnostic") == "Thomson spectral distribution"
+    )["execution_contract"]
+    distribution_inputs = {item["name"]: item for item in distribution["input_specs"]}
+    background_covariance_description = distribution_inputs["background_signal_covariance"]["description"].lower()
+    assert "signal_background_cross_covariance" in background_covariance_description
+    assert "not currently represented" not in background_covariance_description
+    cross_description = distribution_inputs["signal_background_cross_covariance"]["description"].lower()
+    assert "both marginal covariance models" in cross_description
+    assert "positive-definite" in cross_description
