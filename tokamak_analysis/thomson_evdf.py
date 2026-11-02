@@ -170,10 +170,18 @@ def reconstruct_thomson_evdf(
     if signal_background_cross_covariance is not None:
         if signal_covariance_matrix is None or background_covariance_matrix is None:
             raise ValueError("signal_background_cross_covariance requires both signal and background uncertainty models")
-        cross = _validated_covariance_shape = np.asarray(signal_background_cross_covariance)
+        cross = np.asarray(signal_background_cross_covariance)
         if cross.dtype.kind not in "iuf" or cross.shape != (measured.size, measured.size) or not np.all(np.isfinite(cross)):
             raise ValueError("signal_background_cross_covariance must be a finite square matrix matching signal")
         cross = cross.astype(float, copy=False)
+        joint_covariance = np.block([
+            [signal_covariance_matrix, cross],
+            [cross.T, background_covariance_matrix],
+        ])
+        try:
+            np.linalg.cholesky(joint_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("joint signal/background covariance must be positive definite") from exc
         residual_covariance = signal_covariance_matrix + background_covariance_matrix - cross - cross.T
         uncertainty_model = "joint_signal_background_covariance"
     elif signal_covariance_matrix is not None and background_covariance_matrix is not None:
