@@ -667,3 +667,72 @@ closed.
 **Verification:** the new module and regression tests were committed to
 main. A local Python test run and a completed GitHub Actions run have not
 yet been observed; no passing-test or experimental-validation claim is made.
+
+## Implementation update — 2026-11-03 (joint optical model and recoil integration)
+
+### A3 — joint spatial-spectral model coverage
+
+The joint spatial-spectral callable already contained Maxwellian, finite-variance
+Kappa and relativistic Maxwell-Juttner forward branches. The workflow dispatcher
+and dashboard had not exposed that full callable contract: the dashboard disabled
+joint mode for Kappa/relativistic selections, and the workflow rejected the
+relativistic model. The dispatcher and dashboard now expose all three registered
+models. Kappa mode explicitly requests an index seed and whether that index is
+fitted or held fixed. Relativistic mode requires the incident-polarization vector
+and retains its quadrature controls. This does not add arbitrary EVDF inversion,
+anisotropy inference, or full spatially varying geometry.
+
+### A5 — Compton/recoil selection parity
+
+The joint relativistic spatial-spectral forward path now accepts
+include_compton_recoil and passes it to the same relativistic Maxwell-Juttner
+single-scattering kernel used by the channel-wise path. The maximum no-recoil
+fractional correction remains a screening/error-budget control when the
+elastic Thomson limit is selected. The dashboard passes the user's explicit
+choice, and the runtime, canonical JSON and packaged JSON registries describe
+the same model-selection semantics. Recoil-enabled mode means single-scattering
+Compton kinematics and polarized Klein-Nishina weighting; it does not mean
+multiple scattering or unrestricted relativistic EVDF inversion.
+
+### A7 — structured backgrounds in joint Kappa/relativistic fits
+
+The joint spatial-spectral optimizer already fits the selected detector-space
+background basis simultaneously with the plasma spectral model. With the
+dispatcher/dashboard change, constant, linear, polynomial, cubic-spline and
+researcher-supplied template backgrounds can now be used in the joint Kappa and
+relativistic Maxwell-Juttner paths as well as Maxwellian. Template columns remain
+detector-space nuisance components, not plasma emission. The separate
+channel-wise Kappa and relativistic fit routes still retain their existing
+linear-background contract; A7 is therefore **partially addressed**, not closed
+for every optical fit path.
+
+### A2 — geometry uncertainty
+
+The full-forward Monte-Carlo API building block added above remains partial:
+a caller-supplied sampler must regenerate equilibrium and beam-covariance
+realizations and rerun ray tracing/overlap. No dashboard sampler or joint
+cross-covariance model between geometry and other external inputs is claimed.
+
+### A12 — profile-aware Full-EM CTS
+
+Still open. Full-EM CTS continues to fit a spatially uniform set of plasma
+parameters over the sampled scattering volume while allowing local ray geometry,
+magnetic field and relative overlap to vary. The new work does not implement
+simultaneous ne(r), Te(r), species-resolved Ti(r) inversion with full profile,
+geometry and cross-profile covariance. A weighted sum of local spectra is not
+a substitute for a profile-aware nonlinear kinetic forward model. Optical
+Thomson spectra also do not independently identify ion temperature; Ti belongs
+to the CTS inference path and requires its own identifiable spectral response.
+
+### Registry and verification
+
+The root and packaged DIAGNOSTIC_REGISTRY.json files were synchronized after
+updating the joint spatial model and recoil contracts. The Python runtime
+registry, dashboard and workflow dispatcher were updated. Regression coverage
+was added for the workflow's relativistic-model and Compton-flag forwarding,
+and for the new Full-EM geometry-ensemble uncertainty API.
+
+The changes are committed to main. The repository test suite has not been run
+in a local checkout during this session. GitHub combined commit status returned
+no status entries for the latest direct-main commit; therefore CI success is
+not claimed. No independent experimental validation is claimed.
