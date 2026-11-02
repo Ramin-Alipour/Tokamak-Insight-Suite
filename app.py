@@ -3311,11 +3311,12 @@ elif page=='Advanced Analysis':
             pop_angle=st.text_input('Scattering angle (rad)',value='',key='ts_population_angle')
             pop_polarization=st.text_input('Incident polarization (x,y,z in scattering frame)',value='',key='ts_population_polarization')
         with p2:
-            pop_cold=st.text_input('Initial cold-population Te (eV)',value='',key='ts_population_cold')
-            pop_hot=st.text_input('Initial hot-population Te (eV)',value='',key='ts_population_hot')
+            pop_cold=st.text_input('Optional initial cold-population Te (eV)',value='',key='ts_population_cold')
+            pop_hot=st.text_input('Optional initial hot-population Te (eV)',value='',key='ts_population_hot')
         with p3:
-            pop_fraction=st.text_input('Initial hot-population number fraction (0–1)',value='',key='ts_population_fraction')
-            pop_flow=st.text_input('Initial flow projection (m/s)',value='',key='ts_population_flow')
+            pop_fraction=st.text_input('Optional initial hot-population number fraction (0–1)',value='',key='ts_population_fraction')
+            pop_flow=st.text_input('Optional initial flow projection (m/s)',value='',key='ts_population_flow')
+        st.caption('Leave all four initial-value fields blank to let TIS estimate deterministic optimizer seeds from the measured spectral moments and run three starts. If you enter any initial value, all four must be supplied. These are optimizer seeds, not inferred plasma measurements.')
         if st.button('Fit two-population Thomson spectrum',type='primary',key='run_ts_population_fit'):
             try:
                 if pop_spectrum_upload is None or pop_response_upload is None:
@@ -3335,16 +3336,24 @@ elif page=='Advanced Analysis':
                     optional['signal_uncertainty']=pd.read_csv(pop_uncertainty_upload,header=None).to_numpy(dtype=float).reshape(-1)
                 if pop_covariance_upload is not None:
                     optional['spectral_covariance']=pd.read_csv(pop_covariance_upload,header=None).to_numpy(dtype=float)
+                initial_text=(pop_cold,pop_hot,pop_fraction,pop_flow)
+                if any(value.strip() for value in initial_text) and not all(value.strip() for value in initial_text):
+                    raise ValueError('Leave all four optimizer initial-value fields blank, or provide all four; partial initial values are not accepted.')
+                initial_parameters={}
+                if all(value.strip() for value in initial_text):
+                    initial_parameters={
+                        'cold_temperature_initial_eV':_parse_ts_scalar(pop_cold,'Initial cold-population temperature',minimum=1e-12),
+                        'hot_temperature_initial_eV':_parse_ts_scalar(pop_hot,'Initial hot-population temperature',minimum=1e-12),
+                        'hot_population_fraction_initial':_parse_ts_scalar(pop_fraction,'Initial hot-population fraction',minimum=1e-12,maximum=1.0-1e-12),
+                        'flow_projection_initial_m_s':_parse_ts_scalar(pop_flow,'Initial flow projection'),
+                    }
                 result=fit_two_population_relativistic_thomson_spectrum(
                     wavelength_values,measured_values,
                     _parse_ts_scalar(pop_laser,'Laser wavelength',minimum=1e-12),
                     _parse_ts_scalar(pop_angle,'Scattering angle',minimum=1e-12),
                     response_values,
                     incident_polarization=_parse_ts_vector(pop_polarization,'Incident polarization'),
-                    cold_temperature_initial_eV=_parse_ts_scalar(pop_cold,'Initial cold-population temperature',minimum=1e-12),
-                    hot_temperature_initial_eV=_parse_ts_scalar(pop_hot,'Initial hot-population temperature',minimum=1e-12),
-                    hot_population_fraction_initial=_parse_ts_scalar(pop_fraction,'Initial hot-population fraction',minimum=1e-12,maximum=1.0-1e-12),
-                    flow_projection_initial_m_s=_parse_ts_scalar(pop_flow,'Initial flow projection'),
+                    **initial_parameters,
                     **optional,
                 )
                 st.success('Two-population Thomson shape inference completed within its declared model scope.')
