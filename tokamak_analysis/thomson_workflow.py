@@ -657,7 +657,7 @@ def reconstruct_thomson_profile_from_spectra(
     result["spatial_profile_reconstruction"] = {
         "input_origin": "physical parameters inferred from measured calibrated Thomson spectra",
         "profiles": profiles,
-        "channel_order": "sorted by calibrated radius within each reconstructed profile",
+        "channel_order": "supplied channel order; input coordinates must already be unique and strictly increasing; no sorting or reordering is performed",
         "methods_requested": profile_reconstruction_method,
         "no_extrapolation": True,
         "limitations": [
