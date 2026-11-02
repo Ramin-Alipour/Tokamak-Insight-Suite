@@ -61,14 +61,14 @@ def test_two_population_fit_uses_automatic_deterministic_initialization():
         wavelength, 532.0, angle, 120.0, 4200.0, 0.12,
         flow_projection_m_s=1.5e5,
         incident_polarization=[0.0, 0.0, 1.0],
-        radial_order=8, angular_order=6,
+        radial_order=12, angular_order=8,
     )
     measured = 1.7e4 * forward["spectral_density_per_nm"] + 0.5
     result = fit_two_population_relativistic_thomson_spectrum(
         wavelength, measured, 532.0, angle, np.eye(wavelength.size),
         incident_polarization=[0.0, 0.0, 1.0],
         signal_uncertainty=np.full(wavelength.size, 0.5),
-        radial_order=8, angular_order=6, max_nfev=350,
+        radial_order=12, angular_order=8, max_nfev=350,
     )
     assert result["optimizer_initialization"] == "automatic_deterministic_spectral_moment_multistart"
     assert result["optimizer_multistart_count"] == 3
