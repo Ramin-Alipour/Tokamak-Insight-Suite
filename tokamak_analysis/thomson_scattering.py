@@ -117,9 +117,9 @@ def density_from_thomson_scattered_power(
     ps = _positive_finite_scalar(scattered_power_W, "scattered_power_W", allow_zero=True)
     pi = _positive_finite_scalar(incident_power_W, "incident_power_W")
     length = _positive_finite_scalar(interaction_length_m, "interaction_length_m")
-    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
-    if theta > np.pi:
-        raise ValueError("scattering_angle_rad must lie between 0 and pi")
+    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad")
+    if theta >= np.pi:
+        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
     omega = _positive_finite_scalar(collection_solid_angle_sr, "collection_solid_angle_sr")
     if optical_efficiency is None:
         raise ValueError(
