@@ -263,6 +263,33 @@ def test_collective_external_covariance_indices_use_full_channel_stride():
     assert _collective_external_parameter_indices(1, 2) == (5, 6, 7, (8, 9))
 
 
+def test_collective_uncertainty_completeness_respects_supplied_flow_and_geometry_errors():
+    from tokamak_analysis.thomson_inference import _collective_uncertainty_inputs_missing
+
+    assert _collective_uncertainty_inputs_missing(
+        ion_temperature_uncertainty=[10.0, 12.0],
+        ion_velocity_uncertainty=np.ones((2, 3)),
+        electron_velocity_uncertainty=np.ones(3),
+        scattering_angle_uncertainty=None,
+        incident_direction_uncertainty=np.full(3, 1e-4),
+        scattered_direction_uncertainty=None,
+    ) == []
+
+    assert _collective_uncertainty_inputs_missing(
+        ion_temperature_uncertainty=None,
+        ion_velocity_uncertainty=None,
+        electron_velocity_uncertainty=None,
+        scattering_angle_uncertainty=None,
+        incident_direction_uncertainty=None,
+        scattered_direction_uncertainty=None,
+    ) == [
+        "ion_temperature_uncertainty_eV",
+        "ion_velocity_uncertainty_m_s",
+        "electron_velocity_uncertainty_m_s",
+        "scattering_geometry_uncertainty",
+    ]
+
+
 def test_relativistic_model_propagates_laser_angle_and_polarization_uncertainties():
     from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
 
