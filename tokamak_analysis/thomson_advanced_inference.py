@@ -26,7 +26,7 @@ def validate_covariance(covariance, size: int, *, name: str = "covariance",
         raise ValueError(f"{name} must be symmetric")
     cov = 0.5 * (cov + cov.T)
     eigenvalues = np.linalg.eigvalsh(cov)
-    tolerance = rtol * max(float(np.max(np.abs(eigenvalues))), 1.0)
+    tolerance = rtol * max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
     if eigenvalues[0] < -tolerance:
         raise ValueError(f"{name} must be positive semidefinite")
     if positive_definite and eigenvalues[0] <= tolerance:
