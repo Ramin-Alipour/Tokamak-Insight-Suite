@@ -1022,3 +1022,14 @@ def test_result_classification_separates_primary_conditional_and_non_identifiabl
         item for item in channel["conditional"] if item["parameter"] == "electron_density_m3"
     )
     assert "absolute spectral power density in W/nm" in density_requirement["required_auxiliary_inputs"]
+
+
+def test_measured_response_matrix_is_rejected_not_renormalized():
+    from tokamak_analysis.thomson_inference import _response_for_channel
+
+    response = np.eye(7)
+    response[0, 0] = 0.5
+    original = response.copy()
+    with pytest.raises(ValueError, match="columns must already sum to one"):
+        _response_for_channel(response, 0, 1, 7, np.linspace(500.0, 506.0, 7))
+    np.testing.assert_array_equal(response, original)
