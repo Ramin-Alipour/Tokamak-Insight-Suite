@@ -11,7 +11,8 @@ from scipy.optimize import lsq_linear
 
 def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mixing_matrix, radius_m, *,
         uncertainty=None, covariance=None, parameter_name="physical_parameter", parameter_unit="",
-        positive=False, regularization_strength=None, gcv_grid_size=81):
+        positive=False, regularization_strength=None, gcv_grid_size=81,
+        radius_covariance_m2=None, radius_mc_samples=200, radius_mc_seed=84621):
     """Invert supplied channel mixing y=H x with curvature regularization.
 
     Inputs are calibrated channel values and a fixed researcher-supplied spatial
@@ -48,6 +49,32 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
     else:
         a=h.copy(); b=y.copy()
         covariance_model="unweighted_residual_scaled_covariance"
+    coordinate_covariance = None
+    if radius_covariance_m2 is not None:
+        raw_coordinate_covariance = np.asarray(radius_covariance_m2)
+        if raw_coordinate_covariance.dtype.kind not in "iuf":
+            raise ValueError("radius_covariance_m2 must contain real numeric values")
+        coordinate_covariance = raw_coordinate_covariance.astype(float, copy=False)
+        if (coordinate_covariance.shape != (x.size, x.size)
+                or not np.all(np.isfinite(coordinate_covariance))
+                or not np.allclose(coordinate_covariance, coordinate_covariance.T,
+                                   rtol=1e-10, atol=1e-18)):
+            raise ValueError("radius_covariance_m2 must be finite, symmetric and match radius_m")
+        coordinate_covariance = 0.5*(coordinate_covariance+coordinate_covariance.T)
+        eigenvalues, eigenvectors = np.linalg.eigh(coordinate_covariance)
+        coordinate_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(eigenvalues)) < -1e-10*coordinate_scale:
+            raise ValueError("radius_covariance_m2 must be positive semidefinite")
+        coordinate_covariance = (eigenvectors*np.maximum(eigenvalues, 0.0))@eigenvectors.T
+        if (isinstance(radius_mc_samples, (bool, np.bool_))
+                or not isinstance(radius_mc_samples, (int, np.integer))
+                or radius_mc_samples < 20):
+            raise ValueError("radius_mc_samples must be an integer >= 20 when coordinate covariance is supplied")
+        if isinstance(radius_mc_seed, (bool, np.bool_)) or not isinstance(radius_mc_seed, (int, np.integer)):
+            raise ValueError("radius_mc_seed must be an integer")
+    elif radius_mc_samples != 200:
+        raise ValueError("radius_mc_samples is meaningful only when radius_covariance_m2 is supplied")
+
     d2=np.zeros((x.size-2,x.size),dtype=float)
     for i in range(x.size-2):
         left=x[i+1]-x[i]; right=x[i+2]-x[i+1]
@@ -103,10 +130,57 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             reduced=system[np.ix_(free,free)]
             conditional[np.ix_(free,free)]=np.linalg.solve(reduced,gram[np.ix_(free,free)])@np.linalg.inv(reduced).T
         pcov=conditional
+    measurement_profile_covariance = pcov.copy()
+    coordinate_profile_covariance = None
+    coordinate_successful_draws = 0
+    coordinate_warning = None
+    if coordinate_covariance is not None:
+        rng = np.random.default_rng(int(radius_mc_seed))
+        eigenvalues, eigenvectors = np.linalg.eigh(coordinate_covariance)
+        root = eigenvectors*np.sqrt(np.maximum(eigenvalues, 0.0))
+        profile_draws = []
+        # Hold the selected regularization strength fixed: this propagates
+        # coordinate uncertainty, not GCV model-selection variability.
+        for _ in range(int(radius_mc_samples)):
+            sampled_radius = x + rng.standard_normal(x.size)@root.T
+            if not np.all(np.isfinite(sampled_radius)) or np.any(np.diff(sampled_radius) <= 0):
+                continue
+            try:
+                sampled = reconstruct_profile_with_spatial_mixing(
+                    y, h, sampled_radius, uncertainty=uncertainty,
+                    covariance=covariance, parameter_name=parameter_name,
+                    parameter_unit=parameter_unit, positive=positive,
+                    regularization_strength=lam, gcv_grid_size=gcv_grid_size,
+                )
+            except (ValueError, np.linalg.LinAlgError):
+                continue
+            if np.all(np.isfinite(sampled["profile"])):
+                profile_draws.append(np.asarray(sampled["profile"], dtype=float))
+        coordinate_successful_draws = len(profile_draws)
+        minimum_draws = max(20, int(np.ceil(0.8*int(radius_mc_samples))))
+        if coordinate_successful_draws >= minimum_draws:
+            coordinate_profile_covariance = np.cov(np.asarray(profile_draws), rowvar=False, ddof=1)
+            pcov = measurement_profile_covariance + coordinate_profile_covariance
+        else:
+            coordinate_warning = (
+                "Too few monotonic, numerically valid coordinate draws; reported profile covariance "
+                "remains conditional on the nominal supplied radius_m."
+            )
     return {
         "analysis_status":"completed","parameter_name":str(parameter_name),"parameter_unit":str(parameter_unit),
         "radius_m":x.copy(),"profile":solution,"profile_uncertainty":np.sqrt(np.maximum(np.diag(pcov),0)),
-        "profile_covariance":pcov,"measured_channel_values":y.copy(),"fitted_channel_values":h@solution,
+        "profile_covariance":pcov,
+        "measurement_conditional_profile_covariance":measurement_profile_covariance,
+        "coordinate_induced_profile_covariance":coordinate_profile_covariance,
+        "radius_covariance_m2":None if coordinate_covariance is None else coordinate_covariance.copy(),
+        "coordinate_uncertainty_propagation_status":(
+            "not_supplied" if coordinate_covariance is None else
+            "propagated_by_monte_carlo_with_fixed_selected_regularization"
+            if coordinate_profile_covariance is not None else "insufficient_valid_draws"
+        ),
+        "coordinate_uncertainty_successful_draws":int(coordinate_successful_draws),
+        "coordinate_uncertainty_warning":coordinate_warning,
+        "measured_channel_values":y.copy(),"fitted_channel_values":h@solution,
         "residual_whitened":resid,"spatial_mixing_operator":"researcher_supplied_fixed_forward_operator",
         "spatial_mixing_matrix":h.copy(),
         "regularization":{"kind":"nonuniform_grid_second_derivative_curvature_penalty","strength":lam,
