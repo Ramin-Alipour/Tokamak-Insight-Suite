@@ -164,6 +164,16 @@ spectrum after subtraction of the explicitly supplied background.
 - Optional `regularization_strength`; when omitted, the solver selects the second-difference Tikhonov strength by generalized cross-validation (GCV) over its documented logarithmic candidate grid. A finite positive researcher-supplied value overrides GCV.
 - Optionally, pointwise `signal_uncertainty` or a full within-spectrum
   `signal_covariance` (mutually exclusive).
+- Optionally, pointwise `background_uncertainty` or a full
+  `background_covariance` (mutually exclusive) for the explicitly supplied
+  background.
+- Optionally, `signal_background_cross_covariance` when both signal and
+  background covariance models are supplied. The full joint block covariance
+  must be positive definite. The residual covariance is evaluated as
+  (C_{y-b}=C_y+C_b-C_{yb}-C_{yb}^{T}); no independence is assumed when a
+  cross-covariance is supplied. If only background uncertainty is supplied,
+  the result is conditional on the signal being treated as exact and is not a
+  complete measurement-noise budget.
 - Optionally, a velocity grid; otherwise the caller supplies its limit and
   point count.
 
