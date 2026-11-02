@@ -946,13 +946,15 @@ elif page=='Spectral Analysis':
                     joint_covariance_upload=None
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
-            joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (Maxwellian only)',value=False,disabled=model!='non_collective_maxwellian',key='ts_infer_joint_spatial')
+            joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
             spatial_mixing_upload=None
             spatial_regularization_text='0'
             spatial_background_model='linear'
             spatial_background_degree=2
             spatial_background_interior_knots=3
             spatial_background_templates_upload=None
+            spatial_kappa_index_text=None
+            spatial_fit_kappa_index=False
             if joint_spatial_spectral:
                 spatial_mixing_upload=st.file_uploader('Fixed measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
                 spatial_regularization_text=st.text_input('Spatial curvature regularization strength (dimensionless numerical control; explicit)',value='0',key='ts_infer_spatial_regularization')
@@ -967,6 +969,11 @@ elif page=='Spectral Analysis':
                     spatial_background_interior_knots=st.number_input('Background spline interior knots',min_value=0,max_value=20,value=3,step=1,key='ts_infer_joint_background_knots')
                 if spatial_background_model=='templates':
                     spatial_background_templates_upload=st.file_uploader('Researcher-supplied detector-background templates CSV (wavelength rows × basis columns)',type=['csv','txt'],key='ts_infer_joint_background_templates')
+                if model=='non_collective_kappa':
+                    spatial_kappa_index_text=st.text_input('Kappa index initial value (>1.5)',value='4.0',key='ts_infer_joint_kappa_index')
+                    spatial_fit_kappa_index=st.checkbox('Infer Kappa index from measured joint spectra',value=True,key='ts_infer_joint_fit_kappa')
+                if model=='non_collective_relativistic_maxwell_juttner':
+                    st.caption('The relativistic joint inversion uses the supplied incident-polarization vector in the model scattering frame. Compton recoil is controlled by the relativistic-model option below. Geometry and polarization uncertainty are held fixed in this joint optimizer.')
                 st.caption('The selected detector-space background basis is fitted jointly with the physical Thomson spectrum. Template columns are researcher-supplied nuisance shapes, not plasma emission. The spatial-mixing matrix and measured spectral response remain fixed; regularization cannot create measurement information. Absolute density is not inferred in this joint mode.')
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
@@ -1193,16 +1200,28 @@ elif page=='Spectral Analysis':
                             kwargs['spatial_background_templates']=pd.read_csv(
                                 spatial_background_templates_upload,header=None
                             ).to_numpy(dtype=float)
+                        if model=='non_collective_kappa':
+                            kwargs['kappa_index']=_parse_ts_scalar(spatial_kappa_index_text,'Kappa index initial value',minimum=1.5000001)
+                            kwargs['fit_kappa_index']=bool(spatial_fit_kappa_index)
                     if density_covariance_upload is not None:
                         kwargs['density_relative_covariance']=pd.read_csv(density_covariance_upload,header=None).to_numpy(dtype=float)
                     if joint_density_covariance_upload is not None:
                         kwargs['joint_density_relative_covariance']=pd.read_csv(joint_density_covariance_upload,header=None).to_numpy(dtype=float)
                     if model=='non_collective_relativistic_maxwell_juttner':
-                        kwargs.update({
-                            'incident_direction':_parse_ts_vector(relativistic_incident_direction_text,'Incident direction'),
-                            'scattered_direction':_parse_ts_vector(relativistic_scattered_direction_text,'Scattered direction'),
-                            'incident_polarization':_parse_ts_vector(relativistic_polarization_text,'Incident polarization'),
-                        })
+                        if joint_spatial_spectral:
+                            kwargs['incident_polarization']=_parse_ts_vector(relativistic_polarization_text,'Incident polarization')
+                            if any(text and text.strip() for text in (
+                                relativistic_incident_direction_unc_text,
+                                relativistic_scattered_direction_unc_text,
+                                relativistic_polarization_unc_text,
+                            )):
+                                raise ValueError('The joint spatial-spectral optimizer currently treats beam directions and incident polarization as fixed; omit their uncertainty inputs rather than silently ignoring them.')
+                        else:
+                            kwargs.update({
+                                'incident_direction':_parse_ts_vector(relativistic_incident_direction_text,'Incident direction'),
+                                'scattered_direction':_parse_ts_vector(relativistic_scattered_direction_text,'Scattered direction'),
+                                'incident_polarization':_parse_ts_vector(relativistic_polarization_text,'Incident polarization'),
+                            })
                         if relativistic_incident_direction_unc_text.strip():
                             kwargs['incident_direction_uncertainty']=_parse_ts_vector(
                                 relativistic_incident_direction_unc_text,'Incident-direction component uncertainties')
