@@ -311,3 +311,33 @@ def test_distribution_rejects_non_normalized_measured_response_without_modifying
             x, y, instrument_response_matrix=response, background_fraction=0.1,
         )
     np.testing.assert_array_equal(response, original)
+
+
+def test_nonuniform_wavelength_moments_use_one_finite_volume_measure():
+    from tokamak_analysis.thomson_distribution import (
+        _moment_statistics,
+        _wavelength_bin_widths,
+    )
+
+    wavelength = np.array([0.0, 0.5, 1.5, 3.0, 5.0, 8.0, 12.0, 17.0, 23.0])
+    signal = np.array([0.2, 0.8, 2.0, 4.0, 3.0, 1.5, 0.7, 0.3, 0.1])
+    background = np.zeros_like(signal)
+    result = _moment_statistics(
+        wavelength,
+        signal,
+        background_fraction=None,
+        background_mask=None,
+        background_signal=background,
+    )
+
+    widths = _wavelength_bin_widths(wavelength)
+    expected_area = float(np.sum(signal * widths))
+    expected_center = float(np.sum(wavelength * signal * widths) / expected_area)
+    expected_variance = float(
+        np.sum((wavelength - expected_center) ** 2 * signal * widths)
+        / expected_area
+    )
+    assert result["signed_area"] == pytest.approx(expected_area, rel=1e-13)
+    assert result["positive_area"] == pytest.approx(expected_area, rel=1e-13)
+    assert result["center"] == pytest.approx(expected_center, rel=1e-13)
+    assert result["variance"] == pytest.approx(expected_variance, rel=1e-13)
