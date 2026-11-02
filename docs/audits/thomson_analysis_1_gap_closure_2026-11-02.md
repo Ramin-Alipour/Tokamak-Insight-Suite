@@ -87,3 +87,17 @@ This supports a forward model with externally supplied spatial variation. It doe
 ## Validation state
 
 The code changes and regression tests have been committed to `main`. A CI pass and empirical validation must be reported only after their respective runs have completed and their results have been inspected. No experimental validation is claimed in this note.
+
+
+### A2 — ray-resolved Full-EM external covariance extension
+
+The Full-EM inversion now accepts the following additional entries in the ordered `external_input_parameter_order` when a matching `frequency_resolved_geometry` is supplied:
+
+- `ray_<frequency>_<sample>_magnetic_field_T_<x|y|z>`
+- `ray_<frequency>_<sample>_incident_direction_<x|y|z>`
+- `ray_<frequency>_<sample>_scattered_direction_<x|y|z>`
+- `ray_<frequency>_beam_overlap_relative`
+
+All selected entries share one positive-semidefinite covariance matrix, so correlations across frequency bins, scattering-volume samples, local magnetic field, ray directions, beam-overlap weights, and the already-supported ion fraction/mass/charge-state inputs are retained during joint Monte Carlo propagation. Sampled ray directions are renormalized; non-positive beam-overlap draws are rejected. Requested parameters must correspond to fields actually present in the supplied geometry.
+
+**Scope boundary:** this propagates uncertainty in the supplied discretized ray/equilibrium geometry. It does not perturb the underlying EFIT equilibrium coefficients and retrace rays automatically, nor does it model diffraction, mode conversion, quasi-optical beam propagation, or absolute launcher/receiver coupling. The covariance is conditional on the supplied ray-tracing and beam-overlap model.
