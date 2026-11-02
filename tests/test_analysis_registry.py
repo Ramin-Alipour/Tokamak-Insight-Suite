@@ -448,3 +448,58 @@ def test_thomson_cts_and_spectral_distribution_contracts_match_fixed_operator_an
     cross_description = distribution_inputs["signal_background_cross_covariance"]["description"].lower()
     assert "both marginal covariance models" in cross_description
     assert "positive-definite" in cross_description
+
+
+def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and_dashboard_api():
+    import json
+    from pathlib import Path
+
+    runtime = get_analysis(30)["execution_contract"]
+    runtime_inputs = {item["name"]: item for item in runtime["input_specs"]}
+    expected_inputs = {
+        "external_input_covariance", "external_input_parameter_order",
+        "external_input_mc_samples", "external_input_mc_seed",
+    }
+    assert expected_inputs <= set(runtime_inputs)
+    assert runtime_inputs["external_input_mc_samples"]["default"] == 100
+    assert runtime_inputs["external_input_mc_seed"]["default"] == 84622
+    assert "frequency-resolved ray/equilibrium covariance is not represented" in (
+        runtime_inputs["external_input_covariance"]["description"]
+    )
+    runtime_outputs = {item["name"] for item in runtime["output_specs"]}
+    expected_outputs = {
+        "external_input_covariance_supplied", "external_input_covariance_order",
+        "external_input_covariance_propagated", "external_input_parameter_covariance",
+        "external_input_mc_successes", "external_input_mc_requested",
+        "external_input_covariance_warning",
+    }
+    assert expected_outputs <= runtime_outputs
+    full_mode = next(
+        item for item in runtime["workflow_modes"]
+        if item["name"] == "magnetized_full_electromagnetic_cts"
+    )
+    assert any("external_input_covariance" in item for item in full_mode["inputs"])
+    assert any("external_input_parameter_covariance" in item for item in full_mode["outputs"])
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+    entry = next(
+        item for item in root_registry
+        if item["diagnostic"] == "Collective Thomson / coherent scattering (CTS)"
+    )
+    contract = entry["execution_contract"]
+    json_inputs = {item["name"]: item for item in contract["input_specs"]}
+    assert expected_inputs <= set(json_inputs)
+    assert json_inputs["external_input_covariance"]["applies_when_model"] == "full_electromagnetic"
+    json_outputs = {item["name"] for item in contract["output_specs"]}
+    assert expected_outputs <= json_outputs
+    json_mode = next(
+        item for item in contract["workflow_modes"]
+        if item["name"] == "magnetized_full_electromagnetic_cts"
+    )
+    assert any("external_input_covariance" in item for item in json_mode["inputs"])
+    assert any("external_input_parameter_covariance" in item for item in json_mode["outputs"])
