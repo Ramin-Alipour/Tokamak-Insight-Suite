@@ -12,7 +12,8 @@ from scipy.optimize import lsq_linear
 def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mixing_matrix, radius_m, *,
         uncertainty=None, covariance=None, parameter_name="physical_parameter", parameter_unit="",
         positive=False, regularization_strength=None, gcv_grid_size=81,
-        radius_covariance_m2=None, radius_mc_samples=200, radius_mc_seed=84621):
+        radius_covariance_m2=None, radius_mc_samples=200, radius_mc_seed=84621,
+        spatial_mixing_covariance=None, mixing_mc_samples=200, mixing_mc_seed=84622):
     """Invert supplied channel mixing y=H x with curvature regularization.
 
     Inputs are calibrated channel values and a fixed researcher-supplied spatial
@@ -74,6 +75,32 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             raise ValueError("radius_mc_seed must be an integer")
     elif radius_mc_samples != 200:
         raise ValueError("radius_mc_samples is meaningful only when radius_covariance_m2 is supplied")
+
+    mixing_covariance = None
+    if spatial_mixing_covariance is not None:
+        raw_mixing_covariance = np.asarray(spatial_mixing_covariance)
+        if raw_mixing_covariance.dtype.kind not in "iuf":
+            raise ValueError("spatial_mixing_covariance must contain real numeric values")
+        mixing_covariance = raw_mixing_covariance.astype(float, copy=False)
+        if (mixing_covariance.shape != (h.size, h.size)
+                or not np.all(np.isfinite(mixing_covariance))
+                or not np.allclose(mixing_covariance, mixing_covariance.T,
+                                   rtol=1e-10, atol=1e-14)):
+            raise ValueError("spatial_mixing_covariance must be finite, symmetric, and match the flattened spatial_mixing_matrix")
+        mixing_covariance = 0.5*(mixing_covariance+mixing_covariance.T)
+        eigenvalues, eigenvectors = np.linalg.eigh(mixing_covariance)
+        mixing_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(eigenvalues)) < -1e-10*mixing_scale:
+            raise ValueError("spatial_mixing_covariance must be positive semidefinite")
+        mixing_covariance = (eigenvectors*np.maximum(eigenvalues, 0.0))@eigenvectors.T
+        if (isinstance(mixing_mc_samples, (bool,np.bool_))
+                or not isinstance(mixing_mc_samples, (int,np.integer))
+                or mixing_mc_samples < 20):
+            raise ValueError("mixing_mc_samples must be an integer >= 20 when PSF covariance is supplied")
+        if isinstance(mixing_mc_seed, (bool,np.bool_)) or not isinstance(mixing_mc_seed, (int,np.integer)):
+            raise ValueError("mixing_mc_seed must be an integer")
+    elif mixing_mc_samples != 200:
+        raise ValueError("mixing_mc_samples is meaningful only when spatial_mixing_covariance is supplied")
 
     d2=np.zeros((x.size-2,x.size),dtype=float)
     for i in range(x.size-2):
@@ -166,12 +193,56 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
                 "Too few monotonic, numerically valid coordinate draws; reported profile covariance "
                 "remains conditional on the nominal supplied radius_m."
             )
+    mixing_profile_covariance = None
+    mixing_successful_draws = 0
+    mixing_warning = None
+    if mixing_covariance is not None:
+        rng = np.random.default_rng(int(mixing_mc_seed))
+        eigenvalues, eigenvectors = np.linalg.eigh(mixing_covariance)
+        root = eigenvectors*np.sqrt(np.maximum(eigenvalues, 0.0))
+        profile_draws = []
+        for _ in range(int(mixing_mc_samples)):
+            sampled_h = h + (rng.standard_normal(h.size)@root.T).reshape(h.shape)
+            if not np.all(np.isfinite(sampled_h)) or np.any(sampled_h < 0.0):
+                continue
+            try:
+                sampled = reconstruct_profile_with_spatial_mixing(
+                    y, sampled_h, x, uncertainty=uncertainty, covariance=covariance,
+                    parameter_name=parameter_name, parameter_unit=parameter_unit,
+                    positive=positive, regularization_strength=lam,
+                    gcv_grid_size=gcv_grid_size,
+                )
+            except (ValueError, np.linalg.LinAlgError):
+                continue
+            if np.all(np.isfinite(sampled["profile"])):
+                profile_draws.append(np.asarray(sampled["profile"], dtype=float))
+        mixing_successful_draws = len(profile_draws)
+        minimum_draws = max(20, int(np.ceil(0.8*int(mixing_mc_samples))))
+        if mixing_successful_draws >= minimum_draws:
+            mixing_profile_covariance = np.cov(np.asarray(profile_draws), rowvar=False, ddof=1)
+            pcov = measurement_profile_covariance
+            if coordinate_profile_covariance is not None:
+                pcov = pcov + coordinate_profile_covariance
+            pcov = pcov + mixing_profile_covariance
+        else:
+            mixing_warning = (
+                "Too few non-negative, full-rank PSF draws; no PSF covariance contribution was added."
+            )
     return {
         "analysis_status":"completed","parameter_name":str(parameter_name),"parameter_unit":str(parameter_unit),
         "radius_m":x.copy(),"profile":solution,"profile_uncertainty":np.sqrt(np.maximum(np.diag(pcov),0)),
         "profile_covariance":pcov,
         "measurement_conditional_profile_covariance":measurement_profile_covariance,
         "coordinate_induced_profile_covariance":coordinate_profile_covariance,
+        "spatial_mixing_covariance":None if mixing_covariance is None else mixing_covariance.copy(),
+        "spatial_mixing_induced_profile_covariance":mixing_profile_covariance,
+        "spatial_mixing_uncertainty_propagation_status":(
+            "not_supplied" if mixing_covariance is None else
+            "propagated_by_monte_carlo_with_fixed_selected_regularization"
+            if mixing_profile_covariance is not None else "insufficient_valid_draws"
+        ),
+        "spatial_mixing_uncertainty_successful_draws":int(mixing_successful_draws),
+        "spatial_mixing_uncertainty_warning":mixing_warning,
         "radius_covariance_m2":None if coordinate_covariance is None else coordinate_covariance.copy(),
         "coordinate_uncertainty_propagation_status":(
             "not_supplied" if coordinate_covariance is None else
@@ -187,8 +258,8 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
             "selection":selection,"gcv_score":gcv_score,"effective_degrees_of_freedom":dof},
         "covariance_model":covariance_model,"jacobian_rank":int(np.linalg.matrix_rank(a)),
         "jacobian_condition_number":float(np.linalg.cond(a)),"active_nonnegative_nodes":np.flatnonzero(active).tolist(),
-        "uncertainty_semantics":("local conditional covariance; for non-negative fits conditional on the active set"
-            if positive else "linearized covariance conditional on supplied mixing operator and selected regularization"),
+        "uncertainty_semantics":("measurement covariance conditional on the active set, plus separately propagated coordinate and/or PSF covariance components when supplied"
+            if positive else "linearized measurement covariance plus separately propagated coordinate and/or PSF covariance components when supplied"),
         "identifiability":{"primary":["regularized profile within supplied finite-dimensional spatial basis"],
             "conditional":["physical units/meaning are inherited from the upstream inferred parameter"],
             "non_identifiable":["spatial structures in the null space of the supplied mixing operator",
