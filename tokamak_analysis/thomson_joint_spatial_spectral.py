@@ -147,6 +147,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     physical_model="maxwellian", kappa_index=None,
+    fit_kappa_index=False, kappa_index_initial=3.0,
+    kappa_index_bounds=(1.500001, 100.0),
     incident_polarization=None, radial_order=24, angular_order=12,
     maximum_recoil_correction_fraction=0.01,
 ):
@@ -160,18 +162,37 @@ def reconstruct_joint_thomson_spatial_spectra(
     """
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
+    if not isinstance(fit_kappa_index, (bool, np.bool_)):
+        raise ValueError("fit_kappa_index must be boolean")
     if physical_model == "kappa":
-        if (
-            kappa_index is None
-            or isinstance(kappa_index, (bool, np.bool_))
-            or not isinstance(kappa_index, (int, float, np.integer, np.floating))
-            or not np.isfinite(kappa_index)
-            or float(kappa_index) <= 1.5
-        ):
-            raise ValueError("kappa_index must be a finite real value > 1.5 for a finite-variance projected Kappa model")
-        kappa_index = float(kappa_index)
-    elif kappa_index is not None:
-        raise ValueError("kappa_index is used only when physical_model='kappa'")
+        if fit_kappa_index:
+            if kappa_index is not None:
+                raise ValueError("set kappa_index=None when fit_kappa_index=True")
+            if (isinstance(kappa_index_initial, (bool, np.bool_))
+                    or not isinstance(kappa_index_initial, (int, float, np.integer, np.floating))
+                    or not np.isfinite(kappa_index_initial) or float(kappa_index_initial) <= 1.5):
+                raise ValueError("kappa_index_initial must be finite and > 1.5")
+            if (not isinstance(kappa_index_bounds, (tuple, list)) or len(kappa_index_bounds) != 2
+                    or any(isinstance(v, (bool, np.bool_)) or not isinstance(v, (int, float, np.integer, np.floating)) or not np.isfinite(v) for v in kappa_index_bounds)
+                    or float(kappa_index_bounds[0]) <= 1.5
+                    or float(kappa_index_bounds[0]) >= float(kappa_index_bounds[1])
+                    or not float(kappa_index_bounds[0]) <= float(kappa_index_initial) <= float(kappa_index_bounds[1])):
+                raise ValueError("kappa_index_bounds must be finite, ordered, and strictly above 1.5; initial value must lie inside")
+            kappa_index = None
+            kappa_index_initial = float(kappa_index_initial)
+            kappa_index_bounds = (float(kappa_index_bounds[0]), float(kappa_index_bounds[1]))
+        else:
+            if (
+                kappa_index is None
+                or isinstance(kappa_index, (bool, np.bool_))
+                or not isinstance(kappa_index, (int, float, np.integer, np.floating))
+                or not np.isfinite(kappa_index)
+                or float(kappa_index) <= 1.5
+            ):
+                raise ValueError("kappa_index must be a finite real value > 1.5 for a fixed finite-variance projected Kappa model")
+            kappa_index = float(kappa_index)
+    elif kappa_index is not None or fit_kappa_index:
+        raise ValueError("kappa_index and fit_kappa_index are used only when physical_model='kappa'")
     if physical_model == "relativistic_maxwell_juttner":
         if incident_polarization is None:
             raise ValueError("relativistic Maxwell-Juttner joint inference requires incident_polarization")
@@ -258,7 +279,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     background_seed[:, 0] = np.median(y[:, :max(2, nlam//10)], axis=1)
     p0 = np.r_[np.full(r.size, np.log(initial_amp)),
                np.full(r.size, np.log(initial_te)),
-               np.zeros(r.size), background_seed.ravel()]
+               np.zeros(r.size), background_seed.ravel(),
+               ([kappa_index_initial] if physical_model == "kappa" and fit_kappa_index else [])]
     # Only numerical overflow guards are imposed on logarithmic positive
     # parameters.  Temperature and flow have no invented physical fit bounds;
     # the Maxwellian model-domain screen below classifies out-of-regime fits.
@@ -268,7 +290,10 @@ def reconstruct_joint_thomson_spatial_spectra(
                   np.full(m*n_background, -np.inf)]
     upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
                   np.full(r.size, np.inf),
-                  np.full(m*n_background, np.inf)]
+                  np.full(m*n_background, np.inf),
+                  ([kappa_index_bounds[1]] if physical_model == "kappa" and fit_kappa_index else [])]
+    if physical_model == "kappa" and fit_kappa_index:
+        lower = np.r_[lower, kappa_index_bounds[0]]
     if physical_model == "relativistic_maxwell_juttner":
         # Subluminal flow is a physical domain constraint of the relativistic kernel.
         lower[2*r.size:3*r.size] = -0.99*_C_M_S/1e6
@@ -293,21 +318,22 @@ def reconstruct_joint_thomson_spatial_spectra(
                 -0.5 * ((x[None, :] - center[:, None]) / sigma[:, None])**2
             )
         elif physical_model == "kappa":
-            # The isotropic 3-D finite-variance Kappa marginal along q is a
-            # Student-like 1-D profile with exponent kappa. sigma remains its
-            # standard deviation, so the scale is converted consistently.
+            # Isotropic finite-variance projected Kappa marginal. When
+            # requested, one shared kappa index is estimated jointly with all
+            # spatial profiles and detector-background nuisance coefficients.
             from scipy.special import gammaln
-            scale = sigma * np.sqrt((2.0*kappa_index-3.0)/kappa_index)
+            kappa_value = float(p[-1]) if fit_kappa_index else kappa_index
+            scale = sigma * np.sqrt((2.0*kappa_value-3.0)/kappa_value)
             normalization = np.exp(
-                gammaln(kappa_index)
-                - 0.5*np.log(np.pi*kappa_index)
+                gammaln(kappa_value)
+                - 0.5*np.log(np.pi*kappa_value)
                 - np.log(scale)
-                - gammaln(kappa_index-0.5)
+                - gammaln(kappa_value-0.5)
             )
             z = (x[None,:]-center[:,None])/scale[:,None]
             node_spectra = amp[:,None] * normalization[:,None] * (
-                1.0 + z*z/kappa_index
-            )**(-kappa_index)
+                1.0 + z*z/kappa_value
+            )**(-kappa_value)
         else:
             from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
             node_spectra = np.empty((r.size,x.size),dtype=float)
@@ -400,7 +426,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     if joint_spectral_covariance is None and signal_uncertainty is None:
         covariance_p *= float(data_residual @ data_residual / dof)
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
-                              np.ones(m*n_background)])
+                              np.ones(m*n_background),
+                              ([1.0] if physical_model == "kappa" and fit_kappa_index else [])])
     physical_covariance = transform @ covariance_p @ transform.T
     diagonal = np.maximum(np.diag(physical_covariance), 0.0)
     uncertainties = np.sqrt(diagonal)
@@ -416,8 +443,16 @@ def reconstruct_joint_thomson_spatial_spectra(
         }[physical_model],
         "physical_model_selection": {
             "model": physical_model,
-            "kappa_index": kappa_index,
-            "kappa_index_role": "fixed_external_model_parameter_not_inferred" if physical_model == "kappa" else None,
+            "kappa_index": (float(fit.x[-1]) if physical_model == "kappa" and fit_kappa_index else kappa_index),
+            "kappa_index_role": (
+                "jointly_fitted_global_shape_parameter" if physical_model == "kappa" and fit_kappa_index
+                else "fixed_external_model_parameter_not_inferred" if physical_model == "kappa"
+                else None
+            ),
+            "kappa_index_uncertainty": (
+                float(uncertainties[-1]) if physical_model == "kappa" and fit_kappa_index and data_identifiable
+                else None
+            ),
             "incident_polarization": incident_polarization,
             "relativistic_quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order)} if physical_model == "relativistic_maxwell_juttner" else None,
             "amplitude_semantics": "Gaussian peak amplitude" if physical_model == "maxwellian" else "relative integrated spectral amplitude",
@@ -456,16 +491,17 @@ def reconstruct_joint_thomson_spatial_spectra(
                             [f"flow_projection_{i}_m_s" for i in range(n)] +
                             [f"background_channel_{channel}_coefficient_{coefficient}"
                              for channel in range(m)
-                             for coefficient in range(n_background)]),
+                             for coefficient in range(n_background)] +
+                            (["kappa_index"] if physical_model == "kappa" and fit_kappa_index else [])),
         "detector_background_model": background_model,
         "detector_background_basis": background_basis.copy(),
-        "detector_background_coefficients": fit.x[3*n:].reshape(m, n_background).copy(),
+        "detector_background_coefficients": fit.x[3*n:3*n+m*n_background].reshape(m, n_background).copy(),
         "detector_background_offset": (
-            fit.x[3*n:].reshape(m, n_background)[:, 0].copy()
+            fit.x[3*n:3*n+m*n_background].reshape(m, n_background)[:, 0].copy()
             if background_model in {"linear", "polynomial"} else None
         ),
         "detector_background_slope_per_nm": (
-            fit.x[3*n:].reshape(m, n_background)[:, 1].copy()
+            fit.x[3*n:3*n+m*n_background].reshape(m, n_background)[:, 1].copy()
             * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
         "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
