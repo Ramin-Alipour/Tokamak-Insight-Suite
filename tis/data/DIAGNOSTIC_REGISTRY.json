@@ -4,8 +4,8 @@
     "diagnostic": "Thomson scattering",
     "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated optical Thomson spectra; absolute electron density only where identifiable from calibrated spectral power and complete optical geometry.",
     "status": "D",
-    "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Microwave CTS is a registered subanalysis of primary Analysis 1; its electrostatic and full-electromagnetic models remain a distinct CTS model branch.",
-    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it screens the maximum represented electron-rest-frame Compton correction and rejects cases exceeding the configured 1% default limit. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is included as a subanalysis of primary Analysis 1. No independent experimental validation is claimed.",
+    "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Microwave CTS is a registered subanalysis of primary Analysis 1; its electrostatic and full-electromagnetic models remain a distinct CTS model branch. The Maxwellian optical fitter also supports researcher-selected constant, linear, polynomial, cubic-spline or template detector-background bases. The joint spatial-spectral inverse supports isotropic finite-variance Kappa (fixed external kappa index) and relativistic Maxwell-Juttner forward kernels in addition to Maxwellian. A separate relativistic Thomson-limit inverse returns only a 1-D projected q-marginal under explicit symmetric-geometry assumptions.",
+    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it screens the maximum represented electron-rest-frame Compton correction and rejects cases exceeding the configured 1% default limit. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is included as a subanalysis of primary Analysis 1. No independent experimental validation is claimed. Structured background integration in the channel-wise optical inference is currently limited to the non-collective Maxwellian fit; Kappa and Maxwell-Juttner retain their existing linear baselines. The relativistic projected-EVDF inverse uses exact elastic Thomson Doppler kinematics but omits polarized differential-cross-section weighting, Compton recoil and transverse velocity structure; it is not a general 3-D EVDF. The PSF-aware profile inverse requires a fixed researcher-supplied mixing operator and suppresses primary outputs when data-only rank is deficient. The joint spatial-spectral Kappa index is fixed externally and its uncertainty is not propagated.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
@@ -13,7 +13,11 @@
       "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
       "tokamak_analysis.thomson_population_mixture.two_population_relativistic_thomson_spectrum",
       "tokamak_analysis.thomson_population_mixture.fit_two_population_relativistic_thomson_spectrum",
-      "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+      "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+      "tokamak_analysis.thomson_evdf.reconstruct_relativistic_projected_thomson_evdf",
+      "tokamak_analysis.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf",
+      "tokamak_analysis.thomson_workflow.reconstruct_psf_aware_thomson_profile",
+      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
@@ -216,6 +220,33 @@
           "required": false,
           "default": 121,
           "description": "Number of nodes in the projected-velocity inversion grid. The velocity interval is derived from the measured wavelength coverage and the supplied laser wavelength/scattering geometry."
+        },
+        {
+          "name": "background_model",
+          "unit": "constant, linear, polynomial, cubic_spline or templates",
+          "required": false,
+          "default": "linear",
+          "description": "Structured detector-space background basis jointly fitted with the non-collective Maxwellian optical Thomson feature. Other optical models currently retain their existing linear baseline."
+        },
+        {
+          "name": "background_degree",
+          "unit": "integer 0–8",
+          "required": false,
+          "default": 2,
+          "description": "Legendre polynomial degree when background_model='polynomial'."
+        },
+        {
+          "name": "background_interior_knots",
+          "unit": "non-negative integer",
+          "required": false,
+          "default": 3,
+          "description": "Interior knot count when background_model='cubic_spline'."
+        },
+        {
+          "name": "background_templates",
+          "unit": "wavelength x basis, or channel x wavelength x basis",
+          "required": false,
+          "description": "Researcher-supplied detector-space background templates; not a plasma-emission model."
         }
       ],
       "output_specs": [
@@ -421,6 +452,16 @@
           "name": "regularization_sensitivity",
           "unit": "structured numerical sensitivity diagnostic",
           "description": "For projected 1-D EVDF inversion, summarizes changes in mean, standard deviation, skewness, excess kurtosis and total-variation distance across successful GCV regularization candidates; a single explicit regularization value is reported without a sensitivity range. Not a measurement uncertainty."
+        },
+        {
+          "name": "relativistic_projected_evdf",
+          "unit": "normalized 1-D probability density in m s^-1",
+          "description": "Separate exact Thomson-limit kinematic inverse under symmetric geometry; no 3-D or Compton-corrected reconstruction."
+        },
+        {
+          "name": "psf_aware_profile",
+          "unit": "latent spatial profile on supplied PSF nodes",
+          "description": "Separate fixed-operator inverse with data-only rank diagnostics; only full-rank data-supported profiles are primary outputs."
         }
       ],
       "assumptions": [
@@ -453,7 +494,12 @@
         "Regularization sensitivity is assessed only across the solver's declared candidate grid; it is a numerical robustness diagnostic, not a measurement uncertainty or posterior interval.",
         "Relativistic Maxwell-Juttner spectral GLS is currently channel-separable: full within-channel wavelength covariance is supported, but non-zero cross-channel spectral covariance is rejected until a joint relativistic multi-channel forward inversion is implemented.",
         "The joint spatial-spectral Maxwellian subanalysis supports detector-space constant, linear, polynomial, cubic-spline, and researcher-supplied template backgrounds fitted jointly with the plasma forward model; this does not replace the primary channel-wise inference background model.",
-        "Relativistic Maxwell-Juttner supports a canonical joint multi-channel GLS fit with full channel-major spectral covariance, including cross-channel blocks, when wavelength grids, geometry and measured response are shared; independent marginal channel fits are retained."
+        "Relativistic Maxwell-Juttner supports a canonical joint multi-channel GLS fit with full channel-major spectral covariance, including cross-channel blocks, when wavelength grids, geometry and measured response are shared; independent marginal channel fits are retained.",
+        "Structured detector-background bases are integrated into the non-collective Maxwellian optical fit only; Kappa and relativistic Maxwell-Juttner fitters retain their linear background models.",
+        "The relativistic projected EVDF inverse is a one-dimensional exact-Doppler kinematic model in the Thomson limit; polarization-dependent cross-section weighting, Compton recoil, transverse velocity structure and unrestricted 3-D reconstruction are not included.",
+        "The PSF-aware profile inverse requires a researcher-supplied fixed mixing operator; uncertainty in that operator is not propagated and its null-space modes remain non-identifiable.",
+        "Joint spatial-spectral Kappa inference treats kappa_index as a fixed external parameter; its uncertainty is not propagated.",
+        "Full-EM CTS per-sample relative density/temperature factors are fixed external spatial profiles, not independently inferred profiles; their cross-sample covariance is not propagated."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -499,7 +545,9 @@
         "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles",
-        "tests/test_thomson_inference.py::test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covariance"
+        "tests/test_thomson_inference.py::test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covariance",
+        "tests/test_thomson_gap_closure.py::test_psf_aware_profile_recovers_full_rank_latent_profile",
+        "tests/test_thomson_gap_closure.py::test_relativistic_projected_evdf_normalizes_and_reports_model_scope"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
@@ -4342,8 +4390,8 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family. Electrostatic CTS optionally fits a fixed detector-space PCA nuisance background from explicitly supplied calibrated background-only reference spectra on the same frequency grid; the number of retained components is researcher-selected. The Full-EM branch does not accept this option.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; reference-ensemble uncertainty is not propagated and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948).",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family. Electrostatic CTS optionally fits a fixed detector-space PCA nuisance background from explicitly supplied calibrated background-only reference spectra on the same frequency grid; the number of retained components is researcher-selected. The Full-EM branch does not accept this option. Scattering-volume samples may additionally carry externally prescribed electron_density_relative, electron_temperature_relative and ion_temperature_relative factors, plus sample-local species/flow/polarization overrides.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; reference-ensemble uncertainty is not propagated and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948). Per-sample relative plasma profiles are fixed external forward-model inputs. The inversion does not fit arbitrary node-wise plasma profiles and does not propagate covariance of those factors or cross-sample profile covariance.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -6024,10 +6072,12 @@
     "diagnostic": "Thomson spatial profile reconstruction",
     "quantities": "Channel-resolved radial electron-temperature and electron-density profiles where identifiable, electron-flow projection profiles, and their supported uncertainties inferred directly from measured calibrated Thomson spectra.",
     "status": "D",
-    "method": "Delegates to the canonical multi-channel Thomson physical forward-inference model and returns its radial channel-resolved physical-parameter profiles. It does not interpolate or fit previously derived ne/Te samples. Smoothing-spline reconstruction uses a generalized least-squares natural-cubic objective and GCV hat-matrix effective degrees of freedom when full cross-channel parameter covariance is available; pointwise-only uncertainty retains the diagonal route.",
-    "caveat": "This profile subanalysis uses the same measured calibrated spectral inputs and physical inference as Analysis 1. It does not accept previously inferred density/temperature profiles, perform detector calibration, or claim independent experimental validation.",
+    "method": "Delegates to the canonical multi-channel Thomson physical forward-inference model and returns its radial channel-resolved physical-parameter profiles. It does not interpolate or fit previously derived ne/Te samples. Smoothing-spline reconstruction uses a generalized least-squares natural-cubic objective and GCV hat-matrix effective degrees of freedom when full cross-channel parameter covariance is available; pointwise-only uncertainty retains the diagonal route. A separate PSF-aware inverse solves measured channel values against a fixed supplied spatial mixing operator; it is not interpolation and reports only data-supported latent profiles as primary.",
+    "caveat": "This profile subanalysis uses the same measured calibrated spectral inputs and physical inference as Analysis 1. It does not accept previously inferred density/temperature profiles, perform detector calibration, or claim independent experimental validation. The PSF-aware inverse requires a researcher-supplied fixed mixing operator; PSF uncertainty and spatial null-space modes remain outside its scope.",
     "implementation_functions": [
-      "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra"
+      "tokamak_analysis.thomson_workflow.reconstruct_thomson_profile_from_spectra",
+      "tokamak_analysis.thomson_workflow.reconstruct_psf_aware_thomson_profile",
+      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile"
     ],
     "implementation_status": "Complete as a profile-oriented output of the canonical measured-spectrum physical inference; no separate profile-point input or duplicated physical model is exposed.",
     "execution_contract": {
