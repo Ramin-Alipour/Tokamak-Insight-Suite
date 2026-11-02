@@ -37,9 +37,15 @@ def _response_stack(response, n_channels, n_wavelengths):
         raise ValueError("instrument_response must be (n_lambda,n_lambda) or (n_channels,n_lambda,n_lambda)")
     if not np.all(np.isfinite(value)) or np.any(value < 0):
         raise ValueError("instrument_response must be finite and non-negative")
-    sums = value.sum(axis=0)
-    if np.any(sums <= 0) or not np.allclose(sums, 1.0, rtol=1e-6, atol=1e-9):
-        raise ValueError("instrument_response columns must sum to one")
+    # Each channel stores a wavelength-output x wavelength-input operator.
+    # Sum over output rows (axis=1) so every input-wavelength column is
+    # checked independently for every channel. Summing axis=0 would instead
+    # mix channels and response rows, rejecting valid shared/channel matrices.
+    column_sums = value.sum(axis=1)
+    if np.any(column_sums <= 0) or not np.allclose(
+        column_sums, 1.0, rtol=1e-6, atol=1e-9
+    ):
+        raise ValueError("instrument_response columns must sum to one for every channel")
     return value
 
 
@@ -85,8 +91,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser = float(laser_wavelength_nm)
     angle = float(scattering_angle_rad)
     lam_reg = float(regularization_strength)
-    if not np.isfinite(laser) or laser <= 0 or not np.isfinite(angle) or not 0 < angle <= np.pi:
-        raise ValueError("laser_wavelength_nm and scattering_angle_rad are outside their physical domains")
+    if not np.isfinite(laser) or laser <= 0 or not np.isfinite(angle) or not 0 < angle < np.pi:
+        raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie strictly between 0 and pi")
     if not np.isfinite(lam_reg) or lam_reg < 0:
         raise ValueError("regularization_strength must be finite and non-negative")
     if signal_uncertainty is not None and joint_spectral_covariance is not None:
@@ -224,15 +230,10 @@ def reconstruct_joint_thomson_spatial_spectra(
         "primary_outputs_reportable_as_identified": data_identifiable,
         "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
         "radius_m": r.copy(),
-        # Stable aliases keep the joint route compatible with the shared dashboard schema.
-        # Absolute density is unavailable because this shape inversion has no power normalization.
         "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
         "electron_density_profile_m3": np.full(n, np.nan, dtype=float),
         "electron_density_uncertainty_profile_m3": np.full(n, np.nan, dtype=float),
         "electron_velocity_projection_uncertainty_profile_m_s": uncertainties[2*n:3*n] if data_identifiable else None,
-        # Numerical optimizer candidates are retained for diagnostics, but
-        # they are not promoted to measured primary outputs when the data-only
-        # inverse is rank deficient or the optimizer has not converged.
         "electron_temperature_profile_eV": te if data_identifiable else None,
         "electron_temperature_uncertainty_eV": uncertainties[n:2*n] if data_identifiable else None,
         "electron_velocity_projection_profile_m_s": flow if data_identifiable else None,
