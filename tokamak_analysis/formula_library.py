@@ -857,7 +857,12 @@ def langmuir_ion_density_from_saturation_current(
 
 
 def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_wavelength_nm, scattering_angle_rad, *, sigma_intrinsic_sigma_nm=None, sigma_laser_wavelength_nm=None, sigma_scattering_angle_rad=None):
-    """Non-relativistic Maxwellian Te from instrument-corrected Thomson width."""
+    """Infer Maxwellian Te from an intrinsic width parameter of the physical forward fit.
+
+    The canonical analysis estimates this intrinsic width while convolving the
+    physical spectrum with the supplied measured instrument response. This
+    helper does not deconvolve or instrument-correct the measured spectrum.
+    """
     sigma=_positive("intrinsic_sigma_nm",intrinsic_sigma_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
     if not 0 < angle <= math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi].")
     supplied=(sigma_intrinsic_sigma_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
