@@ -302,3 +302,27 @@ The joint spatial-spectral Maxwellian inverse requires an explicit measured inst
 
 
 The Full-EM CTS inversion additionally supports conditional joint covariance propagation for explicitly supplied local magnetic-field, incident/scattered direction and complex polarization components. It uses Monte Carlo refits and is not available for frequency-resolved ray/equilibrium geometry; see [the CTS contract](collective_thomson_scattering.md) for the exact input names and limits.
+
+
+## PSF-aware profile coordinate uncertainty
+
+The standalone `reconstruct_profile_with_spatial_mixing` inverse accepts an
+optional full covariance matrix `radius_covariance_m2` for the supplied spatial
+node coordinates. It validates symmetry and positive semidefiniteness, samples
+joint coordinate perturbations, rejects non-monotonic grids, and refits the
+profile using the nominally selected regularization strength. When at least
+80% of the requested draws (and at least 20) are valid, the coordinate-induced
+profile covariance is added to the measurement-conditional profile covariance.
+The result reports both covariance contributions, the number of successful
+draws, and an explicit propagation status. If too few draws are valid, the
+reported covariance remains conditional on the nominal coordinates and carries
+a warning.
+
+This extension propagates only the supplied coordinate covariance through the
+fixed researcher-supplied spatial mixing operator and the selected curvature
+regularization. It does not estimate the PSF, infer coordinate errors, propagate
+uncertainty in the mixing operator, or close coordinate-uncertainty propagation
+for the separate PCHIP/GCV profile workflow. Holding the regularization strength
+fixed isolates coordinate uncertainty; variability from re-selecting GCV is
+not included. This is numerical uncertainty propagation, not experimental
+validation.
