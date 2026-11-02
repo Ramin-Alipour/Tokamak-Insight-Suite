@@ -212,5 +212,5 @@ def test_evdf_rejects_non_positive_definite_combined_background_covariance():
             wavelength, signal, background,
             signal_uncertainty=np.full(signal.size, 0.1),
             background_uncertainty=np.full(signal.size, 1.0),
-            signal_background_cross_covariance=np.eye(signal.size) * 0.2,
+            signal_background_cross_covariance=np.eye(signal.size) * 0.6,
         )
