@@ -1084,6 +1084,7 @@ def analyze_thomson_spectra(
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                 include_compton_recoil=include_compton_recoil,
+                include_compton_recoil=include_compton_recoil,
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
@@ -1574,6 +1575,7 @@ def analyze_thomson_spectra(
                             sampled, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
                             incident_polarization=incident_polarization,
                             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
                         )
                     else:
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,
@@ -1798,6 +1800,7 @@ def analyze_thomson_spectra(
                         scattered_direction=sampled_scattered,
                         incident_polarization=sampled_polarization,
                         maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
                     )
                     external_te_samples.append(float(draw["electron_temperature_eV"]))
                     external_velocity_samples.append(float(draw["electron_velocity_projection_m_s"]))
@@ -1979,6 +1982,7 @@ def analyze_thomson_spectra(
             initial_temperature_eV=initial_joint_te,
             initial_flow_projection_m_s=initial_joint_flow,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
         )
         joint_summary["integration_status"] = "used_by_canonical_multichannel_thomson_api"
         joint_summary["channel_individual_fits_retained"] = True
