@@ -5124,6 +5124,16 @@
           "name": "external_input_covariance_warning",
           "unit": "text; conditional",
           "description": "Full-EM: warning when too few local external-input perturbation/refits succeed."
+        },
+        {
+          "name": "external_inputs_fixed",
+          "unit": "list of external input groups",
+          "description": "Full-EM: groups retained fixed at nominal supplied values during inversion because no covariance for those groups was supplied."
+        },
+        {
+          "name": "external_inputs_with_supplied_covariance",
+          "unit": "list of external input groups",
+          "description": "Full-EM: local magnetic-field, geometry or polarization groups for which a supplied covariance was propagated by Monte Carlo refitting."
         }
       ],
       "assumptions": [
@@ -5263,7 +5273,9 @@
             "external_input_covariance_propagated",
             "external_input_parameter_covariance",
             "external_input_mc_successes",
-            "external_input_mc_requested"
+            "external_input_mc_requested",
+            "external_inputs_fixed",
+            "external_inputs_with_supplied_covariance"
           ],
           "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. Explicit relativistic gyrotropic electron distributions are forward-model capabilities only and are not accepted by the current inversion."
         }
