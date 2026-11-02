@@ -35,6 +35,8 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
     assert any("not identifiable" in item.lower() or "absolute density" in item.lower()
                for item in contract["limitations"])
     assert "maximum_recoil_correction_fraction" in inputs
+    assert inputs["include_compton_recoil"]["default"] is False
+    assert "Klein-Nishina" in inputs["include_compton_recoil"]["description"]
     profile_inputs = {item["name"] for item in get_analysis(46)["execution_contract"]["input_specs"]}
     assert {"profile_reconstruction_method", "profile_reconstruction_points",
             "profile_reconstruction_mc_samples", "maximum_recoil_correction_fraction"} <= profile_inputs
