@@ -94,7 +94,7 @@ The spectral-distribution subanalysis is deliberately descriptive. It uses signe
 
 ## Spatial profile reconstruction
 
-The registered “Thomson spatial profile reconstruction” subanalysis starts from measured calibrated multi-channel spectra, runs the canonical physical inference, and reconstructs every identifiable radial parameter profile using shape-preserving PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived \(n_e/T_e\) profile points and never extrapolates beyond the measured radial interval. The Kappa-index profile is included only for the non-collective Kappa model.
+The registered “Thomson spatial profile reconstruction” subanalysis starts from measured calibrated multi-channel spectra, runs the canonical physical inference, and reconstructs every identifiable radial parameter profile using shape-preserving PCHIP and/or a generalized-cross-validation smoothing spline. It never accepts pre-derived \(n_e/T_e\) profile points and never extrapolates beyond the measured radial interval. The Kappa-index profile is included only for the non-collective Kappa model. The supplied radial coordinates must already be unique and strictly increasing; channel order is preserved exactly, and the workflow does not sort or reorder measured channels.
 
 The reconstruction propagates the available per-channel fit covariance and any supplied cross-channel spectral or absolute-density input covariance. A profile is reported only where its source physical parameter is identifiable; no missing channel values are fabricated or extrapolated.
 
