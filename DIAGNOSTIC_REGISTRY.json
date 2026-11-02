@@ -508,6 +508,16 @@
             "path_integrated_sensitivity_W_m3"
           ],
           "identifiability": "A single integrated power measurement identifies only the optical-kernel-weighted path-average density, not an arbitrary pointwise density profile."
+        },
+        {
+          "name": "Projected EVDF signal/background uncertainty propagation",
+          "function": "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
+          "optional_inputs": [
+            "background_uncertainty",
+            "background_covariance",
+            "signal_background_cross_covariance"
+          ],
+          "uncertainty_rule": "The residual covariance is C(signal-background)=C_signal+C_background-C_signal_background-C_signal_background.T. Signal/background cross-covariance requires both marginal covariance models and a positive-definite joint block covariance. Background-only covariance treats signal noise as not supplied; all uncertainty remains conditional on supplied covariance inputs."
         }
       ]
     },
