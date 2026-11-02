@@ -299,3 +299,15 @@ def test_background_uncertainty_requires_explicit_background_signal():
             background_fraction=0.1,
             background_signal_uncertainty=np.full(x.size, 0.1),
         )
+
+
+def test_distribution_rejects_non_normalized_measured_response_without_modifying_it():
+    x, y = _spectrum()
+    response = np.eye(x.size)
+    response[0, 0] = 0.5
+    original = response.copy()
+    with pytest.raises(ValueError, match="columns must already sum to one"):
+        analyze_thomson_spectral_distribution(
+            x, y, instrument_response_matrix=response, background_fraction=0.1,
+        )
+    np.testing.assert_array_equal(response, original)
