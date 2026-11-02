@@ -180,7 +180,8 @@ def _convolve(response,spectrum,axis):
     r=_array(response,"instrument_response",2)
     if r.shape!=(axis.size,axis.size) or np.any(r<0) or np.any(r.sum(axis=0)<=0):
         raise ValueError("instrument_response must be a valid non-negative square matrix on the frequency grid")
-    r=r/r.sum(axis=0)[None,:]
+    if not np.allclose(r.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
     edges=np.empty(axis.size+1,dtype=float)
     edges[1:-1]=.5*(axis[:-1]+axis[1:])
     edges[0]=axis[0]-.5*(axis[1]-axis[0])
@@ -388,6 +389,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("electron-flow optimizer seed must be subluminal")
     response=_array(instrument_response,"instrument_response",2)
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
     unc=None if signal_uncertainty is None else _array(signal_uncertainty,"signal_uncertainty",1)
     if unc is not None and (unc.shape!=y.shape or np.any(unc<=0)): raise ValueError("signal_uncertainty must match spectrum and be positive")
     if unc is not None and spectral_covariance is not None:
