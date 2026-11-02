@@ -44,6 +44,35 @@ def test_joint_spatial_spectral_inverse_recovers_synthetic_te_and_flow_profiles(
     assert out["parameter_identifiability"]["status"] == "identified_from_measured_data"
 
 
+def test_joint_inverse_fits_polynomial_detector_background_jointly():
+    x, y, r, h, *_ = _synthetic_case()
+    z = 2.0 * (x - x.min()) / np.ptp(x) - 1.0
+    baseline = np.vstack([
+        0.02 + 0.004*z + 0.003*z*z,
+        0.03 - 0.003*z + 0.002*z*z,
+        0.01 + 0.002*z - 0.001*z*z,
+        0.025 - 0.004*z + 0.0015*z*z,
+        0.015 + 0.003*z + 0.0025*z*z,
+    ])
+    measured = y + baseline
+    out = reconstruct_joint_thomson_spatial_spectra(
+        x, measured, r, h, laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full_like(measured, 0.01),
+        regularization_strength=0.0, background_model="polynomial",
+        background_degree=2,
+    )
+    assert out["background_contract"]["fit_is_joint_with_physical_thomson_forward_model"] is True
+    assert out["detector_background_model"] == "polynomial"
+    assert out["detector_background_coefficients"].shape == (measured.shape[0], 3)
+    assert out["parameter_covariance"].shape == (3*r.size + 3*measured.shape[0],)*2
+    assert out["parameter_order"][-1] == "background_channel_4_coefficient_2"
+    np.testing.assert_allclose(
+        out["electron_temperature_profile_eV"], [70., 85., 100., 115., 130.],
+        rtol=0.06,
+    )
+
+
 def test_joint_inverse_accepts_full_channel_major_covariance():
     x, y, r, h, *_ = _synthetic_case()
     covariance = np.eye(y.size) * 1e-4
