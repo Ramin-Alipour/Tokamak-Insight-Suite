@@ -1381,10 +1381,37 @@ def analyze_full_em_cts_spectrum(
         "model": ("magnetized full-EM CTS with relativistic gyrotropic electron/fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
-        "external_inputs_fixed": [
-            "magnetic_field_T", "ion_species", "ion_fractions",
-            "incident_polarization", "scattered_polarization",
-        ],
+        "external_inputs_fixed": (
+            ["ion_species", "ion_fractions"]
+            + (["magnetic_field_T"] if not external_order or not any(
+                name.startswith("magnetic_field_T_") for name in external_order
+            ) else [])
+            + (["scattering_geometry"] if not external_order or not any(
+                name.startswith(("incident_direction_", "scattered_direction_"))
+                for name in external_order
+            ) else [])
+            + (["incident_polarization"] if not external_order or not any(
+                name.startswith("incident_polarization_") for name in external_order
+            ) else [])
+            + (["scattered_polarization"] if not external_order or not any(
+                name.startswith("scattered_polarization_") for name in external_order
+            ) else [])
+        ),
+        "external_inputs_with_supplied_covariance": (
+            (["magnetic_field_T"] if external_order and any(
+                name.startswith("magnetic_field_T_") for name in external_order
+            ) else [])
+            + (["scattering_geometry"] if external_order and any(
+                name.startswith(("incident_direction_", "scattered_direction_"))
+                for name in external_order
+            ) else [])
+            + (["incident_polarization"] if external_order and any(
+                name.startswith("incident_polarization_") for name in external_order
+            ) else [])
+            + (["scattered_polarization"] if external_order and any(
+                name.startswith("scattered_polarization_") for name in external_order
+            ) else [])
+        ),
         "electron_flow_inference": (
             "fitted scalar component along the local scattering wavevector; "
             "transverse components are not identifiable from a single CTS geometry"
@@ -1490,11 +1517,11 @@ def analyze_full_em_cts_spectrum(
                 for i, name in enumerate(species_names)
             }
             out["external_input_covariance_propagated"] = True
+            propagated_sources = sorted(out["external_uncertainty_covariance_components"])
             out["parameter_covariance_scope"] = (
-                "conditional local-fit covariance plus separately propagated supplied "
-                "instrument-response and local magnetic-field/geometry/polarization covariance "
-                "components; cross-covariance between distinct external covariance sources "
-                "is not included"
+                "conditional local-fit covariance plus separately propagated supplied covariance "
+                "components: " + ", ".join(propagated_sources)
+                + "; cross-covariance between distinct external covariance sources is not included"
             )
         else:
             out["external_input_covariance_warning"] = (
