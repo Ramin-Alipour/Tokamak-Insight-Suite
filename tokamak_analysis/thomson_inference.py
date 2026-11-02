@@ -1446,13 +1446,17 @@ def analyze_thomson_spectra(
             "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
         )
         fit["background_model_status"] = (
+            f"{background_model}_detector_space_basis_jointly_fitted"
+            if model == "non_collective_maxwellian" else
             "linear_intercept_and_slope_nuisance_background"
-            if model in {"non_collective_maxwellian", "non_collective_kappa"}
-            else "model_specific_background_treatment"
+            if model == "non_collective_kappa" else
+            "model_specific_background_treatment"
         )
         fit["background_model_limitation"] = (
-            "Curved, structured, line-contaminated or time-varying backgrounds are not represented by the two-parameter linear baseline."
-            if model in {"non_collective_maxwellian", "non_collective_kappa"} else
+            "The selected researcher-supplied detector-space basis is fitted jointly with the Maxwellian Thomson feature; basis inadequacy and signal/background degeneracy remain model-dependent and no automatic physical background decomposition is claimed."
+            if model == "non_collective_maxwellian" else
+            "Kappa optical fitting retains a linear detector-space baseline; curved or structured backgrounds are not represented by that baseline."
+            if model == "non_collective_kappa" else
             "Interpret the selected model's documented background treatment; no automatic physical background decomposition is claimed."
         )
         fit["channel_index"] = int(i)
