@@ -912,7 +912,8 @@ def _apply_frequency_response(response, spectrum, frequency):
         raise ValueError("response, spectrum and frequency axis must share a square frequency grid")
     if np.any(r < 0.0) or np.any(r.sum(axis=0) <= 0.0):
         raise ValueError("instrument_response must be non-negative with non-zero columns")
-    r = r/r.sum(axis=0, keepdims=True)
+    if not np.allclose(r.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
     edges = np.empty(f.size + 1, dtype=float)
     edges[1:-1] = 0.5*(f[:-1] + f[1:])
     edges[0] = f[0] - 0.5*(f[1]-f[0])
@@ -969,7 +970,8 @@ def analyze_full_em_cts_spectrum(
     response = _real_array(instrument_response, "instrument_response", 2)
     if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
         raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
-    response = response / response.sum(axis=0, keepdims=True)
+    if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
     response_sigma = None
     if instrument_response_uncertainty is not None:
         response_sigma = _real_array(instrument_response_uncertainty, "instrument_response_uncertainty", 2)
