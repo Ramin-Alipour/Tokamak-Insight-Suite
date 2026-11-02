@@ -552,7 +552,10 @@ def fit_relativistic_maxwell_juttner(
         "captured_spectral_probability_uncertainty": captured_uncertainty,
         "integrated_scattered_power_window_W": window_area,
         "effective_cross_section_uncertainty_method": "finite-difference propagation of fitted Te/flow covariance through the Lorentz-transformed polarized Thomson cross-section",
-        "reduced_chi_square": float(np.sum((residual/np.asarray(uncertainty,dtype=float))**2)/dof) if uncertainty is not None else None,
+        "reduced_chi_square": (
+            float(2.0*fit.cost/dof)
+            if covariance_cholesky is not None or unc is not None else None
+        ),
         "fitted_spectrum": fitted,
         "residual": residual,
         "optimizer_success": bool(fit.success),
