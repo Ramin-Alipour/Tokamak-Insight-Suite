@@ -74,6 +74,58 @@ def _response_stack(response, n_channels, n_wavelengths):
     return value
 
 
+def _bound_aware_jacobian(function, parameters, lower, upper):
+    """Finite-difference Jacobian that never evaluates outside fit bounds.
+
+    Central differences are used in the interior and second-order accuracy is
+    retained where both directions are available. At an active bound, a
+    one-sided difference is used; a parameter fixed at identical lower/upper
+    bounds has a zero derivative column.
+    """
+    point = np.asarray(parameters, dtype=float)
+    lo = np.asarray(lower, dtype=float)
+    hi = np.asarray(upper, dtype=float)
+    if point.ndim != 1 or lo.shape != point.shape or hi.shape != point.shape:
+        raise ValueError("parameters and finite-difference bounds must be matching vectors")
+    if not np.all(np.isfinite(point)) or np.any(lo > hi) or np.any(point < lo) or np.any(point > hi):
+        raise ValueError("finite-difference point must be finite and lie within ordered bounds")
+    base = np.asarray(function(point), dtype=float).reshape(-1)
+    if not np.all(np.isfinite(base)):
+        raise ValueError("finite-difference function must return finite values")
+    jacobian = np.zeros((base.size, point.size), dtype=float)
+    relative_step = np.cbrt(np.finfo(float).eps)
+    for column, value in enumerate(point):
+        step = relative_step * max(1.0, abs(float(value)))
+        plus_room = float(hi[column] - value)
+        minus_room = float(value - lo[column])
+        if plus_room >= step and minus_room >= step:
+            plus = point.copy()
+            minus = point.copy()
+            plus[column] += step
+            minus[column] -= step
+            jacobian[:, column] = (
+                np.asarray(function(plus), dtype=float).reshape(-1)
+                - np.asarray(function(minus), dtype=float).reshape(-1)
+            ) / (2.0 * step)
+        elif plus_room > 0.0:
+            h = min(step, plus_room)
+            plus = point.copy()
+            plus[column] += h
+            jacobian[:, column] = (
+                np.asarray(function(plus), dtype=float).reshape(-1) - base
+            ) / h
+        elif minus_room > 0.0:
+            h = min(step, minus_room)
+            minus = point.copy()
+            minus[column] -= h
+            jacobian[:, column] = (
+                base - np.asarray(function(minus), dtype=float).reshape(-1)
+            ) / h
+    if not np.all(np.isfinite(jacobian)):
+        raise ValueError("finite-difference Jacobian contains non-finite values")
+    return jacobian
+
+
 def _curvature(axis):
     matrix = np.zeros((axis.size - 2, axis.size), dtype=float)
     for i in range(axis.size - 2):
@@ -215,16 +267,9 @@ def reconstruct_joint_thomson_spatial_spectra(
         return whiten(y - predict(parameters)[0])
 
     parameter_count = int(fit.x.size)
-    data_jacobian = np.empty((data_residual.size, parameter_count), dtype=float)
-    for column in range(parameter_count):
-        step = 1.0e-5 * max(1.0, abs(float(fit.x[column])))
-        plus = fit.x.copy()
-        minus = fit.x.copy()
-        plus[column] += step
-        minus[column] -= step
-        data_jacobian[:, column] = (
-            data_residual_only(plus) - data_residual_only(minus)
-        ) / (2.0 * step)
+    data_jacobian = _bound_aware_jacobian(
+        data_residual_only, fit.x, lower, upper
+    )
     column_norms = np.linalg.norm(data_jacobian, axis=0)
     scaled_data_jacobian = data_jacobian / np.maximum(
         column_norms, np.finfo(float).tiny
