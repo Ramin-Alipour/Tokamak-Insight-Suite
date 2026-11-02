@@ -384,3 +384,15 @@ Commits:
 - `2a5dfe37474183678033a4c214ca5b4048e93c39` — dashboard contract.
 
 **Experimental validation:** not performed or claimed. GitHub Actions for the resulting main head must complete before software-test success is stated.
+
+
+## W. Thomson temperature formula contract and geometry endpoint — 2026-11-02
+
+122. **The standalone Thomson temperature formula helper and formula registry retained two inconsistencies.** The helper accepted the exact backscattering endpoint \u03c0 despite the optical Analysis 1 geometry contract requiring \u03b8 strictly inside (0, \u03c0), and the human-readable formula-registry summary still called its intrinsic fit-width input an “instrument-corrected width.” **Fixed directly on main:** the helper now rejects both endpoints, a regression test covers exactly \u03c0, and both root and packaged formula registries describe the input as the intrinsic plasma Doppler-width parameter inferred by the measured-response-convolved physical forward fit. The formula remains a standalone relation for a parameter inferred by the canonical fit; it does not deconvolve or correct measured spectra.
+
+Commits:
+- 2b24e7fa3b9ef4377fcbb7976432147ff65e2b89 — strict angle domain in the formula helper.
+- f03a967b62da91b72cc5d19459ee48ba46a96d62 — endpoint regression test.
+- 17cd55c3e0bc0be1bf3e2b3e6e22a00dc0e5bb96 and 747688bde16c4fabd1b5195cc4e04335c3ea59af — synchronized formula-registry wording.
+
+No experimental validation was performed or claimed. Software-test status remains unconfirmed until GitHub Actions reports the final main-head result.
