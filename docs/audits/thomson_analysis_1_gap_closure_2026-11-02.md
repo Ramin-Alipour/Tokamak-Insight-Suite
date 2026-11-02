@@ -101,3 +101,12 @@ The Full-EM inversion now accepts the following additional entries in the ordere
 All selected entries share one positive-semidefinite covariance matrix, so correlations across frequency bins, scattering-volume samples, local magnetic field, ray directions, beam-overlap weights, and the already-supported ion fraction/mass/charge-state inputs are retained during joint Monte Carlo propagation. Sampled ray directions are renormalized; non-positive beam-overlap draws are rejected. Requested parameters must correspond to fields actually present in the supplied geometry.
 
 **Scope boundary:** this propagates uncertainty in the supplied discretized ray/equilibrium geometry. It does not perturb the underlying EFIT equilibrium coefficients and retrace rays automatically, nor does it model diffraction, mode conversion, quasi-optical beam propagation, or absolute launcher/receiver coupling. The covariance is conditional on the supplied ray-tracing and beam-overlap model.
+
+
+### A10 — joint covariance across CTS external-input sources
+
+The Full-EM CTS external-input covariance contract now also accepts individual calibrated instrument-response elements using `instrument_response_<row>_<column>`. These elements can be placed in the **same ordered covariance matrix** as local magnetic-field components, local/ray-resolved incident and scattered directions, ray magnetic-field samples, beam-overlap weights, polarization components, and indexed ion fractions/masses/charge states. This allows explicitly supplied cross-covariances between instrument response and plasma/geometry/species inputs to survive joint Monte Carlo refitting.
+
+For every draw, the sampled response matrix must remain finite and non-negative and have positive column sums; it is column-normalized before applying the forward response. This normalization enforces the response-operator contract and means the inferred uncertainty is conditional on a column-normalized response. The existing separate `instrument_response_uncertainty` input cannot be combined with response elements in the joint covariance, to prevent double counting; use one joint covariance matrix when cross-source correlations are known.
+
+**Remaining boundary:** the code cannot infer cross-covariance values that the diagnostic calibration/equilibrium workflow has not supplied. The parameter covariance still combines separately propagated covariance components additively when they are provided through distinct interfaces; those distinct sources are not automatically correlated.
