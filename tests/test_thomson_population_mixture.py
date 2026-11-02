@@ -17,7 +17,7 @@ def test_two_population_relativistic_thomson_spectrum_is_normalized():
     )
     assert np.all(np.isfinite(result["spectral_density_per_nm"]))
     assert np.all(result["spectral_density_per_nm"] >= 0)
-    assert np.trapezoid(result["spectral_density_per_nm"], wavelength) == pytest.approx(1.0, rel=2e-3)
+    assert np.trapz(result["spectral_density_per_nm"], wavelength) == pytest.approx(1.0, rel=2e-3)
     assert result["hot_population_fraction"] == pytest.approx(0.2)
     assert result["absolute_density_inferred"] is False
 
