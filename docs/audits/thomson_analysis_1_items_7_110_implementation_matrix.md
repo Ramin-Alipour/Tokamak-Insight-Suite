@@ -1,7 +1,7 @@
 # Thomson Analysis 1 — Item-by-item implementation matrix (7–110)
 
 **Reviewed branch:** `main`  
-**Review date:** 2026-11-01  
+**Review date:** 2026-11-02  
 **Purpose:** evidence-based implementation triage for the comprehensive audit. This is an inventory, not a claim that every item is closed.  
 **Input boundary:** calibrated/prepared measured diagnostic data only. No instrument calibration, raw-data repair, or experimental validation is introduced.
 
@@ -191,3 +191,8 @@ The exact root/package diagnostic registry copies, Python runtime registry, dash
 5. Only after these, consider broader anisotropic/multi-population EVDF models with a defensible identifiability and uncertainty analysis.
 
 **Completion rule:** an item is closed only when code, API contract, both JSON registry copies, Python registry, dashboard, documentation and direct regression tests agree. No experimental validation is claimed.
+
+
+## I. Follow-up registry consistency correction (2026-11-02)
+
+A direct main-branch comparison found that the packaged Thomson registry omitted the already-declared `result_classification` output from the root registry. The packaged copy has now been synchronized with the root copy; the existing root/package equality regression test covers the correction. This is a metadata consistency fix only and does not add physical assumptions or claim experimental validation.
