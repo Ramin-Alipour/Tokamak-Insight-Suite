@@ -87,7 +87,8 @@ def _bound_aware_jacobian(function, parameters, lower, upper):
     hi = np.asarray(upper, dtype=float)
     if point.ndim != 1 or lo.shape != point.shape or hi.shape != point.shape:
         raise ValueError("parameters and finite-difference bounds must be matching vectors")
-    if not np.all(np.isfinite(point)) or np.any(lo > hi) or np.any(point < lo) or np.any(point > hi):
+    if (not np.all(np.isfinite(point)) or np.any(np.isnan(lo)) or np.any(np.isnan(hi))
+            or np.any(lo > hi) or np.any(point < lo) or np.any(point > hi)):
         raise ValueError("finite-difference point must be finite and lie within ordered bounds")
     base = np.asarray(function(point), dtype=float).reshape(-1)
     if not np.all(np.isfinite(base)):
@@ -203,8 +204,11 @@ def reconstruct_joint_thomson_spatial_spectra(
     spectral_spacing = float(np.min(np.diff(x)))
     peak_scale = max(float(np.max(y) - np.median(y)), np.finfo(float).tiny)
     initial_sigma = max(span / 3.0, spectral_spacing)
-    initial_te = max(_MEC2_EV * (initial_sigma / (2.0 * laser * np.sin(angle/2.0)))**2, 0.05)
-    initial_te = float(np.clip(initial_te, 0.05, 1e5))
+    # Data-informed numerical seed only.  Do not clip this estimate to an
+    # assumed scientific temperature interval; the selected Maxwellian model's
+    # declared asymptotic-domain screen is applied to the fitted result below.
+    initial_te = _MEC2_EV * (initial_sigma / (2.0 * laser * np.sin(angle/2.0)))**2
+    initial_te = float(max(initial_te, np.finfo(float).tiny))
     initial_amp = peak_scale / max(float(np.max(h.sum(axis=1))), 1.0)
 
     # Parameter vector: log amplitude[n], log Te[n], flow[1e6 m/s,n],
@@ -214,11 +218,15 @@ def reconstruct_joint_thomson_spatial_spectra(
                np.zeros(r.size),
                np.full(m, float(np.median(y[:, :max(2,nlam//10)]))),
                np.zeros(m)]
-    lower = np.r_[np.full(r.size, -700.0), np.full(r.size, np.log(0.01)),
-                  np.full(r.size, -299.0),
+    # Only numerical overflow guards are imposed on logarithmic positive
+    # parameters.  Temperature and flow have no invented physical fit bounds;
+    # the Maxwellian model-domain screen below classifies out-of-regime fits.
+    # Background nuisance parameters and projected flow are unbounded.
+    lower = np.r_[np.full(r.size, -700.0), np.full(r.size, -700.0),
+                  np.full(r.size, -np.inf),
                   np.full(m, -np.inf), np.full(m, -np.inf)]
-    upper = np.r_[np.full(r.size, 700.0), np.full(r.size, np.log(1e7)),
-                  np.full(r.size, 299.0),
+    upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
+                  np.full(r.size, np.inf),
                   np.full(m, np.inf), np.full(m, np.inf)]
     if not isinstance(positive_amplitude, (bool, np.bool_)):
         raise ValueError("positive_amplitude must be boolean")
