@@ -306,6 +306,13 @@ def reconstruct_thomson_profile_from_spectra(
     beyond the measured channel coordinates.
     """
     selected_model = kwargs.get("model")
+    if spatial_mixing_covariance is not None and spatial_mixing_matrix is None:
+        raise ValueError("spatial_mixing_covariance requires spatial_mixing_matrix")
+    if joint_spatial_spectral and spatial_mixing_covariance is not None:
+        raise ValueError(
+            "spatial_mixing_covariance is currently propagated by the downstream "
+            "PSF-aware profile path, not by the raw joint spatial-spectral optimizer"
+        )
     if joint_spatial_spectral:
         if spatial_mixing_matrix is None:
             raise ValueError("spatial_mixing_matrix is required when joint_spatial_spectral=True")
