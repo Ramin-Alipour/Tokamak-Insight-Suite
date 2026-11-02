@@ -18,6 +18,11 @@ def _covariance_is_positive_semidefinite(covariance, *, rtol=1e-10):
     matrix = np.asarray(covariance, dtype=float)
     if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or not np.all(np.isfinite(matrix)):
         return False
+    # Covariance matrices must be symmetric. eigvalsh assumes Hermitian input
+    # and can otherwise accept an asymmetric matrix by reading one triangle.
+    matrix_scale = float(np.max(np.abs(matrix)))
+    if matrix_scale > 0.0 and float(np.max(np.abs(matrix - matrix.T))) > float(rtol) * matrix_scale:
+        return False
     diagonal = np.diag(matrix)
     if np.any(diagonal < 0.0):
         return False
