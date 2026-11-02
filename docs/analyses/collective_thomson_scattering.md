@@ -165,3 +165,43 @@ the fixed eigenvalue-order index used by the Hamiltonian ODE remains the same
 tracked polarization branch along the sampled ray. A branch permutation or
 near-degenerate subspace is reported explicitly; the ray solver does not
 silently claim coupled-mode conversion or continuity through a degeneracy.
+
+
+## Degeneracy-aware coherent CTS mode conversion
+
+The cold-plasma mode utility now has two distinct operations. 
+`track_cold_plasma_modes_from_operators` performs branch bookkeeping and flags
+degenerate eigenspaces. `propagate_cold_plasma_mode_coupling` propagates a
+three-component coherent modal-amplitude vector along an explicitly supplied
+ordered path using the lossless coupled-mode equation
+
+```
+d(a)/ds = -[U^H dU/ds + i diag(beta)] a
+```
+
+Here `U` is the parallel-transported local polarization frame and `beta`
+contains the caller-supplied propagation constants in rad/m. Degenerate
+subspaces are aligned as subspaces by a unitary Procrustes transport; the
+individual basis labels within an exact degeneracy are not treated as
+observable. The solver reports modal powers, conversion coupling, degeneracy
+flags and the numerical power-conservation residual. It rejects missing or
+misaligned path/propagation-constant inputs rather than inventing them.
+
+This is a **conditional local cold-plasma coupled-mode model**, not a full-wave
+solution. It requires the researcher to provide the physical path, local
+Maxwell operators and propagation constants for the same ray. It does not
+model absorption, collisions, reflection at cutoffs, resonant layers,
+diffraction or nonlinear coupling. Numerical regression tests are synthetic
+software checks only; no experimental validation is claimed.
+
+The physical context is consistent with (i) J. De Vadder, J. De Jonghe and
+R. Keppens, “Collisional damping of wave modes in ion–electron plasmas,”
+*Journal of Plasma Physics* 90 (2024), DOI:
+10.1017/S0022377824000680, which explicitly documents wave-mode crossings and
+avoided crossings, and (ii) X. Fang et al., “Study on the Full Electromagnetic
+Model of Collective Thomson Scattering in Magnetic Confinement Fusion,”
+*Power Generation Technology* 46 (2025), DOI:
+10.12096/j.2096-4528.pgt.24149, for the full-electromagnetic CTS context.
+The coupled-mode evolution is an explicit mathematical propagation layer
+requiring supplied path and propagation constants; it is not attributed as an
+algorithm reproduced from either paper.
