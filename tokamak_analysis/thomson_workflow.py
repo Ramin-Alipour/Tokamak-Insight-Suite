@@ -292,7 +292,10 @@ def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
     joint_spatial_spectral=False, spatial_mixing_matrix=None,
-    spatial_regularization_strength=0.0, profile_grid_radius_m=None, **kwargs,
+    spatial_regularization_strength=0.0, profile_grid_radius_m=None,
+    spatial_background_model="linear", spatial_background_degree=2,
+    spatial_background_interior_knots=3, spatial_background_templates=None,
+    **kwargs,
 ):
     """Infer physical parameters from calibrated spectra, then reconstruct profiles.
 
@@ -328,6 +331,10 @@ def reconstruct_thomson_profile_from_spectra(
             signal_uncertainty=kwargs.get("signal_uncertainty"),
             joint_spectral_covariance=kwargs.get("joint_spectral_covariance"),
             regularization_strength=spatial_regularization_strength,
+            background_model=spatial_background_model,
+            background_degree=spatial_background_degree,
+            background_interior_knots=spatial_background_interior_knots,
+            background_templates=spatial_background_templates,
         )
     if selected_model not in {
         "non_collective_maxwellian",
