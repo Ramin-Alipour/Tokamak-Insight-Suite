@@ -87,7 +87,12 @@ def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     sums = out.sum(axis=0)
     if np.any(sums <= 0):
         raise ValueError("each instrument-response column must have positive normalization")
-    return out / sums[None, :]
+    if not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError(
+            "measured instrument-response matrix columns must already sum to one; "
+            "the calibrated response operator is not renormalized"
+        )
+    return out
 
 
 def _apply_response(response, spectrum, wavelength):
