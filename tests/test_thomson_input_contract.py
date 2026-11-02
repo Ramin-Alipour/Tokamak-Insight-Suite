@@ -32,3 +32,28 @@ def test_thomson_spectrum_rejects_boolean_uncertainties():
             signal_uncertainty=[True] * 9,
         )
 
+
+@pytest.mark.parametrize("invalid_value", ["false", 0, 1, None])
+def test_primary_thomson_rejects_non_boolean_evdf_switch(invalid_value):
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+
+    with pytest.raises(ValueError, match="enable_evdf_reconstruction must be boolean"):
+        analyze_thomson_spectra(
+            np.linspace(1050.0, 1078.0, 9), np.ones((1, 9)), [0.5],
+            laser_wavelength_nm=1064.0, scattering_angle_rad=1.0,
+            instrument_response=np.eye(9), model="non_collective_maxwellian",
+            enable_evdf_reconstruction=invalid_value,
+        )
+
+
+@pytest.mark.parametrize("invalid_points", [True, 40, 2002, 121.0, "121"])
+def test_primary_thomson_rejects_evdf_grid_coercion(invalid_points):
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+
+    with pytest.raises(ValueError, match="evdf_velocity_points must be an integer from 41 to 2001"):
+        analyze_thomson_spectra(
+            np.linspace(1050.0, 1078.0, 9), np.ones((1, 9)), [0.5],
+            laser_wavelength_nm=1064.0, scattering_angle_rad=1.0,
+            instrument_response=np.eye(9), model="non_collective_maxwellian",
+            evdf_velocity_points=invalid_points,
+        )
