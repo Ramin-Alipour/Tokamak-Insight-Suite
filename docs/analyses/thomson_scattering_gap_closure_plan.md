@@ -109,3 +109,8 @@ The detailed audit remains the source of truth for item numbering. Each item 7â€
 - `outside_selected_model_with_reason`
 
 Do not mark an item complete merely because it has been described in this plan.
+
+
+### Local Full-EM CTS external covariance â€” partial closure of WP-C2
+
+The Full-EM spectrum inversion accepts an ordered joint covariance over local magnetic-field, incident/scattered direction and complex polarization components and propagates it through reproducible full-parameter Monte Carlo refits. Frequency-resolved ray/equilibrium/beam covariance, composition covariance and cross-covariance between distinct external covariance sources remain open. The local-vector covariance route explicitly rejects ray-resolved geometry. This closes only the local-input portion of audit item 102; it does not close the full WP-C2 external uncertainty work package.
