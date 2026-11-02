@@ -47,7 +47,8 @@ def test_geometry_uncertainty_refits_and_returns_full_covariance(monkeypatch):
             "ion_temperature_eV_by_species": {"D": 20.0 + scale},
             "ion_flow_projection_m_s_by_species": {"D": 2.0e2 * scale},
             "conditional_fit_covariance": np.eye(5),
-            "fit_covariance": np.eye(5),
+            "instrument_response_parameter_covariance": 0.5 * np.eye(5),
+            "fit_covariance": 1.5 * np.eye(5),
         }
 
     monkeypatch.setattr(full_em, "analyze_full_em_cts_spectrum", fake_analyze)
@@ -69,7 +70,7 @@ def test_geometry_uncertainty_refits_and_returns_full_covariance(monkeypatch):
     assert result["ray_geometry_uncertainty"]["propagated"] is True
     assert result["ray_geometry_parameter_covariance"].shape == (5, 5)
     assert np.all(np.isfinite(result["fit_covariance"]))
-    assert np.all(np.diag(result["fit_covariance"]) >= 1.0)
+    assert np.all(np.diag(result["fit_covariance"]) >= 1.5)
 
 
 def test_geometry_uncertainty_rejects_local_mean_only(monkeypatch):
