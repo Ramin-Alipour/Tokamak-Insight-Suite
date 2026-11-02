@@ -106,3 +106,24 @@ def test_thomson_covariance_psd_guard_is_scale_relative_for_symmetry():
     asymmetric = scale * np.array([[1.0, 0.25], [0.249, 1.0]])
     assert _covariance_is_positive_semidefinite(symmetric_psd)
     assert not _covariance_is_positive_semidefinite(asymmetric)
+
+
+def test_thomson_temperature_formula_contract_preserves_measured_response_forward_fit():
+    import json
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    root_registry = json.loads((root / "FORMULA_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged_registry = json.loads(
+        (root / "tis" / "data" / "FORMULA_REGISTRY.json").read_text(encoding="utf-8")
+    )
+    assert root_registry == packaged_registry
+    entry = next(
+        item for item in root_registry
+        if item["execution_contract"]["formula_key"]
+        == "thomson_electron_temperature_from_spectral_width"
+    )
+    contract = entry["execution_contract"]
+    assert "instrument-corrected width" not in " ".join(contract["prerequisites"]).lower()
+    assert "measured-response-convolved physical forward fit" in contract["note"]
+    assert "does not correct or deconvolve measured spectra" in contract["note"]
