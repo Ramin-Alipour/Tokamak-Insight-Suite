@@ -294,3 +294,8 @@ The canonical optical Thomson API now includes a top-level `result_classificatio
 - **Non-identifiable:** unrestricted 3-D electron velocity distribution from a single scattering geometry. The measured spectrum constrains a projection along the scattering vector, not arbitrary perpendicular velocity structure.
 
 Each classification entry includes the parameter name, dimensional unit where applicable, status/reason, and explicit auxiliary-input requirements. Numerical values remain in the existing channel/profile fields; the classification object does not duplicate or manufacture parameter values. This is a machine-readable scientific status contract, not a claim of experimental validation.
+
+
+## Joint wavelength-resolved spatial inversion — response contract
+
+The joint spatial-spectral Maxwellian inverse requires an explicit measured instrument-response operator. The API does not silently substitute an identity response when the argument is omitted. Supply the measured shared or channel-specific response matrix; an identity matrix is acceptable only when the researcher explicitly declares that the supplied spectra are already corrected for the instrument line-spread function. The operator is used unchanged and is never estimated or calibrated by TIS.
