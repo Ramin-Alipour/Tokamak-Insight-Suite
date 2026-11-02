@@ -145,7 +145,7 @@ This review separates **actual repository inconsistencies** from **declared scie
 103. Full-EM covariance is conditional on fixed external inputs and the selected damping/quadrature/harmonic settings.
 104. If no spectral noise/covariance is supplied, its unweighted-fit covariance is residual-scaled and not measurement-noise-calibrated.
 105. Positive log-parameters have no default scientific bounds; researcher-supplied bounds are available where needed.
-106. Gyro-harmonic and momentum/velocity quadrature convergence is an opt-in numerical assessment, not an automatic physical uncertainty estimate.
+106. Paired gyro-harmonic and momentum/velocity quadrature convergence is default-enabled in the Full-EM measured-spectrum inversion, with explicit refinement sequences and L2/L-infinity tolerances; it is a numerical discretization assessment, not a physical uncertainty estimate.
 107. The damping default is numerical resonance regularization, not a physical collision frequency.
 108. Full-EM flow outputs are scalar projections along the scattering wavevector; one view cannot uniquely determine a 3-D flow vector.
 109. Frequency-resolved ray geometry must match the measured frequency-shift axis and explicitly select the propagation branch; no default mode branch is invented.
