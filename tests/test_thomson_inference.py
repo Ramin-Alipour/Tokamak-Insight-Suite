@@ -1221,7 +1221,7 @@ def test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covar
     assert fit["electron_temperature_eV"] == pytest.approx(200.0, rel=0.08)
 
 
-def test_relativistic_maxwell_juttner_rejects_unimplemented_cross_channel_covariance():
+def test_relativistic_maxwell_juttner_full_cross_channel_covariance_is_integrated_by_canonical_api():
     from tokamak_analysis.thomson_inference import analyze_thomson_spectra
     from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
 
@@ -1239,16 +1239,23 @@ def test_relativistic_maxwell_juttner_rejects_unimplemented_cross_channel_covari
     measured = 700.0 * shape + 0.04
     n = wavelength.size
     covariance = np.eye(2*n) * 0.015**2
-    covariance[:n, n:] = 1e-6
-    covariance[n:, :n] = 1e-6
-    with pytest.raises(ValueError, match="cross-channel covariance blocks must be exactly zero"):
-        analyze_thomson_spectra(
-            wavelength, np.vstack([measured, measured]), [0.2, 0.3],
-            laser_wavelength_nm=laser, scattering_angle_rad=angle,
-            instrument_response=np.eye(n),
-            incident_direction=incident, scattered_direction=scattered,
-            incident_polarization=polarization,
-            model="non_collective_relativistic_maxwell_juttner",
-            joint_spectral_covariance=covariance,
-            enable_evdf_reconstruction=False,
-        )
+    covariance[:n, n:] = np.eye(n) * 1e-6
+    covariance[n:, :n] = np.eye(n) * 1e-6
+    out = analyze_thomson_spectra(
+        wavelength, np.vstack([measured, 1.2*measured]), [0.2, 0.3],
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(n),
+        incident_direction=incident, scattered_direction=scattered,
+        incident_polarization=polarization,
+        model="non_collective_relativistic_maxwell_juttner",
+        joint_spectral_covariance=covariance,
+        enable_evdf_reconstruction=False,
+    )
+    assert out["joint_inference"]["spectral_weighting_status"] == (
+        "full_channel_major_generalized_least_squares_including_cross_channel_covariance"
+    )
+    assert out["joint_inference"]["integration_status"] == "used_by_canonical_multichannel_thomson_api"
+    assert out["joint_inference"]["fit_covariance"].shape == (8, 8)
+    assert out["channels"][0]["spectral_weighting_status"] == (
+        "within_channel_marginal_gls_cross_channel_covariance_used_in_joint_shared_parameter_fit"
+    )
