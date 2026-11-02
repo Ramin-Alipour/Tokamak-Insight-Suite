@@ -966,6 +966,16 @@ def analyze_thomson_spectra(
             raise ValueError("joint_spectral_covariance must be positive definite") from exc
         # Full channel-major covariance is retained for the joint relativistic
         # shared-parameter fit below; marginal channel fits use diagonal blocks.
+    cross_channel_covariance_present = False
+    if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
+        nchan_cov, nlam_cov = y.shape
+        cross_channel_covariance_present = any(
+            np.any(joint_covariance[
+                row*nlam_cov:(row+1)*nlam_cov,
+                col*nlam_cov:(col+1)*nlam_cov,
+            ] != 0.0)
+            for row in range(nchan_cov) for col in range(nchan_cov) if row != col
+        )
     results = []
     channel_responses = []
     for i in range(y.shape[0]):
@@ -1363,6 +1373,8 @@ def analyze_thomson_spectra(
             if "density_status" not in fit:
                 fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
         fit["spectral_weighting_status"] = (
+            "within_channel_marginal_gls_cross_channel_covariance_used_in_joint_shared_parameter_fit"
+            if cross_channel_covariance_present else
             "block_diagonal_channel_major_within_channel_generalized_least_squares"
             if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner" else
             "full_channel_major_generalized_least_squares"
