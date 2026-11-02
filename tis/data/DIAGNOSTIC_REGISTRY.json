@@ -413,6 +413,11 @@
           "name": "result_classification",
           "unit": "structured per-channel Primary / Conditional / Non-identifiable result contract",
           "description": "Machine-readable physical-result status for each channel, including units, conditional auxiliary-input requirements, single-view non-identifiability, calibrated measured-input assumption, and explicit no-calibration/no-experimental-validation flags."
+        },
+        {
+          "name": "regularization_sensitivity",
+          "unit": "structured numerical sensitivity diagnostic",
+          "description": "For projected 1-D EVDF inversion, summarizes changes in mean, standard deviation, skewness, excess kurtosis and total-variation distance across successful GCV regularization candidates; a single explicit regularization value is reported without a sensitivity range. Not a measurement uncertainty."
         }
       ],
       "assumptions": [
@@ -428,7 +433,7 @@
         "Validate finite channel-by-wavelength arrays, channel-to-radius correspondence and strictly increasing calibrated wavelength axes without sorting, repairing or dropping source samples.",
         "Apply the supplied instrument response in bin-integrated spectral-power space using calibrated wavelength-bin widths, then convert back to spectral density; 1-D index kernels require a uniform wavelength grid."
       ],
-      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry. For non-relativistic Maxwellian/Kappa fits, optionally reconstruct the identifiable one-dimensional projected electron-velocity marginal from the same measured spectra using the fitted background, measured response and supplied spectral uncertainty/covariance. The non-relativistic EVDF inverse is not run for the relativistic Maxwell-Juttner model.",
+      "algorithm": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured response using the explicitly selected non-collective Maxwellian, non-collective Kappa or relativistic Maxwell-Juttner single-particle model. Infer electron temperature and scattering-vector flow; infer absolute electron density only from calibrated W/nm spectra with complete optical geometry. For non-relativistic Maxwellian/Kappa fits, optionally reconstruct the identifiable one-dimensional projected electron-velocity marginal from the same measured spectra using the fitted background, measured response and supplied spectral uncertainty/covariance. The non-relativistic EVDF inverse is not run for the relativistic Maxwell-Juttner model. The projected-EVDF inverse also reports numerical sensitivity of distribution moments across its successful GCV regularization candidates; this is distinct from measurement uncertainty.",
       "uncertainty_model": "Non-collective Maxwellian and Kappa fits use local fit covariance and support full channel-major GLS when supplied. The relativistic Maxwell-Juttner fit uses local covariance, measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties; full channel-major spectral GLS remains outside its scope. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines the supplied optical-factor covariance with spectral GLS and response Monte Carlo when the scattered-power covariance rows/columns are zero; scalar angle uncertainty is propagated separately as a common geometry source.",
       "limitations": [
         "Relativistic Maxwell-Juttner model assumes isotropic rest-frame electrons and bulk flow parallel to the scattering vector; arbitrary anisotropic relativistic optical electron VDF inversion is not implemented.",
@@ -441,7 +446,8 @@
         "The projected EVDF is a regularized one-dimensional inverse estimate conditional on the velocity grid, measured response, fitted background and GCV selection; unresolved velocity-space detail is not identifiable, and a single view cannot recover unrestricted 3-D anisotropy.",
         "The projected EVDF inverse uses non-relativistic Doppler kinematics and is attempted only for non-collective Maxwellian and Kappa fits; for the relativistic Maxwell-Juttner model it is explicitly withheld until a relativistically consistent inverse operator is implemented.",
         "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline.",
-        "Response uncertainty for callable response functions is not supported; provide an explicit 1-D kernel or 2-D/3-D matrix uncertainty representation."
+        "Response uncertainty for callable response functions is not supported; provide an explicit 1-D kernel or 2-D/3-D matrix uncertainty representation.",
+        "Regularization sensitivity is assessed only across the solver's declared candidate grid; it is a numerical robustness diagnostic, not a measurement uncertainty or posterior interval."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
