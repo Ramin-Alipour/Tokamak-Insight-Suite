@@ -52,6 +52,7 @@ def test_registered_spatial_profile_analysis_dispatches_joint_spatial_spectral_m
         np.linspace(520., 544., 9), np.ones((3, 9)), [0.1, 0.2, 0.3],
         joint_spatial_spectral=True, spatial_mixing_matrix=mixing,
         laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(9),
         spatial_regularization_strength=0.02,
     )
     assert result["analysis_status"] == "joint-dispatch-tested"
