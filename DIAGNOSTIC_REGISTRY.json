@@ -4688,7 +4688,7 @@
           "name": "external_input_covariance",
           "unit": "ordered covariance matrix for local magnetic-field, incident/scattered direction and complex polarization components",
           "required": false,
-          "description": "Optional positive-semidefinite joint covariance propagated by reproducible Monte Carlo refits. Supported components: magnetic_field_T_{x,y,z}, incident_direction_{x,y,z}, scattered_direction_{x,y,z}, and real/imaginary x/y/z components of incident_polarization and scattered_polarization. Applies to local direction geometry only; frequency-resolved ray/equilibrium covariance is not represented. Covariance is conditional on the supplied local uncertainty model.",
+          "description": "Full-EM only: optional positive-semidefinite joint covariance propagated by reproducible Monte Carlo refits for supported local magnetic-field, beam-direction and complex-polarization components. This input does not represent frequency-resolved ray/equilibrium/beam covariance; use the separate propagate_full_em_cts_ray_geometry_uncertainty API with a geometry_sampler that regenerates equilibrium, beam covariance, rays and overlap for each realization.",
           "applies_when_model": "full_electromagnetic"
         },
         {
