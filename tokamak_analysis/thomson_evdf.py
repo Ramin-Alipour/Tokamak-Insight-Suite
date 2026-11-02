@@ -55,6 +55,9 @@ def reconstruct_thomson_evdf(
     velocity_points=241,
     signal_uncertainty=None,
     signal_covariance=None,
+    background_uncertainty=None,
+    background_covariance=None,
+    signal_background_cross_covariance=None,
     max_iter=3000,
 ):
     """Reconstruct the non-negative 1-D electron-velocity marginal along q.
@@ -132,29 +135,71 @@ def reconstruct_thomson_evdf(
     residual_data = measured - background
     if signal_uncertainty is not None and signal_covariance is not None:
         raise ValueError("Supply signal_uncertainty or signal_covariance, not both")
+    if background_uncertainty is not None and background_covariance is not None:
+        raise ValueError("Supply background_uncertainty or background_covariance, not both")
+
+    def _validated_covariance(value, name):
+        matrix = np.asarray(value)
+        if matrix.dtype.kind not in "iuf":
+            raise ValueError(f"{name} must contain real numeric values")
+        matrix = matrix.astype(float, copy=False)
+        if matrix.shape != (measured.size, measured.size) or not np.all(np.isfinite(matrix)):
+            raise ValueError(f"{name} must be a finite square matrix matching signal")
+        if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=0.0):
+            raise ValueError(f"{name} must be symmetric")
+        return matrix
+
+    signal_covariance_matrix = None
     if signal_uncertainty is not None:
         sigma = _finite_vector(signal_uncertainty, "signal_uncertainty")
         if sigma.size != measured.size or np.any(sigma <= 0):
             raise ValueError("signal_uncertainty must be strictly positive and match signal")
-        design = forward / sigma[:, None]
-        target = residual_data / sigma
-        uncertainty_model = "independent_pointwise_measurement_uncertainty"
+        signal_covariance_matrix = np.diag(sigma**2)
     elif signal_covariance is not None:
-        covariance = np.asarray(signal_covariance, dtype=float)
-        if covariance.shape != (measured.size, measured.size) or not np.all(np.isfinite(covariance)) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=0.0):
-            raise ValueError("signal_covariance must be a finite symmetric square matrix matching signal")
+        signal_covariance_matrix = _validated_covariance(signal_covariance, "signal_covariance")
+
+    background_covariance_matrix = None
+    if background_uncertainty is not None:
+        background_sigma = _finite_vector(background_uncertainty, "background_uncertainty")
+        if background_sigma.size != measured.size or np.any(background_sigma <= 0):
+            raise ValueError("background_uncertainty must be strictly positive and match signal")
+        background_covariance_matrix = np.diag(background_sigma**2)
+    elif background_covariance is not None:
+        background_covariance_matrix = _validated_covariance(background_covariance, "background_covariance")
+
+    if signal_background_cross_covariance is not None:
+        if signal_covariance_matrix is None or background_covariance_matrix is None:
+            raise ValueError("signal_background_cross_covariance requires both signal and background uncertainty models")
+        cross = _validated_covariance_shape = np.asarray(signal_background_cross_covariance)
+        if cross.dtype.kind not in "iuf" or cross.shape != (measured.size, measured.size) or not np.all(np.isfinite(cross)):
+            raise ValueError("signal_background_cross_covariance must be a finite square matrix matching signal")
+        cross = cross.astype(float, copy=False)
+        residual_covariance = signal_covariance_matrix + background_covariance_matrix - cross - cross.T
+        uncertainty_model = "joint_signal_background_covariance"
+    elif signal_covariance_matrix is not None and background_covariance_matrix is not None:
+        residual_covariance = signal_covariance_matrix + background_covariance_matrix
+        uncertainty_model = "independent_signal_and_background_covariance"
+    elif signal_covariance_matrix is not None:
+        residual_covariance = signal_covariance_matrix
+        uncertainty_model = "signal_measurement_covariance_background_fixed"
+    elif background_covariance_matrix is not None:
+        residual_covariance = background_covariance_matrix
+        uncertainty_model = "background_covariance_signal_noise_not_supplied"
+    else:
+        residual_covariance = None
+        uncertainty_model = "not_supplied_unweighted_fit"
+
+    if residual_covariance is not None:
         try:
-            chol = np.linalg.cholesky(covariance)
+            chol = np.linalg.cholesky(residual_covariance)
         except np.linalg.LinAlgError as exc:
-            raise ValueError("signal_covariance must be positive definite") from exc
+            raise ValueError("combined signal/background residual covariance must be positive definite") from exc
         design = np.linalg.solve(chol, forward)
         target = np.linalg.solve(chol, residual_data)
-        uncertainty_model = "full_within_spectrum_covariance"
     else:
         scale = max(float(np.max(np.abs(residual_data))), np.finfo(float).tiny)
         design = forward / scale
         target = residual_data / scale
-        uncertainty_model = "not_supplied_unweighted_fit"
 
     dv = np.diff(velocity)
     if not np.allclose(dv, dv[0], rtol=1e-6, atol=1e-12):
@@ -469,6 +514,13 @@ def reconstruct_thomson_evdf(
             "regularization and active set; not a posterior or experimental validation"
         ),
         "measurement_uncertainty_model": uncertainty_model,
+        "background_uncertainty_included": background_covariance_matrix is not None,
+        "signal_background_cross_covariance_included": signal_background_cross_covariance is not None,
+        "residual_covariance_interpretation": (
+            "Cov(signal-background)=Cov(signal)+Cov(background)-Cov(signal,background)-Cov(background,signal); "
+            "conditional on the supplied covariance matrices"
+            if residual_covariance is not None else "no signal or background uncertainty supplied; unweighted fit"
+        ),
         "forward_model": "non-relativistic single-particle Doppler projection with supplied measured response matrix",
         "scattering_vector_projection_only": True,
         "absolute_density_identified": False,
