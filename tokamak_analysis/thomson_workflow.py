@@ -292,7 +292,7 @@ def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
     joint_spatial_spectral=False, spatial_mixing_matrix=None,
-    spatial_regularization_strength=0.0, **kwargs,
+    spatial_regularization_strength=0.0, profile_grid_radius_m=None, **kwargs,
 ):
     """Infer physical parameters from calibrated spectra, then reconstruct profiles.
 
@@ -676,6 +676,79 @@ def reconstruct_thomson_profile_from_spectra(
     from .thomson_identifiability import spatial_profile_identifiability
     result["parameter_identifiability"] = spatial_profile_identifiability()
     result["registered_subanalysis"] = "Thomson spatial profile reconstruction from calibrated spectra"
+
+    # Optional downstream PSF-aware profile inversion. This path is distinct
+    # from the joint spatial-spectral fit above: it acts on physical parameters
+    # already inferred per channel and never estimates/calibrates the mixing
+    # operator. A profile grid is mandatory to prevent an implicit resolution
+    # or interpolation choice.
+    if spatial_mixing_matrix is not None:
+        if profile_grid_radius_m is None:
+            raise ValueError(
+                "profile_grid_radius_m is required when spatial_mixing_matrix is supplied "
+                "for downstream PSF-aware profile reconstruction."
+            )
+        from .thomson_spatial_mixing import reconstruct_profile_with_spatial_mixing
+        profile_grid = np.asarray(profile_grid_radius_m, dtype=float)
+        mixing = np.asarray(spatial_mixing_matrix, dtype=float)
+        if (profile_grid.ndim != 1 or profile_grid.size < 2
+                or not np.all(np.isfinite(profile_grid))
+                or np.any(np.diff(profile_grid) <= 0)):
+            raise ValueError("profile_grid_radius_m must be a finite, strictly increasing vector with at least two nodes.")
+        if (mixing.ndim != 2 or mixing.shape != (n_channels, profile_grid.size)
+                or not np.all(np.isfinite(mixing))):
+            raise ValueError(
+                "spatial_mixing_matrix must be finite with shape "
+                "(n_measured_channels, n_profile_grid_nodes)."
+            )
+        psf_profiles = {}
+        profile_inputs = (
+            ("electron_temperature", result.get("electron_temperature_profile_eV"),
+             result.get("electron_temperature_uncertainty_profile_eV"), te_covariance, True, "eV"),
+            ("electron_density", result.get("electron_density_profile_m3"),
+             result.get("electron_density_uncertainty_profile_m3"), density_covariance, True, "m^-3"),
+            ("electron_velocity_projection", result.get("electron_velocity_projection_profile_m_s"),
+             result.get("electron_velocity_projection_uncertainty_profile_m_s"), flow_covariance, False, "m s^-1"),
+        )
+        for name, values, sigma, parameter_covariance, positive_parameter, unit in profile_inputs:
+            if values is None:
+                psf_profiles[name] = {
+                    "status": "not_available",
+                    "reason": "The upstream spectral inference did not identify this parameter profile.",
+                }
+                continue
+            values = np.asarray(values, dtype=float)
+            if values.shape != (n_channels,) or not np.all(np.isfinite(values)):
+                psf_profiles[name] = {
+                    "status": "not_available",
+                    "reason": "The upstream parameter profile is incomplete or non-finite.",
+                }
+                continue
+            try:
+                psf_profiles[name] = reconstruct_profile_with_spatial_mixing(
+                    values, mixing, profile_grid, uncertainty=sigma,
+                    covariance=parameter_covariance, positive=positive_parameter,
+                    parameter_name=name, parameter_unit=unit,
+                    regularization_strength=spatial_regularization_strength,
+                )
+            except ValueError as exc:
+                psf_profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
+        result["psf_aware_profile_reconstruction"] = {
+            "status": "completed",
+            "profile_grid_radius_m": profile_grid,
+            "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
+            "spatial_mixing_matrix": mixing,
+            "profiles": psf_profiles,
+            "interpretation": (
+                "Downstream inversion of channel-inferred physical parameters through a fixed supplied "
+                "spatial mixing/PSF operator. This is not a joint fit to raw spectra and does not estimate "
+                "the PSF, instrument response, or unresolved spatial structure."
+            ),
+            "resolution_limit": (
+                "Profile components in the null space or below the spatial resolution of the supplied "
+                "mixing operator remain non-identifiable."
+            ),
+        }
     return result
 
 
