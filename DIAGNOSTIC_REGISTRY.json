@@ -321,6 +321,16 @@
           "unit": "boolean; exact photon-frequency ratio used by relativistic Maxwell-Juttner model"
         },
         {
+          "name": "recoil_included",
+          "unit": "boolean",
+          "description": "Relativistic Maxwell-Juttner fit provenance; true only when single-scattering Compton recoil and polarized Klein-Nishina weighting were used."
+        },
+        {
+          "name": "scattering_cross_section_model",
+          "unit": "text",
+          "description": "Records whether the relativistic forward fit used the polarized elastic Thomson or single-scattering Klein-Nishina differential cross-section."
+        },
+        {
           "name": "captured_spectral_probability",
           "unit": "dimensionless; fraction of quadrature spectrum inside the supplied wavelength range"
         },
