@@ -60,7 +60,7 @@
           "name": "joint_spectral_covariance",
           "unit": "full channel-major spectral covariance; mutually exclusive with signal_uncertainty",
           "required": false,
-          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supported by the non-collective Maxwellian and Kappa fits; not supported by the relativistic Maxwell-Juttner fit. May be combined with density_relative_covariance or joint_density_relative_covariance when the scattered-power rows/columns of the optical covariance are zero."
+          "description": "Full positive-definite covariance in channel-major order; mutually exclusive with signal_uncertainty. Supports joint cross-channel GLS for non-collective Maxwellian and Kappa fits. For relativistic Maxwell-Juttner, supports full within-channel spectral covariance when the complete channel-major matrix is block diagonal; cross-channel covariance blocks must be exactly zero because a joint cross-channel relativistic forward fit is not implemented. May be combined with optical density-factor covariance only under the documented zero-scattered-power covariance conditions."
         },
         {
           "name": "model",
@@ -449,7 +449,8 @@
         "The projected EVDF inverse uses non-relativistic Doppler kinematics and is attempted only for non-collective Maxwellian and Kappa fits; for the relativistic Maxwell-Juttner model it is explicitly withheld until a relativistically consistent inverse operator is implemented.",
         "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline.",
         "Response uncertainty for callable response functions is not supported; provide an explicit 1-D kernel or 2-D/3-D matrix uncertainty representation.",
-        "Regularization sensitivity is assessed only across the solver's declared candidate grid; it is a numerical robustness diagnostic, not a measurement uncertainty or posterior interval."
+        "Regularization sensitivity is assessed only across the solver's declared candidate grid; it is a numerical robustness diagnostic, not a measurement uncertainty or posterior interval.",
+        "Relativistic Maxwell-Juttner spectral GLS is currently channel-separable: full within-channel wavelength covariance is supported, but non-zero cross-channel spectral covariance is rejected until a joint relativistic multi-channel forward inversion is implemented."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -493,7 +494,8 @@
         "tests/test_thomson_kinetic_models.py::test_relativistic_effective_cross_section_matches_polarized_thomson_limit",
         "tests/test_thomson_kinetic_models.py::test_relativistic_response_convolution_conserves_area_on_nonuniform_bins",
         "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
-        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles"
+        "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles",
+        "tests/test_thomson_inference.py::test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covariance"
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
@@ -656,7 +658,8 @@
         "reference": "Sakai et al., JINST 21 (2026) C01002, DOI 10.1088/1748-0221/21/01/C01002; the TIS two-component model is a parametric approximation, not the cited Monte Carlo algorithm.",
         "experimental_validation": "not_performed"
       }
-    ]
+    ],
+    "uncertainty_model": "Non-collective Maxwellian and Kappa fits support full channel-major GLS, including cross-channel covariance. Relativistic Maxwell-Juttner fits support full within-channel spectral covariance through GLS when the channel-major covariance is block diagonal; cross-channel covariance is explicitly rejected and remains unsupported. Relativistic fits also support measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines supplied optical-factor covariance with supported spectral/response propagation under the zero-scattered-power covariance rule."
   },
   {
     "family": "Plasma parameters",
