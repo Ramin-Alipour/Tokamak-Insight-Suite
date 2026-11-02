@@ -938,11 +938,12 @@ elif page=='Spectral Analysis':
                 response_channel_upload=st.file_uploader('Alternative: channel-specific measured response matrices JSON (Nchannel × Nλ × Nλ)',type=['json'],key='ts_infer_channel_response')
                 response_unc_upload=st.file_uploader('Optional shared response-kernel or response-matrix 1σ CSV',type=['csv','txt'],key='ts_infer_response_unc')
                 response_channel_unc_upload=st.file_uploader('Optional channel-specific response-matrix 1σ JSON',type=['json'],key='ts_infer_channel_response_unc')
-                if model in {'non_collective_maxwellian','non_collective_kappa'}:
+                if model in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'}:
                     joint_covariance_upload=st.file_uploader('Optional full cross-channel spectral covariance CSV (channel-major order)',type=['csv','txt'],key='ts_infer_joint_covariance')
+                    if model=='non_collective_relativistic_maxwell_juttner':
+                        st.caption('For relativistic Maxwell-Juttner, non-zero cross-channel covariance is used by a joint fit with shared electron temperature and scattering-vector flow; channels must share the same wavelength grid, scattering geometry and measured response. Per-channel marginal fits are retained separately.')
                 else:
                     joint_covariance_upload=None
-                    st.caption('Full cross-channel spectral GLS is currently supported for the Maxwellian and Kappa fits, not the relativistic Maxwell-Juttner fit.')
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (Maxwellian only)',value=False,disabled=model!='non_collective_maxwellian',key='ts_infer_joint_spatial')
