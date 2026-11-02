@@ -149,6 +149,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     physical_model="maxwellian", kappa_index=None, fit_kappa_index=False,
     incident_polarization=None, radial_order=24, angular_order=12,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
 ):
     """Jointly infer Te(r), projected flow(r), and spectral amplitude(r).
 
@@ -160,6 +161,10 @@ def reconstruct_joint_thomson_spatial_spectra(
     """
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
+    if include_compton_recoil and physical_model != "relativistic_maxwell_juttner":
+        raise ValueError("Compton recoil is available only for relativistic_maxwell_juttner")
     if not isinstance(fit_kappa_index, (bool, np.bool_)):
         raise ValueError("fit_kappa_index must be boolean")
     if physical_model == "kappa":
@@ -326,6 +331,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                     incident_polarization=incident_polarization,
                     radial_order=int(radial_order), angular_order=int(angular_order),
                     maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                    include_compton_recoil=include_compton_recoil,
                 )
                 node_spectra[node] = amp[node] * np.asarray(
                     spectrum_result["spectral_density_per_nm"],dtype=float
@@ -429,6 +435,8 @@ def reconstruct_joint_thomson_spatial_spectra(
             "kappa_index_initial_seed": kappa_index if physical_model == "kappa" else None,
             "kappa_index_role": ("inferred_from_measured_spectra_with_profiled_uncertainty" if kappa_parameter_count else "fixed_external_model_parameter_not_inferred") if physical_model == "kappa" else None,
             "incident_polarization": incident_polarization,
+            "include_compton_recoil": bool(include_compton_recoil),
+            "maximum_recoil_correction_fraction": float(maximum_recoil_correction_fraction),
             "relativistic_quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order)} if physical_model == "relativistic_maxwell_juttner" else None,
             "amplitude_semantics": "Gaussian peak amplitude" if physical_model == "maxwellian" else "relative integrated spectral amplitude",
         },
