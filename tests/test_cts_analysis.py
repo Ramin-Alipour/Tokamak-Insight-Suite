@@ -1103,6 +1103,10 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
         "incident_polarization_real_y",
     ]
     assert result["external_input_mc_successes"] >= 12
+    assert "magnetic_field_T" in result["external_inputs_with_supplied_covariance"]
+    assert "scattering_geometry" in result["external_inputs_with_supplied_covariance"]
+    assert "incident_polarization" in result["external_inputs_with_supplied_covariance"]
+    assert "ion_species" in result["external_inputs_fixed"]
     component = result["external_uncertainty_covariance_components"]["local_external_inputs"]
     assert component.shape == result["conditional_fit_covariance"].shape
     assert np.any(np.diag(component) > 0.0)
