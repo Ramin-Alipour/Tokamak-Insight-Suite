@@ -36,6 +36,7 @@ def test_thomson_entry_declares_measured_spectrum_to_physics_workflow():
                for item in contract["limitations"])
     assert "maximum_recoil_correction_fraction" in inputs
     assert inputs["include_compton_recoil"]["default"] is False
+    assert {"recoil_included", "scattering_cross_section_model"} <= {item["name"] for item in contract["output_specs"]}
     assert "Klein-Nishina" in inputs["include_compton_recoil"]["description"]
     profile_inputs = {item["name"] for item in get_analysis(46)["execution_contract"]["input_specs"]}
     assert {"profile_reconstruction_method", "profile_reconstruction_points",
