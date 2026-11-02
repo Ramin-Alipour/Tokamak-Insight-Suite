@@ -161,8 +161,14 @@ def reconstruct_joint_thomson_spatial_spectra(
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
     if physical_model == "kappa":
-        if kappa_index is None or isinstance(kappa_index, (bool, np.bool_)) or not np.isfinite(kappa_index) or float(kappa_index) <= 1.5:
-            raise ValueError("kappa_index must be a finite value > 1.5 for a finite-variance projected Kappa model")
+        if (
+            kappa_index is None
+            or isinstance(kappa_index, (bool, np.bool_))
+            or not isinstance(kappa_index, (int, float, np.integer, np.floating))
+            or not np.isfinite(kappa_index)
+            or float(kappa_index) <= 1.5
+        ):
+            raise ValueError("kappa_index must be a finite real value > 1.5 for a finite-variance projected Kappa model")
         kappa_index = float(kappa_index)
     elif kappa_index is not None:
         raise ValueError("kappa_index is used only when physical_model='kappa'")
