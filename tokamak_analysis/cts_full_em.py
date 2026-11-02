@@ -344,22 +344,37 @@ def full_em_cts_spectral_density(
                         "beam_overlap_relative": 1.0,
                     }]
                 }
+                # Optional spatial profile factors are fixed external inputs. The
+                # global inversion parameters remain the reference values; this
+                # path does not claim to infer arbitrary node-wise plasma profiles.
+                ne_scale = _positive(sample.get("electron_density_relative", 1.0), "scattering sample electron_density_relative")
+                te_scale = _positive(sample.get("electron_temperature_relative", 1.0), "scattering sample electron_temperature_relative")
+                ti_scale = _positive(sample.get("ion_temperature_relative", 1.0), "scattering sample ion_temperature_relative")
+                local_ion_temperature = (
+                    {name: float(value) * ti_scale for name, value in ion_temperature_eV.items()}
+                    if isinstance(ion_temperature_eV, Mapping)
+                    else np.asarray(ion_temperature_eV, dtype=float) * ti_scale
+                    if not np.isscalar(ion_temperature_eV)
+                    else float(ion_temperature_eV) * ti_scale
+                )
                 sample_result = full_em_cts_spectral_density(
                     [float(shift)], f0, sample_geometry,
-                    electron_density_m3=ne, electron_temperature_eV=te,
-                    ion_temperature_eV=ion_temperature_eV,
-                    ion_species=ion_species, ion_fractions=ion_fractions,
+                    electron_density_m3=ne * ne_scale,
+                    electron_temperature_eV=te * te_scale,
+                    ion_temperature_eV=local_ion_temperature,
+                    ion_species=ion_species,
+                    ion_fractions=sample.get("ion_fractions", ion_fractions),
                     magnetic_field_T=sample.get("magnetic_field_T"),
-                    electron_flow_velocity_m_s=electron_flow_velocity_m_s,
-                    electron_flow_projection_m_s=electron_flow_projection_m_s,
-                    ion_flow_velocity_m_s=ion_flow_velocity_m_s,
-                    ion_flow_projection_m_s=ion_flow_projection_m_s,
-                    incident_polarization=incident_polarization,
-                    scattered_polarization=scattered_polarization,
+                    electron_flow_velocity_m_s=sample.get("electron_flow_velocity_m_s", electron_flow_velocity_m_s),
+                    electron_flow_projection_m_s=sample.get("electron_flow_projection_m_s", electron_flow_projection_m_s),
+                    ion_flow_velocity_m_s=sample.get("ion_flow_velocity_m_s", ion_flow_velocity_m_s),
+                    ion_flow_projection_m_s=sample.get("ion_flow_projection_m_s", ion_flow_projection_m_s),
+                    incident_polarization=sample.get("incident_polarization", incident_polarization),
+                    scattered_polarization=sample.get("scattered_polarization", scattered_polarization),
                     harmonic_order=harmonic_order, quadrature_order=quadrature_order,
                     damping_rate_rad_s=damping_rate_rad_s,
-                    fast_ion_populations=fast_ion_populations,
-                    electron_distribution=electron_distribution,
+                    fast_ion_populations=sample.get("fast_ion_populations", fast_ion_populations),
+                    electron_distribution=sample.get("electron_distribution", electron_distribution),
                 )
                 local_spectrum += float(sample_weight)*float(sample_result["spectral_density"][0])
                 local_location += float(sample_weight)*_finite_vec3(sample["scattering_location_m"], "scattering sample location")
@@ -375,6 +390,10 @@ def full_em_cts_spectral_density(
                     "sample_weight": float(sample_weight),
                     "scattering_location_m": np.asarray(sample["scattering_location_m"], dtype=float),
                     "magnetic_field_T": np.asarray(sample["magnetic_field_T"], dtype=float),
+                    "electron_density_relative": float(ne_scale),
+                    "electron_temperature_relative": float(te_scale),
+                    "ion_temperature_relative": float(ti_scale),
+                    "plasma_profile_inputs": "fixed_external_relative_profiles",
                     "ray_separation_m": sample.get("ray_separation_m"),
                     "spectral_density": float(sample_result["spectral_density"][0]),
                 })
@@ -425,7 +444,8 @@ def full_em_cts_spectral_density(
             "scattering_volume_weighting": "normalized local Gaussian beam overlap times incident-ray path-length quadrature",
             "magnetic_field_T": np.mean(np.asarray(integrated_fields), axis=0),
             "limitations": list(first_result.get("limitations", []))+[
-                "Scattering-volume integration uses local Gaussian overlap samples and assumes fitted ne, Te and thermal-ion temperatures are uniform across the volume.",
+                "Scattering-volume integration uses local Gaussian overlap samples. Optional per-sample electron_density_relative, electron_temperature_relative and ion_temperature_relative factors represent fixed externally supplied spatial profiles; they are not independently inferred by this inversion.",
+                "Uncertainty in externally supplied spatial profile factors and their cross-sample covariance is not propagated unless represented by a future explicit profile-covariance input contract.",
                 "Absolute beam-overlap path integrals are used only as relative spectral-bin weights; absolute launcher/receiver power coupling is not normalized."
             ],
         })
