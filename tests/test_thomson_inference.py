@@ -1177,3 +1177,78 @@ def test_optical_thomson_rejects_backscattering_endpoint_at_pi():
             scattering_angle_rad=np.pi, instrument_response=np.eye(x.size),
             model="non_collective_maxwellian",
         )
+
+
+def test_relativistic_maxwell_juttner_accepts_full_within_channel_spectral_covariance():
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(526.0, 538.0, 241)
+    laser = 532.0
+    angle = np.pi / 2
+    incident = np.array([1.0, 0.0, 0.0])
+    scattered = np.array([0.0, 1.0, 0.0])
+    polarization = np.array([0.0, 1.0, 0.0])
+    polarization_local = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+    shape = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 200.0,
+        flow_projection_m_s=2.0e4,
+        incident_polarization=polarization_local,
+    )["spectral_density_per_nm"]
+    measured = 700.0 * shape + 0.04 + 0.001 * (wavelength - laser)
+    rho = 0.25
+    indices = np.arange(wavelength.size)
+    covariance = (0.015**2) * rho ** np.abs(indices[:, None] - indices[None, :])
+
+    out = analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.2],
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        incident_direction=incident, scattered_direction=scattered,
+        incident_polarization=polarization,
+        model="non_collective_relativistic_maxwell_juttner",
+        joint_spectral_covariance=covariance,
+        enable_evdf_reconstruction=False,
+    )
+    fit = out["channels"][0]
+    assert fit["spectral_weighting_status"] == (
+        "block_diagonal_channel_major_within_channel_generalized_least_squares"
+    )
+    assert fit["fit_covariance_interpretation"] == (
+        "local_parameter_covariance_from_supplied_measurement_noise_model"
+    )
+    assert fit["fit_covariance"].shape == (5, 5)
+    assert fit["electron_temperature_eV"] == pytest.approx(200.0, rel=0.08)
+
+
+def test_relativistic_maxwell_juttner_rejects_unimplemented_cross_channel_covariance():
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(526.0, 538.0, 121)
+    laser = 532.0
+    angle = np.pi / 2
+    incident = np.array([1.0, 0.0, 0.0])
+    scattered = np.array([0.0, 1.0, 0.0])
+    polarization = np.array([0.0, 1.0, 0.0])
+    polarization_local = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+    shape = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 200.0,
+        incident_polarization=polarization_local,
+    )["spectral_density_per_nm"]
+    measured = 700.0 * shape + 0.04
+    n = wavelength.size
+    covariance = np.eye(2*n) * 0.015**2
+    covariance[:n, n:] = 1e-6
+    covariance[n:, :n] = 1e-6
+    with pytest.raises(ValueError, match="cross-channel covariance blocks must be exactly zero"):
+        analyze_thomson_spectra(
+            wavelength, np.vstack([measured, measured]), [0.2, 0.3],
+            laser_wavelength_nm=laser, scattering_angle_rad=angle,
+            instrument_response=np.eye(n),
+            incident_direction=incident, scattered_direction=scattered,
+            incident_polarization=polarization,
+            model="non_collective_relativistic_maxwell_juttner",
+            joint_spectral_covariance=covariance,
+            enable_evdf_reconstruction=False,
+        )
