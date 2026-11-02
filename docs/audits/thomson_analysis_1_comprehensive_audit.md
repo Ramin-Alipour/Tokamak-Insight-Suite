@@ -627,3 +627,43 @@ channel-dependent-distribution solver.
 **Verification status:** code and tests were committed to `main`; no GitHub
 Actions workflow run was returned for the resulting commits at the time of
 this update. Therefore test execution and CI status are pending verification.
+
+## Implementation update — 2026-11-03
+
+### Full-forward ray/equilibrium/beam uncertainty propagation — API building block
+
+Added tokamak_analysis/cts_geometry_uncertainty.py with
+propagate_full_em_cts_ray_geometry_uncertainty.
+
+Unlike a post-fit covariance inflation, this routine performs a fresh
+Full-EM spectral inversion for every geometry realization. Its sampler
+contract requires each realization to regenerate the equilibrium, retrace
+incident and receiver rays, resupply the local beam-covariance realization,
+and recompute scattering-volume locations, path-length quadrature and
+Gaussian overlap. The routine then calculates the sample covariance of the
+refitted physical parameter vector, retaining cross-parameter covariance,
+and combines it with the baseline conditional local-fit covariance.
+
+The routine rejects a local mean-geometry-only realization and reports failed
+draws, requested/successful sample counts, deterministic seed, parameter
+ordering, and an explicit conditional uncertainty interpretation. It refuses
+to combine this independent ensemble with the existing local
+external_input_covariance path because doing so would lose cross-source
+correlations.
+
+Regression coverage was added in tests/test_cts_geometry_uncertainty.py
+for successful full-geometry ensemble propagation, rejection of local-only
+geometry, and input validation.
+
+**Scope boundary:** this is an API-level propagation building block, not a
+claim that the Streamlit dashboard, canonical registries, or all serialized
+project workflows already expose a geometry-sampler interface. The sampler
+must be supplied by the calling research workflow and must actually rerun
+the ray/overlap calculation for each draw. Diffraction-aware propagation,
+quasi-optical beam evolution, and profile-varying plasma response remain
+outside this implementation. A2 is therefore **partially addressed**, not
+closed.
+
+**Verification:** the new module and regression tests were committed to
+main. A local Python test run and a completed GitHub Actions run have not
+yet been observed; no passing-test or experimental-validation claim is made.
