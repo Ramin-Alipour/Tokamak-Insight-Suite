@@ -667,6 +667,7 @@ def analyze_thomson_spectra(
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
     enable_evdf_reconstruction=True,
     evdf_velocity_points=121,
 ):
@@ -677,6 +678,8 @@ def analyze_thomson_spectra(
     spectral bins to detector bins. Supplied response matrices must already have unit-sum columns and are used without renormalization. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
     if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
         raise ValueError("enable_evdf_reconstruction must be boolean")
     if (
@@ -1080,6 +1083,7 @@ def analyze_thomson_spectra(
                 incident_direction=probe_vec, scattered_direction=scatter_vec,
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                include_compton_recoil=include_compton_recoil,
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
