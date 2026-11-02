@@ -1534,7 +1534,7 @@ def analyze_full_em_cts_spectrum(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
             + (["scattering_geometry"] if not external_order or not any(
-                name.startswith(("incident_direction_", "scattered_direction_"))
+                name.startswith(("incident_direction_", "scattered_direction_", "ray_"))
                 for name in external_order
             ) else [])
             + (["incident_polarization"] if not external_order or not any(
