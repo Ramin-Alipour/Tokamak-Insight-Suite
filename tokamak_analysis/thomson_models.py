@@ -198,17 +198,52 @@ def fit_custom_spectral_model(
         output_order=list(numeric_outputs)
         if output_order:
             mapper_jacobian=np.zeros((len(output_order),len(parameters)))
+            parameter_values=np.asarray(parameters,dtype=float)
+            lower=np.asarray(spec.lower_bounds,dtype=float)
+            upper=np.asarray(spec.upper_bounds,dtype=float)
             for j in range(len(parameters)):
-                step=np.cbrt(np.finfo(float).eps)*max(abs(float(parameters[j])),1.0)
-                plus=np.asarray(parameters,dtype=float).copy()
-                minus=np.asarray(parameters,dtype=float).copy()
-                plus[j]+=step; minus[j]-=step
-                plus_map={n:float(v) for n,v in zip(spec.parameter_names,plus)}
-                minus_map={n:float(v) for n,v in zip(spec.parameter_names,minus)}
-                plus_values=spec.physical_parameter_mapper(plus_map)
-                minus_values=spec.physical_parameter_mapper(minus_map)
+                step=np.cbrt(np.finfo(float).eps)*max(abs(float(parameter_values[j])),1.0)
+                plus_room=upper[j]-parameter_values[j]
+                minus_room=parameter_values[j]-lower[j]
+                # Respect the registered fit domain. A central difference that
+                # crosses a physical parameter bound can make a valid mapper
+                # fail (or evaluate an unphysical state) at a boundary optimum.
+                if plus_room >= step and minus_room >= step:
+                    plus=parameter_values.copy(); minus=parameter_values.copy()
+                    plus[j]+=step; minus[j]-=step
+                    plus_values=spec.physical_parameter_mapper(
+                        {n:float(v) for n,v in zip(spec.parameter_names,plus)}
+                    )
+                    minus_values=spec.physical_parameter_mapper(
+                        {n:float(v) for n,v in zip(spec.parameter_names,minus)}
+                    )
+                    denominator=2.0*step
+                    differences={key:float(plus_values[key])-float(minus_values[key])
+                                 for key in output_order}
+                elif plus_room > 0.0:
+                    h=min(step,plus_room*0.5)
+                    plus=parameter_values.copy(); plus[j]+=h
+                    plus_values=spec.physical_parameter_mapper(
+                        {n:float(v) for n,v in zip(spec.parameter_names,plus)}
+                    )
+                    differences={key:float(plus_values[key])-float(mapped[key])
+                                 for key in output_order}
+                    denominator=h
+                elif minus_room > 0.0:
+                    h=min(step,minus_room*0.5)
+                    minus=parameter_values.copy(); minus[j]-=h
+                    minus_values=spec.physical_parameter_mapper(
+                        {n:float(v) for n,v in zip(spec.parameter_names,minus)}
+                    )
+                    differences={key:float(mapped[key])-float(minus_values[key])
+                                 for key in output_order}
+                    denominator=h
+                else:
+                    raise ValueError("Cannot estimate mapper uncertainty for a parameter fixed at both bounds")
                 for row,key in enumerate(output_order):
-                    mapper_jacobian[row,j]=(float(plus_values[key])-float(minus_values[key]))/(2.0*step)
+                    mapper_jacobian[row,j]=differences[key]/denominator
+            if not np.all(np.isfinite(mapper_jacobian)):
+                raise ValueError("physical_parameter_mapper must return finite, stable numeric outputs for uncertainty propagation")
             physical_covariance=mapper_jacobian@covariance@mapper_jacobian.T
             physical_uncertainties={key:float(np.sqrt(max(physical_covariance[i,i],0.0)))
                                     for i,key in enumerate(output_order)}
