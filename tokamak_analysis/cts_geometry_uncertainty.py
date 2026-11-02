@@ -111,7 +111,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     names = list(baseline.get("parameter_names", []))
     if not names or len(set(names)) != len(names):
         raise ValueError("baseline fit did not return a unique parameter_names ordering")
-    baseline_vector = _parameter_vector(baseline, names)
+    _parameter_vector(baseline, names)  # Validate that every named physical parameter is available.
     conditional_covariance = np.asarray(
         baseline.get("conditional_fit_covariance", baseline.get("fit_covariance")),
         dtype=float,
