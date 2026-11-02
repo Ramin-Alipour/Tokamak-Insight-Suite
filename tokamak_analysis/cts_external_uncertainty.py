@@ -71,3 +71,34 @@ def sample_external_input_vectors(base_values, covariance, *, samples=100, seed=
     root = vectors * np.sqrt(np.maximum(values, 0.0))
     rng = np.random.default_rng(int(seed))
     return base[None, :] + rng.standard_normal((int(samples), base.size)) @ root.T
+
+
+def propagate_cts_external_uncertainty(forward_or_inverse_model, input_mean, covariance, *,
+                                       input_names=None, relative_step=None):
+    """Propagate correlated external Full-EM CTS inputs through a supplied model.
+
+    Pass a callable that returns either a forward-model observable vector or
+    an inversion's fitted-parameter vector. This deliberately does not merge
+    external-input uncertainty with spectral measurement-noise covariance.
+    """
+    from .thomson_external_uncertainty import propagate_external_covariance
+    names = tuple(input_names) if input_names is not None else None
+    if names is not None:
+        validate_external_input_covariance(covariance, names)
+    return propagate_external_covariance(
+        forward_or_inverse_model, input_mean, covariance,
+        input_names=names, relative_step=relative_step,
+    )
+
+
+def monte_carlo_cts_external_uncertainty(forward_or_inverse_model, input_mean, covariance, *,
+                                         samples=1000, seed=84621, input_names=None):
+    """Joint Monte-Carlo propagation for correlated external Full-EM CTS inputs."""
+    from .thomson_external_uncertainty import monte_carlo_external_covariance
+    names = tuple(input_names) if input_names is not None else None
+    if names is not None:
+        validate_external_input_covariance(covariance, names)
+    return monte_carlo_external_covariance(
+        forward_or_inverse_model, input_mean, covariance,
+        samples=samples, seed=seed, input_names=names,
+    )
