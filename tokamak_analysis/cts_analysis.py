@@ -142,10 +142,11 @@ def _component_tabulated(omega, k, density, mass, charge, flow, velocity_grid, p
 def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geometry,*,electron_density_m3,
     electron_temperature_eV,ion_temperature_eV,ion_species,ion_fractions,
     ion_velocity_projection_m_s=None,electron_velocity_projection_m_s=None,fast_ion=None):
-    """Evaluate the longitudinal multi-species S(k,omega); ion fractions are charge-density fractions.
+    """Evaluate longitudinal multi-species S(k,omega).
 
-    Electron flow is an explicit external input. Pass 0.0 only when a stationary
-    electron-flow assumption is intentionally selected by the caller.
+    ion_temperature_eV may be one shared positive scalar or one positive
+    temperature per species. ion_fractions are charge-density fractions.
+    Electron flow is explicit; pass 0.0 only to select stationary flow.
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
     if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
@@ -178,7 +179,7 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
         ti_values=_array(ti_raw,"ion_temperature_eV",1)
         if ti_values.shape!=(len(ions),) or np.any(ti_values<=0):
             raise ValueError("ion_temperature_eV vector must contain one positive value per ion species")
-    ti=float(ti_values[0]) if np.allclose(ti_values,ti_values[0]) else ti_values.copy()
+    # Preserve scalar-or-species-vector input; each ion term uses its own Ti.
     if electron_velocity_projection_m_s is None:
         raise ValueError("electron_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare a stationary-electron-flow assumption")
     if ion_velocity_projection_m_s is None:
@@ -897,6 +898,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
       "model":"unmagnetized electrostatic longitudinal microwave CTS",
+      "species_resolved_ion_temperature_input_supported":True,
+      "external_species_covariance_parameter_families":[
+          "ion_fraction", "ion_mass_amu", "ion_charge_state", "ion_temperature_eV"
+      ],
       "background_model":"constant_offset" if background_basis is None else "reference_spectrum_PCA",
       "background_spectrum":background_fit.copy(),
       "background_coefficients":background_coefficients.copy(),
