@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import least_squares
+from scipy.special import gammaln
 
 
 _C_M_S = 299792458.0
@@ -145,6 +146,9 @@ def reconstruct_joint_thomson_spatial_spectra(
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
+    physical_model="maxwellian", kappa_index=None,
+    incident_polarization=None, radial_order=24, angular_order=12,
+    maximum_recoil_correction_fraction=0.01,
 ):
     """Jointly infer Te(r), projected flow(r), and spectral amplitude(r).
 
@@ -154,6 +158,27 @@ def reconstruct_joint_thomson_spatial_spectra(
     coefficients and are not mixed as plasma emission. Select constant,
     linear, polynomial, cubic-spline, or researcher-supplied template bases.
     """
+    if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
+        raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
+    if physical_model == "kappa":
+        if kappa_index is None or isinstance(kappa_index, (bool, np.bool_)) or not np.isfinite(kappa_index) or float(kappa_index) <= 1.5:
+            raise ValueError("kappa_index must be a finite value > 1.5 for a finite-variance projected Kappa model")
+        kappa_index = float(kappa_index)
+    elif kappa_index is not None:
+        raise ValueError("kappa_index is used only when physical_model='kappa'")
+    if physical_model == "relativistic_maxwell_juttner":
+        if incident_polarization is None:
+            raise ValueError("relativistic Maxwell-Juttner joint inference requires incident_polarization")
+        polarization = _real_array(incident_polarization, "incident_polarization")
+        if polarization.shape != (3,) or np.linalg.norm(polarization) == 0:
+            raise ValueError("incident_polarization must be a finite non-zero 3-vector")
+        incident_polarization = polarization / np.linalg.norm(polarization)
+        if isinstance(radial_order, (bool, np.bool_)) or not isinstance(radial_order, (int, np.integer)) or radial_order < 12:
+            raise ValueError("radial_order must be an integer >= 12")
+        if isinstance(angular_order, (bool, np.bool_)) or not isinstance(angular_order, (int, np.integer)) or angular_order < 8:
+            raise ValueError("angular_order must be an integer >= 8")
+    elif incident_polarization is not None:
+        raise ValueError("incident_polarization is used only for relativistic_maxwell_juttner")
     x = _real_array(wavelength_nm, "wavelength_nm")
     y = _real_array(measured_spectra, "measured_spectra")
     r = _real_array(radius_m, "radius_m")
@@ -253,9 +278,40 @@ def reconstruct_joint_thomson_spatial_spectra(
         detector_background = background_coefficients @ background_basis.T
         sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
         center = laser * (1.0 - q * flow / _C_M_S)
-        node_spectra = amp[:, None] * np.exp(
-            -0.5 * ((x[None, :] - center[:, None]) / sigma[:, None])**2
-        )
+        if physical_model == "maxwellian":
+            node_spectra = amp[:, None] * np.exp(
+                -0.5 * ((x[None, :] - center[:, None]) / sigma[:, None])**2
+            )
+        elif physical_model == "kappa":
+            # The isotropic 3-D finite-variance Kappa marginal along q is a
+            # Student-like 1-D profile with exponent kappa. sigma remains its
+            # standard deviation, so the scale is converted consistently.
+            from scipy.special import gammaln
+            scale = sigma * np.sqrt((2.0*kappa_index-3.0)/kappa_index)
+            normalization = np.exp(
+                gammaln(kappa_index)
+                - 0.5*np.log(np.pi*kappa_index)
+                - np.log(scale)
+                - gammaln(kappa_index-0.5)
+            )
+            z = (x[None,:]-center[:,None])/scale[:,None]
+            node_spectra = amp[:,None] * normalization[:,None] * (
+                1.0 + z*z/kappa_index
+            )**(-kappa_index)
+        else:
+            from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+            node_spectra = np.empty((r.size,x.size),dtype=float)
+            for node in range(r.size):
+                spectrum_result = relativistic_maxwell_juttner_spectrum(
+                    x, laser, angle, float(te[node]),
+                    flow_projection_m_s=float(flow[node]),
+                    incident_polarization=incident_polarization,
+                    radial_order=int(radial_order), angular_order=int(angular_order),
+                    maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+                )
+                node_spectra[node] = amp[node] * np.asarray(
+                    spectrum_result["spectral_density_per_nm"],dtype=float
+                )
         mixed = h @ node_spectra
         predicted = np.empty_like(y)
         for channel in range(m):
@@ -315,10 +371,13 @@ def reconstruct_joint_thomson_spatial_spectra(
     )
     theta_e = te / ELECTRON_REST_ENERGY_EV
     flow_beta = np.abs(flow) / _C_M_S
-    model_domain_valid = bool(
-        np.all(theta_e < NONRELATIVE_THETA_E_SCREEN)
-        and np.all(flow_beta < NONRELATIVE_FLOW_BETA_SCREEN)
-    )
+    if physical_model in {"maxwellian", "kappa"}:
+        model_domain_valid = bool(
+            np.all(theta_e < NONRELATIVE_THETA_E_SCREEN)
+            and np.all(flow_beta < NONRELATIVE_FLOW_BETA_SCREEN)
+        )
+    else:
+        model_domain_valid = bool(np.all(flow_beta < 1.0))
     data_identifiable = bool(fit.success and data_rank == parameter_count and model_domain_valid)
     if fit.success and not model_domain_valid:
         primary_status = "model_domain_rejected"
@@ -340,14 +399,26 @@ def reconstruct_joint_thomson_spatial_spectra(
         "analysis_status": ("model_domain_rejected" if fit.success and not model_domain_valid else "completed" if fit.success else "optimizer_not_converged"),
         "primary_result_status": primary_status,
         "primary_outputs_reportable_as_identified": data_identifiable,
-        "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
+        "model": {
+            "maxwellian": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
+            "kappa": "isotropic_finite_variance_kappa_projected_single_particle_thomson",
+            "relativistic_maxwell_juttner": "isotropic_relativistic_maxwell_juttner_single_particle_thomson",
+        }[physical_model],
+        "physical_model_selection": {
+            "model": physical_model,
+            "kappa_index": kappa_index,
+            "kappa_index_role": "fixed_external_model_parameter_not_inferred" if physical_model == "kappa" else None,
+            "incident_polarization": incident_polarization,
+            "relativistic_quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order)} if physical_model == "relativistic_maxwell_juttner" else None,
+            "amplitude_semantics": "Gaussian peak amplitude" if physical_model == "maxwellian" else "relative integrated spectral amplitude",
+        },
         "validity_screening": {
             "theta_e_profile": theta_e,
             "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
             "bulk_flow_beta_profile": flow_beta,
             "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
             "model_domain_valid": model_domain_valid,
-            "rationale": "Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal physical validity boundaries.",
+            "rationale": ("Conservative asymptotic screens apply to the non-relativistic Maxwellian/Kappa kernels; the Maxwell-Juttner kernel uses relativistic kinematics and instead requires subluminal flow. These are declared model-domain checks, not universal validity boundaries."),
         },
         "radius_m": r.copy(),
         "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
@@ -411,13 +482,13 @@ def reconstruct_joint_thomson_spatial_spectra(
             "status": "identified_from_measured_data" if data_identifiable else "rank_deficient_or_optimizer_not_converged",
             "data_only_jacobian_rank": data_rank,
             "parameter_count": parameter_count,
-            "primary": ["joint finite-dimensional Te(r), scattering-vector flow projection(r), and relative amplitude(r) under the supplied Maxwellian model and fixed operators"],
+            "primary": [f"joint finite-dimensional Te(r), scattering-vector flow projection(r), and relative amplitude(r) under the supplied {physical_model} model and fixed operators"],
             "conditional": ["absolute density only if independent absolute-power and complete optical-geometry inputs are subsequently supplied; this function does not infer it"],
             "non_identifiable": ["flow components perpendicular to the scattering vector",
                                  "spatial structures in the null space of the supplied mixing operator",
                                  "sub-resolution spatial structure not encoded by the measured mixing operator",
                                  "unrestricted anisotropic or non-Maxwellian electron distributions"]},
-        "uncertainty_semantics": "local linearized covariance conditional on the selected Maxwellian model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization; inspect primary_result_status because regularization is excluded from the data-only identifiability rank",
+        "uncertainty_semantics": f"local linearized covariance conditional on the selected {physical_model} model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization; inspect primary_result_status because regularization is excluded from the data-only identifiability rank",
         "parameter_identifiability": {
             "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
             "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
