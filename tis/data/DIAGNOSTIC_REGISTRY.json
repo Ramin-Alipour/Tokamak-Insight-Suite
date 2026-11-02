@@ -4309,13 +4309,13 @@
           "name": "instrument_response",
           "unit": "normalized frequency response matrix",
           "required": true,
-          "description": "Calibrated frequency-bin probability response matrix; each column is normalized as a redistribution probability by the forward model. Spectral convolution conserves integrated power using the actual frequency-bin widths."
+          "description": "Calibrated frequency-bin probability response matrix. The supplied matrix must already be finite, non-negative, square and have unit-sum columns; the measured operator is applied unchanged, without normalization. Spectral convolution conserves integrated power using the actual frequency-bin widths."
         },
         {
           "name": "instrument_response_uncertainty",
           "unit": "response-matrix 1-sigma",
           "required": false,
-          "description": "Non-negative measured response-matrix 1-sigma uncertainty. Electrostatic and full-electromagnetic CTS sample and renormalize perturbed response matrices and refit the plasma parameters by Monte Carlo; response uncertainty is not an instrument calibration."
+          "description": "Non-negative 1-sigma uncertainty of the supplied measured response matrix. The base matrix must already satisfy the unit-column-sum contract and is used unchanged; electrostatic and full-electromagnetic CTS normalize only admissible perturbed Monte Carlo realizations before refitting plasma parameters. This propagates supplied response uncertainty and is not instrument calibration."
         },
         {
           "name": "response_mc_samples",
@@ -7341,7 +7341,7 @@
           "name": "background_signal_covariance",
           "unit": "full wavelength-space covariance of fitted background_signal",
           "required": false,
-          "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. Signal/background cross-covariance is not currently represented."
+          "description": "Optional finite symmetric positive-definite covariance for an explicitly supplied fitted background_signal; mutually exclusive with background_signal_uncertainty. Cross-covariance with the measured signal is represented separately by signal_background_cross_covariance when both marginal covariance models are supplied."
         },
         {
           "name": "signal_background_cross_covariance",
