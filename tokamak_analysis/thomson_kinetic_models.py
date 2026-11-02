@@ -1117,6 +1117,8 @@ def fit_relativistic_maxwell_juttner_channels(
         "spectral_weighting_status": "full_channel_major_generalized_least_squares_including_cross_channel_covariance",
         "covariance_ordering": "channel_major",
         "model": "relativistic non-collective Thomson scattering; shared Maxwell-Juttner Te and q-parallel flow across channels",
+        "recoil_included": bool(include_compton_recoil),
+        "scattering_cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson"),
         "density_inference": "not_inferred_from_normalized_spectral_shape",
-        "assumptions": ["All channels share Te, q-parallel bulk flow, wavelength grid and scattering geometry.", "Channel amplitudes and affine backgrounds are independent nuisance parameters.", "The supplied full covariance is known, positive definite and includes cross-channel correlations.", "A common measured response is used unless a per-channel response list is supplied.", "Photon recoil is neglected only within the configured Thomson-limit correction threshold."]
+        "assumptions": ["All channels share Te, q-parallel bulk flow, wavelength grid and scattering geometry.", "Channel amplitudes and affine backgrounds are independent nuisance parameters.", "The supplied full covariance is known, positive definite and includes cross-channel correlations.", "A common measured response is used unless a per-channel response list is supplied.", "Single-scattering photon recoil and polarized Klein-Nishina weighting are included only when include_compton_recoil=True; otherwise the configured Thomson-limit correction threshold is enforced."]
     }
