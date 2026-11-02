@@ -1020,6 +1020,17 @@ def analyze_full_em_cts_spectrum(
             for axis, value in zip("xyz", vec):
                 external_base[f"{kind}_polarization_real_{axis}"] = float(value.real)
                 external_base[f"{kind}_polarization_imag_{axis}"] = float(value.imag)
+        missing_species_indices = [
+            int(name.rsplit("_", 1)[1])
+            for name in external_order
+            if name.startswith(("ion_fraction_", "ion_mass_amu_", "ion_charge_state_"))
+            and int(name.rsplit("_", 1)[1]) >= len(ion_species)
+        ]
+        if missing_species_indices:
+            raise ValueError(
+                "external_input_parameter_order references an ion species index "
+                "outside the supplied ion_species sequence"
+            )
         external_draw_vectors = sample_external_input_vectors(
             np.asarray([external_base[name] for name in external_order], dtype=float),
             external_covariance, samples=external_input_mc_samples,
@@ -1244,10 +1255,10 @@ def analyze_full_em_cts_spectrum(
                     f"ion_charge_state_{species_index}", species_item["charge_state"]
                 )
             if (np.any(active_ion_fractions <= 0.0)
-                    or not np.isclose(active_ion_fractions.sum(), 1.0, rtol=1e-6, atol=1e-8)
                     or any(float(item["mass_amu"]) <= 0.0 or float(item["charge_state"]) <= 0.0
                            for item in active_ion_species)):
-                raise ValueError("sampled CTS ion composition, mass and charge states must remain positive with fractions summing to one")
+                raise ValueError("sampled CTS ion fractions, masses and charge states must remain positive")
+            active_ion_fractions /= np.sum(active_ion_fractions)
             active_geometry = dict(scattering_geometry)
             for kind in ("incident_direction", "scattered_direction"):
                 if any(f"{kind}_{axis}" in values for axis in "xyz"):
@@ -1423,7 +1434,10 @@ def analyze_full_em_cts_spectrum(
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": (
-            ["ion_species", "ion_fractions"]
+            ([] if external_order and any(
+                name.startswith(("ion_fraction_", "ion_mass_amu_", "ion_charge_state_"))
+                for name in external_order
+            ) else ["ion_species", "ion_fractions"])
             + (["magnetic_field_T"] if not external_order or not any(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
