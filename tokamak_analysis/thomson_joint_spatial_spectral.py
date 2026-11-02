@@ -210,7 +210,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     optimizer_condition = float(np.linalg.cond(optimizer_jacobian))
     data_identifiable = bool(fit.success and data_rank == parameter_count)
     dof = max(1, data_residual.size - parameter_count)
-    covariance_p = np.linalg.pinv(jac.T @ jac)
+    covariance_p = np.linalg.pinv(optimizer_jacobian.T @ optimizer_jacobian)
     if joint_spectral_covariance is None and signal_uncertainty is None:
         covariance_p *= float(data_residual @ data_residual / dof)
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6), np.ones(2*m)])
