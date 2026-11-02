@@ -169,8 +169,15 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     if geometry_covariance.shape != conditional_covariance.shape or not np.all(np.isfinite(geometry_covariance)):
         diagnostics["warning"] = "Geometry sample covariance is invalid; no covariance was reported."
         return output
-    total_covariance = conditional_covariance + geometry_covariance
+    response_covariance = np.asarray(
+        baseline.get("instrument_response_parameter_covariance", np.zeros_like(conditional_covariance)),
+        dtype=float,
+    )
+    if response_covariance.shape != conditional_covariance.shape or not np.all(np.isfinite(response_covariance)):
+        raise ValueError("baseline instrument-response covariance does not match the fitted parameter vector")
+    total_covariance = conditional_covariance + response_covariance + geometry_covariance
     output["ray_geometry_parameter_covariance"] = geometry_covariance
+    output.setdefault("external_uncertainty_covariance_components", {})["ray_geometry"] = geometry_covariance
     output["fit_covariance"] = total_covariance
     output["parameter_uncertainties"] = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
     uncertainty_by_name = dict(zip(names, output["parameter_uncertainties"]))
@@ -186,8 +193,9 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
         for name in names if name.startswith("ion_flow_projection_m_s:")
     }
     output["parameter_covariance_scope"] = (
-        "conditional local-fit covariance plus full-forward Monte-Carlo ray/equilibrium/beam-geometry covariance; "
-        "cross-covariance with instrument-response and other external sources is not included"
+        "conditional local-fit covariance plus any successfully propagated baseline instrument-response "
+        "covariance and full-forward Monte-Carlo ray/equilibrium/beam-geometry covariance; "
+        "cross-covariance between response and geometry sources is not included"
     )
     diagnostics.update({
         "propagated": True,
