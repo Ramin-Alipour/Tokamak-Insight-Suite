@@ -3290,13 +3290,74 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Analysis 1 / Optical multi-channel Thomson inference':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
             st.session_state['spectral_analysis_workflow']='Thomson multi-channel spectral inference'
             st.session_state['jump']='Spectral Analysis'
             st.rerun()
+    elif workflow=='Analysis 1 / Two-population optical Thomson subanalysis':
+        from tokamak_analysis.thomson_population_mixture import fit_two_population_relativistic_thomson_spectrum
+        st.info('Fit a measured calibrated optical Thomson spectrum with two isotropic relativistic Maxwell-Juttner electron populations. The fit returns two temperatures, hot-population fraction and one scattering-vector flow projection. Absolute density and unrestricted 3-D EVDF are not inferred.')
+        st.caption('Upload a two-column CSV in the existing row order: calibrated wavelength_nm, calibrated spectral intensity. Upload the measured response matrix unchanged. The incident-polarization vector is expressed in the model scattering frame, where the incident direction is [-sin(theta/2), cos(theta/2), 0].')
+        pop_spectrum_upload=st.file_uploader('Measured calibrated Thomson spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_population_spectrum')
+        pop_response_upload=st.file_uploader('Measured calibrated wavelength-response matrix CSV',type=['csv','txt'],key='ts_population_response')
+        pop_uncertainty_upload=st.file_uploader('Optional measured spectral 1σ uncertainty CSV (one column)',type=['csv','txt'],key='ts_population_uncertainty')
+        pop_covariance_upload=st.file_uploader('Optional full spectral covariance CSV (mutually exclusive with pointwise uncertainty)',type=['csv','txt'],key='ts_population_covariance')
+        p1,p2,p3=st.columns(3)
+        with p1:
+            pop_laser=st.text_input('Laser wavelength (nm)',value='',key='ts_population_laser')
+            pop_angle=st.text_input('Scattering angle (rad)',value='',key='ts_population_angle')
+            pop_polarization=st.text_input('Incident polarization (x,y,z in scattering frame)',value='',key='ts_population_polarization')
+        with p2:
+            pop_cold=st.text_input('Initial cold-population Te (eV)',value='',key='ts_population_cold')
+            pop_hot=st.text_input('Initial hot-population Te (eV)',value='',key='ts_population_hot')
+        with p3:
+            pop_fraction=st.text_input('Initial hot-population number fraction (0–1)',value='',key='ts_population_fraction')
+            pop_flow=st.text_input('Initial flow projection (m/s)',value='',key='ts_population_flow')
+        if st.button('Fit two-population Thomson spectrum',type='primary',key='run_ts_population_fit'):
+            try:
+                if pop_spectrum_upload is None or pop_response_upload is None:
+                    raise ValueError('Upload both the measured calibrated spectrum and its measured response matrix.')
+                measured_table=pd.read_csv(pop_spectrum_upload,header=None).to_numpy(dtype=float)
+                if measured_table.ndim!=2 or measured_table.shape[1]!=2:
+                    raise ValueError('The spectrum CSV must contain exactly two columns: wavelength_nm and calibrated intensity.')
+                wavelength_values=measured_table[:,0]
+                measured_values=measured_table[:,1]
+                if np.any(np.diff(wavelength_values)<=0):
+                    raise ValueError('The supplied calibrated wavelength samples must already be strictly increasing; TIS does not reorder them.')
+                response_values=pd.read_csv(pop_response_upload,header=None).to_numpy(dtype=float)
+                optional={}
+                if pop_uncertainty_upload is not None and pop_covariance_upload is not None:
+                    raise ValueError('Supply pointwise uncertainty or full spectral covariance, not both.')
+                if pop_uncertainty_upload is not None:
+                    optional['signal_uncertainty']=pd.read_csv(pop_uncertainty_upload,header=None).to_numpy(dtype=float).reshape(-1)
+                if pop_covariance_upload is not None:
+                    optional['spectral_covariance']=pd.read_csv(pop_covariance_upload,header=None).to_numpy(dtype=float)
+                result=fit_two_population_relativistic_thomson_spectrum(
+                    wavelength_values,measured_values,
+                    _parse_ts_scalar(pop_laser,'Laser wavelength',minimum=1e-12),
+                    _parse_ts_scalar(pop_angle,'Scattering angle',minimum=1e-12),
+                    response_values,
+                    incident_polarization=_parse_ts_vector(pop_polarization,'Incident polarization'),
+                    cold_temperature_initial_eV=_parse_ts_scalar(pop_cold,'Initial cold-population temperature',minimum=1e-12),
+                    hot_temperature_initial_eV=_parse_ts_scalar(pop_hot,'Initial hot-population temperature',minimum=1e-12),
+                    hot_population_fraction_initial=_parse_ts_scalar(pop_fraction,'Initial hot-population fraction',minimum=1e-12,maximum=1.0-1e-12),
+                    flow_projection_initial_m_s=_parse_ts_scalar(pop_flow,'Initial flow projection'),
+                    **optional,
+                )
+                st.success('Two-population Thomson shape inference completed within its declared model scope.')
+                c1,c2,c3=st.columns(3)
+                c1.metric('Cold Te',f"{result['cold_electron_temperature_eV']:.5g} eV")
+                c2.metric('Hot Te',f"{result['hot_electron_temperature_eV']:.5g} eV")
+                c3.metric('Hot population fraction',f"{result['hot_population_fraction']:.5g}")
+                st.metric('Scattering-vector flow projection',f"{result['electron_velocity_projection_m_s']:.5g} m/s")
+                st.json(result)
+                json_download('Export two-population Thomson fit and covariance',result,'tis_thomson_two_population_fit.json')
+                add_report_section('Two-population relativistic optical Thomson inference',result)
+            except Exception as exc:
+                st.error(f'Two-population Thomson inference failed: {exc}')
     elif workflow=='Analysis 1 / Spectral-distribution subanalysis':
         st.caption('Analysis 1 subanalysis: spectral-shape diagnostics are available only together with the physical parameters inferred by the canonical Thomson forward fit of the same calibrated measured spectrum.')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
