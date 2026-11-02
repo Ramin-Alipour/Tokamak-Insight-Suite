@@ -1016,6 +1016,13 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
     assert result["instrument_response_uncertainty_supplied"] is True
     assert result["instrument_response_uncertainty_propagated"] is True
     assert result["instrument_response_mc_successes"] >= 12
+    assert result["conditional_fit_covariance"].shape == result["fit_covariance"].shape
+    assert "instrument_response" in result["external_uncertainty_covariance_components"]
+    np.testing.assert_allclose(
+        result["fit_covariance"],
+        result["conditional_fit_covariance"] + result["instrument_response_parameter_covariance"],
+        rtol=1e-10, atol=1e-12,
+    )
 
 def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
     from tokamak_analysis.cts_analysis import _convolve
