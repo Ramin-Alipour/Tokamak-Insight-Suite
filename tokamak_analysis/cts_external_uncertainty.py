@@ -34,16 +34,29 @@ def _validated_covariance(covariance, size, name="covariance"):
 def validate_external_input_covariance(covariance, parameter_order):
     """Validate ordered covariance for local Full-EM CTS field/geometry inputs.
 
-    Frequency-resolved ray/equilibrium and composition uncertainties are not
-    represented by this local-vector contract.
+    Frequency-resolved ray/equilibrium uncertainties are not represented by
+    this local-vector contract. Species composition, mass, and charge-state
+    components may be included using indexed ion_fraction_i, ion_mass_amu_i,
+    and ion_charge_state_i names; cross-covariances with local geometry,
+    field, and polarization terms are retained in the same matrix.
     """
     if (not isinstance(parameter_order, Sequence)
             or isinstance(parameter_order, (str, bytes)) or not parameter_order):
         raise ValueError("parameter_order must be a non-empty ordered sequence")
     order = tuple(parameter_order)
-    if any(not isinstance(name, str) or name not in SUPPORTED_LOCAL_COMPONENTS
-           for name in order):
-        raise ValueError("parameter_order contains an unsupported local Full-EM CTS component")
+    import re
+    supported = all(
+        isinstance(name, str) and (
+            name in SUPPORTED_LOCAL_COMPONENTS
+            or re.fullmatch(r"ion_(?:fraction|mass_amu|charge_state)_\\d+", name) is not None
+        )
+        for name in order
+    )
+    if not supported:
+        raise ValueError(
+            "parameter_order contains an unsupported local Full-EM CTS component; "
+            "species terms use ion_fraction_i, ion_mass_amu_i, or ion_charge_state_i"
+        )
     if len(set(order)) != len(order):
         raise ValueError("parameter_order entries must be unique")
     return order, _validated_covariance(covariance, len(order))
