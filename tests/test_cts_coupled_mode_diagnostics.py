@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from tokamak_analysis.cts_em_geometry import propagate_cold_plasma_mode_coupling
 
