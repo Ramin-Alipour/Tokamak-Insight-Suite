@@ -590,6 +590,16 @@ def analyze_thomson_spectra(
     spectral bins to detector bins. Supplied response matrices must already have unit-sum columns and are used without renormalization. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
+    if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
+        raise ValueError("enable_evdf_reconstruction must be boolean")
+    if (
+        isinstance(evdf_velocity_points, (bool, np.bool_))
+        or not isinstance(evdf_velocity_points, (int, np.integer))
+        or evdf_velocity_points < 41
+        or evdf_velocity_points > 2001
+    ):
+        raise ValueError("evdf_velocity_points must be an integer from 41 to 2001")
+
     y = _finite_array(spectra, "spectra", 2)
     if y.shape[1] < 7:
         raise ValueError("Each Thomson spectrum must contain at least seven wavelength samples")
