@@ -3383,6 +3383,15 @@ elif page=='Advanced Analysis':
                 cts_response_upload=st.file_uploader('Measured frequency-response matrix CSV',type=['csv','txt'],key='cts_response_upload')
                 cts_response_unc_upload=st.file_uploader('Optional response-matrix 1σ CSV',type=['csv','txt'],key='cts_response_unc_upload')
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_covariance_upload')
+                cts_background_reference_upload=st.file_uploader(
+                    'Optional calibrated background-only reference spectra CSV (rows = references, columns = frequency bins)',
+                    type=['csv','txt'],key='cts_background_reference_upload',
+                )
+                cts_background_components_text=st.text_input(
+                    'PCA background component count (required when reference spectra are uploaded)',
+                    value='',key='cts_background_components',
+                )
+                st.caption('Reference spectra must already be calibrated and use the same frequency grid and detector scale as the measured CTS spectrum. TIS fits the reference-derived PCA modes as detector-space nuisance background; it does not calibrate or subtract the measured spectrum.')
                 cts_method=st.selectbox('CTS inversion method',['local_least_squares','differential_evolution','improved_genetic','regularized'],index=None,placeholder='Select method explicitly',key='cts_inversion_method')
                 cts_global_search=cts_method in {'differential_evolution','improved_genetic'}
                 cts_parameter_bounds_json=st.text_area('Optional explicit physical parameter bounds JSON (leave blank for unbounded positive log-parameters)',placeholder='{"electron_density_m3":[1e18,1e20],"electron_temperature_eV":[50,500],"ion_temperature_eV":[10,200]}',key='cts_parameter_bounds')
@@ -3492,6 +3501,14 @@ elif page=='Advanced Analysis':
                     if cts_fraction_unc_text.strip():
                         fraction_unc=[float(v.strip()) for v in cts_fraction_unc_text.split(',') if v.strip()]
                         external_unc['ion_fractions']=fraction_unc
+                    if cts_background_reference_upload is not None:
+                        if not cts_background_components_text.strip():
+                            raise ValueError('Enter the PCA background component count explicitly when calibrated reference spectra are uploaded.')
+                        background_reference=pd.read_csv(cts_background_reference_upload,header=None).to_numpy(dtype=float)
+                        kwargs_cts['background_reference_spectra']=background_reference
+                        kwargs_cts['background_components']=int(cts_background_components_text)
+                    elif cts_background_components_text.strip():
+                        raise ValueError('Upload calibrated background reference spectra when a PCA component count is entered.')
                     if cts_external_covariance_upload is not None:
                         if external_unc:
                             raise ValueError('Use either the joint external-parameter covariance file or separate scalar uncertainty inputs, not both.')
