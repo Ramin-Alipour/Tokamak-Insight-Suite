@@ -50,7 +50,11 @@ def _finite_real_scalar(value, name):
 
 def _response_stack(response, n_channels, n_wavelengths):
     if response is None:
-        return np.repeat(np.eye(n_wavelengths)[None, :, :], n_channels, axis=0)
+        raise ValueError(
+            "A measured instrument_response is required. Supply the calibrated response operator, "
+            "or explicitly supply an identity matrix only when the input spectra are already "
+            "corrected for the instrument response."
+        )
     value = _real_array(response, "instrument_response")
     if value.ndim == 2:
         value = np.repeat(value[None, :, :], n_channels, axis=0)
