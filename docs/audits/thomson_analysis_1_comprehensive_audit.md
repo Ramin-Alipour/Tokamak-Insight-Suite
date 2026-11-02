@@ -340,3 +340,19 @@ This is a numerical discretization assessment at fixed fitted parameters. It doe
 117. **The packaged diagnostic registry omitted the primary Thomson `result_classification` output.** The root `DIAGNOSTIC_REGISTRY.json` declared the per-channel Primary / Conditional / Non-identifiable result contract, but `tis/data/DIAGNOSTIC_REGISTRY.json` did not. Because the Python runtime registry loads the packaged copy, runtime metadata could omit a result field returned by the canonical Thomson workflow, and the existing root/package parity regression would fail. **Fixed directly on main:** the packaged registry was synchronized byte-for-byte with the root registry. The existing `test_analysis_registry` parity assertion covers this correction. No physical model, input assumption or output value was added; this restores the already-implemented result contract. No experimental validation is claimed.
 
 Fix commit: `a1462d79702b44e857332067d34642d41274d3fb`.
+
+
+## T. Calibrated response preservation and strict optical geometry domain — 2026-11-02
+
+118. **Several Thomson response paths silently renormalized the supplied calibrated response matrix.** The canonical optical inference, projected-EVDF inverse, spectral-distribution analysis and legacy spectrum adapter must treat a supplied calibrated response operator as fixed measured input. Renormalizing its columns changes the operator supplied by the researcher and is an unrequested data/model transformation. **Corrected directly on main:** matrix paths now reject non-finite, negative, zero-column or non-unit-column operators as applicable, and preserve an accepted matrix unchanged; no normalization is performed. Regression tests cover the primary inference, EVDF inverse, spectral-distribution path and legacy adapter, including preservation of the supplied matrix.
+
+119. **The optical scattering-angle validator admitted the exact backscattering endpoint π.** The supported optical geometry contract is an angle strictly inside the open interval (0, π); the endpoint is now rejected explicitly. Added a regression test at exactly π. This is input-domain enforcement, not a calibration or measurement operation.
+
+Relevant direct-main commits:
+- `e38d6d79d19e033a304b4ca2eb143fab2337a244` — preserve the calibrated response in primary optical inference.
+- `7c1e9ea215c9ccc17165ad29a58fd917d69de7c0fb` and `58fea7dea3a3a956484d174d4d7521955af0a364` — preserve response operators in spectral-distribution and EVDF paths.
+- `ef75f0484c7631c8b35f1106e466e2037bad976d` — remove silent normalization from the legacy adapter.
+- `f149306964ecb4f5917a962e61890510324632fd` — enforce the strict optical scattering-angle domain.
+- `0aae1c5287da46541b2f70a5da99bf094109cfd6` and `2dbea429e4b8c15d9753f4c63b2627f2bc08e7cf` — regression tests.
+
+**Experimental validation:** not performed and not claimed. GitHub Actions for the current main head are pending; software-test success is not asserted until those workflows complete.
