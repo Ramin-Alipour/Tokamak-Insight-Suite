@@ -302,6 +302,7 @@ def relativistic_maxwell_juttner_spectrum(
         ),
         "compton_energy_ratio_epsilon_scattered_over_incident_rest_frame": recoil_ratio,
         "maximum_recoil_correction_fraction_on_quadrature_support": recoil_correction_fraction,
+        "thomson_recoil_correction_fraction_max_on_quadrature_support": recoil_correction_fraction,
         "thomson_recoil_correction_fraction_limit": float(recoil_limit),
         "thomson_no_recoil_validity_status": (
             "Compton_recoil_included" if include_compton_recoil else
