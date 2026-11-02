@@ -147,7 +147,7 @@
 | 103 | `implemented_and_tested` — covariance is conditional on fixed external inputs/settings. | Keep conditional uncertainty label. |
 | 104 | `implemented_and_tested` — unweighted covariance is residual-scaled, not measurement-noise calibrated. | Preserve semantics. |
 | 105 | `implemented_and_tested` — positive log parameters have no default scientific bounds. | Require user-supplied bounds where optimizer needs them. |
-| 106 | `partially_implemented` — opt-in paired harmonic/quadrature convergence assessment exists; not automatic across every forward/inversion path. | Add automated declared-tolerance convergence gates for all applicable paths. |
+| 106 | `implemented_and_tested` for the Full-EM measured-spectrum inversion — paired gyro-harmonic/momentum-quadrature refinement is default-enabled, supports explicit increasing refinement sequences and relative L2/L-infinity tolerances, and reports convergence fields; Python registry, both JSON registries, dashboard and regression tests are synchronized. | This is a fixed-parameter numerical discretization assessment, not physical uncertainty and not a universal convergence guarantee for every standalone forward-model call. |
 | 107 | `implemented_and_tested` — damping is numerical resonance regularization. | Never report it as physical collision frequency. |
 | 108 | `non_identifiable_by_physics` — full-EM flow is scalar scattering-vector projection. | Preserve single-view limitation. |
 | 109 | `conditional_on_explicit_inputs` — frequency-resolved geometry must match frequency axis and explicitly select propagation branch. | Reject mismatches; never invent a branch. |
@@ -180,7 +180,7 @@ Recent literature reviewed for method selection:
 **Model decision:** no new physical model is added merely because a recent paper proposes an optimizer, regularizer or flexible basis. The existing physical shortlist is retained until the full mathematical response, parameter identifiability, uncertainty contract and analytic limiting cases are implemented and tested.
 
 ### Stage 6 — Integration and verification gate
-The exact root/package diagnostic registry copies, Python runtime registry, dashboard, documentation and tests must be synchronized for every new input/output. The present inventory identifies the integration work; it does not certify closure. GitHub Actions runs associated with the preceding plan commit were queued when inspected. A green result must be checked against the exact resulting commit SHA before claiming software-test success.
+The exact root/package diagnostic registry copies, Python runtime registry, dashboard, documentation and tests must be synchronized for every new input/output. Full-EM paired harmonic/quadrature convergence controls and result fields are now synchronized across those surfaces and covered by regression tests (item 106, within the Full-EM measured-spectrum inversion scope). The present inventory still does not certify closure of the remaining open/partial items. A green result must be checked against the exact resulting commit SHA before claiming software-test success.
 
 ## I. Immediate implementation order (no scope expansion)
 
