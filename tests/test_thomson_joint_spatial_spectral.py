@@ -219,3 +219,23 @@ def test_joint_maxwellian_inverse_rejects_fit_outside_nonrelativistic_domain():
     assert out["electron_temperature_profile_eV"] is None
     assert np.all(out["validity_screening"]["bulk_flow_beta_profile"] >= 0.1)
     assert out["optimizer_candidate"]["role"] == "numerical_candidate_not_a_measured_result"
+
+
+def test_bound_aware_jacobian_handles_active_and_fixed_parameter_bounds():
+    from tokamak_analysis.thomson_joint_spatial_spectral import _bound_aware_jacobian
+
+    lower = np.array([0.0, -2.0, 3.0])
+    upper = np.array([5.0, 2.0, 3.0])
+    point = np.array([0.0, 0.5, 3.0])
+    evaluated = []
+
+    def model(parameters):
+        evaluated.append(parameters.copy())
+        x, y, fixed = parameters
+        return np.array([x*x + 3.0*y, 2.0*x - y + fixed])
+
+    jacobian = _bound_aware_jacobian(model, point, lower, upper)
+    np.testing.assert_allclose(jacobian[:, 0], [0.0, 2.0], atol=2e-5)
+    np.testing.assert_allclose(jacobian[:, 1], [3.0, -1.0], rtol=2e-6, atol=2e-6)
+    np.testing.assert_array_equal(jacobian[:, 2], [0.0, 0.0])
+    assert all(np.all(sample >= lower) and np.all(sample <= upper) for sample in evaluated)
