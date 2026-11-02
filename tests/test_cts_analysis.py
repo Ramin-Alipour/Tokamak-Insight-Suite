@@ -1044,6 +1044,8 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
             + 0.04 * (field[2] - 2.0) * x**2
             + 0.03 * (geometry["incident_direction"][1]) * x**3
             + 0.02 * (incident_pol[1].real) * x**4
+            + 0.14 * (kwargs["ion_species"][0]["mass_amu"] - 2.014) * x**2
+            + 0.08 * (kwargs["ion_species"][0]["charge_state"] - 1.0) * x**3
         )
         return {"spectral_density": spectrum}
 
@@ -1069,7 +1071,9 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
         magnetic_field_T=[0.0, 0.0, 2.0],
         incident_polarization=[0.0, 0.0, 1.0],
     )["spectral_density"]
-    covariance = np.diag([1.0e-4, 1.0e-6, 1.0e-6])
+    scales = np.array([1.0e-4, 1.0e-6, 1.0e-6, 1.0e-3, 1.0e-3])
+    covariance = np.diag(scales**2)
+    covariance[0, 3] = covariance[3, 0] = 0.25 * scales[0] * scales[3]
     result = full_em.analyze_full_em_cts_spectrum(
         frequency, 2.4 * synthetic + 0.7,
         probe_frequency_Hz=140.0e9,
@@ -1087,6 +1091,7 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
         external_input_parameter_order=[
             "magnetic_field_T_z", "incident_direction_y",
             "incident_polarization_real_y",
+            "ion_mass_amu_0", "ion_charge_state_0",
         ],
         external_input_mc_samples=20,
         external_input_mc_seed=17,
@@ -1101,12 +1106,14 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
     assert result["external_input_covariance_order"] == [
         "magnetic_field_T_z", "incident_direction_y",
         "incident_polarization_real_y",
+        "ion_mass_amu_0", "ion_charge_state_0",
     ]
     assert result["external_input_mc_successes"] >= 12
     assert "magnetic_field_T" in result["external_inputs_with_supplied_covariance"]
     assert "scattering_geometry" in result["external_inputs_with_supplied_covariance"]
     assert "incident_polarization" in result["external_inputs_with_supplied_covariance"]
-    assert "ion_species" in result["external_inputs_fixed"]
+    assert "ion_species" in result["external_inputs_with_supplied_covariance"]
+    assert "ion_fractions" in result["external_inputs_fixed"]
     component = result["external_uncertainty_covariance_components"]["local_external_inputs"]
     assert component.shape == result["conditional_fit_covariance"].shape
     assert np.any(np.diag(component) > 0.0)
@@ -1619,3 +1626,45 @@ def test_cts_improved_genetic_search_rejects_all_nonfinite_objective():
             lambda p: np.inf, [(-1.0, 1.0)],
             seed=3, population_size=8, generations=2,
         )
+
+
+
+def test_cts_species_resolved_ion_temperatures_and_correlated_species_covariance():
+    f0,f,g,ions,frac,response=_case()
+    two_ions=[ions[0],{"name":"C6+","charge_state":6,"mass_amu":12.0}]
+    temperatures=np.array([700.0,1100.0])
+    spectrum=cts_spectral_density(
+        f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200.0,
+        ion_temperature_eV=temperatures,ion_species=two_ions,
+        ion_fractions=[0.7,0.3],electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=1.5e4,
+    )
+    assert spectrum.shape==f.shape and np.all(np.isfinite(spectrum)) and np.all(spectrum>=0)
+    common=dict(
+        probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+        instrument_response=response,
+        electron_density_initial_m3=2e19,
+        electron_temperature_initial_eV=1200.0,
+        ion_temperature_initial_eV=800.0,ion_velocity_initial_m_s=1.5e4,
+        global_search=False,inversion_method="local_least_squares",
+    )
+    truth=cts_spectral_density(
+        f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,ion_species=ions,ion_fractions=frac,
+        electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=1.5e4,
+    )
+    measured=2.4e4*truth+3.0
+    scales=np.array([1e-3,1e-3,5.0])
+    covariance=np.diag(scales**2)
+    out=analyze_cts_spectrum(
+        f,measured,**common,
+        external_parameter_covariance=covariance,
+        external_parameter_order=[
+            "ion_mass_amu_0","ion_charge_state_0","ion_temperature_eV_0"
+        ],
+        response_mc_samples=20,
+    )
+    assert out["external_parameter_covariance_propagated"] is True
+    assert out["response_external_mc_successes"]>=12
+    assert np.all(np.isfinite(out["fit_covariance"]))

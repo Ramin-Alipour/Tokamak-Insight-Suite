@@ -292,6 +292,8 @@ def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
     joint_spatial_spectral=False, spatial_mixing_matrix=None,
+    spatial_mixing_covariance=None, spatial_mixing_mc_samples=200,
+    spatial_mixing_mc_seed=84622,
     spatial_regularization_strength=0.0, profile_grid_radius_m=None,
     spatial_background_model="linear", spatial_background_degree=2,
     spatial_background_interior_knots=3, spatial_background_templates=None,
@@ -304,6 +306,13 @@ def reconstruct_thomson_profile_from_spectra(
     beyond the measured channel coordinates.
     """
     selected_model = kwargs.get("model")
+    if spatial_mixing_covariance is not None and spatial_mixing_matrix is None:
+        raise ValueError("spatial_mixing_covariance requires spatial_mixing_matrix")
+    if joint_spatial_spectral and spatial_mixing_covariance is not None:
+        raise ValueError(
+            "spatial_mixing_covariance is currently propagated by the downstream "
+            "PSF-aware profile path, not by the raw joint spatial-spectral optimizer"
+        )
     if joint_spatial_spectral:
         if spatial_mixing_matrix is None:
             raise ValueError("spatial_mixing_matrix is required when joint_spatial_spectral=True")
@@ -708,6 +717,22 @@ def reconstruct_thomson_profile_from_spectra(
                 "spatial_mixing_matrix must be finite with shape "
                 "(n_measured_channels, n_profile_grid_nodes)."
             )
+        if spatial_mixing_covariance is not None:
+            covariance_shape = (mixing.size, mixing.size)
+            raw_mixing_covariance = np.asarray(spatial_mixing_covariance)
+            if (raw_mixing_covariance.dtype.kind not in "iuf"
+                    or raw_mixing_covariance.shape != covariance_shape
+                    or not np.all(np.isfinite(raw_mixing_covariance))
+                    or not np.allclose(raw_mixing_covariance, raw_mixing_covariance.T,
+                                        rtol=1e-10, atol=1e-14)):
+                raise ValueError(
+                    "spatial_mixing_covariance must be a finite symmetric matrix "
+                    "with shape (spatial_mixing_matrix.size, spatial_mixing_matrix.size)"
+                )
+        elif spatial_mixing_mc_samples != 200:
+            raise ValueError(
+                "spatial_mixing_mc_samples is meaningful only when spatial_mixing_covariance is supplied"
+            )
         psf_profiles = {}
         profile_inputs = (
             ("electron_temperature", result.get("electron_temperature_profile_eV"),
@@ -737,6 +762,9 @@ def reconstruct_thomson_profile_from_spectra(
                     covariance=parameter_covariance, positive=positive_parameter,
                     parameter_name=name, parameter_unit=unit,
                     regularization_strength=spatial_regularization_strength,
+                    spatial_mixing_covariance=spatial_mixing_covariance,
+                    mixing_mc_samples=spatial_mixing_mc_samples,
+                    mixing_mc_seed=spatial_mixing_mc_seed,
                 )
             except ValueError as exc:
                 psf_profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
@@ -745,6 +773,11 @@ def reconstruct_thomson_profile_from_spectra(
             "profile_grid_radius_m": profile_grid,
             "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
             "spatial_mixing_matrix": mixing,
+            "spatial_mixing_covariance": (
+                None if spatial_mixing_covariance is None
+                else np.asarray(spatial_mixing_covariance, dtype=float).copy()
+            ),
+            "spatial_mixing_covariance_vectorization": "row-major C order over spatial_mixing_matrix entries",
             "profiles": psf_profiles,
             "interpretation": (
                 "Downstream inversion of channel-inferred physical parameters through a fixed supplied "
