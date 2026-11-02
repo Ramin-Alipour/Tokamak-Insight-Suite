@@ -964,20 +964,8 @@ def analyze_thomson_spectra(
             joint_cholesky = np.linalg.cholesky(joint_covariance)
         except np.linalg.LinAlgError as exc:
             raise ValueError("joint_spectral_covariance must be positive definite") from exc
-        if model == "non_collective_relativistic_maxwell_juttner":
-            nchan, nlam = y.shape
-            for row_channel in range(nchan):
-                for column_channel in range(nchan):
-                    if row_channel == column_channel:
-                        continue
-                    row_slice = slice(row_channel*nlam, (row_channel+1)*nlam)
-                    column_slice = slice(column_channel*nlam, (column_channel+1)*nlam)
-                    cross_block = joint_covariance[row_slice, column_slice]
-                    if np.any(cross_block != 0.0):
-                        raise ValueError(
-                            "Relativistic Maxwell-Juttner currently supports full within-channel spectral covariance only; "
-                            "cross-channel covariance blocks must be exactly zero. A joint cross-channel relativistic forward fit is not implemented."
-                        )
+        # Full channel-major covariance is retained for the joint relativistic
+        # shared-parameter fit below; marginal channel fits use diagonal blocks.
     results = []
     channel_responses = []
     for i in range(y.shape[0]):
@@ -1857,6 +1845,45 @@ def analyze_thomson_spectra(
         item.pop("_shared_lsf_area_draws", None)
     joint_summary = None
     joint_area_covariance_from_spectral_fit = None
+    if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
+        common_grid = all(
+            np.array_equal(np.asarray(xs[0]), np.asarray(item))
+            for item in xs[1:]
+        )
+        if not common_grid:
+            raise ValueError(
+                "Full cross-channel relativistic Maxwell-Juttner GLS requires identical wavelength sampling in every channel."
+            )
+        if incident_direction is None or scattered_direction is None or incident_polarization is None:
+            raise ValueError(
+                "The joint relativistic Maxwell-Juttner channel fit requires incident_direction, scattered_direction and incident_polarization."
+            )
+        from .thomson_kinetic_models import fit_relativistic_maxwell_juttner_channels
+        initial_joint_te = float(np.median([
+            item["electron_temperature_eV"] for item in results
+        ]))
+        initial_joint_flow = float(np.median([
+            item["electron_velocity_projection_m_s"] for item in results
+        ]))
+        joint_summary = fit_relativistic_maxwell_juttner_channels(
+            xs[0], y, laser_wavelength_nm, scattering_angle_rad,
+            channel_responses,
+            incident_direction=incident_direction,
+            scattered_direction=scattered_direction,
+            incident_polarization=incident_polarization,
+            joint_spectral_covariance=joint_covariance,
+            initial_temperature_eV=initial_joint_te,
+            initial_flow_projection_m_s=initial_joint_flow,
+            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+        )
+        joint_summary["integration_status"] = "used_by_canonical_multichannel_thomson_api"
+        joint_summary["channel_individual_fits_retained"] = True
+        joint_summary["interpretation"] = (
+            "The full cross-channel covariance is used by a joint relativistic Maxwell-Juttner fit "
+            "with shared electron temperature and scattering-vector flow, and channel-specific "
+            "amplitudes/background nuisance terms. The per-channel fits remain available as "
+            "independent marginal fits; the joint result is a separate shared-parameter inference."
+        )
     if joint_covariance is not None and model != "non_collective_relativistic_maxwell_juttner":
         from scipy.optimize import least_squares
         nchan, nlam = y.shape
