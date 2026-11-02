@@ -764,3 +764,7 @@ def reconstruct_thomson_joint_spatial_spectra(*args, **kwargs):
     """Run joint wavelength-resolved spatial Thomson inversion with fixed mixing."""
     from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
     return reconstruct_joint_thomson_spatial_spectra(*args, **kwargs)
+
+
+# PSF-aware inverse profile reconstruction is distinct from PCHIP/smoothing interpolation.
+from .thomson_gap_closure import reconstruct_psf_aware_thomson_profile
