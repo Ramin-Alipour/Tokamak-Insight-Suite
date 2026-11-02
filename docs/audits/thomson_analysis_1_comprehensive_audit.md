@@ -396,3 +396,12 @@ Commits:
 - 17cd55c3e0bc0be1bf3e2b3e6e22a00dc0e5bb96 and 747688bde16c4fabd1b5195cc4e04335c3ea59af — synchronized formula-registry wording.
 
 No experimental validation was performed or claimed. Software-test status remains unconfirmed until GitHub Actions reports the final main-head result.
+
+
+## X. Thomson model-literature and Kappa-identifiability documentation synchronization — 2026-11-02
+
+A final documentation cross-check found that the scientific note still described Kappa identifiability as a local Jacobian diagnostic only, although the current implementation also performs a conditional profile-likelihood scan that re-optimizes the five nuisance parameters at each fixed Kappa index. The note now describes both diagnostics and explicitly preserves finite-grid censoring semantics.
+
+The selected three-model optical shortlist is now explicitly tied to recent peer-reviewed work: Carole et al. (2025, *Journal of Instrumentation*, DOI 10.1088/1748-0221/20/07/P07014) for Maxwellian optical Thomson diagnostic modelling; Skolar, Longley & Goodwin (2025, *Physics of Plasmas*, DOI 10.1063/5.0261966) for Kappa/non-Maxwellian kinetic-integral methods; and Sakai et al. (2026, *Journal of Instrumentation*, DOI 10.1088/1748-0221/21/01/C01002) for Monte Carlo incoherent Thomson spectra including relativistic Maxwellian and Kappa distributions. The TIS analytic finite-variance Student-t Kappa projection is explicitly distinguished from the Skolar generalized-dispersion algorithm. These are literature/model-selection references, not experimental validation of TIS.
+
+Direct-main documentation commit: recorded in the GitHub commit history. No source algorithm, model, input, output, calibration step or experimental-validation claim was added or removed.
