@@ -575,7 +575,7 @@ def analyze_thomson_spectra(
 
     Spectra have shape (channel, wavelength); wavelength may be shared (1-D) or
     channel-specific (2-D). A measured response callable, kernel or matrix maps true
-    spectral bins to detector bins; matrix columns are normalized internally. Absolute density is emitted only
+    spectral bins to detector bins. Supplied response matrices must already have unit-sum columns and are used without renormalization. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
     y = _finite_array(spectra, "spectra", 2)
@@ -601,6 +601,8 @@ def analyze_thomson_spectra(
         raise ValueError("A measured instrument-response matrix is required; supply an identity matrix only when a delta-like response is explicitly justified.")
     laser_wavelength_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     scattering_angle_rad = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
+    if scattering_angle_rad >= np.pi:
+        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
     for uncertainty_value, uncertainty_name in (
         (laser_wavelength_uncertainty_nm,"laser_wavelength_uncertainty_nm"),
         (scattering_angle_uncertainty_rad,"scattering_angle_uncertainty_rad"),
