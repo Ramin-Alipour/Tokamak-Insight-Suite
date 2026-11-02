@@ -16,6 +16,16 @@ The model must be selected explicitly in both the dashboard and the public Pytho
 
 Optical collective dielectric models are not part of this three-model Analysis 1 shortlist. Microwave collective Thomson scattering (CTS) is another registered subanalysis within this same primary Analysis 1 family. It has its own explicitly selected electrostatic and magnetized full-electromagnetic forward models; these are CTS models, not additional optical models. No physical model is switched automatically.
 
+### Recent peer-reviewed model and method basis
+
+The three-model optical shortlist is deliberately limited to the common Maxwellian reference case, a finite-variance Kappa non-Maxwellian case, and a relativistic Maxwell-Juttner case. Recent literature supports these as useful, distinct modelling regimes without requiring a large catalogue of speculative models:
+
+- **Maxwellian optical Thomson forward model:** Carole et al., “A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak,” *Journal of Instrumentation* **20** (2025), P07014, DOI: https://doi.org/10.1088/1748-0221/20/07/P07014. This recent diagnostic paper describes an incoherent Thomson synthetic diagnostic and inference of electron temperature/density from measured polychromator signals.
+- **Kappa / non-Maxwellian model family:** Skolar, Longley & Goodwin, “Computing the generalized plasma dispersion function for non-Maxwellian plasmas, with applications to Thomson scattering,” *Physics of Plasmas* **32** (2025), 043907, DOI: https://doi.org/10.1063/5.0261966. It provides a numerical kinetic-integral method for Kappa and other non-Maxwellian distributions. The current TIS Kappa implementation is the explicitly documented analytic finite-variance Student-t projection; it must not be represented as implementing the Skolar generalized-dispersion algorithm.
+- **Relativistic Maxwellian and Kappa spectral modelling:** Sakai et al., “Monte Carlo simulation method for incoherent Thomson scattering spectra from arbitrary electron distribution functions,” *Journal of Instrumentation* **21** (2026), C01002, DOI: https://doi.org/10.1088/1748-0221/21/01/C01002. The paper presents a Monte Carlo forward method and compares relativistic Maxwellian and Kappa spectra with analytical/numerical results. It supports the relevance of these regimes; it does not by itself validate the TIS implementation.
+
+These papers inform model selection and implementation scope only. Their reported synthetic or experimental demonstrations are not validation of TIS. No additional model is selected solely because a paper proposes a new numerical optimizer, regularizer, or distribution parameterization.
+
 ## Input contract
 
 | Input | Unit / shape | Requirement |
@@ -218,7 +228,7 @@ with the smoothing parameter selected by generalized cross-validation using the 
 
 ### Kappa-shape identifiability
 
-The non-collective Kappa fit evaluates the finite-difference Jacobian of the actual measured-response-convolved six-parameter spectrum. It reports numerical rank, normalized Jacobian conditioning, and the Kappa-shape sensitivity remaining after projection against amplitude, centroid, width and linear-background nuisance directions. The result includes an explicit `reportable_as_inferred_parameter` flag and a reason when the Kappa index is weakly/non-identifiable. This is a local identifiability diagnostic, not a global profile-likelihood interval or empirical validation.
+The non-collective Kappa fit evaluates the finite-difference Jacobian of the actual measured-response-convolved six-parameter spectrum. It reports numerical rank, normalized Jacobian conditioning, and the Kappa-shape sensitivity remaining after projection against amplitude, centroid, width and linear-background nuisance directions. The result includes an explicit `reportable_as_inferred_parameter` flag and a reason when the Kappa index is weakly/non-identifiable. In addition to the local Jacobian diagnostics, the fit performs a conditional profile-likelihood scan over the Kappa index, re-optimizing the five nuisance parameters at each fixed index. The reported interval is conditional on the selected physical model and supplied noise representation; a limit truncated by the finite scan grid is marked as censored rather than presented as a closed confidence interval. This is a model-conditional numerical identifiability diagnostic, not empirical validation.
 
 
 ## Joint wavelength-resolved spatial inference
