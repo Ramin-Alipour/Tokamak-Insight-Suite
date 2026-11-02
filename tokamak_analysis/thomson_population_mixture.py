@@ -130,10 +130,10 @@ def fit_two_population_relativistic_thomson_spectrum(
     instrument_response,
     *,
     incident_polarization,
-    cold_temperature_initial_eV,
-    hot_temperature_initial_eV,
-    hot_population_fraction_initial,
-    flow_projection_initial_m_s,
+    cold_temperature_initial_eV=None,
+    hot_temperature_initial_eV=None,
+    hot_population_fraction_initial=None,
+    flow_projection_initial_m_s=None,
     signal_uncertainty=None,
     spectral_covariance=None,
     radial_order=24,
@@ -181,23 +181,60 @@ def fit_two_population_relativistic_thomson_spectrum(
         whitening = lambda z: np.linalg.solve(cholesky, z)
         uncertainty_status = "supplied full spectral covariance"
 
-    tc0 = _positive(cold_temperature_initial_eV, "cold_temperature_initial_eV")
-    th0 = _positive(hot_temperature_initial_eV, "hot_temperature_initial_eV")
-    if th0 <= tc0:
-        raise ValueError("hot_temperature_initial_eV must exceed cold_temperature_initial_eV")
-    fraction0 = float(hot_population_fraction_initial)
-    if not np.isfinite(fraction0) or not 0 < fraction0 < 1:
-        raise ValueError("hot_population_fraction_initial must lie strictly inside (0, 1)")
-    flow0 = float(flow_projection_initial_m_s)
-    if not np.isfinite(flow0) or abs(flow0) >= C:
-        raise ValueError("flow_projection_initial_m_s must be finite and subluminal")
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
     angle = float(scattering_angle_rad)
     if not np.isfinite(angle) or not 0 < angle < np.pi:
         raise ValueError("scattering_angle_rad must lie strictly inside (0, pi)")
 
+    supplied_initial = (cold_temperature_initial_eV, hot_temperature_initial_eV,
+                        hot_population_fraction_initial, flow_projection_initial_m_s)
+    if all(value is None for value in supplied_initial):
+        # Deterministic moment-based seeds are optimizer aids only; they are
+        # never reported as physical measurements or substituted for the fit.
+        baseline = float(np.quantile(y, 0.05))
+        weights = np.maximum(y - baseline, 0.0)
+        area = float(np.sum(weights))
+        if not np.isfinite(area) or area <= np.finfo(float).tiny:
+            raise ValueError("automatic two-population initialization failed: spectrum has no positive contrast above its 5th-percentile baseline")
+        centroid = float(np.sum(weights * x) / area)
+        variance = float(np.sum(weights * (x - centroid) ** 2) / area)
+        if not np.isfinite(variance) or variance <= 0.0:
+            raise ValueError("automatic two-population initialization failed: measured spectrum has no positive wavelength variance")
+        # Width-to-Te conversion is used only for seeds. The relativistic
+        # Maxwell-Juttner forward model remains the fitted physical model.
+        width_temperature = 510_998.95069 * variance / (
+            2.0 * laser**2 * np.sin(angle / 2.0)**2
+        )
+        width_temperature = float(np.clip(width_temperature, 1e-3, 2e5))
+        flow_seed = -C * (centroid / laser - 1.0) / (2.0 * np.sin(angle / 2.0))
+        flow_seed = float(np.clip(flow_seed, -0.2*C, 0.2*C))
+        seed_specs = [
+            (max(0.35*width_temperature, 1e-3), max(4.0*width_temperature, 2e-3), 0.08, flow_seed),
+            (max(0.15*width_temperature, 1e-3), max(2.5*width_temperature, 2e-3), 0.18, flow_seed),
+            (max(0.60*width_temperature, 1e-3), max(8.0*width_temperature, 2e-3), 0.04, flow_seed),
+        ]
+        initialization_status = "automatic_deterministic_spectral_moment_multistart"
+    elif any(value is None for value in supplied_initial):
+        raise ValueError("Supply either all four optimizer initial values or none; partial physical-parameter seeds are not accepted")
+    else:
+        tc0 = _positive(cold_temperature_initial_eV, "cold_temperature_initial_eV")
+        th0 = _positive(hot_temperature_initial_eV, "hot_temperature_initial_eV")
+        if th0 <= tc0:
+            raise ValueError("hot_temperature_initial_eV must exceed cold_temperature_initial_eV")
+        fraction0 = float(hot_population_fraction_initial)
+        if not np.isfinite(fraction0) or not 0 < fraction0 < 1:
+            raise ValueError("hot_population_fraction_initial must lie strictly inside (0, 1)")
+        flow0 = float(flow_projection_initial_m_s)
+        if not np.isfinite(flow0) or abs(flow0) >= C:
+            raise ValueError("flow_projection_initial_m_s must be finite and subluminal")
+        seed_specs = [(tc0, th0, fraction0, flow0)]
+        initialization_status = "researcher_supplied_optimizer_seed"
+
     scale_flow = 1.0e6
-    initial = np.array([np.log(tc0), np.log(th0 - tc0), logit(fraction0), flow0 / scale_flow])
+    initial_vectors = [
+        np.array([np.log(tc0), np.log(th0 - tc0), logit(fraction0), flow0 / scale_flow])
+        for tc0, th0, fraction0, flow0 in seed_specs
+    ]
     lower = np.array([np.log(np.finfo(float).tiny) + 5, np.log(np.finfo(float).tiny) + 5, -30.0, -C / scale_flow * (1.0 - 1e-12)])
     upper = np.array([np.log(np.finfo(float).max) - 5, np.log(np.finfo(float).max) - 5, 30.0, C / scale_flow * (1.0 - 1e-12)])
 
@@ -236,9 +273,24 @@ def fit_two_population_relativistic_thomson_spectrum(
         _, _, fitted = profile(p)
         return whitening(fitted-y)
 
-    fit = least_squares(residual, initial, bounds=(lower, upper), x_scale="jac", max_nfev=int(max_nfev))
-    if not fit.success or not np.all(np.isfinite(fit.x)):
-        raise ValueError(f"two-population Thomson fit failed: {fit.message}")
+    fit_candidates = []
+    fit_failures = []
+    for initial in initial_vectors:
+        try:
+            candidate = least_squares(
+                residual, initial, bounds=(lower, upper), x_scale="jac",
+                max_nfev=int(max_nfev),
+            )
+            if candidate.success and np.all(np.isfinite(candidate.x)):
+                fit_candidates.append((float(np.dot(candidate.fun, candidate.fun)), candidate))
+            else:
+                fit_failures.append(str(candidate.message))
+        except (ValueError, FloatingPointError, np.linalg.LinAlgError) as exc:
+            fit_failures.append(str(exc))
+    if not fit_candidates:
+        raise ValueError("two-population Thomson fit failed for every deterministic start: " + "; ".join(fit_failures[:3]))
+    fit_candidates.sort(key=lambda item: item[0])
+    _, fit = fit_candidates[0]
     amplitude, offset, fitted = profile(fit.x)
     tc, th, fraction, flow = decode(fit.x)
     jac = np.asarray(fit.jac, dtype=float)
@@ -290,6 +342,9 @@ def fit_two_population_relativistic_thomson_spectrum(
         "fit_jacobian_condition_number": condition,
         "fit_degrees_of_freedom": int(dof),
         "optimizer_success": bool(fit.success),
+        "optimizer_initialization": initialization_status,
+        "optimizer_multistart_count": int(len(initial_vectors)),
+        "optimizer_seed_parameters_are_not_inferred_outputs": True,
         "spectral_uncertainty_status": uncertainty_status,
         "effective_differential_cross_section_m2_sr": final_model["effective_differential_cross_section_m2_sr"],
         "absolute_density_inferred": False,
