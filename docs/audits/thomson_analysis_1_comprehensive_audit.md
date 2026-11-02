@@ -442,3 +442,10 @@ Added a registry/API regression test that checks root/package parity, verifies t
 **Fixed directly on main:** all wavelength-space areas, centroid and central moments now use the same finite-volume bin-width measure returned by the wavelength-bin-width helper. Added a regression test on a deliberately non-uniform wavelength grid that independently checks area, centroid and variance against that measure.
 
 This change concerns numerical integration of already calibrated measured spectra. It does not calibrate or modify the wavelength axis, alter measured intensities, introduce a physical model, or perform experimental validation.
+
+
+## AB. Bound-aware data-only identifiability Jacobian — 2026-11-02
+
+**Confirmed numerical robustness gap:** the joint spatial-spectral inverse estimated its data-only Jacobian with central finite differences even when an optimized parameter was at an active physical/numerical bound. The perturbed evaluations could therefore leave the optimizer's declared domain and produce invalid or misleading rank/conditioning diagnostics.
+
+**Fixed directly on main:** the data-only Jacobian now uses central differences in the interior, one-sided differences at active bounds, and zero columns for parameters fixed at identical bounds. A regression test verifies derivative values and confirms that every perturbation remains within the declared bounds. This changes only numerical identifiability diagnostics; it does not alter measured spectra, physical models, calibration, or experimental-validation status.
