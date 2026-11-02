@@ -242,10 +242,21 @@ def fit_two_population_relativistic_thomson_spectrum(
     amplitude, offset, fitted = profile(fit.x)
     tc, th, fraction, flow = decode(fit.x)
     jac = np.asarray(fit.jac, dtype=float)
-    singular = np.linalg.svd(jac, compute_uv=False)
-    rank = int(np.linalg.matrix_rank(jac))
-    if rank < fit.x.size or not singular.size or singular[-1] <= 0:
-        raise ValueError("two-population Thomson fit rejected: population parameters are not jointly identifiable from this measured spectrum")
+    column_norms = np.linalg.norm(jac, axis=0)
+    scaled_jac = np.divide(
+        jac, column_norms[None, :],
+        out=np.zeros_like(jac),
+        where=column_norms[None, :] > np.finfo(float).tiny,
+    )
+    singular = np.linalg.svd(scaled_jac, compute_uv=False)
+    tolerance = np.finfo(float).eps * max(scaled_jac.shape) * (singular[0] if singular.size else 0.0)
+    rank = int(np.count_nonzero(singular > tolerance))
+    condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > 0.0 else float("inf")
+    if rank < fit.x.size or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError(
+            "two-population Thomson fit rejected: population parameters are not jointly identifiable "
+            f"(scaled Jacobian rank {rank}/{fit.x.size}, condition number {condition:.6g})"
+        )
     dof = max(1, y.size-fit.x.size-2)
     covariance_optimizer = np.linalg.pinv(jac.T@jac)
     if signal_uncertainty is None and spectral_covariance is None:
@@ -276,6 +287,7 @@ def fit_two_population_relativistic_thomson_spectrum(
         "fitted_constant_background": offset,
         "fit_covariance": covariance_physical,
         "fit_jacobian_rank": rank,
+        "fit_jacobian_condition_number": condition,
         "fit_degrees_of_freedom": int(dof),
         "optimizer_success": bool(fit.success),
         "spectral_uncertainty_status": uncertainty_status,
