@@ -37,7 +37,8 @@ def validate_external_input_covariance(covariance, parameter_order):
     In addition to local field/geometry/polarization and indexed ion inputs,
     ray-resolved geometry accepts ray_<frequency>_<sample>_<component>_<axis>
     names for magnetic_field_T, incident_direction and scattered_direction,
-    plus ray_<frequency>_beam_overlap_relative. All cross-covariances are
+    plus ray_<frequency>_beam_overlap_relative and instrument_response_<row>_<column> matrix elements. This permits joint response/geometry/species cross-covariance. All cross-covariances are
+            or re.fullmatch(r"instrument_response_\\d+_\\d+", name) is not None
     retained in the same ordered covariance matrix.
     """
     if (not isinstance(parameter_order, Sequence)
