@@ -220,6 +220,31 @@ def _channel_value(value, channel, n_channels, name, *, vector_length=None):
     raise ValueError(f"{name} must be a scalar shared across channels or have one value per channel")
 
 
+def _collective_uncertainty_inputs_missing(
+    ion_temperature_uncertainty,
+    ion_velocity_uncertainty,
+    electron_velocity_uncertainty,
+    scattering_angle_uncertainty,
+    incident_direction_uncertainty,
+    scattered_direction_uncertainty,
+):
+    """Return genuinely missing external-uncertainty inputs for collective fits."""
+    missing = []
+    if ion_temperature_uncertainty is None:
+        missing.append("ion_temperature_uncertainty_eV")
+    if ion_velocity_uncertainty is None:
+        missing.append("ion_velocity_uncertainty_m_s")
+    if electron_velocity_uncertainty is None:
+        missing.append("electron_velocity_uncertainty_m_s")
+    if (
+        scattering_angle_uncertainty is None
+        and incident_direction_uncertainty is None
+        and scattered_direction_uncertainty is None
+    ):
+        missing.append("scattering_geometry_uncertainty")
+    return missing
+
+
 
 def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertainty):
     signal_scale = float(np.max(np.abs(signal)))
@@ -1368,7 +1393,17 @@ def analyze_thomson_spectra(
             if polarization_unc is None:
                 missing_uncertainties.append("incident_polarization_uncertainty")
         if model in {"collective_maxwellian", "collective_kappa"}:
-            missing_uncertainties.extend(["ion_temperature_uncertainty_eV","ion_velocity_uncertainty_m_s","electron_velocity_uncertainty_m_s"])
+            # A beam-direction uncertainty is an alternative representation of
+            # scattering-angle uncertainty. Do not report the scalar angle as
+            # missing when either measured direction has a supplied covariance.
+            missing_uncertainties = [
+                name for name in missing_uncertainties
+                if name != "scattering_angle_uncertainty_rad"
+            ]
+            missing_uncertainties.extend(_collective_uncertainty_inputs_missing(
+                ion_t_unc, ion_v_unc, electron_v_unc, scattering_angle_uncertainty_rad,
+                incident_direction_unc, scattered_direction_unc,
+            ))
             if lsf_unc is not None:
                 # Collective response uncertainty is propagated in the external-input
                 # Monte Carlo below; do not mark it missing before that calculation.
