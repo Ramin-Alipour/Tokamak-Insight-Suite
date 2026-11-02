@@ -10,7 +10,9 @@
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
       "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
-      "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+      "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+      "tokamak_analysis.thomson_population_mixture.two_population_relativistic_thomson_spectrum",
+      "tokamak_analysis.thomson_population_mixture.fit_two_population_relativistic_thomson_spectrum"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
@@ -620,6 +622,39 @@
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_recovers_weighted_uniform_density",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_path_integrated_density_rejects_unmatched_or_unphysical_profiles",
       "tests/test_thomson_inference.py::test_one_dimensional_response_kernel_uncertainty_is_monte_carlo_propagated"
+    ],
+    "subanalyses": [
+      {
+        "name": "Two-population relativistic optical Thomson inference",
+        "module": "tokamak_analysis.thomson_population_mixture",
+        "callable": "fit_two_population_relativistic_thomson_spectrum",
+        "forward_model": "two_population_relativistic_thomson_spectrum",
+        "inputs": [
+          "wavelength_nm",
+          "measured_spectrum",
+          "laser_wavelength_nm",
+          "scattering_angle_rad",
+          "instrument_response",
+          "incident_polarization",
+          "cold_temperature_initial_eV",
+          "hot_temperature_initial_eV",
+          "hot_population_fraction_initial",
+          "flow_projection_initial_m_s",
+          "signal_uncertainty or spectral_covariance (optional)"
+        ],
+        "outputs": [
+          "cold_electron_temperature_eV",
+          "hot_electron_temperature_eV",
+          "hot_population_fraction",
+          "electron_velocity_projection_m_s",
+          "fit_covariance",
+          "fitted_spectrum",
+          "residual"
+        ],
+        "scope": "Two isotropic Maxwell-Juttner populations with one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred.",
+        "reference": "Sakai et al., JINST 21 (2026) C01002, DOI 10.1088/1748-0221/21/01/C01002; the TIS two-component model is a parametric approximation, not the cited Monte Carlo algorithm.",
+        "experimental_validation": "not_performed"
+      }
     ]
   },
   {
