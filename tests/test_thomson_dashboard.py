@@ -128,6 +128,10 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     joint.set_value(True).run()
     assert any(item.label.startswith("Fixed measured/researcher-supplied spatial mixing matrix") for item in app.file_uploader)
     assert any(item.label.startswith("Spatial curvature regularization strength") for item in app.text_input)
+    background_model = next(item for item in app.selectbox if item.label == "Joint detector-background basis")
+    assert background_model.options == ["constant", "linear", "polynomial", "cubic_spline", "templates"]
+    background_model.set_value("polynomial").run()
+    assert any(item.label.startswith("Background polynomial degree") for item in app.number_input)
     assert not app.exception, [str(error.value) for error in app.exception]
 
 
