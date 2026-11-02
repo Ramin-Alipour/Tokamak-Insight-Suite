@@ -56,8 +56,8 @@ def test_external_covariance_propagation_preserves_correlations():
         samples=2000, seed=7,
     )
     assert result["status"] == "completed"
-    assert result["output_covariance"].shape == (2, 2)
-    assert result["output_covariance"][0, 1] == pytest.approx(
+    assert np.asarray(result["output_covariance"]).shape == (2, 2)
+    assert np.asarray(result["output_covariance"])[0, 1] == pytest.approx(
         covariance[0, 0] - covariance[1, 1], abs=0.015
     )
     assert result["not_a_posterior"]
