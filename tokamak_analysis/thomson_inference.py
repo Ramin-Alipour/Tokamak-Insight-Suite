@@ -246,94 +246,126 @@ def _collective_uncertainty_inputs_missing(
 
 
 
-def _fit_noncollective(wavelength, signal, laser_nm, angle, response, uncertainty):
+def _fit_noncollective(
+    wavelength, signal, laser_nm, angle, response, uncertainty, *,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
+):
+    """Fit the Maxwellian Thomson feature jointly with a detector-space background basis."""
+    from .thomson_background import _background_design
+
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
         raise ValueError("signal must have a positive finite scale")
-    signal_scaled = signal/signal_scale
-    uncertainty_scaled = None if uncertainty is None else uncertainty/signal_scale
+    y = np.asarray(signal, dtype=float) / signal_scale
+    sigma_y = None if uncertainty is None else np.asarray(uncertainty, dtype=float) / signal_scale
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
-    edge = max(2, wavelength.size // 10)
-    baseline = float(np.median(np.r_[signal_scaled[:edge], signal_scaled[-edge:]]))
-    peak = int(np.argmax(signal_scaled))
-    amp0 = max(float(signal_scaled[peak] - baseline), np.finfo(float).eps)
-    p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), baseline, 0.0]
-    lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), -np.inf, -np.inf]
-    upper = [np.inf, wavelength[-1], span, np.inf, np.inf]
+    basis = _background_design(
+        wavelength, background_model, degree=background_degree,
+        interior_knots=background_interior_knots, templates=background_templates,
+    )
+    n_background = basis.shape[1]
+    peak = int(np.argmax(y))
+    background_seed = np.linalg.lstsq(
+        basis, y - max(float(y[peak]), np.finfo(float).eps)
+        * np.exp(-0.5*((wavelength-wavelength[peak])/max(spacing,span/10))**2),
+        rcond=None,
+    )[0]
+    amp0 = max(float(y[peak] - np.median(y)), np.finfo(float).eps)
+    p0 = np.r_[amp0, float(wavelength[peak]), max(spacing, span/10), background_seed]
+    lower = np.r_[0.0, wavelength[0], max(spacing*0.2, 1e-12), np.full(n_background,-np.inf)]
+    upper = np.r_[np.inf, wavelength[-1], span, np.full(n_background,np.inf)]
 
-    def observed(x, amp, center, sigma, offset, slope):
-        intrinsic = _gaussian(x, amp, center, sigma, offset, slope)
-        # The LSF acts on the signal component; a slowly varying background is
-        # represented in detector space and is therefore not convolved.
-        signal_only = amp*np.exp(-0.5*((x-center)/sigma)**2)
-        return _apply_response(response, signal_only, x) + offset + slope*(x-center)
+    def predict(parameters):
+        amp, center, width = parameters[:3]
+        coefficients = parameters[3:]
+        intrinsic = amp*np.exp(-0.5*((wavelength-center)/width)**2)
+        return _apply_response(response, intrinsic, wavelength) + basis@coefficients
 
-    p, cov = curve_fit(observed, wavelength, signal_scaled, p0=p0, bounds=(lower, upper),
-                       sigma=uncertainty_scaled, absolute_sigma=uncertainty_scaled is not None,
-                       maxfev=50000)
-    # Keep optimizer-space parameters for evaluating the model: observed()
-    # is defined on signal_scaled, whereas the public fit parameters below
-    # are converted back to the measured intensity units.
-    p_scaled = np.asarray(p, dtype=float)
-    parameter_scales=np.array([signal_scale,1.0,1.0,signal_scale,signal_scale])
-    p=p_scaled*parameter_scales
-    cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
-    amp, center, sigma, offset, slope = map(float, p)
-    if sigma <= 0:
+    def residual(parameters):
+        difference = predict(parameters)-y
+        return difference if sigma_y is None else difference/sigma_y
+
+    fit = least_squares(
+        residual, p0, bounds=(lower,upper), x_scale="jac",
+        max_nfev=50000, method="trf",
+    )
+    if not fit.success or not np.all(np.isfinite(fit.x)):
+        raise ValueError(f"Maxwellian Thomson/background fit failed: {fit.message}")
+    amp_s, center, width = map(float, fit.x[:3])
+    coefficients_scaled = np.asarray(fit.x[3:], dtype=float)
+    if width <= 0:
         raise ValueError("Fitted intrinsic spectral width is not positive")
-    if center-3*sigma < wavelength[0] or center+3*sigma > wavelength[-1]:
+    if center-3*width < wavelength[0] or center+3*width > wavelength[-1]:
         raise ValueError("Wavelength coverage must include at least ±3 fitted intrinsic widths")
-    # Non-collective, non-relativistic, isotropic Maxwellian electron model.
-    thermal_sigma = sigma
-    te = thomson_electron_temperature_from_spectral_width(
-        thermal_sigma, laser_nm, angle
-    )["electron_temperature_eV"]
-    # The canonical formula-library helper defines the Doppler sign convention.
+    te = thomson_electron_temperature_from_spectral_width(width, laser_nm, angle)["electron_temperature_eV"]
     velocity = thomson_velocity_projection(center, laser_nm, angle)["electron_velocity_projection_m_s"]
     q_projection = 2.0*np.sin(angle/2.0)
-    if te / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
-        raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
-    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
-        raise ValueError("Non-relativistic Maxwellian model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
-    dof = max(1, wavelength.size-len(p))
-    fitted_spectrum = signal_scale * observed(wavelength, *p_scaled)
-    residual = signal - fitted_spectrum
-    fit_cov = np.asarray(cov, dtype=float)
-    te_unc = float(te*2*np.sqrt(max(fit_cov[2,2], 0.0))/sigma)
-    # A normalized instrument-response operator redistributes power without
-    # changing the full-domain integral of the fitted intrinsic Gaussian.
-    area = float(amp * sigma * np.sqrt(2.0*np.pi))
-    area_gradient = np.array([sigma*np.sqrt(2.0*np.pi), 0.0,
-                              amp*np.sqrt(2.0*np.pi), 0.0, 0.0])
-    area_unc = float(np.sqrt(max(float(area_gradient @ fit_cov @ area_gradient), 0.0)))
+    if te/ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
+        raise ValueError("Non-relativistic Maxwellian model rejected: fitted electron temperature is outside its declared validity range.")
+    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN*C_M_S:
+        raise ValueError("Non-relativistic Maxwellian model rejected: fitted flow projection is outside its declared |v|/c < 0.1 regime.")
+    fitted_scaled = predict(fit.x)
+    fitted = signal_scale*fitted_scaled
+    residual_physical = np.asarray(signal,dtype=float)-fitted
+    dof = max(1, wavelength.size-fit.x.size)
+    covariance_scaled = np.linalg.pinv(fit.jac.T@fit.jac)
+    if sigma_y is None:
+        covariance_scaled *= float(fit.fun@fit.fun/dof)
+    scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
+    covariance = covariance_scaled*np.outer(scales,scales)
+    amp = amp_s*signal_scale
+    coefficients = coefficients_scaled*signal_scale
+    te_unc = float(te*2*np.sqrt(max(covariance[2,2],0.0))/width)
+    area = float(amp*width*np.sqrt(2.0*np.pi))
+    area_gradient = np.zeros(3+n_background)
+    area_gradient[:3] = [width*np.sqrt(2.0*np.pi),0.0,amp*np.sqrt(2.0*np.pi)]
+    area_unc = float(np.sqrt(max(float(area_gradient@covariance@area_gradient),0.0)))
+    if background_model == "linear":
+        slope = float(coefficients[1]*2.0/span)
+    else:
+        slope = None
     return {
         "electron_temperature_eV": float(te),
         "electron_temperature_uncertainty_eV": te_unc,
         "electron_velocity_projection_m_s": float(velocity),
-        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(fit_cov[1,1],0.0))/(laser_nm*q_projection)),
-        "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
-        "amplitude": amp, "background_intercept": offset, "background_slope_per_nm": slope,
-        "fit_covariance": fit_cov, "residual": residual,
-        "integrated_scattered_power_W": area, "integrated_scattered_power_uncertainty_W": area_unc,
-        "reduced_chi_square": float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
-        "fitted_spectrum": fitted_spectrum,
-        "fit_parameters": np.asarray(p, dtype=float),
-        "fit_parameter_names": ["amplitude", "center_nm", "intrinsic_sigma_nm", "background_intercept", "background_slope_per_nm"],
+        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(covariance[1,1],0.0))/(laser_nm*q_projection)),
+        "fitted_center_nm": center, "intrinsic_sigma_nm": width,
+        "amplitude": amp,
+        "background_intercept": float(coefficients[0]),
+        "background_slope_per_nm": slope,
+        "background_model": background_model,
+        "background_coefficients": coefficients,
+        "background_basis": basis,
+        "background_coefficient_covariance": covariance[3:,3:],
+        "fit_covariance": covariance, "residual": residual_physical,
+        "integrated_scattered_power_W": area,
+        "integrated_scattered_power_uncertainty_W": area_unc,
+        "reduced_chi_square": float(fit.fun@fit.fun/dof) if uncertainty is not None else None,
+        "fitted_spectrum": fitted,
+        "fit_parameters": np.r_[amp,center,width,coefficients],
+        "fit_parameter_names": ["amplitude","center_nm","intrinsic_sigma_nm"]+[f"background_coefficient_{i}" for i in range(n_background)],
+        "optimizer": {"success": bool(fit.success), "message": str(fit.message),
+                      "nfev": int(fit.nfev), "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
+                      "parameter_count": int(fit.x.size)},
+        "uncertainty_interpretation": (
+            "local covariance from supplied pointwise measurement uncertainty"
+            if uncertainty is not None else
+            "residual-variance-scaled local covariance; not measurement-noise-calibrated"
+        ),
         "model": "non-collective, non-relativistic Maxwellian electron spectrum",
         "validity_screening": {
-            "theta_e": float(te / ELECTRON_REST_ENERGY_EV),
+            "theta_e": float(te/ELECTRON_REST_ENERGY_EV),
             "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
-            "bulk_flow_beta": float(abs(velocity) / C_M_S),
+            "bulk_flow_beta": float(abs(velocity)/C_M_S),
             "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
-            "rationale": "Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal validity boundaries.",
+            "rationale": "Conservative asymptotic error-budget screens; not universal validity boundaries.",
         },
-        "assumptions": ["single-scattering non-collective regime", "isotropic Maxwellian electrons",
-                        "non-relativistic electron velocities", "known scattering geometry"],
+        "assumptions": ["single-scattering non-collective regime","isotropic Maxwellian electrons",
+                        "non-relativistic electron velocities","known scattering geometry",
+                        "selected detector-space background basis"],
     }
-
-
-
 
 def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
     """Profile Kappa while re-optimizing amplitude, centroid, width and baseline."""
@@ -604,6 +636,8 @@ def analyze_thomson_spectra(
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
     incident_polarization_uncertainty=None,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
     maximum_recoil_correction_fraction=0.01,
     enable_evdf_reconstruction=True,
     evdf_velocity_points=121,
@@ -989,7 +1023,7 @@ def analyze_thomson_spectra(
             channel_covariance = joint_covariance[channel_slice, channel_slice]
             ui = None
         if model == "non_collective_maxwellian":
-            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
+            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,\n                                background_model=background_model, background_degree=background_degree,\n                                background_interior_knots=background_interior_knots,\n                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_relativistic_maxwell_juttner":
@@ -1487,7 +1521,7 @@ def analyze_thomson_spectra(
                             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                         )
                     else:
-                        draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
+                        draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,\n                            background_model=background_model, background_degree=background_degree,\n                            background_interior_knots=background_interior_knots,\n                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     area_samples.append(float(draw["integrated_scattered_power_W"])
