@@ -24,6 +24,27 @@ def _supported_component(name):
 
 
 
+
+
+
+def ion_fractions_from_log_ratios(log_ratios):
+    """Map additive-log-ratio coordinates to a normalized positive composition.
+
+    The final species is the reference with log-ratio zero.  A stable softmax
+    guarantees strictly positive fractions summing to unity.
+    """
+    values = np.asarray(log_ratios)
+    if values.dtype.kind not in "iuf" or values.ndim != 1 or not np.all(np.isfinite(values)):
+        raise ValueError("log_ratios must be a finite real vector")
+    logits = np.concatenate((values.astype(float, copy=False), [0.0]))
+    logits -= float(np.max(logits))
+    weights = np.exp(logits)
+    fractions = weights / np.sum(weights)
+    if not np.all(np.isfinite(fractions)) or np.any(fractions <= 0.0):
+        raise ValueError("log-ratio coordinates produced an invalid ion composition")
+    return fractions
+
+
 def _validated_covariance(covariance, size, name="covariance"):
     matrix = np.asarray(covariance)
     if matrix.dtype.kind not in "iuf" or matrix.ndim != 2:
