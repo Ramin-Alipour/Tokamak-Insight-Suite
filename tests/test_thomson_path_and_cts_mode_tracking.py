@@ -96,3 +96,32 @@ def test_cold_plasma_ray_includes_branch_tracking_diagnostics(monkeypatch):
     assert result["mode_branch_tracking"]["tracked_eigenvalues"].shape == (3, 3)
     assert isinstance(result["fixed_eigenvalue_order_tracks_initial_polarization_branch"], bool)
     assert "mode conversion" in " ".join(result["limitations"]).lower()
+
+
+
+def test_coupled_mode_propagation_conserves_power_and_reports_conversion():
+    from tokamak_analysis.cts_em_geometry import propagate_cold_plasma_mode_coupling
+    s = np.linspace(0.0, 1.0, 101)
+    angles = np.linspace(0.0, np.pi / 2.0, s.size)
+    operators = []
+    for a in angles:
+        c, q = np.cos(a), np.sin(a)
+        rotation = np.array([[c, -q, 0.0], [q, c, 0.0], [0.0, 0.0, 1.0]])
+        operators.append(rotation @ np.diag([-1.0, 1.0, 3.0]) @ rotation.T)
+    result = propagate_cold_plasma_mode_coupling(
+        np.asarray(operators), s, np.tile([10.0, 12.0, 15.0], (s.size, 1)),
+        np.array([1.0 + 0j, 0j, 0j]),
+    )
+    assert result["mode_powers"].shape == (s.size, 3)
+    assert result["power_conservation_max_abs_error"] < 1e-10
+    assert np.max(result["mode_powers"][-1, 1:]) > 1e-3
+    assert result["mode_conversion_model"] == "lossless_flux_normalized_cold_plasma_coupled_mode_equation"
+
+
+def test_coupled_mode_propagation_rejects_missing_or_misaligned_physical_path():
+    from tokamak_analysis.cts_em_geometry import propagate_cold_plasma_mode_coupling
+    operators = np.asarray([np.diag([0.0, 1.0, 2.0])] * 3, dtype=complex)
+    with pytest.raises(ValueError, match="strictly increasing"):
+        propagate_cold_plasma_mode_coupling(
+            operators, [0.0, 1.0, 1.0], np.ones((3, 3)), [1.0, 0.0, 0.0]
+        )
