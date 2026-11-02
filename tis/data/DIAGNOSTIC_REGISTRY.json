@@ -349,7 +349,7 @@
         {
           "name": "spectral_weighting_status",
           "unit": "text",
-          "description": "Per-channel statistical weighting: full channel-major GLS, diagonal pointwise uncertainty weighting, or unweighted least squares when no measurement uncertainty is supplied."
+          "description": "Per-channel statistical weighting: full cross-channel GLS for Maxwellian/Kappa, block-diagonal channel-major within-channel GLS for relativistic Maxwell-Juttner, diagonal pointwise uncertainty weighting, or unweighted least squares when no measurement uncertainty is supplied."
         },
         {
           "name": "fit_covariance_interpretation",
@@ -659,7 +659,7 @@
         "experimental_validation": "not_performed"
       }
     ],
-    "uncertainty_model": "Non-collective Maxwellian and Kappa fits support full channel-major GLS, including cross-channel covariance. Relativistic Maxwell-Juttner fits support full within-channel spectral covariance through GLS when the channel-major covariance is block diagonal; cross-channel covariance is explicitly rejected and remains unsupported. Relativistic fits also support measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines supplied optical-factor covariance with supported spectral/response propagation under the zero-scattered-power covariance rule."
+    "uncertainty_model": "Non-collective Maxwellian and Kappa fits support full channel-major GLS, including cross-channel covariance. Relativistic Maxwell-Juttner fits support full within-channel spectral covariance through GLS when the channel-major covariance is block diagonal; cross-channel covariance is explicitly rejected pending a joint relativistic multi-channel forward inversion. Relativistic fits also support measured-response Monte Carlo and external-parameter Monte Carlo for supplied laser-wavelength, scalar scattering-angle or beam-direction component, and incident-polarization component uncertainties. A shared 2-D response uncertainty is sampled as one common instrument realization across channels and its cross-channel parameter covariance is returned. Absolute-density uncertainty combines supplied optical-factor covariance with supported spectral/response propagation under the zero-scattered-power covariance rule."
   },
   {
     "family": "Plasma parameters",
