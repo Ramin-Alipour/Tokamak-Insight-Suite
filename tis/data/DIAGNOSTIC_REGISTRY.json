@@ -12,7 +12,7 @@
       "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
       "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
     ],
-    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model.",
+    "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -408,6 +408,11 @@
           "name": "electron_density_path_averaged_m3",
           "unit": "m^-3; conditional path-integrated weighted average",
           "description": "Computed by the separate path-integrated helper when all path-dependent optical factors and the absolutely calibrated integrated scattered power are supplied."
+        },
+        {
+          "name": "result_classification",
+          "unit": "structured per-channel Primary / Conditional / Non-identifiable result contract",
+          "description": "Machine-readable physical-result status for each channel, including units, conditional auxiliary-input requirements, single-view non-identifiability, calibrated measured-input assumption, and explicit no-calibration/no-experimental-validation flags."
         }
       ],
       "assumptions": [
@@ -484,7 +489,7 @@
       ],
       "input_data_level": "measured_calibrated_measurements_only",
       "raw_data_to_physics_semantics": "false means uncalibrated detector/raw acquisition values are not accepted; true calibrated_measurements_to_physics means calibrated measured spectra are mapped to physical inference. These flags describe different data levels and are not contradictory.",
-      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation.",
+      "execution_contract_interpretation": "This pipeline starts from measured, calibrated diagnostic spectra and supplied measured instrument response. It does not perform detector calibration, raw-count correction, data repair or empirical validation. The API also returns result_classification, separating Primary, Conditional and Non-identifiable parameters per channel; this metadata does not duplicate or fabricate physical values.",
       "conditional_capabilities": [
         {
           "name": "Path-integrated absolute-density inference",
