@@ -1044,6 +1044,8 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
             + 0.04 * (field[2] - 2.0) * x**2
             + 0.03 * (geometry["incident_direction"][1]) * x**3
             + 0.02 * (incident_pol[1].real) * x**4
+            + 0.14 * (kwargs["ion_species"][0]["mass_amu"] - 2.014) * x**2
+            + 0.08 * (kwargs["ion_species"][0]["charge_state"] - 1.0) * x**3
         )
         return {"spectral_density": spectrum}
 
@@ -1069,7 +1071,9 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
         magnetic_field_T=[0.0, 0.0, 2.0],
         incident_polarization=[0.0, 0.0, 1.0],
     )["spectral_density"]
-    covariance = np.diag([1.0e-4, 1.0e-6, 1.0e-6])
+    scales = np.array([1.0e-4, 1.0e-6, 1.0e-6, 1.0e-3, 1.0e-3])
+    covariance = np.diag(scales**2)
+    covariance[0, 3] = covariance[3, 0] = 0.25 * scales[0] * scales[3]
     result = full_em.analyze_full_em_cts_spectrum(
         frequency, 2.4 * synthetic + 0.7,
         probe_frequency_Hz=140.0e9,
@@ -1087,6 +1091,7 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
         external_input_parameter_order=[
             "magnetic_field_T_z", "incident_direction_y",
             "incident_polarization_real_y",
+            "ion_mass_amu_0", "ion_charge_state_0",
         ],
         external_input_mc_samples=20,
         external_input_mc_seed=17,
@@ -1101,12 +1106,14 @@ def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_cova
     assert result["external_input_covariance_order"] == [
         "magnetic_field_T_z", "incident_direction_y",
         "incident_polarization_real_y",
+        "ion_mass_amu_0", "ion_charge_state_0",
     ]
     assert result["external_input_mc_successes"] >= 12
     assert "magnetic_field_T" in result["external_inputs_with_supplied_covariance"]
     assert "scattering_geometry" in result["external_inputs_with_supplied_covariance"]
     assert "incident_polarization" in result["external_inputs_with_supplied_covariance"]
-    assert "ion_species" in result["external_inputs_fixed"]
+    assert "ion_species" in result["external_inputs_with_supplied_covariance"]
+    assert "ion_fractions" in result["external_inputs_fixed"]
     component = result["external_uncertainty_covariance_components"]["local_external_inputs"]
     assert component.shape == result["conditional_fit_covariance"].shape
     assert np.any(np.diag(component) > 0.0)
