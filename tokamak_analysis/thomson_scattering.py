@@ -59,9 +59,9 @@ def thomson_differential_cross_section_m2_sr(scattering_angle_rad: float, *, inc
     Without vectors, use the unpolarized result. With both vectors, calculate
     the polarization-dependent result summed over unanalysed outgoing states.
     """
-    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad", allow_zero=True)
-    if theta > np.pi:
-        raise ValueError("scattering_angle_rad must lie between 0 and pi")
+    theta = _positive_finite_scalar(scattering_angle_rad, "scattering_angle_rad")
+    if theta >= np.pi:
+        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
     if incident_polarization_vector is None and incident_direction_vector is None and scattered_direction_vector is None:
         return float(0.5 * _ELECTRON_CLASSICAL_RADIUS_M**2 * (1.0 + np.cos(theta)**2))
     if any(v is None for v in (incident_polarization_vector, incident_direction_vector, scattered_direction_vector)):
