@@ -666,8 +666,8 @@ def propagate_cold_plasma_mode_coupling(
     tolerance = float(degeneracy_relative_tolerance)
     if not np.isfinite(tolerance) or tolerance <= 0:
         raise ValueError("degeneracy_relative_tolerance must be positive and finite")
-    if np.any(np.abs(np.imag(np.diagonal(operators, axis1=1, axis2=2))) > 1e-10):
-        raise ValueError("wave operators must be Hermitian")
+    if not np.allclose(operators, np.swapaxes(operators.conj(), 1, 2), rtol=1e-10, atol=1e-12):
+        raise ValueError("wave operators must be Hermitian; non-Hermitian operators are not silently symmetrized")
     eigvals = np.empty((n, 3), dtype=float)
     frames = np.empty((n, 3, 3), dtype=complex)
     degenerate = np.zeros(n, dtype=bool)
@@ -699,8 +699,11 @@ def propagate_cold_plasma_mode_coupling(
                     frame[:, m] *= np.exp(-1j * np.angle(z))
             # Within a degenerate cluster, transport the whole subspace by
             # the unitary polar factor, avoiding arbitrary eigensolver rotations.
-            for group in groups:
-                if len(group) > 1:
+            for raw_group in groups:
+                if len(raw_group) > 1:
+                    # Convert raw eigensolver columns to their matched-frame
+                    # positions before aligning the degenerate subspace.
+                    group = np.flatnonzero(np.isin(order, raw_group))
                     previous_group = frames[j - 1][:, group]
                     current_group = frame[:, group]
                     u, _, vh = np.linalg.svd(current_group.conj().T @ previous_group)
@@ -739,7 +742,6 @@ def propagate_cold_plasma_mode_coupling(
         "local_wave_operator_eigenvalues": eigvals,
         "parallel_transported_polarization_frames": frames,
         "degenerate_subspace_detected": degenerate,
-        "degenerate_subspace_power": np.sum(powers[:, :], axis=1),
         "mode_conversion_model": "lossless_flux_normalized_cold_plasma_coupled_mode_equation",
         "coupled_mode_equation": "d(a)/ds = -[U^H dU/ds + i diag(beta)] a",
         "power_conservation_max_abs_error": conservation_error,
