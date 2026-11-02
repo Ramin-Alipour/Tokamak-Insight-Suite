@@ -57,7 +57,8 @@ def test_collective_kappa_uses_dielectric_response_and_non_maxwellian_electrons(
     assert low_kappa["model"].startswith("unmagnetized collective Thomson")
 
 
-def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters():
+@pytest.mark.parametrize("include_compton_recoil", [False, True])
+def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters(include_compton_recoil):
     from tokamak_analysis.thomson_kinetic_models import fit_relativistic_maxwell_juttner
 
     wavelength = np.linspace(800.0, 1328.0, 401)
@@ -69,6 +70,7 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
         wavelength, laser, angle, 500.0,
         flow_projection_m_s=1.0e6, incident_polarization=[0.0, 0.0, 1.0],
         radial_order=16, angular_order=8,
+        include_compton_recoil=include_compton_recoil,
     )
     signal = 2.0e4*forward["spectral_density_per_nm"] + 10.0 + 0.001*(wavelength-laser)
     result = fit_relativistic_maxwell_juttner(
@@ -77,12 +79,13 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
         incident_direction=incident, scattered_direction=scattered,
         incident_polarization=[0.0, 0.0, 1.0],
         radial_order=16, angular_order=8,
+        include_compton_recoil=include_compton_recoil,
     )
     assert result["electron_temperature_eV"] == pytest.approx(500.0, rel=0.15)
     assert result["electron_velocity_projection_m_s"] == pytest.approx(1.0e6, abs=2.0e5)
     assert result["relativistic_kinematics"] is True
-    assert result["recoil_included"] is False
-    assert "elastic Thomson limit" in " ".join(result["assumptions"])
+    assert result["recoil_included"] is include_compton_recoil
+    assert ("Klein-Nishina" in " ".join(result["assumptions"])) is include_compton_recoil
     assert result["fit_covariance"].shape == (5, 5)
 
 @pytest.mark.parametrize("use_bounds", [False, True])
