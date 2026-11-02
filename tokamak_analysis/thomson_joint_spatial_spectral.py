@@ -150,8 +150,9 @@ def reconstruct_joint_thomson_spatial_spectra(
 
     Data layout is channel x wavelength; covariance is flattened in
     channel-major order. The supplied mixing matrix maps spatial nodes to
-    detector channels. Background offset and slope are detector-channel
-    nuisance parameters and are not mixed as plasma emission.
+    detector-space backgrounds are fitted jointly as nuisance basis
+    coefficients and are not mixed as plasma emission. Select constant,
+    linear, polynomial, cubic-spline, or researcher-supplied template bases.
     """
     x = _real_array(wavelength_nm, "wavelength_nm")
     y = _real_array(measured_spectra, "measured_spectra")
