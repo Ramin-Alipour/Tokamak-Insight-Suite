@@ -948,10 +948,25 @@ elif page=='Spectral Analysis':
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (Maxwellian only)',value=False,disabled=model!='non_collective_maxwellian',key='ts_infer_joint_spatial')
             spatial_mixing_upload=None
             spatial_regularization_text='0'
+            spatial_background_model='linear'
+            spatial_background_degree=2
+            spatial_background_interior_knots=3
+            spatial_background_templates_upload=None
             if joint_spatial_spectral:
                 spatial_mixing_upload=st.file_uploader('Fixed measured/researcher-supplied spatial mixing matrix CSV (detector channels × radial nodes)',type=['csv','txt'],key='ts_infer_spatial_mixing')
                 spatial_regularization_text=st.text_input('Spatial curvature regularization strength (dimensionless numerical control; explicit)',value='0',key='ts_infer_spatial_regularization')
-                st.caption('The matrix is treated as a fixed forward operator, never estimated or calibrated by TIS. Data-only Jacobian rank determines whether profiles are reportable; regularization cannot create measurement information. Absolute density is not inferred in this joint mode.')
+                spatial_background_model=st.selectbox(
+                    'Joint detector-background basis',
+                    ['constant','linear','polynomial','cubic_spline','templates'],
+                    index=1,key='ts_infer_joint_background_model',
+                )
+                if spatial_background_model=='polynomial':
+                    spatial_background_degree=st.number_input('Background polynomial degree (0–8)',min_value=0,max_value=8,value=2,step=1,key='ts_infer_joint_background_degree')
+                if spatial_background_model=='cubic_spline':
+                    spatial_background_interior_knots=st.number_input('Background spline interior knots',min_value=0,max_value=20,value=3,step=1,key='ts_infer_joint_background_knots')
+                if spatial_background_model=='templates':
+                    spatial_background_templates_upload=st.file_uploader('Researcher-supplied detector-background templates CSV (wavelength rows × basis columns)',type=['csv','txt'],key='ts_infer_joint_background_templates')
+                st.caption('The selected detector-space background basis is fitted jointly with the physical Thomson spectrum. Template columns are researcher-supplied nuisance shapes, not plasma emission. The spatial-mixing matrix and measured spectral response remain fixed; regularization cannot create measurement information. Absolute density is not inferred in this joint mode.')
             relativistic_incident_direction_text=None
             relativistic_scattered_direction_text=None
             relativistic_polarization_text=None
@@ -1034,6 +1049,10 @@ elif page=='Spectral Analysis':
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
                 'joint_spatial_spectral': joint_spatial_spectral,
                 'spatial_mixing_upload': _ts_upload_digest(spatial_mixing_upload),
+                'spatial_background_model': spatial_background_model,
+                'spatial_background_degree': spatial_background_degree,
+                'spatial_background_interior_knots': spatial_background_interior_knots,
+                'spatial_background_templates_upload': _ts_upload_digest(spatial_background_templates_upload),
                 'spatial_regularization_strength': spatial_regularization_text,
                 'identity_response': identity_response,
                 'relativistic_incident_direction': relativistic_incident_direction_text,
@@ -1157,7 +1176,16 @@ elif page=='Spectral Analysis':
                             'joint_spatial_spectral':True,
                             'spatial_mixing_matrix':spatial_mixing_matrix,
                             'spatial_regularization_strength':_parse_ts_scalar(spatial_regularization_text,'Spatial regularization strength',minimum=0.0),
+                            'spatial_background_model':spatial_background_model,
+                            'spatial_background_degree':int(spatial_background_degree),
+                            'spatial_background_interior_knots':int(spatial_background_interior_knots),
                         })
+                        if spatial_background_model=='templates':
+                            if spatial_background_templates_upload is None:
+                                raise ValueError('Upload the researcher-supplied background template matrix for the templates background model.')
+                            kwargs['spatial_background_templates']=pd.read_csv(
+                                spatial_background_templates_upload,header=None
+                            ).to_numpy(dtype=float)
                     if density_covariance_upload is not None:
                         kwargs['density_relative_covariance']=pd.read_csv(density_covariance_upload,header=None).to_numpy(dtype=float)
                     if joint_density_covariance_upload is not None:
