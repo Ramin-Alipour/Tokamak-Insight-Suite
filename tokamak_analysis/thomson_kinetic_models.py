@@ -321,10 +321,38 @@ def fit_relativistic_maxwell_juttner(
     polarization_local = local_to_lab.T@polarization_lab
     scale = max(float(np.max(np.abs(y))), np.finfo(float).tiny)
     ys = y/scale
-    unc = None if uncertainty is None else np.asarray(uncertainty, dtype=float)/scale
-    if unc is not None and (unc.shape != y.shape or np.any(~np.isfinite(unc)) or np.any(unc <= 0)):
-        raise ValueError("uncertainty must be positive and match signal")
-    residual_scale = np.full_like(ys, max(float(np.max(np.abs(ys))), np.finfo(float).tiny)) if unc is None else unc
+    unc = None
+    covariance = None
+    covariance_cholesky = None
+    if uncertainty is not None:
+        supplied_uncertainty = np.asarray(uncertainty, dtype=float)
+        if supplied_uncertainty.shape == y.shape:
+            unc = supplied_uncertainty/scale
+            if np.any(~np.isfinite(unc)) or np.any(unc <= 0):
+                raise ValueError("uncertainty must be positive and match signal")
+        elif supplied_uncertainty.shape == (y.size, y.size):
+            covariance = supplied_uncertainty/(scale*scale)
+            if np.any(~np.isfinite(covariance)):
+                raise ValueError("spectral_covariance must contain only finite values")
+            covariance_scale = float(np.max(np.abs(covariance)))
+            if covariance_scale <= 0 or not np.allclose(
+                covariance, covariance.T, rtol=1e-9, atol=1e-12*covariance_scale
+            ):
+                raise ValueError("spectral_covariance must be symmetric and non-zero")
+            try:
+                covariance_cholesky = np.linalg.cholesky(covariance)
+            except np.linalg.LinAlgError as exc:
+                raise ValueError("spectral_covariance must be positive definite") from exc
+        else:
+            raise ValueError("uncertainty must be a positive pointwise vector or a full n_wavelength x n_wavelength covariance matrix")
+    residual_scale = (
+        np.full_like(ys, max(float(np.max(np.abs(ys))), np.finfo(float).tiny))
+        if unc is None and covariance_cholesky is None else unc
+    )
+    def whiten(residual):
+        if covariance_cholesky is not None:
+            return np.linalg.solve(covariance_cholesky, residual)
+        return residual/residual_scale
     edge = max(2, x.size//10)
     baseline = float(np.median(np.r_[ys[:edge], ys[-edge:]]))
     positive = np.maximum(ys-baseline, 0.0)
@@ -362,7 +390,7 @@ def fit_relativistic_maxwell_juttner(
 
     def objective(parameters):
         try:
-            return (evaluate(parameters, require_full_spectrum=False)-ys)/residual_scale
+            return whiten(evaluate(parameters, require_full_spectrum=False)-ys)
         except ValueError as exc:
             message = str(exc)
             if "capture at least 99.5%" in message or "produced zero spectral power" in message:
@@ -426,7 +454,7 @@ def fit_relativistic_maxwell_juttner(
     )
     dof = max(1, x.size-5)
     covariance_fit = np.linalg.pinv(fit.jac.T@fit.jac)
-    if unc is None:
+    if unc is None and covariance_cholesky is None:
         covariance_fit *= float(2.0*fit.cost/dof)
     te = float(np.exp(np.clip(fit.x[0], -700.0, 700.0)))
     beta_flow = float(np.tanh(fit.x[1]))
@@ -499,6 +527,20 @@ def fit_relativistic_maxwell_juttner(
         "background_intercept": offset,
         "background_slope_per_nm": slope,
         "fit_covariance": covariance_physical,
+        "spectral_weighting_status": (
+            "full_within_channel_generalized_least_squares"
+            if covariance_cholesky is not None else
+            "diagonal_pointwise_measurement_uncertainty_weighted"
+            if unc is not None else
+            "unweighted_least_squares_no_measurement_uncertainty_supplied"
+        ),
+        "fit_covariance_interpretation": (
+            "local_parameter_covariance_from_supplied_full_spectral_covariance"
+            if covariance_cholesky is not None else
+            "local_parameter_covariance_from_supplied_pointwise_measurement_uncertainty"
+            if unc is not None else
+            "residual_variance_scaled_local_covariance_not_measurement_noise_calibrated"
+        ),
         "fit_parameters": np.array([te, beta_flow*C, amplitude, offset, slope], dtype=float),
         "fit_parameter_names": ["electron_temperature_eV", "electron_velocity_projection_m_s", "amplitude", "background_intercept", "background_slope_per_nm"],
         "integrated_scattered_power_W": area,
