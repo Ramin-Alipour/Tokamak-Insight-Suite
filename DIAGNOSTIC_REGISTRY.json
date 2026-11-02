@@ -4711,6 +4711,12 @@
           "required": false,
           "description": "Deterministic seed for local external-input Monte Carlo sampling; default 84622.",
           "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "geometry_sampler",
+          "unit": "callable Monte-Carlo geometry realization provider",
+          "required": false,
+          "description": "For the Full-EM ray-geometry uncertainty API, each call must resample the declared equilibrium and local beam covariance, rerun incident and receiver ray tracing, and recompute scattering-volume locations, path-length quadrature and Gaussian overlap. A local mean-geometry perturbation is not sufficient."
         }
       ],
       "output_specs": [
@@ -5285,6 +5291,16 @@
           "name": "external_inputs_with_supplied_covariance",
           "unit": "list of external input groups",
           "description": "Full-EM: local magnetic-field, geometry or polarization groups for which a supplied covariance was propagated by Monte Carlo refitting."
+        },
+        {
+          "name": "ray_geometry_parameter_covariance",
+          "unit": "physical parameter covariance",
+          "description": "Sample covariance of the refitted physical parameter vector across complete ray/equilibrium/beam geometry realizations, including cross-parameter terms."
+        },
+        {
+          "name": "ray_geometry_uncertainty",
+          "unit": "structured",
+          "description": "Requested/successful/failed geometry realizations, seed, parameter order, propagated covariance and explicit conditional interpretation."
         }
       ],
       "assumptions": [
@@ -5303,7 +5319,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
-      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; supplied measured response-matrix uncertainty is propagated by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance is not yet propagated. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion. Full-EM additionally accepts a joint positive-semidefinite covariance over explicitly ordered local magnetic-field, incident/scattered direction and complex polarization components and propagates it by Monte Carlo refitting. This route is unavailable for frequency-resolved ray/equilibrium geometry. Covariance contributions from separate response and local-external sources are added separately; cross-source covariance is not inferred.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; supplied measured response-matrix uncertainty is propagated by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance is not yet propagated. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion. Full-EM additionally accepts a joint positive-semidefinite covariance over explicitly ordered local magnetic-field, incident/scattered direction and complex polarization components and propagates it by Monte Carlo refitting. This route is unavailable for frequency-resolved ray/equilibrium geometry. Covariance contributions from separate response and local-external sources are added separately; cross-source covariance is not inferred. Full-forward ray/equilibrium/beam uncertainty is available through a separate API sampler that reruns the geometry-dependent spectral inversion for each realization; cross-source covariance is not inferred.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -5334,7 +5350,8 @@
         "tokamak_analysis.cts_relativistic.relativistic_gyrotropic_species_response",
         "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
         "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators",
-        "tokamak_analysis.cts_em_geometry.trace_cold_plasma_ray"
+        "tokamak_analysis.cts_em_geometry.trace_cold_plasma_ray",
+        "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty"
       ],
       "raw_data_to_physics": false,
       "note": "Registered CTS subanalysis under primary Analysis 1; its two CTS models are separate from the three optical Thomson models and are never substituted automatically.",
@@ -5429,6 +5446,24 @@
             "external_inputs_with_supplied_covariance"
           ],
           "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. Explicit relativistic gyrotropic electron distributions are forward-model capabilities only and are not accepted by the current inversion."
+        },
+        {
+          "name": "full_forward_ray_geometry_uncertainty",
+          "function": "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty",
+          "inputs": [
+            "inference_kwargs for analyze_full_em_cts_spectrum",
+            "geometry_sampler(rng, realization_index) returning a complete frequency_resolved_geometry",
+            "samples (integer >=20)",
+            "seed",
+            "minimum_success_fraction"
+          ],
+          "outputs": [
+            "ray_geometry_parameter_covariance",
+            "fit_covariance (conditional fit covariance plus geometry sample covariance)",
+            "parameter_uncertainties",
+            "ray_geometry_uncertainty diagnostics"
+          ],
+          "scope": "API-level full-forward Monte-Carlo propagation. The sampler must regenerate equilibrium and beam covariance and rerun ray tracing/overlap for every realization. It is not yet a dashboard workflow and does not infer correlations with other external uncertainty sources."
         }
       ],
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
