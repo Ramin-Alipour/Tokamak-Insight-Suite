@@ -347,7 +347,7 @@ def full_em_cts_spectral_density(
         if matrix.shape[1] <= 1_000:
             cov = np.atleast_2d(np.cov(matrix, rowvar=False, ddof=1))
             output_covariance[key] = cov
-            output_standard_uncertainty[key] = np.sqrt(np.maximum(np.diag(cov), 0.0)).reshape(
+            output_standard_uncertainty[key] = np.sqrt(np.maximum(np.real(np.diag(cov)), 0.0)).reshape(
                 np.asarray(nominal[key]).shape
             )
         else:
