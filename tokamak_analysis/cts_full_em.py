@@ -1435,9 +1435,12 @@ def analyze_full_em_cts_spectrum(
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": (
             ([] if external_order and any(
-                name.startswith(("ion_fraction_", "ion_mass_amu_", "ion_charge_state_"))
+                name.startswith(("ion_mass_amu_", "ion_charge_state_"))
                 for name in external_order
-            ) else ["ion_species", "ion_fractions"])
+            ) else ["ion_species"])
+            + ([] if external_order and any(
+                name.startswith("ion_fraction_") for name in external_order
+            ) else ["ion_fractions"])
             + (["magnetic_field_T"] if not external_order or not any(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
@@ -1453,7 +1456,13 @@ def analyze_full_em_cts_spectrum(
             ) else [])
         ),
         "external_inputs_with_supplied_covariance": (
-            (["magnetic_field_T"] if external_order and any(
+            (["ion_species"] if external_order and any(
+                name.startswith(("ion_mass_amu_", "ion_charge_state_")) for name in external_order
+            ) else [])
+            + (["ion_fractions"] if external_order and any(
+                name.startswith("ion_fraction_") for name in external_order
+            ) else [])
+            + (["magnetic_field_T"] if external_order and any(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
             + (["scattering_geometry"] if external_order and any(
