@@ -1480,3 +1480,70 @@ def test_full_em_scattering_volume_uses_each_sample_local_magnetic_field():
     np.testing.assert_allclose(
         integrated["frequency_resolved_magnetic_field_T"], [[0.0, 0.0, 2.075]]
     )
+
+
+def test_cts_reference_pca_background_is_used_as_fixed_calibrated_nuisance_basis():
+    f0, f, g, ions, frac, response = _case()
+    truth = (2e19, 1200.0, 800.0, 1.5e4, 2.5e5)
+    physical = cts_spectral_density(
+        f, f0, g,
+        electron_density_m3=truth[0],
+        electron_temperature_eV=truth[1],
+        ion_temperature_eV=truth[2],
+        ion_species=ions,
+        ion_fractions=frac,
+        electron_velocity_projection_m_s=truth[4],
+        ion_velocity_projection_m_s=truth[3],
+    )
+    coordinate = np.linspace(-1.0, 1.0, f.size)
+    mode = np.sin(np.pi * coordinate)
+    references = np.vstack([
+        3.0 + 0.20 * mode,
+        3.0 + 0.10 * mode,
+        3.0 - 0.10 * mode,
+        3.0 - 0.20 * mode,
+    ])
+    original_references = references.copy()
+    target_background = 3.0 + 0.15 * mode
+    measured = 2.4e4 * physical + target_background
+
+    result = analyze_cts_spectrum(
+        f, measured,
+        probe_frequency_Hz=f0,
+        scattering_geometry=g,
+        ion_species=ions,
+        ion_fractions=frac,
+        instrument_response=response,
+        signal_uncertainty=np.full_like(measured, 0.02 * np.max(measured)),
+        electron_density_initial_m3=truth[0],
+        electron_temperature_initial_eV=truth[1],
+        ion_temperature_initial_eV=truth[2],
+        ion_velocity_initial_m_s=truth[3],
+        global_search=False,
+        inversion_method="local_least_squares",
+        background_reference_spectra=references,
+        background_components=1,
+    )
+
+    assert result["background_model"] == "reference_spectrum_PCA"
+    assert result["background_pca_components_used"] == 1
+    assert result["background_spectrum"].shape == measured.shape
+    assert result["background_coefficients"].shape == (3,)
+    assert np.all(np.isfinite(result["background_spectrum"]))
+    assert np.all(np.isfinite(result["fitted_spectrum"]))
+    np.testing.assert_array_equal(references, original_references)
+
+
+def test_cts_reference_pca_background_requires_explicit_component_count():
+    f0, f, g, ions, frac, response = _case()
+    references = np.vstack([np.ones_like(f), 1.0 + 0.1 * np.sin(f / np.max(np.abs(f)))])
+    with pytest.raises(ValueError, match="background_components must be an explicit positive integer"):
+        analyze_cts_spectrum(
+            f, np.ones_like(f),
+            probe_frequency_Hz=f0,
+            scattering_geometry=g,
+            ion_species=ions,
+            ion_fractions=frac,
+            instrument_response=response,
+            background_reference_spectra=references,
+        )
