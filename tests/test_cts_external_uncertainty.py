@@ -61,3 +61,29 @@ def test_sampler_rejects_non_integer_seed():
         sample_external_input_vectors(
             np.array([0.0, 0.0]), np.eye(2), samples=24, seed=1.5
         )
+
+
+def test_shared_external_jacobian_propagation_retains_cross_covariance():
+    from tokamak_analysis.thomson_external_uncertainty import propagate_external_covariance
+
+    covariance = np.array([[0.04, 0.01], [0.01, 0.09]])
+    result = propagate_external_covariance(
+        lambda x: np.array([x[0] + 2.0*x[1]]), [2.0, 3.0], covariance
+    )
+    jacobian = np.array([[1.0, 2.0]])
+    np.testing.assert_allclose(
+        result["external_output_covariance"], jacobian @ covariance @ jacobian.T,
+        rtol=2e-6,
+    )
+    assert "distinct_from_measurement_noise" in result["covariance_semantics"]
+
+
+def test_shared_external_monte_carlo_is_reproducible():
+    from tokamak_analysis.thomson_external_uncertainty import monte_carlo_external_covariance
+
+    covariance = np.array([[1.0, 0.7], [0.7, 1.0]])
+    function = lambda x: np.array([x[0] + x[1]])
+    first = monte_carlo_external_covariance(function, [0.0, 0.0], covariance, samples=1000, seed=31)
+    second = monte_carlo_external_covariance(function, [0.0, 0.0], covariance, samples=1000, seed=31)
+    np.testing.assert_array_equal(first["input_samples"], second["input_samples"])
+    assert first["external_output_covariance"][0, 0] == pytest.approx(3.4, rel=0.12)
