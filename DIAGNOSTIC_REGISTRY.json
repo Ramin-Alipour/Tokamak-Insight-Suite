@@ -205,7 +205,14 @@
           "unit": "dimensionless; maximum accepted fractional recoil-correction estimate",
           "required": false,
           "default": 0.01,
-          "description": "Relativistic Maxwell-Juttner screening control. The implementation default is 0.01; the value is a user-adjustable software error-budget threshold, not a universal plasma validity boundary."
+          "description": "Relativistic Maxwell-Juttner no-recoil screening control when include_compton_recoil=false. The implementation default is 0.01; this is a user-adjustable software error-budget threshold, not a universal plasma validity boundary."
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Relativistic Maxwell-Juttner only. When true, the optical forward model includes single-scattering Compton energy recoil and polarized Klein-Nishina differential weighting; when false, it uses elastic Thomson kinematics and screens the represented recoil correction against maximum_recoil_correction_fraction."
         },
         {
           "name": "enable_evdf_reconstruction",
@@ -226,7 +233,7 @@
           "unit": "constant, linear, polynomial, cubic_spline or templates",
           "required": false,
           "default": "linear",
-          "description": "Structured detector-space background basis jointly fitted with the non-collective Maxwellian optical Thomson feature. Other optical models currently retain their existing linear baseline."
+          "description": "Structured detector-space background basis jointly fitted with the non-collective Maxwellian optical Thomson feature. Kappa and relativistic Maxwell-Juttner currently retain linear baselines."
         },
         {
           "name": "background_degree",
@@ -6246,6 +6253,13 @@
           "required": false,
           "default": 0.01,
           "description": "Forwarded to the canonical optical inference engine; used only by the relativistic Maxwell-Juttner model. The implementation default is 0.01 and is a software error-budget threshold, not a universal plasma validity boundary."
+        },
+        {
+          "name": "include_compton_recoil",
+          "unit": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Forwarded to the canonical optical inference engine; used only by the relativistic Maxwell-Juttner model to select single-scattering recoil-corrected Klein-Nishina physics instead of the elastic Thomson limit."
         },
         {
           "name": "profile_reconstruction_method",
