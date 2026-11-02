@@ -479,3 +479,19 @@ This capability applies only to local geometry. Frequency-resolved ray/equilibri
 **Fixed directly on main:** updated the Python runtime registry description for `background_signal_covariance` to state that it may be combined with `signal_background_cross_covariance` when the complete joint signal/background block covariance is positive definite. Added a regression assertion to `tests/test_analysis_registry.py` requiring the runtime registry to expose the supported cross-covariance contract.
 
 Commits: `5b288c642a96312d99c8139cb1efc3eceb1c3c50` (runtime registry), `7657bc356da2de29835ac64784c60f85f3ebf326` (regression test). No measured data, physical model, input/output capability, calibration process or experimental-validation claim was changed. GitHub Actions has not yet been used to claim that the new regression passes.
+
+
+## AF. Two-population relativistic optical Thomson subanalysis — 2026-11-02
+
+The new optional callable tokamak_analysis.thomson_population_mixture.fit_two_population_relativistic_thomson_spectrum fits a measured calibrated optical spectrum with a two-component isotropic Maxwell-Juttner mixture. It returns cold/hot electron temperatures, hot number-density fraction, one shared scattering-vector flow projection, local parameter covariance, fitted spectrum and residual. The measured response operator is applied unchanged. The component temperatures are ordered to prevent label switching, and rank-deficient fits are rejected.
+
+This is a shape-only subanalysis: absolute density is not inferred, and a single view does not reconstruct an unrestricted 3-D or anisotropic EVDF. The model is a low-dimensional parametric approximation motivated by the arbitrary-VDF Monte Carlo forward-modelling direction of Sakai et al. (JINST 21 (2026) C01002; DOI 10.1088/1748-0221/21/01/C01002); it is not the paper's Monte Carlo algorithm. The callable is documented and registered under Analysis 1, with a dedicated dashboard workflow and software regression tests. No experimental validation is performed or claimed.
+
+
+## AG. Calibrated reference-spectrum PCA nuisance background for electrostatic CTS — 2026-11-02
+
+The electrostatic analyze_cts_spectrum callable now optionally accepts a researcher-supplied ensemble of at least two calibrated background-only reference spectra on the same frequency grid and detector scale as the measured CTS spectrum, together with an explicit PCA component count. The reference mean and selected principal components form a fixed detector-space nuisance basis. At every nonlinear plasma-parameter trial, the CTS amplitude and linear background coefficients are profiled jointly. The physical CTS forward spectrum alone is convolved with the unchanged measured frequency-response operator; the measured spectrum and reference ensemble are not calibrated, baseline-subtracted or otherwise modified.
+
+The result exposes the selected background model, fitted background spectrum, nuisance coefficients and PCA component count. Without a reference ensemble, the prior constant-offset nuisance remains unchanged. The new input is electrostatic-only; the Full-EM branch does not accept it. The implementation is explicitly a reference-spectrum PCA nuisance model, not a reproduction of the physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96 (2025) 043513; DOI 10.1063/5.0238948), which additionally uses CTS-specific modulation/time-series structure. Reference-ensemble uncertainty is not propagated. The callable, dashboard, root/package JSON registries, Python runtime registry, documentation and regression tests were updated directly on main. No experimental validation is performed or claimed.
+
+The final software-test status is determined only by GitHub Actions for the exact resulting main-head commit; no experimental validation is claimed.
