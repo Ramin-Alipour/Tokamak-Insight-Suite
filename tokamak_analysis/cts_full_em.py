@@ -241,6 +241,8 @@ _GEOMETRY_PATH_TOKEN = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)|\\[(\\d+)\\]")
 def _geometry_path_tokens(path):
     if not isinstance(path, str) or not path:
         raise ValueError("geometry covariance parameter paths must be non-empty strings")
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\\[\\d+\\]|\\.[A-Za-z_][A-Za-z0-9_]*)*", path) is None:
+        raise ValueError(f"invalid geometry covariance path: {path}")
     tokens = []
     position = 0
     for match in _GEOMETRY_PATH_TOKEN.finditer(path):
