@@ -61,9 +61,15 @@ def relativistic_maxwell_juttner_spectrum(
     electron_temperature_eV, *, flow_projection_m_s=0.0,
     incident_polarization, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
     require_full_spectrum=True,
 ):
-    """Return a unit-area relativistic Thomson spectrum on a wavelength grid.
+    """Return a relativistic Maxwell-Juttner Thomson or Klein-Nishina spectrum.
+
+    Set include_compton_recoil=True to evaluate the exact single-scattering
+    Compton energy transfer and polarized Klein-Nishina differential cross-section.
+    The default remains the elastic Thomson limit, guarded by the supplied
+    maximum fractional recoil screen.
 
     Electron momenta follow an isotropic Maxwell-Juttner distribution in the
     plasma rest frame and are Lorentz-boosted along the scattering-vector
@@ -90,6 +96,8 @@ def relativistic_maxwell_juttner_spectrum(
         raise ValueError("flow_projection_m_s must be finite and strictly subluminal (|v| < c)")
     if int(radial_order) < 12 or int(angular_order) < 8:
         raise ValueError("radial_order >=12 and angular_order >=8 are required")
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
     recoil_limit = _positive(maximum_recoil_correction_fraction, "maximum_recoil_correction_fraction")
     if recoil_limit >= 1.0:
         raise ValueError("maximum_recoil_correction_fraction must be below 1")
@@ -129,7 +137,7 @@ def relativistic_maxwell_juttner_spectrum(
     gamma_lab = gamma_bulk*GAMMA_REST*denominator
     ni_dot = np.einsum("...j,j->...", beta, n_incident)
     ns_dot = np.einsum("...j,j->...", beta, n_scattered)
-    lambda_scattered = laser*(1.0-ns_dot)/(1.0-ni_dot)
+    lambda_scattered_thomson = laser*(1.0-ns_dot)/(1.0-ni_dot)
 
     beta_hat = np.divide(
         beta, beta_mag[..., None],
@@ -159,15 +167,17 @@ def relativistic_maxwell_juttner_spectrum(
     recoil_parameter = (
         rest_photon_energy_eV / E_REST_EV * (1.0 - rest_angle_cosine)
     )
-    recoil_correction_fraction = float(np.max(
-        recoil_parameter / (1.0 + recoil_parameter)
-    ))
-    if not np.isfinite(recoil_correction_fraction) or recoil_correction_fraction > recoil_limit:
+    recoil_ratio = 1.0/(1.0+recoil_parameter)
+    recoil_correction_fraction = float(np.max(1.0-recoil_ratio))
+    if (not np.isfinite(recoil_correction_fraction)
+            or (not include_compton_recoil and recoil_correction_fraction > recoil_limit)):
         raise ValueError(
             "The Thomson/no-recoil approximation is outside the selected validity "
             f"limit: maximum represented Compton correction={recoil_correction_fraction:.6g}, "
-            f"limit={recoil_limit:.6g}. Use a lower photon energy or a Compton-capable model."
+            f"limit={recoil_limit:.6g}. Enable include_compton_recoil=True to use the "
+            "single-scattering Klein-Nishina forward model."
         )
+    lambda_scattered = lambda_scattered_thomson/recoil_ratio
     # Lorentz-transform the incident electric field to each electron rest frame.
     magnetic_direction_cross_e = np.cross(n_incident, polarization)
     e_rest = (
@@ -183,9 +193,20 @@ def relativistic_maxwell_juttner_spectrum(
         e_rest, e_rest_norm[..., None],
         out=np.zeros_like(e_rest), where=e_rest_norm[..., None] > 0,
     )
-    polarization_factor = np.maximum(
-        1.0-np.square(np.einsum("...j,...j->...", ns_rest, e_rest)), 0.0
+    polarization_projection_squared = np.square(
+        np.einsum("...j,...j->...", ns_rest, e_rest)
     )
+    if include_compton_recoil:
+        # Polarized Klein-Nishina cross-section, summed over final photon
+        # polarization states. r=epsilon_s'/epsilon_i'; in the r->1 limit
+        # this reduces exactly to the polarized Thomson factor.
+        polarization_factor = 0.5*np.square(recoil_ratio)*(
+            1.0/recoil_ratio + recoil_ratio
+            - 2.0*polarization_projection_squared
+        )
+    else:
+        polarization_factor = 1.0-polarization_projection_squared
+    polarization_factor = np.maximum(polarization_factor, 0.0)
     differential_weight = (
         (1.0-ni_dot)*polarization_factor
         /(gamma_lab*gamma_lab*np.square(1.0-ns_dot))
@@ -268,12 +289,24 @@ def relativistic_maxwell_juttner_spectrum(
         "spectral_rms_width_nm": float(np.sqrt(max(variance, 0.0))),
         "captured_probability": captured,
         "relativistic_kinematics": True,
-        "frequency_ratio": "lambda_s/lambda_i=(1-n_s dot beta)/(1-n_i dot beta)",
+        "frequency_ratio": (
+            "lambda_s/lambda_i=[(1-n_s dot beta)/(1-n_i dot beta)]/r_KN"
+            if include_compton_recoil else
+            "lambda_s/lambda_i=(1-n_s dot beta)/(1-n_i dot beta)"
+        ),
         "distribution": "Lorentz-boosted isotropic Maxwell-Juttner",
-        "recoil_included": False,
-        "thomson_recoil_correction_fraction_max_on_quadrature_support": recoil_correction_fraction,
+        "recoil_included": bool(include_compton_recoil),
+        "scattering_cross_section_model": (
+            "polarized_single_scattering_Klein_Nishina_instantaneous_electron_rest_frame"
+            if include_compton_recoil else "polarized_Thomson_instantaneous_electron_rest_frame"
+        ),
+        "compton_energy_ratio_epsilon_scattered_over_incident_rest_frame": recoil_ratio,
+        "maximum_recoil_correction_fraction_on_quadrature_support": recoil_correction_fraction,
         "thomson_recoil_correction_fraction_limit": float(recoil_limit),
-        "thomson_no_recoil_validity_status": "within_user_selected_fractional_correction_limit",
+        "thomson_no_recoil_validity_status": (
+            "Compton_recoil_included" if include_compton_recoil else
+            "within_user_selected_fractional_correction_limit"
+        ),
         "polarization_model": "supplied incident polarization Lorentz-transformed to the electron rest frame",
         "quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order), "gyrophase_points": nphi},
     }
@@ -284,8 +317,9 @@ def fit_relativistic_maxwell_juttner(
     response, uncertainty=None, *, incident_direction, scattered_direction,
     incident_polarization, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
 ):
-    """Fit relativistic Maxwell-Juttner Te and q-parallel bulk flow to one spectrum."""
+    """Fit relativistic Maxwell-Juttner Te and q-parallel flow to one spectrum."""
 
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(signal, dtype=float)
@@ -380,6 +414,7 @@ def fit_relativistic_maxwell_juttner(
             incident_polarization=polarization_local,
             radial_order=radial_order, angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            include_compton_recoil=include_compton_recoil,
             require_full_spectrum=require_full_spectrum,
         )
         shape = _apply_response(response, physical["spectral_density_per_nm"], x)
@@ -930,7 +965,8 @@ def fit_relativistic_maxwell_juttner_channels(
     response, *, incident_direction, scattered_direction, incident_polarization,
     joint_spectral_covariance, initial_temperature_eV,
     initial_flow_projection_m_s=0.0, radial_order=36, angular_order=18,
-    maximum_recoil_correction_fraction=0.01, max_nfev=1600,
+    maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
+    max_nfev=1600,
 ):
     """Joint relativistic MJ fit to multiple channels with full cross-channel GLS.
 
@@ -1017,6 +1053,7 @@ def fit_relativistic_maxwell_juttner_channels(
             incident_polarization=pol_local, radial_order=radial_order,
             angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            include_compton_recoil=include_compton_recoil,
             require_full_spectrum=False,
         )
         shape = physical["spectral_density_per_nm"]
