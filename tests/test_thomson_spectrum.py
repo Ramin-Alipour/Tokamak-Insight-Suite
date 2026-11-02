@@ -337,3 +337,16 @@ def test_legacy_adapter_response_convolved_width_uses_nonuniform_bin_measure():
     center = np.sum(wavelength * component * widths) / area
     expected_sigma = np.sqrt(np.sum((wavelength - center)**2 * component * widths) / area)
     assert out["fitted_sigma_nm"] == pytest.approx(expected_sigma, rel=1e-12)
+
+
+def test_legacy_adapter_rejects_and_does_not_renormalize_measured_response():
+    wavelength, signal, laser_nm, angle, _ = _synthetic_spectrum()
+    response = _measured_response(wavelength).copy()
+    response[:, 0] *= 0.5
+    original = response.copy()
+    with pytest.raises(ValueError, match="must already have unit-sum columns"):
+        fit_thomson_spectrum(
+            wavelength, signal, laser_wavelength_nm=laser_nm,
+            scattering_angle_rad=angle, instrument_response_matrix=response,
+        )
+    np.testing.assert_array_equal(response, original)
