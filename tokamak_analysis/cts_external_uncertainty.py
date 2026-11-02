@@ -66,7 +66,7 @@ def sample_external_input_vectors(base_values, covariance, *, samples=100, seed=
 
 
 def propagate_cts_external_uncertainty(forward_or_inverse_model, input_mean, covariance, *,
-                                       input_names=None, relative_step=None):
+                                       input_names=None, relative_step=None, input_bounds=None):
     """Propagate correlated external Full-EM CTS inputs through a supplied model.
 
     Pass a callable that returns either a forward-model observable vector or
@@ -79,7 +79,7 @@ def propagate_cts_external_uncertainty(forward_or_inverse_model, input_mean, cov
         validate_external_input_covariance(covariance, names)
     return propagate_external_covariance(
         forward_or_inverse_model, input_mean, covariance,
-        input_names=names, relative_step=relative_step,
+        input_names=names, relative_step=relative_step, input_bounds=input_bounds,
     )
 
 
