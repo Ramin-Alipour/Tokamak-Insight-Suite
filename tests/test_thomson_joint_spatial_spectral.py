@@ -294,3 +294,53 @@ def test_structured_thomson_background_models_recover_detector_baseline():
     result = fit_structured_background(x, y, model="polynomial", degree=2)
     np.testing.assert_allclose(result["background"], y, atol=1e-11)
     assert result["background_role"] == "detector_space_nuisance_not_plasma_emission"
+
+
+def test_joint_kappa_inverse_fits_index_and_propagates_its_uncertainty():
+    wavelength = np.linspace(520.0, 544.0, 241)
+    radius = np.linspace(0.0, 1.0, 5)
+    mixing = np.array([
+        [0.80, 0.20, 0.00, 0.00, 0.00],
+        [0.15, 0.70, 0.15, 0.00, 0.00],
+        [0.00, 0.15, 0.70, 0.15, 0.00],
+        [0.00, 0.00, 0.15, 0.70, 0.15],
+        [0.00, 0.00, 0.00, 0.20, 0.80],
+    ])
+    te = np.array([70.0, 85.0, 100.0, 115.0, 130.0])
+    flow = np.array([-1.0e4, -0.5e4, 0.0, 0.5e4, 1.0e4])
+    amplitude = np.array([1.0, 1.1, 1.2, 1.1, 1.0])
+    true_kappa = 3.8
+    sigma = 2.0*532.0*np.sqrt(te/510998.95069)*np.sin(np.pi/4.0)
+    center = 532.0*(1.0-2.0*np.sin(np.pi/4.0)*flow/299792458.0)
+    scale = sigma*np.sqrt((2.0*true_kappa-3.0)/true_kappa)
+    from scipy.special import gammaln
+    normalization = np.exp(
+        gammaln(true_kappa)-0.5*np.log(np.pi*true_kappa)
+        -np.log(scale)-gammaln(true_kappa-0.5)
+    )
+    z = (wavelength[None, :]-center[:, None])/scale[:, None]
+    intrinsic = amplitude[:, None]*normalization[:, None]*(
+        1.0+z*z/true_kappa
+    )**(-true_kappa)
+    measured = mixing@intrinsic + 0.005
+
+    out = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, measured, radius, mixing,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(measured, 0.002),
+        physical_model="kappa", kappa_index=4.5, fit_kappa_index=True,
+        regularization_strength=0.0, max_nfev=5000,
+    )
+    assert out["primary_result_status"] == "identified_from_measured_data"
+    assert out["physical_model_selection"]["kappa_index_role"] == (
+        "inferred_from_measured_spectra_with_profiled_uncertainty"
+    )
+    assert out["physical_model_selection"]["kappa_index"] == pytest.approx(
+        true_kappa, rel=0.08
+    )
+    assert np.isfinite(out["kappa_index_uncertainty"])
+    assert out["parameter_covariance"].shape == (
+        3*radius.size + 1 + 2*measured.shape[0],
+    )*2
+    assert "kappa_index" in out["parameter_order"]
