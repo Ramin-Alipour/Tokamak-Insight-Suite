@@ -368,3 +368,19 @@ Commits:
 - `06d80a2d5d482cf9fb35db2206150c6d5f206691` — regression tests.
 
 **Experimental validation:** not performed and not claimed. GitHub Actions must pass for the final main head before software-test success is stated.
+
+
+
+## V. Calibrated 1-D optical response-kernel boundary handling — 2026-11-02
+
+121. **The 1-D measured-kernel route contradicted the fixed-calibrated-response contract and rejected its own finite-window convolution.** It silently divided the supplied kernel by its total area, then required every truncated edge column of the resulting finite-grid matrix to sum to one. A normalized finite-support kernel naturally loses response outside the recorded wavelength interval, so its edge columns are sub-stochastic; the old code therefore rejected the advertised 1-D kernel input. **Fixed directly on main:** the supplied base kernel must already have unit total area and is preserved unchanged. The finite-window operator omits out-of-window tails without folding them back into measured bins; edge-column sums below one explicitly represent response outside the recorded interval. The 2-D and 3-D measured response-matrix contract remains unchanged: non-negative unit-sum columns, used without renormalization. Response-uncertainty Monte Carlo normalizes only perturbed 1-D kernel realizations to the kernel's unit-area constraint and does not renormalize the finite-window edge columns.
+
+Added regression coverage for base-kernel preservation, finite-window edge losses, rejection of non-unit-area base kernels, and the existing end-to-end kernel fit/uncertainty paths. Updated the Analysis 1 scientific contract and dashboard help text. This is finite measurement-window handling, not instrument calibration, detector correction, or experimental validation.
+
+Commits:
+- `9fb8d2763b57f5942864e303eeca4b3d6434f1b9` — inference implementation.
+- `8918ff3569c8d486e20bc33a08c3f31bbcff7256` — regression tests.
+- `59e2b86bca36949f4cbce397e5096913e10259ea` — scientific contract.
+- `2a5dfe37474183678033a4c214ca5b4048e93c39` — dashboard contract.
+
+**Experimental validation:** not performed or claimed. GitHub Actions for the resulting main head must complete before software-test success is stated.
