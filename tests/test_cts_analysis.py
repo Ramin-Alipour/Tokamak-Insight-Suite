@@ -1157,6 +1157,11 @@ def test_cts_external_parameter_covariance_rejects_invalid_order_or_non_psd_matr
             external_parameter_covariance=np.eye(2),
             external_parameter_order=["probe_frequency_Hz","not_supported"])
 
+    with pytest.raises(ValueError,match="positive semidefinite"):
+        analyze_cts_spectrum(trial_spectrum,**common,
+            external_parameter_covariance=np.diag([1e-18,-1e-12]),
+            external_parameter_order=["probe_frequency_Hz","scattering_angle_rad"])
+
 
 @pytest.mark.parametrize("response_path", ["electrostatic", "full_em"])
 def test_cts_measured_response_operator_is_rejected_not_renormalized(response_path):
