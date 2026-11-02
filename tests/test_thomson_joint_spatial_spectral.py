@@ -28,7 +28,7 @@ def _synthetic_case():
 def test_joint_spatial_spectral_inverse_recovers_synthetic_te_and_flow_profiles():
     x, y, r, h, te, flow = _synthetic_case()
     out = reconstruct_joint_thomson_spatial_spectra(
-        x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
+        x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
         signal_uncertainty=np.full_like(y, 0.01), regularization_strength=0.0,
     )
     assert out["analysis_status"] == "completed"
@@ -48,7 +48,7 @@ def test_joint_inverse_accepts_full_channel_major_covariance():
     x, y, r, h, *_ = _synthetic_case()
     covariance = np.eye(y.size) * 1e-4
     out = reconstruct_joint_thomson_spatial_spectra(
-        x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
+        x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
         joint_spectral_covariance=covariance, regularization_strength=1e-5,
     )
     assert out["noise_model"] == "full_channel_major_joint_spectral_covariance"
@@ -61,11 +61,11 @@ def test_joint_inverse_rejects_singular_mixing_and_invalid_covariance():
     bad[-1] = bad[0]
     with pytest.raises(ValueError, match="rank deficient"):
         reconstruct_joint_thomson_spatial_spectra(
-            x, y, r, bad, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
+            x, y, r, bad, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
         )
     with pytest.raises(ValueError, match="positive definite"):
         reconstruct_joint_thomson_spatial_spectra(
-            x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2,
+            x, y, r, h, laser_wavelength_nm=532., scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
             joint_spectral_covariance=np.zeros((y.size,y.size)),
         )
 
@@ -78,7 +78,7 @@ def test_regularization_does_not_manufacture_data_identifiability():
     mixing = np.ones((1, r.size), dtype=float)
     out = reconstruct_joint_thomson_spatial_spectra(
         x, y[:1], r, mixing, laser_wavelength_nm=532.,
-        scattering_angle_rad=np.pi/2, regularization_strength=1e-2,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size), regularization_strength=1e-2,
         signal_uncertainty=np.full((1, x.size), 0.01),
     )
     assert out["optimizer"]["regularization_rows_excluded_from_identifiability"] is True
@@ -136,7 +136,7 @@ def test_joint_inverse_rejects_optical_scattering_angle_endpoints(angle):
     with pytest.raises(ValueError, match="strictly between 0 and pi"):
         reconstruct_joint_thomson_spatial_spectra(
             x, y, r, h, laser_wavelength_nm=532.0,
-            scattering_angle_rad=angle,
+            scattering_angle_rad=angle, instrument_response=np.eye(x.size),
         )
 
 
@@ -162,7 +162,7 @@ def test_joint_inverse_rejects_non_numeric_or_nonfinite_measured_inputs(field, b
         reconstruct_joint_thomson_spatial_spectra(
             values["wavelength_nm"], values["measured_spectra"],
             values["radius_m"], values["spatial_mixing_matrix"],
-            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
         )
 
 
@@ -185,3 +185,12 @@ def test_joint_inverse_rejects_invalid_scalar_and_control_types(kwargs, message)
     arguments.update(kwargs)
     with pytest.raises(ValueError, match=message):
         reconstruct_joint_thomson_spatial_spectra(x, y, r, h, **arguments)
+
+
+def test_joint_inverse_requires_explicit_measured_response_operator():
+    x, y, r, h, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="A measured instrument_response is required"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi / 2,
+        )
