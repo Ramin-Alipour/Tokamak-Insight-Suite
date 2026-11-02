@@ -131,6 +131,15 @@ def test_dashboard_exposes_fixed_operator_joint_spatial_thomson_mode():
     assert not app.exception, [str(error.value) for error in app.exception]
 
 
+def test_dashboard_source_renders_projected_evdf_profiles_and_uncertainty():
+    source = APP_PATH.read_text(encoding="utf-8")
+    assert "Projected electron velocity distribution (EVDF) from calibrated Thomson spectra" in source
+    assert "velocity_parallel_m_s" in source
+    assert "evdf_parallel_s_per_m" in source
+    assert "evdf_standard_uncertainty_s_per_m" in source
+    assert "regularization_sensitivity" in source
+
+
 def test_dashboard_exposes_conditional_path_integrated_density_inputs():
     frame = pd.DataFrame({
         "channel_id": ["ch0"] * 9,
