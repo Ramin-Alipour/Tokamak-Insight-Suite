@@ -1381,7 +1381,7 @@ elif page=='Spectral Analysis':
                             if sensitivity:
                                 st.markdown('**Regularization sensitivity diagnostics**')
                                 st.json(sensitivity)
-                    if result.get('electron_temperature_profile_eV') is not None:
+                if result.get('electron_temperature_profile_eV') is not None:
                     st.line_chart(profile.set_index('radius_m')[['electron_temperature_eV']])
                 if np.any(np.isfinite(result['electron_density_profile_m3'])):
                     st.line_chart(profile.set_index('radius_m')[['electron_density_m3']])
