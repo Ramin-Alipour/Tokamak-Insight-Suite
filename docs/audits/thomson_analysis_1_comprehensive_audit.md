@@ -405,3 +405,14 @@ A final documentation cross-check found that the scientific note still described
 The selected three-model optical shortlist is now explicitly tied to recent peer-reviewed work: Carole et al. (2025, *Journal of Instrumentation*, DOI 10.1088/1748-0221/20/07/P07014) for Maxwellian optical Thomson diagnostic modelling; Skolar, Longley & Goodwin (2025, *Physics of Plasmas*, DOI 10.1063/5.0261966) for Kappa/non-Maxwellian kinetic-integral methods; and Sakai et al. (2026, *Journal of Instrumentation*, DOI 10.1088/1748-0221/21/01/C01002) for Monte Carlo incoherent Thomson spectra including relativistic Maxwellian and Kappa distributions. The TIS analytic finite-variance Student-t Kappa projection is explicitly distinguished from the Skolar generalized-dispersion algorithm. These are literature/model-selection references, not experimental validation of TIS.
 
 Direct-main documentation commit: recorded in the GitHub commit history. No source algorithm, model, input, output, calibration step or experimental-validation claim was added or removed.
+
+
+## K. Projected EVDF background-covariance correction (2026-11-02)
+
+The projected one-dimensional EVDF inverse now accepts optional pointwise or full covariance for the explicitly supplied background, in addition to the existing signal uncertainty/covariance. When signal/background cross-covariance is supplied, both marginal covariance models are required and the full joint block covariance is required to be positive definite. The inverse whitens with the residual covariance
+
+\[
+C_{y-b}=C_y+C_b-C_{yb}-C_{yb}^{T}.
+\]
+
+Background-only uncertainty is explicitly labelled as conditional on treating signal noise as not supplied; it is not represented as a complete measurement-noise budget. The API implementation, root and packaged diagnostic registries, analysis documentation and direct regression tests were updated on the main branch. This is covariance propagation conditional on researcher-supplied uncertainty inputs; it is not background estimation, detector correction, calibration or experimental validation.
