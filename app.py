@@ -1244,7 +1244,16 @@ elif page=='Spectral Analysis':
                     and saved_ts.get('model')==model
                     and saved_ts.get('analysis_signature')==analysis_signature):
                 result=saved_ts['result']
-                st.success('Thomson spectral inference completed within the selected physical model.')
+                is_joint_spatial = result.get('spatial_mixing_operator') == 'researcher_supplied_fixed_forward_operator'
+                if result.get('analysis_status') == 'model_domain_rejected':
+                    st.error('The fitted Maxwellian candidate is outside the declared non-relativistic model domain. The candidate is retained for diagnostics, but physical profile outputs are withheld.')
+                elif result.get('primary_outputs_reportable_as_identified') is False:
+                    st.warning('The optimizer completed, but the requested physical profiles are not reportable as identified from the measured data.')
+                else:
+                    st.success('Thomson spectral inference completed within the selected physical model.')
+                if result.get('validity_screening'):
+                    st.markdown('**Selected-model validity screening**')
+                    st.json(result['validity_screening'])
                 if result.get('path_integrated_density'):
                     st.markdown('**Conditional path-integrated density result**')
                     st.json(result['path_integrated_density'])
@@ -1286,88 +1295,94 @@ elif page=='Spectral Analysis':
                     st.markdown('**Kappa-index profile-likelihood identifiability**')
                     st.dataframe(pd.DataFrame(kappa_profile_rows),width="stretch")
                     st.caption('Intervals are conditional on the selected Kappa forward model. Grid-censored limits are not physical bounds; when no measurement uncertainty is supplied, the profile uses residual-scaled noise and is not measurement-noise calibrated.')
-                if result.get('absolute_scattered_power_available'):
+                if is_joint_spatial:
+                    if result.get('relative_spectral_amplitude_profile') is not None:
+                        profile['relative_spectral_amplitude']=result['relative_spectral_amplitude_profile']
+                        profile['relative_spectral_amplitude_uncertainty']=result.get('relative_spectral_amplitude_uncertainty')
+                elif result.get('absolute_scattered_power_available'):
                     profile['integrated_scattered_power_W']=[channel.get('integrated_scattered_power_W',np.nan) for channel in result['channels']]
                 else:
                     profile['integrated_spectral_signal_input_units_nm']=[channel.get('integrated_spectral_signal_input_units_nm',np.nan) for channel in result['channels']]
                 st.dataframe(profile,width="stretch")
-                distribution_rows=[]
-                for channel in result['channels']:
-                    distribution=channel.get('spectral_distribution',{})
-                    distribution_rows.append({
-                        'channel_index':channel.get('channel_index'),
-                        'radius_m':channel.get('radius_m'),
-                        'analysis_status':distribution.get('analysis_status'),
-                        'spectral_centroid_nm':distribution.get('spectral_centroid_nm'),
-                        'observed_sigma_nm':distribution.get('observed_sigma_nm'),
-                        'spectral_skewness':distribution.get('spectral_skewness'),
-                        'spectral_excess_kurtosis':distribution.get('spectral_excess_kurtosis'),
-                        'integrated_signed_spectral_signal':distribution.get('integrated_signed_spectral_signal'),
-                    })
-                st.markdown('**Thomson spectral-distribution diagnostics**')
-                st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
-
-                # The parent physical fit also returns a model-conditional,
-                # one-dimensional electron-velocity marginal for each channel.
-                # Render the actual inverse result (not only wavelength moments)
-                # so this Analysis 1 subanalysis is usable from the dashboard.
-                st.markdown('**Projected electron velocity distribution (EVDF) from calibrated Thomson spectra**')
-                evdf_summary_rows=[]
-                for channel in result['channels']:
-                    evdf=channel.get('electron_velocity_distribution',{})
-                    evdf_summary_rows.append({
-                        'channel_index':channel.get('channel_index'),
-                        'radius_m':channel.get('radius_m'),
-                        'status':evdf.get('analysis_status','unavailable'),
-                        'mean_velocity_parallel_m_s':evdf.get('mean_velocity_parallel_m_s'),
-                        'velocity_parallel_std_m_s':evdf.get('velocity_parallel_standard_deviation_m_s'),
-                        'directional_equivalent_temperature_eV':evdf.get('directional_equivalent_temperature_eV'),
-                        'skewness':evdf.get('skewness'),
-                        'excess_kurtosis':evdf.get('excess_kurtosis'),
-                        'regularization_strength':evdf.get('regularization_strength'),
-                        'design_matrix_condition_number':evdf.get('design_matrix_condition_number'),
-                    })
-                st.dataframe(pd.DataFrame(evdf_summary_rows),width="stretch")
-                for channel in result['channels']:
-                    evdf=channel.get('electron_velocity_distribution',{})
-                    channel_index=channel.get('channel_index')
-                    radius=channel.get('radius_m')
-                    with st.expander(f"Projected EVDF — channel {channel_index}, radius {radius} m"):
-                        if evdf.get('analysis_status')!='completed':
-                            st.info(evdf.get('reason',evdf.get('analysis_status','Projected EVDF unavailable for this channel/model.')))
-                            continue
-                        velocity=np.asarray(evdf.get('velocity_parallel_m_s',[]),dtype=float)
-                        distribution_values=np.asarray(evdf.get('evdf_parallel_s_per_m',[]),dtype=float)
-                        if (velocity.ndim!=1 or distribution_values.shape!=velocity.shape
-                                or velocity.size<2 or not np.all(np.isfinite(velocity))
-                                or not np.all(np.isfinite(distribution_values))):
-                            st.warning('The returned projected EVDF arrays are incomplete or non-finite; no curve is displayed.')
-                            continue
-                        evdf_curve=pd.DataFrame(
-                            {'normalized_projected_EVDF_s_per_m':distribution_values},
-                            index=pd.Index(velocity,name='velocity_parallel_m_s'),
-                        )
-                        st.line_chart(evdf_curve)
-                        uncertainty=evdf.get('evdf_standard_uncertainty_s_per_m')
-                        if uncertainty is not None:
-                            uncertainty=np.asarray(uncertainty,dtype=float)
-                            if uncertainty.shape==distribution_values.shape and np.all(np.isfinite(uncertainty)):
-                                band=pd.DataFrame({
-                                    'lower_local_1sigma':np.maximum(distribution_values-uncertainty,0.0),
-                                    'upper_local_1sigma':distribution_values+uncertainty,
-                                },index=pd.Index(velocity,name='velocity_parallel_m_s'))
-                                st.caption('Local active-set 1σ uncertainty conditional on the selected velocity grid, measured response, fitted background, regularization and active set; not a posterior interval.')
-                                st.line_chart(band)
-                        st.caption(evdf.get('interpretation','One-dimensional marginal along the scattering vector; not an unrestricted three-dimensional EVDF.'))
-                        comparison=evdf.get('parametric_model_comparison')
-                        if comparison:
-                            st.markdown('**Parametric comparison of the reconstructed marginal**')
-                            st.json(comparison)
-                        sensitivity=evdf.get('regularization_sensitivity')
-                        if sensitivity:
-                            st.markdown('**Regularization sensitivity diagnostics**')
-                            st.json(sensitivity)
-                st.line_chart(profile.set_index('radius_m')[['electron_temperature_eV']])
+                if not is_joint_spatial:
+                    distribution_rows=[]
+                    for channel in result['channels']:
+                        distribution=channel.get('spectral_distribution',{})
+                        distribution_rows.append({
+                            'channel_index':channel.get('channel_index'),
+                            'radius_m':channel.get('radius_m'),
+                            'analysis_status':distribution.get('analysis_status'),
+                            'spectral_centroid_nm':distribution.get('spectral_centroid_nm'),
+                            'observed_sigma_nm':distribution.get('observed_sigma_nm'),
+                            'spectral_skewness':distribution.get('spectral_skewness'),
+                            'spectral_excess_kurtosis':distribution.get('spectral_excess_kurtosis'),
+                            'integrated_signed_spectral_signal':distribution.get('integrated_signed_spectral_signal'),
+                        })
+                    st.markdown('**Thomson spectral-distribution diagnostics**')
+                    st.dataframe(pd.DataFrame(distribution_rows),width="stretch")
+    
+                    # The parent physical fit also returns a model-conditional,
+                    # one-dimensional electron-velocity marginal for each channel.
+                    # Render the actual inverse result (not only wavelength moments)
+                    # so this Analysis 1 subanalysis is usable from the dashboard.
+                    st.markdown('**Projected electron velocity distribution (EVDF) from calibrated Thomson spectra**')
+                    evdf_summary_rows=[]
+                    for channel in result['channels']:
+                        evdf=channel.get('electron_velocity_distribution',{})
+                        evdf_summary_rows.append({
+                            'channel_index':channel.get('channel_index'),
+                            'radius_m':channel.get('radius_m'),
+                            'status':evdf.get('analysis_status','unavailable'),
+                            'mean_velocity_parallel_m_s':evdf.get('mean_velocity_parallel_m_s'),
+                            'velocity_parallel_std_m_s':evdf.get('velocity_parallel_standard_deviation_m_s'),
+                            'directional_equivalent_temperature_eV':evdf.get('directional_equivalent_temperature_eV'),
+                            'skewness':evdf.get('skewness'),
+                            'excess_kurtosis':evdf.get('excess_kurtosis'),
+                            'regularization_strength':evdf.get('regularization_strength'),
+                            'design_matrix_condition_number':evdf.get('design_matrix_condition_number'),
+                        })
+                    st.dataframe(pd.DataFrame(evdf_summary_rows),width="stretch")
+                    for channel in result['channels']:
+                        evdf=channel.get('electron_velocity_distribution',{})
+                        channel_index=channel.get('channel_index')
+                        radius=channel.get('radius_m')
+                        with st.expander(f"Projected EVDF — channel {channel_index}, radius {radius} m"):
+                            if evdf.get('analysis_status')!='completed':
+                                st.info(evdf.get('reason',evdf.get('analysis_status','Projected EVDF unavailable for this channel/model.')))
+                                continue
+                            velocity=np.asarray(evdf.get('velocity_parallel_m_s',[]),dtype=float)
+                            distribution_values=np.asarray(evdf.get('evdf_parallel_s_per_m',[]),dtype=float)
+                            if (velocity.ndim!=1 or distribution_values.shape!=velocity.shape
+                                    or velocity.size<2 or not np.all(np.isfinite(velocity))
+                                    or not np.all(np.isfinite(distribution_values))):
+                                st.warning('The returned projected EVDF arrays are incomplete or non-finite; no curve is displayed.')
+                                continue
+                            evdf_curve=pd.DataFrame(
+                                {'normalized_projected_EVDF_s_per_m':distribution_values},
+                                index=pd.Index(velocity,name='velocity_parallel_m_s'),
+                            )
+                            st.line_chart(evdf_curve)
+                            uncertainty=evdf.get('evdf_standard_uncertainty_s_per_m')
+                            if uncertainty is not None:
+                                uncertainty=np.asarray(uncertainty,dtype=float)
+                                if uncertainty.shape==distribution_values.shape and np.all(np.isfinite(uncertainty)):
+                                    band=pd.DataFrame({
+                                        'lower_local_1sigma':np.maximum(distribution_values-uncertainty,0.0),
+                                        'upper_local_1sigma':distribution_values+uncertainty,
+                                    },index=pd.Index(velocity,name='velocity_parallel_m_s'))
+                                    st.caption('Local active-set 1σ uncertainty conditional on the selected velocity grid, measured response, fitted background, regularization and active set; not a posterior interval.')
+                                    st.line_chart(band)
+                            st.caption(evdf.get('interpretation','One-dimensional marginal along the scattering vector; not an unrestricted three-dimensional EVDF.'))
+                            comparison=evdf.get('parametric_model_comparison')
+                            if comparison:
+                                st.markdown('**Parametric comparison of the reconstructed marginal**')
+                                st.json(comparison)
+                            sensitivity=evdf.get('regularization_sensitivity')
+                            if sensitivity:
+                                st.markdown('**Regularization sensitivity diagnostics**')
+                                st.json(sensitivity)
+                    if result.get('electron_temperature_profile_eV') is not None:
+                    st.line_chart(profile.set_index('radius_m')[['electron_temperature_eV']])
                 if np.any(np.isfinite(result['electron_density_profile_m3'])):
                     st.line_chart(profile.set_index('radius_m')[['electron_density_m3']])
                 st.caption('Electron density is reported only when identifiable from the selected physical model and supplied calibrated intensity/geometry. Flow is the projection along the scattering wavevector, not a reconstructed 3-D velocity vector.')
