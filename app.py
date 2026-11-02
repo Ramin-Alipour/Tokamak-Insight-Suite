@@ -944,6 +944,7 @@ elif page=='Spectral Analysis':
                     joint_covariance_upload=None
                     st.caption('Full cross-channel spectral GLS is currently supported for the Maxwellian and Kappa fits, not the relativistic Maxwell-Juttner fit.')
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
+                st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (Maxwellian only)',value=False,disabled=model!='non_collective_maxwellian',key='ts_infer_joint_spatial')
             spatial_mixing_upload=None
             spatial_regularization_text='0'
