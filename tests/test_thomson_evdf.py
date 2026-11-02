@@ -214,3 +214,41 @@ def test_evdf_rejects_non_positive_definite_combined_background_covariance():
             background_uncertainty=np.full(signal.size, 1.0),
             signal_background_cross_covariance=np.eye(signal.size) * 0.6,
         )
+
+
+
+def test_evdf_reports_regularization_sensitivity_across_gcv_candidates():
+    wavelength, signal, background = _case()
+    result = _run(wavelength, signal, background)
+
+    sensitivity = result["regularization_sensitivity"]
+    assert sensitivity["status"] == "assessed_over_gcv_candidate_grid"
+    assert sensitivity["candidate_count"] == 13
+    assert len(sensitivity["candidate_results"]) == 13
+    assert sensitivity["selected_regularization_strength"] == pytest.approx(
+        result["regularization_strength"]
+    )
+    selected = min(
+        sensitivity["candidate_results"],
+        key=lambda item: abs(
+            np.log(item["regularization_strength"])
+            - np.log(result["regularization_strength"])
+        ),
+    )
+    assert selected["total_variation_distance_from_selected"] == pytest.approx(0.0, abs=1e-12)
+    assert sensitivity["ranges"]["velocity_parallel_standard_deviation_m_s"]["maximum"] >= sensitivity["ranges"]["velocity_parallel_standard_deviation_m_s"]["minimum"]
+    assert "not a measurement uncertainty" in sensitivity["interpretation"]
+
+
+def test_evdf_explicit_regularization_reports_single_candidate_not_sensitivity_range():
+    wavelength, signal, background = _case()
+    result = _run(
+        wavelength, signal, background, regularization_strength=1e-3
+    )
+    sensitivity = result["regularization_sensitivity"]
+    assert sensitivity["status"] == "single_explicit_regularization_value"
+    assert sensitivity["candidate_count"] == 1
+    assert sensitivity["ranges"]["total_variation_distance_from_selected"] == {
+        "minimum": pytest.approx(0.0, abs=1e-12),
+        "maximum": pytest.approx(0.0, abs=1e-12),
+    }
