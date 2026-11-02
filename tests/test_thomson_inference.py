@@ -844,6 +844,47 @@ def test_primary_thomson_inference_includes_spectral_distribution_diagnostics():
         assert evdf["regularization_selection"] == "generalized_cross_validation_over_logarithmic_candidate_grid"
 
 
+def test_rejected_primary_fit_withholds_dependent_thomson_subanalyses(monkeypatch):
+    import tokamak_analysis.thomson_inference as inference
+    import tokamak_analysis.thomson_distribution as distribution_module
+    import tokamak_analysis.thomson_evdf as evdf_module
+
+    original_identifiability = inference._fit_identifiability
+
+    def reject_primary_fit(*args, **kwargs):
+        result = original_identifiability(*args, **kwargs)
+        result["fit_accepted"] = False
+        result["fit_quality_status"] = "rejected_unidentifiable_or_invalid"
+        result["fit_quality_reasons"].append("forced primary-fit rejection for regression test")
+        return result
+
+    def forbidden_subanalysis(*args, **kwargs):
+        pytest.fail("A dependent subanalysis must not run after primary-fit rejection.")
+
+    monkeypatch.setattr(inference, "_fit_identifiability", reject_primary_fit)
+    monkeypatch.setattr(
+        distribution_module, "analyze_thomson_spectral_distribution",
+        forbidden_subanalysis,
+    )
+    monkeypatch.setattr(
+        evdf_module, "reconstruct_thomson_evdf",
+        forbidden_subanalysis,
+    )
+
+    x, y, _ = _spectral_case(120.0)
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+    )
+
+    channel = out["channels"][0]
+    assert channel["fit_accepted"] is False
+    assert channel["spectral_distribution"]["analysis_status"] == "unavailable_primary_fit_rejected"
+    assert channel["electron_velocity_distribution"]["analysis_status"] == "unavailable_primary_fit_rejected"
+    assert out["spectral_distribution"][0]["analysis_status"] == "unavailable_primary_fit_rejected"
+    assert out["electron_velocity_distribution"][0]["analysis_status"] == "unavailable_primary_fit_rejected"
+
+
 def test_thomson_evdf_can_be_explicitly_disabled_without_changing_primary_physics_fit():
     x, y, _ = _spectral_case(100.0)
     out = analyze_thomson_spectra(
