@@ -309,7 +309,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         amp = np.exp(p[:r.size])
         te = np.exp(p[r.size:2*r.size])
         flow = p[2*r.size:3*r.size] * 1e6
-        background_coefficients = p[3*r.size:].reshape(m, n_background)
+        background_coefficients = p[3*r.size:3*r.size + m*n_background].reshape(m, n_background)
         detector_background = background_coefficients @ background_basis.T
         sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
         center = laser * (1.0 - q * flow / _C_M_S)
