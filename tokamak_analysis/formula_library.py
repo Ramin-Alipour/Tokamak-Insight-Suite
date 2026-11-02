@@ -864,7 +864,7 @@ def thomson_electron_temperature_from_spectral_width(intrinsic_sigma_nm, laser_w
     helper does not deconvolve or instrument-correct the measured spectrum.
     """
     sigma=_positive("intrinsic_sigma_nm",intrinsic_sigma_nm); laser=_positive("laser_wavelength_nm",laser_wavelength_nm); angle=_finite("scattering_angle_rad",scattering_angle_rad)
-    if not 0 < angle <= math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi].")
+    if not 0 < angle < math.pi: raise ValueError("scattering_angle_rad must lie in (0, pi).")
     supplied=(sigma_intrinsic_sigma_nm,sigma_laser_wavelength_nm,sigma_scattering_angle_rad)
     if any(v is not None for v in supplied) and not all(v is not None for v in supplied): raise ValueError("Provide all three independent uncertainties, or none.")
     sine=math.sin(angle/2); te=(sigma/laser)**2*510998.95069/(4*sine**2); out={"electron_temperature_eV":te}
