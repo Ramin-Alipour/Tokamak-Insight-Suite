@@ -162,7 +162,10 @@ def trace_cold_plasma_ray(
     it is not a physical time or path-length coordinate.
 
     Mode index is the eigenvalue order returned by numpy.linalg.eigh (0..2).
-    Near branch crossings, the caller must verify eigenvector continuity.
+    Near branch crossings, the caller must inspect the returned branch-continuity
+    diagnostics. Optional coherent mode-amplitude propagation is computed only
+    when both initial_mode_amplitudes and propagation_constants_rad_m are
+    explicitly supplied; it does not change the Hamiltonian ray trajectory.
     """
     x0 = _vector(initial_position_m, "initial_position_m")
     k0 = _vector(initial_wavevector_rad_m, "initial_wavevector_rad_m")
@@ -263,7 +266,7 @@ def trace_cold_plasma_ray(
         "limitations": [
             "Cold, collisionless, local dielectric; not valid at unresolved resonant layers.",
             "The ray ODE follows a fixed eigenvalue-order index. If the tracked eigenvalue-order permutation changes, the ray is not following one continuous polarization branch across the crossing.",
-            "Near-degenerate eigenspaces are flagged as ambiguous; coupled-mode conversion dynamics are not solved.",
+            "Optional lossless coherent mode-amplitude propagation is returned only when its path and propagation constants are explicitly supplied; it does not change the fixed-branch ray trajectory or CTS spectral transfer.",
             "Geometrical-optics approximation; diffraction and finite-beam evolution are not included.",
             "The equilibrium callback and its spatial derivatives are supplied by the caller."
         ],
@@ -293,9 +296,15 @@ def trace_cts_frequency_resolved_beams(
     evaluates each local sample and sums its spectrum with these weights.
 
     This is cold-plasma geometrical optics with caller-supplied local Gaussian
-    covariance. It does not propagate diffraction or mode conversion, and
-    assumes uniform fitted ne/Te/Ti across the sampled volume while allowing
-    local ray directions and magnetic field to vary.
+    covariance. Optional coherent mode-amplitude propagation is available
+    independently on the incident ray and each receiver ray when their ray
+    mappings supply both initial_mode_amplitudes and
+    propagation_constants_rad_m. That calculation is diagnostic output only:
+    it does not alter the ray trajectories, Gaussian overlap weights, or the
+    full-EM CTS spectral transfer. Diffraction and quasi-optical beam evolution
+    remain outside this model. The workflow assumes uniform fitted ne/Te/Ti
+    across the sampled volume while allowing local ray directions and magnetic
+    field to vary.
     """
     if (
         isinstance(mode_index, bool) or not isinstance(mode_index, (int, np.integer))
@@ -737,7 +746,20 @@ def propagate_cold_plasma_mode_coupling(
                     u, _, vh = np.linalg.svd(current_group.conj().T @ previous_group)
                     frame[:, group] = current_group @ (u @ vh)
         frames[j] = frame
-        eigvals[j] = vals[np.argsort(np.arange(3))] if j == 0 else vals[order]
+        eigvals[j] = vals if j == 0 else vals[order]
+        if j == 0:
+            order = np.arange(3)
+        tracked_groups = []
+        start = 0
+        for q in range(2):
+            if abs(eigvals[j, q + 1] - eigvals[j, q]) > tolerance * scale:
+                tracked_groups.append(np.arange(start, q + 1))
+                start = q + 1
+        tracked_groups.append(np.arange(start, 3))
+        subspace_power.append([
+            group.astype(int).tolist()
+            for group in tracked_groups if len(group) > 1
+        ])
     state = amplitudes0.copy()
     amplitudes = np.empty((n, 3), dtype=complex)
     amplitudes[0] = state
@@ -761,6 +783,18 @@ def propagate_cold_plasma_mode_coupling(
     total_power = np.sum(powers, axis=1)
     initial_power = float(np.sum(np.abs(amplitudes0) ** 2))
     conservation_error = float(np.max(np.abs(total_power - initial_power)))
+    degenerate_subspace_power = np.zeros(n, dtype=float)
+    degenerate_subspace_groups = []
+    for sample_index, groups_at_sample in enumerate(subspace_power):
+        sample_groups = []
+        for indices in groups_at_sample:
+            group_power = float(np.sum(powers[sample_index, indices]))
+            degenerate_subspace_power[sample_index] += group_power
+            sample_groups.append({
+                "mode_indices": indices,
+                "power": group_power,
+            })
+        degenerate_subspace_groups.append(sample_groups)
     return {
         "path_coordinate_m": path.copy(),
         "mode_amplitudes": amplitudes,
@@ -770,6 +804,8 @@ def propagate_cold_plasma_mode_coupling(
         "local_wave_operator_eigenvalues": eigvals,
         "parallel_transported_polarization_frames": frames,
         "degenerate_subspace_detected": degenerate,
+        "degenerate_subspace_power": degenerate_subspace_power,
+        "degenerate_subspace_groups": degenerate_subspace_groups,
         "mode_conversion_model": "lossless_flux_normalized_cold_plasma_coupled_mode_equation",
         "coupled_mode_equation": "d(a)/ds = -[U^H dU/ds + i diag(beta)] a",
         "power_conservation_max_abs_error": conservation_error,
