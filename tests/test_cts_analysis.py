@@ -1264,3 +1264,17 @@ def test_cts_frequency_resolved_geometry_requires_one_entry_per_frequency():
             ion_fractions=[1.0], electron_velocity_projection_m_s=0.0,
             ion_velocity_projection_m_s=0.0,
         )
+
+
+def test_cts_whitener_checks_covariance_symmetry_relative_to_its_scale():
+    from tokamak_analysis.cts_analysis import _whitener
+
+    scale = 1e-24
+    valid = scale * np.array([[2.0, 0.2], [0.2, 1.0]])
+    whiten, returned = _whitener(valid, 2, None)
+    assert np.array_equal(returned, valid)
+    assert np.all(np.isfinite(whiten(np.array([1.0, -1.0]))))
+
+    invalid = scale * np.array([[2.0, 0.2], [0.199, 1.0]])
+    with pytest.raises(ValueError, match="scale-relative tolerance"):
+        _whitener(invalid, 2, None)
