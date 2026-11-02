@@ -1033,3 +1033,13 @@ def test_measured_response_matrix_is_rejected_not_renormalized():
     with pytest.raises(ValueError, match="columns must already sum to one"):
         _response_for_channel(response, 0, 1, 7, np.linspace(500.0, 506.0, 7))
     np.testing.assert_array_equal(response, original)
+
+
+def test_optical_thomson_rejects_backscattering_endpoint_at_pi():
+    x, y, _ = _spectral_case(100.0)
+    with pytest.raises(ValueError, match="strictly between 0 and pi"):
+        analyze_thomson_spectra(
+            x, y[None, :], [0.1], laser_wavelength_nm=532.0,
+            scattering_angle_rad=np.pi, instrument_response=np.eye(x.size),
+            model="non_collective_maxwellian",
+        )
