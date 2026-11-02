@@ -61,6 +61,30 @@ def test_registered_spatial_profile_analysis_dispatches_joint_spatial_spectral_m
 
 
 
+def test_joint_spatial_dispatch_forwards_relativistic_model_and_compton_selection(monkeypatch):
+    captured = {}
+
+    def fake_joint(*args, **kwargs):
+        captured["kwargs"] = kwargs
+        return {"analysis_status": "joint-dispatch-tested"}
+
+    import tokamak_analysis.thomson_joint_spatial_spectral as joint
+    monkeypatch.setattr(joint, "reconstruct_joint_thomson_spatial_spectra", fake_joint)
+    result = workflow.reconstruct_thomson_profile_from_spectra(
+        np.linspace(520.0, 544.0, 9), np.ones((3, 9)), np.array([0.1, 0.2, 0.3]),
+        joint_spatial_spectral=True, spatial_mixing_matrix=np.eye(3),
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(9), model="non_collective_relativistic_maxwell_juttner",
+        incident_polarization=[1.0, 0.0, 0.0], maximum_recoil_correction_fraction=0.02,
+        include_compton_recoil=True,
+    )
+    assert result["analysis_status"] == "joint-dispatch-tested"
+    assert captured["kwargs"]["physical_model"] == "relativistic_maxwell_juttner"
+    assert captured["kwargs"]["incident_polarization"] == [1.0, 0.0, 0.0]
+    assert captured["kwargs"]["maximum_recoil_correction_fraction"] == pytest.approx(0.02)
+    assert captured["kwargs"]["include_compton_recoil"] is True
+
+
 def test_gls_smoothing_accepts_small_but_positive_covariance_without_rescaling():
     radius = np.linspace(0.0, 1.0, 5)
     values = np.array([1.0, 1.2, 1.1, 1.4, 1.3])
