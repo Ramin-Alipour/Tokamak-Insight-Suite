@@ -263,6 +263,10 @@ def reconstruct_joint_thomson_spatial_spectra(
     upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
                   np.full(r.size, np.inf),
                   np.full(m*n_background, np.inf)]
+    if physical_model == "relativistic_maxwell_juttner":
+        # Subluminal flow is a physical domain constraint of the relativistic kernel.
+        lower[2*r.size:3*r.size] = -0.99*_C_M_S/1e6
+        upper[2*r.size:3*r.size] = 0.99*_C_M_S/1e6
     if not isinstance(positive_amplitude, (bool, np.bool_)):
         raise ValueError("positive_amplitude must be boolean")
     if not positive_amplitude:
