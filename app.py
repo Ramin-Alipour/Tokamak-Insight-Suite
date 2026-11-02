@@ -1257,7 +1257,7 @@ elif page=='Spectral Analysis':
                         })
                     if joint_spatial_spectral:
                         if laser_unc_value is not None or angle_unc_value is not None or response_uncertainty is not None:
-                            raise ValueError('The current joint spatial-spectral Maxwellian inverse treats laser geometry and the supplied response operator as fixed; omit their uncertainty inputs rather than having them silently ignored.')
+                            raise ValueError('The current joint spatial-spectral inverse treats laser geometry and the supplied response operator as fixed; omit their uncertainty inputs rather than having them silently ignored.')
                         for unsupported_key in ('laser_wavelength_uncertainty_nm','scattering_angle_uncertainty_rad','instrument_response_uncertainty'):
                             kwargs.pop(unsupported_key,None)
                         result=reconstruct_thomson_profile_from_spectra(wavelengths,spectra,radii,**kwargs)
