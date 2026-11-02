@@ -495,3 +495,16 @@ The electrostatic analyze_cts_spectrum callable now optionally accepts a researc
 The result exposes the selected background model, fitted background spectrum, nuisance coefficients and PCA component count. Without a reference ensemble, the prior constant-offset nuisance remains unchanged. The new input is electrostatic-only; the Full-EM branch does not accept it. The implementation is explicitly a reference-spectrum PCA nuisance model, not a reproduction of the physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96 (2025) 043513; DOI 10.1063/5.0238948), which additionally uses CTS-specific modulation/time-series structure. Reference-ensemble uncertainty is not propagated. The callable, dashboard, root/package JSON registries, Python runtime registry, documentation and regression tests were updated directly on main. No experimental validation is performed or claimed.
 
 The final software-test status is determined only by GitHub Actions for the exact resulting main-head commit; no experimental validation is claimed.
+
+
+## AH. Automatic initialization for the two-population relativistic optical Thomson fit — 2026-11-02
+
+The two-population Maxwell–Jüttner shape fit previously required the researcher to supply all four nonlinear optimizer starting values (cold temperature, hot temperature, hot number fraction and common scattering-vector flow projection). This contradicted the project input contract that optimizer seeds should be determined automatically from the measured spectrum.
+
+**Implemented directly on `main`:** when all four optional seeds are omitted, the fit now derives deterministic moment-based starting values from the measured calibrated spectrum and runs three bounded deterministic starts, selecting the successful candidate with the smallest whitened residual sum of squares. The moment-to-temperature relation is used only to initialize the relativistic optimizer; it is not returned as an inferred temperature and does not replace the relativistic Maxwell–Jüttner forward model. Partial manual seed sets are rejected; all four may be supplied together for reproducibility. The result explicitly records initialization provenance, multistart count and that seeds are not inferred outputs.
+
+The Streamlit workflow now makes all four seed fields optional, explains the all-or-none rule and invokes automatic initialization when they are blank. The Python runtime registry describes the same contract, and regression tests cover automatic initialization and registry metadata. The model remains a shape-only two-isotropic-population parameterization with one shared projected flow; absolute density and unrestricted 3-D EVDF remain non-identifiable/not inferred. The change does not add calibration or experimental validation.
+
+Commits: `c17de1eb6756cd2388308ad8859ee649e9776748` (fit implementation), `ba91377df25d45fdfeff82f766feb5565038ca8e` (fit regression), `49256fde60415091c1e7d4210c97c090e886492b` (dashboard), `730d95f6268c8d34d9fb7bc5d6dda35c084bbc74` (runtime registry), `58fb0e7bca6f635208bb50eb1edaa80b24ef0da2` (registry regression).
+
+GitHub Actions were not triggered; software-test success is not claimed. Experimental validation was not performed or claimed.
