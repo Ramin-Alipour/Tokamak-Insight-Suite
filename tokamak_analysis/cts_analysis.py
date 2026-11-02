@@ -786,8 +786,35 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     fit=least_squares(residual,start,bounds=(lo,hi),x_scale="jac",max_nfev=6000)
     d=decode(fit.x); z=forward(fit.x); amp,background_fit,background_coefficients=profile_amplitude(z)
     fitted=amp*z+background_fit; res=y-fitted; data_fit_residual=data_residual(fit.x)
-    nuisance_parameter_count=(1 if background_basis is None else background_basis.shape[1])
+    nuisance = np.ones((f.size, 1)) if background_basis is None else background_basis
+    nuisance_parameter_count=nuisance.shape[1]
     dof=max(1,y.size-len(fit.x)-1-nuisance_parameter_count)
+
+    # Conditional covariance of the fitted detector-space background
+    # coefficients.  This quantifies uncertainty in the linear nuisance fit
+    # while keeping the researcher-supplied PCA reference subspace fixed.
+    # It does not claim to propagate uncertainty in the reference ensemble
+    # or in the PCA basis itself.
+    if amp > 0.0:
+        linear_design = np.column_stack((z, nuisance))
+        linear_covariance_slice = slice(1, 1 + nuisance_parameter_count)
+    else:
+        linear_design = nuisance
+        linear_covariance_slice = slice(0, nuisance_parameter_count)
+    whitened_linear_design = whiten(linear_design)
+    linear_normal = whitened_linear_design.T @ whitened_linear_design
+    linear_covariance = np.linalg.pinv(linear_normal)
+    if unc is None and spectral_covariance is None:
+        linear_covariance *= float(data_fit_residual @ data_fit_residual / dof)
+    background_coefficient_covariance = linear_covariance[
+        linear_covariance_slice, linear_covariance_slice
+    ]
+    background_spectrum_covariance = (
+        nuisance @ background_coefficient_covariance @ nuisance.T
+    )
+    background_spectrum_uncertainty = np.sqrt(
+        np.maximum(np.diag(background_spectrum_covariance), 0.0)
+    )
     # Identifiability must be assessed after column scaling.  The optimizer
     # parameters mix logarithms, a dimensional flow projection and (for an
     # inferred VDF) dimensionless logits; a raw condition number is therefore
@@ -837,6 +864,19 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "background_model":"constant_offset" if background_basis is None else "reference_spectrum_PCA",
       "background_spectrum":background_fit.copy(),
       "background_coefficients":background_coefficients.copy(),
+      "background_coefficient_names":(
+          ["constant_offset"] if background_basis is None else
+          ["reference_mean"] + [f"pca_component_{i+1}" for i in range(background_pca_components_used)]
+      ),
+      "background_coefficient_covariance":background_coefficient_covariance.copy(),
+      "background_spectrum_covariance":background_spectrum_covariance.copy(),
+      "background_spectrum_uncertainty":background_spectrum_uncertainty.copy(),
+      "background_uncertainty_status":(
+          "conditional_linear_nuisance_covariance_from_supplied_spectral_uncertainty"
+          if unc is not None or spectral_covariance is not None else
+          "conditional_linear_nuisance_covariance_scaled_by_fit_residual_variance"
+      ),
+      "background_reference_basis_uncertainty_propagated":False,
       "background_reference_mean":None if background_reference_mean is None else background_reference_mean.copy(),
       "background_pca_components_used":int(background_pca_components_used),
       "background_provenance":"single fitted constant offset nuisance" if background_basis is None else "PCA nuisance subspace derived only from supplied calibrated reference spectra on the same frequency grid; no reference data are modified or recalibrated",
