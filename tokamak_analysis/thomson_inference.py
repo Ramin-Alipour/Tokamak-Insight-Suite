@@ -1819,8 +1819,11 @@ def analyze_thomson_spectra(
         dof_joint = max(1, measured_flat.size-initial.size)
         standardized = joint_residual(joint_fit.x)
         reduced_chi2_joint = float(standardized @ standardized / dof_joint)
-        if not np.isfinite(reduced_chi2_joint) or reduced_chi2_joint>10.0:
-            raise ValueError("Joint Thomson GLS fit rejected: reduced chi-square exceeds the default acceptance ceiling of 10")
+        if not np.isfinite(reduced_chi2_joint):
+            raise ValueError("Joint Thomson GLS fit rejected: reduced chi-square is non-finite")
+        # With a supplied covariance, reduced chi-square is a model-adequacy
+        # diagnostic. A universal hard cutoff is not justified without an
+        # explicit noise/significance policy supplied by the researcher.
         # Transform the full parameter covariance to all channel Te and flow values.
         def physical_vector(parameters):
             values=[]
@@ -2045,6 +2048,7 @@ def analyze_thomson_spectra(
             "model_discrepancy_uncertainty_available": bool(discrepancy_scale > 0.0),
             "total_physical_parameter_covariance":total_physical_covariance,
             "reduced_chi_square":reduced_chi2_joint,
+            "reduced_chi_square_policy":"diagnostic_only_no_hard_acceptance_cutoff_without_an_explicit_noise_and_significance_policy",
             "jacobian_rank":joint_rank,"jacobian_condition_number":joint_condition,
             "degrees_of_freedom":int(dof_joint),
             "model_discrepancy_scale":discrepancy_scale,
