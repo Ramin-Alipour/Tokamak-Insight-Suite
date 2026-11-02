@@ -288,3 +288,27 @@ def test_evdf_explicit_regularization_reports_single_candidate_not_sensitivity_r
         "minimum": pytest.approx(0.0, abs=1e-12),
         "maximum": pytest.approx(0.0, abs=1e-12),
     }
+
+
+def test_evdf_candidate_shape_parameters_use_only_mathematical_domain_bounds(monkeypatch):
+    import tokamak_analysis.thomson_evdf as module
+
+    wavelength, signal, background = _case()
+    original = module.least_squares
+    observed_bounds = []
+
+    def recording_least_squares(*args, **kwargs):
+        observed_bounds.append(kwargs["bounds"])
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "least_squares", recording_least_squares)
+    _run(wavelength, signal, background)
+
+    assert len(observed_bounds) == 3
+    # Candidate order: Maxwellian, finite-variance Student-t, super-Gaussian.
+    kappa_lower, kappa_upper = observed_bounds[1]
+    super_lower, super_upper = observed_bounds[2]
+    assert kappa_lower[3] > 2.0
+    assert np.isinf(kappa_upper[3])
+    assert super_lower[3] > 0.0
+    assert np.isinf(super_upper[3])
