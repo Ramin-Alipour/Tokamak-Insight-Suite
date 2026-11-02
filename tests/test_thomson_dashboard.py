@@ -91,6 +91,33 @@ def test_analysis_1_dashboard_exposes_only_three_selected_optical_models():
     ]
 
 
+def test_dashboard_exposes_joint_spectral_covariance_for_relativistic_mj():
+    wavelength = np.linspace(526.0, 538.0, 9)
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * wavelength.size + ["ch1"] * wavelength.size,
+        "radius_m": [0.1] * wavelength.size + [0.2] * wavelength.size,
+        "wavelength_nm": np.tile(wavelength, 2),
+        "intensity": np.tile(np.linspace(1.0, 2.0, wavelength.size), 2),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.radio if item.label == "WORKSPACE").set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "Thomson multi-channel spectral inference"
+    ).run()
+    next(item for item in app.selectbox if item.label == "Physical spectral model").set_value(
+        "non_collective_relativistic_maxwell_juttner"
+    ).run()
+    assert any(
+        item.label.startswith("Optional full cross-channel spectral covariance CSV")
+        for item in app.file_uploader
+    )
+    assert any(
+        "joint fit with shared electron temperature" in item.value
+        for item in app.caption
+    )
+    assert not app.exception, [str(error.value) for error in app.exception]
+
+
 def test_independent_thomson_spectral_distribution_workflow_is_exposed_and_renders():
     wavelength = np.linspace(531.0, 533.0, 41)
     signal = np.exp(-0.5 * ((wavelength - 532.0) / 0.18) ** 2) + 0.02
