@@ -553,3 +553,77 @@ The requested B items are not all software defects. Single-view 3-D velocity rec
 The C-series contract work is distributed across the existing machine-readable result classification, fit provenance, optimizer-seed metadata, covariance semantics, response/measurement input contracts, synchronized root/package registries, dashboard regressions and audit history. This matrix is a reconciliation of the requested list against the current source; it is not a claim that all A/B/C items are closed.
 
 **Validation:** the source, tests and registries were updated on main. The GitHub combined commit-status endpoint returned no status entries for the final commit at the time of this audit; therefore this audit does not claim that the full test suite passed. No experimental validation was performed or claimed.
+
+
+---
+
+## Implementation update — 2026-11-02
+
+### Implemented on `main`
+
+The relativistic non-collective optical Thomson branch now includes a dedicated
+multi-channel generalized least-squares API:
+
+- `tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner_channels`
+- Full positive-definite channel-major covariance of shape
+  `(n_channels*n_wavelengths, n_channels*n_wavelengths)`, including non-zero
+  cross-channel blocks, is Cholesky-whitened and used in the objective.
+- Electron temperature and scattering-vector-parallel bulk flow are shared
+  plasma parameters; each detector channel retains independent positive
+  amplitude, constant offset and linear spectral-background slope.
+- The result returns the complete local parameter covariance, weighted
+  residual sum of squares, scaled-Jacobian rank/condition diagnostics,
+  per-channel fitted spectra and an explicit covariance-order declaration.
+- Rank-deficient or severely ill-conditioned fits are rejected rather than
+  reported as identified.
+- Density is explicitly not inferred from normalized spectral shapes. Absolute
+  density still requires independently calibrated spectral power and the
+  complete optical/collection calibration chain.
+- The primary Analysis 1 registry now links the new callable and distinguishes
+  this shared-parameter multi-channel API from the existing channel-local
+  relativistic fitting route.
+
+Regression tests were added in
+`tests/test_thomson_mj_multichannel.py` for synthetic parameter recovery,
+cross-channel covariance use, output covariance dimensions and rejection of
+non-positive-definite covariance.
+
+### Scientific scope and remaining work
+
+This implementation closes the specific limitation that the existing
+relativistic Maxwell–Jüttner fitter could only use channel-local spectral
+covariance. It does **not** claim to solve the other independent gaps in this
+audit. In particular, arbitrary anisotropic/relativistic EVDF inversion,
+structured-background inference, jointly estimated spatial PSF, full
+electromagnetic CTS ray/beam propagation and mode conversion, finite-orbit
+width/collisional CTS corrections, and independent experimental validation
+remain separate tasks. The new function assumes common plasma parameters and
+geometry across channels; it is not a general multi-population or
+channel-dependent-distribution solver.
+
+### Recent methodological references
+
+1. Sakai et al., “Monte Carlo simulation method for incoherent Thomson
+   scattering spectra from arbitrary electron distribution functions,”
+   *Journal of Instrumentation* **21** (2026), C01002.
+   DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002).
+   Relevant to arbitrary-EVDF forward modelling; it motivates a separate
+   distribution-aware kernel rather than relabelling the present Maxwell–
+   Jüttner model as an arbitrary-EVDF solver.
+
+2. Skolar, Longley & Goodwin, “Computing the generalized plasma dispersion
+   function for non-Maxwellian plasmas, with applications to Thomson
+   scattering,” *Physics of Plasmas* **32** (2025), 043907.
+   DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966).
+   Relevant to non-Maxwellian dielectric response and collective scattering.
+
+3. Carole et al., “A photonic model of the High-Resolution Thomson Scattering
+   diagnostic of WEST tokamak,” *Journal of Instrumentation* **20** (2025),
+   P07014. DOI:
+   [10.1088/1748-0221/20/07/P07014](https://doi.org/10.1088/1748-0221/20/07/P07014).
+   Relevant to instrument/photonic response modelling and the distinction
+   between a plasma spectral model and a diagnostic forward model.
+
+**Verification status:** code and tests were committed to `main`; no GitHub
+Actions workflow run was returned for the resulting commits at the time of
+this update. Therefore test execution and CI status are pending verification.
