@@ -52,11 +52,22 @@ def sample_external_input_vectors(base_values, covariance, *, samples=100, seed=
     if base.dtype.kind not in "iuf" or base.ndim != 1 or not np.all(np.isfinite(base)):
         raise ValueError("base_values must be a finite real vector")
     cov = np.asarray(covariance)
-    if cov.shape != (base.size, base.size):
-        raise ValueError("covariance shape must match base_values")
+    if cov.dtype.kind not in "iuf" or cov.ndim != 2:
+        raise ValueError("covariance must be a real numeric matrix")
+    cov = cov.astype(float, copy=False)
+    if cov.shape != (base.size, base.size) or not np.all(np.isfinite(cov)):
+        raise ValueError("covariance must be finite and match base_values")
+    if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-14):
+        raise ValueError("covariance must be symmetric")
+    cov = 0.5 * (cov + cov.T)
     if isinstance(samples, (bool, np.bool_)) or not isinstance(samples, (int, np.integer)) or samples < 20:
         raise ValueError("samples must be an integer >= 20")
-    values, vectors = np.linalg.eigh(0.5 * (cov + cov.T))
+    if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)):
+        raise ValueError("seed must be an integer")
+    values, vectors = np.linalg.eigh(cov)
+    scale = max(float(np.max(np.abs(values))), np.finfo(float).tiny)
+    if float(np.min(values)) < -1e-10 * scale:
+        raise ValueError("covariance must be positive semidefinite")
     root = vectors * np.sqrt(np.maximum(values, 0.0))
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(int(seed))
     return base[None, :] + rng.standard_normal((int(samples), base.size)) @ root.T
