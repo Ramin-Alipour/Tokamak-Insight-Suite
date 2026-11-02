@@ -356,3 +356,15 @@ Relevant direct-main commits:
 - `0aae1c5287da46541b2f70a5da99bf094109cfd6` and `2dbea429e4b8c15d9753f4c63b2627f2bc08e7cf` — regression tests.
 
 **Experimental validation:** not performed and not claimed. GitHub Actions for the current main head are pending; software-test success is not asserted until those workflows complete.
+
+
+## U. CTS calibrated frequency-response preservation — 2026-11-02
+
+120. **The electrostatic and Full-EM CTS branches silently renormalized the supplied measured frequency-response matrix.** This violated the same fixed-calibrated-operator contract used by optical Thomson inference. **Fixed directly on main:** both electrostatic response application and inversion, and both Full-EM response application and inversion, now require finite non-negative square matrices whose columns already sum to one; accepted measured matrices are used unchanged. The Full-EM uncertainty-propagation routine may still normalize its *sampled perturbed realizations* to enforce the declared non-negative unit-column response-operator constraint; it does not renormalize the base supplied operator. Added direct regression coverage for both private response operators and both public inversion entry points, including input-matrix preservation.
+
+Commits:
+- `598e0004e353ada77d4eb28c032aa99ae64dc710` — electrostatic CTS response contract.
+- `410e0c00c48771def4b70bc8ddf64b41dc244a17` — Full-EM CTS response contract.
+- `06d80a2d5d482cf9fb35db2206150c6d5f206691` — regression tests.
+
+**Experimental validation:** not performed and not claimed. GitHub Actions must pass for the final main head before software-test success is stated.
