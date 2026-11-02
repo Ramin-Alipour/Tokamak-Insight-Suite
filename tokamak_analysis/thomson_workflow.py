@@ -684,3 +684,24 @@ def reconstruct_thomson_joint_spatial_spectra(*args, **kwargs):
     """Run joint wavelength-resolved spatial Thomson inversion with fixed mixing."""
     from .thomson_joint_spatial_spectral import reconstruct_joint_thomson_spatial_spectra
     return reconstruct_joint_thomson_spatial_spectra(*args, **kwargs)
+
+
+def reconstruct_thomson_profile_with_psf(
+    measured_profile, spatial_mixing_matrix, *,
+    measurement_covariance=None, measurement_uncertainty=None,
+    regularization=None, candidate_regularizations=None,
+):
+    """PSF-aware profile inversion using a researcher-supplied spatial operator.
+
+    The mixing matrix maps latent spatial nodes to measured channel values.
+    This is an explicit alternative to ordinary PCHIP/smoothing-spline
+    interpolation; it never estimates or silently invents a PSF.
+    """
+    from .thomson_advanced_inference import reconstruct_profile_with_psf
+    return reconstruct_profile_with_psf(
+        measured_profile, spatial_mixing_matrix,
+        measurement_covariance=measurement_covariance,
+        measurement_uncertainty=measurement_uncertainty,
+        regularization=regularization,
+        candidate_regularizations=candidate_regularizations,
+    )
