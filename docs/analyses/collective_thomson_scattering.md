@@ -237,3 +237,46 @@ propagation is requested.
 For local (non-ray-resolved) geometry, `analyze_full_em_cts_spectrum` accepts an optional ordered positive-semidefinite `external_input_covariance` with its exact `external_input_parameter_order`. Supported components are the three magnetic-field components, incident/scattered direction components, and real/imaginary components of the incident/scattered complex polarization vectors. The supplied joint covariance is sampled reproducibly and the complete physical parameter fit is repeated for each accepted draw. The returned `external_input_parameter_covariance` is a separate physical-parameter covariance contribution, with requested/successful draw counts and an explicit propagation status.
 
 This route is conditional on the supplied local covariance and is deliberately rejected for `frequency_resolved_geometry`: ray, equilibrium, path-sample and beam-covariance uncertainty are not represented by this local-vector contract. Covariance contributions from the measured response and local external-input Monte Carlo routes are combined as separate components; cross-covariance between those distinct sources is not inferred. No geometry, polarization, magnetic field or instrument response is calibrated or modified.
+
+
+## Calibrated reference-spectrum PCA background (electrostatic CTS)
+
+The electrostatic analyze_cts_spectrum workflow optionally accepts
+background_reference_spectra and background_components. The reference
+array contains at least two already calibrated background-only spectra,
+sampled on exactly the same frequency-shift grid and detector intensity scale
+as the measured CTS spectrum. The researcher explicitly selects the number
+of retained principal components; the code does not choose a component count
+or fabricate reference spectra.
+
+The reference mean and selected PCA modes define a fixed detector-space
+background nuisance subspace. At every nonlinear plasma-parameter trial,
+linear least squares profiles the CTS amplitude and the background-mode
+coefficients jointly. The measured CTS spectrum is not baseline-subtracted
+or otherwise modified. The supplied CTS frequency-response operator is
+applied only to the physical CTS forward spectrum; the reference-derived
+background remains in detector space because it is already measured there.
+
+The result returns background_model, background_spectrum,
+background_coefficients, and background_pca_components_used.
+Without reference spectra, the existing single constant-offset nuisance
+model remains unchanged. This option is electrostatic-only; passing it to
+the Full-EM dispatcher is not supported.
+
+This is a reference-spectrum PCA nuisance model, not a claim to reproduce
+the full physics-informed PCA method of Verdier et al. It is motivated by
+the demonstrated importance of structured, time-varying CTS backgrounds:
+T. Verdier et al., “Robust monitoring of thermal and fast ions using
+collective Thomson scattering: Combining physics- and data-driven
+background estimation,” Review of Scientific Instruments 96 (2025),
+043513, DOI: 10.1063/5.0238948. Their physics-informed PCA method used
+on-pulse modulation and diagnostic-specific temporal structure; the TIS
+implementation uses only the calibrated reference spectra explicitly
+provided by the researcher and does not infer missing modulation states.
+
+All reference spectra are treated as prepared/calibrated measurements.
+No instrument calibration, detector correction, empirical validation or
+experimental validation is performed or claimed. Uncertainty in the
+reference ensemble itself is not propagated by this conditional PCA route;
+the returned background coefficients are nuisance-fit outputs, not
+independent physical plasma parameters.
