@@ -353,6 +353,29 @@ def test_polarized_thomson_cross_section_uses_full_consistent_geometry():
         )
 
 
+def test_thomson_differential_cross_section_rejects_both_optical_geometry_endpoints():
+    from tokamak_analysis.thomson_scattering import thomson_differential_cross_section_m2_sr
+
+    for angle in (0.0, np.pi):
+        with pytest.raises(ValueError, match="strictly between 0 and pi"):
+            thomson_differential_cross_section_m2_sr(angle)
+
+
+def test_thomson_density_formula_rejects_both_optical_geometry_endpoints():
+    from tokamak_analysis.thomson_scattering import density_from_thomson_scattered_power
+
+    for angle in (0.0, np.pi):
+        with pytest.raises(ValueError, match="strictly between 0 and pi"):
+            density_from_thomson_scattered_power(
+                scattered_power_W=1e-6,
+                incident_power_W=1.0,
+                interaction_length_m=0.1,
+                scattering_angle_rad=angle,
+                collection_solid_angle_sr=0.01,
+                optical_efficiency=0.8,
+            )
+
+
 def test_instrument_response_accepts_kernel_array_and_callable():
     from tokamak_analysis.thomson_inference import _response_for_channel
     x,y,_=_spectral_case(100.0)
