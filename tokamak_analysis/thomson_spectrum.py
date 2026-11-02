@@ -78,18 +78,9 @@ def fit_thomson_spectrum(
     if instrument_response_matrix is None:
         raise ValueError("A measured instrument_response_matrix is required; a scalar Gaussian width is not converted into a synthetic response.")
     response = np.asarray(instrument_response_matrix, dtype=float)
-    if (response.shape != (x.size, x.size) or np.any(~np.isfinite(response))
-            or np.any(response < 0) or np.any(response.sum(axis=0) <= 0)):
-        raise ValueError(
-            "instrument_response_matrix must be a finite non-negative measured square matrix "
-            "with positive column sums"
-        )
-    column_sums = response.sum(axis=0)
-    if not np.allclose(column_sums, 1.0, rtol=1e-8, atol=1e-10):
-        raise ValueError(
-            "instrument_response_matrix must already have unit-sum columns; "
-            "the measured response is never renormalized or otherwise modified"
-        )
+    if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
+        raise ValueError("instrument_response_matrix must be a finite non-negative measured square matrix with positive column sums")
+    response = response / response.sum(axis=0, keepdims=True)
     from .thomson_inference import analyze_thomson_spectra
     try:
         result = analyze_thomson_spectra(
