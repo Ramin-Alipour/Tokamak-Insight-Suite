@@ -89,3 +89,52 @@ def test_regularization_does_not_manufacture_data_identifiability():
     assert out["electron_velocity_projection_profile_m_s"] is None
     assert out["parameter_covariance"] is None
     assert out["optimizer_candidate"]["role"] == "numerical_candidate_not_a_measured_result"
+
+
+
+def test_response_stack_validates_column_sums_per_channel_and_preserves_operators():
+    from tokamak_analysis.thomson_joint_spatial_spectral import _response_stack
+
+    shared = np.array([
+        [0.90, 0.10, 0.00],
+        [0.10, 0.80, 0.10],
+        [0.00, 0.10, 0.90],
+    ])
+    shared_before = shared.copy()
+    stacked_shared = _response_stack(shared, n_channels=2, n_wavelengths=3)
+    assert stacked_shared.shape == (2, 3, 3)
+    np.testing.assert_array_equal(stacked_shared[0], shared_before)
+    np.testing.assert_array_equal(stacked_shared[1], shared_before)
+    np.testing.assert_array_equal(shared, shared_before)
+
+    channel_specific = np.stack([
+        shared,
+        np.array([
+            [0.85, 0.15, 0.00],
+            [0.15, 0.75, 0.10],
+            [0.00, 0.10, 0.90],
+        ]),
+    ])
+    channel_before = channel_specific.copy()
+    stacked_specific = _response_stack(channel_specific, n_channels=2, n_wavelengths=3)
+    np.testing.assert_array_equal(stacked_specific, channel_before)
+    np.testing.assert_array_equal(channel_specific, channel_before)
+
+
+def test_response_stack_rejects_non_unit_columns_independently_for_each_channel():
+    from tokamak_analysis.thomson_joint_spatial_spectral import _response_stack
+
+    response = np.repeat(np.eye(3)[None, :, :], 2, axis=0)
+    response[1, 0, 0] = 0.5
+    with pytest.raises(ValueError, match="columns must sum to one for every channel"):
+        _response_stack(response, n_channels=2, n_wavelengths=3)
+
+
+@pytest.mark.parametrize("angle", [0.0, np.pi])
+def test_joint_inverse_rejects_optical_scattering_angle_endpoints(angle):
+    x, y, r, h, *_ = _synthetic_case()
+    with pytest.raises(ValueError, match="strictly between 0 and pi"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, laser_wavelength_nm=532.0,
+            scattering_angle_rad=angle,
+        )
