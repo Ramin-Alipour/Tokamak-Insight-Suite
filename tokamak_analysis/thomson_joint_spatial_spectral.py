@@ -243,7 +243,26 @@ def reconstruct_joint_thomson_spatial_spectra(
     optimizer_jacobian = np.asarray(fit.jac, dtype=float)
     optimizer_rank = int(np.linalg.matrix_rank(optimizer_jacobian))
     optimizer_condition = float(np.linalg.cond(optimizer_jacobian))
-    data_identifiable = bool(fit.success and data_rank == parameter_count)
+    # Apply the same conservative non-relativistic asymptotic screens as the
+    # channel-wise Maxwellian inference. These are numerical error-budget
+    # screens, not universal physical validity boundaries.
+    from .thomson_inference import (
+        ELECTRON_REST_ENERGY_EV, NONRELATIVE_THETA_E_SCREEN,
+        NONRELATIVE_FLOW_BETA_SCREEN,
+    )
+    theta_e = te / ELECTRON_REST_ENERGY_EV
+    flow_beta = np.abs(flow) / _C_M_S
+    model_domain_valid = bool(
+        np.all(theta_e < NONRELATIVE_THETA_E_SCREEN)
+        and np.all(flow_beta < NONRELATIVE_FLOW_BETA_SCREEN)
+    )
+    data_identifiable = bool(fit.success and data_rank == parameter_count and model_domain_valid)
+    if fit.success and not model_domain_valid:
+        primary_status = "model_domain_rejected"
+    elif data_identifiable:
+        primary_status = "identified_from_measured_data"
+    else:
+        primary_status = "not_identifiable_from_measured_data"
     dof = max(1, data_residual.size - parameter_count)
     covariance_p = np.linalg.pinv(optimizer_jacobian.T @ optimizer_jacobian)
     if joint_spectral_covariance is None and signal_uncertainty is None:
@@ -254,10 +273,18 @@ def reconstruct_joint_thomson_spatial_spectra(
     uncertainties = np.sqrt(diagonal)
     n = r.size
     return {
-        "analysis_status": "completed" if fit.success else "optimizer_not_converged",
-        "primary_result_status": "identified_from_measured_data" if data_identifiable else "not_identifiable_from_measured_data",
+        "analysis_status": ("model_domain_rejected" if fit.success and not model_domain_valid else "completed" if fit.success else "optimizer_not_converged"),
+        "primary_result_status": primary_status,
         "primary_outputs_reportable_as_identified": data_identifiable,
         "model": "isotropic_nonrelativistic_maxwellian_single_particle_thomson",
+        "validity_screening": {
+            "theta_e_profile": theta_e,
+            "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
+            "bulk_flow_beta_profile": flow_beta,
+            "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
+            "model_domain_valid": model_domain_valid,
+            "rationale": "Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal physical validity boundaries.",
+        },
         "radius_m": r.copy(),
         "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
         "electron_density_profile_m3": np.full(n, np.nan, dtype=float),
