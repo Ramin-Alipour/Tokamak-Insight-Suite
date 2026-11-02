@@ -4257,7 +4257,7 @@
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
     "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms.",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -4265,9 +4265,11 @@
       "tokamak_analysis.cts_full_em.full_em_cts_spectral_density",
       "tokamak_analysis.cts_em_geometry.trace_cts_frequency_resolved_beams",
       "tokamak_analysis.cts_full_em.assess_full_em_cts_numerical_convergence",
-      "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators"
+      "tokamak_analysis.cts_em_geometry.track_cold_plasma_modes_from_operators",
+      "tokamak_analysis.cts_external_uncertainty.validate_external_input_covariance",
+      "tokamak_analysis.cts_external_uncertainty.sample_external_input_vectors"
     ],
-    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs.",
+    "implementation_status": "Both CTS physical branches are callable under primary Analysis 1 through the explicit analyze_cts_spectrum_model dispatcher. Full-EM spectrum inversion fits scalar electron- and species-resolved ion-flow projections along the scattering wavevector; optional projection values are optimizer seeds, not 3-D flow vectors. Relativistic gyrotropic electron distributions are supported by the forward spectral-density function only and are rejected by the current inversion API. Fast-ion distributions supplied to inversion remain fixed external inputs. Full-EM inversion additionally supports joint Monte Carlo propagation of explicitly supplied local magnetic-field, incident/scattered direction and complex polarization covariance for local (non-ray-resolved) geometry. Frequency-resolved ray/equilibrium/beam covariance and cross-covariance between distinct external covariance sources remain unsupported and are reported as such.",
     "execution_contract": {
       "schema_version": "2.0",
       "execution_level": "analysis_pipeline",
@@ -4529,6 +4531,34 @@
           "required": false,
           "default": 0.001,
           "description": "Full-EM only: both successive relative spectral changes must be below this tolerance for convergence_status=converged_at_final_refinement.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "external_input_covariance",
+          "unit": "ordered covariance matrix for local magnetic-field, incident/scattered direction and complex polarization components",
+          "required": false,
+          "description": "Optional positive-semidefinite joint covariance propagated by reproducible Monte Carlo refits. Supported components: magnetic_field_T_{x,y,z}, incident_direction_{x,y,z}, scattered_direction_{x,y,z}, and real/imaginary x/y/z components of incident_polarization and scattered_polarization. Applies to local direction geometry only; frequency-resolved ray/equilibrium covariance is not represented. Covariance is conditional on the supplied local uncertainty model.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "external_input_parameter_order",
+          "unit": "ordered component-name vector matching external_input_covariance",
+          "required": false,
+          "description": "Required with external_input_covariance. Names must be unique and selected from the supported local magnetic-field, direction and complex-polarization components.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "external_input_mc_samples",
+          "unit": "integer >=20",
+          "required": false,
+          "description": "Number of local external-input perturbation/refit samples; default 100.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "external_input_mc_seed",
+          "unit": "integer",
+          "required": false,
+          "description": "Deterministic seed for local external-input Monte Carlo sampling; default 84622.",
           "applies_when_model": "full_electromagnetic"
         }
       ],
@@ -5059,6 +5089,41 @@
           "name": "numerical_convergence_is_uncertainty",
           "unit": "boolean; always false",
           "description": "Explicitly marks numerical discretization assessment as separate from physical uncertainty."
+        },
+        {
+          "name": "external_input_covariance_supplied",
+          "unit": "boolean",
+          "description": "Full-EM: whether a local magnetic-field/geometry/polarization covariance was supplied."
+        },
+        {
+          "name": "external_input_covariance_order",
+          "unit": "ordered component-name vector",
+          "description": "Full-EM: exact component order used for the supplied local external covariance."
+        },
+        {
+          "name": "external_input_covariance_propagated",
+          "unit": "boolean",
+          "description": "Full-EM: whether enough successful local external-input Monte Carlo refits were obtained to add a covariance contribution."
+        },
+        {
+          "name": "external_input_parameter_covariance",
+          "unit": "mixed physical parameter covariance",
+          "description": "Full-EM: parameter covariance contribution from the supplied joint local magnetic-field, direction and polarization covariance."
+        },
+        {
+          "name": "external_input_mc_successes",
+          "unit": "integer",
+          "description": "Full-EM: successful local external-input perturbation/refits."
+        },
+        {
+          "name": "external_input_mc_requested",
+          "unit": "integer",
+          "description": "Full-EM: requested local external-input perturbation/refit count."
+        },
+        {
+          "name": "external_input_covariance_warning",
+          "unit": "text; conditional",
+          "description": "Full-EM: warning when too few local external-input perturbation/refits succeed."
         }
       ],
       "assumptions": [
@@ -5077,7 +5142,7 @@
         "Convolve the physical spectrum with the supplied frequency-response matrix in frequency-bin-integrated space."
       ],
       "algorithm": "The explicit dispatcher selects exactly one of two CTS physical forward models: unmagnetized electrostatic longitudinal or magnetized full-electromagnetic. Both start from measured calibrated frequency-shift spectra and the supplied measured response. The public dispatcher uses the shared `spectrum` keyword; it maps that value to `measured_spectrum` for the Full-EM implementation. Ray tracing and relativistic population response are optional Full-EM model capabilities, not additional CTS physical model choices.",
-      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; supplied measured response-matrix uncertainty is propagated by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance is not yet propagated. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion.",
+      "uncertainty_model": "Electrostatic CTS: local Jacobian covariance with optional full spectral covariance whitening; supplied response-matrix and supported probe-frequency, scalar scattering-angle, electron-flow and ion-fraction uncertainties are propagated by Monte Carlo refits. Full-electromagnetic CTS: local Jacobian covariance from supplied signal uncertainty or spectral covariance when available; without either, unweighted least squares is used and covariance is residual-variance-scaled, not measurement-noise-calibrated; supplied measured response-matrix uncertainty is propagated by Monte Carlo refitting; full external magnetic-field, geometry, polarization, ray and equilibrium covariance is not yet propagated. Excess reduced chi-square is reported as a separate model-discrepancy covariance component. Inferred tabulated fast-ion VDF logit covariance is transformed to VDF-node covariance. Electrostatic CTS additionally accepts an explicitly ordered positive-semidefinite joint external_parameter_covariance over probe frequency, scalar scattering angle and individual ion fractions; correlated draws are propagated together by Monte Carlo refits. Full-EM CTS additionally propagates a supplied measured response-matrix uncertainty by column-renormalized Monte Carlo perturbation and repeated full inversion. Full-EM additionally accepts a joint positive-semidefinite covariance over explicitly ordered local magnetic-field, incident/scattered direction and complex polarization components and propagates it by Monte Carlo refitting. This route is unavailable for frequency-resolved ray/equilibrium geometry. Covariance contributions from separate response and local-external sources are added separately; cross-source covariance is not inferred.",
       "limitations": [
         "The relativistic kinetic vertex is local and homogeneous; it does not include spatially varying relativistic kinetic response, finite-orbit-width effects, collisions, nonlinear equilibrium evolution or mode conversion.",
         "The Bindslev Gamma/X closure remains the bulk Maxwellian-electron nonlinear source; it is not used as a relativistic correction.",
@@ -5392,6 +5457,9 @@
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_reports_exact_degeneracy_as_ambiguous",
       "tests/test_thomson_path_and_cts_mode_tracking.py::test_mode_tracking_follows_polarization_through_eigenvalue_order_crossing"
+    ],
+    "limitations": [
+      "Full-EM local external-input covariance supports local magnetic-field, direction and complex-polarization components only; frequency-resolved ray/equilibrium/beam covariance and cross-source covariance are not represented."
     ]
   },
   {
