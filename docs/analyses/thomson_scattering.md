@@ -78,6 +78,25 @@ multichannel APIs forward the same explicit switch. The reported effective
 cross-section is correspondingly labelled as Thomson or polarized
 Klein-Nishina according to the selected mode.
 
+### Joint spatial-spectral Kappa inference
+
+The joint spatial-spectral inverse accepts the finite-variance projected Kappa
+kernel as a distinct physical model. By default, `kappa_index` is a fixed
+external model parameter. Setting `fit_kappa_index=True` treats the supplied
+`kappa_index` as a numerical starting value and estimates one shared Kappa
+index jointly with the node-wise (T_e(r)), scattering-vector flow projection,
+relative spectral amplitudes and detector-space background nuisance terms.
+The transformed fit coordinate is (log(\kappa-1.5)), enforcing the
+finite-variance condition (kappa>1.5). Its local covariance is transformed
+back to physical Kappa units and returned as `kappa_index_uncertainty`.
+The index is Primary only when the data-only Jacobian is full rank and the
+selected model passes its validity screen. Otherwise it is not reported as a
+Primary physical result. This remains a one-dimensional isotropic Kappa
+projection with a single shared index; it is not the generalized plasma
+dispersion algorithm of Skolar et al. and does not represent an arbitrary
+anisotropic EVDF. Background basis coefficients remain nuisance parameters
+and do not contribute artificial rank to the data-only identifiability test.
+
 ## Electron density and identifiability
 
 A normalized non-collective spectral shape alone does not determine absolute electron density. Absolute density is calculated only when the spectral intensity is explicitly declared calibrated in W/nm and all required optical factors are supplied: laser power at the scattering volume, interaction length, collection solid angle, optical efficiency, incident direction, incident polarization and scattered-light direction. If the contract is incomplete, density is reported unavailable rather than fabricated from fitted amplitude.
