@@ -16,6 +16,8 @@ No empirical validation is performed by this solver.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+import copy
+import re
 import numpy as np
 from scipy.special import roots_laguerre, roots_hermite
 
@@ -232,7 +234,150 @@ def _select_flux_normalized_cold_mode(omega, direction, magnetic_field, species,
     }
 
 
+
+_GEOMETRY_PATH_TOKEN = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)|\[(\d+)\]")
+
+
+def _geometry_path_tokens(path):
+    if not isinstance(path, str) or not path:
+        raise ValueError("geometry covariance parameter paths must be non-empty strings")
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:\[\d+\]|\.[A-Za-z_][A-Za-z0-9_]*)*", path) is None:
+        raise ValueError(f"invalid geometry covariance path: {path}")
+    tokens = []
+    position = 0
+    for match in _GEOMETRY_PATH_TOKEN.finditer(path):
+        if match.start() != position and path[position:match.start()] not in {".", ""}:
+            raise ValueError(f"invalid geometry covariance path: {path}")
+        tokens.append(int(match.group(2)) if match.group(2) is not None else match.group(1))
+        position = match.end()
+        if position < len(path) and path[position] == ".":
+            position += 1
+    if position != len(path) or not tokens:
+        raise ValueError(f"invalid geometry covariance path: {path}")
+    return tokens
+
+
+def _set_geometry_path(root, path, value):
+    tokens = _geometry_path_tokens(path)
+    target = root
+    for token in tokens[:-1]:
+        target = target[token]
+    target[tokens[-1]] = float(value)
+
+
 def full_em_cts_spectral_density(
+    frequency_shift_Hz, probe_frequency_Hz, scattering_geometry, *,
+    geometry_uncertainty_mc_samples=200, geometry_uncertainty_seed=73131,
+    **model_kwargs,
+):
+    """Full-EM CTS forward model with optional joint ray/equilibrium/beam covariance.
+
+    Put a geometry_uncertainty mapping in scattering_geometry with parameter_order
+    (paths into the geometry mapping) and a full covariance matrix in the same
+    units/order. Paths may address frequency_resolved_geometry[0].incident_direction[0],
+    frequency_resolved_geometry[0].magnetic_field_T[2],
+    frequency_resolved_geometry[0].scattering_samples[1].scattering_location_m[0],
+    or frequency_resolved_geometry[0].scattering_samples[1].sample_weight.
+    The covariance is propagated by re-evaluating the complete forward model for
+    multivariate-normal geometry draws. This is conditional on the supplied
+    covariance; it does not create an equilibrium or ray-tracing error model.
+    """
+    if not isinstance(scattering_geometry, Mapping):
+        raise ValueError("scattering_geometry must be a mapping")
+    uncertainty = scattering_geometry.get("geometry_uncertainty")
+    if uncertainty is None:
+        return _full_em_cts_spectral_density_nominal(
+            frequency_shift_Hz, probe_frequency_Hz, scattering_geometry,
+            **model_kwargs,
+        )
+    if not isinstance(uncertainty, Mapping):
+        raise ValueError("geometry_uncertainty must be a mapping")
+    order = uncertainty.get("parameter_order")
+    if not isinstance(order, Sequence) or isinstance(order, (str, bytes)) or not order:
+        raise ValueError("geometry_uncertainty.parameter_order must be a non-empty sequence of paths")
+    paths = [str(item) for item in order]
+    if len(set(paths)) != len(paths):
+        raise ValueError("geometry covariance parameter paths must be unique")
+    for path in paths:
+        _geometry_path_tokens(path)
+    covariance = _real_array(uncertainty.get("covariance"), "geometry_uncertainty.covariance", 2)
+    if covariance.shape != (len(paths), len(paths)):
+        raise ValueError("geometry covariance shape must match parameter_order")
+    scale = max(float(np.max(np.abs(covariance))), np.finfo(float).tiny)
+    if not np.allclose(covariance, covariance.T, rtol=1e-9, atol=1e-12*scale):
+        raise ValueError("geometry covariance must be symmetric")
+    covariance = 0.5*(covariance+covariance.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    if float(np.min(eigenvalues)) < -1e-10*scale:
+        raise ValueError("geometry covariance must be positive semidefinite")
+    covariance = (eigenvectors*np.maximum(eigenvalues, 0.0))@eigenvectors.T
+    if isinstance(geometry_uncertainty_mc_samples, (bool, np.bool_)) or not isinstance(geometry_uncertainty_mc_samples, (int, np.integer)) or geometry_uncertainty_mc_samples < 20:
+        raise ValueError("geometry_uncertainty_mc_samples must be an integer >=20")
+    if isinstance(geometry_uncertainty_seed, (bool, np.bool_)) or not isinstance(geometry_uncertainty_seed, (int, np.integer)):
+        raise ValueError("geometry_uncertainty_seed must be an integer")
+    base = copy.deepcopy(dict(scattering_geometry))
+    base.pop("geometry_uncertainty", None)
+    nominal = _full_em_cts_spectral_density_nominal(
+        frequency_shift_Hz, probe_frequency_Hz, base, **model_kwargs,
+    )
+    rng = np.random.default_rng(int(geometry_uncertainty_seed))
+    draws = rng.multivariate_normal(np.zeros(len(paths)), covariance,
+                                    size=int(geometry_uncertainty_mc_samples),
+                                    check_valid="raise")
+    propagated = {}
+    failures = []
+    for draw_index, perturbation in enumerate(draws):
+        sampled = copy.deepcopy(base)
+        try:
+            for path, delta in zip(paths, perturbation):
+                _set_geometry_path(sampled, path, delta)
+            evaluated = _full_em_cts_spectral_density_nominal(
+                frequency_shift_Hz, probe_frequency_Hz, sampled, **model_kwargs,
+            )
+            for key, value in evaluated.items():
+                if isinstance(value, np.ndarray) and value.dtype.kind in "iufc" and np.all(np.isfinite(value)):
+                    propagated.setdefault(key, []).append(np.asarray(value).reshape(-1))
+        except (ValueError, RuntimeError, np.linalg.LinAlgError, FloatingPointError) as exc:
+            failures.append({"draw": draw_index, "reason": str(exc)})
+    minimum_successes = max(20, int(np.ceil(0.7*int(geometry_uncertainty_mc_samples))))
+    output_covariance = {}
+    output_standard_uncertainty = {}
+    for key, values in propagated.items():
+        if len(values) < minimum_successes:
+            continue
+        matrix = np.asarray(values)
+        if matrix.shape[1] <= 1_000:
+            cov = np.atleast_2d(np.cov(matrix, rowvar=False, ddof=1))
+            output_covariance[key] = cov
+            output_standard_uncertainty[key] = np.sqrt(np.maximum(np.real(np.diag(cov)), 0.0)).reshape(
+                np.asarray(nominal[key]).shape
+            )
+        else:
+            output_standard_uncertainty[key] = np.std(matrix, axis=0, ddof=1).reshape(
+                np.asarray(nominal[key]).shape
+            )
+    result = dict(nominal)
+    result["geometry_uncertainty"] = {
+        "propagated": bool(len(next(iter(propagated.values()), [])) >= minimum_successes),
+        "method": "multivariate_normal_geometry_monte_carlo_full_forward_model",
+        "parameter_order": paths,
+        "input_covariance": covariance,
+        "requested_samples": int(geometry_uncertainty_mc_samples),
+        "successful_samples": max((len(v) for v in propagated.values()), default=0),
+        "failed_samples": failures,
+        "output_covariance": output_covariance,
+        "output_standard_uncertainty": output_standard_uncertainty,
+        "covariance_semantics": "conditional on the supplied joint geometry covariance; cross-source covariance is included only when encoded jointly in this input matrix",
+        "limitations": [
+            "The caller must supply a physically meaningful covariance for ray directions, equilibrium magnetic field, scattering locations, beam overlap and any other uncertain geometry fields.",
+            "For outputs larger than 1000 elements, standard uncertainties are returned without a dense output covariance matrix.",
+            "This propagation does not include uncertainty in plasma parameters or instrument response unless separately supplied to their inference interfaces."
+        ],
+    }
+    return result
+
+
+def _full_em_cts_spectral_density_nominal(
     frequency_shift_Hz, probe_frequency_Hz, scattering_geometry, *,
     electron_density_m3, electron_temperature_eV, ion_temperature_eV,
     ion_species, ion_fractions, magnetic_field_T,
