@@ -63,6 +63,27 @@ def _geometry(g,f0):
     return q,qv/q,angle
 
 
+
+def _maximum_geometry_wave_number(scattering_geometry, probe_frequency_Hz):
+    """Return the largest |k| represented by the supplied CTS geometry.
+
+    A frequency-resolved geometry has one scattering vector per spectral bin.
+    Use the largest magnitude for conservative Doppler-support bounds; never
+    substitute the middle bin's geometry for the complete measured spectrum.
+    """
+    f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+        entries = scattering_geometry["frequency_resolved_geometry"]
+        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)) or not entries:
+            raise ValueError("frequency_resolved_geometry must be a non-empty sequence of geometry mappings")
+        wave_numbers = []
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, Mapping) or "frequency_resolved_geometry" in entry:
+                raise ValueError(f"frequency_resolved_geometry[{index}] must be a single-frequency geometry mapping")
+            wave_numbers.append(_geometry(entry, f0)[0])
+        return float(max(wave_numbers))
+    return float(_geometry(scattering_geometry, f0)[0])
+
 def _species(species,fractions):
     if not isinstance(species,Sequence) or isinstance(species,(str,bytes)) or not species: raise ValueError("ion_species must be a non-empty sequence")
     frac=_array(fractions,"ion_fractions",1)
@@ -353,6 +374,12 @@ def estimate_cts_optimizer_initial_parameters(
     variance = float(np.sum(weights * offsets**2) / total)
     if not np.isfinite(variance) or variance <= 0:
         raise ValueError("CTS spectral-shape seed estimation failed: spectrum has no resolvable frequency width")
+    if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+        raise ValueError(
+            "Automatic width-based optimizer seeds require one fixed scattering vector. "
+            "For frequency_resolved_geometry, supply electron_density_initial_m3, "
+            "electron_temperature_initial_eV and ion_temperature_initial_eV explicitly."
+        )
     q, _, _ = _geometry(scattering_geometry, _positive(probe_frequency_Hz, "probe_frequency_Hz"))
     electron_velocity_rms = 2.0 * np.pi * np.sqrt(variance) / q
     te_seed = ME * electron_velocity_rms**2 / E
@@ -461,7 +488,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     tb=positive_bounds("electron_temperature_eV")
     ib=positive_bounds("ion_temperature_eV")
     physical_flow_limit=float(np.nextafter(C,0.0))
-    q_fit, _, _ = _geometry(scattering_geometry, f0)
+    q_fit = _maximum_geometry_wave_number(scattering_geometry, f0)
     spectral_flow_limit = min(physical_flow_limit, 2.0*np.pi*float(np.max(np.abs(f)))/q_fit)
     eub=tuple(map(float,b.get("electron_velocity_projection_m_s",(-spectral_flow_limit,spectral_flow_limit))))
     if len(eub)!=2 or not np.all(np.isfinite(eub)) or eub[0]>=eub[1] or max(map(abs,eub))>=C:
