@@ -314,22 +314,46 @@ def _fit_noncollective(
     if sigma_y is None:
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
-    covariance = covariance_scaled*np.outer(scales,scales)
+    raw_covariance = covariance_scaled*np.outer(scales,scales)
     amp = amp_s*signal_scale
     coefficients = coefficients_scaled*signal_scale
-    te_unc = float(te*2*np.sqrt(max(covariance[2,2],0.0))/width)
-    area = float(amp*width*np.sqrt(2.0*np.pi))
-    area_gradient = np.zeros(3+n_background)
-    area_gradient[:3] = [width*np.sqrt(2.0*np.pi),0.0,amp*np.sqrt(2.0*np.pi)]
-    area_unc = float(np.sqrt(max(float(area_gradient@covariance@area_gradient),0.0)))
-    background_at_center = float(
-        np.asarray([np.interp(center, wavelength, basis[:, j])
-                    for j in range(n_background)]) @ coefficients
-    )
     if background_model == "linear":
+        z_center = 2.0*(center-float(wavelength[0]))/span-1.0
         slope = float(coefficients[1]*2.0/span)
+        background_at_center = float(coefficients[0]+coefficients[1]*z_center)
+        # Convert [amp, center, sigma, c0, c1] in the midpoint-scaled
+        # background basis to the established [amp, center, sigma,
+        # background_at_center, slope_per_nm] public parameter convention.
+        transform = np.zeros((5,5),dtype=float)
+        transform[0,0] = signal_scale
+        transform[1,1] = 1.0
+        transform[2,2] = 1.0
+        transform[3,1] = slope
+        transform[3,3] = signal_scale
+        transform[3,4] = signal_scale*z_center
+        transform[4,4] = signal_scale*2.0/span
+        covariance = transform@covariance_scaled@transform.T
+        fit_parameters = np.asarray([amp,center,width,background_at_center,slope])
+        fit_parameter_names = ["amplitude","center_nm","intrinsic_sigma_nm","background_intercept","background_slope_per_nm"]
+        coefficient_transform = np.zeros((2,5),dtype=float)
+        coefficient_transform[0,3] = signal_scale
+        coefficient_transform[1,4] = signal_scale
+        background_coefficient_covariance = coefficient_transform@covariance_scaled@coefficient_transform.T
     else:
         slope = None
+        background_at_center = float(
+            np.asarray([np.interp(center, wavelength, basis[:, j])
+                        for j in range(n_background)]) @ coefficients
+        )
+        covariance = raw_covariance
+        fit_parameters = np.r_[amp,center,width,coefficients]
+        fit_parameter_names = ["amplitude","center_nm","intrinsic_sigma_nm"]+[f"background_coefficient_{i}" for i in range(n_background)]
+        background_coefficient_covariance = covariance[3:,3:]
+    te_unc = float(te*2*np.sqrt(max(covariance[2,2],0.0))/width)
+    area = float(amp*width*np.sqrt(2.0*np.pi))
+    area_gradient = np.zeros(fit_parameters.size)
+    area_gradient[:3] = [width*np.sqrt(2.0*np.pi),0.0,amp*np.sqrt(2.0*np.pi)]
+    area_unc = float(np.sqrt(max(float(area_gradient@covariance@area_gradient),0.0)))
     return {
         "electron_temperature_eV": float(te),
         "electron_temperature_uncertainty_eV": te_unc,
@@ -342,14 +366,14 @@ def _fit_noncollective(
         "background_model": background_model,
         "background_coefficients": coefficients,
         "background_basis": basis,
-        "background_coefficient_covariance": covariance[3:,3:],
+        "background_coefficient_covariance": background_coefficient_covariance,
         "fit_covariance": covariance, "residual": residual_physical,
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_unc,
         "reduced_chi_square": float(fit.fun@fit.fun/dof) if uncertainty is not None else None,
         "fitted_spectrum": fitted,
-        "fit_parameters": np.r_[amp,center,width,coefficients],
-        "fit_parameter_names": ["amplitude","center_nm","intrinsic_sigma_nm"]+[f"background_coefficient_{i}" for i in range(n_background)],
+        "fit_parameters": fit_parameters,
+        "fit_parameter_names": fit_parameter_names,
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
                       "nfev": int(fit.nfev), "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
                       "parameter_count": int(fit.x.size)},
