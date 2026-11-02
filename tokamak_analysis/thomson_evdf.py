@@ -41,6 +41,22 @@ def _response_matrix(values, n):
     return response
 
 
+def _wavelength_bin_widths(wavelength):
+    """Return midpoint finite-volume bin widths for a calibrated wavelength axis."""
+    axis = np.asarray(wavelength, dtype=float)
+    if (axis.ndim != 1 or axis.size < 2 or np.any(~np.isfinite(axis))
+            or np.any(np.diff(axis) <= 0.0)):
+        raise ValueError("wavelength axis must be finite, one-dimensional and strictly increasing")
+    edges = np.empty(axis.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (axis[:-1] + axis[1:])
+    edges[0] = axis[0] - 0.5 * (axis[1] - axis[0])
+    edges[-1] = axis[-1] + 0.5 * (axis[-1] - axis[-2])
+    widths = np.diff(edges)
+    if np.any(widths <= 0.0):
+        raise ValueError("wavelength axis must define positive finite-volume bin widths")
+    return widths
+
+
 def _normalize_evdf_coefficients(coefficients, velocity):
     """Normalize non-negative velocity-bin coefficients using trapezoidal weights.
 
@@ -140,10 +156,9 @@ def reconstruct_thomson_evdf(
     if np.any(lambda_centres < wavelength[0]) or np.any(lambda_centres > wavelength[-1]):
         raise ValueError("velocity grid maps outside the measured wavelength interval; narrow the velocity grid or widen the measured spectral window")
 
-    widths = np.empty(wavelength.size)
-    widths[1:-1] = 0.5 * (wavelength[2:] - wavelength[:-2])
-    widths[0] = wavelength[1] - wavelength[0]
-    widths[-1] = wavelength[-1] - wavelength[-2]
+    # Use the same midpoint finite-volume measure as the spectral-distribution
+    # analysis; endpoint bins are half-width, including on non-uniform grids.
+    widths = _wavelength_bin_widths(wavelength)
 
     # Each velocity node contributes unit integrated spectral power. Linear
     # deposition avoids pretending that a sample is a finite-width line shape.
