@@ -478,16 +478,21 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     assert expected_inputs <= set(runtime_inputs)
     assert runtime_inputs["external_input_mc_samples"]["default"] == 100
     assert runtime_inputs["external_input_mc_seed"]["default"] == 84622
-    assert "frequency-resolved ray/equilibrium covariance is not represented" in (
+    assert "frequency-resolved ray/equilibrium/beam covariance" in (
         runtime_inputs["external_input_covariance"]["description"]
     )
+    assert "propagate_full_em_cts_ray_geometry_uncertainty" in (
+        runtime_inputs["external_input_covariance"]["description"]
+    )
+    assert "geometry_sampler" in runtime_inputs
     runtime_outputs = {item["name"] for item in runtime["output_specs"]}
     expected_outputs = {
         "external_input_covariance_supplied", "external_input_covariance_order",
         "external_input_covariance_propagated", "external_input_parameter_covariance",
         "external_input_mc_successes", "external_input_mc_requested",
         "external_input_covariance_warning", "external_inputs_fixed",
-        "external_inputs_with_supplied_covariance",
+        "external_inputs_with_supplied_covariance", "ray_geometry_parameter_covariance",
+        "ray_geometry_uncertainty",
     }
     assert expected_outputs <= runtime_outputs
     full_mode = next(
@@ -496,6 +501,12 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     )
     assert any("external_input_covariance" in item for item in full_mode["inputs"])
     assert any("external_input_parameter_covariance" in item for item in full_mode["outputs"])
+    geometry_mode = next(
+        item for item in runtime["workflow_modes"]
+        if item["name"] == "full_forward_ray_geometry_uncertainty"
+    )
+    assert "geometry_sampler" in " ".join(geometry_mode["inputs"])
+    assert any("ray_geometry_parameter_covariance" in item for item in geometry_mode["outputs"])
 
     root = Path(__file__).resolve().parents[1]
     root_registry = json.loads((root / "DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
@@ -511,9 +522,16 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     json_inputs = {item["name"]: item for item in contract["input_specs"]}
     assert expected_inputs <= set(json_inputs)
     assert json_inputs["external_input_covariance"]["applies_when_model"] == "full_electromagnetic"
+    assert "geometry_sampler" in json_inputs
     json_outputs = {item["name"] for item in contract["output_specs"]}
     assert expected_outputs <= json_outputs
-    assert {"external_inputs_fixed", "external_inputs_with_supplied_covariance"} <= json_outputs
+    assert {"external_inputs_fixed", "external_inputs_with_supplied_covariance",
+            "ray_geometry_parameter_covariance", "ray_geometry_uncertainty"} <= json_outputs
+    geometry_json_mode = next(
+        item for item in contract["workflow_modes"]
+        if item["name"] == "full_forward_ray_geometry_uncertainty"
+    )
+    assert "geometry_sampler(rng, realization_index)" in " ".join(geometry_json_mode["inputs"])
     json_mode = next(
         item for item in contract["workflow_modes"]
         if item["name"] == "magnetized_full_electromagnetic_cts"
