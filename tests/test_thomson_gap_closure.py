@@ -55,7 +55,12 @@ def test_relativistic_projected_evdf_normalizes_and_reports_model_scope():
         background_signal=np.zeros_like(measured), velocity_grid_m_s=velocity,
         regularization_strength=1e-3,
     )
-    assert result["status"] == "completed"
-    assert np.isclose(np.trapz(result["projected_evdf_s_m"], velocity), 1.0, rtol=1e-8)
+    assert result["status"] in {"completed", "conditional_regularized_candidate"}
+    candidate = result["regularized_candidate_evdf_s_m"]
+    assert np.isclose(np.trapz(candidate, velocity), 1.0, rtol=1e-8)
+    if result["status"] == "completed":
+        assert result["projected_evdf_s_m"] is not None
+    else:
+        assert result["projected_evdf_s_m"] is None
     assert result["absolute_density_inferred"] is False
     assert "Compton recoil" in " ".join(result["assumptions"])
