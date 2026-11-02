@@ -205,3 +205,24 @@ Model of Collective Thomson Scattering in Magnetic Confinement Fusion,”
 The coupled-mode evolution is an explicit mathematical propagation layer
 requiring supplied path and propagation constants; it is not attributed as an
 algorithm reproduced from either paper.
+
+
+### Ray-tracing integration contract
+
+`trace_cold_plasma_ray` accepts the optional pair
+`initial_mode_amplitudes` and `propagation_constants_rad_m`. Supplying both
+activates the coherent coupled-mode propagation on the ray's physical
+arc-length coordinate. Supplying only one is an input-contract error. For
+`trace_cts_frequency_resolved_beams`, the same pair may be included in the
+`incident_ray` mapping and independently in each `receiver_rays` mapping.
+The propagation-constant array must have shape `(n_ray_samples, 3)`, in
+rad/m, and must correspond to the same ordered ray samples used to construct
+the local wave operators. Initial amplitudes are a three-component complex
+vector in the initial flux-normalized modal basis. Their squared magnitudes
+are modal powers; the lossless model conserves their sum.
+
+The optional calculation is not inferred from frequency, refractive index or
+the eigenvalues of the wave operator. A researcher must supply the actual
+propagation constants and initial modal amplitudes. The geometry routine
+continues to return branch-continuity diagnostics whether or not coupled-mode
+propagation is requested.
