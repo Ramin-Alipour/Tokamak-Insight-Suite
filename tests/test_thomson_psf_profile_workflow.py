@@ -43,3 +43,37 @@ def test_psf_profile_path_requires_explicit_profile_grid(monkeypatch):
             scattering_angle_rad=np.pi / 2, instrument_response=np.eye(9),
             spatial_mixing_matrix=np.eye(3),
         )
+
+
+def test_joint_spatial_workflow_forwards_structured_background_contract(monkeypatch):
+    captured = {}
+
+    def fake_joint(*args, **kwargs):
+        captured.update(kwargs)
+        return {"analysis_status": "captured"}
+
+    monkeypatch.setattr(
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+        fake_joint,
+    )
+    wavelength = np.linspace(520.0, 544.0, 25)
+    spectra = np.ones((3, wavelength.size))
+    radius = np.array([0.1, 0.2, 0.3])
+    mixing = np.eye(3)
+    templates = np.column_stack((np.ones(wavelength.size), wavelength - wavelength.mean()))
+    result = workflow.reconstruct_thomson_profile_from_spectra(
+        wavelength, spectra, radius,
+        joint_spatial_spectral=True,
+        spatial_mixing_matrix=mixing,
+        spatial_background_model="templates",
+        spatial_background_templates=templates,
+        spatial_regularization_strength=0.02,
+        model="non_collective_maxwellian",
+        laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response=np.eye(wavelength.size),
+    )
+    assert result["analysis_status"] == "captured"
+    assert captured["background_model"] == "templates"
+    np.testing.assert_array_equal(captured["background_templates"], templates)
+    assert captured["regularization_strength"] == pytest.approx(0.02)
