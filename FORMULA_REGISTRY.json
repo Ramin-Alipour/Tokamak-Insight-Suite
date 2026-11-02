@@ -2819,14 +2819,14 @@
       "prerequisites": [
         "Single scattering",
         "isotropic non-relativistic Maxwellian electrons",
-        "instrument-corrected width",
+        "intrinsic plasma Doppler-width parameter inferred by the measured-response-convolved physical forward fit",
         "known geometry"
       ],
       "uncertainty_model": "Independent first-order propagation of width, laser-wavelength and angle uncertainties.",
       "test_links": [
         "tests/test_thomson_formula_contracts.py::test_thomson_temperature_formula_reference"
       ],
-      "note": "Analytic software calculation with numerical tests; not empirical validation.",
+      "note": "Standalone analytic relation for the intrinsic width parameter of the canonical measured-spectrum forward fit; it does not correct or deconvolve measured spectra. Numerical software tests only; not empirical validation.",
       "raw_data_to_physics": false,
       "calibrated_measurements_to_physics": false,
       "execution_scope": "forward_model_or_derived_formula_not_a_raw_measurement_pipeline",
