@@ -1285,3 +1285,69 @@ def test_cts_whitener_checks_covariance_symmetry_relative_to_its_scale():
     invalid = scale * np.array([[2.0, 0.2], [0.199, 1.0]])
     with pytest.raises(ValueError, match="scale-relative tolerance"):
         _whitener(invalid, 2, None)
+
+
+def test_full_em_scattering_volume_uses_each_sample_local_magnetic_field():
+    from tokamak_analysis.cts_full_em import full_em_cts_spectral_density
+
+    shifts = [0.9e9]
+    incident = [1.0, 0.0, 0.0]
+    scattered = [np.cos(1.8), np.sin(1.8), 0.0]
+    samples = [
+        {
+            "incident_direction": incident,
+            "scattered_direction": scattered,
+            "magnetic_field_T": [0.0, 0.0, 2.0],
+            "scattering_location_m": [0.0, 0.0, 0.0],
+            "sample_weight": 0.25,
+        },
+        {
+            "incident_direction": incident,
+            "scattered_direction": scattered,
+            "magnetic_field_T": [0.0, 0.0, 2.1],
+            "scattering_location_m": [0.01, 0.0, 0.0],
+            "sample_weight": 0.75,
+        },
+    ]
+    common = dict(
+        electron_density_m3=2e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV={"D+": 800.0},
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        electron_flow_velocity_m_s=[0.0, 0.0, 0.0],
+        ion_flow_velocity_m_s={"D+": [0.0, 0.0, 0.0]},
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        harmonic_order=3,
+        quadrature_order=4,
+    )
+    integrated = full_em_cts_spectral_density(
+        shifts, 140e9,
+        {"frequency_shift_Hz": shifts, "frequency_resolved_geometry": [{
+            "incident_direction": incident,
+            "scattered_direction": scattered,
+            "magnetic_field_T": [0.0, 0.0, 2.075],
+            "scattering_location_m": [0.0075, 0.0, 0.0],
+            "beam_overlap_relative": 0.5,
+            "scattering_samples": samples,
+        }]},
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        **common,
+    )
+    expected_local = []
+    for sample in samples:
+        local = full_em_cts_spectral_density(
+            shifts, 140e9,
+            {"incident_direction": incident, "scattered_direction": scattered},
+            magnetic_field_T=sample["magnetic_field_T"],
+            **common,
+        )
+        expected_local.append(local["spectral_density"][0])
+    expected = 0.5 * (
+        0.25 * expected_local[0] + 0.75 * expected_local[1]
+    )
+    np.testing.assert_allclose(integrated["spectral_density"], [expected], rtol=1e-11, atol=0.0)
+    np.testing.assert_allclose(
+        integrated["frequency_resolved_magnetic_field_T"], [[0.0, 0.0, 2.075]]
+    )
