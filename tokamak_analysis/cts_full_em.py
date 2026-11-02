@@ -1026,6 +1026,9 @@ def analyze_full_em_cts_spectrum(
                     external_base[f"ray_{frequency_index}_beam_overlap_relative"] = float(
                         _positive(record["beam_overlap_relative"], "ray beam_overlap_relative")
                     )
+        for row in range(response.shape[0]):
+            for column in range(response.shape[1]):
+                external_base[f"instrument_response_{row}_{column}"] = float(response[row, column])
         for kind, vector in (
             ("incident", incident_polarization),
             ("scattered", scattered_polarization),
@@ -1052,6 +1055,14 @@ def analyze_full_em_cts_spectrum(
             raise ValueError(
                 "external_input_parameter_order references inputs absent from the supplied CTS geometry/species: "
                 + ", ".join(missing_external_inputs)
+            )
+        response_covariance_names = [
+            name for name in external_order if name.startswith("instrument_response_")
+        ]
+        if response_sigma is not None and response_covariance_names:
+            raise ValueError(
+                "instrument_response_uncertainty and instrument_response entries in external_input_covariance "
+                "cannot both be supplied; use the joint covariance to retain cross-source correlations"
             )
         external_draw_vectors = sample_external_input_vectors(
             np.asarray([external_base[name] for name in external_order], dtype=float),
@@ -1367,7 +1378,30 @@ def analyze_full_em_cts_spectrum(
         return _apply_frequency_response(response if response_matrix is None else response_matrix, result, f)
 
     def residual(p, return_profile=False, response_matrix=None, external_values=None):
-        z = model(p, response_matrix=response_matrix, external_values=external_values)
+        active_response_matrix = response_matrix
+        if external_values is not None:
+            values = dict(zip(external_order, np.asarray(external_values, dtype=float)))
+            response_entries = [
+                name for name in external_order if name.startswith("instrument_response_")
+            ]
+            if response_entries:
+                sampled_response = response.copy()
+                import re
+                for name in response_entries:
+                    match = re.fullmatch(r"instrument_response_(\d+)_(\d+)", name)
+                    if match is None:
+                        raise ValueError(f"invalid instrument response covariance entry: {name}")
+                    row, column = int(match.group(1)), int(match.group(2))
+                    if row >= response.shape[0] or column >= response.shape[1]:
+                        raise ValueError(f"instrument response covariance index is outside matrix: {name}")
+                    sampled_response[row, column] = values[name]
+                if np.any(~np.isfinite(sampled_response)) or np.any(sampled_response < 0.0):
+                    raise ValueError("sampled instrument response must remain finite and non-negative")
+                column_sums = sampled_response.sum(axis=0)
+                if np.any(column_sums <= 0.0):
+                    raise ValueError("sampled instrument response must have positive column sums")
+                active_response_matrix = sampled_response / column_sums[None, :]
+        z = model(p, response_matrix=active_response_matrix, external_values=external_values)
         design = whiten(np.column_stack((z, np.ones_like(z))))
         target = whiten(y)
         amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
@@ -1509,6 +1543,9 @@ def analyze_full_em_cts_spectrum(
             + (["scattered_polarization"] if not external_order or not any(
                 name.startswith("scattered_polarization_") for name in external_order
             ) else [])
+            + (["instrument_response"] if not external_order or not any(
+                name.startswith("instrument_response_") for name in external_order
+            ) else [])
         ),
         "external_inputs_with_supplied_covariance": (
             (["ion_species"] if external_order and any(
@@ -1529,6 +1566,9 @@ def analyze_full_em_cts_spectrum(
             ) else [])
             + (["scattered_polarization"] if external_order and any(
                 name.startswith("scattered_polarization_") for name in external_order
+            ) else [])
+            + (["instrument_response"] if external_order and any(
+                name.startswith("instrument_response_") for name in external_order
             ) else [])
         ),
         "electron_flow_inference": (
