@@ -304,6 +304,12 @@ def reconstruct_thomson_profile_from_spectra(
     if joint_spatial_spectral:
         if spatial_mixing_matrix is None:
             raise ValueError("spatial_mixing_matrix is required when joint_spatial_spectral=True")
+        if kwargs.get("instrument_response") is None:
+            raise ValueError(
+                "instrument_response is required when joint_spatial_spectral=True; "
+                "supply the measured response operator or explicitly supply an identity "
+                "matrix only for spectra already corrected for the instrument response."
+            )
         if selected_model not in (None, "non_collective_maxwellian"):
             raise ValueError("joint spatial-spectral reconstruction currently supports only non_collective_maxwellian")
         if len(args) < 3:
