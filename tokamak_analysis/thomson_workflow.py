@@ -322,13 +322,15 @@ def reconstruct_thomson_profile_from_spectra(
                 "supply the measured response operator or explicitly supply an identity "
                 "matrix only for spectra already corrected for the instrument response."
             )
-        if selected_model not in (None, "non_collective_maxwellian", "non_collective_kappa"):
-            raise ValueError("joint spatial-spectral reconstruction supports non_collective_maxwellian and non_collective_kappa; relativistic joint inversion is not yet enabled")
+        if selected_model not in (None, "non_collective_maxwellian", "non_collective_kappa", "non_collective_relativistic_maxwell_juttner"):
+            raise ValueError("joint spatial-spectral reconstruction requires a registered non-collective optical Thomson model")
         if len(args) < 3:
             raise ValueError("joint spatial-spectral reconstruction requires wavelength_nm, measured spectra and radius_m")
         allowed_joint = {"model", "laser_wavelength_nm", "scattering_angle_rad",
                          "instrument_response", "signal_uncertainty", "joint_spectral_covariance",
-                         "kappa_index", "fit_kappa_index"}
+                         "kappa_index", "fit_kappa_index", "incident_polarization",
+                         "radial_order", "angular_order", "maximum_recoil_correction_fraction",
+                         "include_compton_recoil"}
         unsupported = set(kwargs)-allowed_joint
         if unsupported:
             raise ValueError(f"unsupported joint spatial-spectral inputs: {sorted(unsupported)}")
@@ -345,9 +347,17 @@ def reconstruct_thomson_profile_from_spectra(
             background_degree=spatial_background_degree,
             background_interior_knots=spatial_background_interior_knots,
             background_templates=spatial_background_templates,
-            physical_model=("kappa" if selected_model == "non_collective_kappa" else "maxwellian"),
+            physical_model={
+                "non_collective_kappa": "kappa",
+                "non_collective_relativistic_maxwell_juttner": "relativistic_maxwell_juttner",
+            }.get(selected_model, "maxwellian"),
             kappa_index=kwargs.get("kappa_index"),
             fit_kappa_index=kwargs.get("fit_kappa_index", False),
+            incident_polarization=kwargs.get("incident_polarization"),
+            radial_order=kwargs.get("radial_order", 24),
+            angular_order=kwargs.get("angular_order", 12),
+            maximum_recoil_correction_fraction=kwargs.get("maximum_recoil_correction_fraction", 0.01),
+            include_compton_recoil=kwargs.get("include_compton_recoil", False),
         )
     if selected_model not in {
         "non_collective_maxwellian",
