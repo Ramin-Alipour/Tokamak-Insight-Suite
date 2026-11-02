@@ -52,3 +52,25 @@ def test_two_population_fit_recovers_synthetic_shape_parameters():
     assert result["hot_population_fraction"] == pytest.approx(0.2, abs=0.08)
     assert result["electron_velocity_projection_m_s"] == pytest.approx(3.0e5, abs=1.0e5)
     assert result["fit_covariance"].shape == (4, 4)
+
+
+def test_two_population_fit_uses_automatic_deterministic_initialization():
+    wavelength = np.linspace(350.0, 750.0, 81)
+    angle = np.pi / 2.0
+    forward = two_population_relativistic_thomson_spectrum(
+        wavelength, 532.0, angle, 120.0, 4200.0, 0.12,
+        flow_projection_m_s=1.5e5,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=8, angular_order=6,
+    )
+    measured = 1.7e4 * forward["spectral_density_per_nm"] + 0.5
+    result = fit_two_population_relativistic_thomson_spectrum(
+        wavelength, measured, 532.0, angle, np.eye(wavelength.size),
+        incident_polarization=[0.0, 0.0, 1.0],
+        signal_uncertainty=np.full(wavelength.size, 0.5),
+        radial_order=8, angular_order=6, max_nfev=350,
+    )
+    assert result["optimizer_initialization"] == "automatic_deterministic_spectral_moment_multistart"
+    assert result["optimizer_multistart_count"] == 3
+    assert result["optimizer_seed_parameters_are_not_inferred_outputs"] is True
+    assert np.all(np.isfinite(result["fit_covariance"]))
