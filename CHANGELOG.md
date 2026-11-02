@@ -76,3 +76,9 @@ See README → "Scientific scope and limitations" and RELEASE_NOTES.
 
 ### Scope limitations
 This release does not claim a Grad–Shafranov equilibrium solver, a collisional-radiative atomic model, device-specific calibration, or validation of every catalog entry. Geometry matrices, atomic data, diagnostic response and uncertainty models remain explicit user/device inputs where applicable.
+
+## 2026-11-02 — Thomson projected-EVDF covariance normalization
+
+- Corrected the projected-EVDF normalization Jacobian to use the same trapezoidal quadrature weights as the reported normalized velocity marginal. The previous Jacobian treated both endpoint bins as full-weight samples, which understated/mis-shaped propagated uncertainty at the velocity-grid boundaries.
+- Added a finite-difference regression test for the normalization Jacobian and exact trapezoidal unit-integral behavior.
+- No instrument calibration, measured-data correction, or experimental validation was added.
