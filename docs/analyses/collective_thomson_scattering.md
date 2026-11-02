@@ -230,3 +230,10 @@ the eigenvalues of the wave operator. A researcher must supply the actual
 propagation constants and initial modal amplitudes. The geometry routine
 continues to return branch-continuity diagnostics whether or not coupled-mode
 propagation is requested.
+
+
+## Conditional local external-input covariance in Full-EM inversion
+
+For local (non-ray-resolved) geometry, `analyze_full_em_cts_spectrum` accepts an optional ordered positive-semidefinite `external_input_covariance` with its exact `external_input_parameter_order`. Supported components are the three magnetic-field components, incident/scattered direction components, and real/imaginary components of the incident/scattered complex polarization vectors. The supplied joint covariance is sampled reproducibly and the complete physical parameter fit is repeated for each accepted draw. The returned `external_input_parameter_covariance` is a separate physical-parameter covariance contribution, with requested/successful draw counts and an explicit propagation status.
+
+This route is conditional on the supplied local covariance and is deliberately rejected for `frequency_resolved_geometry`: ray, equilibrium, path-sample and beam-covariance uncertainty are not represented by this local-vector contract. Covariance contributions from the measured response and local external-input Monte Carlo routes are combined as separate components; cross-covariance between those distinct sources is not inferred. No geometry, polarization, magnetic field or instrument response is calibrated or modified.
