@@ -584,14 +584,13 @@ def fit_relativistic_maxwell_juttner(
         "integrated_scattered_power_uncertainty_W": area_sigma,
         "integrated_scattered_power_fit_uncertainty_W": area_sigma,
         "effective_differential_cross_section_m2_sr": cross_section,
-        "recoil_included": bool(physical["recoil_included"]),
         "scattering_cross_section_model": physical["scattering_cross_section_model"],
         "maximum_recoil_correction_fraction": float(physical["maximum_recoil_correction_fraction_on_quadrature_support"]),
         "effective_differential_cross_section_uncertainty_m2_sr": cross_section_uncertainty,
         "power_cross_section_relative_covariance": power_cross_section_relative_covariance,
         "captured_spectral_probability_uncertainty": captured_uncertainty,
         "integrated_scattered_power_window_W": window_area,
-        "effective_cross_section_uncertainty_method": "finite-difference propagation of fitted Te/flow covariance through the Lorentz-transformed polarized Thomson cross-section",
+        "effective_cross_section_uncertainty_method": "finite-difference propagation of fitted Te/flow covariance through the Lorentz-transformed polarized differential cross-section (Thomson or Klein-Nishina, as selected)",
         "reduced_chi_square": (
             float(2.0*fit.cost/dof)
             if covariance_cholesky is not None or unc is not None else None
