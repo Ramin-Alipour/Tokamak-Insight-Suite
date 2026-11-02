@@ -164,3 +164,18 @@ def test_evdf_parametric_comparison_does_not_score_nonconverged_optimizer(monkey
         assert fit["aic"] is None
         assert fit["bic"] is None
         assert fit["parameter_uncertainty_status"] == "unavailable_optimizer_not_converged"
+
+
+def test_evdf_rejects_non_normalized_measured_response_without_renormalizing():
+    wavelength, signal, background = _case()
+    with pytest.raises(ValueError, match="already sum to one"):
+        reconstruct_thomson_evdf(
+            wavelength, signal,
+            laser_wavelength_nm=500.0,
+            scattering_angle_rad=np.pi / 2,
+            instrument_response_matrix=2.0 * np.eye(wavelength.size),
+            background_signal=background,
+            regularization_strength=1e-3,
+            velocity_limit_m_s=8.0e4,
+            velocity_points=81,
+        )
