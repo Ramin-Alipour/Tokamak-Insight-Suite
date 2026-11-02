@@ -253,7 +253,11 @@ def test_joint_thomson_profile_mode_exposes_data_only_identifiability_contract()
     contract = entry["execution_contract"]
     inputs = {item["name"] for item in contract["input_specs"]}
     assert {"joint_spatial_spectral", "spatial_mixing_matrix",
-            "spatial_regularization_strength"} <= inputs
+            "spatial_regularization_strength", "kappa_index", "fit_kappa_index",
+            "incident_polarization", "include_compton_recoil",
+            "maximum_recoil_correction_fraction"} <= inputs
+    assert "relativistic_maxwell_juttner" in contract["algorithm"]
+    assert "Klein-Nishina" in contract["algorithm"]
     outputs = {item["name"] for item in contract["output_specs"]}
     assert {"primary_result_status", "primary_outputs_reportable_as_identified",
             "optimizer", "optimizer_candidate"} <= outputs
