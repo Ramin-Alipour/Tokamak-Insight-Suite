@@ -1016,6 +1016,19 @@ def analyze_full_em_cts_spectrum(
             for axis, value in zip("xyz", vec):
                 external_base[f"{kind}_polarization_real_{axis}"] = float(value.real)
                 external_base[f"{kind}_polarization_imag_{axis}"] = float(value.imag)
+        # Composition covariance is expressed in additive-log-ratio (ALR)
+        # coordinates.  The final species is the reference component, which
+        # removes the redundant degree of freedom imposed by sum(f_i)=1.
+        fractions = _real_array(ion_fractions, "ion_fractions", 1)
+        if (fractions.shape != (len(ion_species),) or np.any(fractions <= 0.0)
+                or not np.isclose(float(np.sum(fractions)), 1.0, rtol=1e-8, atol=1e-10)):
+            raise ValueError("ion_fractions must be positive, match ion_species, and sum to one")
+        reference_fraction = float(fractions[-1])
+        for index, item in enumerate(ion_species[:-1]):
+            species_name = str(item.get("name", f"ion_{index}"))
+            external_base[f"ion_fraction_logit_{species_name}"] = float(
+                np.log(fractions[index] / reference_fraction)
+            )
         external_draw_vectors = sample_external_input_vectors(
             np.asarray([external_base[name] for name in external_order], dtype=float),
             external_covariance, samples=external_input_mc_samples,
@@ -1219,10 +1232,23 @@ def analyze_full_em_cts_spectrum(
     def model(p, response_matrix=None, external_values=None):
         active_geometry = scattering_geometry
         active_field = magnetic_field_T
+        active_ion_fractions = np.asarray(ion_fractions, dtype=float)
         active_incident_polarization = incident_polarization
         active_scattered_polarization = scattered_polarization
         if external_values is not None:
             values = dict(zip(external_order, np.asarray(external_values, dtype=float)))
+            composition_names = [
+                f"ion_fraction_logit_{str(item.get('name', f'ion_{i}'))}"
+                for i, item in enumerate(ion_species[:-1])
+            ]
+            if any(name in values for name in composition_names):
+                logits = np.asarray([
+                    values.get(name, np.log(active_ion_fractions[i] / active_ion_fractions[-1]))
+                    for i, name in enumerate(composition_names)
+                ] + [0.0], dtype=float)
+                logits -= float(np.max(logits))
+                weights = np.exp(logits)
+                active_ion_fractions = weights / np.sum(weights)
             active_field = np.asarray([
                 values.get(f"magnetic_field_T_{axis}", np.asarray(magnetic_field_T, dtype=float)[i])
                 for i, axis in enumerate("xyz")
@@ -1265,7 +1291,7 @@ def analyze_full_em_cts_spectrum(
             electron_density_m3=10.0**np.clip(p[0], -300.0, 300.0),
             electron_temperature_eV=10.0**np.clip(p[1], -300.0, 300.0),
             ion_temperature_eV=unpack_temperatures(p),
-            ion_species=ion_species, ion_fractions=ion_fractions,
+            ion_species=ion_species, ion_fractions=active_ion_fractions,
             magnetic_field_T=active_field,
             electron_flow_projection_m_s=electron_flow_projection(p),
             ion_flow_projection_m_s=unpack_ion_flow_projections(p),
@@ -1402,7 +1428,10 @@ def analyze_full_em_cts_spectrum(
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
         "external_inputs_fixed": (
-            ["ion_species", "ion_fractions"]
+            ["ion_species"]
+            + (["ion_fractions"] if not external_order or not any(
+                name.startswith("ion_fraction_logit_") for name in external_order
+            ) else [])
             + (["magnetic_field_T"] if not external_order or not any(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
@@ -1418,7 +1447,10 @@ def analyze_full_em_cts_spectrum(
             ) else [])
         ),
         "external_inputs_with_supplied_covariance": (
-            (["magnetic_field_T"] if external_order and any(
+            (["ion_fractions"] if external_order and any(
+                name.startswith("ion_fraction_logit_") for name in external_order
+            ) else [])
+            + (["magnetic_field_T"] if external_order and any(
                 name.startswith("magnetic_field_T_") for name in external_order
             ) else [])
             + (["scattering_geometry"] if external_order and any(

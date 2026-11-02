@@ -14,6 +14,37 @@ SUPPORTED_LOCAL_COMPONENTS = tuple(
 )
 
 
+def _supported_component(name):
+    """Accept fixed local components and composition log-ratio coordinates."""
+    if name in SUPPORTED_LOCAL_COMPONENTS:
+        return True
+    # Fractions are represented in additive-log-ratio coordinates relative to
+    # the final species, avoiding unconstrained Gaussian draws on a simplex.
+    return isinstance(name, str) and name.startswith("ion_fraction_logit_") and bool(name[len("ion_fraction_logit_"):])
+
+
+
+
+
+
+def ion_fractions_from_log_ratios(log_ratios):
+    """Map additive-log-ratio coordinates to a normalized positive composition.
+
+    The final species is the reference with log-ratio zero.  A stable softmax
+    guarantees strictly positive fractions summing to unity.
+    """
+    values = np.asarray(log_ratios)
+    if values.dtype.kind not in "iuf" or values.ndim != 1 or not np.all(np.isfinite(values)):
+        raise ValueError("log_ratios must be a finite real vector")
+    logits = np.concatenate((values.astype(float, copy=False), [0.0]))
+    logits -= float(np.max(logits))
+    weights = np.exp(logits)
+    fractions = weights / np.sum(weights)
+    if not np.all(np.isfinite(fractions)) or np.any(fractions <= 0.0):
+        raise ValueError("log-ratio coordinates produced an invalid ion composition")
+    return fractions
+
+
 def _validated_covariance(covariance, size, name="covariance"):
     matrix = np.asarray(covariance)
     if matrix.dtype.kind not in "iuf" or matrix.ndim != 2:
@@ -34,16 +65,20 @@ def _validated_covariance(covariance, size, name="covariance"):
 def validate_external_input_covariance(covariance, parameter_order):
     """Validate ordered covariance for local Full-EM CTS field/geometry inputs.
 
-    Frequency-resolved ray/equilibrium and composition uncertainties are not
-    represented by this local-vector contract.
+    Frequency-resolved ray/equilibrium uncertainty is handled by the separate
+    ray-resolved covariance interface. Ion composition is represented in
+    additive-log-ratio coordinates, one coordinate per species except the
+    reference (last) species, so sampled fractions remain on the simplex.
     """
     if (not isinstance(parameter_order, Sequence)
             or isinstance(parameter_order, (str, bytes)) or not parameter_order):
         raise ValueError("parameter_order must be a non-empty ordered sequence")
     order = tuple(parameter_order)
-    if any(not isinstance(name, str) or name not in SUPPORTED_LOCAL_COMPONENTS
-           for name in order):
-        raise ValueError("parameter_order contains an unsupported local Full-EM CTS component")
+    if any(not _supported_component(name) for name in order):
+        raise ValueError(
+            "parameter_order contains an unsupported component; use local field/direction/"
+            "polarization components or ion_fraction_logit_<species-name> composition coordinates"
+        )
     if len(set(order)) != len(order):
         raise ValueError("parameter_order entries must be unique")
     return order, _validated_covariance(covariance, len(order))
