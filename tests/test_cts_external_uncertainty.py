@@ -87,3 +87,16 @@ def test_shared_external_monte_carlo_is_reproducible():
     second = monte_carlo_external_covariance(function, [0.0, 0.0], covariance, samples=1000, seed=31)
     np.testing.assert_array_equal(first["input_samples"], second["input_samples"])
     assert first["external_output_covariance"][0, 0] == pytest.approx(3.4, rel=0.12)
+
+
+def test_cts_api_propagates_correlated_external_inputs_through_inversion():
+    from tokamak_analysis.cts_external_uncertainty import propagate_cts_external_uncertainty
+
+    names = ("magnetic_field_T_x", "magnetic_field_T_y")
+    covariance = np.array([[0.04, 0.01], [0.01, 0.09]])
+    result = propagate_cts_external_uncertainty(
+        lambda x: np.array([x[0] + x[1]]), [2.0, 3.0], covariance,
+        input_names=names,
+    )
+    assert result["input_names"] == names
+    assert result["external_output_covariance"][0, 0] == pytest.approx(0.15, rel=2e-6)
