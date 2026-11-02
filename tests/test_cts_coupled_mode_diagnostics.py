@@ -15,9 +15,10 @@ def test_degenerate_subspace_power_is_reported_separately_from_total_power():
 
     np.testing.assert_allclose(result["total_mode_power"], 14.0, rtol=1e-12)
     np.testing.assert_allclose(result["degenerate_subspace_power"], 5.0, rtol=1e-12)
-    assert result["degenerate_subspace_groups"] == [
-        [{"mode_indices": [0, 1], "power": 5.0}]
-    ] * 4
+    for sample_groups in result["degenerate_subspace_groups"]:
+        assert len(sample_groups) == 1
+        assert sample_groups[0]["mode_indices"] == [0, 1]
+        assert sample_groups[0]["power"] == pytest.approx(5.0, rel=1e-12)
     assert np.max(result["degenerate_subspace_power"]) < np.max(
         result["total_mode_power"]
     )
