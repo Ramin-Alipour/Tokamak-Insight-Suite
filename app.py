@@ -3533,6 +3533,19 @@ elif page=='Advanced Analysis':
                 cts_covariance_upload=st.file_uploader('Optional frequency-bin covariance CSV',type=['csv','txt'],key='cts_full_covariance_upload')
                 cts_response_uncertainty_upload=st.file_uploader('Optional measured frequency-response matrix 1σ uncertainty CSV',type=['csv','txt'],key='cts_full_response_uncertainty_upload')
                 cts_response_mc_samples=int(st.number_input('Response-uncertainty Monte Carlo refits',min_value=20,max_value=2000,value=100,step=20,key='cts_full_response_mc_samples'))
+                cts_local_external_covariance_upload=st.file_uploader(
+                    'Optional local magnetic-field / direction / polarization joint covariance CSV',
+                    type=['csv','txt'],key='cts_full_local_external_covariance_upload',
+                )
+                cts_local_external_order=st.text_input(
+                    'Exact covariance parameter order (comma-separated)',
+                    placeholder='magnetic_field_T_z,incident_direction_y,incident_polarization_real_y',
+                    key='cts_full_local_external_order',
+                )
+                cts_local_external_mc_samples=int(st.number_input(
+                    'Local external-input Monte Carlo refits',min_value=20,max_value=2000,
+                    value=100,step=20,key='cts_full_local_external_mc_samples',
+                ))
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
                 cts_ray_mode_index=None
                 if cts_geometry_upload is not None:
@@ -3661,6 +3674,23 @@ elif page=='Advanced Analysis':
                         'numerical_convergence':bool(cts_numerical_convergence),
                         'convergence_relative_tolerance':float(cts_convergence_tolerance),
                     }
+                    if cts_local_external_covariance_upload is not None:
+                        if 'frequency_resolved_geometry' in scattering_geometry:
+                            raise ValueError(
+                                'The local external covariance applies only to local direction geometry; '
+                                'frequency-resolved ray/equilibrium covariance is not represented by this input.'
+                            )
+                        if not cts_local_external_order.strip():
+                            raise ValueError('Enter the exact comma-separated parameter order for the uploaded local external covariance.')
+                        kwargs_cts['external_input_covariance']=pd.read_csv(
+                            cts_local_external_covariance_upload,header=None
+                        ).to_numpy(dtype=float)
+                        kwargs_cts['external_input_parameter_order']=[
+                            item.strip() for item in cts_local_external_order.split(',') if item.strip()
+                        ]
+                        kwargs_cts['external_input_mc_samples']=cts_local_external_mc_samples
+                    elif cts_local_external_order.strip():
+                        raise ValueError('Upload a local external covariance matrix when a parameter order is entered.')
                     for raw_orders, keyword, label in (
                         (cts_convergence_harmonics, 'convergence_harmonic_orders', 'harmonic'),
                         (cts_convergence_quadratures, 'convergence_quadrature_orders', 'quadrature'),
