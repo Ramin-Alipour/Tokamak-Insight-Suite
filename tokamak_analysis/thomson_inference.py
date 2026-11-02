@@ -61,14 +61,23 @@ def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
             raise ValueError("wavelength_nm is required when instrument_response is callable")
         response = response(np.asarray(wavelength,dtype=float))
     r = _finite_array(response, "instrument_response")
-    if r.ndim == 1:
+    kernel_input = r.ndim == 1
+    if kernel_input:
         if r.size < 1 or r.size % 2 == 0 or np.any(r < 0) or np.sum(r) <= 0:
             raise ValueError("a 1-D instrument-response kernel must be non-negative, odd-length and have positive area")
+        if not np.isclose(float(np.sum(r)), 1.0, rtol=1e-8, atol=1e-10):
+            raise ValueError(
+                "a measured 1-D instrument-response kernel must already have unit total area; "
+                "the calibrated kernel is not renormalized"
+            )
         if wavelength is not None:
             wavelength_steps = np.diff(np.asarray(wavelength, dtype=float))
             if not np.allclose(wavelength_steps, wavelength_steps[0], rtol=1e-6, atol=1e-12):
                 raise ValueError("a 1-D index-space response kernel requires a uniform wavelength grid; use a measured wavelength-to-wavelength response matrix for nonuniform grids")
-        kernel = r/np.sum(r)
+        # Preserve the supplied calibrated kernel. At the finite wavelength
+        # window, off-window response tails are not folded back into measured
+        # bins: edge columns are therefore sub-stochastic by design.
+        kernel = r.copy()
         out = np.zeros((nlam,nlam),dtype=float)
         center = kernel.size//2
         for col in range(nlam):
@@ -87,7 +96,10 @@ def _response_for_channel(response, channel, nchan, nlam, wavelength=None):
     sums = out.sum(axis=0)
     if np.any(sums <= 0):
         raise ValueError("each instrument-response column must have positive normalization")
-    if not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
+    if kernel_input:
+        if np.any(sums > 1.0 + 1e-10):
+            raise ValueError("finite-window 1-D response columns cannot exceed unit integrated response")
+    elif not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError(
             "measured instrument-response matrix columns must already sum to one; "
             "the calibrated response operator is not renormalized"
@@ -1373,25 +1385,30 @@ def analyze_thomson_spectra(
                         np.asarray(instrument_response, dtype=float)
                         + rng.normal(0.0, lsf_sigma), 0.0
                     )
-                    if not np.isfinite(sampled_kernel.sum()) or sampled_kernel.sum() <= 0:
+                    kernel_area = float(sampled_kernel.sum())
+                    if not np.isfinite(kernel_area) or kernel_area <= 0:
                         te_samples.append(np.nan)
                         velocity_samples.append(np.nan)
                         area_samples.append(np.nan)
                         cross_section_samples.append(np.nan)
                         continue
+                    # Normalize only the perturbed kernel realization; preserve
+                    # the supplied calibrated base kernel and its finite-window
+                    # edge losses unchanged.
+                    sampled_kernel /= kernel_area
                     sampled = _response_for_channel(
                         sampled_kernel, i, y.shape[0], y.shape[1], xi
                     )
                 else:
                     sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
-                colsum = sampled.sum(axis=0)
-                if np.any(colsum <= 0):
-                    te_samples.append(np.nan)
-                    velocity_samples.append(np.nan)
-                    area_samples.append(np.nan)
-                    cross_section_samples.append(np.nan)
-                    continue
-                sampled /= colsum[None, :]
+                    colsum = sampled.sum(axis=0)
+                    if np.any(colsum <= 0):
+                        te_samples.append(np.nan)
+                        velocity_samples.append(np.nan)
+                        area_samples.append(np.nan)
+                        cross_section_samples.append(np.nan)
+                        continue
+                    sampled /= colsum[None, :]
                 try:
                     if model == "non_collective_kappa":
                         draw = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
