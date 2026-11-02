@@ -143,6 +143,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
 ):
     """Jointly infer Te(r), projected flow(r), and spectral amplitude(r).
 
@@ -196,6 +198,13 @@ def reconstruct_joint_thomson_spatial_spectra(
         whiten = lambda v: np.asarray(v).reshape(-1) / scale
         noise_model = "unweighted_residual_scaled"
 
+    from .thomson_background import _background_design
+    background_basis = _background_design(
+        x, background_model, degree=background_degree,
+        interior_knots=background_interior_knots,
+        templates=background_templates,
+    )
+    n_background = int(background_basis.shape[1])
     widths = _bin_widths(x)
     response = _response_stack(instrument_response, m, nlam)
     q = 2.0 * np.sin(angle / 2.0)
@@ -212,22 +221,22 @@ def reconstruct_joint_thomson_spatial_spectra(
     initial_amp = peak_scale / max(float(np.max(h.sum(axis=1))), 1.0)
 
     # Parameter vector: log amplitude[n], log Te[n], flow[1e6 m/s,n],
-    # then per-detector offset and linear spectral slope.
+    # then independent detector-space background-basis coefficients.
+    background_seed = np.zeros((m, n_background), dtype=float)
+    background_seed[:, 0] = np.median(y[:, :max(2, nlam//10)], axis=1)
     p0 = np.r_[np.full(r.size, np.log(initial_amp)),
                np.full(r.size, np.log(initial_te)),
-               np.zeros(r.size),
-               np.full(m, float(np.median(y[:, :max(2,nlam//10)]))),
-               np.zeros(m)]
+               np.zeros(r.size), background_seed.ravel()]
     # Only numerical overflow guards are imposed on logarithmic positive
     # parameters.  Temperature and flow have no invented physical fit bounds;
     # the Maxwellian model-domain screen below classifies out-of-regime fits.
     # Background nuisance parameters and projected flow are unbounded.
     lower = np.r_[np.full(r.size, -700.0), np.full(r.size, -700.0),
                   np.full(r.size, -np.inf),
-                  np.full(m, -np.inf), np.full(m, -np.inf)]
+                  np.full(m*n_background, -np.inf)]
     upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
                   np.full(r.size, np.inf),
-                  np.full(m, np.inf), np.full(m, np.inf)]
+                  np.full(m*n_background, np.inf)]
     if not isinstance(positive_amplitude, (bool, np.bool_)):
         raise ValueError("positive_amplitude must be boolean")
     if not positive_amplitude:
@@ -239,8 +248,8 @@ def reconstruct_joint_thomson_spatial_spectra(
         amp = np.exp(p[:r.size])
         te = np.exp(p[r.size:2*r.size])
         flow = p[2*r.size:3*r.size] * 1e6
-        offset = p[3*r.size:3*r.size+m]
-        slope = p[3*r.size+m:3*r.size+2*m]
+        background_coefficients = p[3*r.size:].reshape(m, n_background)
+        detector_background = background_coefficients @ background_basis.T
         sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
         center = laser * (1.0 - q * flow / _C_M_S)
         node_spectra = amp[:, None] * np.exp(
@@ -251,7 +260,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         for channel in range(m):
             # Response acts on spectral density through bin-integrated power.
             convolved = (response[channel] @ (mixed[channel] * widths)) / widths
-            predicted[channel] = convolved + offset[channel] + slope[channel] * (x-laser)
+            predicted[channel] = convolved + detector_background[channel]
         return predicted, te, flow, amp
 
     def residual(p):
@@ -320,7 +329,8 @@ def reconstruct_joint_thomson_spatial_spectra(
     covariance_p = np.linalg.pinv(optimizer_jacobian.T @ optimizer_jacobian)
     if joint_spectral_covariance is None and signal_uncertainty is None:
         covariance_p *= float(data_residual @ data_residual / dof)
-    transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6), np.ones(2*m)])
+    transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
+                              np.ones(m*n_background)])
     physical_covariance = transform @ covariance_p @ transform.T
     diagonal = np.maximum(np.diag(physical_covariance), 0.0)
     uncertainties = np.sqrt(diagonal)
@@ -362,15 +372,32 @@ def reconstruct_joint_thomson_spatial_spectra(
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                             [f"Te_{i}_eV" for i in range(n)] +
                             [f"flow_projection_{i}_m_s" for i in range(n)] +
-                            [f"background_offset_channel_{i}" for i in range(m)] +
-                            [f"background_slope_channel_{i}" for i in range(m)]),
-        "detector_background_offset": fit.x[3*n:3*n+m].copy(),
-        "detector_background_slope_per_nm": fit.x[3*n+m:3*n+2*m].copy(),
+                            [f"background_channel_{channel}_coefficient_{coefficient}"
+                             for channel in range(m)
+                             for coefficient in range(n_background)]),
+        "detector_background_model": background_model,
+        "detector_background_basis": background_basis.copy(),
+        "detector_background_coefficients": fit.x[3*n:].reshape(m, n_background).copy(),
+        "detector_background_offset": (
+            fit.x[3*n:3*n+m].copy() if background_model in {"linear", "polynomial"}
+            else None
+        ),
+        "detector_background_slope_per_nm": (
+            fit.x[3*n+m:3*n+2*m].copy() * (2.0 / float(np.ptp(x)))
+            if background_model == "linear" else None
+        ),
         "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
         "instrument_response": "researcher_supplied_fixed_forward_operator",
         "regularization": {"kind": "nonuniform_radius_curvature_on_log_Te_flow_and_log_amplitude",
                            "strength": lam_reg, "user_selected": True},
         "noise_model": noise_model,
+        "background_contract": {
+            "model": background_model,
+            "coefficient_count_per_channel": n_background,
+            "role": "detector_space_nuisance_not_plasma_emission",
+            "basis_source": "researcher_selected_model_or_supplied_templates",
+            "fit_is_joint_with_physical_thomson_forward_model": True,
+        },
         "optimizer": {"success": bool(fit.success), "message": str(fit.message),
                       "nfev": int(fit.nfev), "cost": float(fit.cost),
                       "jacobian_rank": optimizer_rank, "parameter_count": parameter_count,
