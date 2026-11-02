@@ -52,7 +52,7 @@
 | 33 | `implemented_and_tested` — physical model selection is explicit. | Retain no automatic regime switching. |
 | 34 | `implemented_and_tested` — supplied response is a fixed forward operator. | No response calibration or measurement inside TIS. |
 | 35 | `implemented_and_tested` — kernel/matrix response representations are distinguished. | Retain uniform-grid requirement for index-space 1-D kernels. |
-| 36 | `implemented_and_tested` — response matrix validation enforces non-negative normalized redistribution. | Do not silently accept signed/non-normalized operators. |
+| 36 | `implemented_and_tested` — response matrix validation enforces finite, non-negative, unit-sum columns and preserves the supplied calibrated operator unchanged; no internal renormalization is performed. | Reject invalid operators; never alter the researcher-supplied calibrated response. |
 
 ## C. Optical uncertainty, nuisance parameters and channel coupling
 
