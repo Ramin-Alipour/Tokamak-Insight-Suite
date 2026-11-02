@@ -196,3 +196,14 @@ The exact root/package diagnostic registry copies, Python runtime registry, dash
 ## I. Follow-up registry consistency correction (2026-11-02)
 
 A direct main-branch comparison found that the packaged Thomson registry omitted the already-declared `result_classification` output from the root registry. The packaged copy has now been synchronized with the root copy; the existing root/package equality regression test covers the correction. This is a metadata consistency fix only and does not add physical assumptions or claim experimental validation.
+
+
+## J. EVDF parametric-comparison likelihood correction (2026-11-02)
+
+The projected-EVDF parametric comparison now uses the Gaussian information-criterion likelihood consistent with the supplied noise contract:
+
+- When pointwise uncertainty or full spectral covariance is supplied and whitened, the reported criteria are (AIC=\chi^2+2k) and (BIC=\chi^2+k\ln n), up to parameter-independent constants.
+- When no measurement uncertainty is supplied, the residual variance is estimated from the unweighted fit and the criteria retain the (n\ln(RSS/n)) form with the AIC/BIC penalties.
+- A parametric candidate whose nonlinear optimizer did not converge is now explicitly unavailable; it is not assigned residual scores or information criteria.
+
+Direct regression tests cover both likelihood cases. This is a statistical inference correction only: it introduces no new physical model, calibration step, input assumption, or experimental-validation claim.
