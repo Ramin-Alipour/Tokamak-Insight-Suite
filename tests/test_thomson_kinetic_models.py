@@ -81,6 +81,8 @@ def test_relativistic_maxwell_juttner_spectrum_fit_recovers_synthetic_parameters
     assert result["electron_temperature_eV"] == pytest.approx(500.0, rel=0.15)
     assert result["electron_velocity_projection_m_s"] == pytest.approx(1.0e6, abs=2.0e5)
     assert result["relativistic_kinematics"] is True
+    assert result["recoil_included"] is False
+    assert "elastic Thomson limit" in " ".join(result["assumptions"])
     assert result["fit_covariance"].shape == (5, 5)
 
 @pytest.mark.parametrize("use_bounds", [False, True])
