@@ -19,6 +19,7 @@ def test_thomson_density_formula_reference():
 
 def test_thomson_formulas_reject_invalid_physics():
     with pytest.raises(ValueError): thomson_electron_temperature_from_spectral_width(0.2,532.0,0.0)
+    with pytest.raises(ValueError,match="(0, pi)"): thomson_electron_temperature_from_spectral_width(0.2,532.0,math.pi)
     with pytest.raises(ValueError,match="superluminal"): thomson_velocity_projection(1500.0,500.0,math.pi/2)
 
 
