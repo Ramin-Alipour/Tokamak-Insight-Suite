@@ -50,6 +50,34 @@ The supplied measured response is applied in the physical forward model. Spectra
 
 For the three optical models, supplied response-matrix uncertainty is propagated by Monte Carlo perturbation and refitting. A shared 2-D response matrix uses the same perturbation realization across all channels, and the resulting cross-channel covariance of temperature, flow projection and integrated power is returned; channel-specific 3-D response matrices retain channel-local uncertainty. The spectral-distribution subanalysis is separately callable (registry entry 81) but remains a child of primary Analysis 1; it requires the canonical physical fit to have completed for the same calibrated measured spectrum. It reports signed wavelength-space centroid, observed variance/width, skewness and excess kurtosis, together with a response-convolved Gaussian shape diagnostic. It does not claim to complete physical-parameter extraction when the canonical fit fails. It does not claim to reconstruct an arbitrary electron velocity distribution.
 
+## Relativistic Compton option
+
+The relativistic Maxwell-Juttner forward kernel exposes an explicit
+`include_compton_recoil` switch. Its default is `false`: the existing
+polarized elastic-Thomson model is retained and rejects a quadrature support
+whose maximum fractional Compton energy correction exceeds
+`maximum_recoil_correction_fraction`. When `true`, the kernel instead
+uses the single-scattering Compton energy ratio
+\[
+r=\frac{\epsilon_s'}{\epsilon_i'}=
+\frac{1}{1+(\epsilon_i'/m_ec^2)(1-\cos\Theta')}
+\]
+in the instantaneous electron rest frame. The scattered laboratory wavelength
+includes the recoil factor (1/r), and the differential weight uses the
+polarized Klein-Nishina factor, summed over final photon polarization states,
+\[
+\frac{1}{2}r^2\left(r+r^{-1}
+-2|\mathbf e_i'\cdot\mathbf n_s'|^2\right).
+\]
+This expression reduces to the polarized Thomson factor
+(1-|\mathbf e_i'\cdot\mathbf n_s'|^2) as (r\to1).
+The option includes single-photon recoil and Klein-Nishina weighting; it does
+not model multiple scattering, pair production, radiative corrections, or
+collective photon effects. It is not enabled automatically. The fit and
+multichannel APIs forward the same explicit switch. The reported effective
+cross-section is correspondingly labelled as Thomson or polarized
+Klein-Nishina according to the selected mode.
+
 ## Electron density and identifiability
 
 A normalized non-collective spectral shape alone does not determine absolute electron density. Absolute density is calculated only when the spectral intensity is explicitly declared calibrated in W/nm and all required optical factors are supplied: laser power at the scattering volume, interaction length, collection solid angle, optical efficiency, incident direction, incident polarization and scattered-light direction. If the contract is incomplete, density is reported unavailable rather than fabricated from fitted amplitude.
