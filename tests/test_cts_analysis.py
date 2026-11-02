@@ -1156,3 +1156,56 @@ def test_cts_external_parameter_covariance_rejects_invalid_order_or_non_psd_matr
         analyze_cts_spectrum(trial_spectrum,**common,
             external_parameter_covariance=np.eye(2),
             external_parameter_order=["probe_frequency_Hz","not_supported"])
+
+
+@pytest.mark.parametrize("response_path", ["electrostatic", "full_em"])
+def test_cts_measured_response_operator_is_rejected_not_renormalized(response_path):
+    frequency = np.linspace(-5.0, 5.0, 8)
+    response = 2.0 * np.eye(frequency.size)
+    original = response.copy()
+    spectrum = np.linspace(0.2, 1.0, frequency.size)
+    if response_path == "electrostatic":
+        from tokamak_analysis.cts_analysis import _convolve
+        convolve = _convolve
+    else:
+        from tokamak_analysis.cts_full_em import _apply_frequency_response
+        convolve = _apply_frequency_response
+    with pytest.raises(ValueError, match="already sum to one"):
+        convolve(response, spectrum, frequency)
+    np.testing.assert_array_equal(response, original)
+
+
+def test_electrostatic_cts_analysis_rejects_non_normalized_calibrated_response():
+    f0, f, g, ions, fractions, response = _case()
+    response *= 2.0
+    with pytest.raises(ValueError, match="already sum to one"):
+        analyze_cts_spectrum(
+            f, np.ones_like(f), probe_frequency_Hz=f0, scattering_geometry=g,
+            ion_species=ions, ion_fractions=fractions,
+            electron_velocity_projection_m_s=0.0, instrument_response=response,
+            electron_density_initial_m3=2.0e19,
+            electron_temperature_initial_eV=1200.0,
+            ion_temperature_initial_eV=800.0,
+            ion_velocity_initial_m_s=0.0, global_search=False,
+            inversion_method="local_least_squares",
+        )
+
+
+def test_full_em_cts_analysis_rejects_non_normalized_calibrated_response():
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    frequency = np.linspace(-1.0e8, 1.0e8, 8)
+    response = 2.0 * np.eye(frequency.size)
+    with pytest.raises(ValueError, match="already sum to one"):
+        analyze_full_em_cts_spectrum(
+            frequency, np.ones(frequency.size),
+            probe_frequency_Hz=140.0e9, scattering_geometry={},
+            electron_density_initial_m3=2.0e19,
+            electron_temperature_initial_eV=1000.0,
+            ion_temperature_initial_eV=500.0,
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], magnetic_field_T=[0.0, 0.0, 2.0],
+            incident_polarization=[0.0, 0.0, 1.0],
+            scattered_polarization=[0.0, 0.0, 1.0],
+            instrument_response=response,
+        )
