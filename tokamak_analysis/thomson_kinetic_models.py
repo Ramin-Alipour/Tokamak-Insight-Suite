@@ -603,7 +603,7 @@ def fit_relativistic_maxwell_juttner(
         "jacobian_condition_number": condition,
         "model": "relativistic non-collective Thomson scattering with Lorentz-boosted Maxwell-Juttner electrons",
         "relativistic_kinematics": True,
-        "recoil_included": False,
+        "recoil_included": bool(physical["recoil_included"]),
         "thomson_recoil_correction_fraction_max_on_quadrature_support": physical[
             "thomson_recoil_correction_fraction_max_on_quadrature_support"
         ],
@@ -617,7 +617,7 @@ def fit_relativistic_maxwell_juttner(
             "Bulk electron flow is parallel to the scattering vector.",
             "The incident polarization is explicitly supplied and Lorentz-transformed into each electron rest frame.",
             "Exact relativistic photon-frequency ratio and Lorentz aberration are used.",
-            "Photon recoil/Compton corrections are neglected; the Thomson limit is assumed.",
+            ("Single-scattering Compton recoil and polarized Klein-Nishina weighting are included." if physical["recoil_included"] else "Photon recoil/Compton corrections are neglected; the elastic Thomson limit is assumed."),
             "Measured instrument response is applied to the calculated spectral density."
         ],
     }
