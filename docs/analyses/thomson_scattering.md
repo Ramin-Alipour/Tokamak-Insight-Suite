@@ -299,3 +299,6 @@ Each classification entry includes the parameter name, dimensional unit where ap
 ## Joint wavelength-resolved spatial inversion — response contract
 
 The joint spatial-spectral Maxwellian inverse requires an explicit measured instrument-response operator. The API does not silently substitute an identity response when the argument is omitted. Supply the measured shared or channel-specific response matrix; an identity matrix is acceptable only when the researcher explicitly declares that the supplied spectra are already corrected for the instrument line-spread function. The operator is used unchanged and is never estimated or calibrated by TIS.
+
+
+The Full-EM CTS inversion additionally supports conditional joint covariance propagation for explicitly supplied local magnetic-field, incident/scattered direction and complex polarization components. It uses Monte Carlo refits and is not available for frequency-resolved ray/equilibrium geometry; see [the CTS contract](collective_thomson_scattering.md) for the exact input names and limits.
