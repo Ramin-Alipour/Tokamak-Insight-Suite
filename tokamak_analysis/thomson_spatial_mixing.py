@@ -18,7 +18,9 @@ def reconstruct_profile_with_spatial_mixing(measured_channel_values, spatial_mix
 
     Inputs are calibrated channel values and a fixed researcher-supplied spatial
     response operator. No PSF estimation, instrument calibration, or spectral fit
-    is performed here.
+    is performed here. Optional spatial_mixing_covariance is the covariance of
+    the flattened matrix entries in row-major (C) order; it is propagated by
+    Monte Carlo while holding the selected regularization strength fixed.
     """
     y=np.asarray(measured_channel_values,dtype=float)
     h=np.asarray(spatial_mixing_matrix,dtype=float)
