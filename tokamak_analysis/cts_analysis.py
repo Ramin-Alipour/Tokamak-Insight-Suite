@@ -602,7 +602,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if external_covariance.shape != (len(external_order), len(external_order)) or not np.allclose(external_covariance, external_covariance.T, rtol=1e-9, atol=1e-12):
             raise ValueError("external_parameter_covariance must be symmetric and match external_parameter_order")
         eigenvalues, eigenvectors = np.linalg.eigh(external_covariance)
-        covariance_scale = max(float(np.max(np.abs(eigenvalues))), 1.0)
+        covariance_scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
         if float(np.min(eigenvalues)) < -1e-10*covariance_scale:
             raise ValueError("external_parameter_covariance must be positive semidefinite")
         external_root = eigenvectors @ np.diag(np.sqrt(np.maximum(eigenvalues, 0.0)))
