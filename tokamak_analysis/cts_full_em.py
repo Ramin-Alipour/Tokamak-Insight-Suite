@@ -935,7 +935,9 @@ def analyze_full_em_cts_spectrum(
     parameter_bounds=None, harmonic_order=8, quadrature_order=12,
     damping_rate_rad_s=None, fast_ion_populations=None, electron_distribution=None,
     bindslev_validity_theta_e_limit=None, instrument_response_uncertainty=None,
-    response_mc_samples=100,
+    response_mc_samples=100, external_input_covariance=None,
+    external_input_parameter_order=None, external_input_mc_samples=100,
+    external_input_mc_seed=84622,
     numerical_convergence=True, convergence_harmonic_orders=None,
     convergence_quadrature_orders=None, convergence_relative_tolerance=1e-3,
 ):
@@ -952,6 +954,53 @@ def analyze_full_em_cts_spectrum(
     """
     from scipy.optimize import least_squares
     from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
+
+    external_order = None
+    external_covariance = None
+    external_draw_vectors = None
+    if (external_input_covariance is None) != (external_input_parameter_order is None):
+        raise ValueError(
+            "external_input_covariance and external_input_parameter_order must be supplied together"
+        )
+    if external_input_covariance is not None:
+        from .cts_external_uncertainty import (
+            validate_external_input_covariance, sample_external_input_vectors,
+        )
+        if not isinstance(scattering_geometry, Mapping) or "frequency_resolved_geometry" in scattering_geometry:
+            raise ValueError(
+                "external_input_covariance currently supports local incident/scattered geometry only; "
+                "frequency-resolved ray/equilibrium covariance is not represented by this input contract"
+            )
+        external_order, external_covariance = validate_external_input_covariance(
+            external_input_covariance, external_input_parameter_order
+        )
+        external_base = {
+            "magnetic_field_T_x": float(np.asarray(magnetic_field_T, dtype=float)[0]),
+            "magnetic_field_T_y": float(np.asarray(magnetic_field_T, dtype=float)[1]),
+            "magnetic_field_T_z": float(np.asarray(magnetic_field_T, dtype=float)[2]),
+        }
+        for kind, vector in (
+            ("incident_direction", scattering_geometry.get("incident_direction")),
+            ("scattered_direction", scattering_geometry.get("scattered_direction")),
+        ):
+            vec = _vec3(vector, kind)
+            for axis, value in zip("xyz", vec):
+                external_base[f"{kind}_{axis}"] = float(value)
+        for kind, vector in (
+            ("incident", incident_polarization),
+            ("scattered", scattered_polarization),
+        ):
+            vec = np.asarray(vector, dtype=complex)
+            if vec.shape != (3,) or not np.all(np.isfinite(vec)):
+                raise ValueError(f"{kind}_polarization must be a finite complex 3-vector")
+            for axis, value in zip("xyz", vec):
+                external_base[f"{kind}_polarization_real_{axis}"] = float(value.real)
+                external_base[f"{kind}_polarization_imag_{axis}"] = float(value.imag)
+        external_draw_vectors = sample_external_input_vectors(
+            np.asarray([external_base[name] for name in external_order], dtype=float),
+            external_covariance, samples=external_input_mc_samples,
+            seed=external_input_mc_seed,
+        )
 
     if electron_distribution is not None:
         raise ValueError(
@@ -1147,18 +1196,61 @@ def analyze_full_em_cts_spectrum(
             for i, name in enumerate(species_names)
         }
 
-    def model(p, response_matrix=None):
+    def model(p, response_matrix=None, external_values=None):
+        active_geometry = scattering_geometry
+        active_field = magnetic_field_T
+        active_incident_polarization = incident_polarization
+        active_scattered_polarization = scattered_polarization
+        if external_values is not None:
+            values = dict(zip(external_order, np.asarray(external_values, dtype=float)))
+            active_field = np.asarray([
+                values.get(f"magnetic_field_T_{axis}", np.asarray(magnetic_field_T, dtype=float)[i])
+                for i, axis in enumerate("xyz")
+            ], dtype=float)
+            active_geometry = dict(scattering_geometry)
+            for kind in ("incident_direction", "scattered_direction"):
+                if any(f"{kind}_{axis}" in values for axis in "xyz"):
+                    vector = np.asarray([
+                        values.get(f"{kind}_{axis}", scattering_geometry[kind][i])
+                        for i, axis in enumerate("xyz")
+                    ], dtype=float)
+                    norm = float(np.linalg.norm(vector))
+                    if not np.isfinite(norm) or norm <= 0.0:
+                        raise ValueError(f"sampled {kind} has zero or invalid norm")
+                    active_geometry[kind] = vector / norm
+            for kind, base in (
+                ("incident", incident_polarization),
+                ("scattered", scattered_polarization),
+            ):
+                if any(f"{kind}_polarization_{part}_{axis}" in values
+                       for part in ("real", "imag") for axis in "xyz"):
+                    vector = np.asarray([
+                        complex(
+                            values.get(f"{kind}_polarization_real_{axis}", complex(base[i]).real),
+                            values.get(f"{kind}_polarization_imag_{axis}", complex(base[i]).imag),
+                        )
+                        for i, axis in enumerate("xyz")
+                    ], dtype=complex)
+                    norm = float(np.linalg.norm(vector))
+                    base_norm = float(np.linalg.norm(np.asarray(base, dtype=complex)))
+                    if not np.isfinite(norm) or norm <= 0.0:
+                        raise ValueError(f"sampled {kind} polarization has zero or invalid norm")
+                    vector *= base_norm / norm
+                    if kind == "incident":
+                        active_incident_polarization = vector
+                    else:
+                        active_scattered_polarization = vector
         result = full_em_cts_spectral_density(
-            f, probe_frequency_Hz, scattering_geometry,
+            f, probe_frequency_Hz, active_geometry,
             electron_density_m3=10.0**np.clip(p[0], -300.0, 300.0),
             electron_temperature_eV=10.0**np.clip(p[1], -300.0, 300.0),
             ion_temperature_eV=unpack_temperatures(p),
             ion_species=ion_species, ion_fractions=ion_fractions,
-            magnetic_field_T=magnetic_field_T,
+            magnetic_field_T=active_field,
             electron_flow_projection_m_s=electron_flow_projection(p),
             ion_flow_projection_m_s=unpack_ion_flow_projections(p),
-            incident_polarization=incident_polarization,
-            scattered_polarization=scattered_polarization,
+            incident_polarization=active_incident_polarization,
+            scattered_polarization=active_scattered_polarization,
             harmonic_order=harmonic_order, quadrature_order=quadrature_order,
             damping_rate_rad_s=damping_rate_rad_s,
             fast_ion_populations=fast_ion_populations,
@@ -1167,8 +1259,8 @@ def analyze_full_em_cts_spectrum(
         )["spectral_density"]
         return _apply_frequency_response(response if response_matrix is None else response_matrix, result, f)
 
-    def residual(p, return_profile=False, response_matrix=None):
-        z = model(p, response_matrix=response_matrix)
+    def residual(p, return_profile=False, response_matrix=None, external_values=None):
+        z = model(p, response_matrix=response_matrix, external_values=external_values)
         design = whiten(np.column_stack((z, np.ones_like(z))))
         target = whiten(y)
         amplitude, offset = np.linalg.lstsq(design, target, rcond=None)[0]
@@ -1354,6 +1446,60 @@ def analyze_full_em_cts_spectrum(
         else:
             out["instrument_response_uncertainty_warning"] = (
                 "Too few successful response-matrix perturbation refits; no response covariance was added."
+            )
+    out["external_input_covariance_supplied"] = external_covariance is not None
+    out["external_input_covariance_order"] = list(external_order) if external_order is not None else []
+    out["external_input_covariance_propagated"] = False
+    out["external_input_mc_requested"] = (
+        int(external_input_mc_samples) if external_covariance is not None else 0
+    )
+    out["external_input_mc_successes"] = 0
+    if external_draw_vectors is not None:
+        external_draws = []
+        for draw_values in external_draw_vectors:
+            try:
+                draw = least_squares(
+                    lambda parameters: residual(
+                        parameters, external_values=draw_values
+                    ),
+                    fit.x, bounds=(lower, upper), x_scale="jac", max_nfev=1200,
+                )
+                if draw.success and np.all(np.isfinite(draw.x)):
+                    external_draws.append(physical_parameter_values(draw.x))
+            except (ValueError, RuntimeError, np.linalg.LinAlgError):
+                continue
+        out["external_input_mc_successes"] = len(external_draws)
+        if len(external_draws) >= max(12, int(np.ceil(0.7*external_input_mc_samples))):
+            external_parameter_covariance = np.cov(
+                np.asarray(external_draws), rowvar=False, ddof=1
+            )
+            covariance = covariance + external_parameter_covariance
+            out["external_input_parameter_covariance"] = external_parameter_covariance
+            out["external_uncertainty_covariance_components"]["local_external_inputs"] = (
+                external_parameter_covariance
+            )
+            out["fit_covariance"] = covariance
+            out["parameter_uncertainties"] = np.sqrt(
+                np.maximum(np.diag(covariance), 0.0)
+            )
+            out["electron_flow_projection_uncertainty_m_s"] = float(
+                np.sqrt(max(covariance[2, 2], 0.0))
+            )
+            out["ion_flow_projection_uncertainty_m_s_by_species"] = {
+                name: float(np.sqrt(max(covariance[3+n_species+i, 3+n_species+i], 0.0)))
+                for i, name in enumerate(species_names)
+            }
+            out["external_input_covariance_propagated"] = True
+            out["parameter_covariance_scope"] = (
+                "conditional local-fit covariance plus separately propagated supplied "
+                "instrument-response and local magnetic-field/geometry/polarization covariance "
+                "components; cross-covariance between distinct external covariance sources "
+                "is not included"
+            )
+        else:
+            out["external_input_covariance_warning"] = (
+                "Too few successful local external-input perturbation refits; "
+                "no local external-input covariance was added."
             )
     if not isinstance(numerical_convergence, (bool, np.bool_)):
         raise ValueError("numerical_convergence must be boolean")
