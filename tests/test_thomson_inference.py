@@ -562,6 +562,26 @@ def test_joint_multi_channel_gls_propagates_cross_channel_spectral_covariance():
     assert all(ch["joint_fit_used"] for ch in out["channels"])
 
 
+def test_joint_gls_reports_large_reduced_chi_square_without_arbitrary_rejection():
+    x, y1, _ = _spectral_case(100.0, n=161)
+    _, y2, _ = _spectral_case(140.0, n=161)
+    perturbation = 8.0 * np.sin(np.linspace(0.0, 24.0 * np.pi, x.size))
+    measured = np.vstack([y1 + perturbation, y2 - perturbation])
+    covariance = np.eye(measured.size) * 0.1**2
+
+    out = analyze_thomson_spectra(
+        x, measured, [0.1, 0.2], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi / 2, instrument_response=np.eye(x.size),
+        joint_spectral_covariance=covariance,
+    )
+
+    joint = out["joint_inference"]
+    assert joint["reduced_chi_square"] > 10.0
+    assert joint["reduced_chi_square_policy"].startswith("diagnostic_only")
+    assert all(channel["joint_fit_used"] for channel in out["channels"])
+    assert all(channel["fit_accepted"] for channel in out["channels"])
+
+
 def test_joint_multi_channel_gls_rejects_non_positive_definite_covariance():
     x,y,_=_spectral_case(100.0,n=81)
     covariance=np.eye(2*x.size)
