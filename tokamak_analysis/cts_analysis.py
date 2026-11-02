@@ -398,7 +398,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     ion_velocity_initial_m_s=None,parameter_bounds=None,electron_velocity_projection_m_s=None,
     fast_ion=None,global_search=False,random_seed=1729, inversion_method=None,
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
-    regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None):
+    regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None,
+    background_reference_spectra=None, background_components=None):
     """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
     electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
     Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
@@ -414,6 +415,30 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
     if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
+    # Optional calibrated off-pulse/reference spectra define a fixed PCA
+    # nuisance subspace. References are already on the same calibrated
+    # frequency grid and detector scale; this routine never re-calibrates them.
+    background_basis = None
+    background_reference_mean = None
+    background_pca_components_used = 0
+    if background_reference_spectra is not None:
+        reference = _array(background_reference_spectra, "background_reference_spectra", 2)
+        if reference.shape[1] != f.size or reference.shape[0] < 2:
+            raise ValueError("background_reference_spectra must contain at least two calibrated reference spectra on the same frequency grid")
+        if np.any(reference < 0):
+            raise ValueError("calibrated background reference spectra must be non-negative")
+        if isinstance(background_components, (bool, np.bool_)) or not isinstance(background_components, (int, np.integer)):
+            raise ValueError("background_components must be an explicit positive integer when background_reference_spectra is supplied")
+        if not 1 <= int(background_components) <= min(reference.shape[0]-1, f.size):
+            raise ValueError("background_components must be between 1 and min(n_reference_spectra-1, n_frequency)")
+        background_reference_mean = np.mean(reference, axis=0)
+        centered_reference = reference - background_reference_mean
+        _, singular_values, right_vectors = np.linalg.svd(centered_reference, full_matrices=False)
+        numerical_rank = int(np.count_nonzero(singular_values > np.finfo(float).eps * max(centered_reference.shape) * (singular_values[0] if singular_values.size else 0.0)))
+        if int(background_components) > numerical_rank:
+            raise ValueError(f"background_components={int(background_components)} exceeds the numerical rank {numerical_rank} of the supplied reference spectra")
+        background_pca_components_used = int(background_components)
+        background_basis = np.column_stack((background_reference_mean, right_vectors[:background_pca_components_used].T))
     unc=None if signal_uncertainty is None else _array(signal_uncertainty,"signal_uncertainty",1)
     if unc is not None and (unc.shape!=y.shape or np.any(unc<=0)): raise ValueError("signal_uncertainty must match spectrum and be positive")
     if unc is not None and spectral_covariance is not None:
@@ -674,18 +699,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
           fast_ion=d.get("fast_ion"))
         return _convolve(response if response_matrix is None else response_matrix,z,f)
     def profile_amplitude(z):
-        A=whiten(np.column_stack((z,np.ones_like(z))))
-        amp,off=np.linalg.lstsq(A,whiten(y),rcond=None)[0]
-        if amp<0:
-            amp=0.0
-            whitened_one=whiten(np.ones_like(y))
-            whitened_y=whiten(y)
-            denominator=float(whitened_one@whitened_one)
-            off=float(whitened_one@whitened_y/denominator)
-        return amp,off
+        # Linear nuisance parameters are profiled jointly with the nonlinear
+        # plasma parameters. Reference-derived background modes remain in
+        # detector space; only the physical CTS spectrum is response-convolved.
+        nuisance = np.ones((f.size, 1)) if background_basis is None else background_basis
+        design = np.column_stack((z, nuisance))
+        coefficients = np.linalg.lstsq(whiten(design), whiten(y), rcond=None)[0]
+        amp = float(coefficients[0])
+        if amp < 0.0:
+            amp = 0.0
+            coefficients = np.linalg.lstsq(whiten(nuisance), whiten(y), rcond=None)[0]
+        background = nuisance @ coefficients
+        return amp, background, coefficients
     def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
-        z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override); amp,off=profile_amplitude(z)
-        return whiten(amp*z+off-y)
+        z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override)
+        amp,background,_=profile_amplitude(z)
+        return whiten(amp*z+background-y)
     def regularization_terms(p):
         if inversion_method!="regularized":
             return []
@@ -728,8 +757,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         start=de.x; score=float(de.fun)
     else: start=p0
     fit=least_squares(residual,start,bounds=(lo,hi),x_scale="jac",max_nfev=6000)
-    d=decode(fit.x); z=forward(fit.x); amp,off=profile_amplitude(z)
-    fitted=amp*z+off; res=y-fitted; data_fit_residual=data_residual(fit.x); dof=max(1,y.size-len(fit.x)-2)
+    d=decode(fit.x); z=forward(fit.x); amp,background_fit,background_coefficients=profile_amplitude(z)
+    fitted=amp*z+background_fit; res=y-fitted; data_fit_residual=data_residual(fit.x)
+    nuisance_parameter_count=(1 if background_basis is None else background_basis.shape[1])
+    dof=max(1,y.size-len(fit.x)-1-nuisance_parameter_count)
     # Identifiability must be assessed after column scaling.  The optimizer
     # parameters mix logarithms, a dimensional flow projection and (for an
     # inferred VDF) dimensionless logits; a raw condition number is therefore
@@ -776,6 +807,12 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       "scattering_angle_rad":angle,"collective_parameter_alpha":float(alpha),"scattering_regime":"collective" if alpha>1 else "weakly_collective_or_noncollective",
       "ion_species":ions,"ion_fractions_charge_density":[float(v) for v in ion_fractions],"probe_frequency_Hz":f0,
       "model":"unmagnetized electrostatic longitudinal microwave CTS",
+      "background_model":"constant_offset" if background_basis is None else "reference_spectrum_PCA",
+      "background_spectrum":background_fit.copy(),
+      "background_coefficients":background_coefficients.copy(),
+      "background_reference_mean":None if background_reference_mean is None else background_reference_mean.copy(),
+      "background_pca_components_used":int(background_pca_components_used),
+      "background_provenance":"single fitted constant offset nuisance" if background_basis is None else "PCA nuisance subspace derived only from supplied calibrated reference spectra on the same frequency grid; no reference data are modified or recalibrated",
       "parameter_provenance":{"electron_density":"inferred from measured CTS spectral shape","electron_temperature":"inferred from measured CTS spectral shape",
        "ion_temperature":"one common ion temperature inferred from the measured ion feature and shared by all supplied species",
        "ion_velocity_projection":"one common projected ion flow inferred from the measured ion-feature Doppler shift and shared by all supplied species",
@@ -787,7 +824,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "The current Maxwellian background model has one common ion temperature and one common projected ion flow for all species; species-specific Ti and flow inference is not implemented.",
        "Only the electron-flow component projected along the scattering wavevector is inferred; transverse vector components are not identifiable from one scattering geometry.",
        "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
-       "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied."]}
+       "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
+       "The optional structured background uses PCA modes from explicitly supplied calibrated reference spectra; it is conditional on those references and does not infer or calibrate missing background measurements."]}
     if out["reduced_chi_square"] is not None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
         discrepancy_covariance=discrepancy_scale*cov
