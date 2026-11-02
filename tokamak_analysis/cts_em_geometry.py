@@ -749,13 +749,10 @@ def propagate_cold_plasma_mode_coupling(
         eigvals[j] = vals if j == 0 else vals[order]
         if j == 0:
             order = np.arange(3)
-        tracked_groups = []
-        start = 0
-        for q in range(2):
-            if abs(eigvals[j, q + 1] - eigvals[j, q]) > tolerance * scale:
-                tracked_groups.append(np.arange(start, q + 1))
-                start = q + 1
-        tracked_groups.append(np.arange(start, 3))
+        tracked_groups = [
+            np.flatnonzero(np.isin(order, raw_group))
+            for raw_group in groups
+        ]
         subspace_power.append([
             group.astype(int).tolist()
             for group in tracked_groups if len(group) > 1
