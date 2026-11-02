@@ -68,7 +68,7 @@ def test_psf_profile_inverse_rejects_non_psd_radius_covariance():
 def test_psf_profile_inverse_propagates_spatial_mixing_matrix_covariance():
     radius = np.linspace(0.0, 1.0, 7)
     profile = 2.0 + 0.3*np.sin(np.pi*radius)
-    mixing = 0.8*np.eye(7) + 0.1*np.roll(np.eye(7), 1, axis=1) + 0.1*np.roll(np.eye(7), -1, axis=1)
+    mixing = 0.8*np.eye(7) + 0.1*np.roll(np.eye(7), 1, axis=1) + 0.1*np.roll(np.eye(7), -1, axis=1) + 0.01*np.ones((7,7))
     mixing_covariance = np.eye(mixing.size) * (2.0e-4)**2
     result = reconstruct_profile_with_spatial_mixing(
         mixing@profile, mixing, radius, uncertainty=np.full(7, 0.02),
