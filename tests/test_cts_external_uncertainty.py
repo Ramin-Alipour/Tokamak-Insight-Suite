@@ -44,3 +44,20 @@ def test_local_external_covariance_sampling_is_reproducible():
     second = sample_external_input_vectors(base, covariance, samples=24, seed=17)
     assert first.shape == (24, 2)
     np.testing.assert_array_equal(first, second)
+
+@pytest.mark.parametrize("covariance,match", [
+    (np.array([[1.0, 2.0], [0.0, 1.0]]), "symmetric"),
+    (np.array([[1.0, 2.0], [2.0, 1.0]]), "positive semidefinite"),
+    (np.array([[1.0, np.nan], [np.nan, 1.0]]), "finite"),
+    (np.array([[1.0 + 0.0j, 0.0], [0.0, 1.0]]), "real numeric"),
+])
+def test_sampler_rejects_invalid_covariance(covariance, match):
+    with pytest.raises(ValueError, match=match):
+        sample_external_input_vectors(np.array([0.0, 0.0]), covariance, samples=24)
+
+
+def test_sampler_rejects_non_integer_seed():
+    with pytest.raises(ValueError, match="seed must be an integer"):
+        sample_external_input_vectors(
+            np.array([0.0, 0.0]), np.eye(2), samples=24, seed=1.5
+        )
