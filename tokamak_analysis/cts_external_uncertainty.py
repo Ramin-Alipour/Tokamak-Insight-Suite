@@ -14,6 +14,23 @@ SUPPORTED_LOCAL_COMPONENTS = tuple(
 )
 
 
+def _validated_covariance(covariance, size, name="covariance"):
+    matrix = np.asarray(covariance)
+    if matrix.dtype.kind not in "iuf" or matrix.ndim != 2:
+        raise ValueError(f"{name} must be a real numeric matrix")
+    matrix = matrix.astype(float, copy=False)
+    if matrix.shape != (size, size) or not np.all(np.isfinite(matrix)):
+        raise ValueError(f"{name} must be finite and match the ordered input vector")
+    if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-14):
+        raise ValueError(f"{name} must be symmetric")
+    matrix = 0.5 * (matrix + matrix.T)
+    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
+    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+    if float(np.min(eigenvalues)) < -1e-10 * scale:
+        raise ValueError(f"{name} must be positive semidefinite")
+    return (eigenvectors * np.maximum(eigenvalues, 0.0)) @ eigenvectors.T
+
+
 def validate_external_input_covariance(covariance, parameter_order):
     """Validate ordered covariance for local Full-EM CTS field/geometry inputs.
 
@@ -29,45 +46,20 @@ def validate_external_input_covariance(covariance, parameter_order):
         raise ValueError("parameter_order contains an unsupported local Full-EM CTS component")
     if len(set(order)) != len(order):
         raise ValueError("parameter_order entries must be unique")
-    matrix = np.asarray(covariance)
-    if matrix.dtype.kind not in "iuf" or matrix.ndim != 2:
-        raise ValueError("covariance must be a real numeric matrix")
-    matrix = matrix.astype(float, copy=False)
-    if matrix.shape != (len(order), len(order)) or not np.all(np.isfinite(matrix)):
-        raise ValueError("covariance must be finite and match parameter_order")
-    if not np.allclose(matrix, matrix.T, rtol=1e-10, atol=1e-14):
-        raise ValueError("covariance must be symmetric")
-    matrix = 0.5 * (matrix + matrix.T)
-    eigenvalues, eigenvectors = np.linalg.eigh(matrix)
-    scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
-    if float(np.min(eigenvalues)) < -1e-10 * scale:
-        raise ValueError("covariance must be positive semidefinite")
-    matrix = (eigenvectors * np.maximum(eigenvalues, 0.0)) @ eigenvectors.T
-    return order, matrix
+    return order, _validated_covariance(covariance, len(order))
 
 
 def sample_external_input_vectors(base_values, covariance, *, samples=100, seed=84621):
     """Draw reproducible joint local-input perturbations from a supplied covariance."""
     base = np.asarray(base_values)
-    if base.dtype.kind not in "iuf" or base.ndim != 1 or not np.all(np.isfinite(base)):
-        raise ValueError("base_values must be a finite real vector")
-    cov = np.asarray(covariance)
-    if cov.dtype.kind not in "iuf" or cov.ndim != 2:
-        raise ValueError("covariance must be a real numeric matrix")
-    cov = cov.astype(float, copy=False)
-    if cov.shape != (base.size, base.size) or not np.all(np.isfinite(cov)):
-        raise ValueError("covariance must be finite and match base_values")
-    if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-14):
-        raise ValueError("covariance must be symmetric")
-    cov = 0.5 * (cov + cov.T)
+    if base.dtype.kind not in "iuf" or base.ndim != 1 or base.size == 0 or not np.all(np.isfinite(base)):
+        raise ValueError("base_values must be a finite non-empty real vector")
+    cov = _validated_covariance(covariance, base.size)
     if isinstance(samples, (bool, np.bool_)) or not isinstance(samples, (int, np.integer)) or samples < 20:
         raise ValueError("samples must be an integer >= 20")
     if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)):
         raise ValueError("seed must be an integer")
     values, vectors = np.linalg.eigh(cov)
-    scale = max(float(np.max(np.abs(values))), np.finfo(float).tiny)
-    if float(np.min(values)) < -1e-10 * scale:
-        raise ValueError("covariance must be positive semidefinite")
     root = vectors * np.sqrt(np.maximum(values, 0.0))
     rng = np.random.default_rng(int(seed))
     return base[None, :] + rng.standard_normal((int(samples), base.size)) @ root.T

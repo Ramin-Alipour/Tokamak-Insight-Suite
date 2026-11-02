@@ -45,6 +45,7 @@ def test_local_external_covariance_sampling_is_reproducible():
     assert first.shape == (24, 2)
     np.testing.assert_array_equal(first, second)
 
+
 @pytest.mark.parametrize("covariance,match", [
     (np.array([[1.0, 2.0], [0.0, 1.0]]), "symmetric"),
     (np.array([[1.0, 2.0], [2.0, 1.0]]), "positive semidefinite"),
