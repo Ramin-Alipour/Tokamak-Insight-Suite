@@ -954,8 +954,8 @@ def analyze_thomson_spectra(
         )
     joint_covariance = None
     if joint_spectral_covariance is not None:
-        if model not in {"non_collective_maxwellian","non_collective_kappa"}:
-            raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian and non_collective_kappa; other physical models require model-specific joint forward models")
+        if model not in {"non_collective_maxwellian","non_collective_kappa","non_collective_relativistic_maxwell_juttner"}:
+            raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian, non_collective_kappa, and block-diagonal non_collective_relativistic_maxwell_juttner; other physical models require model-specific joint forward models")
         joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
         expected_joint_shape = (y.size, y.size)
         if joint_covariance.shape != expected_joint_shape or not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-9, atol=0.0):
@@ -964,6 +964,20 @@ def analyze_thomson_spectra(
             joint_cholesky = np.linalg.cholesky(joint_covariance)
         except np.linalg.LinAlgError as exc:
             raise ValueError("joint_spectral_covariance must be positive definite") from exc
+        if model == "non_collective_relativistic_maxwell_juttner":
+            nchan, nlam = y.shape
+            for row_channel in range(nchan):
+                for column_channel in range(nchan):
+                    if row_channel == column_channel:
+                        continue
+                    row_slice = slice(row_channel*nlam, (row_channel+1)*nlam)
+                    column_slice = slice(column_channel*nlam, (column_channel+1)*nlam)
+                    cross_block = joint_covariance[row_slice, column_slice]
+                    if np.any(cross_block != 0.0):
+                        raise ValueError(
+                            "Relativistic Maxwell-Juttner currently supports full within-channel spectral covariance only; "
+                            "cross-channel covariance blocks must be exactly zero. A joint cross-channel relativistic forward fit is not implemented."
+                        )
     results = []
     channel_responses = []
     for i in range(y.shape[0]):
@@ -971,6 +985,11 @@ def analyze_thomson_spectra(
         response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1], xi)
         channel_responses.append(response)
         ui = None if unc is None else unc[i]
+        channel_covariance = None
+        if joint_covariance is not None:
+            channel_slice = slice(i*y.shape[1], (i+1)*y.shape[1])
+            channel_covariance = joint_covariance[channel_slice, channel_slice]
+            ui = None
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_kappa":
@@ -978,7 +997,8 @@ def analyze_thomson_spectra(
         elif model == "non_collective_relativistic_maxwell_juttner":
             fit = fit_relativistic_maxwell_juttner(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
-                response, ui, incident_direction=probe_vec, scattered_direction=scatter_vec,
+                response, channel_covariance if channel_covariance is not None else ui,
+                incident_direction=probe_vec, scattered_direction=scatter_vec,
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
             )
@@ -1355,6 +1375,8 @@ def analyze_thomson_spectra(
             if "density_status" not in fit:
                 fit["density_status"] = "not_identifiable_from_spectral_shape_alone"
         fit["spectral_weighting_status"] = (
+            "block_diagonal_channel_major_within_channel_generalized_least_squares"
+            if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner" else
             "full_channel_major_generalized_least_squares"
             if joint_covariance is not None else
             "diagonal_pointwise_measurement_uncertainty_weighted"
@@ -1835,7 +1857,7 @@ def analyze_thomson_spectra(
         item.pop("_shared_lsf_area_draws", None)
     joint_summary = None
     joint_area_covariance_from_spectral_fit = None
-    if joint_covariance is not None:
+    if joint_covariance is not None and model != "non_collective_relativistic_maxwell_juttner":
         from scipy.optimize import least_squares
         nchan, nlam = y.shape
         initial = np.concatenate([np.asarray(item["fit_parameters"], dtype=float) for item in results])
