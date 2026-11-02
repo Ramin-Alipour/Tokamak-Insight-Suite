@@ -349,7 +349,7 @@ def full_em_cts_spectral_density(
                     electron_density_m3=ne, electron_temperature_eV=te,
                     ion_temperature_eV=ion_temperature_eV,
                     ion_species=ion_species, ion_fractions=ion_fractions,
-                    magnetic_field_T=magnetic_field_T,
+                    magnetic_field_T=sample.get("magnetic_field_T"),
                     electron_flow_velocity_m_s=electron_flow_velocity_m_s,
                     electron_flow_projection_m_s=electron_flow_projection_m_s,
                     ion_flow_velocity_m_s=ion_flow_velocity_m_s,
