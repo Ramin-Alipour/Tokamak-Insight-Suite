@@ -194,3 +194,24 @@ def test_joint_inverse_requires_explicit_measured_response_operator():
             x, y, r, h, laser_wavelength_nm=532.0,
             scattering_angle_rad=np.pi / 2,
         )
+
+
+def test_joint_maxwellian_inverse_rejects_fit_outside_nonrelativistic_domain():
+    wavelength = np.linspace(500.0, 564.0, 321)
+    radius = np.linspace(0.0, 1.0, 3)
+    mixing = np.eye(3)
+    te = np.full(3, 6000.0)
+    sigma = 2.0 * 532.0 * np.sqrt(te / 510998.95069) * np.sin(np.pi / 4.0)
+    spectra = np.exp(-0.5 * ((wavelength[None, :] - 532.0) / sigma[:, None]) ** 2)
+    out = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, spectra, radius, mixing,
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(spectra, 1e-3),
+    )
+    assert out["analysis_status"] == "model_domain_rejected"
+    assert out["primary_result_status"] == "model_domain_rejected"
+    assert out["primary_outputs_reportable_as_identified"] is False
+    assert out["electron_temperature_profile_eV"] is None
+    assert np.all(out["validity_screening"]["theta_e_profile"] >= 0.01)
+    assert out["optimizer_candidate"]["role"] == "numerical_candidate_not_a_measured_result"
