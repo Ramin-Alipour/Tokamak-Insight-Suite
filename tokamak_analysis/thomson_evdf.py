@@ -320,11 +320,37 @@ def reconstruct_thomson_evdf(
                 model_residual, initial, bounds=(lower_bounds, upper_bounds),
                 max_nfev=4000, xtol=1e-10, ftol=1e-10, gtol=1e-10,
             )
+            if not model_fit.success or not np.all(np.isfinite(model_fit.x)):
+                parametric_comparison[model_name] = {
+                    "success": False,
+                    "message": str(model_fit.message),
+                    "weighted_residual_sum_squares": None,
+                    "aic": None,
+                    "bic": None,
+                    "parameter_covariance": None,
+                    "parameter_standard_uncertainty": None,
+                    "parameter_one_sigma_intervals": None,
+                    "parameter_uncertainty_status": "unavailable_optimizer_not_converged",
+                    "uncertainty_intervals": None,
+                }
+                continue
             model_resid = model_residual(model_fit.x)
             rss = float(model_resid @ model_resid)
             sample_count = int(target.size)
             parameter_count = int(model_fit.x.size)
             safe_rss = max(rss, np.finfo(float).tiny)
+            # With supplied, correctly whitened measurement errors, the
+            # Gaussian -2 log-likelihood is chi-square plus a parameter-
+            # independent constant. The n*log(RSS/n) form is appropriate
+            # only when a common residual variance is estimated from data.
+            if uncertainty_model == "not_supplied_unweighted_fit":
+                aic = float(sample_count * np.log(safe_rss / sample_count) + 2 * parameter_count)
+                bic = float(sample_count * np.log(safe_rss / sample_count) + parameter_count * np.log(sample_count))
+                information_criterion_likelihood = "unknown_common_residual_variance_estimated_from_unweighted_residuals"
+            else:
+                aic = float(rss + 2 * parameter_count)
+                bic = float(rss + parameter_count * np.log(sample_count))
+                information_criterion_likelihood = "known_measurement_covariance_gaussian_likelihood_up_to_parameter_independent_constant"
             # Local parameter covariance for each candidate model. The residual
             # vector is already whitened when a measurement uncertainty/covariance
             # was supplied; otherwise its residual variance provides only a
@@ -387,9 +413,10 @@ def reconstruct_thomson_evdf(
                     **({"super_gaussian_exponent": float(model_fit.x[3])} if model_name == "super_gaussian" else {}),
                 },
                 "weighted_residual_sum_squares": rss,
-                "aic": float(sample_count * np.log(safe_rss / sample_count) + 2 * parameter_count),
-                "bic": float(sample_count * np.log(safe_rss / sample_count) + parameter_count * np.log(sample_count)),
-                "success": bool(model_fit.success),
+                "aic": aic,
+                "bic": bic,
+                "information_criterion_likelihood": information_criterion_likelihood,
+                "success": True,
                 "message": str(model_fit.message),
                 "parameter_covariance": parameter_covariance,
                 "parameter_standard_uncertainty": parameter_standard_uncertainty,
