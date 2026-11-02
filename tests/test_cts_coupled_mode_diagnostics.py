@@ -33,6 +33,6 @@ def test_non_degenerate_modes_have_zero_degenerate_subspace_power():
         np.array([1.0 + 0.0j, 2.0 + 0.0j, 3.0 + 0.0j]),
     )
 
-    np.testing.assert_array_equal(result["degenerate_subspace_power"], 0.0)
+    np.testing.assert_allclose(result["degenerate_subspace_power"], np.zeros(3), atol=0.0)
     assert result["degenerate_subspace_groups"] == [[], [], []]
     assert np.all(~result["degenerate_subspace_detected"])
