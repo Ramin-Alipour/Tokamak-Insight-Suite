@@ -1004,13 +1004,18 @@ def analyze_full_em_cts_spectrum(
     species_names = [str(item.get("name", f"ion_{i}")) for i, item in enumerate(ion_species)]
     if len(set(species_names)) != len(species_names):
         raise ValueError("ion species names must be unique for species-resolved temperature inference")
+    automatically_estimated_parameters = [
+        name for name, value in (
+            ("electron_density_m3", electron_density_initial_m3),
+            ("electron_temperature_eV", electron_temperature_initial_eV),
+            ("ion_temperature_eV", ion_temperature_initial_eV),
+        ) if value is None
+    ]
     automatic_seeds = estimate_cts_optimizer_initial_parameters(
         f, y, probe_frequency_Hz=probe_frequency_Hz,
         scattering_geometry=scattering_geometry, ion_species=ion_species,
         ion_fractions=ion_fractions,
-    ) if any(value is None for value in (
-        electron_density_initial_m3, electron_temperature_initial_eV, ion_temperature_initial_eV
-    )) else None
+    ) if automatically_estimated_parameters else None
     if electron_density_initial_m3 is None:
         electron_density_initial_m3 = automatic_seeds["electron_density_m3"]
     if electron_temperature_initial_eV is None:
@@ -1223,13 +1228,7 @@ def analyze_full_em_cts_spectrum(
             "electron_temperature_eV": float(initial[1]),
             "ion_temperature_eV": ion_initials.tolist(),
             "method": automatic_seeds["method"] if automatic_seeds is not None else "researcher_supplied",
-            "automatically_estimated_parameters": [
-                name for name, value in (
-                    ("electron_density_m3", electron_density_initial_m3),
-                    ("electron_temperature_eV", electron_temperature_initial_eV),
-                    ("ion_temperature_eV", ion_temperature_initial_eV),
-                ) if value is None
-            ],
+            "automatically_estimated_parameters": automatically_estimated_parameters,
             "density_seed_assumption": (
                 automatic_seeds["density_seed_assumption"] if automatic_seeds is not None else None
             ),
