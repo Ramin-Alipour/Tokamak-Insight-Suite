@@ -323,6 +323,86 @@ def reconstruct_thomson_evdf(
     sigma_v = float(np.sqrt(variance))
     skewness = integral(centred**3 * distribution) / sigma_v**3
     excess_kurtosis = integral(centred**4 * distribution) / variance**2 - 3.0
+
+    # Quantify how the inferred velocity marginal changes across the same
+    # regularization candidates used by GCV. This is a numerical sensitivity
+    # diagnostic, not an additional physical model or uncertainty interval.
+    regularization_sensitivity_candidates = []
+    for candidate, candidate_score, candidate_fit in zip(
+        regularization_candidates, gcv_scores, candidate_fits
+    ):
+        if candidate_fit is None:
+            continue
+        candidate_coefficients = np.maximum(
+            np.asarray(candidate_fit.x, dtype=float), 0.0
+        )
+        candidate_distribution = candidate_coefficients / spacing
+        candidate_norm = float(np.trapz(candidate_distribution, velocity))
+        if not np.isfinite(candidate_norm) or candidate_norm <= np.finfo(float).tiny:
+            continue
+        candidate_distribution = candidate_distribution / candidate_norm
+        candidate_mean = integral(velocity * candidate_distribution)
+        candidate_centred = velocity - candidate_mean
+        candidate_variance = integral(
+            candidate_centred**2 * candidate_distribution
+        )
+        if not np.isfinite(candidate_variance) or candidate_variance <= 0.0:
+            continue
+        candidate_sigma = float(np.sqrt(candidate_variance))
+        candidate_skewness = (
+            integral(candidate_centred**3 * candidate_distribution)
+            / candidate_sigma**3
+        )
+        candidate_excess_kurtosis = (
+            integral(candidate_centred**4 * candidate_distribution)
+            / candidate_variance**2 - 3.0
+        )
+        regularization_sensitivity_candidates.append({
+            "regularization_strength": float(candidate),
+            "gcv_score": (
+                float(candidate_score) if np.isfinite(candidate_score) else None
+            ),
+            "mean_velocity_parallel_m_s": float(candidate_mean),
+            "velocity_parallel_standard_deviation_m_s": candidate_sigma,
+            "skewness": float(candidate_skewness),
+            "excess_kurtosis": float(candidate_excess_kurtosis),
+            "total_variation_distance_from_selected": float(
+                0.5 * np.trapz(
+                    np.abs(candidate_distribution - distribution), velocity
+                )
+            ),
+        })
+    sensitivity_metrics = (
+        "mean_velocity_parallel_m_s",
+        "velocity_parallel_standard_deviation_m_s",
+        "skewness",
+        "excess_kurtosis",
+        "total_variation_distance_from_selected",
+    )
+    regularization_sensitivity = {
+        "status": (
+            "assessed_over_gcv_candidate_grid"
+            if regularization_strength is None
+            else "single_explicit_regularization_value"
+        ),
+        "candidate_count": len(regularization_sensitivity_candidates),
+        "selected_regularization_strength": selected_regularization_strength,
+        "candidate_results": regularization_sensitivity_candidates,
+        "ranges": {
+            key: (
+                {
+                    "minimum": float(min(item[key] for item in regularization_sensitivity_candidates)),
+                    "maximum": float(max(item[key] for item in regularization_sensitivity_candidates)),
+                }
+                if regularization_sensitivity_candidates else None
+            )
+            for key in sensitivity_metrics
+        },
+        "interpretation": (
+            "Candidate-to-candidate numerical variation on the declared GCV grid; "
+            "not a measurement uncertainty, posterior interval, or experimental validation."
+        ),
+    }
     electron_mass = 9.1093837139e-31
     boltzmann = 1.380649e-23
     directional_temperature_ev = electron_mass * variance / (boltzmann * 1.602176634e-19)
@@ -513,6 +593,7 @@ def reconstruct_thomson_evdf(
         ),
         "regularization_candidates": regularization_candidates.copy(),
         "regularization_gcv_scores": np.asarray(gcv_scores, dtype=float),
+        "regularization_sensitivity": regularization_sensitivity,
         "regularization": "non-negative second-difference Tikhonov",
         "evdf_covariance": evdf_covariance,
         "evdf_standard_uncertainty_s_per_m": evdf_standard_uncertainty,
