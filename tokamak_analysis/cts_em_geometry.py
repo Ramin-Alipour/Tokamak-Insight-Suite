@@ -464,7 +464,8 @@ def trace_cts_frequency_resolved_beams(
         "scattering_volume_integration": "normalized Gaussian overlap times incident-ray path-length quadrature",
         "scattering_sample_count": np.asarray([len(entry["scattering_samples"]) for entry in entries], dtype=int),
         "limitations": [
-            "Cold-plasma geometrical optics; diffraction, quasi-optical beam evolution and mode conversion are not included.",
+            "Cold-plasma geometrical optics; diffraction and quasi-optical beam evolution are not included.",
+            "Optional coherent mode-amplitude propagation is diagnostic output only; it does not alter ray trajectories, overlap weights or the full-EM CTS spectral transfer.",
             "Beam covariance matrices are supplied by the caller along the rays; covariance propagation is not inferred.",
             "Fitted ne, Te and thermal-ion temperatures are treated as uniform across the sampled scattering volume; local ray directions and magnetic field vary.",
             "Ray branch continuity near eigenvalue crossings must be checked by the caller.",
