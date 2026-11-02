@@ -75,3 +75,51 @@ def test_cts_reference_pca_background_requires_explicit_component_count():
             ion_temperature_initial_eV=800.0, background_reference_spectra=references,
             global_search=False, inversion_method="local_least_squares",
         )
+
+
+def test_cts_reference_pca_background_reports_conditional_coefficient_and_spectrum_covariance():
+    f0, frequency, geometry, species, fractions = _cts_case()
+    truth = {
+        "electron_density_m3": 2.0e19,
+        "electron_temperature_eV": 1200.0,
+        "ion_temperature_eV": 800.0,
+        "electron_velocity_projection_m_s": 0.0,
+        "ion_velocity_projection_m_s": 1.5e4,
+    }
+    physical = cts_spectral_density(
+        frequency, f0, geometry, **truth,
+        ion_species=species, ion_fractions=fractions,
+    )
+    coordinate = np.linspace(-1.0, 1.0, frequency.size)
+    references = np.asarray([
+        3.0 + scale*coordinate + curvature*(coordinate**2-np.mean(coordinate**2))
+        for scale, curvature in [(-1.0, -0.2), (-0.5, 0.3), (0.0, -0.4),
+                                 (0.5, 0.4), (1.0, -0.1), (0.8, 0.2)]
+    ])
+    measured = 2.4e4*physical + references.mean(axis=0)
+    sigma = np.full(frequency.size, 0.01*np.max(measured))
+    result = analyze_cts_spectrum(
+        frequency, measured, probe_frequency_Hz=f0,
+        scattering_geometry=geometry, ion_species=species,
+        ion_fractions=fractions, instrument_response=np.eye(frequency.size),
+        signal_uncertainty=sigma,
+        electron_density_initial_m3=truth["electron_density_m3"],
+        electron_temperature_initial_eV=truth["electron_temperature_eV"],
+        ion_temperature_initial_eV=truth["ion_temperature_eV"],
+        ion_velocity_initial_m_s=truth["ion_velocity_projection_m_s"],
+        background_reference_spectra=references, background_components=2,
+        global_search=False, inversion_method="local_least_squares",
+    )
+    coefficient_covariance = result["background_coefficient_covariance"]
+    spectrum_covariance = result["background_spectrum_covariance"]
+    assert coefficient_covariance.shape == (3, 3)
+    assert spectrum_covariance.shape == (frequency.size, frequency.size)
+    assert result["background_spectrum_uncertainty"].shape == frequency.shape
+    assert result["background_reference_basis_uncertainty_propagated"] is False
+    assert result["background_uncertainty_status"] == (
+        "conditional_linear_nuisance_covariance_from_supplied_spectral_uncertainty"
+    )
+    np.testing.assert_allclose(coefficient_covariance, coefficient_covariance.T, atol=1e-12)
+    np.testing.assert_allclose(spectrum_covariance, spectrum_covariance.T, atol=1e-12)
+    assert np.linalg.eigvalsh(coefficient_covariance).min() >= -1e-10
+    assert np.all(result["background_spectrum_uncertainty"] >= 0.0)
