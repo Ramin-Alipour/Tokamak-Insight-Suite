@@ -508,3 +508,22 @@ The Streamlit workflow now makes all four seed fields optional, explains the all
 Commits: `c17de1eb6756cd2388308ad8859ee649e9776748` (fit implementation), `ba91377df25d45fdfeff82f766feb5565038ca8e` (fit regression), `49256fde60415091c1e7d4210c97c090e886492b` (dashboard), `730d95f6268c8d34d9fb7bc5d6dda35c084bbc74` (runtime registry), `58fb0e7bca6f635208bb50eb1edaa80b24ef0da2` (registry regression), `01abf52d80fad988e0333be73c21586076d63b78` (automatic-initialization regression uses the model's minimum supported quadrature orders).
 
 GitHub Actions were not triggered; software-test success is not claimed. Experimental validation was not performed or claimed.
+
+
+## AI. Relativistic optical Thomson full within-channel spectral covariance — 2026-11-02
+
+**Confirmed integration gap:** the relativistic Maxwell-Juttner optical fit accepted only pointwise uncertainty, while the Maxwellian and Kappa paths accepted full channel-major GLS covariance. This left the three optical branches with inconsistent spectral-noise contracts.
+
+**Implemented directly on main:** `fit_relativistic_maxwell_juttner` now accepts either a positive pointwise 1-sigma vector or a symmetric positive-definite wavelength-by-wavelength covariance matrix. For a supplied covariance it scales the covariance consistently with the signal normalization, Cholesky-whitens the residual, computes the local parameter covariance from the whitened Jacobian, and reports GLS-consistent reduced chi-square and explicit covariance semantics. The primary multi-channel inference accepts a full channel-major covariance for the relativistic model only when it is block diagonal by channel, extracts each wavelength covariance block, and applies GLS independently to each channel. Non-zero cross-channel blocks are explicitly rejected rather than silently discarded. This does not yet implement a jointly coupled relativistic multi-channel fit.
+
+Added regression coverage for full within-channel GLS covariance and rejection of unsupported cross-channel covariance. The Python runtime registry and both canonical JSON registries now describe the exact supported contract.
+
+Commits:
+- `3150785580f5d21af1c0dc17c3c22958d8ec39e9` — relativistic fitter accepts full wavelength covariance.
+- `717e8d2a8f46eb2062da17acdb2dcf4d0fc4dd7a` — primary inference routes block-diagonal channel-major covariance and rejects cross-channel blocks.
+- `e8827c3262a3bb92d7995edc7d1047ff6a6e8eca` — regression tests.
+- `3562f49908971bda08dc08dddaaa289d823c87f0` — GLS-consistent reduced chi-square.
+- `7d29c4b81b322e766bc297f460d9a96809b391da` and `cc26519d1ff7068f76e5495154b7e71bf52276a7` — root and packaged JSON registry synchronization.
+- `744ab27515b9f3fb2edf30c3151ea2ec496bf90f` — Python runtime registry synchronization.
+
+**Remaining scope:** cross-channel-correlated relativistic spectra still require a joint relativistic multi-channel forward inversion. The implementation does not claim that local covariance captures model discrepancy, external-parameter uncertainty, or experimental uncertainty not supplied by the researcher. No experimental validation is performed or claimed. The exact final source commit must pass GitHub Actions before software-test success is reported.
