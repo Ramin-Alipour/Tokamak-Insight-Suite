@@ -150,6 +150,7 @@ def trace_cold_plasma_ray(
     equilibrium: Callable[[np.ndarray], Mapping],
     mode_index=None, path_parameter_max=1.0, sample_count=256,
     relative_tolerance=1e-8, absolute_tolerance=1e-10,
+    initial_mode_amplitudes=None, propagation_constants_rad_m=None,
 ):
     """Trace a cold-plasma eigenmode ray through a supplied 3-D equilibrium.
 
@@ -223,7 +224,24 @@ def trace_cold_plasma_ray(
             omega, wavevector, state["magnetic_field_T"], state["species"]
         )
         wave_operators.append(operator)
-    branch_tracking = track_cold_plasma_modes_from_operators(np.asarray(wave_operators))
+    wave_operators = np.asarray(wave_operators)
+    branch_tracking = track_cold_plasma_modes_from_operators(wave_operators)
+    if (initial_mode_amplitudes is None) != (propagation_constants_rad_m is None):
+        raise ValueError(
+            "initial_mode_amplitudes and propagation_constants_rad_m must be supplied together "
+            "to enable coherent mode-conversion propagation"
+        )
+    mode_conversion = None
+    if initial_mode_amplitudes is not None:
+        physical_path = np.concatenate((
+            [0.0], np.cumsum(np.linalg.norm(np.diff(positions, axis=0), axis=1))
+        ))
+        if np.any(np.diff(physical_path) <= 0):
+            raise ValueError("ray path must have strictly positive physical arc-length increments for mode conversion")
+        mode_conversion = propagate_cold_plasma_mode_coupling(
+            wave_operators, physical_path, propagation_constants_rad_m,
+            initial_mode_amplitudes,
+        )
     selected_branch_order = branch_tracking["eigenvalue_order_permutation"][:, int(mode_index)]
     fixed_order_branch_consistent = bool(np.all(selected_branch_order == int(mode_index)))
     return {
@@ -234,6 +252,12 @@ def trace_cold_plasma_ray(
         "electric_polarization": polarizations,
         "mode_index": int(mode_index),
         "mode_branch_tracking": branch_tracking,
+        "coherent_mode_conversion": mode_conversion,
+        "mode_conversion_status": (
+            "computed_from_explicit_path_and_propagation_constants"
+            if mode_conversion is not None else
+            "not_requested_requires_initial_mode_amplitudes_and_propagation_constants"
+        ),
         "fixed_eigenvalue_order_tracks_initial_polarization_branch": fixed_order_branch_consistent,
         "parameterization": "Hamiltonian eigenvalue parameter; not physical time",
         "limitations": [
