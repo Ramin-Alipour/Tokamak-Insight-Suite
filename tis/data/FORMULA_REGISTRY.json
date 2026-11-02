@@ -2764,9 +2764,9 @@
   {
     "name": "Thomson electron temperature from intrinsic spectral width",
     "equation": "T_e = (σ_λ/λ_0)^2 (m_e c²/4) / sin²(θ/2)",
-    "inputs": "Intrinsic instrument-corrected width [nm], laser wavelength [nm], scattering angle [rad]",
+    "inputs": "Intrinsic plasma Doppler-width parameter from the measured-response-convolved physical spectrum fit [nm], laser wavelength [nm], scattering angle [rad]",
     "output": "eV",
-    "assumptions": "Single scattering; isotropic non-relativistic Maxwellian electrons; instrument-corrected width; known geometry",
+    "assumptions": "Single scattering; isotropic non-relativistic Maxwellian electrons; intrinsic width inferred by the measured-response-convolved physical forward fit; known geometry",
     "status": "D",
     "category": "Thomson scattering",
     "execution_contract": {
