@@ -380,12 +380,12 @@ def reconstruct_joint_thomson_spatial_spectra(
         "detector_background_basis": background_basis.copy(),
         "detector_background_coefficients": fit.x[3*n:].reshape(m, n_background).copy(),
         "detector_background_offset": (
-            fit.x[3*n:3*n+m].copy() if background_model in {"linear", "polynomial"}
-            else None
+            fit.x[3*n:].reshape(m, n_background)[:, 0].copy()
+            if background_model in {"linear", "polynomial"} else None
         ),
         "detector_background_slope_per_nm": (
-            fit.x[3*n+m:3*n+2*m].copy() * (2.0 / float(np.ptp(x)))
-            if background_model == "linear" else None
+            fit.x[3*n:].reshape(m, n_background)[:, 1].copy()
+            * (2.0 / float(np.ptp(x))) if background_model == "linear" else None
         ),
         "spatial_mixing_operator": "researcher_supplied_fixed_forward_operator",
         "instrument_response": "researcher_supplied_fixed_forward_operator",
