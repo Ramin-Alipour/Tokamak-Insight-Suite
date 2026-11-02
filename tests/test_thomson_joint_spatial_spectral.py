@@ -254,3 +254,14 @@ def test_bound_aware_jacobian_supports_unbounded_physical_parameters():
     )
     expected = np.array([[2.0 * point[0], 3.0], [1.0, -2.0 * point[1]]])
     np.testing.assert_allclose(jacobian, expected, rtol=2e-5, atol=2e-6)
+
+
+def test_structured_thomson_background_models_recover_detector_baseline():
+    from tokamak_analysis.thomson_background import fit_structured_background
+
+    x = np.linspace(520.0, 540.0, 101)
+    z = 2.0*(x-x.min())/np.ptp(x)-1.0
+    y = 0.3 + 0.08*z + 0.015*z*z
+    result = fit_structured_background(x, y, model="polynomial", degree=2)
+    np.testing.assert_allclose(result["background"], y, atol=1e-11)
+    assert result["background_role"] == "detector_space_nuisance_not_plasma_emission"
