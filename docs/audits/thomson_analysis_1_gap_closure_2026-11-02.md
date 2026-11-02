@@ -22,6 +22,12 @@ It retains the supplied spectral response, finite-volume wavelength integration,
 
 **Strict limits:** this is not a general relativistic 3-D EVDF inversion. It omits polarization-dependent differential-cross-section weighting, transverse velocity structure, and Compton recoil. The output explicitly records these assumptions. The routine is a separate API and does not replace the existing non-relativistic `reconstruct_thomson_evdf`.
 
+#### Relativistic optical fit: Compton recoil selection
+
+The canonical optical dashboard now exposes `include_compton_recoil` for the relativistic Maxwell–Jüttner fit. When enabled, the existing forward model uses single-scattering Compton energy transfer and the polarized Klein–Nishina differential weight; when disabled, it uses elastic Thomson kinematics and enforces the configured recoil-correction screen. The selection is passed through the per-channel fit, response-uncertainty Monte Carlo, external-parameter Monte Carlo, and joint multi-channel relativistic fit paths. The Python and JSON registries declare both the input switch and the returned `recoil_included` / `scattering_cross_section_model` provenance. The fitted-result metadata was corrected to report the selected physical model rather than hard-coding the recoil flag to false.
+
+**Strict limits:** this is a single-scattering model. It does not model multiple scattering, collective dielectric effects, or an arbitrary relativistic EVDF. The separate projected-EVDF inverse remains an elastic-Thomson, one-dimensional kinematic inverse.
+
 ### A7 — structured optical background
 
 The Maxwellian optical inference path now accepts `background_model`, `background_degree`, `background_interior_knots`, and `background_templates`. It fits the Thomson feature and the selected detector-space basis jointly. Supported bases are those already defined by `thomson_background._background_design`: constant, linear, Legendre polynomial, cubic spline, and supplied templates.
