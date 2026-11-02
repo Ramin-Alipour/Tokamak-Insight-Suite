@@ -234,44 +234,68 @@ def _convolve(response,spectrum,axis):
 
 
 def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=32, generations=40):
-    """Bounded real-coded GA: tournament selection, blend crossover, elitism and adaptive mutation."""
-    rng = np.random.default_rng(seed)
+    """Bounded real-coded GA with elitism and adaptive crossover/mutation.
+
+    Returns the best parameter vector, its objective value, and a monotone
+    best-so-far history containing the initial and final populations.
+    """
     bounds = np.asarray(bounds, dtype=float)
+    if bounds.ndim != 2 or bounds.shape[1] != 2 or bounds.shape[0] < 1:
+        raise ValueError("genetic-search bounds must have shape (n_parameters, 2)")
     lower, upper = bounds[:, 0], bounds[:, 1]
-    if bounds.ndim != 2 or bounds.shape[1] != 2 or np.any(~np.isfinite(bounds)) or np.any(lower >= upper):
+    if np.any(~np.isfinite(bounds)) or np.any(lower >= upper):
         raise ValueError("genetic-search bounds must be finite increasing pairs")
+    if isinstance(population_size, (bool, np.bool_)) or not isinstance(population_size, (int, np.integer)) or population_size < 4:
+        raise ValueError("genetic-search population_size must be an integer >= 4")
+    if isinstance(generations, (bool, np.bool_)) or not isinstance(generations, (int, np.integer)) or generations < 1:
+        raise ValueError("genetic-search generations must be a positive integer")
+    if isinstance(seed, (bool, np.bool_)) or not isinstance(seed, (int, np.integer)):
+        raise ValueError("genetic-search seed must be an integer")
+
+    rng = np.random.default_rng(int(seed))
     dimension = lower.size
-    population = rng.uniform(lower, upper, size=(population_size, dimension))
-    scores = np.asarray([objective(p) for p in population], dtype=float)
-    if np.any(~np.isfinite(scores)):
-        scores = np.where(np.isfinite(scores), scores, np.inf)
-    best_history = []
-    for generation in range(generations):
+    population = rng.uniform(lower, upper, size=(int(population_size), dimension))
+
+    def evaluate(candidates):
+        values = np.asarray([objective(candidate) for candidate in candidates], dtype=float)
+        if values.shape != (len(candidates),):
+            raise ValueError("genetic-search objective must return one scalar per candidate")
+        values = np.where(np.isfinite(values), values, np.inf)
+        if not np.any(np.isfinite(values)):
+            raise ValueError("genetic-search objective is non-finite for the entire population")
+        return values
+
+    scores = evaluate(population)
+    best_history = [float(np.min(scores))]
+    for generation in range(int(generations)):
         order = np.argsort(scores)
         population, scores = population[order], scores[order]
-        best_history.append(float(scores[0]))
-        elite_count = max(2, population_size // 10)
-        next_population = [p.copy() for p in population[:elite_count]]
-        progress=generation/max(generations-1,1)
+        elite_count = max(2, int(population_size) // 10)
+        next_population = [candidate.copy() for candidate in population[:elite_count]]
+        progress = generation / max(int(generations) - 1, 1)
         mutation_scale = 0.18 * (1.0 - progress) + 0.015
-        crossover_rate = 0.90 - 0.35*progress
-        mutation_rate = min(0.5,(1.0/dimension)*(1.0+2.0*progress))
+        crossover_rate = 0.90 - 0.35 * progress
+        mutation_rate = min(0.5, (1.0 / dimension) * (1.0 + 2.0 * progress))
+
         def tournament():
-            candidates = rng.integers(0, population_size, size=3)
+            candidates = rng.integers(0, int(population_size), size=3)
             return population[candidates[np.argmin(scores[candidates])]]
-        while len(next_population) < population_size:
-            p1, p2 = tournament(), tournament()
-            if rng.random()<crossover_rate:
-                alpha = rng.uniform(-0.15, 1.15, size=dimension)
-                child = alpha * p1 + (1.0 - alpha) * p2
+
+        while len(next_population) < int(population_size):
+            parent_a, parent_b = tournament(), tournament()
+            if rng.random() < crossover_rate:
+                blend = rng.uniform(-0.15, 1.15, size=dimension)
+                child = blend * parent_a + (1.0 - blend) * parent_b
             else:
-                child=p1.copy()
+                child = parent_a.copy()
             mutate = rng.random(dimension) < mutation_rate
             child += mutate * rng.normal(0.0, mutation_scale, size=dimension) * (upper - lower)
             next_population.append(np.clip(child, lower, upper))
-        population = np.asarray(next_population)
-        scores = np.asarray([objective(p) for p in population], dtype=float)
-        scores = np.where(np.isfinite(scores), scores, np.inf)
+
+        population = np.asarray(next_population, dtype=float)
+        scores = evaluate(population)
+        best_history.append(float(min(best_history[-1], np.min(scores))))
+
     best = int(np.argmin(scores))
     return population[best].copy(), float(scores[best]), np.asarray(best_history, dtype=float)
 
