@@ -146,7 +146,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
-    physical_model="maxwellian", kappa_index=None,
+    physical_model="maxwellian", kappa_index=None, fit_kappa_index=False,
     incident_polarization=None, radial_order=24, angular_order=12,
     maximum_recoil_correction_fraction=0.01,
 ):
@@ -160,18 +160,18 @@ def reconstruct_joint_thomson_spatial_spectra(
     """
     if physical_model not in {"maxwellian", "kappa", "relativistic_maxwell_juttner"}:
         raise ValueError("physical_model must be maxwellian, kappa, or relativistic_maxwell_juttner")
+    if not isinstance(fit_kappa_index, (bool, np.bool_)):
+        raise ValueError("fit_kappa_index must be boolean")
     if physical_model == "kappa":
-        if (
-            kappa_index is None
-            or isinstance(kappa_index, (bool, np.bool_))
-            or not isinstance(kappa_index, (int, float, np.integer, np.floating))
-            or not np.isfinite(kappa_index)
-            or float(kappa_index) <= 1.5
-        ):
-            raise ValueError("kappa_index must be a finite real value > 1.5 for a finite-variance projected Kappa model")
+        if (kappa_index is None or isinstance(kappa_index, (bool, np.bool_))
+                or not isinstance(kappa_index, (int, float, np.integer, np.floating))
+                or not np.isfinite(kappa_index) or float(kappa_index) <= 1.5):
+            raise ValueError("kappa_index must be a finite real value > 1.5 and acts as the optimizer seed or fixed model value")
         kappa_index = float(kappa_index)
-    elif kappa_index is not None:
-        raise ValueError("kappa_index is used only when physical_model='kappa'")
+    elif kappa_index is not None or fit_kappa_index:
+        raise ValueError("kappa_index and fit_kappa_index are used only when physical_model='kappa'")
+    if fit_kappa_index and physical_model != "kappa":
+        raise ValueError("fit_kappa_index=True requires physical_model='kappa'")
     if physical_model == "relativistic_maxwell_juttner":
         if incident_polarization is None:
             raise ValueError("relativistic Maxwell-Juttner joint inference requires incident_polarization")
@@ -253,21 +253,26 @@ def reconstruct_joint_thomson_spatial_spectra(
     initial_amp = peak_scale / max(float(np.max(h.sum(axis=1))), 1.0)
 
     # Parameter vector: log amplitude[n], log Te[n], flow[1e6 m/s,n],
-    # then independent detector-space background-basis coefficients.
+    # optional log(kappa-1.5), then detector-space background coefficients.
     background_seed = np.zeros((m, n_background), dtype=float)
     background_seed[:, 0] = np.median(y[:, :max(2, nlam//10)], axis=1)
+    kappa_parameter_count = int(physical_model == "kappa" and fit_kappa_index)
     p0 = np.r_[np.full(r.size, np.log(initial_amp)),
                np.full(r.size, np.log(initial_te)),
-               np.zeros(r.size), background_seed.ravel()]
+               np.zeros(r.size),
+               np.array([np.log(kappa_index-1.5)]) if kappa_parameter_count else np.empty(0),
+               background_seed.ravel()]
     # Only numerical overflow guards are imposed on logarithmic positive
     # parameters.  Temperature and flow have no invented physical fit bounds;
     # the Maxwellian model-domain screen below classifies out-of-regime fits.
     # Background nuisance parameters and projected flow are unbounded.
     lower = np.r_[np.full(r.size, -700.0), np.full(r.size, -700.0),
                   np.full(r.size, -np.inf),
+                  np.array([-10.0]) if kappa_parameter_count else np.empty(0),
                   np.full(m*n_background, -np.inf)]
     upper = np.r_[np.full(r.size, 700.0), np.full(r.size, 700.0),
                   np.full(r.size, np.inf),
+                  np.array([8.0]) if kappa_parameter_count else np.empty(0),
                   np.full(m*n_background, np.inf)]
     if physical_model == "relativistic_maxwell_juttner":
         # Subluminal flow is a physical domain constraint of the relativistic kernel.
@@ -284,7 +289,10 @@ def reconstruct_joint_thomson_spatial_spectra(
         amp = np.exp(p[:r.size])
         te = np.exp(p[r.size:2*r.size])
         flow = p[2*r.size:3*r.size] * 1e6
-        background_coefficients = p[3*r.size:].reshape(m, n_background)
+        fitted_kappa = (1.5+float(np.exp(p[3*r.size]))
+                        if kappa_parameter_count else kappa_index)
+        background_start = 3*r.size+kappa_parameter_count
+        background_coefficients = p[background_start:].reshape(m, n_background)
         detector_background = background_coefficients @ background_basis.T
         sigma = 2.0 * laser * np.sqrt(te / _MEC2_EV) * np.sin(angle/2.0)
         center = laser * (1.0 - q * flow / _C_M_S)
@@ -297,17 +305,17 @@ def reconstruct_joint_thomson_spatial_spectra(
             # Student-like 1-D profile with exponent kappa. sigma remains its
             # standard deviation, so the scale is converted consistently.
             from scipy.special import gammaln
-            scale = sigma * np.sqrt((2.0*kappa_index-3.0)/kappa_index)
+            scale = sigma * np.sqrt((2.0*fitted_kappa-3.0)/fitted_kappa)
             normalization = np.exp(
-                gammaln(kappa_index)
-                - 0.5*np.log(np.pi*kappa_index)
+                gammaln(fitted_kappa)
+                - 0.5*np.log(np.pi*fitted_kappa)
                 - np.log(scale)
-                - gammaln(kappa_index-0.5)
+                - gammaln(fitted_kappa-0.5)
             )
             z = (x[None,:]-center[:,None])/scale[:,None]
             node_spectra = amp[:,None] * normalization[:,None] * (
-                1.0 + z*z/kappa_index
-            )**(-kappa_index)
+                1.0 + z*z/fitted_kappa
+            )**(-fitted_kappa)
         else:
             from .thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
             node_spectra = np.empty((r.size,x.size),dtype=float)
@@ -328,10 +336,10 @@ def reconstruct_joint_thomson_spatial_spectra(
             # Response acts on spectral density through bin-integrated power.
             convolved = (response[channel] @ (mixed[channel] * widths)) / widths
             predicted[channel] = convolved + detector_background[channel]
-        return predicted, te, flow, amp
+        return predicted, te, flow, amp, fitted_kappa
 
     def residual(p):
-        predicted, te, flow, amp = predict(p)
+        predicted, te, flow, amp, _ = predict(p)
         data = whiten(y - predicted)
         if lam_reg > 0:
             penalties = np.r_[np.sqrt(lam_reg) * (d2 @ np.log(te)),
@@ -342,7 +350,7 @@ def reconstruct_joint_thomson_spatial_spectra(
 
     fit = least_squares(residual, p0, bounds=(lower, upper), method="trf",
                         x_scale="jac", max_nfev=int(max_nfev))
-    predicted, te, flow, amp = predict(fit.x)
+    predicted, te, flow, amp, fitted_kappa = predict(fit.x)
     data_residual = whiten(y - predicted)
     # Assess identifiability from measured spectral data alone.  The optimizer
     # Jacobian also contains optional regularization rows; counting those rows
@@ -400,6 +408,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     if joint_spectral_covariance is None and signal_uncertainty is None:
         covariance_p *= float(data_residual @ data_residual / dof)
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
+                              np.array([fitted_kappa-1.5]) if kappa_parameter_count else np.empty(0),
                               np.ones(m*n_background)])
     physical_covariance = transform @ covariance_p @ transform.T
     diagonal = np.maximum(np.diag(physical_covariance), 0.0)
@@ -416,8 +425,9 @@ def reconstruct_joint_thomson_spatial_spectra(
         }[physical_model],
         "physical_model_selection": {
             "model": physical_model,
-            "kappa_index": kappa_index,
-            "kappa_index_role": "fixed_external_model_parameter_not_inferred" if physical_model == "kappa" else None,
+            "kappa_index": fitted_kappa if physical_model == "kappa" else None,
+            "kappa_index_initial_seed": kappa_index if physical_model == "kappa" else None,
+            "kappa_index_role": ("inferred_from_measured_spectra_with_profiled_uncertainty" if kappa_parameter_count else "fixed_external_model_parameter_not_inferred") if physical_model == "kappa" else None,
             "incident_polarization": incident_polarization,
             "relativistic_quadrature": {"radial_order": int(radial_order), "angular_order": int(angular_order)} if physical_model == "relativistic_maxwell_juttner" else None,
             "amplitude_semantics": "Gaussian peak amplitude" if physical_model == "maxwellian" else "relative integrated spectral amplitude",
@@ -431,6 +441,8 @@ def reconstruct_joint_thomson_spatial_spectra(
             "rationale": ("Conservative asymptotic screens apply to the non-relativistic Maxwellian/Kappa kernels; the Maxwell-Juttner kernel uses relativistic kinematics and instead requires subluminal flow. These are declared model-domain checks, not universal validity boundaries."),
         },
         "radius_m": r.copy(),
+        "kappa_index_uncertainty": (float(uncertainties[3*n]) if data_identifiable and kappa_parameter_count else None),
+        "kappa_index_status": ("primary" if data_identifiable and kappa_parameter_count else "conditional_fixed_external_model_parameter" if physical_model == "kappa" else "not_applicable"),
         "electron_temperature_uncertainty_profile_eV": uncertainties[n:2*n] if data_identifiable else None,
         "electron_density_profile_m3": np.full(n, np.nan, dtype=float),
         "electron_density_uncertainty_profile_m3": np.full(n, np.nan, dtype=float),
@@ -443,6 +455,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         "relative_spectral_amplitude_uncertainty": uncertainties[:n] if data_identifiable else None,
         "optimizer_candidate": {
             "role": "numerical_candidate_not_a_measured_result",
+            "kappa_index": fitted_kappa if physical_model == "kappa" else None,
             "electron_temperature_profile_eV": te,
             "electron_velocity_projection_profile_m_s": flow,
             "relative_spectral_amplitude_profile": amp,
@@ -454,6 +467,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                             [f"Te_{i}_eV" for i in range(n)] +
                             [f"flow_projection_{i}_m_s" for i in range(n)] +
+                            (["kappa_index"] if kappa_parameter_count else []) +
                             [f"background_channel_{channel}_coefficient_{coefficient}"
                              for channel in range(m)
                              for coefficient in range(n_background)]),
