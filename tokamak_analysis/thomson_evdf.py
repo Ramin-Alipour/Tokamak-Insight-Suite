@@ -31,6 +31,8 @@ def _response_matrix(values, n):
     if response.shape != (n, n) or not np.all(np.isfinite(response)) or np.any(response < 0):
         raise ValueError("instrument_response_matrix must be finite, non-negative and square on the measured wavelength grid")
     sums = response.sum(axis=0)
+    if np.any(sums <= 0):
+        raise ValueError("every instrument-response column must have positive integrated response")
     if not np.allclose(sums, 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError(
             "measured instrument-response matrix columns must already sum to one; "
