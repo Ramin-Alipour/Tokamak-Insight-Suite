@@ -433,3 +433,12 @@ This is an execution-dependency and result-provenance correction only. No measur
 124. **The Thomson spectral-distribution registry retained a stale statement that signal/background cross-covariance was not represented, despite the implemented `signal_background_cross_covariance` input and joint block-covariance propagation.** **Fixed directly on main:** both canonical JSON copies now describe the separate cross-covariance input and its dependence on the supplied signal and background marginal covariance models.
 
 Added a registry/API regression test that checks root/package parity, verifies the fixed CTS response contract against the electrostatic response-application behavior (including preservation and rejection), and checks the spectral-distribution covariance metadata. These are execution-contract/documentation corrections only. No physical model, input, output, calibration step, measurement, or experimental-validation claim was added or removed.
+
+
+## AA. Non-uniform wavelength moment quadrature consistency — 2026-11-02
+
+**Confirmed numerical inconsistency:** the spectral-distribution subanalysis calculated positive/negative/signed areas with trapezoidal integration but calculated centroid and central moments with midpoint finite-volume bin weights. On non-uniform calibrated wavelength grids, these are different measures and can produce internally inconsistent area and moment outputs.
+
+**Fixed directly on main:** all wavelength-space areas, centroid and central moments now use the same finite-volume bin-width measure returned by the wavelength-bin-width helper. Added a regression test on a deliberately non-uniform wavelength grid that independently checks area, centroid and variance against that measure.
+
+This change concerns numerical integration of already calibrated measured spectra. It does not calibrate or modify the wavelength axis, alter measured intensities, introduce a physical model, or perform experimental validation.
