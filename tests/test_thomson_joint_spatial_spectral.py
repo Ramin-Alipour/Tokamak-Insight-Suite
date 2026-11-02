@@ -138,3 +138,50 @@ def test_joint_inverse_rejects_optical_scattering_angle_endpoints(angle):
             x, y, r, h, laser_wavelength_nm=532.0,
             scattering_angle_rad=angle,
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value", "message"),
+    [
+        ("wavelength_nm", np.array([False, True]), "wavelength_nm must contain real numeric values"),
+        ("measured_spectra", np.array([["1", "2"]]), "measured_spectra must contain real numeric values"),
+        ("radius_m", np.array([0.0, np.nan]), "radius_m must contain only finite values"),
+        ("spatial_mixing_matrix", np.array([[True, False]]), "spatial_mixing_matrix must contain real numeric values"),
+    ],
+)
+def test_joint_inverse_rejects_non_numeric_or_nonfinite_measured_inputs(field, bad_value, message):
+    x, y, r, h, *_ = _synthetic_case()
+    values = {
+        "wavelength_nm": x,
+        "measured_spectra": y,
+        "radius_m": r,
+        "spatial_mixing_matrix": h,
+    }
+    values[field] = bad_value
+    with pytest.raises(ValueError, match=message):
+        reconstruct_joint_thomson_spatial_spectra(
+            values["wavelength_nm"], values["measured_spectra"],
+            values["radius_m"], values["spatial_mixing_matrix"],
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2,
+        )
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"laser_wavelength_nm": True}, "laser_wavelength_nm must be a finite real scalar"),
+        ({"scattering_angle_rad": "1.57079632679"}, "scattering_angle_rad must be a finite real scalar"),
+        ({"regularization_strength": False}, "regularization_strength must be a finite real scalar"),
+        ({"positive_amplitude": "true"}, "positive_amplitude must be boolean"),
+        ({"max_nfev": True}, "max_nfev must be a positive integer"),
+    ],
+)
+def test_joint_inverse_rejects_invalid_scalar_and_control_types(kwargs, message):
+    x, y, r, h, *_ = _synthetic_case()
+    arguments = {
+        "laser_wavelength_nm": 532.0,
+        "scattering_angle_rad": np.pi / 2,
+    }
+    arguments.update(kwargs)
+    with pytest.raises(ValueError, match=message):
+        reconstruct_joint_thomson_spatial_spectra(x, y, r, h, **arguments)
