@@ -999,6 +999,10 @@ def analyze_full_em_cts_spectrum(
             "magnetic_field_T_y": float(np.asarray(magnetic_field_T, dtype=float)[1]),
             "magnetic_field_T_z": float(np.asarray(magnetic_field_T, dtype=float)[2]),
         }
+        for species_index, species_item in enumerate(ion_species):
+            external_base[f"ion_fraction_{species_index}"] = float(np.asarray(ion_fractions, dtype=float)[species_index])
+            external_base[f"ion_mass_amu_{species_index}"] = float(species_item["mass_amu"])
+            external_base[f"ion_charge_state_{species_index}"] = float(species_item["charge_state"])
         for kind, vector in (
             ("incident_direction", scattering_geometry.get("incident_direction")),
             ("scattered_direction", scattering_geometry.get("scattered_direction")),
@@ -1219,6 +1223,8 @@ def analyze_full_em_cts_spectrum(
     def model(p, response_matrix=None, external_values=None):
         active_geometry = scattering_geometry
         active_field = magnetic_field_T
+        active_ion_species = [dict(item) for item in ion_species]
+        active_ion_fractions = np.asarray(ion_fractions, dtype=float).copy()
         active_incident_polarization = incident_polarization
         active_scattered_polarization = scattered_polarization
         if external_values is not None:
@@ -1227,6 +1233,21 @@ def analyze_full_em_cts_spectrum(
                 values.get(f"magnetic_field_T_{axis}", np.asarray(magnetic_field_T, dtype=float)[i])
                 for i, axis in enumerate("xyz")
             ], dtype=float)
+            for species_index, species_item in enumerate(active_ion_species):
+                active_ion_fractions[species_index] = values.get(
+                    f"ion_fraction_{species_index}", active_ion_fractions[species_index]
+                )
+                species_item["mass_amu"] = values.get(
+                    f"ion_mass_amu_{species_index}", species_item["mass_amu"]
+                )
+                species_item["charge_state"] = values.get(
+                    f"ion_charge_state_{species_index}", species_item["charge_state"]
+                )
+            if (np.any(active_ion_fractions <= 0.0)
+                    or not np.isclose(active_ion_fractions.sum(), 1.0, rtol=1e-6, atol=1e-8)
+                    or any(float(item["mass_amu"]) <= 0.0 or float(item["charge_state"]) <= 0.0
+                           for item in active_ion_species)):
+                raise ValueError("sampled CTS ion composition, mass and charge states must remain positive with fractions summing to one")
             active_geometry = dict(scattering_geometry)
             for kind in ("incident_direction", "scattered_direction"):
                 if any(f"{kind}_{axis}" in values for axis in "xyz"):
@@ -1265,7 +1286,7 @@ def analyze_full_em_cts_spectrum(
             electron_density_m3=10.0**np.clip(p[0], -300.0, 300.0),
             electron_temperature_eV=10.0**np.clip(p[1], -300.0, 300.0),
             ion_temperature_eV=unpack_temperatures(p),
-            ion_species=ion_species, ion_fractions=ion_fractions,
+            ion_species=active_ion_species, ion_fractions=active_ion_fractions,
             magnetic_field_T=active_field,
             electron_flow_projection_m_s=electron_flow_projection(p),
             ion_flow_projection_m_s=unpack_ion_flow_projections(p),
