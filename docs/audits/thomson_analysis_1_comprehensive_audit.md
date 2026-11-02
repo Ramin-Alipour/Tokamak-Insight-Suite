@@ -470,3 +470,12 @@ A code review of `tokamak_analysis/thomson_evdf.py` found that the optional para
 The Full-EM measured-spectrum inversion now accepts an ordered positive-semidefinite covariance over local magnetic-field components, incident/scattered direction components and real/imaginary components of incident/scattered complex polarization. Reproducible joint Monte Carlo perturbations repeat the complete physical parameter fit and return a separate parameter-covariance contribution with requested/successful draw counts. The API, dashboard, Python runtime registry, both JSON registries, scientific note and regression tests were synchronized directly on `main`.
 
 This capability applies only to local geometry. Frequency-resolved ray/equilibrium/beam covariance, composition covariance and cross-covariance between distinct external covariance sources remain unsupported; the local covariance route rejects ray-resolved geometry. The separate covariance contributions are not asserted to be jointly correlated. No calibration, measured-data modification or experimental validation is performed or claimed.
+
+
+## AE. Runtime registry background cross-covariance contract synchronization — 2026-11-02
+
+**Confirmed contract inconsistency:** the Thomson spectral-distribution callable, both canonical JSON registries, and the implementation already supported optional `signal_background_cross_covariance` with joint positive-definite block-covariance propagation, but the Python runtime registry still said that signal/background cross-covariance was not represented. This stale statement could mislead API consumers and contradicted the executable contract.
+
+**Fixed directly on main:** updated the Python runtime registry description for `background_signal_covariance` to state that it may be combined with `signal_background_cross_covariance` when the complete joint signal/background block covariance is positive definite. Added a regression assertion to `tests/test_analysis_registry.py` requiring the runtime registry to expose the supported cross-covariance contract.
+
+Commits: `5b288c642a96312d99c8139cb1efc3eceb1c3c50` (runtime registry), `7657bc356da2de29835ac64784c60f85f3ebf326` (regression test). No measured data, physical model, input/output capability, calibration process or experimental-validation claim was changed. GitHub Actions has not yet been used to claim that the new regression passes.
