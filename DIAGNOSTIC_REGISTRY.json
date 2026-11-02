@@ -649,7 +649,8 @@
           "electron_velocity_projection_m_s",
           "fit_covariance",
           "fitted_spectrum",
-          "residual"
+          "residual",
+          "fit_jacobian_condition_number"
         ],
         "scope": "Two isotropic Maxwell-Juttner populations with one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred.",
         "reference": "Sakai et al., JINST 21 (2026) C01002, DOI 10.1088/1748-0221/21/01/C01002; the TIS two-component model is a parametric approximation, not the cited Monte Carlo algorithm.",
