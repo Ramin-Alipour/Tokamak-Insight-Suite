@@ -218,3 +218,33 @@ def test_custom_model_physical_mapper_emits_provenance_and_units():
         assert out["physical_inference"]["uncertainties"]["electron_temperature_eV"] >= 0
     finally:
         unregister_spectral_model(name)
+
+
+
+def test_physical_mapper_uncertainty_respects_parameter_bounds():
+    name = "bounded_mapper_at_lower_limit"
+
+    def model(x, amplitude):
+        return amplitude * np.ones_like(x)
+
+    register_spectral_model(
+        name, model,
+        parameter_names=("amplitude",),
+        initial_values=(0.2,),
+        bounds=((0.0,), (1.0,)),
+        physical_parameter_mapper=lambda p: {"mapped_amplitude": float(np.sqrt(p["amplitude"]))},
+        physical_contract={
+            "output_units": {"mapped_amplitude": "arb."},
+            "formula_references": ["test-only square-root mapping"],
+            "assumptions": ["synthetic test"],
+            "limitations": ["not a plasma inference"],
+            "parameter_provenance": {"mapped_amplitude": "explicit test mapper"},
+        },
+    )
+    try:
+        x = np.linspace(1.0, 2.0, 12)
+        out = fit_custom_spectral_model(x, np.zeros_like(x), model_name=name)
+        assert out["parameters"]["amplitude"] == pytest.approx(0.0, abs=1e-8)
+        assert np.isfinite(out["physical_inference"]["uncertainties"]["mapped_amplitude"])
+    finally:
+        unregister_spectral_model(name)
