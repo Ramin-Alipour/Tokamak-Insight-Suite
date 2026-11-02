@@ -41,6 +41,36 @@ def _response_matrix(values, n):
     return response
 
 
+def _normalize_evdf_coefficients(coefficients, velocity):
+    """Normalize non-negative velocity-bin coefficients using trapezoidal weights.
+
+    Returns the normalized density and its exact Jacobian with respect to the
+    unnormalized coefficients. Endpoint half-weights are essential because
+    the reported density is normalized with trapezoidal integration.
+    """
+    values = np.asarray(coefficients, dtype=float)
+    grid = np.asarray(velocity, dtype=float)
+    if (values.ndim != 1 or grid.shape != values.shape or values.size < 2
+            or np.any(~np.isfinite(values)) or np.any(values < 0.0)
+            or np.any(~np.isfinite(grid)) or np.any(np.diff(grid) <= 0.0)):
+        raise ValueError("coefficients and velocity must be matching finite non-negative/strictly increasing vectors")
+    spacing_values = np.diff(grid)
+    if not np.allclose(spacing_values, spacing_values[0], rtol=1e-6, atol=1e-12):
+        raise ValueError("velocity grid must be uniform for trapezoidal coefficient normalization")
+    spacing = float(spacing_values[0])
+    quadrature_weights = np.ones(values.size, dtype=float)
+    quadrature_weights[[0, -1]] = 0.5
+    weighted_sum = float(quadrature_weights @ values)
+    if not np.isfinite(weighted_sum) or weighted_sum <= np.finfo(float).tiny:
+        raise ValueError("EVDF coefficients must have positive trapezoidal integral")
+    distribution = values / (spacing * weighted_sum)
+    jacobian = (
+        np.eye(values.size) * weighted_sum
+        - np.outer(values, quadrature_weights)
+    ) / (spacing * weighted_sum**2)
+    return distribution, jacobian
+
+
 def reconstruct_thomson_evdf(
     wavelength_nm,
     signal,
@@ -269,11 +299,12 @@ def reconstruct_thomson_evdf(
     if fit is None or not fit.success or not np.all(np.isfinite(fit.x)):
         raise ValueError("EVDF non-negative regularized inversion failed after GCV selection")
     coefficients = np.maximum(fit.x, 0.0)
-    distribution = coefficients / spacing
+    distribution, normalization_jacobian = _normalize_evdf_coefficients(
+        coefficients, velocity
+    )
     norm = float(np.trapz(distribution, velocity))
-    if not np.isfinite(norm) or norm <= np.finfo(float).tiny:
-        raise ValueError("EVDF inversion returned no positive integrated distribution")
-    distribution /= norm
+    if not np.isfinite(norm) or not np.isclose(norm, 1.0, rtol=1e-10, atol=1e-12):
+        raise ValueError("EVDF inversion failed trapezoidal probability normalization")
 
     # Conditional active-set covariance. This is a local linear approximation
     # to the constrained inverse, conditional on the selected regularization.
@@ -295,11 +326,6 @@ def reconstruct_thomson_evdf(
         active_covariance = np.linalg.pinv(hessian, hermitian=True) * covariance_scale
         active_indices = np.flatnonzero(active)
         coefficient_covariance[np.ix_(active_indices, active_indices)] = active_covariance
-        coefficient_sum = float(np.sum(coefficients))
-        normalization_jacobian = (
-            np.eye(velocity.size) * coefficient_sum
-            - np.outer(coefficients, np.ones(velocity.size))
-        ) / (spacing * coefficient_sum**2)
         evdf_covariance = (
             normalization_jacobian @ coefficient_covariance @ normalization_jacobian.T
         )
