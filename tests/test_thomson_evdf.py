@@ -207,7 +207,7 @@ def test_evdf_rejects_cross_covariance_without_both_marginal_models():
 
 def test_evdf_rejects_non_positive_definite_combined_background_covariance():
     wavelength, signal, background = _case()
-    with pytest.raises(ValueError, match="combined signal/background residual covariance"):
+    with pytest.raises(ValueError, match="joint signal/background covariance"):
         _run(
             wavelength, signal, background,
             signal_uncertainty=np.full(signal.size, 0.1),
