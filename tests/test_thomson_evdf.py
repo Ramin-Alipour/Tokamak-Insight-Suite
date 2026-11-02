@@ -179,3 +179,38 @@ def test_evdf_rejects_non_normalized_measured_response_without_renormalizing():
             velocity_limit_m_s=8.0e4,
             velocity_points=81,
         )
+
+
+def test_evdf_propagates_signal_background_and_cross_covariance():
+    wavelength, signal, background = _case()
+    out = _run(
+        wavelength, signal, background,
+        signal_uncertainty=np.full(signal.size, 0.5),
+        background_uncertainty=np.full(signal.size, 0.2),
+        signal_background_cross_covariance=np.eye(signal.size) * 0.05,
+    )
+    assert out["measurement_uncertainty_model"] == "joint_signal_background_covariance"
+    assert out["background_uncertainty_included"] is True
+    assert out["signal_background_cross_covariance_included"] is True
+    assert "Cov(signal-background)" in out["residual_covariance_interpretation"]
+
+
+def test_evdf_rejects_cross_covariance_without_both_marginal_models():
+    wavelength, signal, background = _case()
+    with pytest.raises(ValueError, match="requires both signal and background"):
+        _run(
+            wavelength, signal, background,
+            signal_uncertainty=np.full(signal.size, 0.5),
+            signal_background_cross_covariance=np.eye(signal.size) * 0.01,
+        )
+
+
+def test_evdf_rejects_non_positive_definite_combined_background_covariance():
+    wavelength, signal, background = _case()
+    with pytest.raises(ValueError, match="combined signal/background residual covariance"):
+        _run(
+            wavelength, signal, background,
+            signal_uncertainty=np.full(signal.size, 0.1),
+            background_uncertainty=np.full(signal.size, 1.0),
+            signal_background_cross_covariance=np.eye(signal.size) * 0.2,
+        )
