@@ -239,3 +239,18 @@ def test_bound_aware_jacobian_handles_active_and_fixed_parameter_bounds():
     np.testing.assert_allclose(jacobian[:, 1], [3.0, -1.0], rtol=2e-6, atol=2e-6)
     np.testing.assert_array_equal(jacobian[:, 2], [0.0, 0.0])
     assert all(np.all(sample >= lower) and np.all(sample <= upper) for sample in evaluated)
+
+
+
+def test_bound_aware_jacobian_supports_unbounded_physical_parameters():
+    from tokamak_analysis.thomson_joint_spatial_spectral import _bound_aware_jacobian
+
+    point = np.array([0.7, -1.2])
+    lower = np.array([-np.inf, -np.inf])
+    upper = np.array([np.inf, np.inf])
+    jacobian = _bound_aware_jacobian(
+        lambda p: np.array([p[0] ** 2 + 3.0 * p[1], p[0] - p[1] ** 2]),
+        point, lower, upper,
+    )
+    expected = np.array([[2.0 * point[0], 3.0], [1.0, -2.0 * point[1]]])
+    np.testing.assert_allclose(jacobian, expected, rtol=2e-5, atol=2e-6)
