@@ -333,3 +333,10 @@ On 2026-11-01, the Full-EM measured-spectrum inversion's automatic paired gyro-h
 - The CTS scientific note no longer describes the automatic post-fit assessment as opt-in.
 
 This is a numerical discretization assessment at fixed fitted parameters. It does not add a physical uncertainty term, change fitted parameters, or constitute experimental validation. GitHub Actions must complete successfully before this source change is described as software-test-clean.
+
+
+## S. Additional confirmed root/package registry defect corrected on 2026-11-02
+
+117. **The packaged diagnostic registry omitted the primary Thomson `result_classification` output.** The root `DIAGNOSTIC_REGISTRY.json` declared the per-channel Primary / Conditional / Non-identifiable result contract, but `tis/data/DIAGNOSTIC_REGISTRY.json` did not. Because the Python runtime registry loads the packaged copy, runtime metadata could omit a result field returned by the canonical Thomson workflow, and the existing root/package parity regression would fail. **Fixed directly on main:** the packaged registry was synchronized byte-for-byte with the root registry. The existing `test_analysis_registry` parity assertion covers this correction. No physical model, input assumption or output value was added; this restores the already-implemented result contract. No experimental validation is claimed.
+
+Fix commit: `a1462d79702b44e857332067d34642d41274d3fb`.
