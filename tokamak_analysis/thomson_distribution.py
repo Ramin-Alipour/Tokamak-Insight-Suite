@@ -88,17 +88,17 @@ def _moment_statistics(
     corrected = y - background
     positive = np.maximum(corrected, 0.0)
     negative = np.minimum(corrected, 0.0)
-    positive_area = float(_trapz(positive, x))
-    negative_area = float(_trapz(negative, x))
-    signed_area = float(_trapz(corrected, x))
+    # Use one finite-volume wavelength-bin measure consistently for areas
+    # and all moments. Mixing trapezoidal areas with midpoint-bin moments
+    # biases non-uniform calibrated wavelength grids.
+    quadrature = _wavelength_bin_widths(x)
+    positive_area = float(np.sum(positive * quadrature))
+    negative_area = float(np.sum(negative * quadrature))
+    signed_area = float(np.sum(corrected * quadrature))
     signal_scale = float(np.max(np.abs(y)))
-    area_tolerance = 100.0 * np.finfo(float).eps * signal_scale * float(x[-1] - x[0])
+    area_tolerance = 100.0 * np.finfo(float).eps * signal_scale * float(np.sum(quadrature))
     if not np.isfinite(signed_area) or signed_area <= area_tolerance:
         raise ValueError("No positive spectral area (signed integral) remains after background subtraction")
-    quadrature = np.empty_like(x)
-    quadrature[0] = 0.5 * (x[1] - x[0])
-    quadrature[-1] = 0.5 * (x[-1] - x[-2])
-    quadrature[1:-1] = 0.5 * (x[2:] - x[:-2])
     measure = corrected * quadrature
     measure_sum = float(np.sum(measure))
     normalized = measure / measure_sum
