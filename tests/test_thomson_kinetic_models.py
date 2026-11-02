@@ -169,3 +169,42 @@ def test_relativistic_response_convolution_conserves_area_on_nonuniform_bins():
     response += np.roll(np.eye(wavelength.size), 1, axis=0)*0.2
     result = _apply_response(response, signal, wavelength)
     assert np.sum(result*widths) == pytest.approx(np.sum(signal*widths), rel=1e-12)
+
+
+def test_relativistic_compton_model_uses_recoil_and_klein_nishina_weighting():
+    wavelength = np.linspace(532.0-40.0, 532.0+40.0, 801)
+    thomson = relativistic_maxwell_juttner_spectrum(
+        wavelength, 532.0, np.pi/2.0, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=16, angular_order=8,
+    )
+    compton = relativistic_maxwell_juttner_spectrum(
+        wavelength, 532.0, np.pi/2.0, 100.0,
+        flow_projection_m_s=0.0,
+        incident_polarization=[0.0, 0.0, 1.0],
+        radial_order=16, angular_order=8,
+        include_compton_recoil=True,
+    )
+    assert compton["recoil_included"] is True
+    assert "Klein_Nishina" in compton["scattering_cross_section_model"]
+    assert compton["maximum_recoil_correction_fraction_on_quadrature_support"] > 0.0
+    assert compton["effective_differential_cross_section_m2_sr"] > 0.0
+    # Recoil transfers energy to the electron and therefore red-shifts the
+    # scattered photons relative to the elastic Thomson calculation.
+    assert compton["fitted_centroid_nm"] > thomson["fitted_centroid_nm"]
+    assert np.all(np.isfinite(compton["spectral_density_per_nm"]))
+    np.testing.assert_allclose(
+        np.sum(compton["spectral_density_per_nm"]*compton["wavelength_bin_widths_nm"]),
+        1.0, rtol=1e-12,
+    )
+
+
+def test_relativistic_compton_mode_rejects_non_boolean_selection():
+    wavelength = np.linspace(500.0, 564.0, 101)
+    with pytest.raises(ValueError, match="include_compton_recoil must be boolean"):
+        relativistic_maxwell_juttner_spectrum(
+            wavelength, 532.0, np.pi/2.0, 100.0,
+            incident_polarization=[0.0, 0.0, 1.0],
+            include_compton_recoil="yes",
+        )
