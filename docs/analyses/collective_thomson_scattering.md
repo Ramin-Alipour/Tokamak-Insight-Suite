@@ -184,8 +184,12 @@ contains the caller-supplied propagation constants in rad/m. Degenerate
 subspaces are aligned as subspaces by a unitary Procrustes transport; the
 individual basis labels within an exact degeneracy are not treated as
 observable. The solver reports modal powers, conversion coupling, degeneracy
-flags and the numerical power-conservation residual. It rejects missing or
-misaligned path/propagation-constant inputs rather than inventing them.
+flags, the total conserved modal power, and the power contained specifically
+in each detected degenerate subspace (with the tracked mode indices). The
+subspace-power diagnostic is zero where no degenerate subspace is detected;
+it is not a duplicate of total modal power. It also reports the numerical
+power-conservation residual. It rejects missing or misaligned
+path/propagation-constant inputs rather than inventing them.
 
 This is a **conditional local cold-plasma coupled-mode model**, not a full-wave
 solution. It requires the researcher to provide the physical path, local
