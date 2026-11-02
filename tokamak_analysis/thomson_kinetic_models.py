@@ -923,3 +923,158 @@ def fit_collective_kappa(
         "model":"Plasma kinetic dielectric model with kappa electron VDF and Maxwellian ion species",
         "distribution_model":"1-D projected kappa electron distribution; Maxwellian ions",
     }
+
+
+def fit_relativistic_maxwell_juttner_channels(
+    wavelength_nm, measured_spectra, laser_wavelength_nm, scattering_angle_rad,
+    response, *, incident_direction, scattered_direction, incident_polarization,
+    joint_spectral_covariance, initial_temperature_eV,
+    initial_flow_projection_m_s=0.0, radial_order=36, angular_order=18,
+    maximum_recoil_correction_fraction=0.01, max_nfev=1600,
+):
+    """Joint relativistic MJ fit to multiple channels with full cross-channel GLS.
+
+    The data and covariance are flattened in channel-major order:
+    vec(Y) = [Y[0,:], Y[1,:], ...]. A single Te and q-parallel bulk flow are
+    shared by all channels; each channel has its own positive amplitude,
+    constant background and linear background slope. The complete covariance
+    (including off-diagonal cross-channel blocks) is Cholesky-whitened.
+
+    This is a common-plasma-parameter multi-channel fit, not a model for
+    channel-dependent electron distributions or channel-dependent geometry.
+    All channels must share wavelength sampling, scattering geometry and
+    calibrated response. Density is not inferred from normalized spectral
+    shapes; absolute density requires independently calibrated collection
+    efficiency, throughput, solid angle and laser energy.
+    """
+    x = np.asarray(wavelength_nm, dtype=float)
+    y = np.asarray(measured_spectra, dtype=float)
+    if x.ndim != 1 or x.size < 12 or np.any(~np.isfinite(x)) or np.any(np.diff(x) <= 0):
+        raise ValueError("wavelength_nm must be finite, strictly increasing, with >=12 samples")
+    if y.ndim != 2 or y.shape[1] != x.size or y.shape[0] < 2 or np.any(~np.isfinite(y)):
+        raise ValueError("measured_spectra must be a finite (n_channels,n_wavelengths) array with >=2 channels")
+    m, n = y.shape
+    cov = np.asarray(joint_spectral_covariance, dtype=float)
+    if cov.shape != (m*n, m*n) or np.any(~np.isfinite(cov)):
+        raise ValueError("joint_spectral_covariance must be finite and shaped (n_channels*n_wavelengths)^2 in channel-major order")
+    scale_cov = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
+    if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12*scale_cov):
+        raise ValueError("joint_spectral_covariance must be symmetric")
+    try:
+        chol = np.linalg.cholesky(cov)
+    except np.linalg.LinAlgError as exc:
+        raise ValueError("joint_spectral_covariance must be positive definite") from exc
+    ni = np.asarray(incident_direction, dtype=float)
+    ns = np.asarray(scattered_direction, dtype=float)
+    pol = np.asarray(incident_polarization, dtype=float)
+    if ni.shape != (3,) or ns.shape != (3,) or pol.shape != (3,) or any(np.any(~np.isfinite(v)) for v in (ni, ns, pol)):
+        raise ValueError("incident_direction, scattered_direction and incident_polarization must be finite 3-vectors")
+    if min(np.linalg.norm(ni), np.linalg.norm(ns), np.linalg.norm(pol)) <= 0:
+        raise ValueError("direction and polarization vectors must be non-zero")
+    ni = ni/np.linalg.norm(ni)
+    ns = ns/np.linalg.norm(ns)
+    pol = pol/np.linalg.norm(pol)
+    if abs(float(np.dot(pol, ni))) > 1e-6:
+        raise ValueError("incident_polarization must be transverse to incident_direction")
+    angle = float(np.arccos(np.clip(np.dot(ni, ns), -1.0, 1.0)))
+    if not np.isclose(angle, scattering_angle_rad, rtol=0.0, atol=1e-5):
+        raise ValueError("scattering_angle_rad is inconsistent with direction vectors")
+    qhat = ns-ni
+    qhat /= np.linalg.norm(qhat)
+    e3 = np.cross(ni, ns)
+    if np.linalg.norm(e3) <= 1e-12:
+        e3 = pol-np.dot(pol, qhat)*qhat
+    e3 /= np.linalg.norm(e3)
+    e2 = np.cross(qhat, e3)
+    e2 /= np.linalg.norm(e2)
+    local_to_lab = np.column_stack((qhat, e2, e3))
+    pol_local = local_to_lab.T @ pol
+    laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
+    te0 = _positive(initial_temperature_eV, "initial_temperature_eV")
+    flow0 = float(initial_flow_projection_m_s)
+    if not np.isfinite(flow0) or abs(flow0) >= C:
+        raise ValueError("initial_flow_projection_m_s must be finite and subluminal")
+    if isinstance(max_nfev, (bool, np.bool_)) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 1:
+        raise ValueError("max_nfev must be a positive integer")
+    if isinstance(response, (list, tuple)) and len(response) == m:
+        responses = [np.asarray(item, dtype=float) for item in response]
+    else:
+        responses = [np.asarray(response, dtype=float)]*m
+    for item in responses:
+        if item.shape != (n, n) or np.any(~np.isfinite(item)) or np.any(item < 0):
+            raise ValueError("response must be a finite non-negative (n_lambda,n_lambda) matrix per channel")
+    yscale = max(float(np.max(np.abs(y))), np.finfo(float).tiny)
+    ys = y/yscale
+    chol_scaled = chol/yscale
+    baseline = np.median(np.concatenate((ys[:, :max(2,n//10)], ys[:, -max(2,n//10):]), axis=1), axis=1)
+    amplitudes = np.maximum(np.max(ys, axis=1)-baseline, np.finfo(float).tiny)
+    p0 = np.r_[np.log(te0), np.arctanh(flow0/C), np.log(amplitudes), baseline, np.zeros(m)]
+    def predict(p):
+        te = float(np.exp(np.clip(p[0], -700, 700)))
+        flow = float(np.tanh(p[1])*C)
+        physical = relativistic_maxwell_juttner_spectrum(
+            x, laser, angle, te, flow_projection_m_s=flow,
+            incident_polarization=pol_local, radial_order=radial_order,
+            angular_order=angular_order,
+            maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            require_full_spectrum=False,
+        )
+        shape = physical["spectral_density_per_nm"]
+        out = np.empty_like(ys)
+        amps = np.exp(np.clip(p[2:2+m], -700, 700))
+        offsets = p[2+m:2+2*m]
+        slopes = p[2+2*m:2+3*m]
+        for j in range(m):
+            convolved = _apply_response(responses[j], shape, x)
+            out[j] = amps[j]*convolved + offsets[j] + slopes[j]*(x-laser)
+        return out
+    def objective(p):
+        try:
+            residual = (ys-predict(p)).reshape(-1)
+            return np.linalg.solve(chol_scaled, residual)
+        except ValueError as exc:
+            if "capture at least 99.5%" in str(exc) or "zero spectral power" in str(exc):
+                return np.full(m*n, 1e6)
+            raise
+    bounds = (np.r_[-np.inf, -18.0, np.full(3*m, -np.inf)],
+              np.r_[np.inf, 18.0, np.full(3*m, np.inf)])
+    fit = least_squares(objective, p0, bounds=bounds, x_scale="jac", max_nfev=int(max_nfev))
+    if not fit.success:
+        raise ValueError(f"joint relativistic Maxwell-Juttner fit failed: {fit.message}")
+    jac = np.asarray(fit.jac, dtype=float)
+    norms = np.linalg.norm(jac, axis=0)
+    scaled_jac = np.divide(jac, norms[None, :], out=np.zeros_like(jac), where=norms[None, :] > np.finfo(float).tiny)
+    singular = np.linalg.svd(scaled_jac, compute_uv=False)
+    rank_tol = np.finfo(float).eps*max(scaled_jac.shape)*(singular[0] if singular.size else 0.0)
+    rank = int(np.count_nonzero(singular > rank_tol))
+    condition = float(singular[0]/singular[-1]) if singular.size and singular[-1] > 0 else float("inf")
+    if rank < p0.size or not np.isfinite(condition) or condition > 1e12:
+        raise ValueError(f"joint relativistic Maxwell-Juttner fit is not identifiable (rank {rank}/{p0.size}, condition={condition:.6g})")
+    covariance_p = np.linalg.pinv(jac.T@jac, rcond=1e-12)
+    transform = np.eye(p0.size)
+    transform[0, 0] = np.exp(fit.x[0])
+    transform[1, 1] = C*(1.0-np.tanh(fit.x[1])**2)
+    covariance_physical = transform@covariance_p@transform.T
+    fitted = predict(fit.x)*yscale
+    residual = y-fitted
+    return {
+        "electron_temperature_eV": float(np.exp(fit.x[0])),
+        "electron_temperature_uncertainty_eV": float(np.sqrt(max(covariance_physical[0,0],0.0))),
+        "electron_velocity_projection_m_s": float(np.tanh(fit.x[1])*C),
+        "electron_velocity_projection_uncertainty_m_s": float(np.sqrt(max(covariance_physical[1,1],0.0))),
+        "channel_amplitudes": np.exp(fit.x[2:2+m])*yscale,
+        "channel_background_intercepts": fit.x[2+m:2+2*m]*yscale,
+        "channel_background_slopes_per_nm": fit.x[2+2*m:2+3*m]*yscale,
+        "fitted_spectra": fitted,
+        "residuals": residual,
+        "weighted_residual_sum_squares": float(2.0*fit.cost),
+        "fit_covariance": covariance_physical,
+        "fit_parameter_names": ["electron_temperature_eV","electron_velocity_projection_m_s"]+[f"channel_{j}_amplitude" for j in range(m)]+[f"channel_{j}_background_intercept" for j in range(m)]+[f"channel_{j}_background_slope_per_nm" for j in range(m)],
+        "jacobian_rank": rank,
+        "jacobian_condition_number": condition,
+        "spectral_weighting_status": "full_channel_major_generalized_least_squares_including_cross_channel_covariance",
+        "covariance_ordering": "channel_major",
+        "model": "relativistic non-collective Thomson scattering; shared Maxwell-Juttner Te and q-parallel flow across channels",
+        "density_inference": "not_inferred_from_normalized_spectral_shape",
+        "assumptions": ["All channels share Te, q-parallel bulk flow, wavelength grid and scattering geometry.", "Channel amplitudes and affine backgrounds are independent nuisance parameters.", "The supplied full covariance is known, positive definite and includes cross-channel correlations.", "A common measured response is used unless a per-channel response list is supplied.", "Photon recoil is neglected only within the configured Thomson-limit correction threshold."]
+    }
