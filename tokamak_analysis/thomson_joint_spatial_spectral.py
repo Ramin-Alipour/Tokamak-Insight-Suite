@@ -27,10 +27,31 @@ def _bin_widths(axis):
     return widths
 
 
+def _real_array(values, name):
+    raw = np.asarray(values)
+    if raw.dtype.kind not in "iuf":
+        raise ValueError(f"{name} must contain real numeric values, not booleans, strings or complex values")
+    result = raw.astype(float, copy=False)
+    if not np.all(np.isfinite(result)):
+        raise ValueError(f"{name} must contain only finite values")
+    return result
+
+
+def _finite_real_scalar(value, name):
+    if isinstance(value, (bool, np.bool_)) or not isinstance(
+        value, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a finite real scalar")
+    result = float(value)
+    if not np.isfinite(result):
+        raise ValueError(f"{name} must be a finite real scalar")
+    return result
+
+
 def _response_stack(response, n_channels, n_wavelengths):
     if response is None:
         return np.repeat(np.eye(n_wavelengths)[None, :, :], n_channels, axis=0)
-    value = np.asarray(response, dtype=float)
+    value = _real_array(response, "instrument_response")
     if value.ndim == 2:
         value = np.repeat(value[None, :, :], n_channels, axis=0)
     if value.shape != (n_channels, n_wavelengths, n_wavelengths):
@@ -73,10 +94,10 @@ def reconstruct_joint_thomson_spatial_spectra(
     detector channels. Background offset and slope are detector-channel
     nuisance parameters and are not mixed as plasma emission.
     """
-    x = np.asarray(wavelength_nm, dtype=float)
-    y = np.asarray(measured_spectra, dtype=float)
-    r = np.asarray(radius_m, dtype=float)
-    h = np.asarray(spatial_mixing_matrix, dtype=float)
+    x = _real_array(wavelength_nm, "wavelength_nm")
+    y = _real_array(measured_spectra, "measured_spectra")
+    r = _real_array(radius_m, "radius_m")
+    h = _real_array(spatial_mixing_matrix, "spatial_mixing_matrix")
     if x.ndim != 1 or x.size < 9 or not np.all(np.isfinite(x)) or np.any(np.diff(x) <= 0):
         raise ValueError("wavelength_nm must be finite, strictly increasing, and contain >=9 samples")
     if y.ndim != 2 or y.shape[1] != x.size or not np.all(np.isfinite(y)):
@@ -88,9 +109,9 @@ def reconstruct_joint_thomson_spatial_spectra(
         raise ValueError("spatial_mixing_matrix must be finite, non-negative, and shaped (n_channels,n_nodes)")
     if np.linalg.matrix_rank(h) < min(h.shape):
         raise ValueError("spatial_mixing_matrix is rank deficient")
-    laser = float(laser_wavelength_nm)
-    angle = float(scattering_angle_rad)
-    lam_reg = float(regularization_strength)
+    laser = _finite_real_scalar(laser_wavelength_nm, "laser_wavelength_nm")
+    angle = _finite_real_scalar(scattering_angle_rad, "scattering_angle_rad")
+    lam_reg = _finite_real_scalar(regularization_strength, "regularization_strength")
     if not np.isfinite(laser) or laser <= 0 or not np.isfinite(angle) or not 0 < angle < np.pi:
         raise ValueError("laser_wavelength_nm must be positive and scattering_angle_rad must lie strictly between 0 and pi")
     if not np.isfinite(lam_reg) or lam_reg < 0:
@@ -98,7 +119,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     if signal_uncertainty is not None and joint_spectral_covariance is not None:
         raise ValueError("supply signal_uncertainty or joint_spectral_covariance, not both")
     if joint_spectral_covariance is not None:
-        cov = np.asarray(joint_spectral_covariance, dtype=float)
+        cov = _real_array(joint_spectral_covariance, "joint_spectral_covariance")
         if cov.shape != (m*nlam, m*nlam) or not np.all(np.isfinite(cov)) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-13):
             raise ValueError("joint_spectral_covariance must be finite, symmetric, and channel-major")
         try:
@@ -108,7 +129,7 @@ def reconstruct_joint_thomson_spatial_spectra(
         whiten = lambda v: np.linalg.solve(chol, np.asarray(v).reshape(-1))
         noise_model = "full_channel_major_joint_spectral_covariance"
     elif signal_uncertainty is not None:
-        sigma = np.asarray(signal_uncertainty, dtype=float)
+        sigma = _real_array(signal_uncertainty, "signal_uncertainty")
         if sigma.shape != y.shape or not np.all(np.isfinite(sigma)) or np.any(sigma <= 0):
             raise ValueError("signal_uncertainty must be positive, finite, and match measured_spectra")
         whiten = lambda v: (np.asarray(v) / sigma).reshape(-1)
@@ -143,8 +164,12 @@ def reconstruct_joint_thomson_spatial_spectra(
     upper = np.r_[np.full(r.size, 700.0), np.full(r.size, np.log(1e7)),
                   np.full(r.size, 299.0),
                   np.full(m, np.inf), np.full(m, np.inf)]
+    if not isinstance(positive_amplitude, (bool, np.bool_)):
+        raise ValueError("positive_amplitude must be boolean")
     if not positive_amplitude:
         raise ValueError("signed plasma amplitudes are unsupported; use positive_amplitude=True")
+    if isinstance(max_nfev, (bool, np.bool_)) or not isinstance(max_nfev, (int, np.integer)) or max_nfev < 1:
+        raise ValueError("max_nfev must be a positive integer")
 
     def predict(p):
         amp = np.exp(p[:r.size])
