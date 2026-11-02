@@ -114,3 +114,30 @@ Do not mark an item complete merely because it has been described in this plan.
 ### Local Full-EM CTS external covariance — partial closure of WP-C2
 
 The Full-EM spectrum inversion accepts an ordered joint covariance over local magnetic-field, incident/scattered direction and complex polarization components and propagates it through reproducible full-parameter Monte Carlo refits. Frequency-resolved ray/equilibrium/beam covariance, composition covariance and cross-covariance between distinct external covariance sources remain open. The local-vector covariance route explicitly rejects ray-resolved geometry. This closes only the local-input portion of audit item 102; it does not close the full WP-C2 external uncertainty work package.
+
+
+## 7. 2026-11-02 implementation update — PSF-aware coordinate covariance
+
+The standalone PSF-aware parameter-profile inverse now accepts
+`radius_covariance_m2`, an explicitly supplied full covariance matrix for the
+spatial-node coordinates. It propagates this covariance by deterministic-seed
+Monte Carlo through the nonuniform-grid curvature operator and fixed spatial
+mixing matrix. The nominally selected regularization strength is held fixed so
+that this contribution is not conflated with GCV re-selection variability.
+The output separates measurement-conditional and coordinate-induced profile
+covariance, reports successful draws, and warns when fewer than 80% (minimum
+20) of the requested draws preserve a valid monotonic coordinate grid.
+
+This is a partial closure of the coordinate-uncertainty part of WP-P1 only.
+It does not propagate uncertainty in the supplied spatial mixing matrix, does
+not estimate a PSF, and does not yet propagate coordinate covariance through
+the separate PCHIP/GCV profile workflow or the wavelength-resolved joint
+spatial-spectral inverse. The new path has direct synthetic regression tests;
+those tests are software checks, not experimental validation.
+
+## 8. Literature updates relevant to the model-selection boundary
+
+- Carole et al. (2025), *A photonic model of the High-Resolution Thomson Scattering diagnostic of WEST tokamak*, Journal of Instrumentation 20, P07014, DOI: 10.1088/1748-0221/20/07/P07014. This supports explicit photon/optical-response modelling and absolute signal budgeting in a modern optical Thomson diagnostic.
+- Skolar, Longley & Goodwin (2025), *Computing the generalized plasma dispersion function for non-Maxwellian plasmas, with applications to Thomson scattering*, Physics of Plasmas 32, 043907, DOI: 10.1063/5.0261966. The real-axis pole-aware numerical integration is not equivalent to the existing finite-variance Student-t/Kappa projection and must not be claimed as implemented by it.
+- Sakai et al. (2026), *Monte Carlo simulation method for incoherent Thomson scattering spectra from arbitrary electron distribution functions*, Journal of Instrumentation 21, C01002, DOI: 10.1088/1748-0221/21/01/C01002. This provides a stochastic single photon-electron interaction forward model for sampled arbitrary distributions, with reported comparisons for relativistic Maxwellian and Kappa cases; it is not the current TIS two-population fit.
+- Nishiura et al. (2026), *Development and Application of Collective Thomson Scattering Diagnostics for Energetic and Bulk Ion Measurements in the Large Helical Device*, Journal of Fusion Energy 45, article 55, DOI: 10.1007/s10894-026-00595-7. This recent review/application reference informs CTS diagnostic context, but does not by itself justify replacing the explicitly scoped electrostatic or Full-EM forward models.
