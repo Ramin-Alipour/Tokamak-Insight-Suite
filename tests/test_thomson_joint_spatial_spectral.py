@@ -294,3 +294,60 @@ def test_structured_thomson_background_models_recover_detector_baseline():
     result = fit_structured_background(x, y, model="polynomial", degree=2)
     np.testing.assert_allclose(result["background"], y, atol=1e-11)
     assert result["background_role"] == "detector_space_nuisance_not_plasma_emission"
+
+
+
+def test_joint_kappa_inverse_can_fit_global_kappa_index_and_uncertainty():
+    from scipy.special import gammaln
+
+    wavelength, _, radius, mixing, te, flow = _synthetic_case()
+    laser = 532.0
+    angle = np.pi / 2.0
+    kappa_true = 4.2
+    amplitude = np.array([1.0, 1.1, 1.2, 1.1, 1.0])
+    sigma = 2.0 * laser * np.sqrt(te / 510998.95069) * np.sin(angle / 2.0)
+    center = laser * (1.0 - 2.0 * np.sin(angle / 2.0) * flow / 299792458.0)
+    scale = sigma * np.sqrt((2.0 * kappa_true - 3.0) / kappa_true)
+    normalization = np.exp(
+        gammaln(kappa_true) - 0.5 * np.log(np.pi * kappa_true)
+        - np.log(scale) - gammaln(kappa_true - 0.5)
+    )
+    z = (wavelength[None, :] - center[:, None]) / scale[:, None]
+    intrinsic = amplitude[:, None] * normalization[:, None] * (
+        1.0 + z * z / kappa_true
+    ) ** (-kappa_true)
+    spectra = mixing @ intrinsic
+    spectra += 1e-5
+
+    out = reconstruct_joint_thomson_spatial_spectra(
+        wavelength, spectra, radius, mixing,
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        signal_uncertainty=np.full_like(spectra, 1e-5),
+        physical_model="kappa", kappa_index=None,
+        fit_kappa_index=True, kappa_index_initial=3.0,
+        kappa_index_bounds=(1.5001, 30.0),
+    )
+    assert out["analysis_status"] == "completed"
+    assert out["physical_model_selection"]["kappa_index_role"] == "jointly_fitted_global_shape_parameter"
+    assert out["parameter_order"][-1] == "kappa_index"
+    assert out["parameter_covariance"].shape == (3 * radius.size + 2 * spectra.shape[0] + 1,) * 2
+    assert np.isfinite(out["physical_model_selection"]["kappa_index_uncertainty"])
+    assert out["physical_model_selection"]["kappa_index"] == pytest.approx(kappa_true, rel=0.08)
+
+
+def test_joint_kappa_fit_rejects_invalid_bounds_and_fixed_index_conflict():
+    x, y, r, h, *_ = _synthetic_case()
+    common = dict(
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(x.size), physical_model="kappa",
+    )
+    with pytest.raises(ValueError, match="kappa_index_bounds"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, **common, fit_kappa_index=True,
+            kappa_index_initial=3.0, kappa_index_bounds=(1.5, 10.0),
+        )
+    with pytest.raises(ValueError, match="kappa_index=None"):
+        reconstruct_joint_thomson_spatial_spectra(
+            x, y, r, h, **common, kappa_index=4.0, fit_kappa_index=True,
+        )

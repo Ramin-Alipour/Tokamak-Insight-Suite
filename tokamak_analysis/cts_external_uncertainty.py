@@ -34,11 +34,12 @@ def _validated_covariance(covariance, size, name="covariance"):
 def validate_external_input_covariance(covariance, parameter_order):
     """Validate ordered covariance for local Full-EM CTS field/geometry inputs.
 
-    Frequency-resolved ray/equilibrium uncertainties are not represented by
-    this local-vector contract. Species composition, mass, and charge-state
-    components may be included using indexed ion_fraction_i, ion_mass_amu_i,
-    and ion_charge_state_i names; cross-covariances with local geometry,
-    field, and polarization terms are retained in the same matrix.
+    In addition to local field/geometry/polarization and indexed ion inputs,
+    ray-resolved geometry accepts ray_<frequency>_<sample>_<component>_<axis>
+    names for magnetic_field_T, incident_direction and scattered_direction,
+    plus ray_<frequency>_beam_overlap_relative and instrument_response_<row>_<column> matrix elements. This permits joint response/geometry/species cross-covariance. All cross-covariances are
+            or re.fullmatch(r"instrument_response_\d+_\d+", name) is not None
+    retained in the same ordered covariance matrix.
     """
     if (not isinstance(parameter_order, Sequence)
             or isinstance(parameter_order, (str, bytes)) or not parameter_order):
@@ -49,13 +50,15 @@ def validate_external_input_covariance(covariance, parameter_order):
         isinstance(name, str) and (
             name in SUPPORTED_LOCAL_COMPONENTS
             or re.fullmatch(r"ion_(?:fraction|mass_amu|charge_state)_\d+", name) is not None
+            or re.fullmatch(r"ray_\d+_\d+_(?:magnetic_field_T|incident_direction|scattered_direction)_[xyz]", name) is not None
+            or re.fullmatch(r"ray_\d+_beam_overlap_relative", name) is not None
         )
         for name in order
     )
     if not supported:
         raise ValueError(
             "parameter_order contains an unsupported local Full-EM CTS component; "
-            "species terms use ion_fraction_i, ion_mass_amu_i, or ion_charge_state_i"
+            "species terms use ion_fraction_i, ion_mass_amu_i, or ion_charge_state_i; ray terms use ray_frequency_sample_component_axis"
         )
     if len(set(order)) != len(order):
         raise ValueError("parameter_order entries must be unique")
