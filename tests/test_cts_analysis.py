@@ -1214,3 +1214,53 @@ def test_full_em_cts_analysis_rejects_non_normalized_calibrated_response():
             scattered_polarization=[0.0, 0.0, 1.0],
             instrument_response=response,
         )
+
+
+def test_cts_frequency_resolved_geometry_uses_each_frequency_sample_geometry():
+    from tokamak_analysis.cts_analysis import cts_spectral_density
+
+    f0 = 140e9
+    shifts = np.array([-1.2e9, 0.0, 1.4e9])
+    geometries = [
+        {"scattering_angle_rad": np.deg2rad(angle)}
+        for angle in (65.0, 110.0, 145.0)
+    ]
+    common = dict(
+        electron_density_m3=2e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        electron_velocity_projection_m_s=1.0e5,
+        ion_velocity_projection_m_s=1.0e4,
+    )
+    resolved = cts_spectral_density(
+        shifts, f0, {"frequency_resolved_geometry": geometries}, **common
+    )
+    expected = np.array([
+        cts_spectral_density(np.array([shift]), f0, geometry, **common)[0]
+        for shift, geometry in zip(shifts, geometries)
+    ])
+    assert np.allclose(resolved, expected, rtol=1e-12, atol=0.0)
+    assert not np.allclose(
+        resolved,
+        cts_spectral_density(
+            shifts, f0, geometries[1], **common
+        ),
+        rtol=1e-5, atol=0.0,
+    )
+
+
+def test_cts_frequency_resolved_geometry_requires_one_entry_per_frequency():
+    from tokamak_analysis.cts_analysis import cts_spectral_density
+
+    with pytest.raises(ValueError, match="exactly one geometry mapping per frequency"):
+        cts_spectral_density(
+            np.array([-1e9, 0.0, 1e9]), 140e9,
+            {"frequency_resolved_geometry": [{"scattering_angle_rad": 1.0}]},
+            electron_density_m3=2e19, electron_temperature_eV=1200.0,
+            ion_temperature_eV=800.0,
+            ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+            ion_fractions=[1.0], electron_velocity_projection_m_s=0.0,
+            ion_velocity_projection_m_s=0.0,
+        )
