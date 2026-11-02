@@ -151,7 +151,7 @@ spectrum after subtraction of the explicitly supplied background.
 - `laser_wavelength_nm` and `scattering_angle_rad`.
 - The measured `instrument_response_matrix`.
 - An explicit `background_signal` on the same wavelength grid.
-- An explicit positive `regularization_strength`; it is never silently selected.
+- Optional `regularization_strength`; when omitted, the solver selects the second-difference Tikhonov strength by generalized cross-validation (GCV) over its documented logarithmic candidate grid. A finite positive researcher-supplied value overrides GCV.
 - Optionally, pointwise `signal_uncertainty` or a full within-spectrum
   `signal_covariance` (mutually exclusive).
 - Optionally, a velocity grid; otherwise the caller supplies its limit and
