@@ -449,3 +449,10 @@ This change concerns numerical integration of already calibrated measured spectr
 **Confirmed numerical robustness gap:** the joint spatial-spectral inverse estimated its data-only Jacobian with central finite differences even when an optimized parameter was at an active physical/numerical bound. The perturbed evaluations could therefore leave the optimizer's declared domain and produce invalid or misleading rank/conditioning diagnostics.
 
 **Fixed directly on main:** the data-only Jacobian now uses central differences in the interior, one-sided differences at active bounds, and zero columns for parameters fixed at identical bounds. A regression test verifies derivative values and confirms that every perturbation remains within the declared bounds. This changes only numerical identifiability diagnostics; it does not alter measured spectra, physical models, calibration, or experimental-validation status.
+
+
+## P. Removal of undocumented projected-EVDF candidate-shape caps (2026-11-02)
+
+A code review of `tokamak_analysis/thomson_evdf.py` found that the optional parametric comparison silently constrained the Student-t degrees of freedom to `2.05–100` and the super-Gaussian exponent to `1.2–8`. The upper limits and the stricter-than-mathematical lower limits were not supplied by the researcher or justified by the cited physical model. They could bias candidate comparison and make otherwise admissible measured-spectrum fits unavailable.
+
+**Corrected directly on main:** the Student-t candidate now uses only the finite-variance domain \\(\\nu>2\\) and no finite upper cap; the super-Gaussian candidate uses only its normalizability domain \\(p>0\\) and no finite upper cap. The velocity-location and scale bounds remain tied to the explicitly supplied reconstruction grid and its resolution. Added a regression test that inspects all three candidate optimizer bounds and guards against reintroducing undocumented shape-parameter caps. Updated the scientific analysis documentation. This change does not add a physical scattering model, alter measured input data, or claim experimental validation.
