@@ -466,12 +466,18 @@ def reconstruct_thomson_evdf(
             upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0])]
         elif model_name == "kappa_student_t":
             initial = [float(np.max(np.abs(target))), mean_v, max(sigma_v, spacing), 5.0]
-            lower_bounds = [0.0, float(velocity[0]), spacing, 2.05]
-            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), 100.0]
+            # The projected Student-t variance exists for nu > 2. Do not
+            # impose an arbitrary finite upper limit on the physical tail
+            # parameter; only enforce the distribution's mathematical domain.
+            lower_bounds = [0.0, float(velocity[0]), spacing, np.nextafter(2.0, np.inf)]
+            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), np.inf]
         else:
             initial = [float(np.max(np.abs(target))), mean_v, max(sigma_v, spacing), 2.0]
-            lower_bounds = [0.0, float(velocity[0]), spacing, 1.2]
-            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), 8.0]
+            # exp(-|z|**p) is normalizable for every p > 0. The previous
+            # [1.2, 8] interval was an undocumented researcher-independent
+            # restriction and is therefore not part of the inference contract.
+            lower_bounds = [0.0, float(velocity[0]), spacing, np.nextafter(0.0, np.inf)]
+            upper_bounds = [np.inf, float(velocity[-1]), float(velocity[-1]-velocity[0]), np.inf]
 
         def model_residual(parameters):
             pdf = projected_pdf(model_name, parameters[1:])
