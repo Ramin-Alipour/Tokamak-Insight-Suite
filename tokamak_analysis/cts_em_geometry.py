@@ -322,6 +322,8 @@ def trace_cts_frequency_resolved_beams(
         path_parameter_max=incident_ray.get("path_parameter_max", path_parameter_max),
         sample_count=incident_ray.get("sample_count", sample_count),
         relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
+        initial_mode_amplitudes=incident_ray.get("initial_mode_amplitudes"),
+        propagation_constants_rad_m=incident_ray.get("propagation_constants_rad_m"),
     )
     incident_positions = np.asarray(incident["position_m"], dtype=float)
     incident_cov = np.asarray(incident_beam_covariance_m2, dtype=float)
@@ -354,6 +356,8 @@ def trace_cts_frequency_resolved_beams(
             path_parameter_max=ray_spec.get("path_parameter_max", path_parameter_max),
             sample_count=ray_spec.get("sample_count", sample_count),
             relative_tolerance=relative_tolerance, absolute_tolerance=absolute_tolerance,
+            initial_mode_amplitudes=ray_spec.get("initial_mode_amplitudes"),
+            propagation_constants_rad_m=ray_spec.get("propagation_constants_rad_m"),
         )
         receiver_positions = np.asarray(receiver["position_m"], dtype=float)
         receiver_cov = np.asarray(receiver_beam_covariances_m2, dtype=float)
