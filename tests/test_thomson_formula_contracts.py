@@ -88,3 +88,21 @@ def test_relativistic_mj_effective_cross_section_formula_library_link():
     )
     assert np.isfinite(value)
     assert value > 0.0
+
+
+def test_thomson_covariance_psd_guard_rejects_asymmetric_matrices():
+    from tokamak_analysis.thomson_scattering import _covariance_is_positive_semidefinite
+
+    # eigvalsh reads one triangle and can report positive eigenvalues for this
+    # materially asymmetric input; an asymmetric matrix is not a covariance.
+    assert not _covariance_is_positive_semidefinite(np.array([[1.0, 0.9], [0.1, 1.0]]))
+
+
+def test_thomson_covariance_psd_guard_is_scale_relative_for_symmetry():
+    from tokamak_analysis.thomson_scattering import _covariance_is_positive_semidefinite
+
+    scale = 1e-24
+    symmetric_psd = scale * np.array([[1.0, 0.25], [0.25, 1.0]])
+    asymmetric = scale * np.array([[1.0, 0.25], [0.249, 1.0]])
+    assert _covariance_is_positive_semidefinite(symmetric_psd)
+    assert not _covariance_is_positive_semidefinite(asymmetric)
