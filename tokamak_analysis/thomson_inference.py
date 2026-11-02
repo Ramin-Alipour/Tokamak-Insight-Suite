@@ -322,6 +322,10 @@ def _fit_noncollective(
     area_gradient = np.zeros(3+n_background)
     area_gradient[:3] = [width*np.sqrt(2.0*np.pi),0.0,amp*np.sqrt(2.0*np.pi)]
     area_unc = float(np.sqrt(max(float(area_gradient@covariance@area_gradient),0.0)))
+    background_at_center = float(
+        np.asarray([np.interp(center, wavelength, basis[:, j])
+                    for j in range(n_background)]) @ coefficients
+    )
     if background_model == "linear":
         slope = float(coefficients[1]*2.0/span)
     else:
@@ -333,7 +337,7 @@ def _fit_noncollective(
         "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(covariance[1,1],0.0))/(laser_nm*q_projection)),
         "fitted_center_nm": center, "intrinsic_sigma_nm": width,
         "amplitude": amp,
-        "background_intercept": float(coefficients[0]),
+        "background_intercept": background_at_center,
         "background_slope_per_nm": slope,
         "background_model": background_model,
         "background_coefficients": coefficients,
