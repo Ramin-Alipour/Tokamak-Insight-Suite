@@ -505,6 +505,6 @@ The two-population Maxwell–Jüttner shape fit previously required the research
 
 The Streamlit workflow now makes all four seed fields optional, explains the all-or-none rule and invokes automatic initialization when they are blank. The Python runtime registry describes the same contract, and regression tests cover automatic initialization and registry metadata. The model remains a shape-only two-isotropic-population parameterization with one shared projected flow; absolute density and unrestricted 3-D EVDF remain non-identifiable/not inferred. The change does not add calibration or experimental validation.
 
-Commits: `c17de1eb6756cd2388308ad8859ee649e9776748` (fit implementation), `ba91377df25d45fdfeff82f766feb5565038ca8e` (fit regression), `49256fde60415091c1e7d4210c97c090e886492b` (dashboard), `730d95f6268c8d34d9fb7bc5d6dda35c084bbc74` (runtime registry), `58fb0e7bca6f635208bb50eb1edaa80b24ef0da2` (registry regression).
+Commits: `c17de1eb6756cd2388308ad8859ee649e9776748` (fit implementation), `ba91377df25d45fdfeff82f766feb5565038ca8e` (fit regression), `49256fde60415091c1e7d4210c97c090e886492b` (dashboard), `730d95f6268c8d34d9fb7bc5d6dda35c084bbc74` (runtime registry), `58fb0e7bca6f635208bb50eb1edaa80b24ef0da2` (registry regression), `01abf52d80fad988e0333be73c21586076d63b78` (automatic-initialization regression uses the model's minimum supported quadrature orders).
 
 GitHub Actions were not triggered; software-test success is not claimed. Experimental validation was not performed or claimed.
