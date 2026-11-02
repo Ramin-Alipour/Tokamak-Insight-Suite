@@ -312,3 +312,25 @@ def test_evdf_candidate_shape_parameters_use_only_mathematical_domain_bounds(mon
     assert np.isinf(kappa_upper[3])
     assert super_lower[3] > 0.0
     assert np.isinf(super_upper[3])
+
+
+def test_evdf_uses_midpoint_finite_volume_bins_on_nonuniform_wavelength_grid():
+    from tokamak_analysis.thomson_evdf import _wavelength_bin_widths
+
+    wavelength = np.array([499.80, 499.86, 499.95, 500.00, 500.08, 500.20])
+    expected = np.array([0.03, 0.075, 0.07, 0.065, 0.10, 0.06])
+    np.testing.assert_allclose(_wavelength_bin_widths(wavelength), expected, rtol=0, atol=1e-14)
+
+    # The endpoint bins are half the adjacent interval; all bins are positive
+    # and the measure is valid for the non-uniform calibrated wavelength axis.
+    widths = _wavelength_bin_widths(wavelength)
+    assert np.all(widths > 0.0)
+    assert widths[0] == pytest.approx(0.5 * (wavelength[1] - wavelength[0]))
+    assert widths[-1] == pytest.approx(0.5 * (wavelength[-1] - wavelength[-2]))
+
+
+def test_evdf_wavelength_bin_widths_reject_nonmonotonic_axis():
+    from tokamak_analysis.thomson_evdf import _wavelength_bin_widths
+
+    with pytest.raises(ValueError, match="strictly increasing"):
+        _wavelength_bin_widths(np.array([500.0, 500.1, 500.05]))
