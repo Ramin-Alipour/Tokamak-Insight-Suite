@@ -471,7 +471,8 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
         "external_input_covariance_supplied", "external_input_covariance_order",
         "external_input_covariance_propagated", "external_input_parameter_covariance",
         "external_input_mc_successes", "external_input_mc_requested",
-        "external_input_covariance_warning",
+        "external_input_covariance_warning", "external_inputs_fixed",
+        "external_inputs_with_supplied_covariance",
     }
     assert expected_outputs <= runtime_outputs
     full_mode = next(
@@ -497,6 +498,7 @@ def test_full_em_cts_local_external_covariance_contract_matches_runtime_json_and
     assert json_inputs["external_input_covariance"]["applies_when_model"] == "full_electromagnetic"
     json_outputs = {item["name"] for item in contract["output_specs"]}
     assert expected_outputs <= json_outputs
+    assert {"external_inputs_fixed", "external_inputs_with_supplied_covariance"} <= json_outputs
     json_mode = next(
         item for item in contract["workflow_modes"]
         if item["name"] == "magnetized_full_electromagnetic_cts"
