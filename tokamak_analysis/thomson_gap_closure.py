@@ -183,13 +183,20 @@ def reconstruct_relativistic_projected_thomson_evdf(
     singular = np.linalg.svd(design, compute_uv=False)
     tol = np.finfo(float).eps*max(design.shape)*(singular[0] if singular.size else 0)
     rank = int(np.count_nonzero(singular > tol))
+    condition = (
+        float(singular[0] / singular[-1])
+        if singular.size and singular[-1] > tol else float("inf")
+    )
+    data_identifiable = bool(rank == v.size and np.isfinite(condition) and condition < 1e12)
     return {
-        "status": "completed",
+        "status": "completed" if data_identifiable else "conditional_regularized_candidate",
+        "primary_result_status": "identified_from_measurement" if data_identifiable else "not_fully_identifiable_from_measured_spectrum",
         "model": "exact_relativistic_thomson_limit_projected_1d_kinematic_inversion",
         "quantity": "Projected 1D electron velocity distribution along the scattering vector",
         "velocity_parallel_m_s": v.copy(),
-        "projected_evdf_s_m": evdf,
-        "projected_evdf_covariance": cov_evdf,
+        "projected_evdf_s_m": evdf if data_identifiable else None,
+        "regularized_candidate_evdf_s_m": evdf,
+        "projected_evdf_covariance": cov_evdf if data_identifiable else None,
         "projected_evdf_standard_uncertainty_s_m": np.sqrt(np.maximum(np.diag(cov_evdf),0)),
         "fitted_spectrum": forward@coeff,
         "residual": (y-b)-forward@coeff,
@@ -197,6 +204,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "regularization_selection": "GCV" if regularization_strength is None else "researcher_supplied",
         "gcv_scores": np.asarray(scores),
         "data_only_jacobian_rank": rank,
+        "data_only_jacobian_condition_number": condition,
+        "data_only_parameter_count": int(v.size),
         "velocity_grid_points": int(v.size),
         "noise_model": noise_status,
         "absolute_density_inferred": False,
