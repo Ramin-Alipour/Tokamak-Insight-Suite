@@ -101,3 +101,31 @@ def test_cts_api_propagates_correlated_external_inputs_through_inversion():
     )
     assert result["input_names"] == names
     assert result["external_output_covariance"][0, 0] == pytest.approx(0.15, rel=2e-6)
+
+
+def test_ion_composition_covariance_uses_additive_log_ratio_coordinates():
+    from tokamak_analysis.cts_external_uncertainty import (
+        ion_fractions_from_log_ratios,
+    )
+
+    fractions = ion_fractions_from_log_ratios(np.array([np.log(2.0), np.log(3.0)]))
+    np.testing.assert_allclose(fractions, np.array([2.0, 3.0, 1.0]) / 6.0)
+    assert np.all(fractions > 0.0)
+    assert fractions.sum() == pytest.approx(1.0)
+
+
+def test_composition_log_ratio_names_are_accepted_in_joint_covariance():
+    names = ("ion_fraction_logit_deuterium", "ion_fraction_logit_carbon")
+    covariance = np.array([[0.04, 0.015], [0.015, 0.09]])
+    returned_names, returned = validate_external_input_covariance(covariance, names)
+    assert returned_names == names
+    np.testing.assert_allclose(returned, covariance)
+
+
+def test_composition_log_ratio_transform_rejects_nonfinite_values():
+    from tokamak_analysis.cts_external_uncertainty import (
+        ion_fractions_from_log_ratios,
+    )
+
+    with pytest.raises(ValueError, match="finite real vector"):
+        ion_fractions_from_log_ratios(np.array([np.nan]))
