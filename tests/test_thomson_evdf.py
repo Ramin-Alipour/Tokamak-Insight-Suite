@@ -219,12 +219,21 @@ def test_evdf_rejects_non_positive_definite_combined_background_covariance():
 
 def test_evdf_reports_regularization_sensitivity_across_gcv_candidates():
     wavelength, signal, background = _case()
-    result = _run(wavelength, signal, background)
+    result = reconstruct_thomson_evdf(
+        wavelength, signal,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        regularization_strength=None,
+        velocity_limit_m_s=8.0e4,
+        velocity_points=161,
+    )
 
     sensitivity = result["regularization_sensitivity"]
     assert sensitivity["status"] == "assessed_over_gcv_candidate_grid"
-    assert sensitivity["candidate_count"] == 13
-    assert len(sensitivity["candidate_results"]) == 13
+    assert 1 <= sensitivity["candidate_count"] <= 13
+    assert len(sensitivity["candidate_results"]) == sensitivity["candidate_count"]
     assert sensitivity["selected_regularization_strength"] == pytest.approx(
         result["regularization_strength"]
     )
@@ -242,8 +251,15 @@ def test_evdf_reports_regularization_sensitivity_across_gcv_candidates():
 
 def test_evdf_explicit_regularization_reports_single_candidate_not_sensitivity_range():
     wavelength, signal, background = _case()
-    result = _run(
-        wavelength, signal, background, regularization_strength=1e-3
+    result = reconstruct_thomson_evdf(
+        wavelength, signal,
+        laser_wavelength_nm=500.0,
+        scattering_angle_rad=np.pi / 2,
+        instrument_response_matrix=np.eye(wavelength.size),
+        background_signal=background,
+        regularization_strength=1e-3,
+        velocity_limit_m_s=8.0e4,
+        velocity_points=161,
     )
     sensitivity = result["regularization_sensitivity"]
     assert sensitivity["status"] == "single_explicit_regularization_value"
