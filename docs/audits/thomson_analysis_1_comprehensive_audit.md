@@ -416,3 +416,11 @@ C_{y-b}=C_y+C_b-C_{yb}-C_{yb}^{T}.
 \]
 
 Background-only uncertainty is explicitly labelled as conditional on treating signal noise as not supplied; it is not represented as a complete measurement-noise budget. The API implementation, root and packaged diagnostic registries, analysis documentation and direct regression tests were updated on the main branch. This is covariance propagation conditional on researcher-supplied uncertainty inputs; it is not background estimation, detector correction, calibration or experimental validation.
+
+## Y. Rejected-primary-fit dependency gate — 2026-11-02
+
+**Confirmed defect:** the parent optical Thomson workflow invoked the spectral-distribution and projected-EVDF subanalyses even when the selected primary physical fit had been rejected. Both child workflows reuse the primary fit's nuisance-background parameters; those parameters must not be treated as a valid basis after a failed identifiability/fit-acceptance gate.
+
+**Fixed directly on main:** the parent workflow now withholds both dependent child analyses with the explicit status `unavailable_primary_fit_rejected`. It does not access or reuse the rejected fit's background coefficients. The independent public spectral-distribution API remains callable directly on a calibrated measured spectrum with its own explicitly supplied background, as documented. A regression test forces primary-fit rejection and verifies that neither child solver is called.
+
+This is an execution-dependency and result-provenance correction only. No measured data are altered, no physical model or output is invented, and no experimental validation is performed or claimed.
