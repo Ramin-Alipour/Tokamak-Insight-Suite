@@ -1023,7 +1023,8 @@ def analyze_thomson_spectra(
             channel_covariance = joint_covariance[channel_slice, channel_slice]
             ui = None
         if model == "non_collective_maxwellian":
-            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,\n                                background_model=background_model, background_degree=background_degree,\n                                background_interior_knots=background_interior_knots,\n                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+            fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
+                                background_model=background_model, background_degree=background_degree,\n                                background_interior_knots=background_interior_knots,\n                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_relativistic_maxwell_juttner":
@@ -1521,7 +1522,8 @@ def analyze_thomson_spectra(
                             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                         )
                     else:
-                        draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,\n                            background_model=background_model, background_degree=background_degree,\n                            background_interior_knots=background_interior_knots,\n                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+                        draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,
+                            background_model=background_model, background_degree=background_degree,\n                            background_interior_knots=background_interior_knots,\n                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     area_samples.append(float(draw["integrated_scattered_power_W"])
