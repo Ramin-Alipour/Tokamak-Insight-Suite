@@ -34,7 +34,7 @@ def _generalized_least_squares_smoothing_spline(
     y = observed / scale
     cov = covariance / scale**2
     eigenvalues, eigenvectors = np.linalg.eigh(0.5 * (cov + cov.T))
-    tolerance = np.finfo(float).eps * max(cov.shape) * max(float(eigenvalues[-1]), 1.0)
+    tolerance = np.finfo(float).eps * max(cov.shape) * float(eigenvalues[-1])
     if np.any(eigenvalues <= tolerance):
         raise ValueError(
             "Full-covariance GLS smoothing requires a positive-definite supplied "
