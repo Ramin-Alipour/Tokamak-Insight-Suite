@@ -192,3 +192,30 @@ def test_dashboard_exposes_conditional_path_integrated_density_inputs():
         for item in app.text_input
     )
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+
+def test_relativistic_dashboard_exposes_compton_recoil_switch():
+    wavelength = np.linspace(526.0, 538.0, 9)
+    frame = pd.DataFrame({
+        "channel_id": ["ch0"] * wavelength.size,
+        "radius_m": [0.1] * wavelength.size,
+        "wavelength_nm": wavelength,
+        "intensity": np.linspace(1.0, 2.0, wavelength.size),
+    })
+    app = _app_with_table(frame)
+    next(item for item in app.radio if item.label == "WORKSPACE").set_value("Spectral Analysis").run()
+    next(item for item in app.radio if item.label == "Workflow").set_value(
+        "Thomson multi-channel spectral inference"
+    ).run()
+    next(item for item in app.selectbox if item.label == "Physical spectral model").set_value(
+        "non_collective_relativistic_maxwell_juttner"
+    ).run()
+    recoil = next(
+        item for item in app.checkbox
+        if item.label.startswith("Include single-scattering Compton recoil")
+    )
+    assert recoil.value is False
+    recoil.set_value(True).run()
+    assert recoil.value is True
+    assert not app.exception, [str(error.value) for error in app.exception]
