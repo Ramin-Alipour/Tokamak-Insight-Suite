@@ -57,7 +57,7 @@ def reconstruct_thomson_evdf(
     The Doppler mapping uses the non-relativistic single-particle relation
     delta_omega = q dot v, with |q|/|k_i| = 2 sin(theta/2). The latent spectrum
     is convolved with the supplied measured response matrix before fitting.
-    Background and regularization strength are explicit inputs. The result is
+    The fitted background is an explicit input. Regularization strength is optional: when omitted, the solver selects it by generalized cross-validation (GCV); a finite positive value overrides that selection. The result is
     shape-normalized; absolute density is not inferred by this inverse routine.
     """
     wavelength = _finite_vector(wavelength_nm, "wavelength_nm")
