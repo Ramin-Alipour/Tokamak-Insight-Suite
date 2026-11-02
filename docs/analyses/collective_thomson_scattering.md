@@ -108,11 +108,11 @@ The electrostatic path retains its own differential-evolution, improved-genetic 
 The physical response model remains explicitly selected between the unmagnetized longitudinal electrostatic dielectric formulation and the magnetized full-electromagnetic kinetic formulation. Recent papers are used to guide bounded extensions and inversion methodology; they do not replace the underlying dielectric response equations or validate this implementation.
 
 - **CTS background subspace methods:** T. Verdier et al., “Robust monitoring of thermal and fast ions using collective Thomson scattering: Combining physics- and data-driven background estimation,” *Review of Scientific Instruments* **96** (2025), 043513, DOI: 10.1063/5.0238948. The published method uses rapidly modulated on/off CTS measurements and a physics-informed PCA approach. TIS currently implements a narrower, explicitly supplied reference-spectrum PCA nuisance subspace for the electrostatic CTS inversion. It does not claim to reproduce the paper's modulation-aware physics-informed algorithm, and reference-ensemble uncertainty is not yet propagated.
-- **CTS spectral inversion:** “Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm,” *Physics of Plasmas* (2024), DOI: 10.1063/5.0215734 The paper motivates a bounded global-search alternative and sensitivity-aware fitting. TIS's existing improved-genetic search is a separate implementation; no equivalence to the published fitness function is claimed.
+- **CTS spectral inversion:** “Spectral decomposition for collective Thomson scattering based on an improved genetic algorithm,” *Review of Scientific Instruments* **95** (2024), 093542, DOI: 10.1063/5.0215734 The paper motivates a bounded global-search alternative and sensitivity-aware fitting. TIS's existing improved-genetic search is a separate implementation; no equivalence to the published fitness function is claimed.
 - **Accuracy-driven CTS modelling and inversion:** Flocken, Korsholm & Rasmussen, “Accuracy-driven optimisation procedure for collective Thomson scattering diagnostics for fusion plasmas,” *Fusion Engineering and Design* (2026), DOI: 10.1016/j.fusengdes.2026.115845. This recent work combines ray tracing, forward modelling and Bayesian inversion with explicit nuisance parameters and repeated fits. It motivates further uncertainty-aware full-EM inference; it is not itself a new dielectric response model.
 - **Single-view fast-ion inversion:** Jiang et al., “Physically constrained data-driven inversion of 2D fast-ion velocity distributions from single view CTS spectra,” *Nuclear Fusion* **66** (2026), 056012, DOI: 10.1088/1741-4326/ae4fdc. This is a recent proposed route beyond the currently implemented projected 1-D electrostatic fast-ion VDF. A 2-D inversion must remain a separately selected, physically constrained inverse problem with explicit priors and identifiability reporting; it must not be implied by the existing 1-D API.
 
-The current reference-PCA nuisance model and existing genetic-search implementation are not described as reproductions of these papers. No experimental validation of TIS is performed or claimed.
+The electrostatic CTS genetic-search implementation now validates its controls, rejects an entirely non-finite objective population, preserves the best-so-far candidate, and returns a monotone convergence history including the initial and final populations. It uses the CTS forward-model residual objective; it is not represented as a reproduction of Zhang et al.'s paper-specific fitness function. The reference-PCA nuisance model and genetic-search implementation are not described as reproductions of the cited papers. No experimental validation of TIS is performed or claimed.
 
 ## Software tests and validation boundary
 
@@ -269,7 +269,12 @@ applied only to the physical CTS forward spectrum; the reference-derived
 background remains in detector space because it is already measured there.
 
 The result returns background_model, background_spectrum,
-background_coefficients, and background_pca_components_used.
+background_coefficients, background_coefficient_names,
+background_pca_components_used, the conditional
+background_coefficient_covariance, the propagated detector-space
+background_spectrum_covariance, and its per-frequency 1σ uncertainty.
+When spectral uncertainty is supplied, the linear nuisance covariance uses
+that weighting; otherwise it is scaled by the fitted residual variance.
 Without reference spectra, the existing single constant-offset nuisance
 model remains unchanged. This option is electrostatic-only; passing it to
 the Full-EM dispatcher is not supported.
@@ -287,7 +292,8 @@ provided by the researcher and does not infer missing modulation states.
 
 All reference spectra are treated as prepared/calibrated measurements.
 No instrument calibration, detector correction, empirical validation or
-experimental validation is performed or claimed. Uncertainty in the
-reference ensemble itself is not propagated by this conditional PCA route;
-the returned background coefficients are nuisance-fit outputs, not
-independent physical plasma parameters.
+experimental validation is performed or claimed. Uncertainty in the reference ensemble and in the estimated PCA basis itself
+is not propagated by this conditional route. The reported covariance is
+conditional on the fixed supplied PCA basis; the returned background
+coefficients remain nuisance-fit outputs, not independent physical plasma
+parameters.
