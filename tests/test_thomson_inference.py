@@ -81,6 +81,29 @@ def test_index_space_response_kernel_is_rejected_for_nonuniform_wavelength_grid(
         _response_for_channel(np.array([0.2, 0.6, 0.2]), 0, 1, x.size, x)
 
 
+def test_calibrated_1d_response_kernel_is_preserved_with_finite_window_edge_loss():
+    from tokamak_analysis.thomson_inference import _response_for_channel
+
+    wavelength = np.linspace(500.0, 510.0, 11)
+    kernel = np.array([0.2, 0.6, 0.2])
+    original = kernel.copy()
+    response = _response_for_channel(kernel, 0, 1, wavelength.size, wavelength)
+
+    np.testing.assert_array_equal(kernel, original)
+    np.testing.assert_allclose(response[:, 5], np.r_[0, 0, 0, 0, 0.2, 0.6, 0.2, 0, 0, 0, 0])
+    assert response[:, 0].sum() == pytest.approx(0.8)
+    assert response[:, -1].sum() == pytest.approx(0.8)
+    assert np.allclose(response[:, 1:-1].sum(axis=0), 1.0)
+
+
+def test_calibrated_1d_response_kernel_is_not_silently_normalized():
+    from tokamak_analysis.thomson_inference import _response_for_channel
+
+    wavelength = np.linspace(500.0, 510.0, 11)
+    with pytest.raises(ValueError, match="must already have unit total area"):
+        _response_for_channel(np.array([0.2, 0.5, 0.2]), 0, 1, wavelength.size, wavelength)
+
+
 def test_absolute_density_requires_explicit_watt_per_nm_calibration():
     x, y, _ = _spectral_case(100.0)
     with pytest.raises(ValueError, match="spectral_power_density_calibrated"):
