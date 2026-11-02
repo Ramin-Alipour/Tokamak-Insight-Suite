@@ -80,7 +80,8 @@ def relativistic_maxwell_juttner_spectrum(
     The supplied incident polarization is Lorentz-transformed into each
     electron rest frame and the polarized Thomson differential cross-section
     is evaluated there, together with incident-flux and aberration Jacobians.
-    Recoil and quantum Compton corrections are not included.
+    By default recoil is screened but not included. With include_compton_recoil=True,
+    single-scattering recoil and the polarized Klein-Nishina differential weight are included.
     """
     x = np.asarray(wavelength_nm, dtype=float)
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
@@ -583,6 +584,9 @@ def fit_relativistic_maxwell_juttner(
         "integrated_scattered_power_uncertainty_W": area_sigma,
         "integrated_scattered_power_fit_uncertainty_W": area_sigma,
         "effective_differential_cross_section_m2_sr": cross_section,
+        "recoil_included": bool(physical["recoil_included"]),
+        "scattering_cross_section_model": physical["scattering_cross_section_model"],
+        "maximum_recoil_correction_fraction": float(physical["maximum_recoil_correction_fraction_on_quadrature_support"]),
         "effective_differential_cross_section_uncertainty_m2_sr": cross_section_uncertainty,
         "power_cross_section_relative_covariance": power_cross_section_relative_covariance,
         "captured_spectral_probability_uncertainty": captured_uncertainty,
