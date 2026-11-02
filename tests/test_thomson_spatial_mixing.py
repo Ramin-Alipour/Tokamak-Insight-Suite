@@ -29,3 +29,36 @@ def test_psf_profile_inverse_rejects_invalid_covariance_and_rank():
     bad=np.eye(5); bad[-1]=bad[0]
     with pytest.raises(ValueError,match="rank deficient"):
         reconstruct_profile_with_spatial_mixing(np.ones(5),bad,radius)
+
+
+def test_psf_profile_inverse_propagates_correlated_radius_uncertainty_reproducibly():
+    radius = np.linspace(0.0, 1.0, 7)
+    profile = 2.0 + 0.3*np.sin(np.pi*radius)
+    mixing = 0.8*np.eye(7) + 0.1*np.roll(np.eye(7), 1, axis=1) + 0.1*np.roll(np.eye(7), -1, axis=1)
+    coordinate_covariance = np.eye(7)*(2.0e-5)**2
+    first = reconstruct_profile_with_spatial_mixing(
+        mixing@profile, mixing, radius, uncertainty=np.full(7, 0.02),
+        regularization_strength=1e-5, radius_covariance_m2=coordinate_covariance,
+        radius_mc_samples=40, radius_mc_seed=1234,
+    )
+    second = reconstruct_profile_with_spatial_mixing(
+        mixing@profile, mixing, radius, uncertainty=np.full(7, 0.02),
+        regularization_strength=1e-5, radius_covariance_m2=coordinate_covariance,
+        radius_mc_samples=40, radius_mc_seed=1234,
+    )
+    assert first["coordinate_uncertainty_propagation_status"] == "propagated_by_monte_carlo_with_fixed_selected_regularization"
+    assert first["coordinate_uncertainty_successful_draws"] >= 32
+    assert first["coordinate_induced_profile_covariance"].shape == (7, 7)
+    assert first["profile_covariance"] == pytest.approx(second["profile_covariance"])
+    assert np.all(np.linalg.eigvalsh(first["profile_covariance"]) >= -1e-12)
+
+
+def test_psf_profile_inverse_rejects_non_psd_radius_covariance():
+    radius = np.linspace(0.0, 1.0, 5)
+    invalid = np.eye(5)
+    invalid[0, 1] = invalid[1, 0] = 2.0
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        reconstruct_profile_with_spatial_mixing(
+            np.ones(5), np.eye(5), radius, radius_covariance_m2=invalid,
+            radius_mc_samples=20,
+        )
