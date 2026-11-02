@@ -720,6 +720,16 @@ def analyze_thomson_spectra(
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "is implemented as a separate child subanalysis of primary Analysis 1."
         )
+    if model != "non_collective_maxwellian" and (
+        background_model != "linear" or background_templates is not None
+        or background_degree != 2 or background_interior_knots != 3
+    ):
+        raise ValueError(
+            "Structured optical background bases are currently integrated only with "
+            "non_collective_maxwellian inference. Kappa and relativistic Maxwell-Juttner "
+            "fits retain their existing linear detector-background models; no silent "
+            "background-model substitution is performed."
+        )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
             "Beam-direction component uncertainty is supported only by the relativistic "
@@ -988,6 +998,12 @@ def analyze_thomson_spectra(
         )
     joint_covariance = None
     if joint_spectral_covariance is not None:
+        if model == "non_collective_maxwellian" and background_model != "linear":
+            raise ValueError(
+                "The current full channel-major GLS parameterization requires the linear "
+                "background basis. Use per-channel structured-background inference without "
+                "joint_spectral_covariance until a matching joint basis parameterization is selected."
+            )
         if model not in {"non_collective_maxwellian","non_collective_kappa","non_collective_relativistic_maxwell_juttner"}:
             raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian, non_collective_kappa, and block-diagonal non_collective_relativistic_maxwell_juttner; other physical models require model-specific joint forward models")
         joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
