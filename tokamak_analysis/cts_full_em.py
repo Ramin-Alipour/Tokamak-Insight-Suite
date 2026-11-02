@@ -1047,6 +1047,12 @@ def analyze_full_em_cts_spectrum(
                 "external_input_parameter_order references an ion species index "
                 "outside the supplied ion_species sequence"
             )
+        missing_external_inputs = [name for name in external_order if name not in external_base]
+        if missing_external_inputs:
+            raise ValueError(
+                "external_input_parameter_order references inputs absent from the supplied CTS geometry/species: "
+                + ", ".join(missing_external_inputs)
+            )
         external_draw_vectors = sample_external_input_vectors(
             np.asarray([external_base[name] for name in external_order], dtype=float),
             external_covariance, samples=external_input_mc_samples,
