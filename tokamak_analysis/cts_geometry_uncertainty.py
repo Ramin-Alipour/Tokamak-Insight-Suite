@@ -173,6 +173,18 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     output["ray_geometry_parameter_covariance"] = geometry_covariance
     output["fit_covariance"] = total_covariance
     output["parameter_uncertainties"] = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
+    uncertainty_by_name = dict(zip(names, output["parameter_uncertainties"]))
+    output["electron_density_uncertainty_m3"] = uncertainty_by_name["electron_density_m3"]
+    output["electron_temperature_uncertainty_eV"] = uncertainty_by_name["electron_temperature_eV"]
+    output["electron_flow_projection_uncertainty_m_s"] = uncertainty_by_name["electron_flow_projection_m_s"]
+    output["ion_temperature_uncertainty_eV_by_species"] = {
+        name.split(":", 1)[1]: float(uncertainty_by_name[name])
+        for name in names if name.startswith("ion_temperature_eV:")
+    }
+    output["ion_flow_projection_uncertainty_m_s_by_species"] = {
+        name.split(":", 1)[1]: float(uncertainty_by_name[name])
+        for name in names if name.startswith("ion_flow_projection_m_s:")
+    }
     output["parameter_covariance_scope"] = (
         "conditional local-fit covariance plus full-forward Monte-Carlo ray/equilibrium/beam-geometry covariance; "
         "cross-covariance with instrument-response and other external sources is not included"
