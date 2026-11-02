@@ -197,12 +197,16 @@ def test_joint_inverse_requires_explicit_measured_response_operator():
 
 
 def test_joint_maxwellian_inverse_rejects_fit_outside_nonrelativistic_domain():
-    wavelength = np.linspace(500.0, 564.0, 321)
+    wavelength = np.linspace(400.0, 560.0, 401)
     radius = np.linspace(0.0, 1.0, 3)
     mixing = np.eye(3)
-    te = np.full(3, 6000.0)
+    te = 100.0
+    flow = 0.11 * 299792458.0
     sigma = 2.0 * 532.0 * np.sqrt(te / 510998.95069) * np.sin(np.pi / 4.0)
-    spectra = np.exp(-0.5 * ((wavelength[None, :] - 532.0) / sigma[:, None]) ** 2)
+    center = 532.0 * (1.0 - 2.0 * np.sin(np.pi / 4.0) * flow / 299792458.0)
+    spectra = np.repeat(
+        np.exp(-0.5 * ((wavelength - center) / sigma) ** 2)[None, :], 3, axis=0
+    )
     out = reconstruct_joint_thomson_spatial_spectra(
         wavelength, spectra, radius, mixing,
         laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
@@ -213,5 +217,5 @@ def test_joint_maxwellian_inverse_rejects_fit_outside_nonrelativistic_domain():
     assert out["primary_result_status"] == "model_domain_rejected"
     assert out["primary_outputs_reportable_as_identified"] is False
     assert out["electron_temperature_profile_eV"] is None
-    assert np.all(out["validity_screening"]["theta_e_profile"] >= 0.01)
+    assert np.all(out["validity_screening"]["bulk_flow_beta_profile"] >= 0.1)
     assert out["optimizer_candidate"]["role"] == "numerical_candidate_not_a_measured_result"
