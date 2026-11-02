@@ -1024,6 +1024,131 @@ def test_full_em_cts_fits_electron_flow_projection_from_spectrum_without_vector(
         rtol=1e-10, atol=1e-12,
     )
 
+def test_full_em_cts_propagates_joint_local_field_geometry_and_polarization_covariance(monkeypatch):
+    import tokamak_analysis.cts_full_em as full_em
+
+    frequency = np.linspace(-1.0, 1.0, 41) * 1.0e8
+    x = np.linspace(-1.0, 1.0, frequency.size)
+
+    def synthetic_forward(*args, **kwargs):
+        field = np.asarray(kwargs["magnetic_field_T"], dtype=float)
+        geometry = kwargs["scattering_geometry"]
+        incident_pol = np.asarray(kwargs["incident_polarization"], dtype=complex)
+        spectrum = (
+            1.0
+            + 0.13 * np.log(kwargs["electron_density_m3"] / 2.0e19) * x
+            + 0.11 * np.log(kwargs["electron_temperature_eV"] / 1000.0) * x**2
+            + 0.09 * np.log(kwargs["ion_temperature_eV"]["D+"] / 500.0) * x**3
+            + 0.17 * (kwargs["electron_flow_projection_m_s"] / 1.0e6) * x**4
+            + 0.14 * (kwargs["ion_flow_projection_m_s"]["D+"] / 1.0e6) * x**5
+            + 0.04 * (field[2] - 2.0) * x**2
+            + 0.03 * (geometry["incident_direction"][1]) * x**3
+            + 0.02 * (incident_pol[1].real) * x**4
+        )
+        return {"spectral_density": spectrum}
+
+    monkeypatch.setattr(full_em, "full_em_cts_spectral_density", synthetic_forward)
+    geometry = {
+        "incident_direction": [1.0, 0.0, 0.0],
+        "scattered_direction": [np.cos(1.8), np.sin(1.8), 0.0],
+    }
+    truth = {
+        "electron_density_m3": 2.2e19,
+        "electron_temperature_eV": 1200.0,
+        "ion_temperature_eV": 700.0,
+        "electron_flow_projection_m_s": 2.2e5,
+        "ion_flow_projection_m_s": 1.6e5,
+    }
+    synthetic = synthetic_forward(
+        frequency, 140.0e9, geometry,
+        electron_density_m3=truth["electron_density_m3"],
+        electron_temperature_eV=truth["electron_temperature_eV"],
+        ion_temperature_eV={"D+": truth["ion_temperature_eV"]},
+        electron_flow_projection_m_s=truth["electron_flow_projection_m_s"],
+        ion_flow_projection_m_s={"D+": truth["ion_flow_projection_m_s"]},
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        incident_polarization=[0.0, 0.0, 1.0],
+    )["spectral_density"]
+    covariance = np.diag([1.0e-4, 1.0e-6, 1.0e-6])
+    result = full_em.analyze_full_em_cts_spectrum(
+        frequency, 2.4 * synthetic + 0.7,
+        probe_frequency_Hz=140.0e9,
+        scattering_geometry=geometry,
+        electron_density_initial_m3=2.0e19,
+        electron_temperature_initial_eV=1000.0,
+        ion_temperature_initial_eV=500.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        instrument_response=np.eye(frequency.size),
+        external_input_covariance=covariance,
+        external_input_parameter_order=[
+            "magnetic_field_T_z", "incident_direction_y",
+            "incident_polarization_real_y",
+        ],
+        external_input_mc_samples=20,
+        external_input_mc_seed=17,
+        numerical_convergence=False,
+        parameter_bounds={
+            "electron_flow_projection_m_s": [1.0e5, 8.0e5],
+            "ion_flow_projection_m_s:D+": [1.0e5, 8.0e5],
+        },
+    )
+    assert result["external_input_covariance_supplied"] is True
+    assert result["external_input_covariance_propagated"] is True
+    assert result["external_input_covariance_order"] == [
+        "magnetic_field_T_z", "incident_direction_y",
+        "incident_polarization_real_y",
+    ]
+    assert result["external_input_mc_successes"] >= 12
+    component = result["external_uncertainty_covariance_components"]["local_external_inputs"]
+    assert component.shape == result["conditional_fit_covariance"].shape
+    assert np.any(np.diag(component) > 0.0)
+    np.testing.assert_allclose(
+        result["fit_covariance"],
+        result["conditional_fit_covariance"] + component,
+        rtol=1e-10, atol=1e-12,
+    )
+
+
+def test_full_em_cts_local_external_covariance_rejects_ray_geometry_and_partial_contract():
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    frequency = np.linspace(-1.0e8, 1.0e8, 8)
+    common = dict(
+        probe_frequency_Hz=140.0e9,
+        electron_density_initial_m3=2.0e19,
+        electron_temperature_initial_eV=1000.0,
+        ion_temperature_initial_eV=500.0,
+        ion_species=[{"name": "D+", "charge_state": 1, "mass_amu": 2.014}],
+        ion_fractions=[1.0],
+        magnetic_field_T=[0.0, 0.0, 2.0],
+        incident_polarization=[0.0, 0.0, 1.0],
+        scattered_polarization=[0.0, 0.0, 1.0],
+        instrument_response=np.eye(frequency.size),
+        external_input_covariance=np.eye(1) * 1.0e-6,
+        external_input_parameter_order=["magnetic_field_T_z"],
+        external_input_mc_samples=20,
+        numerical_convergence=False,
+    )
+    with pytest.raises(ValueError, match="must be supplied together"):
+        analyze_full_em_cts_spectrum(
+            frequency, np.ones(frequency.size),
+            scattering_geometry={"incident_direction": [1, 0, 0],
+                                 "scattered_direction": [0, 1, 0]},
+            **{key: value for key, value in common.items()
+               if key != "external_input_parameter_order"},
+        )
+    with pytest.raises(ValueError, match="frequency-resolved ray/equilibrium covariance"):
+        analyze_full_em_cts_spectrum(
+            frequency, np.ones(frequency.size),
+            scattering_geometry={"frequency_resolved_geometry": [{}]},
+            **common,
+        )
+
+
 def test_electrostatic_cts_response_conserves_area_on_nonuniform_frequency_bins():
     from tokamak_analysis.cts_analysis import _convolve
 
