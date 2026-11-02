@@ -2514,42 +2514,56 @@ def analyze_thomson_spectra(
             channel_slice = slice(channel_index * y.shape[1], (channel_index + 1) * y.shape[1])
             channel_covariance = joint_covariance[channel_slice, channel_slice]
             channel_uncertainty = None
-        background_reference_nm = float(
-            channel_result.get("fitted_center_nm", laser_wavelength_nm)
-        )
-        fitted_background = (
-            float(channel_result["background_intercept"])
-            + float(channel_result["background_slope_per_nm"])
-            * (xs[channel_index] - background_reference_nm)
-        )
-        try:
-            distribution = analyze_thomson_spectral_distribution(
-                xs[channel_index],
-                y[channel_index],
-                instrument_response_matrix=channel_responses[channel_index],
-                signal_uncertainty=channel_uncertainty,
-                signal_covariance=channel_covariance,
-                background_signal=fitted_background,
-            )
-            distribution["analysis_status"] = "completed"
-            distribution["background_source"] = (
-                "background nuisance component from the selected Thomson physical forward fit"
-            )
-            distribution["interpretation"] = (
-                "Physical electron temperature and identifiable density are exposed from the selected physical forward fit of this same calibrated measured spectrum; "
-                "electron flow is reported only when identifiable in the selected model. "
-                "Wavelength-space moments and the Gaussian shape fit remain complementary spectral-shape descriptors, "
-                "not a unique arbitrary electron velocity-distribution inversion."
-            )
-        except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+        if not bool(channel_result.get("fit_accepted", False)):
             distribution = {
-                "analysis_status": "unavailable_for_this_channel",
-                "reason": str(exc),
+                "analysis_status": "unavailable_primary_fit_rejected",
+                "reason": (
+                    "The selected primary Thomson physical fit was rejected; its fitted background "
+                    "nuisance parameters are not used as a basis for same-spectrum subanalysis."
+                ),
                 "interpretation": (
-                    "The primary physical Thomson inference remains available; spectral-distribution "
-                    "diagnostics require sufficient wavelength coverage and a positive signed area/variance."
+                    "The calibrated spectrum remains available, but this parent workflow does not "
+                    "present dependent spectral-shape diagnostics as completed when the physical "
+                    "forward fit supplying their background has been rejected."
                 ),
             }
+        else:
+            background_reference_nm = float(
+                channel_result.get("fitted_center_nm", laser_wavelength_nm)
+            )
+            fitted_background = (
+                float(channel_result["background_intercept"])
+                + float(channel_result["background_slope_per_nm"])
+                * (xs[channel_index] - background_reference_nm)
+            )
+            try:
+                distribution = analyze_thomson_spectral_distribution(
+                    xs[channel_index],
+                    y[channel_index],
+                    instrument_response_matrix=channel_responses[channel_index],
+                    signal_uncertainty=channel_uncertainty,
+                    signal_covariance=channel_covariance,
+                    background_signal=fitted_background,
+                )
+                distribution["analysis_status"] = "completed"
+                distribution["background_source"] = (
+                    "background nuisance component from the selected Thomson physical forward fit"
+                )
+                distribution["interpretation"] = (
+                    "Physical electron temperature and identifiable density are exposed from the selected physical forward fit of this same calibrated measured spectrum; "
+                    "electron flow is reported only when identifiable in the selected model. "
+                    "Wavelength-space moments and the Gaussian shape fit remain complementary spectral-shape descriptors, "
+                    "not a unique arbitrary electron velocity-distribution inversion."
+                )
+            except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+                distribution = {
+                    "analysis_status": "unavailable_for_this_channel",
+                    "reason": str(exc),
+                    "interpretation": (
+                        "The primary physical Thomson inference remains available; spectral-distribution "
+                        "diagnostics require sufficient wavelength coverage and a positive signed area/variance."
+                    ),
+                }
         channel_result["spectral_distribution"] = distribution
         spectral_distribution_results.append(distribution)
 
@@ -2557,7 +2571,15 @@ def analyze_thomson_spectra(
         # from the same measured spectrum. The fitted physical-model background,
         # measured response and supplied noise covariance are reused; regularization
         # is selected by GCV rather than requested as an arbitrary user constant.
-        if not enable_evdf_reconstruction:
+        if not bool(channel_result.get("fit_accepted", False)):
+            evdf = {
+                "analysis_status": "unavailable_primary_fit_rejected",
+                "reason": (
+                    "The selected primary Thomson physical fit was rejected; its fitted background "
+                    "nuisance parameters are not used as a basis for projected-EVDF inversion."
+                ),
+            }
+        elif not enable_evdf_reconstruction:
             evdf = {
                 "analysis_status": "not_requested",
                 "reason": "EVDF reconstruction was explicitly disabled.",
