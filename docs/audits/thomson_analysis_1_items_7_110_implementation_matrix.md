@@ -214,3 +214,8 @@ Direct regression tests cover both likelihood cases. This is a statistical infer
 ## K. Projected-EVDF regularization sensitivity (2026-11-02)
 
 The projected one-dimensional EVDF inverse now summarizes numerical sensitivity across the successful candidates in its existing logarithmic GCV grid. For each candidate it reports the inferred projected mean velocity, standard deviation, skewness, excess kurtosis and total-variation distance from the selected distribution, together with the candidate GCV score. Range summaries are returned for these metrics. If a researcher explicitly supplies one regularization strength, the result is labelled as a single-candidate case and no sensitivity range is claimed. The Python output, primary diagnostic registry and packaged registry are synchronized; regression tests cover GCV and explicit-value behavior. This is a numerical robustness diagnostic, not a measurement uncertainty, posterior interval or experimental validation.
+
+
+## J. Scattering-volume local-field propagation regression (2026-11-02)
+
+A source-level trace found that the Full-EM scattering-volume loop recorded each sample's supplied local magnetic field but recursively evaluated every sample using the top-level magnetic_field_T. This made the integrated spectrum insensitive to the per-sample magnetic-field variation even though the returned field diagnostics showed that variation. The recursive forward call now receives that sample's own magnetic_field_T. A regression test independently evaluates each local sample and checks the weighted, path-overlap-scaled spectrum against the integrated result. This closes the local-field propagation defect only; the declared spatially uniform fitted plasma-parameter assumption remains unchanged.
