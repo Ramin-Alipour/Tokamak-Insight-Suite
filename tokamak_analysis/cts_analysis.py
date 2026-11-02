@@ -168,7 +168,17 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
             )[0]))
         return np.asarray(spectra, dtype=float)
     ne=_positive(electron_density_m3,"electron_density_m3"); te=_positive(electron_temperature_eV,"electron_temperature_eV")
-    ti=_positive(ion_temperature_eV,"ion_temperature_eV"); ions=_species(ion_species,ion_fractions)
+    ions=_species(ion_species,ion_fractions)
+    ti_raw=np.asarray(ion_temperature_eV)
+    if ti_raw.dtype.kind not in "iuf" or ti_raw.ndim>1:
+        raise ValueError("ion_temperature_eV must be a positive scalar or one positive value per ion species")
+    if ti_raw.ndim==0:
+        ti_values=np.full(len(ions),_positive(float(ti_raw),"ion_temperature_eV"),dtype=float)
+    else:
+        ti_values=_array(ti_raw,"ion_temperature_eV",1)
+        if ti_values.shape!=(len(ions),) or np.any(ti_values<=0):
+            raise ValueError("ion_temperature_eV vector must contain one positive value per ion species")
+    ti=float(ti_values[0]) if np.allclose(ti_values,ti_values[0]) else ti_values.copy()
     if electron_velocity_projection_m_s is None:
         raise ValueError("electron_velocity_projection_m_s must be supplied explicitly; use 0.0 only to declare a stationary-electron-flow assumption")
     if ion_velocity_projection_m_s is None:
@@ -200,7 +210,7 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
             hot=(idx,hf,"maxwellian",ht)
     for i,s in enumerate(ions):
         ni=s["fraction"]*ne/s["Z"]; hf=hot[1] if hot and hot[0]==i else 0.
-        cb,fb=_component(om,k,ni*(1-hf),ti,s["mass"],s["Z"],ui); total+=cb
+        cb,fb=_component(om,k,ni*(1-hf),float(ti_values[i]),s["mass"],s["Z"],ui); total+=cb
         if ni*(1-hf)>0: terms.append((s["Z"]**2*ni*(1-hf)/ne,cb,fb))
         if hf:
             if hot[2]=="tabulated":
@@ -694,7 +704,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         external_order = [str(item) for item in external_parameter_order]
         allowed_covariance_names = {"probe_frequency_Hz", "scattering_angle_rad"} | {
             f"ion_fraction_{i}" for i in range(len(ions))
-        }
+        } | {f"ion_mass_amu_{i}" for i in range(len(ions))} | {
+            f"ion_charge_state_{i}" for i in range(len(ions))
+        } | {f"ion_temperature_eV_{i}" for i in range(len(ions))}
         if len(set(external_order)) != len(external_order) or set(external_order)-allowed_covariance_names:
             raise ValueError("external_parameter_order contains duplicate or unsupported names")
         external_covariance = _array(external_parameter_covariance, "external_parameter_covariance", 2)
@@ -740,11 +752,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             else:
                 d["fast_ion"]={"species_index":fast["species_index"],"fraction":p[5],"kind":"maxwellian","temperature_eV":10**p[6]}
         return d
-    def forward(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
+    def forward(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None, species_override=None, temperatures_override=None):
         d=decode(p); z=cts_spectral_density(f,f0 if probe_frequency is None else probe_frequency,
           scattering_geometry if geometry_override is None else geometry_override,electron_density_m3=d["electron_density_m3"],
-          electron_temperature_eV=d["electron_temperature_eV"],ion_temperature_eV=d["ion_temperature_eV"],
-          ion_species=ion_species,ion_fractions=ion_fractions if fractions_override is None else fractions_override,
+          electron_temperature_eV=d["electron_temperature_eV"],ion_temperature_eV=d["ion_temperature_eV"] if temperatures_override is None else temperatures_override,
+          ion_species=ion_species if species_override is None else species_override,ion_fractions=ion_fractions if fractions_override is None else fractions_override,
           ion_velocity_projection_m_s=d["ion_velocity_projection_m_s"],
           electron_velocity_projection_m_s=d["electron_velocity_projection_m_s"] if electron_flow is None else electron_flow,
           fast_ion=d.get("fast_ion"))
@@ -762,8 +774,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             coefficients = np.linalg.lstsq(whiten(nuisance), whiten(y), rcond=None)[0]
         background = nuisance @ coefficients
         return amp, background, coefficients
-    def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None):
-        z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override)
+    def data_residual(p, response_matrix=None, probe_frequency=None, electron_flow=None, geometry_override=None, fractions_override=None, species_override=None, temperatures_override=None):
+        z=forward(p,response_matrix,probe_frequency,electron_flow,geometry_override,fractions_override,species_override,temperatures_override)
         amp,background,_=profile_amplitude(z)
         return whiten(amp*z+background-y)
     def regularization_terms(p):
@@ -995,6 +1007,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             if external_covariance is not None:
                 external_draw=external_root @ rng.normal(size=len(external_order))
                 sampled_angle=None
+                sampled_species=[dict(item) for item in ion_species]
+                sampled_temperatures=ti_values.copy()
                 for key, perturbation in zip(external_order, external_draw):
                     if key == "probe_frequency_Hz":
                         sampled_f0 += float(perturbation)
@@ -1003,6 +1017,18 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                     elif key.startswith("ion_fraction_"):
                         index=int(key.rsplit("_",1)[1])
                         sampled_fractions[index] += float(perturbation)
+                    elif key.startswith("ion_mass_amu_"):
+                        index=int(key.rsplit("_",1)[1])
+                        sampled_species[index]["mass_amu"]=float(sampled_species[index]["mass_amu"])+float(perturbation)
+                    elif key.startswith("ion_charge_state_"):
+                        index=int(key.rsplit("_",1)[1])
+                        sampled_species[index]["charge_state"]=float(sampled_species[index]["charge_state"])+float(perturbation)
+                    elif key.startswith("ion_temperature_eV_"):
+                        index=int(key.rsplit("_",1)[1])
+                        sampled_temperatures[index]+=float(perturbation)
+                if (any(float(item["mass_amu"])<=0 or float(item["charge_state"])<=0 for item in sampled_species)
+                        or np.any(sampled_temperatures<=0)):
+                    continue
                 if sampled_angle is not None:
                     if not 0<sampled_angle<=np.pi: continue
                     sampled_geometry=dict(scattering_geometry)
@@ -1020,7 +1046,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             if sampled_f0<=0: continue
             try:
                 def sampled_residual(p):
-                    data=data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions)
+                    data=data_residual(p,sampled,sampled_f0,sampled_electron_flow,sampled_geometry,sampled_fractions,sampled_species,sampled_temperatures)
                     penalties=regularization_terms(p)
                     return np.concatenate([data,*penalties]) if penalties else data
                 draw=least_squares(sampled_residual,fit.x,bounds=(lo,hi),x_scale="jac",max_nfev=2500)
