@@ -1004,9 +1004,10 @@ def analyze_full_em_cts_spectrum(
             ("incident_direction", scattering_geometry.get("incident_direction")),
             ("scattered_direction", scattering_geometry.get("scattered_direction")),
         ):
-            vec = _vec3(vector, kind)
-            for axis, value in zip("xyz", vec):
-                external_base[f"{kind}_{axis}"] = float(value)
+            if vector is not None:
+                vec = _vec3(vector, kind)
+                for axis, value in zip("xyz", vec):
+                    external_base[f"{kind}_{axis}"] = float(value)
         frequency_records = scattering_geometry.get("frequency_resolved_geometry")
         if frequency_records is not None:
             if not isinstance(frequency_records, Sequence) or isinstance(frequency_records, (str, bytes)):
