@@ -49,6 +49,8 @@ def validate_external_input_covariance(covariance, parameter_order):
         isinstance(name, str) and (
             name in SUPPORTED_LOCAL_COMPONENTS
             or re.fullmatch(r"ion_(?:fraction|mass_amu|charge_state)_\d+", name) is not None
+            or re.fullmatch(r"ray_\\d+_\\d+_(?:magnetic_field_T|incident_direction|scattered_direction)_[xyz]", name) is not None
+            or re.fullmatch(r"ray_\\d+_beam_overlap_relative", name) is not None
         )
         for name in order
     )
