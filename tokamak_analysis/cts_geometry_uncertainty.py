@@ -169,9 +169,11 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     if geometry_covariance.shape != conditional_covariance.shape or not np.all(np.isfinite(geometry_covariance)):
         diagnostics["warning"] = "Geometry sample covariance is invalid; no covariance was reported."
         return output
-    response_covariance = np.asarray(
-        baseline.get("instrument_response_parameter_covariance", np.zeros_like(conditional_covariance)),
-        dtype=float,
+    response_covariance_value = baseline.get("instrument_response_parameter_covariance")
+    response_covariance = (
+        np.zeros_like(conditional_covariance)
+        if response_covariance_value is None
+        else np.asarray(response_covariance_value, dtype=float)
     )
     if response_covariance.shape != conditional_covariance.shape or not np.all(np.isfinite(response_covariance)):
         raise ValueError("baseline instrument-response covariance does not match the fitted parameter vector")
