@@ -1308,6 +1308,10 @@ def analyze_full_em_cts_spectrum(
         "wave_tensor": forward_diagnostics["wave_tensor"],
         "forward_model_diagnostics": forward_diagnostics,
     }
+    # Preserve the fit-only covariance before adding any supplied external-response component.
+    # This lets downstream users distinguish conditional fit uncertainty from propagated inputs.
+    out["conditional_fit_covariance"] = covariance.copy()
+    out["external_uncertainty_covariance_components"] = {}
     out["instrument_response_uncertainty_supplied"] = response_sigma is not None
     out["instrument_response_uncertainty_propagated"] = False
     if response_sigma is not None:
@@ -1334,7 +1338,12 @@ def analyze_full_em_cts_spectrum(
             response_covariance = np.cov(np.asarray(response_draws), rowvar=False, ddof=1)
             covariance = covariance + response_covariance
             out["instrument_response_parameter_covariance"] = response_covariance
+            out["external_uncertainty_covariance_components"]["instrument_response"] = response_covariance
             out["fit_covariance"] = covariance
+            out["parameter_covariance_scope"] = (
+                "total covariance = conditional local-fit covariance + supplied instrument-response Monte Carlo covariance; "
+                "cross-covariances with other external inputs are not included"
+            )
             out["parameter_uncertainties"] = np.sqrt(np.maximum(np.diag(covariance), 0.0))
             out["electron_flow_projection_uncertainty_m_s"] = float(np.sqrt(max(covariance[2,2], 0.0)))
             out["ion_flow_projection_uncertainty_m_s_by_species"] = {
