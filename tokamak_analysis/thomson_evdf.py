@@ -683,3 +683,7 @@ def reconstruct_thomson_evdf(
             "The routine does not infer absolute density or correct/calibrate measured spectra.",
         ],
     }
+
+
+# Exact relativistic Thomson-limit projected-marginal inverse (separate from the non-relativistic routine).
+from .thomson_gap_closure import reconstruct_relativistic_projected_thomson_evdf
