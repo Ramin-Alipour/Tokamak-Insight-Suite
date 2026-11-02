@@ -615,3 +615,143 @@ def track_cold_plasma_modes_from_operators(
             "The sequence ordering must correspond to the physical frequency/ray sampling order.",
         ],
     }
+
+
+def propagate_cold_plasma_mode_coupling(
+    wave_operator_sequence,
+    path_coordinate_m,
+    propagation_constants_rad_m,
+    initial_mode_amplitudes,
+    *,
+    degeneracy_relative_tolerance=1e-7,
+):
+    """Propagate coherent mode amplitudes through a sampled cold-plasma path.
+
+    The supplied Hermitian Maxwell wave operators define the local polarization
+    basis. The caller supplies the physical path coordinate and the three
+    local propagation constants (rad/m), since eigenvalues of the wave
+    operator are not themselves propagation constants. The evolution is the
+    lossless, flux-normalized coupled-mode system
+
+        d a / ds = -[U^H dU/ds + i diag(beta)] a,
+
+    discretized with a unitary midpoint propagator. The polarization frame is
+    parallel-transported between samples; exact/near-degenerate eigenspaces
+    are aligned as subspaces by unitary Procrustes transport. Individual mode
+    labels inside a degenerate subspace remain gauge-dependent, while total
+    power in that subspace is invariant.
+
+    This is a local cold-plasma coupled-mode model. It does not include
+    absorption, collisions, reflection at turning points, diffraction,
+    nonlinear coupling, or unresolved resonant-layer physics. The input path,
+    wave operators and propagation constants must describe the same physical
+    ray/path. No equilibrium or path is inferred.
+    """
+    from scipy.linalg import expm, logm
+    from scipy.optimize import linear_sum_assignment
+
+    operators = np.asarray(wave_operator_sequence, dtype=complex)
+    path = np.asarray(path_coordinate_m, dtype=float)
+    beta = np.asarray(propagation_constants_rad_m, dtype=float)
+    amplitudes0 = np.asarray(initial_mode_amplitudes, dtype=complex)
+    if operators.ndim != 3 or operators.shape[0] < 2 or operators.shape[1:] != (3, 3):
+        raise ValueError("wave_operator_sequence must have shape (n_sample>=2, 3, 3)")
+    n = operators.shape[0]
+    if path.shape != (n,) or not np.all(np.isfinite(path)) or np.any(np.diff(path) <= 0):
+        raise ValueError("path_coordinate_m must be finite, strictly increasing and match the operator samples")
+    if beta.shape != (n, 3) or not np.all(np.isfinite(beta)):
+        raise ValueError("propagation_constants_rad_m must have shape (n_sample, 3) and be finite")
+    if amplitudes0.shape != (3,) or not np.all(np.isfinite(amplitudes0)):
+        raise ValueError("initial_mode_amplitudes must be a finite complex 3-vector")
+    tolerance = float(degeneracy_relative_tolerance)
+    if not np.isfinite(tolerance) or tolerance <= 0:
+        raise ValueError("degeneracy_relative_tolerance must be positive and finite")
+    if np.any(np.abs(np.imag(np.diagonal(operators, axis1=1, axis2=2))) > 1e-10):
+        raise ValueError("wave operators must be Hermitian")
+    eigvals = np.empty((n, 3), dtype=float)
+    frames = np.empty((n, 3, 3), dtype=complex)
+    degenerate = np.zeros(n, dtype=bool)
+    subspace_power = []
+    for j, raw in enumerate(operators):
+        h = 0.5 * (raw + raw.conj().T)
+        vals, vecs = np.linalg.eigh(h)
+        scale = max(float(np.max(np.abs(vals))), np.finfo(float).tiny)
+        groups = []
+        start = 0
+        for q in range(2):
+            if abs(vals[q + 1] - vals[q]) > tolerance * scale:
+                groups.append(np.arange(start, q + 1))
+                start = q + 1
+        groups.append(np.arange(start, 3))
+        degenerate[j] = any(len(g) > 1 for g in groups)
+        if j == 0:
+            frame = vecs.copy()
+        else:
+            # Match individual isolated modes by maximum total polarization overlap.
+            overlap = np.abs(frames[j - 1].conj().T @ vecs) ** 2
+            rows, cols = linear_sum_assignment(-overlap)
+            order = cols[np.argsort(rows)]
+            frame = vecs[:, order].copy()
+            # Align each vector's arbitrary complex phase.
+            for m in range(3):
+                z = np.vdot(frames[j - 1, :, m], frame[:, m])
+                if abs(z) > 0:
+                    frame[:, m] *= np.exp(-1j * np.angle(z))
+            # Within a degenerate cluster, transport the whole subspace by
+            # the unitary polar factor, avoiding arbitrary eigensolver rotations.
+            for group in groups:
+                if len(group) > 1:
+                    previous_group = frames[j - 1][:, group]
+                    current_group = frame[:, group]
+                    u, _, vh = np.linalg.svd(current_group.conj().T @ previous_group)
+                    frame[:, group] = current_group @ (u @ vh)
+        frames[j] = frame
+        eigvals[j] = vals[np.argsort(np.arange(3))] if j == 0 else vals[order]
+    state = amplitudes0.copy()
+    amplitudes = np.empty((n, 3), dtype=complex)
+    amplitudes[0] = state
+    coupling = np.zeros((n - 1, 3, 3), dtype=complex)
+    for j in range(n - 1):
+        ds = float(path[j + 1] - path[j])
+        overlap = frames[j].conj().T @ frames[j + 1]
+        # The unitary polar factor removes finite-step non-unitarity from
+        # discretization before taking the anti-Hermitian connection.
+        u, _, vh = np.linalg.svd(overlap)
+        transport = u @ vh
+        connection = logm(transport) / ds
+        connection = 0.5 * (connection - connection.conj().T)
+        beta_mid = 0.5 * (beta[j] + beta[j + 1])
+        generator = -connection - 1j * np.diag(beta_mid)
+        step = expm(generator * ds)
+        state = step @ state
+        amplitudes[j + 1] = state
+        coupling[j] = connection
+    powers = np.abs(amplitudes) ** 2
+    total_power = np.sum(powers, axis=1)
+    initial_power = float(np.sum(np.abs(amplitudes0) ** 2))
+    conservation_error = float(np.max(np.abs(total_power - initial_power)))
+    return {
+        "path_coordinate_m": path.copy(),
+        "mode_amplitudes": amplitudes,
+        "mode_powers": powers,
+        "total_mode_power": total_power,
+        "mode_conversion_matrix_connection_per_m": coupling,
+        "local_wave_operator_eigenvalues": eigvals,
+        "parallel_transported_polarization_frames": frames,
+        "degenerate_subspace_detected": degenerate,
+        "degenerate_subspace_power": np.sum(powers[:, :], axis=1),
+        "mode_conversion_model": "lossless_flux_normalized_cold_plasma_coupled_mode_equation",
+        "coupled_mode_equation": "d(a)/ds = -[U^H dU/ds + i diag(beta)] a",
+        "power_conservation_max_abs_error": conservation_error,
+        "assumptions": [
+            "Hermitian local cold-plasma Maxwell operator and flux-normalized modes.",
+            "Caller-supplied propagation constants and ordered physical path coordinate.",
+            "Piecewise-smooth path and sufficiently resolved operator sampling.",
+            "No absorption, collisions, reflections, diffraction, nonlinear coupling or unresolved resonant layers."
+        ],
+        "limitations": [
+            "At exact degeneracy, individual labels inside the degenerate subspace are basis-dependent; only subspace power is invariant.",
+            "This is not a substitute for full-wave boundary-value modelling at cutoffs, resonances or turning points.",
+            "No experimental validation is performed."
+        ],
+    }
