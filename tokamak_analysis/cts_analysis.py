@@ -258,8 +258,12 @@ def _improved_genetic_search(objective, bounds, *, seed=1729, population_size=32
 def _whitener(covariance, n, uncertainty):
     if covariance is not None:
         cov = _array(covariance, "spectral_covariance", 2)
-        if cov.shape != (n, n) or not np.allclose(cov, cov.T, rtol=1e-9, atol=1e-12):
+        if cov.shape != (n, n):
             raise ValueError("spectral_covariance must be a symmetric n_frequency x n_frequency matrix")
+        covariance_scale = float(np.max(np.abs(cov)))
+        asymmetry = float(np.max(np.abs(cov - cov.T)))
+        if asymmetry > 1e-9 * covariance_scale:
+            raise ValueError("spectral_covariance must be symmetric to a scale-relative tolerance")
         try:
             chol = np.linalg.cholesky(cov)
         except np.linalg.LinAlgError as exc:
