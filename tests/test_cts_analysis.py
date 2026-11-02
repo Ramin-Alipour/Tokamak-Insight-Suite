@@ -1580,3 +1580,42 @@ def test_cts_reference_pca_background_requires_explicit_component_count():
             instrument_response=response,
             background_reference_spectra=references,
         )
+
+
+def test_cts_improved_genetic_search_history_includes_initial_and_final_best():
+    from tokamak_analysis.cts_analysis import _improved_genetic_search
+
+    objective = lambda p: float((p[0]-0.25)**2 + (p[1]+0.4)**2)
+    best, score, history = _improved_genetic_search(
+        objective, [(-1.0, 1.0), (-1.0, 1.0)],
+        seed=19, population_size=24, generations=12,
+    )
+    assert history.shape == (13,)
+    assert np.all(np.diff(history) <= 0.0)
+    assert history[-1] == pytest.approx(score)
+    assert score == pytest.approx(objective(best))
+
+
+@pytest.mark.parametrize("kwargs,match", [
+    ({"population_size": 3}, "population_size"),
+    ({"generations": 0}, "generations"),
+    ({"seed": 1.5}, "seed"),
+])
+def test_cts_improved_genetic_search_rejects_invalid_controls(kwargs, match):
+    from tokamak_analysis.cts_analysis import _improved_genetic_search
+
+    with pytest.raises(ValueError, match=match):
+        _improved_genetic_search(
+            lambda p: float(np.dot(p, p)), [(-1.0, 1.0)],
+            **kwargs,
+        )
+
+
+def test_cts_improved_genetic_search_rejects_all_nonfinite_objective():
+    from tokamak_analysis.cts_analysis import _improved_genetic_search
+
+    with pytest.raises(ValueError, match="entire population"):
+        _improved_genetic_search(
+            lambda p: np.inf, [(-1.0, 1.0)],
+            seed=3, population_size=8, generations=2,
+        )
