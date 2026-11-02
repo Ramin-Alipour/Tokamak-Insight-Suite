@@ -48,7 +48,7 @@ def validate_external_input_covariance(covariance, parameter_order):
     supported = all(
         isinstance(name, str) and (
             name in SUPPORTED_LOCAL_COMPONENTS
-            or re.fullmatch(r"ion_(?:fraction|mass_amu|charge_state)_\\d+", name) is not None
+            or re.fullmatch(r"ion_(?:fraction|mass_amu|charge_state)_\d+", name) is not None
         )
         for name in order
     )
