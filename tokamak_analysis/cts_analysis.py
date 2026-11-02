@@ -127,6 +127,25 @@ def cts_spectral_density(frequency_shift_Hz,probe_frequency_Hz,scattering_geomet
     electron-flow assumption is intentionally selected by the caller.
     """
     f=_array(frequency_shift_Hz,"frequency_shift_Hz",1); f0=_positive(probe_frequency_Hz,"probe_frequency_Hz")
+    if isinstance(scattering_geometry, Mapping) and "frequency_resolved_geometry" in scattering_geometry:
+        entries=scattering_geometry["frequency_resolved_geometry"]
+        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)) or len(entries) != f.size:
+            raise ValueError("frequency_resolved_geometry must contain exactly one geometry mapping per frequency-shift sample")
+        spectra=[]
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, Mapping) or "frequency_resolved_geometry" in entry:
+                raise ValueError(f"frequency_resolved_geometry[{index}] must be a single-frequency geometry mapping")
+            spectra.append(float(cts_spectral_density(
+                np.asarray([f[index]]), f0, entry,
+                electron_density_m3=electron_density_m3,
+                electron_temperature_eV=electron_temperature_eV,
+                ion_temperature_eV=ion_temperature_eV,
+                ion_species=ion_species, ion_fractions=ion_fractions,
+                ion_velocity_projection_m_s=ion_velocity_projection_m_s,
+                electron_velocity_projection_m_s=electron_velocity_projection_m_s,
+                fast_ion=fast_ion,
+            )[0]))
+        return np.asarray(spectra, dtype=float)
     ne=_positive(electron_density_m3,"electron_density_m3"); te=_positive(electron_temperature_eV,"electron_temperature_eV")
     ti=_positive(ion_temperature_eV,"ion_temperature_eV"); ions=_species(ion_species,ion_fractions)
     if electron_velocity_projection_m_s is None:
