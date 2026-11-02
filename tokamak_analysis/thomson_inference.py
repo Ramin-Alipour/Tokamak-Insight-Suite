@@ -1084,7 +1084,6 @@ def analyze_thomson_spectra(
                 incident_polarization=incident_polarization,
                 maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
                 include_compton_recoil=include_compton_recoil,
-                include_compton_recoil=include_compton_recoil,
             )
         elif model == "collective_kappa":
             fit = fit_collective_kappa(
