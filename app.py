@@ -972,6 +972,7 @@ elif page=='Spectral Analysis':
             relativistic_scattered_direction_text=None
             relativistic_polarization_text=None
             relativistic_recoil_limit_text=None
+            relativistic_include_compton_recoil=False
             relativistic_incident_direction_unc_text=None
             relativistic_scattered_direction_unc_text=None
             relativistic_polarization_unc_text=None
@@ -990,7 +991,12 @@ elif page=='Spectral Analysis':
                     'Maximum accepted no-recoil Compton correction fraction (default 1%)',
                     value='0.01',key='ts_infer_rel_recoil_limit',
                 )
-                st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. It evaluates the maximum represented electron-rest-frame Compton correction and rejects spectra above this explicit fractional limit. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
+                relativistic_include_compton_recoil=st.checkbox(
+                    'Include single-scattering Compton recoil and polarized Klein–Nishina weighting',
+                    value=False,key='ts_infer_include_compton_recoil',
+                    help='When enabled, use the recoil-corrected photon kinematics and polarized Klein–Nishina differential cross-section. This is not multiple scattering or a general relativistic EVDF inverse.',
+                )
+                st.caption('The relativistic fit Monte-Carlo propagates supplied laser wavelength, scattering geometry, beam-direction and incident-polarization uncertainties. With recoil disabled, the maximum represented electron-rest-frame Compton correction is screened against the explicit limit. With recoil enabled, the forward model uses single-scattering Klein–Nishina physics. Beam-direction uncertainty and scalar scattering-angle uncertainty are alternative geometry descriptions and cannot be supplied together.')
             absolute_density=st.checkbox('Also infer absolute electron density from calibrated W/nm intensity and supplied optical geometry',value=False,disabled=joint_spatial_spectral,key='ts_infer_absolute_density')
             if joint_spatial_spectral:
                 absolute_density=False
@@ -1210,6 +1216,7 @@ elif page=='Spectral Analysis':
                             relativistic_recoil_limit_text,'Maximum no-recoil Compton correction fraction',
                             minimum=1e-12,maximum=0.999999,
                         )
+                        kwargs['include_compton_recoil']=bool(relativistic_include_compton_recoil)
                     if absolute_density:
                         kwargs.update({
                             'laser_power_w':_parse_ts_scalar(laser_power_text,'Laser power',minimum=1e-30),
