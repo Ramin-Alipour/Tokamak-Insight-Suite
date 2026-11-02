@@ -46,6 +46,16 @@ def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     assert set(out["parametric_model_comparison"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
     assert set(out["parametric_models"]) == {"maxwellian", "kappa_student_t", "super_gaussian"}
     assert all("aic" in item and "bic" in item for item in out["parametric_model_comparison"].values())
+    # Without supplied noise, the residual variance is estimated and the
+    # conventional Gaussian information-criterion form includes n*log(RSS/n).
+    for item in out["parametric_model_comparison"].values():
+        n = signal.size
+        k = len(item["parameters"])
+        rss = item["weighted_residual_sum_squares"]
+        expected = n * np.log(max(rss, np.finfo(float).tiny) / n)
+        assert item["information_criterion_likelihood"] == "unknown_common_residual_variance_estimated_from_unweighted_residuals"
+        assert item["aic"] == pytest.approx(expected + 2 * k)
+        assert item["bic"] == pytest.approx(expected + k * np.log(n))
 
 
 def test_evdf_selects_regularization_by_gcv_and_reports_conditional_covariance():
@@ -87,6 +97,14 @@ def test_evdf_parametric_comparison_reports_conditional_parameter_uncertainty():
     }
     assert fit["parameter_covariance_interpretation"].startswith("Local linearized covariance")
     assert fit["parameter_one_sigma_intervals"]["mean_velocity_parallel_m_s"] is not None
+    # Supplied measurement uncertainty defines a known Gaussian likelihood:
+    # AIC/BIC use chi-square, not the unknown-variance n*log(RSS/n) form.
+    n = signal.size
+    k = len(fit["parameters"])
+    rss = fit["weighted_residual_sum_squares"]
+    assert fit["information_criterion_likelihood"] == "known_measurement_covariance_gaussian_likelihood_up_to_parameter_independent_constant"
+    assert fit["aic"] == pytest.approx(rss + 2 * k)
+    assert fit["bic"] == pytest.approx(rss + k * np.log(n))
 
 
 def test_evdf_requires_explicit_positive_regularization_and_response():
