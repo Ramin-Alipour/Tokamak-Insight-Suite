@@ -58,7 +58,7 @@
 
 | Item | Current evidence/status | Required action |
 |---:|---|---|
-| 37 | `partially_implemented` — full channel-major GLS exists for Maxwellian/Kappa, not relativistic Maxwell–Jüttner. | Add relativistic multi-channel GLS only after a stable joint optimizer/covariance implementation; otherwise keep explicit limitation. |
+| 37 | `implemented_and_tested` — full channel-major GLS including cross-channel spectral covariance is now implemented for Maxwellian, finite-variance Kappa and relativistic Maxwell–Jüttner. The relativistic API is `fit_relativistic_maxwell_juttner_channels`; regression coverage is in `tests/test_thomson_mj_multichannel.py`. | Retain the common-parameter-across-channels assumption, declared channel-major covariance ordering, positive-definite covariance requirement and rank/conditioning rejection. This closes the spectral GLS gap, not all external-parameter uncertainty gaps. |
 | 38 | `implemented_and_tested` — relativistic branch uses channel-local fit covariance plus supported external/response Monte Carlo. | Do not claim cross-channel spectral GLS. |
 | 39 | `conditional_on_explicit_inputs` — cross-channel covariance requires supplied shared covariance. | Keep independent pointwise-noise assumption explicit when covariance absent. |
 | 40 | `implemented_and_tested` — unweighted fit is distinguished when noise is absent. | Preserve residual-scaled covariance caveat. |
