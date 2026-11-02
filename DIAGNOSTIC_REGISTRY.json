@@ -4256,8 +4256,8 @@
     "diagnostic": "Collective Thomson / coherent scattering (CTS)",
     "quantities": "Electron density and temperature; independently inferred temperature for each supplied thermal ion species in full-EM inversion; projected flow in the electrostatic model; optional relativistic Maxwell-Juttner or non-Maxwellian gyrotropic electron and fast-ion response/second-order scattering vertices when their measured-distribution inputs are supplied.",
     "status": "D",
-    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family.",
-    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms.",
+    "method": "Explicit electrostatic longitudinal or magnetized full-electromagnetic CTS selection. The full-EM path combines species-resolved thermal-ion Maxwellian response, relativistic Maxwell-Juttner, bi-Gaussian or tabulated gyrotropic momentum-space Vlasov response and Klimontovich noise for explicitly supplied non-Maxwellian electrons/fast ions, a second-order relativistic Vlasov three-wave vertex, the Bindslev low-temperature bulk-electron closure when the electron distribution is Maxwellian, and optional frequency-resolved cold-plasma ray tracing with path-integrated Gaussian scattering-volume weighting. This CTS entry point is a subanalysis of primary Analysis 1, not a separate primary diagnostic family. Electrostatic CTS optionally fits a fixed detector-space PCA nuisance background from explicitly supplied calibrated background-only reference spectra on the same frequency grid; the number of retained components is researcher-selected. The Full-EM branch does not accept this option.",
+    "caveat": "The relativistic second-order vertex is a homogeneous local kinetic model with prescribed gyrotropic distributions and Lorentzian resonance broadening; it is not a fully spatially inhomogeneous relativistic wave solver. Ray tracing is cold-plasma geometrical optics and integrates caller-supplied local Gaussian beam covariance along the incident ray using nearest receiver-ray samples; diffraction, mode conversion, covariance propagation and absolute received-power normalization remain outside scope. Fitted ne/Te/Ti are assumed uniform across the sampled scattering volume, while local B and wave directions vary. Bulk Maxwellian electron scattering retains the low-temperature Bindslev vertex. Optical Thomson and microwave CTS are distinct physical branches within the same primary Analysis 1 family. The optional local external-input covariance is limited to local B, direction and polarization components; it is not a ray/equilibrium/beam covariance model, and covariance components from distinct external sources are added without cross-source cross terms. Reference-spectrum PCA background is conditional on the supplied calibrated reference ensemble; reference-ensemble uncertainty is not propagated and this is not the full physics-informed PCA method of Verdier et al. (Rev. Sci. Instrum. 96, 043513, 2025; DOI 10.1063/5.0238948).",
     "implementation_functions": [
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
       "tokamak_analysis.cts_analysis.analyze_cts_spectrum",
@@ -5482,6 +5482,42 @@
     ],
     "limitations": [
       "Full-EM local external-input covariance supports local magnetic-field, direction and complex-polarization components only; frequency-resolved ray/equilibrium/beam covariance and cross-source covariance are not represented."
+    ],
+    "inputs": [
+      {
+        "name": "background_reference_spectra",
+        "unit": "calibrated background-only spectra; reference x frequency",
+        "required": false,
+        "description": "Electrostatic CTS only. At least two calibrated reference spectra on the same frequency grid and detector scale as spectrum. Used unchanged to derive a fixed PCA nuisance subspace; not recalibrated or baseline-subtracted."
+      },
+      {
+        "name": "background_components",
+        "unit": "positive integer PCA component count",
+        "required": false,
+        "description": "Required when background_reference_spectra is supplied. Researcher-selected count; must not exceed the numerical rank or min(n_reference-1,n_frequency)."
+      }
+    ],
+    "outputs": [
+      {
+        "name": "background_model",
+        "unit": "model identifier",
+        "description": "constant_offset or reference_spectrum_PCA"
+      },
+      {
+        "name": "background_spectrum",
+        "unit": "calibrated spectral-power units",
+        "description": "Fitted detector-space background nuisance spectrum."
+      },
+      {
+        "name": "background_coefficients",
+        "unit": "linear nuisance coefficients",
+        "description": "Fitted coefficients for the reference mean and retained PCA modes, or the constant offset."
+      },
+      {
+        "name": "background_pca_components_used",
+        "unit": "integer",
+        "description": "Number of researcher-selected PCA modes; zero when no reference ensemble is supplied."
+      }
     ]
   },
   {
