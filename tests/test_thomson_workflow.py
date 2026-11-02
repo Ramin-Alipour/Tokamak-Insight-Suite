@@ -57,3 +57,20 @@ def test_registered_spatial_profile_analysis_dispatches_joint_spatial_spectral_m
     assert result["analysis_status"] == "joint-dispatch-tested"
     np.testing.assert_array_equal(captured["mixing"], mixing)
     assert captured["kwargs"]["regularization_strength"] == pytest.approx(0.02)
+
+
+
+def test_gls_smoothing_accepts_small_but_positive_covariance_without_rescaling():
+    radius = np.linspace(0.0, 1.0, 5)
+    values = np.array([1.0, 1.2, 1.1, 1.4, 1.3])
+    covariance = np.eye(5) * 1e-18
+
+    fitted, gradient, diagnostics = workflow._generalized_least_squares_smoothing_spline(
+        radius, values, covariance, np.linspace(0.0, 1.0, 11)
+    )
+
+    assert fitted.shape == (11,)
+    assert gradient.shape == (11,)
+    assert np.all(np.isfinite(fitted))
+    assert np.all(np.isfinite(gradient))
+    assert diagnostics["covariance_model"] == "researcher_supplied_full_cross_channel_covariance"
