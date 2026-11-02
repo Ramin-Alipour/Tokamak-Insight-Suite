@@ -12,7 +12,8 @@
       "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
       "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
       "tokamak_analysis.thomson_population_mixture.two_population_relativistic_thomson_spectrum",
-      "tokamak_analysis.thomson_population_mixture.fit_two_population_relativistic_thomson_spectrum"
+      "tokamak_analysis.thomson_population_mixture.fit_two_population_relativistic_thomson_spectrum",
+      "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
@@ -450,7 +451,8 @@
         "A single integrated scattered-power measurement cannot identify an arbitrary pointwise density profile along the sightline.",
         "Response uncertainty for callable response functions is not supported; provide an explicit 1-D kernel or 2-D/3-D matrix uncertainty representation.",
         "Regularization sensitivity is assessed only across the solver's declared candidate grid; it is a numerical robustness diagnostic, not a measurement uncertainty or posterior interval.",
-        "Relativistic Maxwell-Juttner spectral GLS is currently channel-separable: full within-channel wavelength covariance is supported, but non-zero cross-channel spectral covariance is rejected until a joint relativistic multi-channel forward inversion is implemented."
+        "Relativistic Maxwell-Juttner spectral GLS is currently channel-separable: full within-channel wavelength covariance is supported, but non-zero cross-channel spectral covariance is rejected until a joint relativistic multi-channel forward inversion is implemented.",
+        "The joint spatial-spectral Maxwellian subanalysis supports detector-space constant, linear, polynomial, cubic-spline, and researcher-supplied template backgrounds fitted jointly with the plasma forward model; this does not replace the primary channel-wise inference background model."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -458,7 +460,8 @@
         "tokamak_analysis.thomson_kinetic_models.relativistic_maxwell_juttner_spectrum",
         "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
         "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
-        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density"
+        "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
@@ -656,6 +659,49 @@
         ],
         "scope": "Two isotropic Maxwell-Juttner populations with one shared scattering-vector flow projection. Shape-only inference; absolute density and unrestricted 3-D EVDF are not inferred.",
         "reference": "Sakai et al., JINST 21 (2026) C01002, DOI 10.1088/1748-0221/21/01/C01002; the TIS two-component model is a parametric approximation, not the cited Monte Carlo algorithm.",
+        "experimental_validation": "not_performed"
+      },
+      {
+        "name": "Joint wavelength-resolved spatial Thomson inference",
+        "module": "tokamak_analysis.thomson_joint_spatial_spectral",
+        "callable": "reconstruct_joint_thomson_spatial_spectra",
+        "inputs": [
+          "wavelength_nm",
+          "measured_spectra (channel x wavelength)",
+          "radius_m",
+          "spatial_mixing_matrix (fixed researcher-supplied channel x spatial-node operator)",
+          "laser_wavelength_nm",
+          "scattering_angle_rad",
+          "instrument_response (fixed measured operator)",
+          "signal_uncertainty or joint_spectral_covariance (channel-major; optional)",
+          "regularization_strength",
+          "background_model (constant, linear, polynomial, cubic_spline or templates)",
+          "background_degree (polynomial)",
+          "background_interior_knots (cubic_spline)",
+          "background_templates (templates)"
+        ],
+        "outputs": [
+          "electron_temperature_profile_eV",
+          "electron_velocity_projection_profile_m_s",
+          "relative_spectral_amplitude_profile",
+          "parameter_covariance",
+          "fitted_spectra",
+          "residuals",
+          "detector_background_model",
+          "detector_background_coefficients",
+          "optimizer diagnostics",
+          "data-only identifiability diagnostics"
+        ],
+        "scope": "Jointly fits wavelength-resolved channel spectra with a finite-dimensional isotropic non-relativistic Maxwellian model, fixed measured instrument-response operators, a fixed supplied spatial-mixing operator, and detector-space nuisance backgrounds. Background coefficients are fitted jointly with the physical spectrum and are not interpreted as plasma emission. Absolute density, perpendicular flow, unrestricted anisotropic/non-Maxwellian EVDFs, and spatial structure in the mixing null space are not inferred.",
+        "background_models": [
+          "constant",
+          "linear",
+          "polynomial",
+          "cubic_spline",
+          "templates"
+        ],
+        "covariance_order": "channel_major",
+        "uncertainty_semantics": "Local linearized covariance conditional on the selected physical model, fixed response and mixing operators, supplied measurement covariance, and selected regularization. Regularization does not contribute to the data-only identifiability rank.",
         "experimental_validation": "not_performed"
       }
     ],
