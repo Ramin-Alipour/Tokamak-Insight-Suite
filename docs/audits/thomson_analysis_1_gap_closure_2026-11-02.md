@@ -28,6 +28,12 @@ The Maxwellian optical inference path now accepts `background_model`, `backgroun
 
 The background remains a detector-space nuisance term, not plasma emission. Its basis choice is researcher-selected. This integration currently applies to the non-collective Maxwellian fit path; equivalent structured-background integration into the Kappa and relativistic Maxwell–Jüttner optical fitters remains open.
 
+### A3 — joint spatial-spectral multi-model extension
+
+The joint spatial-spectral inverse now accepts `physical_model="maxwellian"`, `"kappa"`, or `"relativistic_maxwell_juttner"`. The Kappa kernel is the finite-variance isotropic 3-D Kappa distribution projected onto the scattering vector; its index must be supplied and is treated as a fixed external model parameter, not inferred. The Maxwell–Jüttner path uses the existing relativistic Thomson forward kernel with explicit incident polarization and quadrature orders. The non-relativistic Maxwellian/Kappa paths retain their conservative validity screens; the relativistic path enforces subluminal flow.
+
+The joint inversion still does not reconstruct an arbitrary EVDF, anisotropic distribution, or an unrestricted Kappa-index profile. Kappa-index uncertainty is not propagated in this implementation. Spatial mixing and spectral response remain fixed external operators.
+
 ### A9 — PSF-aware profile reconstruction
 
 Added `reconstruct_psf_aware_thomson_profile` in `tokamak_analysis/thomson_gap_closure.py`, re-exported from `tokamak_analysis/thomson_workflow.py`.
@@ -53,9 +59,9 @@ This supports a forward model with externally supplied spatial variation. It doe
 |---|---|---|
 | A1 — optical multi-channel covariance | Existing channel/joint spectral covariance inputs retained | Confirm exact covariance flattening and public API coverage in regression tests before declaring fully closed |
 | A2 — Full-EM external uncertainty | Existing local external-input Monte Carlo retained | Ray-resolved geometry covariance and cross-sample beam/equilibrium covariance remain unsupported |
-| A3 — joint spatial-spectral multi-model | Existing joint inversion remains Maxwellian | Kappa and relativistic Maxwell–Jüttner joint inversions are not implemented by this change |
+| A3 — joint spatial-spectral multi-model | Maxwellian, finite-variance Kappa, and relativistic Maxwell–Jüttner forward kernels now selectable | Kappa index is fixed externally; uncertainty in that index and arbitrary distribution reconstruction remain unsupported |
 | A5 — relativistic EVDF | New exact Thomson-limit 1-D kinematic inverse | No polarized cross-section weighting, Compton recoil, or 3-D reconstruction |
-| A7 — structured optical background | Added to non-collective Maxwellian path | Kappa and MJ integration remains open |
+| A7 — structured optical background | Added to non-collective Maxwellian path | Kappa and MJ fitters still need equivalent structured-background integration |
 | A8 — spatial covariance | Existing full supplied channel covariance in profile reconstruction retained | Coordinate uncertainty and PSF uncertainty remain outside this contract |
 | A9 — ordinary profile PSF | New fixed-operator inverse added | Requires supplied PSF/mixing matrix; null-space modes remain non-identifiable |
 | A10 — electrostatic CTS external covariance | Existing named external covariance/MC retained | Supported parameter names are intentionally limited; this is not covariance of every possible external input |
