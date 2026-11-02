@@ -32,6 +32,26 @@ def _run(wavelength, signal, background, **kwargs):
     )
 
 
+def test_evdf_trapezoidal_normalization_jacobian_matches_finite_difference():
+    from tokamak_analysis.thomson_evdf import _normalize_evdf_coefficients
+
+    velocity = np.linspace(-3.0, 4.0, 9)
+    coefficients = np.array([0.4, 1.1, 0.7, 2.0, 1.3, 0.8, 1.6, 0.9, 0.5])
+    distribution, analytic_jacobian = _normalize_evdf_coefficients(coefficients, velocity)
+    assert np.trapz(distribution, velocity) == pytest.approx(1.0, abs=1e-13)
+    numerical_jacobian = np.empty_like(analytic_jacobian)
+    step = 1e-6
+    for index in range(coefficients.size):
+        plus = coefficients.copy()
+        minus = coefficients.copy()
+        plus[index] += step
+        minus[index] -= step
+        f_plus, _ = _normalize_evdf_coefficients(plus, velocity)
+        f_minus, _ = _normalize_evdf_coefficients(minus, velocity)
+        numerical_jacobian[:, index] = (f_plus - f_minus) / (2.0 * step)
+    np.testing.assert_allclose(analytic_jacobian, numerical_jacobian, rtol=2e-7, atol=2e-9)
+
+
 def test_evdf_reconstruction_returns_normalized_nonnegative_1d_projection():
     wavelength, signal, background = _case()
     out = _run(wavelength, signal, background)
