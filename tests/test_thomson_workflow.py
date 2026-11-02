@@ -75,3 +75,21 @@ def test_gls_smoothing_accepts_small_but_positive_covariance_without_rescaling()
     assert np.all(np.isfinite(fitted))
     assert np.all(np.isfinite(gradient))
     assert diagnostics["covariance_model"] == "researcher_supplied_full_cross_channel_covariance"
+
+
+def test_psf_aware_profile_reconstruction_is_explicitly_exposed():
+    latent = np.array([1.0, 2.0, 1.0])
+    mixing = np.array([
+        [0.8, 0.2, 0.0],
+        [0.1, 0.8, 0.1],
+        [0.0, 0.2, 0.8],
+    ])
+    measured = mixing @ latent
+    out = workflow.reconstruct_thomson_profile_with_psf(
+        measured, mixing,
+        measurement_uncertainty=np.full(3, 0.01),
+        regularization=1e-6,
+    )
+    assert out["mixing_matrix_is_external_fixed_input"] is True
+    assert out["fitted_measured_profile"].shape == measured.shape
+    np.testing.assert_allclose(out["fitted_measured_profile"], measured, atol=1e-6)
