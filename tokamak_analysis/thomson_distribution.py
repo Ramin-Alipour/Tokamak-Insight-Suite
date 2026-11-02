@@ -172,7 +172,11 @@ def analyze_thomson_spectral_distribution(
         column_sums = np.sum(response, axis=0)
         if np.any(column_sums <= 0):
             raise ValueError("instrument_response_matrix must have positive column sums")
-        response = response / column_sums[None, :]
+        if not np.allclose(column_sums, 1.0, rtol=1e-8, atol=1e-10):
+            raise ValueError(
+                "measured instrument_response_matrix columns must already sum to one; "
+                "the calibrated response operator is not renormalized"
+            )
 
     mask = None
     if background_mask is not None:
