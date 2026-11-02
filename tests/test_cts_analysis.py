@@ -1619,3 +1619,45 @@ def test_cts_improved_genetic_search_rejects_all_nonfinite_objective():
             lambda p: np.inf, [(-1.0, 1.0)],
             seed=3, population_size=8, generations=2,
         )
+
+
+
+def test_cts_species_resolved_ion_temperatures_and_correlated_species_covariance():
+    f0,f,g,ions,frac,response=_case()
+    two_ions=[ions[0],{"name":"C6+","charge_state":6,"mass_amu":12.0}]
+    temperatures=np.array([700.0,1100.0])
+    spectrum=cts_spectral_density(
+        f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200.0,
+        ion_temperature_eV=temperatures,ion_species=two_ions,
+        ion_fractions=[0.7,0.3],electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=1.5e4,
+    )
+    assert spectrum.shape==f.shape and np.all(np.isfinite(spectrum)) and np.all(spectrum>=0)
+    common=dict(
+        probe_frequency_Hz=f0,scattering_geometry=g,ion_species=ions,
+        ion_fractions=frac,electron_velocity_projection_m_s=0.0,
+        instrument_response=response,
+        electron_density_initial_m3=2e19,
+        electron_temperature_initial_eV=1200.0,
+        ion_temperature_initial_eV=800.0,ion_velocity_initial_m_s=1.5e4,
+        global_search=False,inversion_method="local_least_squares",
+    )
+    truth=cts_spectral_density(
+        f,f0,g,electron_density_m3=2e19,electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,ion_species=ions,ion_fractions=frac,
+        electron_velocity_projection_m_s=0.0,ion_velocity_projection_m_s=1.5e4,
+    )
+    measured=2.4e4*truth+3.0
+    scales=np.array([1e-3,1e-3,5.0])
+    covariance=np.diag(scales**2)
+    out=analyze_cts_spectrum(
+        f,measured,**common,
+        external_parameter_covariance=covariance,
+        external_parameter_order=[
+            "ion_mass_amu_0","ion_charge_state_0","ion_temperature_eV_0"
+        ],
+        response_mc_samples=20,
+    )
+    assert out["external_parameter_covariance_propagated"] is True
+    assert out["response_external_mc_successes"]>=12
+    assert np.all(np.isfinite(out["fit_covariance"]))
