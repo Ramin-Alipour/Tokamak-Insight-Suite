@@ -141,3 +141,26 @@ def test_evdf_does_not_claim_a_3d_distribution_or_scalar_temperature():
     assert "unrestricted three-dimensional EVDF from one scattering geometry" in out["identifiability"]["non_identifiable"]
     assert "directional_equivalent_temperature_eV" in out
     assert "electron_temperature_eV" not in out
+
+
+def test_evdf_parametric_comparison_does_not_score_nonconverged_optimizer(monkeypatch):
+    from types import SimpleNamespace
+    import tokamak_analysis.thomson_evdf as evdf
+
+    wavelength, signal, background = _case()
+
+    def failed_optimizer(_objective, initial, **_kwargs):
+        return SimpleNamespace(
+            success=False,
+            x=np.asarray(initial, dtype=float),
+            message="forced non-convergence for regression test",
+        )
+
+    monkeypatch.setattr(evdf, "least_squares", failed_optimizer)
+    out = _run(wavelength, signal, background)
+    for fit in out["parametric_model_comparison"].values():
+        assert fit["success"] is False
+        assert fit["weighted_residual_sum_squares"] is None
+        assert fit["aic"] is None
+        assert fit["bic"] is None
+        assert fit["parameter_uncertainty_status"] == "unavailable_optimizer_not_converged"
