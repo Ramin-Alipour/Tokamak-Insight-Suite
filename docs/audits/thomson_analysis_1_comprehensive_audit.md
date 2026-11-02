@@ -424,3 +424,12 @@ Background-only uncertainty is explicitly labelled as conditional on treating si
 **Fixed directly on main:** the parent workflow now withholds both dependent child analyses with the explicit status `unavailable_primary_fit_rejected`. It does not access or reuse the rejected fit's background coefficients. The independent public spectral-distribution API remains callable directly on a calibrated measured spectrum with its own explicitly supplied background, as documented. A regression test forces primary-fit rejection and verifies that neither child solver is called.
 
 This is an execution-dependency and result-provenance correction only. No measured data are altered, no physical model or output is invented, and no experimental validation is performed or claimed.
+
+
+## Z. CTS response-operator and spectral-distribution covariance metadata synchronization — 2026-11-02
+
+123. **The CTS registry still described the measured frequency-response matrix as being normalized by the forward model, although both electrostatic and Full-EM implementations now reject a non-unit-column base matrix and apply an accepted calibrated matrix unchanged.** This contradicted the fixed calibrated-operator rule and the 2026-11-02 response-preservation correction. **Fixed directly on main:** both canonical JSON registry copies now require a finite, non-negative square response matrix whose columns already sum to one and state that the supplied base operator is used unchanged. The response-uncertainty description distinguishes the unchanged base matrix from normalized perturbed Monte Carlo realizations.
+
+124. **The Thomson spectral-distribution registry retained a stale statement that signal/background cross-covariance was not represented, despite the implemented `signal_background_cross_covariance` input and joint block-covariance propagation.** **Fixed directly on main:** both canonical JSON copies now describe the separate cross-covariance input and its dependence on the supplied signal and background marginal covariance models.
+
+Added a registry/API regression test that checks root/package parity, verifies the fixed CTS response contract against the electrostatic response-application behavior (including preservation and rejection), and checks the spectral-distribution covariance metadata. These are execution-contract/documentation corrections only. No physical model, input, output, calibration step, measurement, or experimental-validation claim was added or removed.
