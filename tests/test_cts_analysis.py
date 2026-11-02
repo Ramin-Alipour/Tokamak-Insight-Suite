@@ -1352,6 +1352,39 @@ def test_full_em_cts_analysis_rejects_non_normalized_calibrated_response():
         )
 
 
+
+def test_cts_frequency_resolved_geometry_uses_maximum_wave_number_for_flow_support():
+    from tokamak_analysis.cts_analysis import _maximum_geometry_wave_number, _geometry
+
+    f0 = 140e9
+    geometries = [
+        {"scattering_angle_rad": np.deg2rad(angle)}
+        for angle in (35.0, 110.0, 155.0)
+    ]
+    actual = _maximum_geometry_wave_number(
+        {"frequency_resolved_geometry": geometries}, f0
+    )
+    expected = max(_geometry(item, f0)[0] for item in geometries)
+    assert actual == pytest.approx(expected, rel=1e-14)
+    assert actual > _geometry(geometries[1], f0)[0]
+
+
+def test_cts_frequency_resolved_geometry_rejects_single_q_automatic_width_seeds():
+    from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
+
+    f0, f, _, ions, fractions, _ = _case()
+    spectrum = 0.03 + np.exp(-0.5 * (f / 1.1e9) ** 2)
+    geometries = [
+        {"scattering_angle_rad": np.deg2rad(angle)}
+        for angle in (65.0, 110.0, 145.0)
+    ]
+    with pytest.raises(ValueError, match="one fixed scattering vector"):
+        estimate_cts_optimizer_initial_parameters(
+            f, spectrum, probe_frequency_Hz=f0,
+            scattering_geometry={"frequency_resolved_geometry": geometries},
+            ion_species=ions, ion_fractions=fractions,
+        )
+
 def test_cts_frequency_resolved_geometry_uses_each_frequency_sample_geometry():
     from tokamak_analysis.cts_analysis import cts_spectral_density
 
