@@ -46,3 +46,24 @@ def test_full_em_cts_does_not_silently_regularize_singular_total_covariance():
         _prepare_full_em_cts_spectral_whitener(
             4, model_discrepancy_covariance=singular
         )
+
+
+def test_full_em_cts_public_inverse_exposes_discrepancy_argument():
+    from inspect import signature
+    from tokamak_analysis.cts_full_em import analyze_full_em_cts_spectrum
+
+    assert "model_discrepancy_covariance" in signature(
+        analyze_full_em_cts_spectrum
+    ).parameters
+
+
+def test_full_em_cts_pointwise_measurement_error_combines_as_diagonal_covariance():
+    sigma = np.linspace(0.1, 0.3, 5)
+    discrepancy = np.eye(5) * 0.02
+    _, effective, status = _prepare_full_em_cts_spectral_whitener(
+        5,
+        signal_uncertainty=sigma,
+        model_discrepancy_covariance=discrepancy,
+    )
+    np.testing.assert_allclose(effective, np.diag(sigma**2) + discrepancy)
+    assert status == "measurement_covariance_plus_independent_correlated_model_discrepancy"
