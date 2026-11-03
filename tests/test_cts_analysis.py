@@ -1727,3 +1727,42 @@ def test_cts_regularization_strength_accepts_finite_nonnegative_real_values(vali
     from tokamak_analysis.cts_analysis import _nonnegative_real
 
     assert _nonnegative_real(valid_strength, "regularization_strength") == float(valid_strength)
+
+@pytest.mark.parametrize(
+    "invalid_strength, message",
+    [
+        (True, "real numeric scalar"),
+        (False, "real numeric scalar"),
+        ("0.1", "real numeric scalar"),
+        ("not-a-number", "real numeric scalar"),
+        (None, "real numeric scalar"),
+        (-1.0, "finite and non-negative"),
+        (np.inf, "finite and non-negative"),
+        (-np.inf, "finite and non-negative"),
+        (np.nan, "finite and non-negative"),
+    ],
+)
+def test_cts_public_inversion_api_rejects_invalid_regularization_strength(
+    invalid_strength, message
+):
+    """Exercise TS-13 validation through the public CTS inversion API."""
+    f0, f, geometry, ions, fractions, response = _case()
+    spectrum = 0.03 + np.exp(-0.5 * (f / 1.0e9) ** 2)
+
+    with pytest.raises(ValueError, match=message):
+        analyze_cts_spectrum(
+            f,
+            spectrum,
+            probe_frequency_Hz=f0,
+            scattering_geometry=geometry,
+            ion_species=ions,
+            ion_fractions=fractions,
+            instrument_response=response,
+            electron_density_initial_m3=2.0e19,
+            electron_temperature_initial_eV=1200.0,
+            ion_temperature_initial_eV=800.0,
+            ion_velocity_initial_m_s=0.0,
+            electron_velocity_projection_m_s=0.0,
+            inversion_method="local_least_squares",
+            regularization_strength=invalid_strength,
+        )
