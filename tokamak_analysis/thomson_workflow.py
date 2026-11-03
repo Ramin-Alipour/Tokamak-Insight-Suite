@@ -339,6 +339,11 @@ def reconstruct_thomson_profile_from_spectra(
     selected_model = kwargs.get("model")
     if spatial_mixing_covariance is not None and spatial_mixing_matrix is None:
         raise ValueError("spatial_mixing_covariance requires spatial_mixing_matrix")
+    if joint_spatial_spectral and profile_coordinate_covariance_m2 is not None:
+        raise ValueError(
+            "profile_coordinate_covariance_m2 is supported by downstream profile "
+            "reconstruction, not by the raw joint spatial-spectral optimizer"
+        )
     if joint_spatial_spectral and spatial_mixing_covariance is not None:
         raise ValueError(
             "spatial_mixing_covariance is currently propagated by the downstream "
