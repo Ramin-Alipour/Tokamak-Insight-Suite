@@ -150,6 +150,26 @@ dispersion algorithm of Skolar et al. and does not represent an arbitrary
 anisotropic EVDF. Background basis coefficients remain nuisance parameters
 and do not contribute artificial rank to the data-only identifiability test.
 
+## Additive model-discrepancy covariance for kinetic fits
+
+The joint structured-background Kappa and relativistic Maxwell-Juttner fit
+(`fit_noncollective_kinetic_thomson_with_background`) accepts an optional
+`model_discrepancy_covariance` in measured spectral-intensity units squared.
+It is a researcher-supplied, wavelength-resolved covariance representing
+uncertainty in the selected forward model, and is added to either the supplied
+pointwise measurement variance or the supplied measurement covariance before
+GLS whitening. It may also be used alone, in which case the result is explicitly
+labelled as discrepancy-weighted rather than measurement-noise-weighted.
+
+The matrix must be finite, symmetric, wavelength-sized and positive definite;
+the implementation rejects invalid or singular matrices rather than silently
+regularizing them. The implementation assumes zero cross-covariance between
+measurement noise and model discrepancy. The resulting parameter covariance
+is conditional on that additive covariance model. This extension is limited
+to the joint structured-background Kappa/MJ workflow; it does not imply that
+the canonical channel-wise Maxwellian/Kappa/MJ fitters or microwave CTS
+automatically consume the same covariance.
+
 ## Electron density and identifiability
 
 A normalized non-collective spectral shape alone does not determine absolute electron density. Absolute density is calculated only when the spectral intensity is explicitly declared calibrated in W/nm and all required optical factors are supplied: laser power at the scattering volume, interaction length, collection solid angle, optical efficiency, incident direction, incident polarization and scattered-light direction. The integrated scattered power is defined at the same calibrated measurement plane to which the end-to-end optical efficiency applies; efficiency is the fraction of power scattered into the collection solid angle that reaches that plane. Do not count the same transmission/throughput loss both in the measured power and in optical efficiency. The returned density is the interaction-length-averaged effective density; it equals a local density only for a uniform density/collection kernel along the scattering path. If the contract is incomplete, density is reported unavailable rather than fabricated from fitted amplitude.
