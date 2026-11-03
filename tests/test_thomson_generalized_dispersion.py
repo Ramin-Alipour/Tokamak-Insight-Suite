@@ -63,3 +63,16 @@ def test_collective_tabulated_evdf_forward_model_returns_finite_positive_spectru
     assert np.all(np.isfinite(spectrum))
     assert np.any(spectrum > 0)
     assert result["electron_distribution_model"] == "researcher_supplied_tabulated_projected_1D_EVDF"
+
+
+def test_generalized_landau_integral_supports_higher_order_pole():
+    velocity = np.linspace(-10.0, 10.0, 1001)
+    distribution = np.exp(-0.5 * velocity**2)
+    result = generalized_landau_integral(
+        velocity, distribution, 0.35,
+        pole_imaginary_part_m_s=0.05,
+        pole_order=2,
+    )
+    assert result["pole_order"] == 2
+    assert np.isfinite(result["integral"].real)
+    assert np.isfinite(result["integral"].imag)
