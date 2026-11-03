@@ -814,7 +814,8 @@ def analyze_thomson_spectra(
             raise ValueError("Poisson count likelihood is currently integrated only for non_collective_maxwellian; Kappa, relativistic and collective fits retain their declared likelihoods")
         if signal_uncertainty is not None or joint_spectral_covariance is not None:
             raise ValueError("Poisson count likelihood cannot be combined with Gaussian signal_uncertainty or joint_spectral_covariance")
-        if np.any(y < 0) or np.any(np.abs(y - np.rint(y)) > 1e-8):
+        count_data = _finite_array(spectra, "spectra", 2)
+        if np.any(count_data < 0) or np.any(np.abs(count_data - np.rint(count_data)) > 1e-8):
             raise ValueError("Poisson likelihood requires raw integer photon/count bins, not calibrated power-density values")
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
