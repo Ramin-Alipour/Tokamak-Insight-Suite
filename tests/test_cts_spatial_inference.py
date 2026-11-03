@@ -206,6 +206,7 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
             item["name"] for item in cts["execution_contract"]["input_specs"]
         }
         assert "geometry_ensemble" in input_names
+        assert "model_discrepancy_covariance" in input_names
         output_names = {
             item["name"] for item in cts["execution_contract"]["output_specs"]
         }
@@ -219,6 +220,7 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
             if item["name"] == "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse"
         )
         assert any("data-only spectral Jacobian" in item for item in profile_mode["outputs"])
+        assert any("model_discrepancy_covariance" in item for item in profile_mode["inputs"])
         geometry_mode = next(
             item for item in cts["execution_contract"]["workflow_modes"]
             if item["name"] == "full_forward_ray_geometry_uncertainty"
@@ -229,6 +231,8 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
     app = Path("app.py").read_text(encoding="utf-8")
     assert "cts_geometry_ensemble_upload" in app
     assert "cts_geometry_mc_samples" in app
+    assert "cts_spatial_model_discrepancy" in app
+    assert "model_discrepancy_covariance" in app
     assert "propagate_full_em_cts_ray_geometry_uncertainty(" in app
 
 

@@ -3883,6 +3883,7 @@ elif page=='Advanced Analysis':
                 spatial_background_upload=st.file_uploader('Fixed background spectrum CSV (required when background=spectrum)',type=['csv','txt'],key='cts_spatial_background')
                 spatial_response_upload=st.file_uploader('Optional measured frequency-response matrix CSV',type=['csv','txt'],key='cts_spatial_response')
                 spatial_covariance_upload=st.file_uploader('Optional full frequency-bin covariance CSV',type=['csv','txt'],key='cts_spatial_covariance')
+                spatial_discrepancy_upload=st.file_uploader('Optional independent model-discrepancy covariance CSV',type=['csv','txt'],key='cts_spatial_model_discrepancy')
                 spatial_bfield=st.text_input('Reference magnetic field vector (T; x,y,z)',key='cts_spatial_bfield')
                 spatial_ion_names=st.text_input('Ion species names (comma-separated)',key='cts_spatial_ions')
                 spatial_ion_charges=st.text_input('Ion charge states (comma-separated)',key='cts_spatial_charges')
@@ -3963,6 +3964,10 @@ elif page=='Advanced Analysis':
                         kwargs_spatial['spectral_covariance']=pd.read_csv(spatial_covariance_upload,header=None).to_numpy(dtype=float)
                     else:
                         raise ValueError('Supply either a spectral uncertainty column or a full covariance matrix.')
+                    if spatial_discrepancy_upload is not None:
+                        kwargs_spatial['model_discrepancy_covariance']=pd.read_csv(
+                            spatial_discrepancy_upload,header=None
+                        ).to_numpy(dtype=float)
                     if spatial_response_upload is not None:
                         kwargs_spatial['instrument_response']=pd.read_csv(spatial_response_upload,header=None).to_numpy(dtype=float)
                     result_cts=analyze_cts_spectrum_model(model='full_em_spatial_profiles',frequency_shift_Hz=frequency,spectrum=spectrum,**kwargs_spatial)
