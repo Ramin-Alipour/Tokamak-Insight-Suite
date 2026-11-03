@@ -57,3 +57,9 @@ def test_primary_thomson_rejects_evdf_grid_coercion(invalid_points):
             instrument_response=np.eye(9), model="non_collective_maxwellian",
             evdf_velocity_points=invalid_points,
         )
+
+
+def test_analysis1_does_not_expose_raw_count_poisson_input():
+    import tokamak_analysis.thomson_inference as inference
+
+    assert not hasattr(inference, "fit_optical_thomson_poisson_counts")

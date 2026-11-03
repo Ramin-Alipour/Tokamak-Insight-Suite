@@ -455,3 +455,8 @@ for the separate PCHIP/GCV profile workflow. Holding the regularization strength
 fixed isolates coordinate uncertainty; variability from re-selecting GCV is
 not included. This is numerical uncertainty propagation, not experimental
 validation.
+
+
+## Input-contract enforcement: calibrated spectra only
+
+The Analysis 1 optical Thomson API accepts measured spectra that are already prepared and calibrated by the instrument/operator. Raw integer photon-count fitting is not part of this analysis contract. The former standalone `fit_optical_thomson_poisson_counts` entry point has been removed, together with its internal Poisson-likelihood branch and registry exposure. Use the canonical calibrated-intensity Gaussian/GLS inference path. This does not imply that calibrated spectral uncertainties must be Gaussian; the supplied uncertainty/covariance model is consumed according to the selected API. No count-to-power conversion, detector correction or calibration is performed by TIS.

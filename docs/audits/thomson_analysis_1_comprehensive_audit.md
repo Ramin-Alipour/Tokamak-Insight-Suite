@@ -736,3 +736,14 @@ The changes are committed to main. The repository test suite has not been run
 in a local checkout during this session. GitHub combined commit status returned
 no status entries for the latest direct-main commit; therefore CI success is
 not claimed. No independent experimental validation is claimed.
+
+
+## Implementation update — 2026-11-03: strict calibrated-input boundary
+
+The previous Analysis 1 registry exposed `fit_optical_thomson_poisson_counts`, which accepted raw integer photon counts. Although it was separate from the calibrated-power workflow and did not infer absolute density, its presence contradicted the project-wide rule that every physical-analysis entry point starts from measured data already prepared and calibrated by the instrument/operator. The public function, its private Poisson-likelihood branch in the Maxwellian fitter, and both root/package registry references and claims have now been removed directly on `main`. A regression test asserts that the raw-count entry point is not exposed. The canonical Gaussian/GLS calibrated-spectrum path is unchanged. This removes an out-of-contract input path; it does not add detector calibration, count conversion, or experimental validation.
+
+### Reconciliation of the earlier T01–T20 list
+
+The earlier list mixed confirmed code defects, incomplete integration, scientific-model boundaries and quantities that cannot be uniquely identified. It must not be treated as twenty confirmed bugs. The repository already contains subsequent direct-main work covering several items: Kappa/MJ structured-background and joint spatial-spectral paths; relativistic multi-channel GLS; Full-EM local external-input covariance; a full-forward CTS geometry-ensemble uncertainty API; response-operator preservation; and synchronized output-identifiability contracts. Remaining integration/model work is recorded explicitly in sections AJ and the 2026-11-03 implementation updates above. In particular, the full-forward geometry sampler is an API building block rather than a dashboard-managed universal covariance model, and profile-aware spatially varying Full-EM CTS remains an unimplemented physics extension. Neither can be honestly marked complete by changing metadata alone.
+
+**Verification:** source, both canonical JSON registries, the input-contract regression test and the scientific/audit notes were updated in one direct-main commit. No local checkout was used. GitHub Actions must report success for the exact resulting commit before claiming software-test success. No experimental validation was performed or claimed.

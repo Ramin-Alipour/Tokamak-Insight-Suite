@@ -321,7 +321,7 @@ def _fit_noncollective(
     wavelength, signal, laser_nm, angle, response, uncertainty, *,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
-    likelihood="gaussian", spectral_covariance=None,
+    spectral_covariance=None,
 ):
     """Fit the Maxwellian Thomson feature jointly with a detector-space background basis."""
     from .thomson_background import _background_design
@@ -329,14 +329,10 @@ def _fit_noncollective(
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
         raise ValueError("signal must have a positive finite scale")
-    if likelihood == "poisson" and uncertainty is not None:
-        raise ValueError("Poisson count likelihood cannot be combined with Gaussian pointwise uncertainty")
     y = np.asarray(signal, dtype=float) / signal_scale
     sigma_y = None if uncertainty is None else np.asarray(uncertainty, dtype=float) / signal_scale
     covariance_cholesky = None
     if spectral_covariance is not None:
-        if likelihood == "poisson":
-            raise ValueError("Poisson count likelihood cannot be combined with Gaussian spectral_covariance")
         covariance = _finite_array(spectral_covariance, "spectral_covariance", 2) / (signal_scale**2)
         if covariance.shape != (wavelength.size, wavelength.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
             raise ValueError("spectral_covariance must be symmetric and match the wavelength grid")
@@ -372,14 +368,6 @@ def _fit_noncollective(
 
     def residual(parameters):
         difference = predict(parameters)-y
-        if likelihood == "poisson":
-            from .advanced_inference import poisson_deviance_residual
-            expected_counts = signal_scale * predict(parameters)
-            if np.any(~np.isfinite(expected_counts)) or np.any(expected_counts <= 0.0):
-                return np.full(signal.size, 1e12, dtype=float)
-            return poisson_deviance_residual(np.asarray(signal, dtype=float), expected_counts)
-        if likelihood != "gaussian":
-            raise ValueError("likelihood must be 'gaussian' or 'poisson'")
         if covariance_cholesky is not None:
             return np.linalg.solve(covariance_cholesky, difference)
         return difference if sigma_y is None else difference/sigma_y
@@ -408,7 +396,7 @@ def _fit_noncollective(
     residual_physical = np.asarray(signal,dtype=float)-fitted
     dof = max(1, wavelength.size-fit.x.size)
     covariance_scaled = np.linalg.pinv(fit.jac.T@fit.jac)
-    if sigma_y is None and covariance_cholesky is None and likelihood == "gaussian":
+    if sigma_y is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
     raw_covariance = covariance_scaled*np.outer(scales,scales)
@@ -467,9 +455,8 @@ def _fit_noncollective(
         "fit_covariance": covariance, "residual": residual_physical,
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_unc,
-        "reduced_chi_square": float(fit.fun@fit.fun/dof) if (uncertainty is not None or covariance_cholesky is not None) and likelihood == "gaussian" else None,
-        "likelihood": likelihood,
-        "likelihood_interpretation": ("independent_Poisson_count_likelihood_using_signed_deviance_residuals" if likelihood == "poisson" else "Gaussian_or_GLS_residual_likelihood"),
+        "reduced_chi_square": float(fit.fun@fit.fun/dof) if (uncertainty is not None or covariance_cholesky is not None) else None,
+        "likelihood": "Gaussian_or_GLS",
         "fitted_spectrum": fitted,
         "fit_parameters": fit_parameters,
         "fit_parameter_names": fit_parameter_names,
@@ -477,8 +464,6 @@ def _fit_noncollective(
                       "nfev": int(fit.nfev), "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
                       "parameter_count": int(fit.x.size)},
         "uncertainty_interpretation": (
-            "local covariance from the independent Poisson-deviance likelihood curvature"
-            if likelihood == "poisson" else
             "local covariance from supplied full spectral covariance"
             if covariance_cholesky is not None else
             "local covariance from supplied pointwise measurement uncertainty"
@@ -3200,60 +3185,3 @@ def analyze_thomson_spectra(
         },
     }
     return output
-
-
-
-def fit_optical_thomson_poisson_counts(
-    wavelength_nm, photon_counts, *, laser_wavelength_nm,
-    scattering_angle_rad, instrument_response,
-    background_model="linear", background_degree=2,
-    background_interior_knots=3, background_templates=None,
-):
-    """Fit a non-collective Maxwellian optical Thomson feature using raw counts.
-
-    This count-likelihood entry point is deliberately separate from the
-    calibrated-power analysis pipeline: it returns count-space observables and
-    never infers absolute electron density or reports count integrals as watts.
-    Each wavelength bin must contain an integer count and the wavelength grid
-    must be uniform so the sampled spectral shape has a consistent bin measure.
-    """
-    wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
-    counts = _finite_array(photon_counts, "photon_counts", 1)
-    if wavelength.size < 9 or counts.shape != wavelength.shape or np.any(np.diff(wavelength) <= 0):
-        raise ValueError("wavelength_nm and photon_counts must be matching increasing vectors with >=9 bins")
-    if np.any(counts < 0) or np.any(np.abs(counts - np.rint(counts)) > 1e-8):
-        raise ValueError("photon_counts must be non-negative integer-valued counts")
-    steps = np.diff(wavelength)
-    if not np.allclose(steps, steps[0], rtol=1e-6, atol=1e-12):
-        raise ValueError("Poisson count fitting requires a uniform wavelength grid; use the calibrated Gaussian/GLS workflow for nonuniform bins")
-    laser = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
-    angle = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
-    if angle >= np.pi:
-        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
-    if instrument_response is None:
-        raise ValueError("a measured instrument_response is required")
-    response = _response_for_channel(
-        instrument_response, 0, 1, wavelength.size, wavelength=wavelength
-    )
-    fit = _fit_noncollective(
-        wavelength, counts, laser, angle, response, None,
-        background_model=background_model,
-        background_degree=background_degree,
-        background_interior_knots=background_interior_knots,
-        background_templates=background_templates,
-        likelihood="poisson",
-    )
-    amplitude = float(fit["amplitude"])
-    center = float(fit["fitted_center_nm"])
-    width = float(fit["intrinsic_sigma_nm"])
-    intrinsic_counts = amplitude * np.exp(-0.5*((wavelength-center)/width)**2)
-    captured_counts = float(np.sum(_apply_response(response, intrinsic_counts, wavelength)))
-    fit.pop("integrated_scattered_power_W", None)
-    fit.pop("integrated_scattered_power_uncertainty_W", None)
-    fit["integrated_signal_counts"] = captured_counts
-    fit["signal_unit"] = "raw_counts_per_wavelength_bin"
-    fit["likelihood"] = "independent_Poisson"
-    fit["density_inference_available"] = False
-    fit["absolute_density_status"] = "not_available_raw_counts_are_not_calibrated_W_per_nm"
-    fit["experimental_validation"] = "not_performed"
-    return fit
