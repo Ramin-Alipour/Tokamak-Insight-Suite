@@ -51,7 +51,8 @@ def assemble_joint_covariance(marginal_covariances, cross_covariances=None):
     for i, block in enumerate(blocks):
         if block.shape[0] != block.shape[1]:
             raise ValueError(f"marginal covariance {i} must be square")
-        _psd(block, block.shape, f"marginal_covariances[{i}]")
+        block = _psd(block, block.shape, f"marginal_covariances[{i}]")
+        blocks[i] = block
         sizes.append(block.shape[0])
     offsets = np.cumsum([0] + sizes)
     result = np.zeros((offsets[-1], offsets[-1]), dtype=float)
