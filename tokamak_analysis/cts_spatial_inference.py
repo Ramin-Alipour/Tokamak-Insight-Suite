@@ -168,7 +168,19 @@ def analyze_full_em_cts_spatial_profiles(
     if regularization_strength is None:
         raise ValueError("regularization_strength must be supplied explicitly; no default smoothness prior is assumed")
     if isinstance(regularization_strength, Mapping):
-        lambdas = {name: float(regularization_strength.get(name, 0.0)) for name in active}
+        missing_lambdas = sorted(set(active) - set(regularization_strength))
+        extra_lambdas = sorted(set(regularization_strength) - set(active))
+        if missing_lambdas:
+            raise ValueError(
+                "regularization_strength mapping must explicitly define every fitted profile; "
+                f"missing: {missing_lambdas}"
+            )
+        if extra_lambdas:
+            raise ValueError(
+                "regularization_strength mapping contains profiles that are not fitted: "
+                f"{extra_lambdas}"
+            )
+        lambdas = {name: float(regularization_strength[name]) for name in active}
     else:
         lambdas = {name: float(regularization_strength) for name in active}
     if any(not np.isfinite(v) or v < 0 for v in lambdas.values()) or not any(v > 0 for v in lambdas.values()):
