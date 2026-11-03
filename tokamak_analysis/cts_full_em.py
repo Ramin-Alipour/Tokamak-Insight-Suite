@@ -1023,6 +1023,36 @@ def build_full_em_cts_physical_background(
     }
     return measured_grid_power, diagnostics
 
+def _physical_background_zero_state(*, transfer_diagnostics=None, supplied_spectrum=None):
+    """Return explicit zero/nonzero/unknown status for the additive CTS background.
+
+    An omitted background is unknown, not evidence that the physical
+    background is zero. A radiative-transfer result carries the vacuum/incident
+    radiance distinction from the lower-level solver. A fixed receiver-grid
+    spectrum is exactly zero only when every supplied bin is exactly zero.
+    """
+    if transfer_diagnostics is not None and supplied_spectrum is not None:
+        raise ValueError("radiative-transfer diagnostics and a fixed background spectrum are mutually exclusive")
+    if transfer_diagnostics is not None:
+        if not isinstance(transfer_diagnostics, Mapping):
+            raise ValueError("transfer_diagnostics must be a mapping")
+        status = transfer_diagnostics.get("background_status")
+        zero = transfer_diagnostics.get("zero_background")
+        if not isinstance(zero, (bool, np.bool_)):
+            raise ValueError("radiative-transfer diagnostics must declare boolean zero_background")
+        if not isinstance(status, str) or not status:
+            raise ValueError("radiative-transfer diagnostics must declare background_status")
+        return bool(zero), status
+    if supplied_spectrum is not None:
+        spectrum = _real_array(supplied_spectrum, "supplied_physical_background", 1)
+        zero = bool(np.all(spectrum == 0.0))
+        return zero, (
+            "zero_background_exact_zero_receiver_grid_spectrum"
+            if zero else "nonzero_fixed_receiver_grid_background"
+        )
+    return None, "background_not_supplied_not_assumed_zero"
+
+
 def _resonance_broadening_metadata(damping_rate_rad_s, *, caller_supplied, probe_frequency_Hz):
     """Describe the Full-EM resonance regularizer without implying collisions."""
     damping = _positive(damping_rate_rad_s, "damping_rate_rad_s")
@@ -1298,6 +1328,10 @@ def analyze_full_em_cts_spectrum(
         physical_background_zero = None
         physical_background_status = "no_fixed_physical_background_supplied"
         physical_background_zero_status = "background_not_supplied_not_assumed_zero"
+    physical_background_zero, physical_background_zero_status = _physical_background_zero_state(
+        transfer_diagnostics=physical_background_transfer_diagnostics,
+        supplied_spectrum=supplied_physical_background,
+    )
     physical_background_covariance = None
     if physical_background_covariance_W2_per_Hz2 is not None:
         if supplied_physical_background is None and physical_background_radiative_transfer is None:
