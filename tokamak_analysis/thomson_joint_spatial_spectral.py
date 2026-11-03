@@ -142,6 +142,7 @@ def _curvature(axis):
 def reconstruct_joint_thomson_spatial_spectra(
     wavelength_nm, measured_spectra, radius_m, spatial_mixing_matrix, *,
     laser_wavelength_nm, scattering_angle_rad, instrument_response=None,
+    laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     signal_uncertainty=None, joint_spectral_covariance=None,
     regularization_strength=0.0, positive_amplitude=True, max_nfev=3000,
     background_model="linear", background_degree=2,
@@ -244,6 +245,25 @@ def reconstruct_joint_thomson_spatial_spectra(
     n_background = int(background_basis.shape[1])
     widths = _bin_widths(x)
     response = _response_stack(instrument_response, m, nlam)
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
+    laser_source_metadata = None
+    if laser_spectrum_wavelength_nm is not None:
+        from .thomson_inference import _laser_source_response
+        broadened_responses = []
+        source_metadata_by_channel = []
+        for channel in range(m):
+            source_operator, source_metadata = _laser_source_response(
+                x, laser, laser_spectrum_wavelength_nm,
+                laser_spectrum_density_per_nm,
+            )
+            broadened_responses.append(response[channel] @ source_operator)
+            source_metadata_by_channel.append(source_metadata)
+        response = np.asarray(broadened_responses, dtype=float)
+        laser_source_metadata = {
+            "model": "measured_incident_laser_profile_convolved_before_instrument_response",
+            "channels": source_metadata_by_channel,
+        }
     q = 2.0 * np.sin(angle / 2.0)
     d2 = _curvature(r)
     span = float(x[-1] - x[0])
@@ -423,6 +443,7 @@ def reconstruct_joint_thomson_spatial_spectra(
     uncertainties = np.sqrt(diagonal)
     n = r.size
     return {
+        "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
         "analysis_status": ("model_domain_rejected" if fit.success and not model_domain_valid else "completed" if fit.success else "optimizer_not_converged"),
         "primary_result_status": primary_status,
         "primary_outputs_reportable_as_identified": data_identifiable,
