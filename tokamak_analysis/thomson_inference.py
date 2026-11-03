@@ -800,7 +800,6 @@ def analyze_thomson_spectra(
     include_compton_recoil=False,
     enable_evdf_reconstruction=True,
     evdf_velocity_points=121,
-    likelihood="gaussian",
 ):
     """Infer per-channel Thomson parameters from calibrated multi-channel spectra.
 
@@ -809,16 +808,6 @@ def analyze_thomson_spectra(
     spectral bins to detector bins. Supplied response matrices must already have unit-sum columns and are used without renormalization. Absolute density is emitted only
     when all optical-power/geometry/polarization factors are supplied.
     """
-    if likelihood not in {"gaussian", "poisson"}:
-        raise ValueError("likelihood must be explicitly 'gaussian' or 'poisson'")
-    if likelihood == "poisson":
-        if model != "non_collective_maxwellian":
-            raise ValueError("Poisson count likelihood is currently integrated only for non_collective_maxwellian; Kappa, relativistic and collective fits retain their declared likelihoods")
-        if signal_uncertainty is not None or joint_spectral_covariance is not None:
-            raise ValueError("Poisson count likelihood cannot be combined with Gaussian signal_uncertainty or joint_spectral_covariance")
-        count_data = _finite_array(spectra, "spectra", 2)
-        if np.any(count_data < 0) or np.any(np.abs(count_data - np.rint(count_data)) > 1e-8):
-            raise ValueError("Poisson likelihood requires raw integer photon/count bins, not calibrated power-density values")
     if not isinstance(include_compton_recoil, (bool, np.bool_)):
         raise ValueError("include_compton_recoil must be boolean")
     if not isinstance(enable_evdf_reconstruction, (bool, np.bool_)):
@@ -1233,8 +1222,7 @@ def analyze_thomson_spectra(
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
                                 background_model=background_model, background_degree=background_degree,
                                 background_interior_knots=background_interior_knots,
-                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
-                                likelihood=likelihood)
+                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_relativistic_maxwell_juttner":
@@ -1754,8 +1742,7 @@ def analyze_thomson_spectra(
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,
                             background_model=background_model, background_degree=background_degree,
                             background_interior_knots=background_interior_knots,
-                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
-                            likelihood=likelihood)
+                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     area_samples.append(float(draw["integrated_scattered_power_W"])
@@ -3146,3 +3133,60 @@ def analyze_thomson_spectra(
         },
     }
     return output
+
+
+
+def fit_optical_thomson_poisson_counts(
+    wavelength_nm, photon_counts, *, laser_wavelength_nm,
+    scattering_angle_rad, instrument_response,
+    background_model="linear", background_degree=2,
+    background_interior_knots=3, background_templates=None,
+):
+    """Fit a non-collective Maxwellian optical Thomson feature using raw counts.
+
+    This count-likelihood entry point is deliberately separate from the
+    calibrated-power analysis pipeline: it returns count-space observables and
+    never infers absolute electron density or reports count integrals as watts.
+    Each wavelength bin must contain an integer count and the wavelength grid
+    must be uniform so the sampled spectral shape has a consistent bin measure.
+    """
+    wavelength = _finite_array(wavelength_nm, "wavelength_nm", 1)
+    counts = _finite_array(photon_counts, "photon_counts", 1)
+    if wavelength.size < 9 or counts.shape != wavelength.shape or np.any(np.diff(wavelength) <= 0):
+        raise ValueError("wavelength_nm and photon_counts must be matching increasing vectors with >=9 bins")
+    if np.any(counts < 0) or np.any(np.abs(counts - np.rint(counts)) > 1e-8):
+        raise ValueError("photon_counts must be non-negative integer-valued counts")
+    steps = np.diff(wavelength)
+    if not np.allclose(steps, steps[0], rtol=1e-6, atol=1e-12):
+        raise ValueError("Poisson count fitting requires a uniform wavelength grid; use the calibrated Gaussian/GLS workflow for nonuniform bins")
+    laser = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
+    angle = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
+    if angle >= np.pi:
+        raise ValueError("scattering_angle_rad must lie strictly between 0 and pi")
+    if instrument_response is None:
+        raise ValueError("a measured instrument_response is required")
+    response = _response_for_channel(
+        instrument_response, 0, 1, wavelength.size, wavelength=wavelength
+    )
+    fit = _fit_noncollective(
+        wavelength, counts, laser, angle, response, None,
+        background_model=background_model,
+        background_degree=background_degree,
+        background_interior_knots=background_interior_knots,
+        background_templates=background_templates,
+        likelihood="poisson",
+    )
+    amplitude = float(fit["amplitude"])
+    center = float(fit["fitted_center_nm"])
+    width = float(fit["intrinsic_sigma_nm"])
+    intrinsic_counts = amplitude * np.exp(-0.5*((wavelength-center)/width)**2)
+    captured_counts = float(np.sum(_apply_response(response, intrinsic_counts, wavelength)))
+    fit.pop("integrated_scattered_power_W", None)
+    fit.pop("integrated_scattered_power_uncertainty_W", None)
+    fit["integrated_signal_counts"] = captured_counts
+    fit["signal_unit"] = "raw_counts_per_wavelength_bin"
+    fit["likelihood"] = "independent_Poisson"
+    fit["density_inference_available"] = False
+    fit["absolute_density_status"] = "not_available_raw_counts_are_not_calibrated_W_per_nm"
+    fit["experimental_validation"] = "not_performed"
+    return fit
