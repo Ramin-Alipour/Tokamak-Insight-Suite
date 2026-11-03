@@ -306,6 +306,7 @@ def reconstruct_multiview_3d_evdf(
         "evdf_velocity_grid_m_s": velocity.copy(),
         "evdf_m3_s3": distribution if identifiable else None,
         "regularized_candidate_evdf_m3_s3": distribution,
+        "unnormalized_nonnegative_coefficients": raw.copy(),
         "normalization": float(volume @ distribution),
         "fitted_spectra": fitted,
         "residual_spectra": residual,
@@ -389,9 +390,14 @@ def assess_multiview_evdf_regularization_sensitivity(
         )
         residual = np.asarray(result["residual_spectra"], dtype=float)
         candidate = np.asarray(result["regularized_candidate_evdf_m3_s3"], dtype=float)
+        coefficients = np.asarray(
+            result["unnormalized_nonnegative_coefficients"], dtype=float
+        )
         whitened_residual = whiten(residual)
         data_residual_norm = float(np.linalg.norm(whitened_residual))
-        penalty_norm = float(np.linalg.norm(penalty @ candidate))
+        # Match the exact coefficient vector to which the inverse solver applies
+        # sqrt(lambda) * L; the normalized PDF is a separate reported quantity.
+        penalty_norm = float(np.linalg.norm(penalty @ coefficients))
         levels.append({
             "regularization_strength": float(strength),
             "weighted_data_residual_norm": data_residual_norm,
