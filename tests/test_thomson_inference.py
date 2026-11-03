@@ -1451,3 +1451,31 @@ def test_relativistic_mj_channel_fit_uses_selected_structured_background_and_joi
     assert channel["electron_temperature_eV"] == pytest.approx(1000.0, rel=0.15)
     assert channel["integrated_scattered_power_W"] > 0.0
     assert channel["integrated_scattered_power_uncertainty_W"] > 0.0
+
+
+def test_joint_channel_gls_uses_selected_polynomial_background_basis():
+    wavelength = np.linspace(492.0, 572.0, 241)
+    z = 2.0*(wavelength-wavelength.min())/np.ptp(wavelength)-1.0
+    p2 = 0.5*(3.0*z*z-1.0)
+    sigma = 2.0*532.0*np.sqrt(120.0/510998.95069)*np.sin(np.pi/4)
+    first = 1200.0*np.exp(-0.5*((wavelength-532.0)/sigma)**2) + 25.0 + 0.3*z + 0.4*p2
+    second = 850.0*np.exp(-0.5*((wavelength-532.04)/sigma)**2) + 18.0 - 0.2*z + 0.25*p2
+    spectra = np.vstack((first, second))
+    n = wavelength.size
+    covariance = np.eye(2*n)*0.25
+    covariance[:n, n:] = np.eye(n)*0.025
+    covariance[n:, :n] = np.eye(n)*0.025
+    result = _analyze_thomson_spectra(
+        wavelength, spectra, [0.1, 0.2],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+        instrument_response=np.eye(n), model="non_collective_maxwellian",
+        joint_spectral_covariance=covariance,
+        background_model="polynomial", background_degree=2,
+    )
+    for channel in result["channels"]:
+        assert channel["background_model"] == "polynomial"
+        assert channel["background_coefficients"].shape == (3,)
+        assert channel["background_coefficient_covariance"].shape == (3, 3)
+        assert channel["physical_background_cross_covariance"].shape == (3, 3)
+        assert channel["joint_fit_used"] is True
+    assert result["joint_inference"]["covariance_ordering"] == "channel_major"
