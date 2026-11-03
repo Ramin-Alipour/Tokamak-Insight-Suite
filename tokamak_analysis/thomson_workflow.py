@@ -815,3 +815,32 @@ def reconstruct_thomson_joint_spatial_spectra(*args, **kwargs):
 
 # PSF-aware inverse profile reconstruction is distinct from PCHIP/smoothing interpolation.
 from .thomson_gap_closure import reconstruct_psf_aware_thomson_profile
+
+
+
+def fit_thomson_spectrum_with_structured_background(*args, **kwargs):
+    """Jointly fit any supplied physical Thomson forward model and detector background.
+
+    This lower-level public entry point is intended for relativistic MJ, Kappa,
+    or custom kinetic forward models when their native fit API does not yet
+    expose the structured background nuisance block.
+    """
+    from .thomson_inference_closure import fit_thomson_with_structured_background
+    return fit_thomson_with_structured_background(*args, **kwargs)
+
+
+def reconstruct_joint_ne_te_ti_profiles(*args, **kwargs):
+    """Joint measured-spectrum inversion for ne(r), Te(r), and Ti(r).
+
+    The caller must supply a physically appropriate channel-resolved forward
+    model; ion temperature is not reported as identifiable unless that model
+    contains an ion-sensitive spectral response.
+    """
+    from .thomson_inference_closure import reconstruct_joint_thomson_profiles
+    return reconstruct_joint_thomson_profiles(*args, **kwargs)
+
+
+def thomson_compton_recoil_contract(*args, **kwargs):
+    """Return the explicit recoil/cross-section validity contract."""
+    from .thomson_inference_closure import compton_recoil_contract
+    return compton_recoil_contract(*args, **kwargs)
