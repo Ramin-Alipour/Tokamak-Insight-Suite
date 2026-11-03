@@ -96,3 +96,13 @@ measurement covariance. It does not remove common-Te/common-flow assumptions,
 and it does not infer background templates or cross-covariances. Software test
 execution and CI success are not claimed until confirmed for the exact commit;
 no experimental validation is claimed.
+
+
+The same basis parameterization was also carried through the full
+channel-major GLS refit for Maxwellian and Kappa models. The joint optimizer
+now uses each channel's selected basis matrix rather than hard-coded affine
+background terms, initializes from the fitted basis coefficients, and reports
+the background-coefficient covariance and physical/background cross-covariance.
+The dashboard's channel-wise basis controls now cover all three optical
+physical models. A regression test exercises polynomial-background recovery
+under non-zero cross-channel covariance.
