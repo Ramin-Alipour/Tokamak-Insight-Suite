@@ -1323,9 +1323,57 @@ def analyze_full_em_cts_spectrum(
         r = whiten(amplitude * z + offset - y)
         return (r, amplitude, offset, z) if return_profile else r
 
-    fit = least_squares(residual, p0, bounds=(lower, upper), x_scale="jac", max_nfev=1200)
-    if not fit.success:
-        raise ValueError(f"full-EM CTS inversion failed: {fit.message}")
+    # Full-EM CTS is a strongly nonlinear inverse problem.  A single
+    # local start is not a defensible default: deterministic starts perturb
+    # density, electron temperature and the complete thermal-ion temperature
+    # vector independently in log space, while retaining the supplied
+    # geometry, composition and flow seeds.  Bounds are respected exactly.
+    start_vectors = [np.asarray(p0, dtype=float).copy()]
+    for parameter_index in (0, 1):
+        for displacement in (-0.35, 0.35):
+            candidate = np.asarray(p0, dtype=float).copy()
+            candidate[parameter_index] += displacement
+            start_vectors.append(np.clip(candidate, lower + 1e-12, upper - 1e-12))
+    ion_temperature_slice = slice(3, 3 + n_species)
+    for displacement in (-0.35, 0.35):
+        candidate = np.asarray(p0, dtype=float).copy()
+        candidate[ion_temperature_slice] += displacement
+        start_vectors.append(np.clip(candidate, lower + 1e-12, upper - 1e-12))
+    successful_fits = []
+    start_diagnostics = []
+    for start_index, start_vector in enumerate(start_vectors):
+        try:
+            candidate_fit = least_squares(
+                residual, start_vector, bounds=(lower, upper),
+                x_scale="jac", max_nfev=1200,
+            )
+            objective_value = (
+                float(candidate_fit.fun @ candidate_fit.fun)
+                if np.all(np.isfinite(candidate_fit.fun)) else float("inf")
+            )
+            start_diagnostics.append({
+                "start_index": int(start_index),
+                "success": bool(candidate_fit.success),
+                "objective": objective_value,
+                "nfev": int(candidate_fit.nfev),
+                "message": str(candidate_fit.message),
+            })
+            if candidate_fit.success and np.isfinite(objective_value):
+                successful_fits.append(candidate_fit)
+        except (ValueError, RuntimeError, FloatingPointError, np.linalg.LinAlgError) as exc:
+            start_diagnostics.append({
+                "start_index": int(start_index),
+                "success": False,
+                "objective": None,
+                "nfev": 0,
+                "message": str(exc),
+            })
+    if not successful_fits:
+        raise ValueError(
+            "All deterministic full-EM CTS multi-start inversions failed; "
+            f"diagnostics={start_diagnostics}"
+        )
+    fit = min(successful_fits, key=lambda candidate_fit: float(candidate_fit.fun @ candidate_fit.fun))
     rank = int(np.linalg.matrix_rank(fit.jac))
     condition = float(np.linalg.cond(fit.jac))
     if rank < len(names) or not np.isfinite(condition) or condition > 1e12:
@@ -1430,6 +1478,14 @@ def analyze_full_em_cts_spectrum(
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "optimizer_success": bool(fit.success),
+        "optimizer": {
+            "method": "deterministic_multistart_bounded_least_squares",
+            "attempted_starts": int(len(start_vectors)),
+            "successful_starts": int(len(successful_fits)),
+            "selected_objective": float(fit.fun @ fit.fun),
+            "starts": start_diagnostics,
+            "scope": "initial density, electron temperature and species-resolved ion-temperature perturbations; not an exhaustive global optimum guarantee",
+        },
         "model": ("magnetized full-EM CTS with relativistic gyrotropic electron/fast-ion response and second-order kinetic vertices"
                   if electron_distribution is not None
                   else "magnetized full-EM CTS with Bindslev low-temperature coupling and optional relativistic gyrotropic fast-ion populations"),
