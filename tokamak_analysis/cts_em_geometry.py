@@ -371,16 +371,16 @@ def trace_cts_frequency_resolved_beams(
     volume weight, and returned as scattering_samples. The full-EM CTS solver
     evaluates each local sample and sums its spectrum with these weights.
 
-    This is cold-plasma geometrical optics with caller-supplied local Gaussian
-    covariance. Optional coherent mode-amplitude propagation is available
-    independently on the incident ray and each receiver ray when their ray
-    mappings supply both initial_mode_amplitudes and
-    propagation_constants_rad_m. That calculation is diagnostic output only:
-    it does not alter the ray trajectories, Gaussian overlap weights, or the
-    full-EM CTS spectral transfer. Diffraction and quasi-optical beam evolution
-    remain outside this model. The workflow assumes uniform fitted ne/Te/Ti
-    across the sampled volume while allowing local ray directions and magnetic
-    field to vary.
+    This is cold-plasma geometrical optics. Beam covariance may be supplied as
+    local 3-D matrices or propagated from explicit symplectic paraxial ABCD maps
+    on each ray; propagated transverse covariances are used in a 2-D Gaussian
+    overlap integral. The ray solver does not derive the ABCD maps from the
+    dispersion Hessian. Optional coherent mode-amplitude propagation remains
+    diagnostic output only and does not alter the ray trajectories or CTS
+    spectral transfer. Non-paraxial diffraction and general vector
+    quasi-optical mode conversion remain outside this model. The workflow
+    assumes uniform fitted ne/Te/Ti across the sampled volume while allowing
+    local ray directions and magnetic field to vary.
     """
     if (
         isinstance(mode_index, bool) or not isinstance(mode_index, (int, np.integer))
@@ -501,7 +501,9 @@ def trace_cts_frequency_resolved_beams(
                 "scattered_direction": ks/np.linalg.norm(ks),
                 "magnetic_field_T": b_local,
                 "scattering_location_m": location,
-                "beam_overlap_m_minus3": float(overlap),
+                "beam_overlap": float(overlap),
+                "beam_overlap_dimension": 2 if incident_cov.shape[-2:] == (2, 2) else 3,
+                "beam_overlap_unit": "m^-2" if incident_cov.shape[-2:] == (2, 2) else "m^-3",
                 "path_length_weight_m": float(path_weights[local_index]),
                 "ray_separation_m": float(np.sqrt(distance2[local_index, receiver_index])),
                 "incident_ray_index": int(incident_index),
@@ -541,7 +543,8 @@ def trace_cts_frequency_resolved_beams(
             "scattered_direction": mean_ks/np.linalg.norm(mean_ks),
             "magnetic_field_T": mean_b,
             "scattering_location_m": mean_location,
-            "beam_overlap_path_integral_m_minus2": path_integral,
+            "beam_overlap_path_integral": path_integral,
+            "beam_overlap_path_integral_unit": "m^-1" if incident_cov.shape[-2:] == (2, 2) else "m^-2",
             "scattering_samples": samples,
         })
     scale = max(path_integrals)
@@ -554,7 +557,8 @@ def trace_cts_frequency_resolved_beams(
         "mode_index": int(mode_index),
         "frequency_resolved_geometry": entries,
         "relative_beam_overlap": np.asarray(path_integrals, dtype=float)/scale,
-        "absolute_beam_overlap_path_integral_m_minus2": np.asarray(path_integrals, dtype=float),
+        "absolute_beam_overlap_path_integral": np.asarray(path_integrals, dtype=float),
+        "absolute_beam_overlap_path_integral_unit": "m^-1" if incident_cov.shape[-2:] == (2, 2) else "m^-2",
         "incident_ray": incident,
         "geometry_model": "cold-plasma Hamiltonian ray tracing with path-integrated local Gaussian intensity overlap",
         "scattering_volume_integration": "normalized Gaussian overlap times incident-ray path-length quadrature",
