@@ -409,7 +409,7 @@
         {
           "name": "spectral_weighting_status",
           "unit": "text",
-          "description": "Per-channel statistical weighting: full cross-channel GLS for Maxwellian/Kappa, block-diagonal channel-major within-channel GLS for relativistic Maxwell-Juttner, diagonal pointwise uncertainty weighting, or unweighted least squares when no measurement uncertainty is supplied."
+          "description": "Per-channel statistical weighting: full cross-channel GLS for Maxwellian/Kappa, full channel-major cross-channel GLS with shared electron temperature and scattering-vector flow, requiring identical channel wavelength grids, geometry and response for relativistic Maxwell-Juttner, diagonal pointwise uncertainty weighting, or unweighted least squares when no measurement uncertainty is supplied."
         },
         {
           "name": "fit_covariance_interpretation",
