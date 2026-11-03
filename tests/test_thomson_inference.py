@@ -1341,7 +1341,7 @@ def test_relativistic_maxwell_juttner_adds_model_discrepancy_to_joint_spectral_c
     assert fit["spectral_weighting_status"] == (
         "block_diagonal_channel_major_within_channel_generalized_least_squares"
     )
-    assert fit["fit_covariance_interpretation" == (
+    assert fit["fit_covariance_interpretation"] == (
         "local_parameter_covariance_from_supplied_measurement_noise_model"
     )
     assert fit["fit_covariance"].shape == (5, 5)
