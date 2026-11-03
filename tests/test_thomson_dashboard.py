@@ -247,3 +247,19 @@ def test_two_population_dashboard_exposes_compton_recoil_switch():
     workflow.set_value("Analysis 1 / Two-population optical Thomson subanalysis").run()
     assert any(item.label.startswith("Include single-scattering Compton recoil") for item in app.checkbox)
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_n_population_thomson_dashboard_exposes_model_inputs():
+    frame = pd.DataFrame({
+        "radius_m": [0.1, 0.1],
+        "wavelength_nm": [530.0, 531.0],
+        "intensity": [1.0, 1.5],
+    })
+    app = _app_with_table(frame)
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    assert "Analysis 1 / N-population optical Thomson subanalysis" in workflow.options
+    workflow.set_value("Analysis 1 / N-population optical Thomson subanalysis").run()
+    assert any(item.label == "Number of electron populations" for item in app.number_input)
+    assert any(item.label.startswith("Initial population temperatures") for item in app.text_input)
+    assert any(item.label.startswith("Initial population number fractions") for item in app.text_input)
+    assert not app.exception, [str(error.value) for error in app.exception]
