@@ -344,3 +344,6 @@ def test_joint_kappa_inverse_fits_index_and_propagates_its_uncertainty():
         3*radius.size + 1 + 2*measured.shape[0],
     )*2
     assert "kappa_index" in out["parameter_order"]
+    assert out["detector_background_coefficients"].shape == (measured.shape[0], 1)
+    assert np.all(np.isfinite(out["detector_background_coefficients"]))
+    assert out["detector_background_offset"].shape == (measured.shape[0],)
