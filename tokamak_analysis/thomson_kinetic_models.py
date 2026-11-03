@@ -970,23 +970,19 @@ def fit_relativistic_maxwell_juttner_channels(
     joint_spectral_covariance, initial_temperature_eV,
     initial_flow_projection_m_s=0.0, radial_order=36, angular_order=18,
     maximum_recoil_correction_fraction=0.01, include_compton_recoil=False,
-    max_nfev=1600,
+    background_model="linear", background_degree=1, background_interior_knots=3,
+    background_templates=None, max_nfev=1600,
 ):
-    """Joint relativistic MJ fit to multiple channels with full cross-channel GLS.
+    """Joint relativistic MJ fit with full cross-channel GLS and structured backgrounds.
 
-    The data and covariance are flattened in channel-major order:
-    vec(Y) = [Y[0,:], Y[1,:], ...]. A single Te and q-parallel bulk flow are
-    shared by all channels; each channel has its own positive amplitude,
-    constant background and linear background slope. The complete covariance
-    (including off-diagonal cross-channel blocks) is Cholesky-whitened.
-
-    This is a common-plasma-parameter multi-channel fit, not a model for
-    channel-dependent electron distributions or channel-dependent geometry.
-    All channels must share wavelength sampling, scattering geometry and
-    calibrated response. Density is not inferred from normalized spectral
-    shapes; absolute density requires independently calibrated collection
-    efficiency, throughput, solid angle and laser energy.
+    Data/covariance use channel-major ordering. A shared Te and q-parallel flow
+    are inferred jointly; each channel has an independent amplitude and an
+    independently weighted detector-space background basis. Supported bases
+    are constant, linear, polynomial, cubic_spline and researcher-supplied
+    templates. Backgrounds are nuisance terms, not plasma emission.
     """
+    from .thomson_background import _background_design
+
     x = np.asarray(wavelength_nm, dtype=float)
     y = np.asarray(measured_spectra, dtype=float)
     if x.ndim != 1 or x.size < 12 or np.any(~np.isfinite(x)) or np.any(np.diff(x) <= 0):
@@ -1043,12 +1039,32 @@ def fit_relativistic_maxwell_juttner_channels(
     for item in responses:
         if item.shape != (n, n) or np.any(~np.isfinite(item)) or np.any(item < 0):
             raise ValueError("response must be a finite non-negative (n_lambda,n_lambda) matrix per channel")
+        if not np.allclose(item.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+            raise ValueError("response columns must already sum to one; calibrated response is not renormalized")
+    if background_model not in {"constant", "linear", "polynomial", "cubic_spline", "templates"}:
+        raise ValueError("background_model must be constant, linear, polynomial, cubic_spline or templates")
+    designs = [
+        _background_design(
+            x, background_model, degree=background_degree,
+            interior_knots=background_interior_knots,
+            templates=(background_templates[j] if isinstance(background_templates, (list, tuple)) else background_templates),
+        )
+        for j in range(m)
+    ]
+    nbg = designs[0].shape[1]
+    if any(d.shape[1] != nbg for d in designs):
+        raise ValueError("all channel background bases must have the same number of columns")
     yscale = max(float(np.max(np.abs(y))), np.finfo(float).tiny)
     ys = y/yscale
     chol_scaled = chol/yscale
-    baseline = np.median(np.concatenate((ys[:, :max(2,n//10)], ys[:, -max(2,n//10):]), axis=1), axis=1)
+    edge = max(2, n//10)
+    baseline = np.median(np.concatenate((ys[:, :edge], ys[:, -edge:]), axis=1), axis=1)
     amplitudes = np.maximum(np.max(ys, axis=1)-baseline, np.finfo(float).tiny)
-    p0 = np.r_[np.log(te0), np.arctanh(flow0/C), np.log(amplitudes), baseline, np.zeros(m)]
+    bg0 = np.concatenate([
+        np.linalg.lstsq(designs[j], np.full(n, baseline[j]), rcond=None)[0]
+        for j in range(m)
+    ])
+    p0 = np.r_[np.log(te0), np.arctanh(flow0/C), np.log(amplitudes), bg0]
     def predict(p):
         te = float(np.exp(np.clip(p[0], -700, 700)))
         flow = float(np.tanh(p[1])*C)
@@ -1063,11 +1079,10 @@ def fit_relativistic_maxwell_juttner_channels(
         shape = physical["spectral_density_per_nm"]
         out = np.empty_like(ys)
         amps = np.exp(np.clip(p[2:2+m], -700, 700))
-        offsets = p[2+m:2+2*m]
-        slopes = p[2+2*m:2+3*m]
+        coefficients = p[2+m:].reshape(m, nbg)
         for j in range(m):
             convolved = _apply_response(responses[j], shape, x)
-            out[j] = amps[j]*convolved + offsets[j] + slopes[j]*(x-laser)
+            out[j] = amps[j]*convolved + designs[j]@coefficients[j]
         return out
     def objective(p):
         try:
@@ -1077,8 +1092,8 @@ def fit_relativistic_maxwell_juttner_channels(
             if "capture at least 99.5%" in str(exc) or "zero spectral power" in str(exc):
                 return np.full(m*n, 1e6)
             raise
-    bounds = (np.r_[-np.inf, -18.0, np.full(3*m, -np.inf)],
-              np.r_[np.inf, 18.0, np.full(3*m, np.inf)])
+    bounds = (np.r_[-np.inf, -18.0, np.full(m + m*nbg, -np.inf)],
+              np.r_[np.inf, 18.0, np.full(m + m*nbg, np.inf)])
     fit = least_squares(objective, p0, bounds=bounds, x_scale="jac", max_nfev=int(max_nfev))
     if not fit.success:
         raise ValueError(f"joint relativistic Maxwell-Juttner fit failed: {fit.message}")
@@ -1098,19 +1113,26 @@ def fit_relativistic_maxwell_juttner_channels(
     covariance_physical = transform@covariance_p@transform.T
     fitted = predict(fit.x)*yscale
     residual = y-fitted
-    return {
+    coefficients = fit.x[2+m:].reshape(m, nbg)*yscale
+    names = ["electron_temperature_eV","electron_velocity_projection_m_s"]
+    names += [f"channel_{j}_amplitude" for j in range(m)]
+    names += [f"channel_{j}_background_coefficient_{k}" for j in range(m) for k in range(nbg)]
+    background_intercepts = np.array([designs[j][np.argmin(np.abs(x-laser))]@coefficients[j] for j in range(m)])
+    result = {
         "electron_temperature_eV": float(np.exp(fit.x[0])),
         "electron_temperature_uncertainty_eV": float(np.sqrt(max(covariance_physical[0,0],0.0))),
         "electron_velocity_projection_m_s": float(np.tanh(fit.x[1])*C),
         "electron_velocity_projection_uncertainty_m_s": float(np.sqrt(max(covariance_physical[1,1],0.0))),
         "channel_amplitudes": np.exp(fit.x[2:2+m])*yscale,
-        "channel_background_intercepts": fit.x[2+m:2+2*m]*yscale,
-        "channel_background_slopes_per_nm": fit.x[2+2*m:2+3*m]*yscale,
+        "channel_background_intercepts": background_intercepts,
+        "channel_background_coefficients": coefficients,
+        "background_model": background_model,
+        "background_basis_matrices": [d.copy() for d in designs],
         "fitted_spectra": fitted,
         "residuals": residual,
         "weighted_residual_sum_squares": float(2.0*fit.cost),
         "fit_covariance": covariance_physical,
-        "fit_parameter_names": ["electron_temperature_eV","electron_velocity_projection_m_s"]+[f"channel_{j}_amplitude" for j in range(m)]+[f"channel_{j}_background_intercept" for j in range(m)]+[f"channel_{j}_background_slope_per_nm" for j in range(m)],
+        "fit_parameter_names": names,
         "jacobian_rank": rank,
         "jacobian_condition_number": condition,
         "spectral_weighting_status": "full_channel_major_generalized_least_squares_including_cross_channel_covariance",
@@ -1119,5 +1141,10 @@ def fit_relativistic_maxwell_juttner_channels(
         "recoil_included": bool(include_compton_recoil),
         "scattering_cross_section_model": ("polarized_single_scattering_Klein_Nishina" if include_compton_recoil else "polarized_elastic_Thomson"),
         "density_inference": "not_inferred_from_normalized_spectral_shape",
-        "assumptions": ["All channels share Te, q-parallel bulk flow, wavelength grid and scattering geometry.", "Channel amplitudes and affine backgrounds are independent nuisance parameters.", "The supplied full covariance is known, positive definite and includes cross-channel correlations.", "A common measured response is used unless a per-channel response list is supplied.", "Single-scattering photon recoil and polarized Klein-Nishina weighting are included only when include_compton_recoil=True; otherwise the configured Thomson-limit correction threshold is enforced."]
+        "assumptions": ["All channels share Te, q-parallel bulk flow, wavelength grid and scattering geometry.", "Channel amplitudes and structured detector-space background coefficients are independent nuisance parameters.", "The supplied full covariance is known, positive definite and includes cross-channel correlations.", "A common measured response is used unless a per-channel response list is supplied.", "Single-scattering photon recoil and polarized Klein-Nishina weighting are included only when include_compton_recoil=True; otherwise the configured Thomson-limit correction threshold is enforced.", "Background basis is researcher-selected and may be confounded with the plasma feature; Jacobian rank/conditioning is the identifiability check."]
     }
+    if background_model == "linear":
+        z = 2.0*(x-x.min())/np.ptp(x)-1.0
+        result["channel_background_slopes_per_nm"] = coefficients[:, 1]*2.0/np.ptp(x)
+        result["channel_background_intercepts"] = coefficients[:, 0] + result["channel_background_slopes_per_nm"]*(x[np.argmin(np.abs(x-laser))]-x.min()+0.5*np.ptp(x))
+    return result
