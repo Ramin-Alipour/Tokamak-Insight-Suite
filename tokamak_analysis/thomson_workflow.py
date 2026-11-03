@@ -327,7 +327,8 @@ def reconstruct_thomson_profile_from_spectra(
         if len(args) < 3:
             raise ValueError("joint spatial-spectral reconstruction requires wavelength_nm, measured spectra and radius_m")
         allowed_joint = {"model", "laser_wavelength_nm", "scattering_angle_rad",
-                         "instrument_response", "signal_uncertainty", "joint_spectral_covariance",
+                         "instrument_response", "laser_spectrum_wavelength_nm",
+                         "laser_spectrum_density_per_nm", "signal_uncertainty", "joint_spectral_covariance",
                          "kappa_index", "fit_kappa_index", "incident_polarization",
                          "radial_order", "angular_order", "maximum_recoil_correction_fraction",
                          "include_compton_recoil"}
@@ -340,6 +341,8 @@ def reconstruct_thomson_profile_from_spectra(
             laser_wavelength_nm=kwargs["laser_wavelength_nm"],
             scattering_angle_rad=kwargs["scattering_angle_rad"],
             instrument_response=kwargs.get("instrument_response"),
+            laser_spectrum_wavelength_nm=kwargs.get("laser_spectrum_wavelength_nm"),
+            laser_spectrum_density_per_nm=kwargs.get("laser_spectrum_density_per_nm"),
             signal_uncertainty=kwargs.get("signal_uncertainty"),
             joint_spectral_covariance=kwargs.get("joint_spectral_covariance"),
             regularization_strength=spatial_regularization_strength,
