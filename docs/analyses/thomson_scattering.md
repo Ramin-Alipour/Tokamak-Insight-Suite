@@ -569,3 +569,12 @@ response, and single-scattering model assumptions remain in force. A
 rank-deficient or ill-conditioned joint Jacobian is rejected. The reported
 local covariance is conditional on the selected basis, supplied covariance,
 response and physical model; it is not an experimental validation.
+
+
+The same detector-background basis contract is used by the cross-channel
+Maxwellian and finite-variance Kappa GLS refits. Their per-channel optimizer
+seeds are converted back to the selected basis coefficients before the joint
+fit; the joint parameter covariance retains physical/background cross-terms
+and channel-to-channel correlations. This prevents the GLS refit from silently
+replacing a selected polynomial, spline or template background with an affine
+baseline.
