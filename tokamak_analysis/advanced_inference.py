@@ -327,6 +327,96 @@ def reconstruct_multiview_3d_evdf(
     }
 
 
+def assess_multiview_evdf_regularization_sensitivity(
+    spectral_kernels, measured_spectra, velocity_grid_m_s, *,
+    voxel_volume_m3_s3, regularization_matrix, regularization_strengths,
+    measurement_uncertainty=None, measurement_covariance=None, max_iter=3000,
+):
+    """Evaluate a non-negative multi-view EVDF inverse over an explicit lambda grid.
+
+    No optimum regularization strength is selected automatically. The returned
+    L-curve quantities, data-only rank/condition diagnostics and candidate
+    distributions let the researcher assess the bias/residual trade-off without
+    presenting regularization as additional measurement information.
+    """
+    strengths = _real_array(
+        regularization_strengths, "regularization_strengths", 1
+    )
+    if strengths.size < 3 or np.any(strengths <= 0.0) or np.any(np.diff(strengths) <= 0.0):
+        raise ValueError(
+            "regularization_strengths must contain at least three positive, strictly increasing values"
+        )
+    kernels = _real_array(spectral_kernels, "spectral_kernels", 3)
+    data = _real_array(measured_spectra, "measured_spectra", 2)
+    penalty = _real_array(regularization_matrix, "regularization_matrix", 2)
+    if data.shape != kernels.shape[:2] or penalty.shape[1] != kernels.shape[2]:
+        raise ValueError("measured spectra and regularization matrix must match the spectral kernel dimensions")
+    if measurement_uncertainty is not None and measurement_covariance is not None:
+        raise ValueError("supply measurement_uncertainty or measurement_covariance, not both")
+    if measurement_uncertainty is not None:
+        sigma = _real_array(measurement_uncertainty, "measurement_uncertainty", 2)
+        if sigma.shape != data.shape or np.any(sigma <= 0.0):
+            raise ValueError("measurement_uncertainty must be positive and match measured_spectra")
+        whiten = lambda value: np.asarray(value, dtype=float) / sigma
+        noise_model = "supplied_pointwise_uncertainty"
+    elif measurement_covariance is not None:
+        covariance = _real_array(measurement_covariance, "measurement_covariance", 2)
+        if covariance.shape != (data.size, data.size) or not np.allclose(
+            covariance, covariance.T, rtol=1e-10, atol=1e-13
+        ):
+            raise ValueError("measurement_covariance must be symmetric and match the stacked multi-view spectra")
+        try:
+            cholesky = np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("measurement_covariance must be positive definite") from exc
+        whiten = lambda value: np.linalg.solve(cholesky, np.asarray(value, dtype=float).ravel()).reshape(data.shape)
+        noise_model = "supplied_full_multi_view_covariance"
+    else:
+        whiten = lambda value: np.asarray(value, dtype=float)
+        noise_model = "unweighted_no_measurement_uncertainty_supplied"
+
+    levels = []
+    candidates = []
+    for strength in strengths:
+        result = reconstruct_multiview_3d_evdf(
+            kernels, data, velocity_grid_m_s,
+            voxel_volume_m3_s3=voxel_volume_m3_s3,
+            regularization_matrix=penalty,
+            measurement_uncertainty=measurement_uncertainty,
+            measurement_covariance=measurement_covariance,
+            regularization_strength=float(strength),
+            max_iter=max_iter,
+        )
+        residual = np.asarray(result["residual_spectra"], dtype=float)
+        candidate = np.asarray(result["regularized_candidate_evdf_m3_s3"], dtype=float)
+        whitened_residual = whiten(residual)
+        data_residual_norm = float(np.linalg.norm(whitened_residual))
+        penalty_norm = float(np.linalg.norm(penalty @ candidate))
+        levels.append({
+            "regularization_strength": float(strength),
+            "weighted_data_residual_norm": data_residual_norm,
+            "regularization_penalty_norm": penalty_norm,
+            "data_only_jacobian_rank": int(result["data_only_jacobian_rank"]),
+            "data_only_condition_number": float(result["data_only_condition_number"]),
+            "null_space_dimension": int(result["null_space_dimension"]),
+            "identifiability_status": result["status"],
+        })
+        candidates.append(candidate)
+    return {
+        "levels": levels,
+        "regularization_strengths": strengths.copy(),
+        "candidate_distributions_m3_s3": np.asarray(candidates),
+        "noise_model": noise_model,
+        "selection_policy": "no automatic lambda selection; inspect the L-curve and external physical constraints",
+        "interpretation": (
+            "Sensitivity of the regularized solution to the supplied lambda grid. "
+            "The data-only rank and null space are invariant to regularization; "
+            "regularization does not create measurement identifiability."
+        ),
+        "experimental_validation": "not_performed",
+    }
+
+
 
 def fit_nonlinear_nonnegative_distribution(
     measured_spectrum, initial_distribution, quadrature_weights, *,
