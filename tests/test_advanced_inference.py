@@ -122,3 +122,55 @@ def test_nonlinear_nonnegative_distribution_fit_uses_full_forward_callback():
     assert result["distribution"] is not None
     assert np.all(result["distribution"] >= 0)
     assert result["normalization"] == pytest.approx(1.0, rel=1e-8)
+
+
+
+def test_optical_maxwellian_fit_accepts_independent_poisson_count_likelihood():
+    from tokamak_analysis.thomson_inference import _fit_noncollective
+
+    wavelength = np.linspace(530.0, 532.0, 121)
+    center = 531.0
+    sigma = 0.18
+    rng = np.random.default_rng(21)
+    expected = 450.0*np.exp(-0.5*((wavelength-center)/sigma)**2) + 18.0 + 2.0*(wavelength-center)
+    counts = rng.poisson(np.maximum(expected, 1.0)).astype(int)
+    result = _fit_noncollective(
+        wavelength, counts, 531.0, np.pi/2.0, np.eye(wavelength.size), None,
+        likelihood="poisson",
+    )
+    assert result["likelihood"] == "poisson"
+    assert result["likelihood_interpretation"].startswith("independent_Poisson")
+    assert np.isfinite(result["electron_temperature_eV"])
+    assert result["reduced_chi_square"] is None
+
+
+def test_cts_accepts_independent_correlated_model_discrepancy_covariance():
+    from tokamak_analysis.cts_analysis import analyze_cts_spectrum, cts_spectral_density
+    frequency = np.linspace(-5.0e9, 5.0e9, 81)
+    f0 = 140e9
+    geometry = {"scattering_angle_rad": np.deg2rad(110.0)}
+    species = [{"name": "D+", "charge_state": 1, "mass_amu": 2.014}]
+    truth = dict(
+        electron_density_m3=2.0e19, electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0, electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=1.5e4,
+    )
+    physical = cts_spectral_density(
+        frequency, f0, geometry, **truth, ion_species=species, ion_fractions=[1.0]
+    )
+    measured = 2.4e4*physical + 1.0
+    discrepancy = np.eye(frequency.size) * (1e-3*np.max(measured))**2
+    result = analyze_cts_spectrum(
+        frequency, measured, probe_frequency_Hz=f0,
+        scattering_geometry=geometry, ion_species=species, ion_fractions=[1.0],
+        instrument_response=np.eye(frequency.size),
+        electron_density_initial_m3=truth["electron_density_m3"],
+        electron_temperature_initial_eV=truth["electron_temperature_eV"],
+        ion_temperature_initial_eV=truth["ion_temperature_eV"],
+        ion_velocity_initial_m_s=truth["ion_velocity_projection_m_s"],
+        model_discrepancy_covariance=discrepancy,
+        global_search=False, inversion_method="local_least_squares",
+    )
+    assert result["independent_model_discrepancy_supplied"] is True
+    assert result["model_discrepancy_model"].startswith("researcher_supplied_correlated")
+    assert "model_discrepancy_scale" not in result
