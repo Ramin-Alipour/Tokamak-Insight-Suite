@@ -219,3 +219,31 @@ def test_relativistic_dashboard_exposes_compton_recoil_switch():
     recoil.set_value(True).run()
     assert recoil.value is True
     assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_advanced_dashboard_exposes_joint_kappa_mj_background_subanalysis():
+    frame = pd.DataFrame({
+        "radius_m": [0.1, 0.1],
+        "wavelength_nm": [530.0, 531.0],
+        "intensity": [1.0, 1.5],
+    })
+    app = _app_with_table(frame)
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    assert "Analysis 1 / Kappa-MJ structured-background subanalysis" in workflow.options
+    workflow.set_value("Analysis 1 / Kappa-MJ structured-background subanalysis").run()
+    assert any(item.label.startswith("Measured calibrated optical Thomson spectrum CSV") for item in app.file_uploader)
+    assert any(item.label == "Physical electron model" for item in app.selectbox)
+    assert not app.exception, [str(error.value) for error in app.exception]
+
+
+def test_two_population_dashboard_exposes_compton_recoil_switch():
+    frame = pd.DataFrame({
+        "radius_m": [0.1, 0.1],
+        "wavelength_nm": [530.0, 531.0],
+        "intensity": [1.0, 1.5],
+    })
+    app = _app_with_table(frame)
+    workflow = next(item for item in app.selectbox if item.label == "Select workflow")
+    workflow.set_value("Analysis 1 / Two-population optical Thomson subanalysis").run()
+    assert any(item.label.startswith("Include single-scattering Compton recoil") for item in app.checkbox)
+    assert not app.exception, [str(error.value) for error in app.exception]
