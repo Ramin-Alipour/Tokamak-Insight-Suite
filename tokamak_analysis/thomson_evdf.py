@@ -95,6 +95,8 @@ def reconstruct_thomson_evdf(
     scattering_angle_rad,
     instrument_response_matrix,
     background_signal,
+    laser_spectrum_wavelength_nm=None,
+    laser_spectrum_density_per_nm=None,
     regularization_strength=None,
     velocity_grid_m_s=None,
     velocity_limit_m_s=8.0e6,
@@ -137,6 +139,16 @@ def reconstruct_thomson_evdf(
         raise ValueError("max_iter must be an integer >= 100")
 
     response = _response_matrix(instrument_response_matrix, wavelength.size)
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
+    laser_source_metadata = None
+    if laser_spectrum_wavelength_nm is not None:
+        from .thomson_inference import _laser_source_response
+        source_operator, laser_source_metadata = _laser_source_response(
+            wavelength, float(laser_wavelength_nm), laser_spectrum_wavelength_nm,
+            laser_spectrum_density_per_nm,
+        )
+        response = response @ source_operator
     theta = float(scattering_angle_rad)
     q_over_ki = 2.0 * np.sin(theta / 2.0)
     if velocity_grid_m_s is None:
@@ -622,6 +634,7 @@ def reconstruct_thomson_evdf(
             }
 
     return {
+        "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
         "velocity_parallel_m_s": velocity,
         "evdf_parallel_s_per_m": distribution,
         "evdf_normalization": integral(distribution),
