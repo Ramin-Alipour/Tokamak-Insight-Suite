@@ -3389,7 +3389,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / N-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Analysis 1 / Optical multi-channel Thomson inference':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
@@ -3470,6 +3470,69 @@ elif page=='Advanced Analysis':
                 add_report_section('Two-population relativistic optical Thomson inference',result)
             except Exception as exc:
                 st.error(f'Two-population Thomson inference failed: {exc}')
+    elif workflow=='Analysis 1 / N-population optical Thomson subanalysis':
+        from tokamak_analysis.thomson_workflow import fit_n_population_relativistic_thomson_spectrum
+        st.info('Fit a measured calibrated optical Thomson spectrum with an explicitly selected finite mixture of 2–8 isotropic relativistic Maxwell-Juttner populations. Temperatures are ordered to prevent label switching, fractions are constrained to sum to one, and all components share one scattering-vector flow projection. This is a parametric mixture, not an unrestricted EVDF reconstruction.')
+        st.caption('Upload the measured two-column spectrum and its measured response matrix. Supply one initial temperature and one number fraction per population; these are optimizer seeds, not measured values.')
+        n_pop_spectrum=st.file_uploader('Measured calibrated spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_npop_spectrum')
+        n_pop_response=st.file_uploader('Measured wavelength-response matrix CSV',type=['csv','txt'],key='ts_npop_response')
+        n_pop_uncertainty=st.file_uploader('Optional pointwise spectral 1σ uncertainty CSV',type=['csv','txt'],key='ts_npop_uncertainty')
+        n_pop_covariance=st.file_uploader('Optional full spectral covariance CSV',type=['csv','txt'],key='ts_npop_covariance')
+        n_pop_count=int(st.number_input('Number of electron populations',min_value=2,max_value=8,value=3,step=1,key='ts_npop_count'))
+        n_pop_laser=st.text_input('Laser wavelength (nm)',value='',key='ts_npop_laser')
+        n_pop_angle=st.text_input('Scattering angle (rad)',value='',key='ts_npop_angle')
+        n_pop_polarization=st.text_input('Incident polarization (x,y,z in scattering frame)',value='',key='ts_npop_polarization')
+        n_pop_temperatures=st.text_input('Initial population temperatures (eV; strictly increasing, comma-separated)',value='',key='ts_npop_temperatures')
+        n_pop_fractions=st.text_input('Initial population number fractions (comma-separated; sum to one)',value='',key='ts_npop_fractions')
+        n_pop_flow=st.text_input('Initial flow projection along q (m/s)',value='0',key='ts_npop_flow')
+        n_pop_background=st.selectbox('Detector-space background model',['constant','linear','polynomial','cubic_spline'],index=1,key='ts_npop_background')
+        n_pop_background_degree=int(st.number_input('Polynomial background degree',min_value=0,max_value=8,value=2,key='ts_npop_background_degree'))
+        n_pop_recoil=st.checkbox('Include single-scattering Compton recoil and polarized Klein-Nishina weighting',value=False,key='ts_npop_recoil')
+        n_pop_recoil_limit=st.text_input('Maximum accepted no-recoil Compton correction fraction',value='0.01',key='ts_npop_recoil_limit')
+        if st.button('Fit N-population Thomson spectrum',type='primary',key='run_ts_npop_fit'):
+            try:
+                if n_pop_spectrum is None or n_pop_response is None:
+                    raise ValueError('Upload both measured calibrated spectrum and measured response matrix.')
+                table=pd.read_csv(n_pop_spectrum,header=None).to_numpy(dtype=float)
+                if table.ndim!=2 or table.shape[1]!=2:
+                    raise ValueError('Spectrum CSV must contain exactly wavelength_nm and calibrated intensity columns.')
+                if np.any(np.diff(table[:,0])<=0):
+                    raise ValueError('Calibrated wavelength samples must already be strictly increasing; TIS does not reorder them.')
+                if n_pop_uncertainty is not None and n_pop_covariance is not None:
+                    raise ValueError('Supply pointwise uncertainty or full spectral covariance, not both.')
+                optional={}
+                if n_pop_uncertainty is not None:
+                    optional['signal_uncertainty']=pd.read_csv(n_pop_uncertainty,header=None).to_numpy(dtype=float).reshape(-1)
+                if n_pop_covariance is not None:
+                    optional['spectral_covariance']=pd.read_csv(n_pop_covariance,header=None).to_numpy(dtype=float)
+                temperatures=[float(v.strip()) for v in n_pop_temperatures.split(',') if v.strip()]
+                fractions=[float(v.strip()) for v in n_pop_fractions.split(',') if v.strip()]
+                if len(temperatures)!=n_pop_count or len(fractions)!=n_pop_count:
+                    raise ValueError('Enter exactly one initial temperature and fraction per selected population.')
+                result=fit_n_population_relativistic_thomson_spectrum(
+                    table[:,0],table[:,1],
+                    _parse_ts_scalar(n_pop_laser,'Laser wavelength',minimum=1e-12),
+                    _parse_ts_scalar(n_pop_angle,'Scattering angle',minimum=1e-12),
+                    pd.read_csv(n_pop_response,header=None).to_numpy(dtype=float),
+                    population_count=n_pop_count,
+                    initial_temperatures_eV=temperatures,
+                    initial_fractions=fractions,
+                    initial_flow_projection_m_s=_parse_ts_scalar(n_pop_flow,'Initial flow projection'),
+                    incident_polarization=_parse_ts_vector(n_pop_polarization,'Incident polarization'),
+                    background_model=n_pop_background,
+                    background_degree=n_pop_background_degree,
+                    include_compton_recoil=bool(n_pop_recoil),
+                    maximum_recoil_correction_fraction=_parse_ts_scalar(n_pop_recoil_limit,'Maximum no-recoil Compton correction fraction',minimum=1e-12,maximum=0.999999),
+                    **optional,
+                )
+                st.success('N-population relativistic Thomson fit completed within its declared model scope.')
+                st.dataframe(pd.DataFrame({'population':np.arange(n_pop_count),'Te (eV)':result['population_temperatures_eV'],'number fraction':result['population_number_fractions']}))
+                st.metric('Scattering-vector flow projection',f"{result['electron_flow_projection_m_s']:.5g} m/s")
+                st.json(result)
+                json_download('Export N-population Thomson fit and covariance',result,'tis_thomson_n_population_fit.json')
+                add_report_section('N-population relativistic optical Thomson inference',result)
+            except Exception as exc:
+                st.error(f'N-population Thomson inference failed: {exc}')
     elif workflow=='Analysis 1 / Kappa-MJ structured-background subanalysis':
         from tokamak_analysis.thomson_workflow import fit_noncollective_kinetic_thomson_with_background
         st.info('Joint measured-spectrum fit for a finite-variance isotropic Kappa projection or relativistic Maxwell-Juttner electrons, with detector-space background coefficients optimized simultaneously. The full local covariance retains physical/amplitude/background cross terms. Absolute density is not inferred.')
