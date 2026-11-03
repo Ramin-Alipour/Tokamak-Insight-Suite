@@ -190,16 +190,58 @@ def analyze_full_em_cts_spatial_profiles(
     profiles = unpack(fit.x)
     predicted = forward(fit.x)
     residual_spectrum = y - predicted - background
-    singular = np.linalg.svd(np.asarray(fit.jac), compute_uv=False)
-    tol = np.finfo(float).eps * max(fit.jac.shape) * (singular[0] if singular.size else 0.0)
-    rank = int(np.count_nonzero(singular > tol))
-    identifiable = rank == fit.x.size
-    log_cov = np.linalg.pinv(fit.jac.T @ fit.jac, rcond=1e-12) if identifiable else None
+    # Identifiability must be assessed from measured spectral information
+    # alone.  The augmented least-squares Jacobian also contains regularization
+    # rows; counting those rows as data can make an underdetermined profile
+    # appear identifiable and produce a falsely finite covariance.
+    def data_residual(x):
+        return np.linalg.solve(chol, forward(x) + background - y)
+
+    data_jacobian = np.empty((y.size, fit.x.size), dtype=float)
+    for column in range(fit.x.size):
+        step = 1.0e-5 * max(abs(float(fit.x[column])), 1.0)
+        plus = fit.x.copy()
+        minus = fit.x.copy()
+        if fit.x[column] - step < lo[column]:
+            plus[column] += step
+            data_jacobian[:, column] = (
+                data_residual(plus) - data_residual(fit.x)
+            ) / step
+        elif fit.x[column] + step > hi[column]:
+            minus[column] -= step
+            data_jacobian[:, column] = (
+                data_residual(fit.x) - data_residual(minus)
+            ) / step
+        else:
+            plus[column] += step
+            minus[column] -= step
+            data_jacobian[:, column] = (
+                data_residual(plus) - data_residual(minus)
+            ) / (2.0 * step)
+
+    data_singular = np.linalg.svd(data_jacobian, compute_uv=False)
+    data_tol = (
+        np.finfo(float).eps * max(data_jacobian.shape)
+        * (data_singular[0] if data_singular.size else 0.0)
+    )
+    data_rank = int(np.count_nonzero(data_singular > data_tol))
+    augmented_jacobian = np.asarray(fit.jac, dtype=float)
+    augmented_singular = np.linalg.svd(augmented_jacobian, compute_uv=False)
+    augmented_tol = (
+        np.finfo(float).eps * max(augmented_jacobian.shape)
+        * (augmented_singular[0] if augmented_singular.size else 0.0)
+    )
+    augmented_rank = int(np.count_nonzero(augmented_singular > augmented_tol))
+    identifiable = data_rank == fit.x.size
+    log_cov = (
+        np.linalg.pinv(augmented_jacobian.T @ augmented_jacobian, rcond=1e-12)
+        if identifiable and augmented_rank == fit.x.size else None
+    )
     scale = np.diag(np.exp(fit.x))
     profile_cov = scale @ log_cov @ scale if log_cov is not None else None
     whitened = np.linalg.solve(chol, residual_spectrum)
     chi2 = float(whitened @ whitened)
-    dof = max(y.size - rank, 1)
+    dof = max(y.size - data_rank, 1)
     sensitivity = None
     if regularization_sensitivity_strengths is not None:
         grid = _vector(regularization_sensitivity_strengths, "regularization_sensitivity_strengths", positive=True)
@@ -248,9 +290,20 @@ def analyze_full_em_cts_spatial_profiles(
         "profile_covariance_relative": profile_cov,
         "log_profile_covariance": log_cov,
         "profile_identifiability": {
-            "jacobian_rank": rank, "parameter_count": int(fit.x.size),
-            "locally_identifiable": bool(identifiable), "singular_values": singular,
-            "condition_number": float(singular[0]/singular[-1]) if singular.size and singular[-1] > 0 else float("inf"),
+            "jacobian_rank": data_rank,
+            "data_only_jacobian_rank": data_rank,
+            "augmented_jacobian_rank": augmented_rank,
+            "parameter_count": int(fit.x.size),
+            "locally_identifiable": bool(identifiable),
+            "data_only_singular_values": data_singular,
+            "augmented_singular_values": augmented_singular,
+            "condition_number": (
+                float(data_singular[0]/data_singular[-1])
+                if data_singular.size and data_singular[-1] > 0 else float("inf")
+            ),
+            "regularization_contributed_to_identifiability": bool(
+                augmented_rank > data_rank
+            ),
         },
         "frequency_shift_Hz": f.copy(), "measured_spectrum": y.copy(),
         "fitted_spectrum": predicted + background, "physical_signal_spectrum": predicted,
@@ -265,7 +318,7 @@ def analyze_full_em_cts_spatial_profiles(
         "limitations": [
             "Profiles are relative to supplied reference density and temperatures.",
             "Spatial nodes, ray geometry, beam weights and polarizations are fixed supplied inputs.",
-            "Profile covariance is omitted when the augmented Jacobian is rank deficient.",
+            "Profile covariance is omitted whenever the data-only spectral Jacobian is rank deficient; regularization cannot establish data identifiability.",
             "No conserving collision operator, non-paraxial propagation or experimental validation is implied.",
         ],
     }
