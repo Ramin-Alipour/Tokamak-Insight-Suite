@@ -461,7 +461,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     fast_ion=None,global_search=False,random_seed=1729, inversion_method=None,
     spectral_covariance=None, instrument_response_uncertainty=None, response_mc_samples=100,
     regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None,
-    background_reference_spectra=None, background_components=None):
+    background_reference_spectra=None, background_components=None,
+    background_reference_basis_mc_samples=200, background_reference_basis_mc_seed=1729):
     """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
     electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
     Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
@@ -958,6 +959,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
           "conditional_linear_nuisance_covariance_scaled_by_fit_residual_variance"
       ),
       "background_reference_basis_uncertainty_propagated":False,
+      "background_reference_basis_covariance":None,
+      "background_reference_basis_parameter_order":[],
+      "background_reference_basis_uncertainty_status":"not_applicable_no_reference_PCA" if background_basis is None else "not_computed",
       "background_reference_mean":None if background_reference_mean is None else background_reference_mean.copy(),
       "background_pca_components_used":int(background_pca_components_used),
       "background_provenance":"single fitted constant offset nuisance" if background_basis is None else "PCA nuisance subspace derived only from supplied calibrated reference spectra on the same frequency grid; no reference data are modified or recalibrated",
@@ -974,6 +978,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
        "Fast-ion VDF support is one-dimensional; fixed-tabulated mode treats shape as external, while infer_tabulated_1d reconstructs it under grid and regularization constraints.",
        "Model discrepancy remains a separate diagnostic and is not automatically a confidence interval.","Response-matrix uncertainty is propagated by Monte Carlo when supplied.",
        "The optional structured background uses PCA modes from explicitly supplied calibrated reference spectra; it is conditional on those references and does not infer or calibrate missing background measurements."]}
+    if background_basis is not None:
+        if isinstance(background_reference_basis_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_basis_mc_samples, (int, np.integer)) or background_reference_basis_mc_samples < 30:
+            raise ValueError("background_reference_basis_mc_samples must be an integer >=30 when PCA reference background is selected")
+        from .advanced_inference import bootstrap_reference_pca_basis
+        basis_uncertainty = bootstrap_reference_pca_basis(
+            reference, components=background_pca_components_used,
+            bootstrap_samples=int(background_reference_basis_mc_samples),
+            random_seed=int(background_reference_basis_mc_seed),
+        )
+        out["background_reference_basis_covariance"] = basis_uncertainty["bootstrap_parameter_covariance"]
+        out["background_reference_basis_parameter_order"] = basis_uncertainty["bootstrap_parameter_order"]
+        out["background_reference_basis_relative_singular_value_gaps"] = basis_uncertainty["component_relative_singular_value_gaps"]
+        out["background_reference_basis_weakly_identified_components"] = basis_uncertainty["weakly_identified_components"]
+        out["background_reference_basis_bootstrap_samples"] = basis_uncertainty["bootstrap_samples"]
+        out["background_reference_basis_uncertainty_status"] = "bootstrap_covariance_of_reference_mean_and_PCA_basis;_not_yet_propagated_to_plasma_parameter_covariance"
+        out["background_reference_basis_uncertainty_propagated"] = False
     if out["reduced_chi_square"] is not None:
         discrepancy_scale=max(float(out["reduced_chi_square"])-1.0,0.0)
         discrepancy_covariance=discrepancy_scale*cov
