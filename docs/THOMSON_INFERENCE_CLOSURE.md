@@ -84,9 +84,10 @@ residual-scaled and is not measurement-noise uncertainty. Absolute density is
 not inferred. Kappa is screened by the declared non-relativistic limits
 \(T_e/(m_ec^2)<0.01\) and \(|v_q|/c<0.1\).
 
-This is a distinct lower-level workflow subanalysis. It does not silently
-replace the existing channel-wise selector or claim that every dashboard path
-has been migrated to this fitter.
+This is a distinct lower-level workflow subanalysis and is now exposed in the
+Advanced Analysis dashboard. It does not silently replace the existing
+channel-wise physical-model selector; users must explicitly open the dedicated
+Kappa/MJ structured-background subanalysis.
 
 ### Generalized tabulated electron VDF in electrostatic CTS
 
@@ -115,9 +116,9 @@ unless the caller includes them in the same realization.
 
 ### Recoil contract and joint profile status
 
-The Compton/recoil selector is recorded in the primary optical inference,
+The Compton/recoil selector is exposed in the primary optical inference,
 joint spatial-spectral path, relativistic multi-channel GLS and two-population
-MJ registry inputs. The output must distinguish polarized elastic Thomson
+MJ dashboard and registry inputs. The output must distinguish polarized elastic Thomson
 scattering from single-scattering Compton kinematics with polarized
 Klein-Nishina weighting; neither branch claims multiple-scattering transport.
 
