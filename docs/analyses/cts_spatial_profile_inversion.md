@@ -27,9 +27,12 @@ The fitted quantities are log-relative node profiles. The default prior is a
 second-difference penalty; a researcher-supplied node-space operator and
 parameter-specific strengths are accepted. The penalty is reported separately
 from measurement covariance. A full spectral covariance is Cholesky-whitened.
-The local profile covariance is returned only when the augmented Jacobian has
-full column rank; otherwise the fit is explicitly marked locally
-non-identifiable and no finite covariance is asserted. An optional strictly
+The local profile covariance is returned only when the data-only spectral
+Jacobian has full column rank. Regularization rows are excluded from this
+identifiability test: a smoothness penalty can stabilize an inverse but cannot
+create information absent from the measured spectrum. The augmented Jacobian
+rank is reported separately, and covariance is withheld whenever the data-only
+rank is deficient. An optional strictly
 increasing grid of regularization strengths reruns the full inverse and
 reports profile spread as regularization-choice sensitivity, separate from
 measurement uncertainty.
