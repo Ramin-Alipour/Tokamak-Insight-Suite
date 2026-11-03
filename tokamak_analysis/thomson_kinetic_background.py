@@ -366,3 +366,7 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if recoil else "polarized_elastic_Thomson") if model=="relativistic_maxwell_juttner" else "isotropic_finite_variance_Kappa_projection",
         "experimental_validation": "not_performed"
     }
+
+
+# Public canonical name resolves to the full joint-covariance implementation.
+fit_noncollective_kinetic_thomson_with_background = fit_noncollective_kinetic_thomson_with_joint_background
