@@ -243,6 +243,7 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
     bg_templates = kw.pop("background_templates", None)
     uncertainty = kw.pop("measurement_uncertainty", None)
     covariance = kw.pop("measurement_covariance", None)
+    model_discrepancy_covariance = kw.pop("model_discrepancy_covariance", None)
     polarization = kw.pop("incident_polarization", None)
     radial_order = kw.pop("radial_order", 36)
     angular_order = kw.pop("angular_order", 18)
@@ -275,21 +276,40 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         sigma = _real_vector(uncertainty, "measurement_uncertainty")
         if sigma.shape != y.shape or np.any(sigma <= 0):
             raise ValueError("measurement_uncertainty must be positive and match the spectrum")
-        whiten = lambda z: np.asarray(z) / sigma
+        total_covariance = np.diag(sigma**2)
         noise = "supplied_pointwise_measurement_uncertainty"
     elif covariance is not None:
-        cov = np.asarray(covariance, dtype=float)
-        if cov.shape != (x.size, x.size) or np.any(~np.isfinite(cov)) or not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-13):
-            raise ValueError("measurement_covariance must be finite symmetric and wavelength-sized")
-        try:
-            chol = np.linalg.cholesky(cov)
-        except np.linalg.LinAlgError as exc:
-            raise ValueError("measurement_covariance must be positive definite") from exc
-        whiten = lambda z: np.linalg.solve(chol, np.asarray(z))
+        total_covariance = np.asarray(covariance, dtype=float)
         noise = "supplied_full_spectral_covariance"
     else:
-        whiten = lambda z: np.asarray(z)
+        total_covariance = None
         noise = "unweighted_no_measurement_uncertainty_supplied"
+
+    if model_discrepancy_covariance is not None:
+        discrepancy = np.asarray(model_discrepancy_covariance, dtype=float)
+        if (discrepancy.shape != (x.size, x.size)
+                or np.any(~np.isfinite(discrepancy))
+                or not np.allclose(discrepancy, discrepancy.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError("model_discrepancy_covariance must be finite, symmetric and wavelength-sized")
+        try:
+            np.linalg.cholesky(discrepancy)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("model_discrepancy_covariance must be positive definite") from exc
+        total_covariance = discrepancy.copy() if total_covariance is None else total_covariance + discrepancy
+        noise = "measurement_plus_model_discrepancy_covariance" if uncertainty is not None or covariance is not None else "model_discrepancy_covariance_only"
+
+    if total_covariance is not None:
+        if (total_covariance.shape != (x.size, x.size)
+                or np.any(~np.isfinite(total_covariance))
+                or not np.allclose(total_covariance, total_covariance.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError("combined spectral covariance must be finite, symmetric and wavelength-sized")
+        try:
+            chol = np.linalg.cholesky(total_covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("combined spectral covariance must be positive definite") from exc
+        whiten = lambda z: np.linalg.solve(chol, np.asarray(z))
+    else:
+        whiten = lambda z: np.asarray(z)
     basis = _background_design(x, bg_model, degree=bg_degree, interior_knots=bg_knots, templates=bg_templates)
     if response.shape != (x.size, x.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("instrument_response must be a measured non-negative column-normalized square matrix")
@@ -375,7 +395,9 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         "jacobian_rank": rank, "jacobian_parameter_count": int(fit.x.size),
         "jacobian_condition_number": cond, "optimizer_success": bool(fit.success),
         "noise_model": noise,
-        "covariance_status": "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty" if noise.startswith("unweighted") else "local_joint_GLS_covariance_conditional_on_supplied_measurement_covariance",
+        "model_discrepancy_covariance_included": model_discrepancy_covariance is not None,
+        "model_discrepancy_covariance_semantics": "researcher_supplied_independent_additive_spectral_covariance; cross-covariance with measurement noise is assumed zero" if model_discrepancy_covariance is not None else "not_supplied",
+        "covariance_status": "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty" if total_covariance is None else "local_joint_GLS_covariance_conditional_on_combined_measurement_and_model_discrepancy_covariance",
         "absolute_density_inferred": False, "theta_e": theta_e, "bulk_flow_beta": beta_flow,
         "recoil_included": bool(recoil) if model=="relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if recoil else "polarized_elastic_Thomson") if model=="relativistic_maxwell_juttner" else "isotropic_finite_variance_Kappa_projection",
