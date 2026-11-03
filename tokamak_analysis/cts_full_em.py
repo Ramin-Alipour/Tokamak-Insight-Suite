@@ -1017,6 +1017,10 @@ def _resonance_broadening_metadata(damping_rate_rad_s, *, caller_supplied, probe
     """Describe the Full-EM resonance regularizer without implying collisions."""
     damping = _positive(damping_rate_rad_s, "damping_rate_rad_s")
     frequency = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    if not caller_supplied:
+        expected_default = max(2.0 * np.pi * frequency * 1e-7, 1.0)
+        if not np.isclose(damping, expected_default, rtol=1e-12, atol=0.0):
+            raise ValueError("default resonance regularization does not match the documented numerical rule")
     return {
         "damping_rate_rad_s": float(damping),
         "damping_rate_source": (
