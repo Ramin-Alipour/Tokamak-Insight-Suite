@@ -460,6 +460,8 @@ def _fit_noncollective(
                       "nfev": int(fit.nfev), "jacobian_rank": int(np.linalg.matrix_rank(fit.jac)),
                       "parameter_count": int(fit.x.size)},
         "uncertainty_interpretation": (
+            "local covariance from the independent Poisson-deviance likelihood curvature"
+            if likelihood == "poisson" else
             "local covariance from supplied pointwise measurement uncertainty"
             if uncertainty is not None else
             "residual-variance-scaled local covariance; not measurement-noise-calibrated"
