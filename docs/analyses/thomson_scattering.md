@@ -150,25 +150,43 @@ dispersion algorithm of Skolar et al. and does not represent an arbitrary
 anisotropic EVDF. Background basis coefficients remain nuisance parameters
 and do not contribute artificial rank to the data-only identifiability test.
 
-## Additive model-discrepancy covariance for kinetic fits
+## Additive model-discrepancy covariance
 
-The joint structured-background Kappa and relativistic Maxwell-Juttner fit
-(`fit_noncollective_kinetic_thomson_with_background`) accepts an optional
-`model_discrepancy_covariance` in measured spectral-intensity units squared.
-It is a researcher-supplied, wavelength-resolved covariance representing
-uncertainty in the selected forward model, and is added to either the supplied
-pointwise measurement variance or the supplied measurement covariance before
-GLS whitening. It may also be used alone, in which case the result is explicitly
-labelled as discrepancy-weighted rather than measurement-noise-weighted.
+The canonical channel-wise optical API
+(`analyze_thomson_spectra`) accepts a researcher-supplied
+`model_discrepancy_covariance` for each of the three selected non-collective
+optical models: Maxwellian, isotropic Kappa and relativistic Maxwell-Juttner.
+The accepted shapes are `(n_wavelength, n_wavelength)` (one common spectral
+covariance broadcast to every channel) or
+`(n_channels, n_wavelength, n_wavelength)` (channel-specific blocks).
+Values are in calibrated spectral-intensity units squared. Each block must
+be finite, symmetric and positive semidefinite. It is added once to the
+corresponding measurement covariance; if only pointwise measurement
+uncertainties are supplied, their diagonal variance is combined with the
+discrepancy block. If neither measurement uncertainty nor measurement
+covariance is supplied, the discrepancy block is the spectral weighting
+covariance and must be usable by the GLS factorization (positive definite).
+No silent diagonal jitter or eigenvalue clipping is applied.
 
-The matrix must be finite, symmetric, wavelength-sized and positive definite;
-the implementation rejects invalid or singular matrices rather than silently
-regularizing them. The implementation assumes zero cross-covariance between
-measurement noise and model discrepancy. The resulting parameter covariance
-is conditional on that additive covariance model. This extension is limited
-to the joint structured-background Kappa/MJ workflow; it does not imply that
-the canonical channel-wise Maxwellian/Kappa/MJ fitters or microwave CTS
-automatically consume the same covariance.
+For a relativistic Maxwell-Juttner fit with a supplied full channel-major
+`joint_spectral_covariance`, the channel discrepancy blocks are added to
+the matching diagonal blocks while the supplied cross-channel measurement
+covariance is retained. The current discrepancy input does not describe
+cross-channel model-discrepancy correlations; those off-diagonal discrepancy
+blocks are therefore not inferred or fabricated. Maxwellian and Kappa use
+channel-wise fits, so their current discrepancy contract is likewise
+channel-block based rather than a shared-parameter multichannel GLS model.
+
+A separate joint structured-background Kappa/MJ workflow
+(`fit_noncollective_kinetic_thomson_with_background`) accepts its own
+wavelength-sized covariance for one spectrum and adds it to the supplied
+measurement variance/covariance before GLS whitening. Its physical/background
+nuisance treatment and covariance output are distinct from the canonical
+channel-wise API. In every path, measurement-noise/model-discrepancy
+cross-covariance is assumed zero, and resulting parameter uncertainties are
+conditional on the supplied covariance model. Microwave CTS does not consume
+this optical discrepancy argument; it requires a separately defined
+CTS-specific discrepancy model.
 
 ## Electron density and identifiability
 
