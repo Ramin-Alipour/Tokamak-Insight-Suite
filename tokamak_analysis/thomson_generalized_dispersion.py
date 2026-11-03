@@ -125,8 +125,11 @@ def collective_tabulated_electron_spectral_density(
     vi = np.asarray(ion_velocity_m_s, dtype=float)
     if fractions.shape != (len(species),) or temperatures.shape != (len(species),):
         raise ValueError("ion_fractions and ion_temperature_eV must provide one value per species")
-    if np.any(fractions <= 0) or not np.isclose(np.sum(fractions), 1.0, rtol=1e-6, atol=1e-8) or np.any(temperatures <= 0):
-        raise ValueError("ion fractions must be positive and sum to one; ion temperatures must be positive")
+    if (np.any(~np.isfinite(fractions)) or np.any(~np.isfinite(temperatures))
+            or np.any(fractions <= 0)
+            or not np.isclose(np.sum(fractions), 1.0, rtol=1e-6, atol=1e-8)
+            or np.any(temperatures <= 0)):
+        raise ValueError("ion fractions must be finite, positive and sum to one; ion temperatures must be finite and positive")
     if vi.shape == (3,) and len(species) == 1:
         vi = vi.reshape(1, 3)
     if vi.shape != (len(species), 3) or np.any(~np.isfinite(vi)) or np.any(np.linalg.norm(vi, axis=1) >= C):
