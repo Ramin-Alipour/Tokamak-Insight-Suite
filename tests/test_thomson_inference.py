@@ -1304,3 +1304,45 @@ def test_kappa_fit_rejects_simultaneous_pointwise_and_full_covariance():
             wavelength, signal, 532.0, np.pi / 2.0, np.eye(wavelength.size),
             np.ones(wavelength.size), spectral_covariance=np.eye(wavelength.size),
         )
+
+
+def test_relativistic_maxwell_juttner_adds_model_discrepancy_to_joint_spectral_covariance():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(526.0, 538.0, 121)
+    laser = 532.0
+    angle = np.pi / 2
+    incident = np.array([1.0, 0.0, 0.0])
+    scattered = np.array([0.0, 1.0, 0.0])
+    polarization = np.array([0.0, 1.0, 0.0])
+    polarization_local = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+    shape = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 200.0,
+        flow_projection_m_s=2.0e4,
+        incident_polarization=polarization_local,
+    )["spectral_density_per_nm"]
+    measured = 700.0 * shape + 0.04 + 0.001 * (wavelength - laser)
+    measurement_covariance = np.eye(wavelength.size) * 0.015**2
+    discrepancy_covariance = np.eye(wavelength.size) * 0.004**2
+
+    out = analyze_thomson_spectra(
+        wavelength, measured[None, :], [0.2],
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(wavelength.size),
+        incident_direction=incident, scattered_direction=scattered,
+        incident_polarization=polarization,
+        model="non_collective_relativistic_maxwell_juttner",
+        joint_spectral_covariance=measurement_covariance,
+        model_discrepancy_covariance=discrepancy_covariance,
+        enable_evdf_reconstruction=False,
+    )
+
+    fit = out["channels"][0]
+    assert fit["spectral_weighting_status"] == (
+        "full_channel_major_generalized_least_squares"
+    )
+    assert fit["fit_covariance_interpretation"] == (
+        "local_parameter_covariance_from_supplied_measurement_noise_model"
+    )
+    assert fit["fit_covariance"].shape == (5, 5)
+    assert out["joint_inference"]["fit_covariance"].shape == (4, 4)
