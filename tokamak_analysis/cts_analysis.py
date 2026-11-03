@@ -131,7 +131,13 @@ def _species(species,fractions):
     out=[]
     for i,s in enumerate(species):
         if not isinstance(s,Mapping): raise ValueError("each ion species must be a mapping")
-        out.append({"name":str(s.get("name",f"ion_{i}")),"Z":_positive(s.get("charge_state"),"charge_state"),
+        charge_state = _positive(s.get("charge_state"), "charge_state")
+        # Ionic charge state is a discrete number of elementary charges.  A
+        # non-integer value silently changes both the plasma frequency and
+        # the Z^2 fluctuation weighting, so do not accept it as a real scalar.
+        if not charge_state.is_integer():
+            raise ValueError("charge_state must be a positive integer number of elementary charges")
+        out.append({"name":str(s.get("name",f"ion_{i}")),"Z":int(charge_state),
                     "mass":_positive(s.get("mass_amu"),"mass_amu")*AMU,"fraction":float(frac[i])})
     return out
 
