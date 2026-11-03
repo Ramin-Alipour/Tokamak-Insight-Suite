@@ -75,8 +75,13 @@ def solve_stratified_full_wave(omega_rad_s, z_m, epsilon_r, *,
                              + 1j*np.interp(s, z, eps[:, i, j].imag)
                              for j in range(3)] for i in range(3)])
         return (berreman_matrix(w, e_local) @ flat.reshape(4, 4)).ravel()
+    solver_options = {"method": "DOP853", "rtol": rtol, "atol": atol}
+    if max_step_m is not None:
+        if not np.isfinite(max_step_m) or max_step_m <= 0:
+            raise ValueError("max_step_m must be positive and finite when supplied")
+        solver_options["max_step"] = float(max_step_m)
     sol = solve_ivp(rhs, (z[0], z[-1]), np.eye(4, dtype=complex).ravel(),
-                    method="DOP853", rtol=rtol, atol=atol, max_step=max_step_m)
+                    **solver_options)
     if not sol.success:
         raise RuntimeError("full-wave fundamental-matrix integration failed: " + sol.message)
     transfer = sol.y[:, -1].reshape(4, 4)
@@ -101,7 +106,6 @@ def solve_stratified_full_wave(omega_rad_s, z_m, epsilon_r, *,
         "incident_electric_amplitude_V_m": inc,
         "reflected_electric_amplitude_V_m": reflected,
         "transmitted_electric_amplitude_V_m": transmitted,
-        "reflection_matrix": np.linalg.solve(backward, backward)[:2,:2] if False else None,
         "incident_power_flux_W_m2": pin,
         "reflected_power_flux_W_m2": pref,
         "transmitted_power_flux_W_m2": ptrans,
