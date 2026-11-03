@@ -26,12 +26,16 @@ covariance using squared-exponential, Matérn-3/2 or Matérn-5/2 kernels.
 Amplitude, length scale and nugget are explicit inputs; no values are inferred
 from reduced chi-square. Electrostatic CTS accepts this covariance through
 `model_discrepancy_covariance` and adds it to the measurement covariance
-before GLS whitening. When supplied, the legacy reduced-chi-square
-overdispersion inflation is not added on top.
+before GLS whitening. Optical Thomson accepts a shared wavelength covariance
+or one covariance block per channel and uses it in the Maxwellian GLS residual.
+When supplied, the legacy reduced-chi-square overdispersion inflation is not
+added on top.
 
 The GP helper does not estimate hyperparameters. They must be selected using a
-declared likelihood/model-comparison procedure. The same covariance is not yet
-wired into every optical Thomson or Full-EM CTS fit.
+declared likelihood/model-comparison procedure. Optical Thomson currently
+consumes this covariance in the non-collective Maxwellian fit only; Kappa,
+relativistic and collective optical fits and the Full-EM CTS fit do not yet
+consume it.
 
 ## CTS reference-PCA basis uncertainty
 
