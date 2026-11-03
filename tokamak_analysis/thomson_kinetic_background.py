@@ -347,6 +347,14 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         joint_cov *= float(fit.fun@fit.fun/dof)
     background = basis@fit.x[nphys+1:]
     fitted = predict(fit.x)
+    if model == "kappa":
+        theta_e = float(fit.x[0] / _E_REST_EV)
+        beta_flow = float(abs(fit.x[1]) / _C)
+        if theta_e >= 0.01 or beta_flow >= 0.1:
+            raise ValueError("non-relativistic Kappa model rejected by its declared theta_e < 0.01 and |v|/c < 0.1 screening policy")
+    else:
+        theta_e = float(fit.x[0] / _E_REST_EV)
+        beta_flow = float(abs(fit.x[1]) / _C)
     return {
         "physical_model": model, "physical_parameters": fit.x[:nphys].copy(),
         "physical_parameter_names": ["electron_temperature_eV","electron_velocity_projection_m_s"]+(["kappa_index"] if model=="kappa" else []),
@@ -362,7 +370,8 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         "jacobian_condition_number": cond, "optimizer_success": bool(fit.success),
         "noise_model": noise,
         "covariance_status": "residual_scaled_unweighted_joint_covariance_not_measurement_uncertainty" if noise.startswith("unweighted") else "local_joint_GLS_covariance_conditional_on_supplied_measurement_covariance",
-        "absolute_density_inferred": False, "recoil_included": bool(recoil) if model=="relativistic_maxwell_juttner" else False,
+        "absolute_density_inferred": False, "theta_e": theta_e, "bulk_flow_beta": beta_flow,
+        "recoil_included": bool(recoil) if model=="relativistic_maxwell_juttner" else False,
         "cross_section_model": ("polarized_single_scattering_Klein_Nishina" if recoil else "polarized_elastic_Thomson") if model=="relativistic_maxwell_juttner" else "isotropic_finite_variance_Kappa_projection",
         "experimental_validation": "not_performed"
     }
