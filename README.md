@@ -75,7 +75,8 @@ Public real-data archives and access notes: [Public Tokamak Data Sources](docs/p
 
 **Optional community research:** existing public-data examples and benchmark notes are exploratory resources, not release gates. Researchers may share reproducible cases whether or not an independent reference result is available.
 
-**Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).
+**Formula and physics notes:** [equations, units, assumptions, uncertainty limitations, and edge-case handling](docs/formula_physics_audit.md).  
+**Thomson inference closure:** [joint physical/background fitting, ne/Te/Ti profile inversion, identifiability and recoil semantics](docs/THOMSON_INFERENCE_CLOSURE.md).
 
 **Analysis structure:** TIS presents **20 primary analysis families** (19 physical/diagnostic families plus one shared instrumentation-support family), grouping all **80 registered underlying analysis entry points** without deleting their distinct computational workflows. See [the primary-analysis structure](docs/ANALYSIS_STRUCTURE.md) and [implementation coverage audit: 80 diagnostic records, 80 ordered entry points, and 39 formula contracts](docs/implementation_coverage_audit.md). Registry maturity describes implementation scope; it is not a scientific-approval gate. For a machine-generated, reconciled status summary, run `python -m tis.cli catalog --kind status --output-dir artifacts/diagnostic-status`; see [Diagnostic status reporting](docs/diagnostic_status_reporting.md).
 
