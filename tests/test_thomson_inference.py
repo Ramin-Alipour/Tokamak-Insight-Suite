@@ -1416,3 +1416,38 @@ def test_kappa_channel_fit_supports_joint_polynomial_detector_background():
     assert channel["electron_temperature_eV"] == pytest.approx(te, rel=0.08)
     assert channel["kappa_index"] == pytest.approx(kappa, rel=0.12)
     assert np.sqrt(np.mean(channel["residual"]**2)) < 0.5
+
+
+def test_relativistic_mj_channel_fit_uses_selected_structured_background_and_joint_covariance():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    x = np.linspace(480.0, 584.0, 521)
+    physical = relativistic_maxwell_juttner_spectrum(
+        x, 532.0, np.pi / 2.0, 1000.0,
+        flow_projection_m_s=1.5e4,
+        incident_polarization=np.array([0.0, 1.0, 0.0]),
+        radial_order=24, angular_order=12,
+        require_full_spectrum=False,
+    )
+    z = (x - 532.0) / 52.0
+    background = 18.0 + 2.0*z - 0.8*(0.5*(3.0*z*z - 1.0))
+    measured = 2.5e4 * physical["spectral_density_per_nm"] + background
+    out = _analyze_thomson_spectra(
+        x, measured[None, :], [0.2],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(x.size),
+        signal_uncertainty=np.full((1, x.size), 0.5),
+        incident_direction=[1.0, 0.0, 0.0],
+        scattered_direction=[0.0, 1.0, 0.0],
+        incident_polarization=[0.0, 1.0, 0.0],
+        model="non_collective_relativistic_maxwell_juttner",
+        background_model="polynomial", background_degree=2,
+        include_compton_recoil=False,
+    )
+    channel = out["channels"][0]
+    assert channel["background_model"] == "polynomial"
+    assert channel["fit_covariance_includes_background_cross_terms"] is True
+    assert channel["fit_covariance"].shape == (6, 6)
+    assert channel["electron_temperature_eV"] == pytest.approx(1000.0, rel=0.15)
+    assert channel["integrated_scattered_power_W"] > 0.0
+    assert channel["integrated_scattered_power_uncertainty_W"] > 0.0
