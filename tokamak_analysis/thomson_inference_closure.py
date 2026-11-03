@@ -215,14 +215,20 @@ def reconstruct_joint_thomson_profiles(
     dof = max(1, y.size - data_jac.shape[1])
     cov = None
     covariance_status = "not_reported_data_non_identifiable"
-    if data_ident["identifiable"]:
+    if result.success and data_ident["identifiable"]:
         cov = np.linalg.pinv(result.jac.T @ result.jac)
         if noise_model == "unweighted_no_measurement_uncertainty_supplied":
             cov *= float(np.sum(data_residual(result.x)**2) / dof)
             covariance_status = "regularized_unweighted_local_covariance_residual_scaled"
         else:
             covariance_status = "regularized_local_covariance_conditional_on_supplied_measurement_covariance"
-    status = "primary_data_identifiable" if data_ident["identifiable"] else "non_identifiable_regularized_solution"
+    if not result.success:
+        status = "optimizer_failed"
+        covariance_status = "not_reported_optimizer_failed"
+    elif data_ident["identifiable"]:
+        status = "primary_data_identifiable"
+    else:
+        status = "non_identifiable_regularized_solution"
     return {
         "profiles": {"electron_density_m3": fitted_profiles[0], "electron_temperature_eV": fitted_profiles[1], "ion_temperature_eV": fitted_profiles[2]},
         "profile_order": ["electron_density_m3", "electron_temperature_eV", "ion_temperature_eV"],
