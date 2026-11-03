@@ -898,8 +898,11 @@ def full_em_cts_spectral_density(
         "retained_cross_correlations": ["electron density-current", "electron density-E", "electron density-B",
             "current-E", "current-B", "E-B"],
         "numerical_controls": {"harmonic_order": int(harmonic_order),
-            "quadrature_order": int(quadrature_order), "damping_rate_rad_s": damping,
-            "damping_rate_source": ("caller_supplied" if damping_rate_rad_s is not None else "documented_numerical_default_max_2pi_probe_frequency_times_1e-7_or_1_rad_per_s")},
+            "quadrature_order": int(quadrature_order),
+            **_resonance_broadening_metadata(
+                damping, caller_supplied=damping_rate_rad_s is not None,
+                probe_frequency_Hz=f0,
+            )},
         "electron_thermal_relativistic_parameter": theta_e,
         "bulk_electron_closure": ("explicit_relativistic_gyrotropic_distribution" if electron_distribution is not None else "Maxwellian_Bindslev_low_temperature_closure"),
         "bulk_electron_closure_validity_status": bindslev_validity_status,
@@ -1009,6 +1012,27 @@ def build_full_em_cts_physical_background(
         "background_uncertainty": "not inferred; supply physical_background_covariance_W2_per_Hz2 for conditional GLS propagation",
     }
     return measured_grid_power, diagnostics
+
+def _resonance_broadening_metadata(damping_rate_rad_s, *, caller_supplied, probe_frequency_Hz):
+    """Describe the Full-EM resonance regularizer without implying collisions."""
+    damping = _positive(damping_rate_rad_s, "damping_rate_rad_s")
+    frequency = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    return {
+        "damping_rate_rad_s": float(damping),
+        "damping_rate_source": (
+            "caller_supplied_numerical_regularization"
+            if caller_supplied
+            else "documented_numerical_default_max_2pi_probe_frequency_times_1e-7_or_1_rad_per_s"
+        ),
+        "damping_rate_is_physical_collision_frequency": False,
+        "resonance_broadening_semantics": (
+            "numerical_resonance_regularization_in_kinetic_denominators_only"
+        ),
+        "collisional_cts_model_status": "not_implemented",
+        "collision_operator": None,
+        "probe_frequency_Hz_for_default_scaling": float(frequency),
+    }
+
 
 def _prepare_full_em_cts_spectral_whitener(
     n_bins, *, signal_uncertainty=None, spectral_covariance=None,
