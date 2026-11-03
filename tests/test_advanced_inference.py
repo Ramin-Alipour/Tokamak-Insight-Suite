@@ -13,6 +13,7 @@ from tokamak_analysis.cts_em_background import (
     planck_spectral_radiance,
     thermal_bremsstrahlung_emissivity_si,
     integrate_thermal_microwave_background,
+    radiance_to_receiver_spectral_power,
 )
 
 
@@ -174,3 +175,13 @@ def test_cts_accepts_independent_correlated_model_discrepancy_covariance():
     assert result["independent_model_discrepancy_supplied"] is True
     assert result["model_discrepancy_model"].startswith("researcher_supplied_correlated")
     assert "model_discrepancy_scale" not in result
+
+
+
+def test_radiance_to_receiver_power_applies_etendue_and_efficiency_once():
+    radiance = np.array([1.0, 2.0, 3.0])
+    power = radiance_to_receiver_spectral_power(
+        radiance, receiver_etendue_m2_sr=0.02,
+        end_to_end_efficiency=0.5,
+    )
+    np.testing.assert_allclose(power, radiance*0.01)
