@@ -67,3 +67,26 @@ def test_thomson_profile_and_spectral_distribution_remain_distinct_workflows():
     assert "scattering_angle_rad" not in distribution_inputs
     assert "electron_velocity_distribution" not in distribution_outputs
     assert "observed_sigma_nm" in distribution_outputs
+
+
+def test_analysis_1_declares_channelwise_background_basis_and_mj_joint_gls():
+    import inspect
+    from tokamak_analysis.thomson_inference import analyze_thomson_spectra
+    from tokamak_analysis.thomson_kinetic_models import fit_relativistic_maxwell_juttner_channels
+
+    entry = get_analysis(1)
+    inputs = {
+        item["name"]: item
+        for item in entry["execution_contract"]["input_specs"]
+    }
+    assert {
+        "background_model", "background_degree",
+        "background_interior_knots", "background_templates",
+    } <= set(inputs)
+    assert "non_collective_relativistic_maxwell_juttner" in inputs["model"]["unit"]
+    assert "background_model" in inspect.signature(analyze_thomson_spectra).parameters
+    parameters = inspect.signature(fit_relativistic_maxwell_juttner_channels).parameters
+    assert {
+        "background_model", "background_degree",
+        "background_interior_knots", "background_templates",
+    } <= set(parameters)
