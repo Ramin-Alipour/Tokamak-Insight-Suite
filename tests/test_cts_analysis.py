@@ -7,6 +7,81 @@ def _case():
     ions=[{"name":"D+","charge_state":1,"mass_amu":2.014}]
     return f0,f,g,ions,[1.],np.eye(f.size)
 
+def test_cts_omitted_background_state_does_not_claim_a_physical_zero():
+    from tokamak_analysis.cts_analysis import cts_spectral_density
+
+    f0, f, geometry, ions, fractions, response = _case()
+    physical = cts_spectral_density(
+        f, f0, geometry,
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+    )
+    measured = 2.4e4 * physical + 3.0
+    result = analyze_cts_spectrum(
+        f, measured,
+        probe_frequency_Hz=f0,
+        scattering_geometry=geometry,
+        ion_species=ions,
+        ion_fractions=fractions,
+        instrument_response=response,
+        electron_density_initial_m3=2.0e19,
+        electron_temperature_initial_eV=1200.0,
+        ion_temperature_initial_eV=800.0,
+        ion_velocity_initial_m_s=0.0,
+        electron_velocity_projection_m_s=0.0,
+        global_search=False,
+        inversion_method="local_least_squares",
+    )
+    assert result["background_state"] == "uncharacterized_constant_offset"
+    assert result["background_state_is_explicit"] is False
+    assert result["background_zero_assumption"] is False
+    assert result["physical_background_zero"] is None
+    assert result["background_state_provenance"] == (
+        "unresolved_legacy_default_constant_offset_nuisance"
+    )
+
+
+def test_cts_explicit_zero_background_declaration_is_preserved():
+    from tokamak_analysis.cts_analysis import cts_spectral_density
+
+    f0, f, geometry, ions, fractions, response = _case()
+    physical = cts_spectral_density(
+        f, f0, geometry,
+        electron_density_m3=2.0e19,
+        electron_temperature_eV=1200.0,
+        ion_temperature_eV=800.0,
+        ion_species=ions,
+        ion_fractions=fractions,
+        electron_velocity_projection_m_s=0.0,
+        ion_velocity_projection_m_s=0.0,
+    )
+    result = analyze_cts_spectrum(
+        f, 2.4e4 * physical,
+        probe_frequency_Hz=f0,
+        scattering_geometry=geometry,
+        ion_species=ions,
+        ion_fractions=fractions,
+        instrument_response=response,
+        electron_density_initial_m3=2.0e19,
+        electron_temperature_initial_eV=1200.0,
+        ion_temperature_initial_eV=800.0,
+        ion_velocity_initial_m_s=0.0,
+        electron_velocity_projection_m_s=0.0,
+        global_search=False,
+        inversion_method="local_least_squares",
+        background_state="assumed_zero",
+    )
+    assert result["background_state"] == "assumed_zero"
+    assert result["background_state_is_explicit"] is True
+    assert result["background_zero_assumption"] is True
+    assert result["physical_background_zero"] is True
+
+
 def test_cts_automatic_optimizer_seed_estimation_from_calibrated_spectral_shape():
     from tokamak_analysis.cts_analysis import estimate_cts_optimizer_initial_parameters
     f0,f,g,ions,frac,response=_case()
