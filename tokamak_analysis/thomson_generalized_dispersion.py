@@ -134,6 +134,14 @@ def collective_tabulated_electron_spectral_density(
     ui = vi @ qhat
     k = 4*np.pi*np.sin(angle/2)/(laser*1e-9)
     vphase = -C*(x-laser)/(2*laser*np.sin(angle/2))
+    if (vgrid.ndim != 1 or fgrid.shape != vgrid.shape or vgrid.size < 9
+            or np.any(~np.isfinite(vgrid)) or np.any(~np.isfinite(fgrid))
+            or np.any(np.diff(vgrid) <= 0) or np.any(fgrid < 0)):
+        raise ValueError("electron velocity grid and tabulated VDF must be matching finite non-negative arrays")
+    evdf_area = float(np.trapz(fgrid, vgrid))
+    if not np.isfinite(evdf_area) or evdf_area <= 0:
+        raise ValueError("tabulated electron VDF must have positive finite integral")
+    fgrid = fgrid / evdf_area
     electron_pdf = np.interp(vphase-ue, vgrid, fgrid, left=0.0, right=0.0)
     chi_e = np.empty(x.size, dtype=complex)
     ion_chi, ion_pdf = [], []
