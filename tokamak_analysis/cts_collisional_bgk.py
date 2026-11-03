@@ -18,7 +18,6 @@ def conserving_bgk_longitudinal_susceptibility(
     angular_frequency_rad_s,
     *,
     species_densities_m3: Sequence[float],
-    species_charges_C: Sequence[float],
     species_masses_kg: Sequence[float],
     common_temperature_J: float,
     collision_frequencies_s_inverse: Sequence[float],
@@ -36,8 +35,9 @@ def conserving_bgk_longitudinal_susceptibility(
     in velocity.  A common equilibrium temperature and flow are mandatory.
 
     The returned matrix R[i,j] = delta(n_i)/delta(U_j), where U_j is an
-    externally applied potential energy (J) coupled to species j.  It is a
-    response kernel, not a fluctuation spectrum.  Do not convert it to CTS
+    externally applied potential energy (J) coupled to species j. It is a
+    bare response to prescribed external potentials; self-consistent
+    electrostatic screening and the CTS fluctuation spectrum are not included.  Do not convert it to CTS
     power without a separately derived and validated fluctuation-dissipation
     closure and Thomson-scattering normalization.
     """
@@ -55,13 +55,12 @@ def conserving_bgk_longitudinal_susceptibility(
     if omega.ndim != 1 or omega.size == 0 or not np.all(np.isfinite(omega)):
         raise ValueError("angular_frequency_rad_s must be a finite non-empty 1-D array")
     n = np.asarray(species_densities_m3, dtype=float)
-    q = np.asarray(species_charges_C, dtype=float)
     m = np.asarray(species_masses_kg, dtype=float)
     nu = np.asarray(collision_frequencies_s_inverse, dtype=float)
-    if n.ndim != 1 or n.size == 0 or q.shape != n.shape or m.shape != n.shape or nu.shape != n.shape:
+    if n.ndim != 1 or n.size == 0 or m.shape != n.shape or nu.shape != n.shape:
         raise ValueError("species density, charge, mass and collision-frequency arrays must match")
     if (np.any(~np.isfinite(n)) or np.any(n <= 0) or np.any(~np.isfinite(q))
-            or np.any(q == 0) or np.any(~np.isfinite(m)) or np.any(m <= 0)
+            or np.any(~np.isfinite(m)) or np.any(m <= 0)
             or np.any(~np.isfinite(nu)) or np.any(nu <= 0)):
         raise ValueError("species densities/masses/frequencies must be positive; charges must be finite nonzero")
     if isinstance(quadrature_order, (bool, np.bool_)) or int(quadrature_order) != quadrature_order or quadrature_order < 24:
