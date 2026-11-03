@@ -108,8 +108,12 @@ def test_cts_reference_pca_background_reports_conditional_coefficient_and_spectr
         ion_temperature_initial_eV=truth["ion_temperature_eV"],
         ion_velocity_initial_m_s=truth["ion_velocity_projection_m_s"],
         background_reference_spectra=references, background_components=2,
+        background_reference_basis_mc_samples=40,
         global_search=False, inversion_method="local_least_squares",
     )
+    assert result["background_reference_basis_covariance"].shape == (3*frequency.size, 3*frequency.size)
+    assert result["background_reference_basis_uncertainty_propagated"] is False
+    assert "not_yet_propagated" in result["background_reference_basis_uncertainty_status"]
     coefficient_covariance = result["background_coefficient_covariance"]
     spectrum_covariance = result["background_spectrum_covariance"]
     assert coefficient_covariance.shape == (3, 3)
