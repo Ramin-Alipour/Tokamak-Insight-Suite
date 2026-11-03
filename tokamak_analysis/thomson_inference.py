@@ -1281,12 +1281,6 @@ def analyze_thomson_spectra(
         )
     joint_covariance = None
     if joint_spectral_covariance is not None:
-        if model == "non_collective_maxwellian" and background_model != "linear":
-            raise ValueError(
-                "The current full channel-major GLS parameterization requires the linear "
-                "background basis. Use per-channel structured-background inference without "
-                "joint_spectral_covariance until a matching joint basis parameterization is selected."
-            )
         if model not in {"non_collective_maxwellian","non_collective_kappa","non_collective_relativistic_maxwell_juttner"}:
             raise ValueError("joint_spectral_covariance currently supports non_collective_maxwellian, non_collective_kappa, and block-diagonal non_collective_relativistic_maxwell_juttner; other physical models require model-specific joint forward models")
         joint_covariance = _finite_array(joint_spectral_covariance, "joint_spectral_covariance", 2)
@@ -1313,7 +1307,45 @@ def analyze_thomson_spectra(
             )
         discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
         nchan_disc, nlam_disc = y.shape
-        if discrepancy.shape == (nlam_disc, nlam_disc):
+        full_discrepancy_covariance = None
+        if discrepancy.shape == (y.size, y.size):
+            full_discrepancy_covariance = discrepancy.copy()
+            if not np.allclose(
+                full_discrepancy_covariance,
+                full_discrepancy_covariance.T,
+                rtol=1e-10, atol=1e-13,
+            ):
+                raise ValueError(
+                    "full channel-major model_discrepancy_covariance must be symmetric"
+                )
+            full_discrepancy_covariance = 0.5 * (
+                full_discrepancy_covariance + full_discrepancy_covariance.T
+            )
+            eigenvalues = np.linalg.eigvalsh(full_discrepancy_covariance)
+            scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+            if float(np.min(eigenvalues)) < -1e-10 * scale:
+                raise ValueError(
+                    "full channel-major model_discrepancy_covariance must be positive semidefinite"
+                )
+            independent_discrepancy_blocks = np.stack([
+                full_discrepancy_covariance[
+                    channel_index*nlam_disc:(channel_index+1)*nlam_disc,
+                    channel_index*nlam_disc:(channel_index+1)*nlam_disc,
+                ]
+                for channel_index in range(nchan_disc)
+            ])
+            if joint_covariance is None:
+                # Pointwise errors are independent across channels unless a
+                # full measured covariance was supplied. Preserve those
+                # marginals while adding the complete discrepancy covariance.
+                if unc is not None:
+                    joint_covariance = np.diag(np.asarray(unc, dtype=float).reshape(-1)**2)
+                    unc = None
+                else:
+                    joint_covariance = np.zeros((y.size, y.size), dtype=float)
+            joint_covariance += full_discrepancy_covariance
+            discrepancy_added_to_joint_covariance = True
+        elif discrepancy.shape == (nlam_disc, nlam_disc):
             independent_discrepancy_blocks = np.broadcast_to(
                 discrepancy, (nchan_disc, nlam_disc, nlam_disc)
             ).copy()
@@ -1321,8 +1353,9 @@ def analyze_thomson_spectra(
             independent_discrepancy_blocks = discrepancy.copy()
         else:
             raise ValueError(
-                "model_discrepancy_covariance must be (n_wavelength,n_wavelength) "
-                "or (n_channels,n_wavelength,n_wavelength)"
+                "model_discrepancy_covariance must be (n_wavelength,n_wavelength), "
+                "(n_channels,n_wavelength,n_wavelength), or the full "
+                "(n_channels*n_wavelength,n_channels*n_wavelength) channel-major matrix"
             )
         for channel_index, block in enumerate(independent_discrepancy_blocks):
             if not np.allclose(block, block.T, rtol=1e-10, atol=1e-13):
@@ -1331,21 +1364,25 @@ def analyze_thomson_spectra(
             scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
             if float(np.min(eigenvalues)) < -1e-10*scale:
                 raise ValueError(f"model_discrepancy_covariance[{channel_index}] must be positive semidefinite")
-        # For the relativistic shared-parameter fit, preserve the supplied
-        # cross-channel measurement covariance and add each channel's
-        # discrepancy block to the matching diagonal block exactly once.
-        if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
+        # Add per-channel discrepancy blocks to any supplied full measurement
+        # covariance for every optical model, not only the relativistic fit.
+        if (
+            joint_covariance is not None
+            and not discrepancy_added_to_joint_covariance
+        ):
             for channel_index, block in enumerate(independent_discrepancy_blocks):
                 channel_slice = slice(channel_index*nlam_disc, (channel_index+1)*nlam_disc)
                 joint_covariance[channel_slice, channel_slice] += block
+            discrepancy_added_to_joint_covariance = True
+        if discrepancy_added_to_joint_covariance:
             try:
                 joint_cholesky = np.linalg.cholesky(joint_covariance)
             except np.linalg.LinAlgError as exc:
                 raise ValueError(
-                    "joint_spectral_covariance plus model_discrepancy_covariance "
-                    "must remain positive definite"
+                    "measurement covariance plus model_discrepancy_covariance "
+                    "must be positive definite; a discrepancy-only covariance must "
+                    "also be positive definite to define GLS weights"
                 ) from exc
-            discrepancy_added_to_joint_covariance = True
     cross_channel_covariance_present = False
     if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
         nchan_cov, nlam_cov = y.shape
@@ -1983,17 +2020,12 @@ def analyze_thomson_spectra(
         )
         fit["background_model_status"] = (
             f"{background_model}_detector_space_basis_jointly_fitted"
-            if model == "non_collective_maxwellian" else
-            "linear_intercept_and_slope_nuisance_background"
-            if model == "non_collective_kappa" else
-            "model_specific_background_treatment"
         )
         fit["background_model_limitation"] = (
-            "The selected researcher-supplied detector-space basis is fitted jointly with the Maxwellian Thomson feature; basis inadequacy and signal/background degeneracy remain model-dependent and no automatic physical background decomposition is claimed."
-            if model == "non_collective_maxwellian" else
-            "Kappa optical fitting retains a linear detector-space baseline; curved or structured backgrounds are not represented by that baseline."
-            if model == "non_collective_kappa" else
-            "Interpret the selected model's documented background treatment; no automatic physical background decomposition is claimed."
+            "The selected researcher-supplied detector-space basis is fitted jointly "
+            "with the selected optical Thomson feature. Basis inadequacy and "
+            "signal/background degeneracy remain model-dependent; the nuisance "
+            "background is not a physical plasma-emission decomposition."
         )
         fit["channel_index"] = int(i)
         fit["radius_m"] = float(radii[i])

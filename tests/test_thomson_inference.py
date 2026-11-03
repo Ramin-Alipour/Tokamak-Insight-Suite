@@ -1479,3 +1479,69 @@ def test_joint_channel_gls_uses_selected_polynomial_background_basis():
         assert channel["physical_background_cross_covariance"].shape == (3, 3)
         assert channel["joint_fit_used"] is True
     assert result["joint_inference"]["covariance_ordering"] == "channel_major"
+
+def test_full_channel_major_model_discrepancy_covariance_preserves_cross_channel_blocks():
+    from tokamak_analysis.thomson_kinetic_models import relativistic_maxwell_juttner_spectrum
+
+    wavelength = np.linspace(526.0, 538.0, 81)
+    laser = 532.0
+    angle = np.pi / 2
+    incident = np.array([1.0, 0.0, 0.0])
+    scattered = np.array([0.0, 1.0, 0.0])
+    polarization = np.array([0.0, 1.0, 0.0])
+    polarization_local = np.array([1.0, 1.0, 0.0]) / np.sqrt(2.0)
+    shape = relativistic_maxwell_juttner_spectrum(
+        wavelength, laser, angle, 200.0,
+        flow_projection_m_s=2.0e4,
+        incident_polarization=polarization_local,
+        radial_order=16, angular_order=8,
+    )["spectral_density_per_nm"]
+    measured = np.vstack((
+        700.0 * shape + 0.04 + 0.001 * (wavelength - laser),
+        520.0 * shape + 0.03 - 0.0007 * (wavelength - laser),
+    ))
+    n = wavelength.size
+    measurement_covariance = np.eye(2*n) * 0.015**2
+    discrepancy_covariance = np.eye(2*n) * 0.004**2
+    cross = np.eye(n) * (0.25 * 0.004**2)
+    discrepancy_covariance[:n, n:] = cross
+    discrepancy_covariance[n:, :n] = cross.T
+
+    out = analyze_thomson_spectra(
+        wavelength, measured, [0.15, 0.25],
+        laser_wavelength_nm=laser, scattering_angle_rad=angle,
+        instrument_response=np.eye(n),
+        incident_direction=incident, scattered_direction=scattered,
+        incident_polarization=polarization,
+        model="non_collective_relativistic_maxwell_juttner",
+        joint_spectral_covariance=measurement_covariance,
+        model_discrepancy_covariance=discrepancy_covariance,
+        enable_evdf_reconstruction=False,
+    )
+
+    assert out["joint_inference"]["spectral_weighting_status"] == (
+        "full_channel_major_generalized_least_squares_including_cross_channel_covariance"
+    )
+    assert out["joint_inference"]["fit_covariance"].shape[0] > 0
+    assert all(
+        channel["spectral_weighting_status"]
+        == "full_channel_major_generalized_least_squares_including_cross_channel_covariance"
+        for channel in out["channels"]
+    )
+
+
+def test_full_channel_major_model_discrepancy_covariance_rejects_indefinite_input():
+    wavelength = np.linspace(500.0, 564.0, 41)
+    measured = np.ones((2, wavelength.size))
+    discrepancy = np.eye(2*wavelength.size)
+    discrepancy[:wavelength.size, wavelength.size:] = 2.0*np.eye(wavelength.size)
+    discrepancy[wavelength.size:, :wavelength.size] = 2.0*np.eye(wavelength.size)
+    with pytest.raises(ValueError, match="positive semidefinite"):
+        analyze_thomson_spectra(
+            wavelength, measured, [0.1, 0.2],
+            laser_wavelength_nm=532.0, scattering_angle_rad=np.pi/2,
+            instrument_response=np.eye(wavelength.size),
+            model="non_collective_maxwellian",
+            model_discrepancy_covariance=discrepancy,
+        )
+

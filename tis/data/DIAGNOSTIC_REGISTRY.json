@@ -271,9 +271,9 @@
         },
         {
           "name": "model_discrepancy_covariance",
-          "unit": "n_wavelength x n_wavelength or n_channels x n_wavelength x n_wavelength spectral covariance",
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
           "required": false,
-          "description": "Independent correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits; added to the applicable measurement covariance before GLS and not estimated from reduced chi-square."
+          "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
           "name": "joint_profile_measurement_covariance",
@@ -339,8 +339,8 @@
         },
         {
           "name": "model_discrepancy_covariance",
-          "unit": "parameter covariance",
-          "description": "Residual-based model-adequacy covariance, only when a supported reduced chi-square and fit covariance are available."
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
+          "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
           "name": "electron_density_joint_covariance_m6",
@@ -5075,9 +5075,9 @@
         },
         {
           "name": "model_discrepancy_covariance",
-          "unit": "n_frequency x n_frequency",
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
           "required": false,
-          "description": "Independent additive correlated model-discrepancy covariance on the measured frequency grid. Electrostatic and Full-EM measured-spectrum inversions accept it. It is added to the supplied measurement covariance (or used alone when no measurement uncertainty is supplied); it is never estimated from residuals. The total covariance must be positive definite for GLS; no silent jitter or regularization is applied. Measurement/discrepancy cross-covariance is not represented."
+          "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
           "name": "background_reference_basis_mc_samples",
@@ -5159,7 +5159,8 @@
         },
         {
           "name": "model_discrepancy_covariance",
-          "unit": "mixed physical parameter covariance"
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
+          "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
           "name": "response_parameter_covariance",
@@ -6218,9 +6219,9 @@
       },
       {
         "name": "model_discrepancy_covariance",
-        "unit": "frequency x frequency spectral covariance",
+        "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
         "required": false,
-        "description": "Electrostatic CTS only. Independent additive correlated model-discrepancy covariance; added to measurement covariance before GLS. Does not derive hyperparameters from reduced chi-square."
+        "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
       },
       {
         "name": "background_reference_basis_mc_samples",
@@ -7010,8 +7011,8 @@
         },
         {
           "name": "model_discrepancy_covariance",
-          "unit": "parameter covariance",
-          "description": "Residual-based model-adequacy covariance, only when a supported reduced chi-square and fit covariance are available."
+          "unit": "n_wavelength x n_wavelength, n_channels x n_wavelength x n_wavelength, or (n_channels*n_wavelength) x (n_channels*n_wavelength) channel-major spectral covariance",
+          "description": "Correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits. The full channel-major form preserves cross-channel discrepancy blocks and is added to supplied measurement covariance (or to pointwise measurement variances when supplied) before GLS; unspecified cross-covariances are not inferred."
         },
         {
           "name": "electron_density_joint_covariance_m6",
