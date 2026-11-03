@@ -8,6 +8,7 @@ from tokamak_analysis.advanced_inference import (
     propagate_paraxial_beam_covariance,
     bootstrap_reference_pca_basis,
     reconstruct_multiview_3d_evdf,
+    assess_multiview_evdf_regularization_sensitivity,
 )
 from tokamak_analysis.cts_em_background import (
     planck_spectral_radiance,
@@ -213,3 +214,25 @@ def test_optical_thomson_uses_independent_model_discrepancy_covariance():
     assert channel["model_discrepancy_diagnostics"]["covariance_included"] is True
     assert channel["model_discrepancy_diagnostics"]["independent_of_reduced_chi_square"] is True
     assert "model_discrepancy_scale" not in channel
+
+
+
+def test_multiview_evdf_regularization_sensitivity_reports_l_curve_without_auto_selection():
+    kernels = np.zeros((3, 2, 6))
+    for view in range(3):
+        kernels[view, :, 2*view:2*view+2] = np.eye(2)
+    truth = np.array([1., 2., 3., 4., 5., 6.])
+    volume = np.full(6, 0.1)
+    data = (kernels.reshape(6, 6) @ (truth * volume)).reshape(3, 2)
+    penalty = np.diff(np.eye(6), axis=0)
+    result = assess_multiview_evdf_regularization_sensitivity(
+        kernels, data, np.arange(18).reshape(6, 3),
+        voxel_volume_m3_s3=volume,
+        regularization_matrix=penalty,
+        regularization_strengths=np.array([1e-8, 1e-5, 1e-2]),
+    )
+    assert len(result["levels"]) == 3
+    assert result["candidate_distributions_m3_s3"].shape == (3, 6)
+    assert result["selection_policy"].startswith("no automatic lambda selection")
+    assert all(level["data_only_jacobian_rank"] == 6 for level in result["levels"])
+    assert all(level["null_space_dimension"] == 0 for level in result["levels"])
