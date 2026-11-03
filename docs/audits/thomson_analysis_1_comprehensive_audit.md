@@ -747,3 +747,25 @@ The previous Analysis 1 registry exposed `fit_optical_thomson_poisson_counts`, w
 The earlier list mixed confirmed code defects, incomplete integration, scientific-model boundaries and quantities that cannot be uniquely identified. It must not be treated as twenty confirmed bugs. The repository already contains subsequent direct-main work covering several items: Kappa/MJ structured-background and joint spatial-spectral paths; relativistic multi-channel GLS; Full-EM local external-input covariance; a full-forward CTS geometry-ensemble uncertainty API; response-operator preservation; and synchronized output-identifiability contracts. Remaining integration/model work is recorded explicitly in sections AJ and the 2026-11-03 implementation updates above. In particular, the full-forward geometry sampler is an API building block rather than a dashboard-managed universal covariance model, and profile-aware spatially varying Full-EM CTS remains an unimplemented physics extension. Neither can be honestly marked complete by changing metadata alone.
 
 **Verification:** source, both canonical JSON registries, the input-contract regression test and the scientific/audit notes were updated in one direct-main commit. No local checkout was used. GitHub Actions must report success for the exact resulting commit before claiming software-test success. No experimental validation was performed or claimed.
+
+
+## Implementation update — 2026-11-03: supplied spatial-coordinate covariance
+
+The downstream measured-spectrum profile reconstruction now accepts
+`profile_coordinate_covariance_m2`. The covariance is validated as finite,
+symmetric, positive semidefinite and dimensionally consistent with the
+channel-coordinate vector. Monte Carlo reconstruction samples the supplied
+coordinate covariance jointly in the same draw loop as the profile-value
+covariance; non-monotonic coordinate draws and draws that do not cover the
+fixed reconstruction grid are rejected. The API applies this option to
+optical profiles and species-resolved CTS flow profiles. Coordinate/value
+cross-covariance is not currently accepted, so the two sources are explicitly
+treated as independent. Omission retains the prior exact-coordinate
+assumption. Regression tests cover successful coordinate-uncertainty
+propagation and invalid covariance rejection.
+
+This closes only the coordinate-uncertainty propagation gap for a supplied
+covariance. It does not infer uncertainty in radius from the spectra, derive
+flux coordinates, or perform equilibrium mapping. GitHub Actions status for
+the resulting commits remains unverified; no test-pass or experimental-
+validation claim is made.
