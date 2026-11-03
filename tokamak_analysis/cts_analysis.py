@@ -552,7 +552,10 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     initial_density=_positive(electron_density_initial_m3 if electron_density_initial_m3 is not None else automatic_seeds["electron_density_m3"],"initial density")
     initial_te=_positive(electron_temperature_initial_eV if electron_temperature_initial_eV is not None else automatic_seeds["electron_temperature_eV"],"initial Te")
     initial_ti_raw = (automatic_seeds["ion_temperature_eV"] if ion_temperature_initial_eV is None else ion_temperature_initial_eV)
-    initial_ti = np.asarray(initial_ti_raw, dtype=float)
+    initial_ti_raw_array = np.asarray(initial_ti_raw)
+    if initial_ti_raw_array.dtype.kind not in ("i", "u", "f"):
+        raise ValueError("ion_temperature_initial_eV must contain real numeric values")
+    initial_ti = initial_ti_raw_array.astype(float, copy=False)
     if initial_ti.ndim == 0:
         initial_ti = np.full(len(ions), float(initial_ti), dtype=float)
     if initial_ti.shape != (len(ions),) or np.any(~np.isfinite(initial_ti)) or np.any(initial_ti <= 0):
