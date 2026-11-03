@@ -7,11 +7,12 @@ relativistic Vlasov three-wave current vertex. Maxwellian bulk-electron
 scattering retains the low-temperature Bindslev Gamma/X source-current
 closure. Species-resolved ion temperatures are fitted independently.
 
-Optional frequency-resolved cold-plasma ray tracing and local Gaussian beam
-overlap are connected to the spectral transfer. The ray path is geometrical
-optics with caller-supplied equilibrium and local beam covariance; it does
-not include diffraction, mode conversion or propagated quasi-optical beams.
-No empirical validation is performed by this solver.
+Optional frequency-resolved cold-plasma ray tracing and Gaussian beam overlap
+are connected to the spectral transfer. Beam covariance may be propagated
+through the local cold-plasma dispersion Hessian in a 6-D paraxial phase-space
+approximation, or through supplied symplectic ABCD maps. Non-paraxial
+diffraction and full vector mode conversion are not solved. No empirical
+validation is performed by this solver.
 """
 from __future__ import annotations
 
