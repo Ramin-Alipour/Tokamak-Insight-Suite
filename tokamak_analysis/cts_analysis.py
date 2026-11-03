@@ -905,7 +905,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     trans=np.eye(len(fit.x))
     trans[0,0]=np.log(10)*d["electron_density_m3"]
     trans[1,1]=np.log(10)*d["electron_temperature_eV"]
-    for species_index, temperature in enumerate(ti_values):
+    fitted_ion_temperatures = np.atleast_1d(d["ion_temperature_eV"]).astype(float)
+    for species_index, temperature in enumerate(fitted_ion_temperatures):
         trans[2+species_index,2+species_index]=np.log(10)*float(temperature)
     trans[2+n_species,2+n_species]=us
     trans[3+n_species,3+n_species]=us
@@ -1044,7 +1045,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             sampled_geometry=scattering_geometry
             sampled_fractions=np.asarray(ion_fractions,dtype=float).copy()
             sampled_species=[dict(item) for item in ion_species]
-            sampled_temperatures=ti_values.copy()
+            sampled_temperatures=fitted_ion_temperatures.copy()
             if external_covariance is not None:
                 external_draw=external_root @ rng.normal(size=len(external_order))
                 sampled_angle=None
