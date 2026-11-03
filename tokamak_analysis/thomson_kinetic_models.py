@@ -1043,11 +1043,19 @@ def fit_relativistic_maxwell_juttner_channels(
             raise ValueError("response columns must already sum to one; calibrated response is not renormalized")
     if background_model not in {"constant", "linear", "polynomial", "cubic_spline", "templates"}:
         raise ValueError("background_model must be constant, linear, polynomial, cubic_spline or templates")
+    if background_templates is not None and np.asarray(background_templates).ndim == 3:
+        template_by_channel = [np.asarray(background_templates, dtype=float)[j] for j in range(m)]
+    elif isinstance(background_templates, (list, tuple)):
+        if len(background_templates) != m:
+            raise ValueError("background_templates list must contain one matrix per channel")
+        template_by_channel = list(background_templates)
+    else:
+        template_by_channel = [background_templates] * m
     designs = [
         _background_design(
             x, background_model, degree=background_degree,
             interior_knots=background_interior_knots,
-            templates=(background_templates[j] if isinstance(background_templates, (list, tuple)) else background_templates),
+            templates=template_by_channel[j],
         )
         for j in range(m)
     ]
