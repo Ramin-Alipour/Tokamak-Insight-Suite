@@ -516,3 +516,30 @@ repaired or silently reordered. If the argument is omitted, coordinates are
 treated as exact. This is uncertainty propagation for supplied spatial
 coordinates, not an equilibrium or flux-surface mapping, and it does not
 estimate coordinate uncertainty from the spectra.
+
+## Calibrated forward-model comparison
+
+The separate public helper
+`tokamak_analysis.thomson_model_comparison.compare_thomson_forward_models`
+compares at least two completed candidate spectra from the same calibrated
+measurement. Supply the measured spectrum, a mapping of candidate model
+predictions on exactly the same wavelength bins, and the number of fitted
+parameters for each candidate. Supply either the full positive-definite
+spectral covariance or pointwise 1-sigma uncertainty; if neither is available,
+the helper uses a common unknown Gaussian variance estimated from residuals
+and labels that assumption explicitly.
+
+The result reports the weighted residual sum of squares, Gaussian
+minus-two-log-likelihood, AIC, AICc, BIC and delta information criteria. The
+unknown common variance is counted as an additional fitted parameter. AICc
+is returned as unavailable when the sample size is insufficient for its
+finite-sample correction.
+
+This helper compares already-computed predictions: it does not perform the
+Maxwellian/Kappa/Maxwell-Juttner nonlinear fits, estimate missing nuisance
+parameters, select a model automatically, or establish physical truth.
+Comparisons are meaningful only when candidates use the same measured bins,
+likelihood, covariance convention and consistent treatment/counting of
+nuisance parameters. Information criteria are model-comparison diagnostics,
+not experimental validation.
+
