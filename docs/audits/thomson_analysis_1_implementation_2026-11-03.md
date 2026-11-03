@@ -106,3 +106,33 @@ the background-coefficient covariance and physical/background cross-covariance.
 The dashboard's channel-wise basis controls now cover all three optical
 physical models. A regression test exercises polynomial-background recovery
 under non-zero cross-channel covariance.
+
+
+## Spatial-profile CTS inverse, drifted EVDF and regularization sensitivity
+
+A dedicated `full_em_spatial_profiles` dispatcher mode was added. It fits
+node-wise relative electron-density and electron-temperature profiles, with
+optional ion-temperature profiles, over a stable scattering-volume node set.
+Each optimizer evaluation calls the local Full-EM kinetic solver at every
+measured frequency and spatial quadrature point. The measured response matrix
+is applied once after volume integration using the frequency-bin widths, and
+the spectral GLS objective retains the supplied full covariance. Profile
+covariance is withheld when the augmented Jacobian is rank deficient.
+
+An optional increasing grid of regularization strengths reruns the spatial
+inverse and reports the resulting profile spread explicitly as
+regularization-choice sensitivity, not measurement uncertainty. The API is
+exposed through the CTS dispatcher, Python analysis registry, both diagnostic
+registry JSON copies, and a dedicated Streamlit dashboard mode. Tests cover
+local-profile forwarding, stable node identity, covariance requirements,
+regularization sensitivity, and registry/dashboard exposure.
+
+The Full-EM relativistic kinetic momentum quadrature now accepts an explicit
+Lorentz-boosted drifted Maxwell-Juttner electron equilibrium. Momentum
+derivatives use the boost-chain-rule derivatives and the parallel quadrature
+support is widened for the boosted distribution. The drift must be subluminal
+and is encoded in the VDF; a second flow-projection shift is rejected.
+
+These changes are committed directly to `main`. GitHub Actions runs are
+triggered by the final push; no successful test or CI result is claimed until
+the runs complete. No experimental validation is claimed.
