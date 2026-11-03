@@ -2545,7 +2545,20 @@ def analyze_thomson_spectra(
         background_parameter_count = background_designs[0].shape[1]
         if any(item.shape[1] != background_parameter_count for item in background_designs):
             raise ValueError("All channel background bases must have the same number of columns for joint GLS.")
-        initial = np.concatenate([np.asarray(item["fit_parameters"], dtype=float) for item in results])
+        initial_parts = []
+        for item in results:
+            physical_seed = [
+                float(item["amplitude"]),
+                float(item["fitted_center_nm"]),
+                float(item["intrinsic_sigma_nm"]),
+            ]
+            if model == "non_collective_kappa":
+                physical_seed.append(float(item["kappa_index"]))
+            nuisance_seed = np.asarray(item["background_coefficients"], dtype=float)
+            if nuisance_seed.shape != (background_parameter_count,):
+                raise ValueError("Per-channel background coefficient count does not match the selected joint GLS basis.")
+            initial_parts.append(np.r_[physical_seed, nuisance_seed])
+        initial = np.concatenate(initial_parts)
         joint_parameter_count = physical_parameter_count + background_parameter_count
         lower_parts, upper_parts = [], []
         for i in range(nchan):
