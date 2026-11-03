@@ -576,3 +576,22 @@ fit; the joint parameter covariance retains physical/background cross-terms
 and channel-to-channel correlations. This prevents the GLS refit from silently
 replacing a selected polynomial, spline or template background with an affine
 baseline.
+
+### Explicit zero-background semantics for microwave CTS
+
+The CTS physical-background radiative-transfer API now accepts exactly zero
+electron and positive-ion density as an explicit vacuum/no-plasma state.
+Quasineutrality is enforced on every path element: a zero-electron-density
+element must also have zero positive-ion density, and its supplied ECE
+absorption coefficient must be exactly zero. The free-free emissivity is
+exactly zero at zero electron density; no numerical floor is converted into a
+spurious physical background.
+
+The returned `background_status` distinguishes
+`zero_background_exact_zero_radiance`,
+`incident_radiance_only_no_plasma_background`, and
+`plasma_emission_or_absorption_present`. The companion boolean
+`zero_background` is true only when plasma free-free/ECE contributions and
+incident radiance are all zero. A nonzero incident radiance in vacuum is
+therefore preserved and is not mislabeled as a zero total signal. This
+contract does not infer ECE opacity, plasma density, or a detector noise floor.
