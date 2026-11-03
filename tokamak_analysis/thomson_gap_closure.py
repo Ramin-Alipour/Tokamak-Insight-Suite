@@ -33,6 +33,16 @@ def _bin_widths(axis):
         raise ValueError("axis must define positive finite-volume bin widths")
     return widths
 
+def _trapezoid_quadrature_weights(axis, name):
+    """Return integration weights for a strictly increasing, uniform 1-D grid."""
+    values = _real_vector(axis, name, minimum=2)
+    steps = np.diff(values)
+    if np.any(steps <= 0) or not np.allclose(steps, steps[0], rtol=1e-6, atol=1e-12):
+        raise ValueError(f"{name} must be strictly increasing and uniform")
+    weights = np.full(values.size, float(steps[0]), dtype=float)
+    weights[[0, -1]] *= 0.5
+    return weights
+
 
 def _whitener(n, uncertainty=None, covariance=None):
     if uncertainty is not None and covariance is not None:
@@ -129,12 +139,17 @@ def reconstruct_relativistic_projected_thomson_evdf(
             frac = (centre-x[left])/(x[right]-x[left])
             latent[left,j] = (1-frac)/widths[left]
             latent[right,j] = frac/widths[right]
-    forward = response @ (latent * widths[:,None]) / widths[:,None]
+    dv = np.diff(v)
+    velocity_weights = _trapezoid_quadrature_weights(v, "velocity_grid_m_s")
+    # The latent columns are wavelength-bin probability densities for a
+    # mono-velocity population. A continuous projected EVDF f(v) [s/m]
+    # contributes through integral K(lambda,v) f(v) dv; omitting these
+    # quadrature weights makes the predicted spectrum depend on grid density.
+    forward = (
+        response @ (latent * widths[:,None])
+    ) * velocity_weights[None,:] / widths[:,None]
     design = whiten(forward)
     target = whiten(y-b)
-    dv = np.diff(v)
-    if not np.allclose(dv, dv[0], rtol=1e-6, atol=1e-12):
-        raise ValueError("velocity_grid_m_s must be uniform for second-difference regularization")
     d2 = np.diff(np.eye(v.size), n=2, axis=0) / float(dv[0])**2
     scale = np.linalg.norm(design, ord="fro") / max(np.linalg.norm(d2, ord="fro"), np.finfo(float).tiny)
     candidates = np.logspace(-8, 4, 13) if regularization_strength is None else np.asarray([float(regularization_strength)])
@@ -207,6 +222,8 @@ def reconstruct_relativistic_projected_thomson_evdf(
         "data_only_jacobian_condition_number": condition,
         "data_only_parameter_count": int(v.size),
         "velocity_grid_points": int(v.size),
+        "velocity_quadrature": "trapezoidal_integral_over_velocity_in_forward_operator",
+        "velocity_quadrature_weights_m_s": velocity_weights.copy(),
         "noise_model": noise_status,
         "absolute_density_inferred": False,
         "assumptions": [
