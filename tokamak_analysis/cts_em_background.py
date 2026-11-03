@@ -129,3 +129,26 @@ def integrate_thermal_microwave_background(
             "The result is spectral radiance, not detector power; receiver etendue and efficiency are external measured inputs.",
         ],
     }
+
+
+
+def radiance_to_receiver_spectral_power(
+    spectral_radiance_W_m2_sr_Hz, *, receiver_etendue_m2_sr,
+    end_to_end_efficiency,
+):
+    """Convert spectral radiance to receiver-plane spectral power in W Hz^-1.
+
+    receiver_etendue_m2_sr is A*Omega at the same plane and geometry used by
+    the radiative-transfer calculation. Efficiency is applied once here; do
+    not apply it again to the resulting receiver-plane spectrum.
+    """
+    radiance = np.asarray(spectral_radiance_W_m2_sr_Hz, dtype=float)
+    etendue = float(receiver_etendue_m2_sr)
+    efficiency = float(end_to_end_efficiency)
+    if radiance.size == 0 or np.any(~np.isfinite(radiance)) or np.any(radiance < 0):
+        raise ValueError("spectral radiance must be finite and non-negative")
+    if not np.isfinite(etendue) or etendue <= 0:
+        raise ValueError("receiver_etendue_m2_sr must be positive and finite")
+    if not np.isfinite(efficiency) or not 0 < efficiency <= 1:
+        raise ValueError("end_to_end_efficiency must lie in (0,1]")
+    return radiance * etendue * efficiency
