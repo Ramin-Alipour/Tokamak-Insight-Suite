@@ -174,7 +174,7 @@ def fit_two_population_relativistic_thomson_spectrum(
         sigma = _vector(signal_uncertainty, "signal_uncertainty")
         if sigma.shape != y.shape or np.any(sigma <= 0):
             raise ValueError("signal_uncertainty must match measured_spectrum and be strictly positive")
-        whitening = lambda z: z / sigma
+        whitening = lambda z: (np.asarray(z) / sigma[:, None]) if np.asarray(z).ndim == 2 else (np.asarray(z) / sigma)
         uncertainty_status = "supplied pointwise 1-sigma uncertainty"
     else:
         covariance = np.asarray(spectral_covariance, dtype=float)
