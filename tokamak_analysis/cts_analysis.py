@@ -1124,30 +1124,22 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
                 if data_fit_residual.size>2 and np.std(data_fit_residual[:-1])>0 and np.std(data_fit_residual[1:])>0 else None,
             "interpretation":"Excess reduced chi-square above unity is treated as a model-discrepancy covariance component; it is conditional on supplied noise covariance and is not experimental validation.",
         }
-    # Reference-PCA bootstrap refits are an independent uncertainty source.
-    # Include their full base-plasma covariance in the reported total parameter
-    # covariance (rather than exposing it only as a detached diagnostic).
+    # Validate the reference-PCA bootstrap component here, but combine it only
+    # once at the end of the workflow.  Response/external Monte Carlo below may
+    # rebuild fit_covariance; adding this component both here and at the final
+    # aggregation double-counted it whenever response_mc_samples was zero.
     reference_parameter_covariance = out.get("background_reference_parameter_covariance")
     if reference_parameter_covariance is not None:
         reference_covariance = np.asarray(reference_parameter_covariance, dtype=float)
-        current_covariance = np.asarray(out.get("total_fit_covariance_including_discrepancy", out["fit_covariance"]), dtype=float)
-        if (reference_covariance.shape != current_covariance.shape
+        base_covariance = np.asarray(out["fit_covariance"], dtype=float)
+        if (reference_covariance.shape != base_covariance.shape
                 or not np.all(np.isfinite(reference_covariance))
                 or not np.allclose(reference_covariance, reference_covariance.T, rtol=1e-9, atol=1e-12)):
             raise ValueError("bootstrap reference-PCA parameter covariance must be finite, symmetric and match the fitted parameter covariance")
-        combined_covariance = current_covariance + reference_covariance
-        out["fit_covariance"] = combined_covariance
-        out["total_fit_covariance_including_discrepancy"] = combined_covariance
+        if not np.allclose(reference_covariance, reference_covariance.T, rtol=1e-9, atol=1e-12):
+            raise ValueError("bootstrap reference-PCA parameter covariance must be symmetric")
         out["background_reference_parameter_covariance_included"] = True
-        out["parameter_uncertainties"] = np.sqrt(np.maximum(np.diag(combined_covariance), 0.0))
-        total_sigma = out["parameter_uncertainties"]
-        out["electron_density_uncertainty_m3"] = float(total_sigma[0])
-        out["electron_temperature_uncertainty_eV"] = float(total_sigma[1])
-        out["ion_temperature_uncertainty_eV"] = (float(total_sigma[2]) if n_species == 1 else total_sigma[2:2+n_species].copy())
-        out["ion_temperature_species_uncertainties_eV"] = total_sigma[2:2+n_species].copy()
-        out["electron_velocity_projection_uncertainty_m_s"] = float(total_sigma[2+n_species])
-        out["ion_velocity_projection_uncertainty_m_s"] = float(total_sigma[3+n_species])
-        out["background_reference_parameter_covariance_combination"] = "additive_independent_covariance_component; cross-covariance with measurement, response and external inputs is not inferred"
+        out["background_reference_parameter_covariance_combination"] = "added_once_after_response_and_external_uncertainty_aggregation; independent component; cross-covariance is not inferred"
     else:
         out["background_reference_parameter_covariance_included"] = False
 
