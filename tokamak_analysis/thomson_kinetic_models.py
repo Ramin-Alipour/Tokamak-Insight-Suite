@@ -1110,6 +1110,8 @@ def fit_relativistic_maxwell_juttner_channels(
     transform = np.eye(p0.size)
     transform[0, 0] = np.exp(fit.x[0])
     transform[1, 1] = C*(1.0-np.tanh(fit.x[1])**2)
+    transform[2:2+m, 2:2+m] = np.diag(np.exp(fit.x[2:2+m])*yscale)
+    transform[2+m:, 2+m:] *= yscale
     covariance_physical = transform@covariance_p@transform.T
     fitted = predict(fit.x)*yscale
     residual = y-fitted
@@ -1146,5 +1148,6 @@ def fit_relativistic_maxwell_juttner_channels(
     if background_model == "linear":
         z = 2.0*(x-x.min())/np.ptp(x)-1.0
         result["channel_background_slopes_per_nm"] = coefficients[:, 1]*2.0/np.ptp(x)
-        result["channel_background_intercepts"] = coefficients[:, 0] + result["channel_background_slopes_per_nm"]*(x[np.argmin(np.abs(x-laser))]-x.min()+0.5*np.ptp(x))
+        laser_z = 2.0*(laser-x.min())/np.ptp(x)-1.0
+        result["channel_background_intercepts"] = coefficients[:, 0] + coefficients[:, 1]*laser_z
     return result
