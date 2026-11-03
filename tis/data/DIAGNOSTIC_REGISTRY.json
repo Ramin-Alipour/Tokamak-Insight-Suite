@@ -274,6 +274,30 @@
           "unit": "n_wavelength x n_wavelength or n_channels x n_wavelength x n_wavelength spectral covariance",
           "required": false,
           "description": "Independent correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits; added to the applicable measurement covariance before GLS and not estimated from reduced chi-square."
+        },
+        {
+          "name": "joint_profile_measurement_covariance",
+          "unit": "full channel-major spectral covariance",
+          "required": false,
+          "description": "Optional positive-definite covariance for the joint multi-channel GLS operator; retains all cross-channel blocks."
+        },
+        {
+          "name": "profile_regularization_strengths",
+          "unit": "dimensionless non-negative sequence",
+          "required": false,
+          "description": "Optional explicit regularization scan; GCV selection and full profile sensitivity envelope are reported separately from data-only identifiability."
+        },
+        {
+          "name": "reference_library_covariance",
+          "unit": "covariance of flattened reference library",
+          "required": false,
+          "description": "Optional positive-semidefinite covariance propagated by PCA refit Monte Carlo; distinct from measurement covariance."
+        },
+        {
+          "name": "geometry_parameter_covariance",
+          "unit": "covariance of geometry/beam parameter vector",
+          "required": false,
+          "description": "Optional full correlated covariance propagated through a supplied geometry-dependent forward operator."
         }
       ],
       "output_specs": [
@@ -524,6 +548,26 @@
           "name": "independent_model_discrepancy_covariance",
           "unit": "spectral covariance",
           "description": "Researcher-supplied covariance used by supported non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical GLS fits; independent of reduced-chi-square scaling."
+        },
+        {
+          "name": "joint_channel_parameter_covariance",
+          "unit": "parameter covariance",
+          "description": "Local GLS covariance conditional on full channel-major spectral covariance, including fitted background nuisance parameters."
+        },
+        {
+          "name": "profile_regularization_sensitivity",
+          "unit": "profile units",
+          "description": "Full regularization-strength scan, GCV score, effective degrees of freedom, resolution matrix and profile envelope."
+        },
+        {
+          "name": "reference_basis_uncertainty",
+          "unit": "spectral basis and radiance units",
+          "description": "Monte Carlo reconstruction covariance and eigenvalue spread from finite reference-library uncertainty."
+        },
+        {
+          "name": "geometry_beam_propagated_covariance",
+          "unit": "output units squared",
+          "description": "Monte Carlo covariance propagated from the supplied correlated geometry/beam covariance."
         }
       ],
       "assumptions": [
@@ -576,10 +620,14 @@
         "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
         "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
         "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract",
-        "tokamak_analysis.thomson_workflow.fit_n_population_relativistic_thomson_spectrum"
+        "tokamak_analysis.thomson_workflow.fit_n_population_relativistic_thomson_spectrum",
+        "tokamak_analysis.thomson_joint_inference.fit_multichannel_joint_gls",
+        "tokamak_analysis.thomson_joint_inference.reconstruct_profiles_regularization_sensitivity",
+        "tokamak_analysis.thomson_joint_inference.sample_reference_basis_uncertainty",
+        "tokamak_analysis.thomson_joint_inference.propagate_geometry_ensemble"
       ],
       "raw_data_to_physics": false,
-      "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
+      "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected. Joint covariance, profile-regularization sensitivity, reference-library PCA uncertainty and correlated geometry-ensemble operators are exposed by tokamak_analysis.thomson_joint_inference.",
       "workflow_modes": [
         {
           "name": "multi_channel_spectral_inference",
