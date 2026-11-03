@@ -297,3 +297,38 @@ is not propagated by this conditional route. The reported covariance is
 conditional on the fixed supplied PCA basis; the returned background
 coefficients remain nuisance-fit outputs, not independent physical plasma
 parameters.
+
+## Full-EM independent model-discrepancy covariance
+
+The Full-EM measured-spectrum inverse now accepts an optional
+`model_discrepancy_covariance` on the calibrated frequency-shift grid. It is
+an independent additive model-error covariance, not a fitted background and
+not an estimate derived from the observed residual.
+
+The solver combines it with exactly one supplied measurement-uncertainty
+representation:
+
+- `spectral_covariance`: full measured frequency-bin covariance; or
+- `signal_uncertainty`: pointwise 1-sigma measurement uncertainty, converted
+  to a diagonal covariance.
+
+The total covariance used for GLS is
+`C_total = C_measurement + C_model_discrepancy`. If no measurement
+uncertainty is supplied, the declared discrepancy covariance alone is used
+and the result explicitly reports that no measurement-noise covariance was
+provided. If neither source is supplied, the fit remains unweighted and its
+local covariance is residual-variance-scaled.
+
+The discrepancy covariance must be finite, symmetric and positive
+semidefinite. The total covariance must be positive definite for Cholesky
+whitening. The solver does not add diagonal jitter, clip eigenvalues, infer
+missing covariance, or silently regularize a singular covariance. The result
+returns the supplied discrepancy covariance, effective covariance, weighting
+status and covariance interpretation.
+
+This is a conditional additive covariance model. It does not propagate
+cross-covariance between measurement noise and model discrepancy, does not
+infer discrepancy hyperparameters, and does not cover omitted uncertainty in
+ray/equilibrium, beam geometry, plasma composition or polarization unless
+those are supplied through their separate supported covariance contracts.
+
