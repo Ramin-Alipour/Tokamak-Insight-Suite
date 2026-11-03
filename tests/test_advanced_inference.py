@@ -208,7 +208,7 @@ def test_optical_thomson_uses_independent_model_discrepancy_covariance():
         model_discrepancy_covariance=discrepancy,
         background_model="linear",
     )
-    channel = result["channel_results"][0] if "channel_results" in result else result["results"][0]
+    channel = result["channels"][0]
     assert channel["independent_model_discrepancy_supplied"] is True
     assert channel["model_discrepancy_diagnostics"]["covariance_included"] is True
     assert channel["model_discrepancy_diagnostics"]["independent_of_reduced_chi_square"] is True
