@@ -104,6 +104,7 @@ def _generalized_least_squares_smoothing_spline(
 
 def _reconstruct_inferred_parameter_profile(
     radius_m, values, *, uncertainty=None, covariance=None, coordinate_covariance=None,
+    coordinate_value_cross_covariance=None,
     positive=False, method="both", points=200, mc_samples=200, random_seed=18473,
 ):
     """Reconstruct one spectrum-inferred physical profile without extrapolation.
@@ -161,6 +162,29 @@ def _reconstruct_inferred_parameter_profile(
                 or not np.allclose(coordinate_cov, coordinate_cov.T, rtol=1e-10, atol=0.0)
                 or not _covariance_is_positive_semidefinite(coordinate_cov)):
             raise ValueError("Coordinate covariance must be finite, symmetric, positive semidefinite and match the channel count.")
+    coordinate_value_cross = None
+    if coordinate_value_cross_covariance is not None:
+        if coordinate_cov is None or cov is None:
+            raise ValueError(
+                "Coordinate/value cross-covariance requires both profile_coordinate_covariance_m2 "
+                "and a profile-value covariance (or pointwise uncertainty)."
+            )
+        coordinate_value_cross = np.asarray(coordinate_value_cross_covariance, dtype=float)
+        if (coordinate_value_cross.shape != (radius.size, value.size)
+                or not np.all(np.isfinite(coordinate_value_cross))):
+            raise ValueError("Coordinate/value cross-covariance must be finite with shape (n_channels,n_channels).")
+        joint_covariance = np.block([
+            [coordinate_cov, coordinate_value_cross],
+            [coordinate_value_cross.T, cov],
+        ])
+        if (not np.allclose(joint_covariance, joint_covariance.T, rtol=1e-10, atol=0.0)
+                or not _covariance_is_positive_semidefinite(joint_covariance)):
+            raise ValueError(
+                "The joint coordinate/profile-value covariance block must be positive semidefinite."
+            )
+    else:
+        joint_covariance = None
+
     grid = np.linspace(float(radius[0]), float(radius[-1]), int(points))
     selected = ("pchip", "smoothing_spline") if method == "both" else (method,)
     output = {
@@ -176,9 +200,12 @@ def _reconstruct_inferred_parameter_profile(
             else "not_available"
         ),
         "coordinate_uncertainty_model": (
-            "researcher_supplied_full_coordinate_covariance_independent_of_profile_values"
+            "joint_researcher_supplied_coordinate_and_profile_value_covariance"
+            if coordinate_value_cross is not None
+            else "researcher_supplied_full_coordinate_covariance_independent_of_profile_values"
             if coordinate_cov is not None else "coordinates_treated_as_exact"
         ),
+        "coordinate_value_cross_covariance_used": coordinate_value_cross is not None,
         "extrapolation": "forbidden; reconstruction is restricted to the measured channel-coordinate interval",
     }
 
@@ -247,21 +274,31 @@ def _reconstruct_inferred_parameter_profile(
     rng = np.random.default_rng(random_seed)
     draws = None
     coordinate_draws = None
-    if ((cov is not None and np.any(np.diag(cov) > 0))
-            or (coordinate_cov is not None and np.any(np.diag(coordinate_cov) > 0))):
+    has_profile_variance = cov is not None and np.any(np.diag(cov) > 0)
+    has_coordinate_variance = coordinate_cov is not None and np.any(np.diag(coordinate_cov) > 0)
+    has_cross_covariance = coordinate_value_cross is not None and np.any(coordinate_value_cross != 0)
+    if has_profile_variance or has_coordinate_variance or has_cross_covariance:
         try:
-            draws = (
-                rng.multivariate_normal(value, cov, size=int(mc_samples), check_valid="raise")
-                if cov is not None and np.any(np.diag(cov) > 0)
-                else np.repeat(value[None, :], int(mc_samples), axis=0)
-            )
-            coordinate_draws = (
-                rng.multivariate_normal(radius, coordinate_cov, size=int(mc_samples), check_valid="raise")
-                if coordinate_cov is not None and np.any(np.diag(coordinate_cov) > 0)
-                else np.repeat(radius[None, :], int(mc_samples), axis=0)
-            )
+            if joint_covariance is not None:
+                joint_mean = np.r_[radius, value]
+                joint_draws = rng.multivariate_normal(
+                    joint_mean, joint_covariance, size=int(mc_samples), check_valid="raise"
+                )
+                coordinate_draws = joint_draws[:, :radius.size]
+                draws = joint_draws[:, radius.size:]
+            else:
+                draws = (
+                    rng.multivariate_normal(value, cov, size=int(mc_samples), check_valid="raise")
+                    if has_profile_variance
+                    else np.repeat(value[None, :], int(mc_samples), axis=0)
+                )
+                coordinate_draws = (
+                    rng.multivariate_normal(radius, coordinate_cov, size=int(mc_samples), check_valid="raise")
+                    if has_coordinate_variance
+                    else np.repeat(radius[None, :], int(mc_samples), axis=0)
+                )
         except (ValueError, np.linalg.LinAlgError) as exc:
-            raise ValueError(f"Profile or coordinate uncertainty covariance could not be sampled: {exc}") from exc
+            raise ValueError(f"Joint profile/coordinate uncertainty covariance could not be sampled: {exc}") from exc
 
     for selected_method in selected:
         if selected_method == "smoothing_spline" and radius.size < 5:
@@ -322,6 +359,7 @@ def reconstruct_thomson_profile_from_spectra(
     *args, profile_reconstruction_method="both",
     profile_reconstruction_points=200, profile_reconstruction_mc_samples=200,
     profile_coordinate_covariance_m2=None,
+    profile_coordinate_value_cross_covariance=None,
     joint_spatial_spectral=False, spatial_mixing_matrix=None,
     spatial_mixing_covariance=None, spatial_mixing_mc_samples=200,
     spatial_mixing_mc_seed=84622,
@@ -339,7 +377,8 @@ def reconstruct_thomson_profile_from_spectra(
     selected_model = kwargs.get("model")
     if spatial_mixing_covariance is not None and spatial_mixing_matrix is None:
         raise ValueError("spatial_mixing_covariance requires spatial_mixing_matrix")
-    if joint_spatial_spectral and profile_coordinate_covariance_m2 is not None:
+    if joint_spatial_spectral and (profile_coordinate_covariance_m2 is not None
+                                  or profile_coordinate_value_cross_covariance is not None):
         raise ValueError(
             "profile_coordinate_covariance_m2 is supported by downstream profile "
             "reconstruction, not by the raw joint spatial-spectral optimizer"
@@ -701,6 +740,7 @@ def reconstruct_thomson_profile_from_spectra(
                 mc_samples=profile_reconstruction_mc_samples,
                 random_seed=18473 + len(profiles),
                 coordinate_covariance=profile_coordinate_covariance_m2,
+                coordinate_value_cross_covariance=profile_coordinate_value_cross_covariance,
             )
         except ValueError as exc:
             profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
@@ -728,6 +768,7 @@ def reconstruct_thomson_profile_from_spectra(
                     mc_samples=profile_reconstruction_mc_samples,
                     random_seed=18473 + 10 + species_index,
                     coordinate_covariance=profile_coordinate_covariance_m2,
+                    coordinate_value_cross_covariance=profile_coordinate_value_cross_covariance,
                 )
             except ValueError as exc:
                 profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
