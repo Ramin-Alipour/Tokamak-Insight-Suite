@@ -855,3 +855,13 @@ def propagate_full_em_cts_ray_geometry_uncertainty(*args, **kwargs):
     """
     from .cts_geometry_uncertainty import propagate_full_em_cts_ray_geometry_uncertainty as _propagate
     return _propagate(*args, **kwargs)
+
+
+def fit_noncollective_kinetic_thomson_with_background(*args, **kwargs):
+    """Fit Kappa/MJ optical Thomson spectra with simultaneous structured background.
+
+    The returned joint covariance retains physical, amplitude and background
+    coefficient cross terms. This lower-level API does not infer absolute density.
+    """
+    from .thomson_kinetic_background import fit_noncollective_kinetic_thomson_with_background as _fit
+    return _fit(*args, **kwargs)
