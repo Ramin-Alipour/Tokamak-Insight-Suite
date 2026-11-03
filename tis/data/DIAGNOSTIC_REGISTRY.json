@@ -921,9 +921,10 @@
           "dielectric_function",
           "dynamic_structure_factor",
           "flow projections",
-          "pole quadrature diagnostics"
+          "pole quadrature diagnostics",
+          "single-pole order and imaginary displacement diagnostics"
         ],
-        "scope": "Unmagnetized electrostatic collective Thomson forward spectrum for a researcher-supplied normalized 1-D projected electron VDF with Maxwellian ions. The first-order Landau pole is integrated analytically interval-by-interval for a piecewise-linear VDF. This is a Skolar-inspired simple-pole quadrature primitive, not a full arbitrary-order-pole reproduction and not a VDF inversion.",
+        "scope": "Unmagnetized electrostatic collective Thomson forward spectrum for a researcher-supplied normalized 1-D projected electron VDF with Maxwellian ions. The Landau integral primitive supports one complex pole of any positive integer order per call by analytic interval integration of a piecewise-linear VDF; the CTS susceptibility uses its first-order pole. This is Skolar-inspired but not a multiple-pole summation or complete kinetic closure, and it is not a VDF inversion.",
         "covariance_order": "No fit covariance; forward model only. Inference must wrap this forward model with an explicitly identifiable measured-spectrum inverse and supplied noise covariance.",
         "experimental_validation": "not_performed"
       },
