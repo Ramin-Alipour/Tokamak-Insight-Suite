@@ -5,7 +5,7 @@
     "quantities": "Per-channel electron temperature and scattering-vector flow projection from measured calibrated optical Thomson spectra; absolute electron density only where identifiable from calibrated spectral power and complete optical geometry.",
     "status": "D",
     "method": "Forward-fit measured calibrated multi-channel optical Thomson spectra with the supplied measured instrument response. Supports only the three implemented non-collective optical models: Maxwellian, isotropic Kappa (Student-t projected spectrum), and relativistic Maxwell-Juttner single-particle Thomson scattering. Microwave CTS is a registered subanalysis of primary Analysis 1; its electrostatic and full-electromagnetic models remain a distinct CTS model branch. The Maxwellian optical fitter also supports researcher-selected constant, linear, polynomial, cubic-spline or template detector-background bases. The joint spatial-spectral inverse supports isotropic finite-variance Kappa (fixed external kappa index) and relativistic Maxwell-Juttner forward kernels in addition to Maxwellian. A separate relativistic Thomson-limit inverse returns only a 1-D projected q-marginal under explicit symmetric-geometry assumptions.",
-    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it either screens the represented electron-rest-frame Compton correction in the elastic Thomson mode or includes single-scattering recoil and polarized Klein-Nishina weighting when include_compton_recoil=true. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is included as a subanalysis of primary Analysis 1. No independent experimental validation is claimed. Structured background integration in the channel-wise optical inference is currently limited to the non-collective Maxwellian fit; Kappa and Maxwell-Juttner retain their existing linear baselines. The relativistic projected-EVDF inverse uses exact elastic Thomson Doppler kinematics but omits polarized differential-cross-section weighting, Compton recoil and transverse velocity structure; it is not a general 3-D EVDF. The PSF-aware profile inverse requires a fixed researcher-supplied mixing operator and suppresses primary outputs when data-only rank is deficient. The joint spatial-spectral Kappa index is fixed externally and its uncertainty is not propagated.",
+    "caveat": "Relativistic optical model assumes isotropic Maxwell-Juttner rest-frame electrons and bulk flow parallel to the scattering vector; it either screens the represented electron-rest-frame Compton correction in the elastic Thomson mode or includes single-scattering recoil and polarized Klein-Nishina weighting when include_compton_recoil=true. Kappa uses an analytic Student-t projection of an isotropic finite-variance kappa VDF; it is not the generalized plasma-dispersion-function algorithm of Skolar et al. Collective CTS is included as a subanalysis of primary Analysis 1. No independent experimental validation is claimed. The canonical channel-wise optical inference retains native structured-background fitting for Maxwellian spectra. A separate joint kinetic-background API now fits Kappa and relativistic Maxwell-Juttner spectra with explicit detector-background nuisance coefficients and returns physical/background cross-covariance; it is exposed as a distinct workflow subanalysis, not silently substituted for the channel-wise model selector. The relativistic projected-EVDF inverse uses exact elastic Thomson Doppler kinematics but omits polarized differential-cross-section weighting, Compton recoil and transverse velocity structure; it is not a general 3-D EVDF. The PSF-aware profile inverse requires a fixed researcher-supplied mixing operator and suppresses primary outputs when data-only rank is deficient. The joint spatial-spectral Kappa index is fixed externally and its uncertainty is not propagated.",
     "implementation_functions": [
       "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
       "tokamak_analysis.thomson_inference.analyze_thomson_spectra",
@@ -17,7 +17,14 @@
       "tokamak_analysis.thomson_evdf.reconstruct_relativistic_projected_thomson_evdf",
       "tokamak_analysis.thomson_gap_closure.reconstruct_relativistic_projected_thomson_evdf",
       "tokamak_analysis.thomson_workflow.reconstruct_psf_aware_thomson_profile",
-      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile"
+      "tokamak_analysis.thomson_gap_closure.reconstruct_psf_aware_thomson_profile",
+      "tokamak_analysis.thomson_workflow.fit_noncollective_kinetic_thomson_with_background",
+      "tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background",
+      "tokamak_analysis.thomson_workflow.propagate_full_em_cts_ray_geometry_uncertainty",
+      "tokamak_analysis.cts_geometry_uncertainty.propagate_full_em_cts_ray_geometry_uncertainty",
+      "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
+      "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
+      "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract"
     ],
     "implementation_status": "Canonical optical Thomson inference supports non-collective Maxwellian, non-collective isotropic Kappa and relativistic Maxwell-Juttner single-particle models. Optical collective dielectric models are not supported by this entry point; microwave CTS is registered as an Analysis 1 subanalysis. Projected-EVDF Maxwellian/Kappa/super-Gaussian candidate comparisons additionally expose local parameter covariance and boundary-aware 1-sigma uncertainties when identifiable from the residual Jacobian; uncertainties remain conditional on the supplied noise model. A machine-readable per-channel result_classification object now exposes Primary, Conditional and Non-identifiable outputs, required auxiliary inputs, and explicit calibrated-input/no-experimental-validation flags.",
     "execution_contract": {
@@ -831,6 +838,51 @@
         ],
         "covariance_order": "channel_major",
         "uncertainty_semantics": "Local linearized covariance conditional on the selected physical model, fixed response and mixing operators, supplied measurement covariance, and selected regularization. Regularization does not contribute to the data-only identifiability rank.",
+        "experimental_validation": "not_performed"
+      },
+      {
+        "name": "Joint Kappa/MJ structured-background inference",
+        "module": "tokamak_analysis.thomson_kinetic_background",
+        "callable": "fit_noncollective_kinetic_thomson_with_background",
+        "inputs": [
+          "wavelength_nm",
+          "measured_spectrum",
+          "physical_model (kappa or relativistic_maxwell_juttner)",
+          "physical_initial (Te, projected flow, and Kappa index when selected)",
+          "laser_wavelength_nm",
+          "scattering_angle_rad",
+          "instrument_response",
+          "background_model",
+          "background_degree",
+          "background_interior_knots",
+          "background_templates",
+          "measurement_uncertainty or measurement_covariance (mutually exclusive)",
+          "incident_polarization (required for relativistic Maxwell-Juttner)",
+          "include_compton_recoil (relativistic MJ only)",
+          "maximum_recoil_correction_fraction"
+        ],
+        "outputs": [
+          "physical_parameters",
+          "spectral_amplitude",
+          "background_coefficients",
+          "fitted_thomson_spectrum",
+          "fitted_background",
+          "residual",
+          "joint_parameter_covariance",
+          "physical_background_cross_covariance",
+          "identifiability diagnostics",
+          "recoil/cross-section provenance"
+        ],
+        "scope": "Simultaneous nonlinear fit of finite-variance isotropic Kappa or relativistic Maxwell-Juttner optical Thomson forward spectra and detector-space nuisance background. Full local covariance includes physical/amplitude/background cross terms. Absolute density and unrestricted 3-D EVDF are not inferred. Kappa remains the analytic Student-t projection, not the generalized Skolar plasma-dispersion-function method.",
+        "background_models": [
+          "constant",
+          "linear",
+          "polynomial",
+          "cubic_spline",
+          "templates"
+        ],
+        "covariance_order": "[physical parameters, spectral amplitude, background coefficients]",
+        "uncertainty_semantics": "Local joint GLS covariance conditional on the supplied measurement uncertainty/covariance, fixed instrument response, selected physical model and background basis. If no measurement noise is supplied, covariance is residual-scaled and is not measurement uncertainty.",
         "experimental_validation": "not_performed"
       }
     ],
@@ -8082,4 +8134,4 @@
     "calibrated_measurements_to_physics": false,
     "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction."
   }
-]\n
+]
