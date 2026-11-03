@@ -4987,6 +4987,20 @@
           "description": "Fixed additive Full-EM background already converted from radiance using receiver etendue and efficiency exactly once."
         },
         {
+          "name": "physical_background_radiative_transfer",
+          "unit": "structured path-resolved free-free/ECE radiative-transfer inputs",
+          "required": false,
+          "description": "Alternative to physical_background_spectrum_W_Hz. Requires explicit path_length_m, electron_temperature_eV, electron_density_m3, ion_densities_m3, ion_charge_states, gaunt_factor, ece_absorption_coefficient_m_inverse (explicit null means ECE intentionally omitted), incident_radiance_W_m2_sr_Hz, receiver_etendue_m2_sr and end_to_end_efficiency. Uses probe_frequency_Hz + frequency_shift_Hz, converts radiance to receiver power, then applies the supplied measured frequency-response operator exactly once. Does not infer profiles, ECE opacity, Gaunt factor, etendue, efficiency or calibration.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
+          "name": "physical_background_covariance_W2_Hz2",
+          "unit": "n_frequency x n_frequency receiver-grid spectral-power covariance",
+          "required": false,
+          "description": "Optional positive-semidefinite covariance of the explicitly supplied receiver-grid physical background. Added to the independent model-discrepancy covariance for GLS; background/discrepancy cross-covariance is not inferred.",
+          "applies_when_model": "full_electromagnetic"
+        },
+        {
           "name": "model_discrepancy_covariance",
           "unit": "n_frequency x n_frequency",
           "required": false,
@@ -5604,6 +5618,16 @@
           "description": "Fixed free-free/ECE background inclusion status for Full-EM."
         },
         {
+          "name": "physical_background_transfer_diagnostics",
+          "unit": "structured",
+          "description": "Path-resolved free-free/ECE radiative-transfer diagnostics, absolute receiver frequencies, pre-response power and response-convolved receiver-grid background."
+        },
+        {
+          "name": "physical_background_covariance_used_in_gls",
+          "unit": "boolean",
+          "description": "Whether the supplied physical-background covariance was added to the independent GLS discrepancy covariance."
+        },
+        {
           "name": "gyrotropic_population_distribution",
           "unit": "p_perp x p_parallel",
           "description": "Conditional nonlinear Full-EM electron or fast-ion VDF shape."
@@ -5735,7 +5759,8 @@
             "external_input_parameter_order",
             "external_input_mc_samples",
             "external_input_mc_seed",
-            "optional physical_background_spectrum_W_Hz (fixed additive receiver-plane free-free/ECE spectrum)"
+            "optional physical_background_spectrum_W_Hz (already on measured receiver grid) or physical_background_radiative_transfer (path-resolved free-free/ECE; exactly one)",
+            "optional physical_background_covariance_W2_Hz2 (receiver-grid covariance; added independently to model discrepancy)"
           ],
           "outputs": [
             "electron_density_m3",

@@ -769,3 +769,27 @@ covariance. It does not infer uncertainty in radius from the spectra, derive
 flux coordinates, or perform equilibrium mapping. GitHub Actions status for
 the resulting commits remains unverified; no test-pass or experimental-
 validation claim is made.
+
+## Implementation update — 2026-11-03: integrated path-resolved CTS thermal background
+
+The Full-EM measured-spectrum inverse now accepts a path-resolved physical
+background input contract in addition to the precomputed receiver-grid
+background. The new builder integrates the existing non-relativistic
+Maxwellian free-free emissivity and LTE radiative transfer along explicitly
+supplied path profiles, requires an explicit receiver-mode ECE absorption
+coefficient (or explicit null to omit ECE), converts radiance using supplied
+receiver etendue and efficiency, and applies the measured frequency response
+once. The inversion adds this measured-grid background to the forward spectrum.
+
+An optional receiver-grid physical-background covariance is validated as
+symmetric positive semidefinite and added to the independent model-discrepancy
+covariance for GLS. The combination assumes independence and does not invent
+cross-covariance. The existing fixed-spectrum input remains available and
+is mutually exclusive with the path-resolved mapping.
+
+Regression tests cover absolute-frequency construction, physical input
+requirements, measured-response convolution and explicit ECE selection.
+This closes the integration gap for the implemented free-free/LTE-ECE
+background kernel; it does not implement a new ECE absorption solver,
+relativistic/magnetized free-free emissivity, or a physical collision operator.
+No experimental validation is performed or claimed.

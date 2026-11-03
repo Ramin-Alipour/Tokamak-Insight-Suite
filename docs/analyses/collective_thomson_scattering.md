@@ -332,3 +332,38 @@ infer discrepancy hyperparameters, and does not cover omitted uncertainty in
 ray/equilibrium, beam geometry, plasma composition or polarization unless
 those are supplied through their separate supported covariance contracts.
 
+
+## Path-resolved physical CTS background integration (Full-EM)
+
+`analyze_full_em_cts_spectrum` accepts either the existing
+`physical_background_spectrum_W_Hz` (already expressed on the measured
+receiver grid) or the new `physical_background_radiative_transfer` mapping,
+but never both. The mapping requires path-resolved electron temperature and
+density, ion densities and charge states, path lengths, an explicit Gaunt
+factor, incident boundary radiance, receiver etendue and end-to-end
+efficiency. It also requires the receiver-mode
+`ece_absorption_coefficient_m_inverse` key; an explicit `None` means ECE is
+intentionally omitted rather than silently assumed absent.
+
+The absolute receiver frequency is formed as
+`probe_frequency_Hz + frequency_shift_Hz`. Free-free and LTE mode-resolved
+ECE transfer is integrated along the supplied path, converted from radiance
+to receiver spectral power, and passed through the measured frequency-response
+operator exactly once. The resulting background is included additively in
+the measured-grid fit. TIS does not estimate any plasma profile, ECE opacity,
+Gaunt factor, etendue, efficiency, geometry or calibration.
+
+An optional positive-semidefinite
+`physical_background_covariance_W2_Hz2` is defined on the final measured
+frequency grid. It is added to the independently supplied model-discrepancy
+covariance for GLS. This addition assumes the two covariance sources are
+independent; their cross-covariance is not inferred. If no uncertainty is
+supplied, the background remains fixed and conditional.
+
+The free-free kernel is non-relativistic and unmagnetized. ECE absorption
+must come from a separate mode-resolved magnetized kinetic/radiative-transfer
+calculation. The implementation does not approximate ECE opacity from scalar
+magnetic-field magnitude. It also does not add a collision operator to the
+CTS dielectric response: numerical resonance damping remains distinct from
+physical collisional kinetics. No experimental validation is claimed; tests
+are synthetic software-contract checks only.

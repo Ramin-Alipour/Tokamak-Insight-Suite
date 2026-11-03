@@ -945,6 +945,71 @@ def _apply_frequency_response(response, spectrum, frequency):
     return (r @ (y*widths))/widths
 
 
+def build_full_em_cts_physical_background(
+    frequency_shift_Hz, probe_frequency_Hz, instrument_response, *,
+    radiative_transfer,
+):
+    """Build a receiver-grid free-free + mode-resolved ECE background.
+
+    The mapping explicitly supplies path profiles, Gaunt factor, ECE opacity
+    (or None to intentionally omit ECE), incident radiance, etendue and
+    efficiency. Frequency is probe_frequency_Hz + frequency_shift_Hz.
+    The measured response operator is applied exactly once. No physical
+    profile, opacity, geometry, calibration or instrument response is inferred.
+    """
+    from collections.abc import Mapping
+    from .cts_em_background import (
+        integrate_thermal_microwave_background,
+        radiance_to_receiver_spectral_power,
+    )
+    if not isinstance(radiative_transfer, Mapping):
+        raise ValueError("physical_background_radiative_transfer must be an explicit mapping")
+    required = {
+        "path_length_m", "electron_temperature_eV", "electron_density_m3",
+        "ion_densities_m3", "ion_charge_states", "gaunt_factor",
+        "ece_absorption_coefficient_m_inverse",
+        "incident_radiance_W_m2_sr_Hz", "receiver_etendue_m2_sr",
+        "end_to_end_efficiency",
+    }
+    missing = sorted(required - set(radiative_transfer))
+    unknown = sorted(set(radiative_transfer) - required)
+    if missing or unknown:
+        raise ValueError(
+            "physical_background_radiative_transfer must contain exactly the "
+            f"documented inputs; missing={missing}, unknown={unknown}"
+        )
+    shifts = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    f0 = _positive(probe_frequency_Hz, "probe_frequency_Hz")
+    absolute_frequency = f0 + shifts
+    if np.any(absolute_frequency <= 0.0):
+        raise ValueError("probe_frequency_Hz + frequency_shift_Hz must remain positive")
+    response = _real_array(instrument_response, "instrument_response", 2)
+    transfer = integrate_thermal_microwave_background(
+        absolute_frequency, radiative_transfer["path_length_m"],
+        radiative_transfer["electron_temperature_eV"],
+        electron_density_m3=radiative_transfer["electron_density_m3"],
+        ion_densities_m3=radiative_transfer["ion_densities_m3"],
+        ion_charge_states=radiative_transfer["ion_charge_states"],
+        ece_absorption_coefficient_m_inverse=radiative_transfer["ece_absorption_coefficient_m_inverse"],
+        gaunt_factor=radiative_transfer["gaunt_factor"],
+        incident_radiance_W_m2_sr_Hz=radiative_transfer["incident_radiance_W_m2_sr_Hz"],
+    )
+    pre_response_power = radiance_to_receiver_spectral_power(
+        transfer["spectral_radiance_W_m2_sr_Hz"],
+        receiver_etendue_m2_sr=radiative_transfer["receiver_etendue_m2_sr"],
+        end_to_end_efficiency=radiative_transfer["end_to_end_efficiency"],
+    )
+    measured_grid_power = _apply_frequency_response(response, pre_response_power, shifts)
+    diagnostics = {
+        **transfer,
+        "absolute_receiver_frequency_Hz": absolute_frequency.copy(),
+        "pre_response_receiver_spectral_power_W_Hz": pre_response_power.copy(),
+        "response_convolved_receiver_spectral_power_W_Hz": measured_grid_power.copy(),
+        "instrument_response_applied_once": True,
+        "background_uncertainty": "not inferred; supply physical_background_covariance_W2_Hz2 for conditional GLS propagation",
+    }
+    return measured_grid_power, diagnostics
+
 def _prepare_full_em_cts_spectral_whitener(
     n_bins, *, signal_uncertainty=None, spectral_covariance=None,
     model_discrepancy_covariance=None,
@@ -1052,6 +1117,8 @@ def analyze_full_em_cts_spectrum(
     external_input_parameter_order=None, external_input_mc_samples=100,
     external_input_mc_seed=84622,
     physical_background_spectrum_W_Hz=None,
+    physical_background_radiative_transfer=None,
+    physical_background_covariance_W2_Hz2=None,
     numerical_convergence=True, convergence_harmonic_orders=None,
     convergence_quadrature_orders=None, convergence_relative_tolerance=1e-3,
 ):
@@ -1145,19 +1212,51 @@ def analyze_full_em_cts_spectrum(
         raise ValueError("frequency_shift_Hz and measured_spectrum must be matching vectors with >=8 bins")
     if np.any(~np.isfinite(f)) or np.any(~np.isfinite(y)) or np.any(np.diff(f) <= 0) or np.any(y < 0):
         raise ValueError("frequency axis must increase; measured spectrum must be finite and non-negative")
-    if physical_background_spectrum_W_Hz is None:
-        physical_background = np.zeros_like(y)
-        physical_background_status = "no_fixed_physical_background_supplied"
-    else:
-        physical_background = _real_array(physical_background_spectrum_W_Hz, "physical_background_spectrum_W_Hz", 1)
-        if physical_background.shape != y.shape or np.any(physical_background < 0):
+    if physical_background_spectrum_W_Hz is not None and physical_background_radiative_transfer is not None:
+        raise ValueError("supply physical_background_spectrum_W_Hz or physical_background_radiative_transfer, not both")
+    supplied_physical_background = None
+    if physical_background_spectrum_W_Hz is not None:
+        supplied_physical_background = _real_array(physical_background_spectrum_W_Hz, "physical_background_spectrum_W_Hz", 1)
+        if supplied_physical_background.shape != y.shape or np.any(supplied_physical_background < 0):
             raise ValueError("physical_background_spectrum_W_Hz must be non-negative and match the measured receiver-plane spectrum")
-        physical_background_status = "fixed_additive_receiver_plane_spectral_power_from_physical_radiative_transfer"
     response = _real_array(instrument_response, "instrument_response", 2)
     if response.shape != (f.size, f.size) or np.any(~np.isfinite(response)) or np.any(response < 0) or np.any(response.sum(axis=0) <= 0):
         raise ValueError("instrument_response must be a non-negative square matrix with non-zero columns")
     if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
+    physical_background_transfer_diagnostics = None
+    if physical_background_radiative_transfer is not None:
+        physical_background, physical_background_transfer_diagnostics = build_full_em_cts_physical_background(
+            f, probe_frequency_Hz, response, radiative_transfer=physical_background_radiative_transfer,
+        )
+        physical_background_status = (
+            "free_free_plus_mode_resolved_ECE_radiative_transfer_convolved_with_measured_response"
+            if physical_background_transfer_diagnostics["ece_model_status"].startswith("mode-resolved")
+            else "free_free_radiative_transfer_ECE_explicitly_omitted_convolved_with_measured_response"
+        )
+    elif supplied_physical_background is not None:
+        physical_background = supplied_physical_background
+        physical_background_status = "fixed_additive_receiver_grid_spectrum_supplied_by_researcher"
+    else:
+        physical_background = np.zeros_like(y)
+        physical_background_status = "no_fixed_physical_background_supplied"
+    physical_background_covariance = None
+    if physical_background_covariance_W2_Hz2 is not None:
+        if supplied_physical_background is None and physical_background_radiative_transfer is None:
+            raise ValueError("physical_background_covariance_W2_Hz2 requires an explicitly supplied physical background")
+        physical_background_covariance = _real_array(physical_background_covariance_W2_Hz2, "physical_background_covariance_W2_Hz2", 2)
+        if physical_background_covariance.shape != (f.size, f.size) or not np.allclose(physical_background_covariance, physical_background_covariance.T, rtol=1e-10, atol=1e-14):
+            raise ValueError("physical_background_covariance_W2_Hz2 must be a symmetric (n_frequency,n_frequency) matrix")
+        background_eigenvalues = np.linalg.eigvalsh(physical_background_covariance)
+        background_scale = max(float(np.max(np.abs(background_eigenvalues))), np.finfo(float).tiny)
+        if float(np.min(background_eigenvalues)) < -1e-10 * background_scale:
+            raise ValueError("physical_background_covariance_W2_Hz2 must be positive semidefinite")
+    effective_discrepancy_covariance = None if model_discrepancy_covariance is None else _real_array(model_discrepancy_covariance, "model_discrepancy_covariance", 2).copy()
+    if physical_background_covariance is not None:
+        effective_discrepancy_covariance = (
+            physical_background_covariance.copy() if effective_discrepancy_covariance is None
+            else effective_discrepancy_covariance + physical_background_covariance
+        )
     response_sigma = None
     if instrument_response_uncertainty is not None:
         response_sigma = _real_array(instrument_response_uncertainty, "instrument_response_uncertainty", 2)
@@ -1171,7 +1270,7 @@ def analyze_full_em_cts_spectrum(
         f.size,
         signal_uncertainty=signal_uncertainty,
         spectral_covariance=spectral_covariance,
-        model_discrepancy_covariance=model_discrepancy_covariance,
+        model_discrepancy_covariance=effective_discrepancy_covariance,
     )
     # If neither measurement uncertainty nor a declared discrepancy covariance
     # is supplied, the calibrated spectrum is fitted unweighted and the local
@@ -1540,7 +1639,10 @@ def analyze_full_em_cts_spectrum(
         "residual": y - (amplitude * convolved + offset + physical_background),
         "physical_background_spectrum_W_Hz": physical_background.copy(),
         "physical_background_status": physical_background_status,
-        "physical_background_role": "fixed_additive_receiver_plane_spectral_power; radiance_to_power conversion uses measured receiver_etendue and efficiency exactly once",
+        "physical_background_transfer_diagnostics": physical_background_transfer_diagnostics,
+        "physical_background_covariance_W2_Hz2": None if physical_background_covariance is None else physical_background_covariance.copy(),
+        "physical_background_covariance_used_in_gls": physical_background_covariance is not None,
+        "physical_background_role": "receiver-grid additive spectral power; radiative-transfer route converts radiance with supplied etendue/efficiency and applies measured response once",
         "profiled_amplitude": float(amplitude),
         "profiled_offset": float(offset),
         "reduced_chi_square": (
