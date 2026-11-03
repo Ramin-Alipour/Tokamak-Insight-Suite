@@ -519,18 +519,33 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if response.shape!=(f.size,f.size) or np.any(response<0) or np.any(response.sum(axis=0)<=0): raise ValueError("invalid instrument_response matrix")
     if not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
         raise ValueError("measured instrument_response columns must already sum to one; the calibrated response operator is not renormalized")
-    # Resolve the physical-background state explicitly in the result contract.
-    # None preserves the legacy call signature while recording the inferred assumption.
+    # A fitted constant-offset nuisance is not evidence that the physical
+    # receiver background is zero.  Keep an omitted declaration explicitly
+    # unresolved; only an explicit user declaration may assert assumed_zero.
     if background_state is None:
-        resolved_background_state = "reference_pca" if background_reference_spectra is not None else "assumed_zero"
+        resolved_background_state = (
+            "reference_pca" if background_reference_spectra is not None
+            else "uncharacterized_constant_offset"
+        )
     else:
-        if background_state not in {"assumed_zero", "reference_pca"}:
-            raise ValueError("background_state must be 'assumed_zero' or 'reference_pca'")
+        allowed_background_states = {
+            "assumed_zero", "reference_pca", "uncharacterized_constant_offset"
+        }
+        if background_state not in allowed_background_states:
+            raise ValueError(
+                "background_state must be 'assumed_zero', 'reference_pca', "
+                "or 'uncharacterized_constant_offset'"
+            )
         resolved_background_state = background_state
     if resolved_background_state == "assumed_zero" and background_reference_spectra is not None:
         raise ValueError("background_state='assumed_zero' conflicts with supplied background_reference_spectra")
     if resolved_background_state == "reference_pca" and background_reference_spectra is None:
         raise ValueError("background_state='reference_pca' requires background_reference_spectra")
+    if resolved_background_state == "uncharacterized_constant_offset" and background_reference_spectra is not None:
+        raise ValueError(
+            "background_state='uncharacterized_constant_offset' conflicts with supplied "
+            "background_reference_spectra; select 'reference_pca'"
+        )
     # Optional calibrated off-pulse/reference spectra define a fixed PCA
     # nuisance subspace. References are already on the same calibrated
     # frequency grid and detector scale; this routine never re-calibrates them.
@@ -1033,8 +1048,17 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
       ],
       "background_model":"constant_offset" if background_basis is None else "reference_spectrum_PCA",
       "background_state":resolved_background_state,
-      "background_zero_assumption":resolved_background_state == "assumed_zero",
-      "background_state_provenance":"explicit_user_declaration" if background_state is not None else "backward_compatible_inference_from_supplied_reference_input",
+      "background_zero_assumption":resolved_background_state == "assumed_zero" and background_state is not None,
+      "physical_background_zero": (
+          True if resolved_background_state == "assumed_zero" and background_state is not None
+          else None
+      ),
+      "background_state_is_explicit":background_state is not None,
+      "background_state_provenance":(
+          "explicit_user_declaration" if background_state is not None else
+          "inferred_reference_pca_from_supplied_reference_input" if background_reference_spectra is not None else
+          "unresolved_legacy_default_constant_offset_nuisance"
+      ),
       "background_spectrum":background_fit.copy(),
       "background_coefficients":background_coefficients.copy(),
       "background_coefficient_names":(
