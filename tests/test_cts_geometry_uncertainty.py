@@ -113,3 +113,76 @@ def test_geometry_uncertainty_requires_sampler_and_sufficient_draws():
             geometry_sampler=lambda rng, index: {},
             samples=5,
         )
+
+
+def test_joint_geometry_sampler_applies_correlated_external_input_updates(monkeypatch):
+    import tokamak_analysis.cts_full_em as full_em
+
+    def fake_analyze(**kwargs):
+        scale = float(kwargs["scattering_geometry"].get("scale", 1.0))
+        external = float(kwargs["probe_frequency_Hz"]) / 1.0e9
+        value = scale + external
+        return {
+            "optimizer_success": True,
+            "parameter_names": PARAMETER_NAMES,
+            "electron_density_m3": 1.0e19 * value,
+            "electron_temperature_eV": 100.0 + value,
+            "electron_flow_projection_m_s": 1.0e3 * value,
+            "ion_temperature_eV_by_species": {"D": 20.0 + value},
+            "ion_flow_projection_m_s_by_species": {"D": 2.0e2 * value},
+            "conditional_fit_covariance": np.eye(5),
+            "fit_covariance": np.eye(5),
+        }
+
+    monkeypatch.setattr(full_em, "analyze_full_em_cts_spectrum", fake_analyze)
+
+    def joint_sampler(rng, index):
+        scale = 0.9 + 0.2 * rng.random()
+        # Deliberately correlate the external probe-frequency draw with
+        # geometry. Both must enter the same forward refit.
+        return {
+            "scattering_geometry": _geometry(scale),
+            "inference_updates": {"probe_frequency_Hz": 1.0e9 * (2.0 * scale)},
+        }
+
+    result = propagate_full_em_cts_ray_geometry_uncertainty(
+        inference_kwargs={
+            "scattering_geometry": {"scale": 1.0},
+            "probe_frequency_Hz": 1.0e9,
+        },
+        geometry_sampler=joint_sampler,
+        samples=20,
+        seed=31,
+    )
+    assert result["ray_geometry_uncertainty"]["propagated"] is True
+    assert "joint_full_forward_monte_carlo" in result["ray_geometry_uncertainty"]["method"]
+    assert result["ray_geometry_parameter_covariance"][0, 1] > 0.0
+
+
+def test_joint_geometry_sampler_cannot_replace_measured_spectrum(monkeypatch):
+    import tokamak_analysis.cts_full_em as full_em
+
+    def fake_analyze(**kwargs):
+        return {
+            "optimizer_success": True,
+            "parameter_names": PARAMETER_NAMES,
+            "electron_density_m3": 1.0e19,
+            "electron_temperature_eV": 100.0,
+            "electron_flow_projection_m_s": 0.0,
+            "ion_temperature_eV_by_species": {"D": 20.0},
+            "ion_flow_projection_m_s_by_species": {"D": 0.0},
+            "conditional_fit_covariance": np.eye(5),
+            "fit_covariance": np.eye(5),
+        }
+
+    monkeypatch.setattr(full_em, "analyze_full_em_cts_spectrum", fake_analyze)
+    result = propagate_full_em_cts_ray_geometry_uncertainty(
+        inference_kwargs={"scattering_geometry": {"scale": 1.0}, "measured_spectrum": [1.0]},
+        geometry_sampler=lambda rng, index: {
+            "scattering_geometry": _geometry(),
+            "inference_updates": {"measured_spectrum": [2.0]},
+        },
+        samples=20,
+    )
+    assert result["ray_geometry_uncertainty"]["propagated"] is False
+    assert result["ray_geometry_uncertainty"]["failed_samples"] == 20
