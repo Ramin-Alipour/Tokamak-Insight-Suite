@@ -1260,7 +1260,7 @@ def analyze_full_em_cts_spectrum(
         )
         physical_background_status = (
             "free_free_plus_mode_resolved_ECE_radiative_transfer_convolved_with_measured_response"
-            if physical_background_transfer_diagnostics["ece_model_status"].startswith("mode-resolved")
+            if "ECE absorption" in physical_background_transfer_diagnostics["ece_model_status"]
             else "free_free_radiative_transfer_ECE_explicitly_omitted_convolved_with_measured_response"
         )
     elif supplied_physical_background is not None:
