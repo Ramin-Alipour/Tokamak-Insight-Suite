@@ -406,7 +406,7 @@ def trace_cold_plasma_ray(
             "Cold, collisionless, local dielectric; not valid at unresolved resonant layers.",
             "The ray ODE follows a fixed eigenvalue-order index. If the tracked eigenvalue-order permutation changes, the ray is not following one continuous polarization branch across the crossing.",
             "Optional lossless coherent mode-amplitude propagation is returned only when its path and propagation constants are explicitly supplied; it does not change the fixed-branch ray trajectory or CTS spectral transfer.",
-            "Geometrical-optics approximation; diffraction and finite-beam evolution are not included.",
+            "Ray trajectories remain geometrical-optics characteristics; optional finite-beam covariance is a linearized paraxial Gaussian phase-space approximation, not a full wave solution.",
             "The equilibrium callback and its spatial derivatives are supplied by the caller."
         ],
     }
@@ -629,7 +629,7 @@ def trace_cts_frequency_resolved_beams(
         "scattering_volume_integration": "normalized Gaussian overlap times incident-ray path-length quadrature",
         "scattering_sample_count": np.asarray([len(entry["scattering_samples"]) for entry in entries], dtype=int),
         "limitations": [
-            "Cold-plasma geometrical optics; diffraction and quasi-optical beam evolution are not included.",
+            "Cold-plasma ray trajectories remain geometrical optics; finite-beam covariance is propagated paraxially from the dispersion Hessian or supplied ABCD maps, while non-paraxial diffraction and full vector quasi-optics are not solved.",
             "Optional coherent mode-amplitude propagation is diagnostic output only; it does not alter ray trajectories, overlap weights or the full-EM CTS spectral transfer.",
             "Beam covariance is supplied locally, propagated from explicit symplectic paraxial maps, or propagated from the full cold-plasma dispersion Hessian; the latter is valid only along a continuous non-degenerate eigenmode branch.",
             "Fitted ne, Te and thermal-ion temperatures are treated as uniform across the sampled scattering volume; local ray directions and magnetic field vary.",
