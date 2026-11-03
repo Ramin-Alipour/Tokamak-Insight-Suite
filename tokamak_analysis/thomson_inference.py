@@ -127,6 +127,78 @@ def _apply_response(response, spectrum, wavelength):
     return (response @ (values * widths)) / widths
 
 
+
+
+def _laser_source_response(wavelength_nm, laser_wavelength_nm,
+                           laser_spectrum_wavelength_nm,
+                           laser_spectrum_density_per_nm):
+    """Build a photon-conserving wavelength-shift operator for a measured laser line.
+
+    The supplied laser profile is a measured, calibrated spectral density. Its
+    absolute power is deliberately irrelevant here: it is normalized to unit
+    area and used only as the source spectral shape. For narrow-band optical
+    Thomson scattering, the incident wavelength offset is transferred to the
+    scattered spectrum as an additive wavelength shift. The resulting operator
+    is composed with (not substituted for) the spectrometer response.
+    """
+    x = _finite_array(wavelength_nm, "wavelength_nm", 1)
+    source_x = _finite_array(laser_spectrum_wavelength_nm,
+                             "laser_spectrum_wavelength_nm", 1)
+    source_y = _finite_array(laser_spectrum_density_per_nm,
+                             "laser_spectrum_density_per_nm", 1)
+    if source_x.size < 3 or source_y.shape != source_x.shape:
+        raise ValueError("The measured laser spectral profile must contain at least three paired wavelength-density samples")
+    if np.any(np.diff(source_x) <= 0) or np.any(source_x <= 0):
+        raise ValueError("laser_spectrum_wavelength_nm must be positive and strictly increasing")
+    if np.any(source_y < 0):
+        raise ValueError("laser_spectrum_density_per_nm must be non-negative")
+    area = float(np.trapz(source_y, source_x))
+    if not np.isfinite(area) or area <= 0:
+        raise ValueError("The measured laser spectral profile must have positive finite integrated area")
+    normalized = source_y / area
+    # Trapezoidal quadrature weights preserve the supplied continuous spectral
+    # density on its native grid without assuming uniform laser sampling.
+    dx = np.diff(source_x)
+    quadrature = np.empty(source_x.size, dtype=float)
+    quadrature[0] = dx[0] / 2.0
+    quadrature[-1] = dx[-1] / 2.0
+    if source_x.size > 2:
+        quadrature[1:-1] = (dx[:-1] + dx[1:]) / 2.0
+    weights = normalized * quadrature
+    weights /= np.sum(weights)
+    operator = np.zeros((x.size, x.size), dtype=float)
+    offsets = source_x - float(laser_wavelength_nm)
+    for column, true_wavelength in enumerate(x):
+        shifted = true_wavelength + offsets
+        right = np.searchsorted(x, shifted, side="right")
+        for position, weight in zip(shifted, weights):
+            if position < x[0] or position > x[-1]:
+                continue
+            hi = int(np.searchsorted(x, position, side="right"))
+            if hi == 0:
+                operator[0, column] += weight
+            elif hi >= x.size:
+                operator[-1, column] += weight
+            else:
+                lo = hi - 1
+                fraction = (position - x[lo]) / (x[hi] - x[lo])
+                operator[lo, column] += weight * (1.0 - fraction)
+                operator[hi, column] += weight * fraction
+    # Do not renormalize edge columns: missing probability represents genuine
+    # source-broadened spectral power outside the finite measured wavelength
+    # window, not an instrumental efficiency correction.
+    return operator, {
+        "normalization_area": area,
+        "centroid_nm": float(np.trapz(source_x * normalized, source_x)),
+        "rms_width_nm": float(np.sqrt(max(np.trapz(
+            (source_x - np.trapz(source_x * normalized, source_x))**2
+            * normalized, source_x), 0.0))),
+        "source_profile_samples": int(source_x.size),
+        "source_operator_column_sums_min": float(np.min(operator.sum(axis=0))),
+        "source_operator_column_sums_max": float(np.max(operator.sum(axis=0))),
+        "convolution_approximation": "additive_wavelength_shift_valid_for_narrow_optical_source_bandwidth",
+    }
+
 def _gaussian(x, amp, center, sigma, offset, slope):
     return amp * np.exp(-0.5 * ((x-center)/sigma)**2) + offset + slope*(x-center)
 
@@ -700,6 +772,7 @@ def analyze_thomson_spectra(
     optical_efficiency_uncertainty=None, polarization_factor_uncertainty=None,
     density_relative_covariance=None, joint_density_relative_covariance=None,
     instrument_response_uncertainty=None, model=None,
+    laser_spectrum_wavelength_nm=None, laser_spectrum_density_per_nm=None,
     ion_species=None, ion_fractions=None, ion_temperature_eV=None, ion_velocity_m_s=None, electron_velocity_m_s=None,
     collective_initial_density_m3=None, collective_initial_temperature_eV=None,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
@@ -756,6 +829,13 @@ def analyze_thomson_spectra(
         raise ValueError("Wavelength samples must be positive")
     if instrument_response is None:
         raise ValueError("A measured instrument-response matrix is required; supply an identity matrix only when a delta-like response is explicitly justified.")
+    if (laser_spectrum_wavelength_nm is None) != (laser_spectrum_density_per_nm is None):
+        raise ValueError("Supply both laser_spectrum_wavelength_nm and laser_spectrum_density_per_nm, or neither.")
+    if laser_spectrum_wavelength_nm is not None and model not in {
+        "non_collective_maxwellian", "non_collective_kappa",
+        "non_collective_relativistic_maxwell_juttner",
+    }:
+        raise ValueError("A measured incident-laser spectral profile is currently supported for non-collective optical Thomson models; collective dielectric models require a source-frequency-resolved dielectric forward model.")
     laser_wavelength_nm = _finite_scalar(laser_wavelength_nm, "laser_wavelength_nm", minimum=np.finfo(float).tiny)
     scattering_angle_rad = _finite_scalar(scattering_angle_rad, "scattering_angle_rad", minimum=np.finfo(float).tiny, maximum=np.pi)
     if scattering_angle_rad >= np.pi:
@@ -1107,6 +1187,16 @@ def analyze_thomson_spectra(
     for i in range(y.shape[0]):
         xi = xs[i]
         response = _response_for_channel(instrument_response, i, y.shape[0], y.shape[1], xi)
+        source_response = None
+        source_profile_metadata = None
+        if laser_spectrum_wavelength_nm is not None:
+            source_response, source_profile_metadata = _laser_source_response(
+                xi, float(laser_wavelength_nm), laser_spectrum_wavelength_nm,
+                laser_spectrum_density_per_nm,
+            )
+            # Source broadening occurs before the spectrometer response:
+            # measured_model = instrument_response @ source_broadened_model.
+            response = response @ source_response
         channel_responses.append(response)
         ui = None if unc is None else unc[i]
         channel_covariance = None
@@ -1535,6 +1625,15 @@ def analyze_thomson_spectra(
         fit["channel_index"] = int(i)
         fit["radius_m"] = float(radii[i])
         fit["instrument_response_used"] = instrument_response is not None
+        fit["laser_spectral_profile_used"] = source_profile_metadata is not None
+        fit["laser_spectral_profile_model"] = (
+            source_profile_metadata if source_profile_metadata is not None
+            else {"assumption": "monochromatic_incident_laser"}
+        )
+        fit["source_and_instrument_response_order"] = (
+            "instrument_response @ laser_source_response"
+            if source_profile_metadata is not None else "instrument_response_only"
+        )
         fit["instrument_response_uncertainty_supplied"] = lsf_unc is not None
         missing_uncertainties=[]
         if unc is None: missing_uncertainties.append("signal_uncertainty")
@@ -1600,6 +1699,8 @@ def analyze_thomson_spectra(
                     sampled = _response_for_channel(
                         sampled_kernel, i, y.shape[0], y.shape[1], xi
                     )
+                    if source_response is not None:
+                        sampled = sampled @ source_response
                 else:
                     sampled = np.maximum(response + rng.normal(0.0, lsf_sigma), 0.0)
                     colsum = sampled.sum(axis=0)
@@ -1610,6 +1711,8 @@ def analyze_thomson_spectra(
                         cross_section_samples.append(np.nan)
                         continue
                     sampled /= colsum[None, :]
+                    if source_response is not None:
+                        sampled = sampled @ source_response
                 try:
                     if model == "non_collective_kappa":
                         draw = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
