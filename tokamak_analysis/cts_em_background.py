@@ -51,6 +51,8 @@ def thermal_bremsstrahlung_emissivity_si(
         raise ValueError("electron_density_m3 must be finite and non-negative; electron_temperature_eV must be positive and finite")
     if ni.ndim != 1 or z.shape != ni.shape or ni.size == 0 or np.any(~np.isfinite(ni)) or np.any(ni < 0) or np.any(~np.isfinite(z)) or np.any(z <= 0):
         raise ValueError("ion densities and charge states must be matching finite vectors with n_i>=0 and Z_i>0")
+    if ne == 0.0 and np.any(ni != 0.0):
+        raise ValueError("zero electron density requires zero positive-ion densities in this quasineutral plasma model")
     if np.any(~np.isfinite(g)) or np.any(g <= 0):
         raise ValueError("gaunt_factor must be positive and finite")
     try:
@@ -92,6 +94,8 @@ def integrate_thermal_microwave_background(
         raise ValueError("path_length_m, electron_temperature_eV and electron_density_m3 must be matching 1-D path arrays")
     if ni.ndim != 2 or ni.shape[0] != length.size or z.shape != (ni.shape[1],):
         raise ValueError("ion_densities_m3 must be (n_path,n_species) and ion_charge_states one value per species")
+    if np.any((ne == 0.0)[:, None] & (ni != 0.0)):
+        raise ValueError("zero electron density requires zero positive-ion densities on the same path elements")
     if (np.any(~np.isfinite(length)) or np.any(length <= 0)
             or np.any(~np.isfinite(te)) or np.any(te <= 0)
             or np.any(~np.isfinite(ne)) or np.any(ne < 0)):
