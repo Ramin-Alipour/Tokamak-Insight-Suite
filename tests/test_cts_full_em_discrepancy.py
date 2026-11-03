@@ -100,8 +100,10 @@ def test_full_em_resonance_broadening_is_never_reported_as_physical_collisions()
     assert supplied["collision_operator"] is None
     assert supplied["damping_rate_source"] == "caller_supplied_numerical_regularization"
 
+    default_frequency = 100.0e9
     defaulted = _resonance_broadening_metadata(
-        2.0e6, caller_supplied=False, probe_frequency_Hz=100.0e9
+        max(2.0 * np.pi * default_frequency * 1e-7, 1.0),
+        caller_supplied=False, probe_frequency_Hz=default_frequency
     )
     assert "documented_numerical_default" in defaulted["damping_rate_source"]
     assert defaulted["resonance_broadening_semantics"] == (
