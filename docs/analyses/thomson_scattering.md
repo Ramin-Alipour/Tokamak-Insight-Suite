@@ -44,6 +44,59 @@ These papers inform model selection and implementation scope only. Their reporte
 
 Input spectra are assumed to be prepared and calibrated. The analysis does not perform wavelength calibration, detector calibration, raw-count correction, background correction of the measurement system, or instrument-response measurement. A local background nuisance parameter in the physical spectral fit is part of inference, not detector calibration.
 
+## Incident-laser spectral profile
+
+The canonical non-collective optical Thomson API optionally accepts
+`laser_spectrum_wavelength_nm` and `laser_spectrum_density_per_nm`. These
+arrays describe an already measured and calibrated incident-laser spectral
+density; the software does not measure, calibrate, smooth, repair or infer the
+source profile. The two arrays must be supplied together. The profile must be
+non-negative, finite and strictly wavelength-ordered with positive integrated
+area. Its shape is normalized to unit area because the source convolution
+redistributes spectral shape, while absolute incident power remains a separate
+input to the density inversion.
+
+The forward ordering is
+
+[
+S_{\rm pred}(\lambda)=
+R_{\rm inst}\left[
+\int B_L(\lambda_L)
+S_{\rm TS}(\lambda;\lambda_L)\,d\lambda_L
+\right],
+]
+
+where (B_L) is the normalized measured laser spectrum,
+(S_{\rm TS}) is the intrinsic Thomson spectrum evaluated at the incident
+wavelength, and (R_{\rm inst}) is the supplied measured spectrometer response.
+The implementation currently transfers the narrow-band incident wavelength
+offset as an additive scattered-wavelength shift. This is the standard
+narrow-band convolution approximation; it is not a full broadband
+frequency-dependent scattering calculation. Finite-window source power that
+shifts outside the measured wavelength interval is not folded back into the
+spectrum. The output records source centroid, RMS linewidth, normalization
+area, edge-column coverage and the approximation used.
+
+If no measured laser profile is supplied, the model explicitly assumes a
+monochromatic incident laser at `laser_wavelength_nm`. The source profile is
+currently supported in the canonical non-collective Maxwellian, Kappa and
+relativistic Maxwell-Jüttner fits, their joint spectral covariance/response
+refits, the joint spatial-spectral profile inverse, and the projected
+non-relativistic EVDF inverse. Collective dielectric optical inference is not
+silently broadened by this approximation; it requires a source-frequency
+resolved dielectric model and therefore rejects this optional input.
+
+Recent X-ray Thomson-scattering literature also treats the source function and
+instrument function as separate broadening operators and often combines them
+into a source-and-instrument convolution only under a stated narrow-band
+approximation. The present optical implementation follows that separation,
+rather than adding source linewidth in quadrature to an inferred electron
+temperature. See the 2026 XRTS source/instrument broadening review and the
+2026 source-and-instrument function treatment (DOI:
+10.1007/s41614-026-00227-9; 10.1063/5.0309991). These X-ray papers support the
+general forward-model structure; they are not claimed as direct validation of
+this optical wavelength-shift approximation.
+
 ## Instrument response and spectral-distribution diagnostics
 
 The supplied measured response is applied in the physical forward model. Spectral-density samples are converted to bin-integrated power before applying the response and divided by measured-bin widths afterward, supporting nonuniform calibrated wavelength grids. No Gaussian line-spread function is imposed by the primary physical fit. A supplied 2-D or channel-specific 3-D measured response matrix must already have non-negative, unit-sum columns and is used unchanged. A supplied 1-D measured kernel must already have unit total area and is also used unchanged; when mapped onto the finite measured wavelength window, response tails outside that window are omitted, so edge columns can have sums below one. Those sub-unit edge sums represent spectral power redistributed outside the recorded wavelength interval, not a renormalization or correction of the calibrated kernel. The kernel path requires a uniform wavelength grid. Joint spectral GLS, optical-factor covariance and independent response-matrix Monte Carlo can be combined when the scattered-power component is excluded (zero first row/column) from the optical covariance to prevent double counting.
