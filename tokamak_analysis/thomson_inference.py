@@ -335,7 +335,7 @@ def _fit_noncollective(
     if spectral_covariance is not None:
         if likelihood == "poisson":
             raise ValueError("Poisson count likelihood cannot be combined with Gaussian spectral_covariance")
-        covariance = _finite_array(spectral_covariance, "spectral_covariance", 2)
+        covariance = _finite_array(spectral_covariance, "spectral_covariance", 2) / (signal_scale**2)
         if covariance.shape != (wavelength.size, wavelength.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
             raise ValueError("spectral_covariance must be symmetric and match the wavelength grid")
         if uncertainty is not None:
