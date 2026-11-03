@@ -479,6 +479,21 @@
           "name": "psf_aware_profile",
           "unit": "latent spatial profile on supplied PSF nodes",
           "description": "Separate fixed-operator inverse with data-only rank diagnostics; only full-rank data-supported profiles are primary outputs."
+        },
+        {
+          "name": "joint_signal_background_parameter_covariance",
+          "unit": "joint physical and detector-background parameter covariance",
+          "description": "Includes physical/background cross terms when the joint structured-background workflow is used."
+        },
+        {
+          "name": "joint_ne_te_ti_profile_covariance",
+          "unit": "(3*n_radius) x (3*n_radius) parameter covariance",
+          "description": "Returned only when the unregularized data Jacobian is full column rank; covariance remains conditional on supplied measurement covariance."
+        },
+        {
+          "name": "profile_data_identifiability",
+          "unit": "structured rank/singular-value diagnostics",
+          "description": "Data-only Jacobian rank is distinct from regularized-Jacobian rank; regularization cannot promote null-space modes to primary measurements."
         }
       ],
       "assumptions": [
@@ -516,7 +531,10 @@
         "The relativistic projected EVDF inverse is a one-dimensional exact-Doppler kinematic model in the Thomson limit; polarization-dependent cross-section weighting, Compton recoil, transverse velocity structure and unrestricted 3-D reconstruction are not included.",
         "The PSF-aware profile inverse requires a researcher-supplied fixed mixing operator; uncertainty in that operator is not propagated and its null-space modes remain non-identifiable.",
         "Joint spatial-spectral Kappa inference treats kappa_index as a fixed external parameter; its uncertainty is not propagated.",
-        "Full-EM CTS per-sample relative density/temperature factors are fixed external spatial profiles, not independently inferred profiles; their cross-sample covariance is not propagated."
+        "Full-EM CTS per-sample relative density/temperature factors are fixed external spatial profiles, not independently inferred profiles; their cross-sample covariance is not propagated.",
+        "The generic structured-background joint optimizer is exposed as a lower-level programmatic workflow; the canonical per-channel Kappa and relativistic Maxwell-Juttner fitters still use linear baseline nuisance terms, so the general spline/template background basis is not yet wired into those model branches.",
+        "The generic joint ne/Te/Ti radial inversion requires a caller-supplied channel-resolved physical forward model and does not itself establish ion-temperature identifiability; data-only Jacobian rank controls Primary versus regularized non-identifiable status.",
+        "The generic joint profile routine does not propagate equilibrium, ray geometry, PSF or spatial cross-talk uncertainty; use explicit forward-input sampling and the dedicated geometry propagation contracts where applicable."
       ],
       "function_links": [
         "tokamak_analysis.thomson_workflow.analyze_thomson_spectra",
@@ -525,7 +543,10 @@
         "tokamak_analysis.thomson_kinetic_models.fit_relativistic_maxwell_juttner",
         "tokamak_analysis.thomson_evdf.reconstruct_thomson_evdf",
         "tokamak_analysis.thomson_scattering.infer_thomson_path_averaged_density",
-        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra"
+        "tokamak_analysis.thomson_joint_spatial_spectral.reconstruct_joint_thomson_spatial_spectra",
+        "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
+        "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
+        "tokamak_analysis.thomson_workflow.thomson_compton_recoil_contract"
       ],
       "raw_data_to_physics": false,
       "note": "Primary Analysis 1 contains the optical Thomson inference, microwave CTS, single-spectrum spectral-distribution diagnostics and spectrum-to-radial-profile reconstruction subanalyses. Optical and CTS model branches remain distinct and explicitly selected.",
@@ -597,6 +618,48 @@
             "signal_background_cross_covariance"
           ],
           "uncertainty_rule": "The residual covariance is C(signal-background)=C_signal+C_background-C_signal_background-C_signal_background.T. Signal/background cross-covariance requires both marginal covariance models and a positive-definite joint block covariance. Background-only covariance treats signal noise as not supplied; all uncertainty remains conditional on supplied covariance inputs."
+        },
+        {
+          "name": "Joint structured-background physical Thomson fitting",
+          "function": "tokamak_analysis.thomson_workflow.fit_thomson_spectrum_with_structured_background",
+          "required_inputs": [
+            "measured calibrated wavelength_nm",
+            "measured calibrated measured_spectrum",
+            "physical forward_model callable",
+            "physical_initial and physical_bounds",
+            "background_design matrix",
+            "optional measurement_uncertainty or measurement_covariance"
+          ],
+          "outputs": [
+            "physical_parameters",
+            "background_coefficients",
+            "fitted_thomson_spectrum",
+            "fitted_background",
+            "joint_parameter_covariance",
+            "physical/background cross-covariance",
+            "identifiability"
+          ],
+          "identifiability": "The physical and nuisance parameters are fitted simultaneously. Full joint covariance is reported only when the combined data Jacobian has full column rank."
+        },
+        {
+          "name": "Joint ne(r), Te(r), Ti(r) profile inversion",
+          "function": "tokamak_analysis.thomson_workflow.reconstruct_joint_ne_te_ti_profiles",
+          "required_inputs": [
+            "measured channel-by-wavelength spectra",
+            "radius_m",
+            "channel-resolved physical forward_model callable",
+            "initial ne/Te/Ti profiles",
+            "profile bounds",
+            "optional measurement uncertainty or full covariance"
+          ],
+          "outputs": [
+            "electron_density_m3 profile",
+            "electron_temperature_eV profile",
+            "ion_temperature_eV profile",
+            "joint profile covariance when data-identifiable",
+            "data-only and regularized Jacobian rank diagnostics"
+          ],
+          "identifiability": "A regularized solution with a rank-deficient data-only Jacobian is explicitly classified non-identifiable; Ti additionally requires an ion-sensitive spectral feature in the supplied forward model."
         }
       ]
     },
@@ -8019,4 +8082,4 @@
     "calibrated_measurements_to_physics": false,
     "completion_scope": "Observed spectral moments and response-convolved Gaussian diagnostics from calibrated measured spectra; no EVDF inversion, physical plasma parameter extraction or measured-data correction."
   }
-]
+]\n
