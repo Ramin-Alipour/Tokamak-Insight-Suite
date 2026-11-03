@@ -341,9 +341,16 @@ receiver grid) or the new `physical_background_radiative_transfer` mapping,
 but never both. The mapping requires path-resolved electron temperature and
 density, ion densities and charge states, path lengths, an explicit Gaunt
 factor, incident boundary radiance, receiver etendue and end-to-end
-efficiency. It also requires the receiver-mode
+efficiency. It also requires the
 `ece_absorption_coefficient_m_inverse` key; an explicit `None` means ECE is
-intentionally omitted rather than silently assumed absent.
+intentionally omitted rather than silently assumed absent. ECE absorption may
+be a single-effective-mode array with shape `(n_path,n_frequency)`, or a
+mode-resolved array with shape `(n_path,n_frequency,n_mode)`. The latter
+requires `ece_mode_weights`, a measured non-negative receiver power-weight
+vector of length `n_mode` summing to one. Each mode is propagated separately
+with its own absorption coefficient before receiver-weighted radiances are
+combined. This extension does not model coherent cross-mode coupling or mode
+conversion.
 
 The absolute receiver frequency is formed as
 `probe_frequency_Hz + frequency_shift_Hz`. Free-free and LTE mode-resolved
@@ -361,9 +368,11 @@ independent; their cross-covariance is not inferred. If no uncertainty is
 supplied, the background remains fixed and conditional.
 
 The free-free kernel is non-relativistic and unmagnetized. ECE absorption
-must come from a separate mode-resolved magnetized kinetic/radiative-transfer
-calculation. The implementation does not approximate ECE opacity from scalar
-magnetic-field magnitude. It also does not add a collision operator to the
-CTS dielectric response: numerical resonance damping remains distinct from
-physical collisional kinetics. No experimental validation is claimed; tests
-are synthetic software-contract checks only.
+must come from a separate magnetized kinetic/radiative-transfer calculation.
+Independent mode transfer is supported when mode-resolved opacity and measured
+receiver-mode weights are supplied; coherent mode conversion and cross-mode
+coupling remain outside this model. The implementation does not approximate
+ECE opacity from scalar magnetic-field magnitude. It also does not add a
+collision operator to the CTS dielectric response: numerical resonance
+damping remains distinct from physical collisional kinetics. No experimental
+validation is claimed; tests are synthetic software-contract checks only.
