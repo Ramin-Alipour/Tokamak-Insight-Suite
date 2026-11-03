@@ -1385,3 +1385,34 @@ def test_kappa_profile_likelihood_uses_full_spectral_covariance_gls():
             wavelength, signal, np.eye(wavelength.size), parameters,
             np.full(wavelength.size, 0.01), spectral_covariance=covariance,
         )
+
+
+def test_kappa_channel_fit_supports_joint_polynomial_detector_background():
+    x = np.linspace(492.0, 572.0, 401)
+    te = 120.0
+    sigma = 2.0 * 532.0 * np.sqrt(te / 510998.95069) * np.sin(np.pi / 4)
+    kappa = 4.0
+    df = 2.0 * kappa - 1.0
+    scale = sigma * np.sqrt((df - 2.0) / df)
+    z = 2.0 * (x - x.min()) / np.ptp(x) - 1.0
+    plasma = 900.0 * (1.0 + ((x - 532.0) / scale)**2 / df)**(-kappa)
+    measured_background = 20.0 + 2.5*z - 1.2*(0.5*(3.0*z*z - 1.0))
+    y = plasma + measured_background
+    out = analyze_thomson_spectra(
+        x, y[None, :], [0.15], laser_wavelength_nm=532.0,
+        scattering_angle_rad=np.pi/2, instrument_response=np.eye(x.size),
+        model="non_collective_kappa", background_model="polynomial",
+        background_degree=2,
+    )
+    channel = out["channels"][0]
+    assert channel["background_model"] == "polynomial"
+    assert channel["background_basis"].shape == (x.size, 3)
+    assert channel["fit_covariance"].shape == (7, 7)
+    assert channel["fit_parameter_names"] == [
+        "amplitude", "center_nm", "intrinsic_sigma_nm", "kappa_index",
+        "background_coefficient_0", "background_coefficient_1",
+        "background_coefficient_2",
+    ]
+    assert channel["electron_temperature_eV"] == pytest.approx(te, rel=0.08)
+    assert channel["kappa_index"] == pytest.approx(kappa, rel=0.12)
+    assert np.sqrt(np.mean(channel["residual"]**2)) < 0.5
