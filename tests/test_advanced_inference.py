@@ -127,7 +127,7 @@ def test_nonlinear_nonnegative_distribution_fit_uses_full_forward_callback():
 
 
 def test_optical_maxwellian_fit_accepts_independent_poisson_count_likelihood():
-    from tokamak_analysis.thomson_inference import _fit_noncollective
+    from tokamak_analysis.thomson_inference import fit_optical_thomson_poisson_counts
 
     wavelength = np.linspace(530.0, 532.0, 121)
     center = 531.0
@@ -135,12 +135,15 @@ def test_optical_maxwellian_fit_accepts_independent_poisson_count_likelihood():
     rng = np.random.default_rng(21)
     expected = 450.0*np.exp(-0.5*((wavelength-center)/sigma)**2) + 18.0 + 2.0*(wavelength-center)
     counts = rng.poisson(np.maximum(expected, 1.0)).astype(int)
-    result = _fit_noncollective(
-        wavelength, counts, 531.0, np.pi/2.0, np.eye(wavelength.size), None,
-        likelihood="poisson",
+    result = fit_optical_thomson_poisson_counts(
+        wavelength, counts, laser_wavelength_nm=531.0,
+        scattering_angle_rad=np.pi/2.0,
+        instrument_response=np.eye(wavelength.size),
     )
-    assert result["likelihood"] == "poisson"
-    assert result["likelihood_interpretation"].startswith("independent_Poisson")
+    assert result["likelihood"] == "independent_Poisson"
+    assert result["density_inference_available"] is False
+    assert "integrated_scattered_power_W" not in result
+    assert result["integrated_signal_counts"] > 0
     assert np.isfinite(result["electron_temperature_eV"])
     assert result["reduced_chi_square"] is None
 
