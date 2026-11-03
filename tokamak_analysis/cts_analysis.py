@@ -64,6 +64,19 @@ def _positive(value,name):
     return float(value)
 
 
+def _nonnegative_real(value, name):
+    """Validate a finite, non-negative real scalar without bool/string coercion."""
+    if (
+        isinstance(value, (bool, np.bool_))
+        or not isinstance(value, (int, float, np.integer, np.floating))
+    ):
+        raise ValueError(f"{name} must be a real numeric scalar, not a boolean or string")
+    result = float(value)
+    if not np.isfinite(result) or result < 0:
+        raise ValueError(f"{name} must be finite and non-negative")
+    return result
+
+
 def _geometry(g,f0):
     if not isinstance(g,Mapping): raise ValueError("scattering_geometry must be a mapping")
     if "incident_direction" in g and "scattered_direction" in g:
@@ -720,19 +733,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("differential_evolution and improved_genetic require global_search=True")
     if inversion_method in {"local_least_squares","regularized"} and global_search:
         raise ValueError("global_search must be disabled for local_least_squares and regularized inversion")
-    if (
-        isinstance(regularization_strength, (bool, np.bool_))
-        or not isinstance(
-            regularization_strength,
-            (int, float, np.integer, np.floating),
-        )
-    ):
-        raise ValueError(
-            "regularization_strength must be a real numeric scalar, not a boolean or string"
-        )
-    regularization_strength = float(regularization_strength)
-    if not np.isfinite(regularization_strength) or regularization_strength < 0:
-        raise ValueError("regularization_strength must be finite and non-negative")
+    regularization_strength = _nonnegative_real(
+        regularization_strength, "regularization_strength"
+    )
     if inversion_method=="regularized" and (not np.isfinite(regularization_strength) or regularization_strength<=0):
         raise ValueError("regularized inversion requires regularization_strength to be finite and > 0")
     if inversion_method=="regularized" and (fast is None or fast["kind"]!="infer_tabulated_1d"):
