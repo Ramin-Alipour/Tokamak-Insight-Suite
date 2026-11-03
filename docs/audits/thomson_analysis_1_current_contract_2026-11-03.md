@@ -83,3 +83,30 @@ Regression tests cover a correlated two-channel discrepancy matrix and reject
 an indefinite full matrix. These are software regressions, not experimental
 validation.
 
+
+
+## Addendum — spatial CTS covariance and response parity (2026-11-03)
+
+The dedicated spatial Full-EM CTS profile inverse now accepts an optional
+independent `model_discrepancy_covariance` in addition to exactly one
+measurement-noise covariance representation. The GLS covariance is formed as
+`C_effective = C_measurement + C_model` exactly once. The model term must be
+finite, symmetric and positive semidefinite; the effective covariance must be
+positive definite. No implicit jitter, eigenvalue clipping or residual-derived
+model error is used. The result reports the measurement, discrepancy and
+effective covariance separately, and the optional term is forwarded through
+regularization-sensitivity refits without double counting.
+
+The same spatial inverse now enforces the common measured frequency-response
+contract: finite, non-negative, square and unit-sum columns, applied unchanged
+after spatial integration. The Streamlit workflow exposes an optional
+model-discrepancy covariance CSV and forwards it to the canonical API. The
+Python runtime registry and both byte-identical JSON registry copies declare
+the input and output semantics. Regression tests cover additive covariance,
+indefinite-matrix rejection, response normalization and dashboard/registry
+exposure.
+
+This closes the spatial-profile route's covariance-integration and response
+contract gaps within the declared model. It does not supply geometry/profile
+cross-covariance, infer missing correlations, or validate the underlying
+physical Full-EM model experimentally.

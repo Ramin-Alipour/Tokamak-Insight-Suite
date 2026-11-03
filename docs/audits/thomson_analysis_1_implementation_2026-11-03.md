@@ -136,3 +136,27 @@ and is encoded in the VDF; a second flow-projection shift is rejected.
 These changes are committed directly to `main`. GitHub Actions runs are
 triggered by the final push; no successful test or CI result is claimed until
 the runs complete. No experimental validation is claimed.
+
+
+## Spatial-profile model-discrepancy and response-contract parity — 2026-11-03
+
+Committed directly to `main` in:
+- `3c5ecec6e1365b5963ecd0a85942d459c17f9899` — spatial inverse, regression tests,
+  CTS documentation, Python runtime registry and both JSON registry copies.
+- `2c73f95576907ffa9850168fe5f6b9d28fe6849e` — Streamlit CSV input and
+  dashboard/registry regression assertions.
+
+The spatial-profile GLS objective now adds an optional independent
+model-discrepancy covariance exactly once to the measurement covariance.
+It validates symmetry and positive semidefiniteness, requires a positive
+definite effective covariance, exposes all covariance components and keeps
+regularization separate from measurement uncertainty. The spatial measured
+response matrix now follows the already-established unit-column-sum contract
+and is not silently renormalized. The dashboard exposes the discrepancy
+matrix input.
+
+GitHub Actions runs were created for the latest commit
+`2c73f95576907ffa9850168fe5f6b9d28fe6849e`; at the time of this record they
+were queued. No successful CI result is claimed until those exact-commit runs
+complete. These regression tests are software checks, not experimental
+validation.
