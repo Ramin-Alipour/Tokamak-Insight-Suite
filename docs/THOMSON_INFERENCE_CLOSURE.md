@@ -152,3 +152,20 @@ of the returned projected EVDF. The change does not relax the model's stated
 1-D, symmetric-geometry, zero-recoil, fixed-background or fixed-response
 assumptions. Synthetic regression coverage checks quadrature normalization
 and uses the same integral convention when generating the test spectrum.
+
+
+### Canonical channel-wise relativistic Maxwell–Jüttner background integration
+
+The canonical `analyze_thomson_spectra` path now routes every relativistic
+Maxwell–Jüttner channel through the joint physical/amplitude/background
+variable-parameter fit after obtaining a deterministic seed from the established
+relativistic fitter. It accepts the same explicit constant, linear, polynomial,
+cubic-spline, and supplied-template detector-space backgrounds as the other
+optical channel fitters. The reported covariance is the complete local
+parameter covariance, including physical–amplitude, physical–background, and
+amplitude–background cross terms. The integrated Thomson component and its
+uncertainty are recomputed from the refitted forward model using the full joint
+covariance; the detector background is excluded from the scattered-power
+integral. The result remains conditional on the fixed measured response and
+supplied measurement covariance, and does not infer absolute density without
+the independent calibrated optical-power and collection inputs.
