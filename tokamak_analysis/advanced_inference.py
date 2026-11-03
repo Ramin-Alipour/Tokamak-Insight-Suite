@@ -409,8 +409,11 @@ def fit_nonlinear_nonnegative_distribution(
     pdf = decode(fit.x)
     data_residual, amplitude, offset, intrinsic = profiled_spectrum(pdf)
     jac = np.asarray(fit.jac, dtype=float)
-    singular = np.linalg.svd(jac, compute_uv=False)
-    tolerance = np.finfo(float).eps * max(jac.shape) * (singular[0] if singular.size else 0.0)
+    # Identifiability is assessed from data residuals only; regularization rows
+    # must never turn a data-null-space mode into an apparently measured mode.
+    data_jac = jac[:y.size, :]
+    singular = np.linalg.svd(data_jac, compute_uv=False)
+    tolerance = np.finfo(float).eps * max(data_jac.shape) * (singular[0] if singular.size else 0.0)
     rank = int(np.count_nonzero(singular > tolerance))
     condition = float(singular[0] / singular[-1]) if singular.size and singular[-1] > tolerance else float("inf")
     identifiable = rank == fit.x.size and np.isfinite(condition) and condition < 1e12
