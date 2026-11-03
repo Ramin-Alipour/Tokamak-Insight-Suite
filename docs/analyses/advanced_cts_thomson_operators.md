@@ -41,8 +41,9 @@ PCA basis, plus singular-value gap diagnostics. Rank-deficient bootstrap
 subspaces are discarded.
 
 The finite-reference bootstrap is also propagated through repeated CTS
-refits. The resulting parameter covariance is added to the base plasma
-parameter covariance when the required refit success fraction is achieved.
+refits (30 resamples by default; at least 20 may be requested). The resulting
+parameter covariance is added to the base plasma parameter covariance when
+at least 70% of the requested refits, and at least 12 refits, succeed.
 This propagation covers density, electron temperature, each thermal-ion
 temperature and the fitted electron/ion flow projections. Fast-ion shape
 parameters are not included in this reference-PCA contribution. The
