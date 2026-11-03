@@ -93,11 +93,12 @@ Kappa/MJ structured-background subanalysis.
 
 `tokamak_analysis.thomson_generalized_dispersion` adds a forward response for
 a researcher-supplied tabulated 1-D electron VDF projected along the scattering
-vector, with Maxwellian ion populations. The first-order Landau integral is
-evaluated by analytic interval integration of the derivative of a
-piecewise-linear VDF using a positive imaginary pole displacement. This is a
-Skolar-inspired simple-pole implementation, not a claim to reproduce the
-paper's full arbitrary-order-pole algorithm. The forward model is
+vector, with Maxwellian ion populations. The Landau integral primitive
+analytically integrates the derivative of a piecewise-linear VDF for one
+complex pole of any positive integer order per call, using a positive
+imaginary pole displacement. The CTS susceptibility uses the first-order
+pole. This is Skolar-inspired but does not implement multiple-pole summation
+or the paper's complete kinetic closure. The forward model is
 non-relativistic, unmagnetized and electrostatic; it does not infer an
 unrestricted EVDF or its uncertainty. A measured-spectrum inverse must still
 establish data-only identifiability before reporting distribution parameters.
