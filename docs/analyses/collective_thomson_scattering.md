@@ -503,3 +503,28 @@ That numerical placeholder is not a physical assertion that the receiver
 background is zero. Regression tests cover the zero, nonzero, incident-only,
 omitted and malformed-status cases.
 
+
+
+## Electrostatic CTS physical-background state (TS-11)
+
+For `analyze_cts_spectrum`, the fitted constant-offset nuisance term is not
+evidence that the receiver's physical background is zero. The state contract
+is therefore tri-state in meaning:
+
+- `background_state="assumed_zero"` is an explicit user declaration. Only
+  this explicit declaration sets `physical_background_zero=True`.
+- `background_state="reference_pca"` requires calibrated reference spectra.
+  It identifies the nuisance basis, but does not assert that the physical
+  receiver background is zero.
+- If `background_state` is omitted and no reference spectra are supplied,
+  the result reports `uncharacterized_constant_offset`. The fitted constant
+  offset remains a nuisance parameter, while `physical_background_zero`
+  remains `None` (unknown), not `True`.
+- `background_state="uncharacterized_constant_offset"` may also be selected
+  explicitly when no reference spectra are supplied.
+
+The result includes `background_state_is_explicit`,
+`background_zero_assumption`, `physical_background_zero`, and
+`background_state_provenance`. This corrects the prior metadata ambiguity
+without changing the numerical constant-offset nuisance fit. It does not
+measure or independently calibrate the physical receiver background.
