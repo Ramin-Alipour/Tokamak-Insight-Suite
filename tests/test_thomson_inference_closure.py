@@ -38,7 +38,7 @@ def test_compton_contract_records_cross_section_and_recoil_screen():
 
 def test_joint_profile_inversion_reports_data_identifiability_separately():
     x = np.linspace(-3.0, 3.0, 61)
-    radius = np.linspace(0.1, 0.5, 5)
+    radius = np.array([0.10, 0.17, 0.29, 0.38, 0.55])
     profiles = np.vstack((
         np.linspace(1.0, 1.4, 5),
         np.linspace(0.8, 1.1, 5),
