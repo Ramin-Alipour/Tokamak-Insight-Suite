@@ -554,13 +554,24 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
         "interpretation": "Conditional one-parameter profile likelihood; a grid-censored limit is not a physical bound. The finite upper grid edge is numerical only."
     }
 
-def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
+def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spectral_covariance=None):
     """Fit the 1-D projection of an isotropic kappa VDF (Student-t form)."""
     signal_scale=float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale<=0:
         raise ValueError("signal must have a positive finite scale")
     signal_scaled=signal/signal_scale
+    if uncertainty is not None and spectral_covariance is not None:
+        raise ValueError("Kappa fitting accepts pointwise uncertainty or spectral_covariance, not both")
     uncertainty_scaled=None if uncertainty is None else uncertainty/signal_scale
+    covariance_cholesky = None
+    if spectral_covariance is not None:
+        covariance = _finite_array(spectral_covariance, "spectral_covariance", 2) / signal_scale**2
+        if covariance.shape != (wavelength.size, wavelength.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
+            raise ValueError("spectral_covariance must be symmetric and match the wavelength grid")
+        try:
+            covariance_cholesky = np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
     edge = max(2, wavelength.size // 10)
@@ -583,6 +594,8 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     # weighted-residual solution.  These are numerical starts, not priors.
     def weighted_residual(parameters):
         difference = observed(wavelength, *parameters) - signal_scaled
+        if covariance_cholesky is not None:
+            return np.linalg.solve(covariance_cholesky, difference)
         return difference if uncertainty_scaled is None else difference / uncertainty_scaled
 
     kappa_seeds = (1.6, 2.0, 3.0, 5.0, 10.0, 30.0)
@@ -611,7 +624,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     p_scaled = np.asarray(fit.x, dtype=float)
     dof_fit = max(1, wavelength.size - p_scaled.size)
     covariance_scaled = np.linalg.pinv(fit.jac.T @ fit.jac)
-    if uncertainty_scaled is None:
+    if uncertainty_scaled is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun @ fit.fun / dof_fit)
     cov = covariance_scaled
     # observed() operates on normalized intensity; retain its optimizer
@@ -657,7 +670,9 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
         jacobian[:, parameter_index] = (
             observed(wavelength, *plus) - observed(wavelength, *minus)
         ) / (2.0 * step)
-    if uncertainty_scaled is not None:
+    if covariance_cholesky is not None:
+        weighted_jacobian = np.linalg.solve(covariance_cholesky, jacobian)
+    elif uncertainty_scaled is not None:
         weighted_jacobian = jacobian / uncertainty_scaled[:, None]
     else:
         weighted_jacobian = jacobian
@@ -733,7 +748,9 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
             "captured_spectral_probability":captured_probability,
             "spectral_window_truncation_warning":("The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window." if captured_probability < 0.999 else None),
-            "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
+            "reduced_chi_square":(float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else float(fit.fun @ fit.fun / dof) if covariance_cholesky is not None else None),
+            "spectral_covariance_used": covariance_cholesky is not None,
+            "spectral_covariance_interpretation": "researcher_supplied_within_channel_covariance_including_model_discrepancy_when_provided" if covariance_cholesky is not None else "not_supplied",
             "fitted_spectrum":fitted_spectrum,
             "optimizer": {
                 "method": "deterministic_multistart_bounded_least_squares",
@@ -1192,8 +1209,8 @@ def analyze_thomson_spectra(
         # shared-parameter fit below; marginal channel fits use diagonal blocks.
     independent_discrepancy_blocks = None
     if model_discrepancy_covariance is not None:
-        if model != "non_collective_maxwellian":
-            raise ValueError("independent model_discrepancy_covariance is currently integrated only for non_collective_maxwellian optical Thomson fits")
+        if model not in {"non_collective_maxwellian", "non_collective_kappa"}:
+            raise ValueError("independent model_discrepancy_covariance is currently integrated for non_collective_maxwellian and non_collective_kappa optical Thomson fits; relativistic Maxwell-Juttner and CTS require model-specific covariance paths")
         discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
         nchan_disc, nlam_disc = y.shape
         if discrepancy.shape == (nlam_disc, nlam_disc):
@@ -1259,7 +1276,7 @@ def analyze_thomson_spectra(
                                 background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
                                 spectral_covariance=channel_covariance)
         elif model == "non_collective_kappa":
-            fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
+            fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui, spectral_covariance=channel_covariance)
         elif model == "non_collective_relativistic_maxwell_juttner":
             fit = fit_relativistic_maxwell_juttner(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
@@ -1780,7 +1797,7 @@ def analyze_thomson_spectra(
                         sampled = sampled @ source_response
                 try:
                     if model == "non_collective_kappa":
-                        draw = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui)
+                        draw = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui, spectral_covariance=channel_covariance)
                     elif model == "non_collective_relativistic_maxwell_juttner":
                         draw = fit_relativistic_maxwell_juttner(
                             xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
