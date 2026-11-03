@@ -3812,6 +3812,16 @@ elif page=='Advanced Analysis':
                     value=100,step=20,key='cts_full_local_external_mc_samples',
                 ))
                 cts_geometry_upload=st.file_uploader('Optional ray-traced scattering-volume geometry JSON',type=['json'],key='cts_full_geometry_upload')
+                cts_physical_background_json=st.text_area(
+                    'Optional physical CTS receiver-background radiative-transfer JSON',
+                    placeholder='{"path_length_m":[0.1,0.2],"electron_temperature_eV":[1200,1400],"electron_density_m3":[2e19,1.8e19],"ion_densities_m3":[[2e19],[1.8e19]],"ion_charge_states":[1],"gaunt_factor":1.1,"ece_absorption_coefficient_m_inverse":[[0.0002,0.0002]],"incident_radiance_W_m2_sr_Hz":0,"receiver_etendue_m2_sr":2e-5,"end_to_end_efficiency":0.4}',
+                    key='cts_full_physical_background_json',
+                    help='Supply calibrated path profiles and mode-resolved ECE absorption from an independent magnetized radiative-transfer calculation. Use null for ece_absorption_coefficient_m_inverse only when ECE is intentionally omitted.',
+                )
+                cts_physical_background_covariance_upload=st.file_uploader(
+                    'Optional physical-background spectral covariance CSV (W²/Hz²)',
+                    type=['csv','txt'],key='cts_full_physical_background_covariance_upload',
+                )
                 cts_ray_mode_index=None
                 if cts_geometry_upload is not None:
                     cts_ray_mode_index=st.selectbox(
@@ -3914,6 +3924,16 @@ elif page=='Advanced Analysis':
                         }
                     fast_ions=None if not cts_fast_ions_json.strip() else json.loads(cts_fast_ions_json)
                     parameter_bounds=None if not cts_parameter_bounds_json.strip() else json.loads(cts_parameter_bounds_json)
+                    physical_background_transfer=(
+                        None if not cts_physical_background_json.strip()
+                        else json.loads(cts_physical_background_json)
+                    )
+                    physical_background_covariance=(
+                        None if cts_physical_background_covariance_upload is None
+                        else pd.read_csv(
+                            cts_physical_background_covariance_upload,header=None
+                        ).to_numpy(dtype=float)
+                    )
                     kwargs_cts={
                         'frequency_shift_Hz':frequency,
                         'measured_spectrum':spectrum,
@@ -3939,6 +3959,10 @@ elif page=='Advanced Analysis':
                         'numerical_convergence':bool(cts_numerical_convergence),
                         'convergence_relative_tolerance':float(cts_convergence_tolerance),
                     }
+                    if physical_background_transfer is not None:
+                        kwargs_cts['physical_background_radiative_transfer']=physical_background_transfer
+                    if physical_background_covariance is not None:
+                        kwargs_cts['physical_background_covariance_W2_per_Hz2']=physical_background_covariance
                     if cts_local_external_covariance_upload is not None:
                         if 'frequency_resolved_geometry' in scattering_geometry:
                             raise ValueError(
