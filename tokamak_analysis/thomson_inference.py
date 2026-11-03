@@ -1806,7 +1806,8 @@ def analyze_thomson_spectra(
                         draw = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), sampled, ui,
                             background_model=background_model, background_degree=background_degree,
                             background_interior_knots=background_interior_knots,
-                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+                            background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
+                            spectral_covariance=channel_covariance)
                     te_samples.append(draw["electron_temperature_eV"])
                     velocity_samples.append(draw["electron_velocity_projection_m_s"])
                     area_samples.append(float(draw["integrated_scattered_power_W"])
