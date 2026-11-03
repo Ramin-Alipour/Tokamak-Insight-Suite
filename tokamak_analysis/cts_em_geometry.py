@@ -533,6 +533,8 @@ def trace_cts_frequency_resolved_beams(
                 receiver_cov_for_frequency = receiver_cov[index]
             else:
                 raise ValueError("receiver_beam_covariances_m2 must be (3,3), (n_frequency,3,3), (n_frequency,n_receiver_ray,3,3), or be supplied through ray paraxial propagation");
+        if incident_cov.shape[-2:] != receiver_cov_for_frequency.shape[-2:]:
+            raise ValueError("incident and receiver beam covariances must both use 2-D propagated transverse blocks or both use 3-D local covariance matrices")
         delta = selected_positions[:, None, :] - receiver_positions[None, :, :]
         distance2 = np.einsum("ijk,ijk->ij", delta, delta)
         nearest_receiver = np.argmin(distance2, axis=1)
