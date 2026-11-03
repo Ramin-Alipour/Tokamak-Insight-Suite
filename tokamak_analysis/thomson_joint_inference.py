@@ -28,12 +28,12 @@ def validate_covariance(covariance, size, *, name="covariance", positive_definit
     cov = _real(covariance, name, 2)
     if cov.shape != (size, size):
         raise ValueError(f"{name} must have shape ({size}, {size})")
-    scale = max(float(np.max(np.abs(cov))), 1.0)
+    scale = max(float(np.max(np.abs(cov))), np.finfo(float).tiny)
     if not np.allclose(cov, cov.T, rtol=1e-10, atol=1e-12 * scale):
         raise ValueError(f"{name} must be symmetric")
     cov = 0.5 * (cov + cov.T)
     eig = np.linalg.eigvalsh(cov)
-    tol = 1e-11 * max(float(np.max(np.abs(eig))), 1.0)
+    tol = 1e-11 * max(float(np.max(np.abs(eig))), np.finfo(float).tiny)
     if positive_definite and eig[0] <= tol:
         raise ValueError(f"{name} must be positive definite")
     if not positive_definite and eig[0] < -tol:
