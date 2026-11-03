@@ -16,7 +16,8 @@ from .thomson_kinetic_models import (
 
 
 def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
-                                phase_velocity_m_s, *, pole_imaginary_part_m_s=None):
+                                phase_velocity_m_s, *, pole_imaginary_part_m_s=None,
+                                pole_order=1):
     """Evaluate integral f'(v)/(v-zeta) dv for a tabulated projected VDF.
 
     f is linearly interpolated on the supplied velocity grid, so f' is
@@ -37,6 +38,9 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     if not np.isfinite(area) or area <= 0:
         raise ValueError("tabulated VDF must have positive finite integral")
     f = f / area
+    if isinstance(pole_order, (bool, np.bool_)) or int(pole_order) != pole_order or int(pole_order) < 1:
+        raise ValueError("pole_order must be a positive integer")
+    pole_order = int(pole_order)
     eta = (1e-6 * float(np.median(np.diff(v))) if pole_imaginary_part_m_s is None
            else float(pole_imaginary_part_m_s))
     if not np.isfinite(eta) or eta <= 0:
@@ -45,8 +49,15 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
     slopes = np.diff(f) / np.diff(v)
     integral = 0.0j
     for left, right, slope in zip(v[:-1], v[1:], slopes):
-        integral += float(slope) * (np.log(complex(right, 0.0) - zeta)
-                                    - np.log(complex(left, 0.0) - zeta))
+        left_delta = complex(left, 0.0) - zeta
+        right_delta = complex(right, 0.0) - zeta
+        if pole_order == 1:
+            interval_integral = np.log(right_delta) - np.log(left_delta)
+        else:
+            interval_integral = (
+                right_delta ** (1 - pole_order) - left_delta ** (1 - pole_order)
+            ) / (1 - pole_order)
+        integral += float(slope) * interval_integral
     if not np.isfinite(integral.real) or not np.isfinite(integral.imag):
         raise ValueError("generalized Landau integral is non-finite")
     return {
@@ -55,7 +66,7 @@ def generalized_landau_integral(velocity_grid_m_s, probability_density_s_m,
         "pole": zeta,
         "pole_imaginary_part_m_s": eta,
         "quadrature": "analytic_interval_integral_of_piecewise_constant_derivative_of_piecewise_linear_VDF",
-        "pole_order": 1,
+        "pole_order": pole_order,
         "limitation": "first-order Landau pole only; finite velocity support and positive pole displacement are explicit numerical inputs",
     }
 
