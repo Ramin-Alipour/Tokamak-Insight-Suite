@@ -337,8 +337,12 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
     if not fit.success or np.any(~np.isfinite(fit.x)):
         raise ValueError("joint kinetic Thomson/background optimizer failed: "+str(fit.message))
     jac = np.asarray(fit.jac,dtype=float)
-    singular = np.linalg.svd(jac,compute_uv=False)
-    tol = np.finfo(float).eps*max(jac.shape)*(singular[0] if singular.size else 0.0)
+    column_norms = np.linalg.norm(jac, axis=0)
+    scaled_jac = np.divide(jac, column_norms[None, :],
+                           out=np.zeros_like(jac),
+                           where=column_norms[None, :] > np.finfo(float).tiny)
+    singular = np.linalg.svd(scaled_jac,compute_uv=False)
+    tol = np.finfo(float).eps*max(scaled_jac.shape)*(singular[0] if singular.size else 0.0)
     rank = int(np.count_nonzero(singular>tol))
     cond = float(singular[0]/singular[-1]) if singular.size and singular[-1]>0 else float("inf")
     if rank < fit.x.size or not np.isfinite(cond) or cond > 1e12:
