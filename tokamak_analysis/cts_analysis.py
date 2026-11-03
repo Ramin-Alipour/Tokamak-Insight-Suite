@@ -667,6 +667,19 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("_skip_reference_basis_mc must be boolean")
     if not isinstance(global_search,(bool,np.bool_)):
         raise ValueError("global_search must be boolean")
+    if not isinstance(inversion_method, str) or inversion_method not in {
+        "local_least_squares", "differential_evolution", "improved_genetic", "regularized"
+    }:
+        raise ValueError("Select inversion_method explicitly: local_least_squares, differential_evolution, improved_genetic or regularized")
+    if inversion_method in {"differential_evolution", "improved_genetic"} and not global_search:
+        raise ValueError("differential_evolution and improved_genetic require global_search=True")
+    if inversion_method in {"local_least_squares", "regularized"} and global_search:
+        raise ValueError("global_search must be disabled for local_least_squares and regularized inversion")
+    regularization_strength = _nonnegative_real(
+        regularization_strength, "regularization_strength"
+    )
+    if inversion_method == "regularized" and regularization_strength <= 0:
+        raise ValueError("regularized inversion requires regularization_strength to be finite and > 0")
     if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
         nb is None or tb is None or any(pair is None for pair in ib_species)
         or "electron_velocity_projection_m_s" not in b
@@ -727,17 +740,6 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             hi=np.r_[hi,fhi,thi_log]
     noise=unc if unc is not None else np.ones_like(y)
     weighting_status="measured_pointwise_uncertainty" if unc is not None else "unweighted_no_measurement_uncertainty_supplied"
-    if inversion_method not in {"local_least_squares", "differential_evolution", "improved_genetic", "regularized"}:
-        raise ValueError("Select inversion_method explicitly: local_least_squares, differential_evolution, improved_genetic or regularized")
-    if inversion_method in {"differential_evolution","improved_genetic"} and not global_search:
-        raise ValueError("differential_evolution and improved_genetic require global_search=True")
-    if inversion_method in {"local_least_squares","regularized"} and global_search:
-        raise ValueError("global_search must be disabled for local_least_squares and regularized inversion")
-    regularization_strength = _nonnegative_real(
-        regularization_strength, "regularization_strength"
-    )
-    if inversion_method=="regularized" and (not np.isfinite(regularization_strength) or regularization_strength<=0):
-        raise ValueError("regularized inversion requires regularization_strength to be finite and > 0")
     if inversion_method=="regularized" and (fast is None or fast["kind"]!="infer_tabulated_1d"):
         raise ValueError("regularized inversion requires fast_ion.kind='infer_tabulated_1d'; initial plasma guesses are not regularization priors")
     if fast and fast["kind"]=="infer_tabulated_1d" and fast["vdf"]["smoothness_parameter"]<=0:
