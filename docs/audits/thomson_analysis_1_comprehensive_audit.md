@@ -909,3 +909,44 @@ It does not infer the cross-covariance, does not propagate it through the raw
 joint spatial-spectral optimizer, and does not solve the full Full-EM CTS
 profile/geometry covariance problem. The new tests have not been executed in
 this environment; no CI-pass or experimental-validation claim is made.
+
+
+## Implementation update — 2026-11-03: explicit Full-EM resonance-broadening semantics
+
+The Full-EM kinetic response previously exposed `damping_rate_rad_s` as a
+numerical control. The value enters the kinetic resonance denominators and is
+not a conserving collision operator. To prevent downstream users, dashboard
+consumers or exported results from interpreting it as a measured/physical
+collision frequency, the Full-EM result now reports:
+
+- `damping_rate_is_physical_collision_frequency = false`;
+- `resonance_broadening_semantics =
+  numerical_resonance_regularization_in_kinetic_denominators_only`;
+- `collisional_cts_model_status = not_implemented`;
+- `collision_operator = null`.
+
+The numerical-control output retains whether the value was caller-supplied or
+used the documented numerical default. The canonical and packaged diagnostic
+registries expose the same result fields, and a regression test guards both
+caller-supplied and defaulted paths.
+
+**This is a semantic/API safety correction, not closure of TS-03.** No
+collisional CTS spectrum is calculated. A physical implementation must
+include the collision-modified susceptibility and its consistent fluctuation
+source/dynamic-structure-factor treatment, with species-resolved collision
+physics and conservation checks. A scalar imaginary broadening term is not a
+substitute.
+
+Relevant model-selection references:
+- Chuna & Murillo, *Physical Review E* **111**, 035206 (2025),
+  DOI: 10.1103/PhysRevE.111.035206 — multicomponent number- and
+  momentum-conserving BGK susceptibility and associated dynamic structure
+  factor; the work discusses the frequency f-sum rule and limitations of
+  simpler Mermin formulations.
+- Zhao et al., *Matter and Radiation at Extremes* **11**, 057401 (2026),
+  DOI: 10.1063/5.0290643 — collisional BGK correction applied to collective
+  Thomson-scattering spectra and EPW feature modelling.
+
+The new regression test has been committed but was not executed in this
+environment. GitHub Actions status is not available for the resulting
+contents-API commits; no test-pass or experimental-validation claim is made.
