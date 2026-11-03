@@ -1,0 +1,39 @@
+import numpy as np
+
+from tokamak_analysis.thomson_kinetic_background import (
+    fit_noncollective_kinetic_thomson_with_background,
+)
+
+
+def test_kappa_structured_background_fit_retains_joint_cross_covariance():
+    wavelength = np.linspace(529.0, 535.0, 181)
+    laser = 532.0
+    angle = np.pi / 2.0
+    response = np.eye(wavelength.size)
+    truth = np.array([300.0, 8.0e4, 3.5])
+    q = 2.0 * np.sin(angle / 2.0)
+    center = laser * (1.0 - q * truth[1] / 299792458.0)
+    sigma = laser * np.sqrt(2.0) * np.sin(angle / 2.0) * np.sqrt(truth[0] / 510998.95069)
+    df = 2.0 * truth[2] - 1.0
+    scale = sigma * np.sqrt((df - 2.0) / df)
+    shape = (1.0 + ((wavelength - center) / scale) ** 2 / df) ** (-truth[2])
+    z = 2.0 * (wavelength - wavelength.min()) / np.ptp(wavelength) - 1.0
+    measured = 2.3 * shape + 0.04 + 0.006 * z
+    result = fit_noncollective_kinetic_thomson_with_background(
+        wavelength, measured,
+        physical_model="kappa",
+        laser_wavelength_nm=laser,
+        scattering_angle_rad=angle,
+        instrument_response=response,
+        physical_initial=[260.0, 0.0, 4.2],
+        background_model="linear",
+        measurement_uncertainty=np.full(wavelength.size, 0.003),
+        max_nfev=5000,
+    )
+    assert result["optimizer_success"]
+    assert result["joint_parameter_covariance"].shape == (6, 6)
+    assert result["physical_background_cross_covariance"].shape == (3, 2)
+    assert result["jacobian_rank"] == result["jacobian_parameter_count"]
+    assert np.allclose(result["physical_parameters"], truth, rtol=0.04, atol=1e-3)
+    assert result["absolute_density_inferred"] is False
+    assert result["cross_section_model"] == "isotropic_finite_variance_Kappa_projection"
