@@ -7,17 +7,17 @@ experimental equivalence is claimed.
 
 ## Optical Thomson: independent Poisson likelihood
 
-The canonical optical Maxwellian fit accepts `likelihood="poisson"`.
-It uses signed square-root Poisson-deviance residuals with expected counts
-formed from the fitted spectral signal plus detector-background nuisance
-terms. Inputs must be raw integer photon/count bins. Calibrated power-density
-spectra must not be passed as counts.
+The separate public API
+`fit_optical_thomson_poisson_counts` uses signed square-root Poisson-deviance
+residuals for raw integer photon-count bins. It requires a uniform wavelength
+grid and a measured instrument-response matrix. It returns count-space
+observables, including captured fitted signal counts, and does not report
+watts or infer absolute electron density.
 
-The integrated Poisson path is currently restricted to
-`non_collective_maxwellian`. Kappa, relativistic Maxwell-Jüttner and
-collective optical fits retain their existing Gaussian/GLS likelihood paths.
-Poisson counts cannot be combined with Gaussian pointwise uncertainties or
-Gaussian spectral covariance in this interface.
+This API is currently restricted to the non-collective Maxwellian model.
+Kappa, relativistic Maxwell-Jüttner and collective fits retain their existing
+Gaussian/GLS likelihood paths. Do not pass calibrated power-density data to
+the Poisson API.
 
 ## Independent model discrepancy
 
@@ -35,7 +35,7 @@ wired into every optical Thomson or Full-EM CTS fit.
 
 ## CTS reference-PCA basis uncertainty
 
-The electrostatic CTS inverse now bootstraps the supplied calibrated reference
+The electrostatic CTS inverse bootstraps the supplied calibrated reference
 spectra and returns covariance for the reference mean and sign/rotation-aligned
 PCA basis, plus singular-value gap diagnostics. Rank-deficient bootstrap
 subspaces are discarded.
@@ -54,30 +54,32 @@ absorption coefficient from a magnetized dielectric/radiative-transfer solver.
 The solver does not fabricate an ECE absorption coefficient from only
 `B`, `n_e` and `T_e`.
 
-The output is spectral radiance. Convert it to receiver-plane spectral power
-using the measured receiver etendue and end-to-end efficiency exactly once.
+The output is spectral radiance. Use
+`radiance_to_receiver_spectral_power` to convert it to receiver-plane spectral
+power using measured receiver etendue and end-to-end efficiency exactly once.
 `analyze_full_em_cts_spectrum` accepts a fixed additive
 `physical_background_spectrum_W_Hz` already expressed at the same receiver
-plane and in the same spectral units as the measured spectrum. The radiative
-transfer helper and the Full-EM inverse therefore have an explicit unit/plane
-boundary.
+plane and in the same spectral units as the measured spectrum.
 
 Free-free emissivity is non-relativistic and unmagnetized. Use a relativistic,
-magnetized emissivity model outside that regime.
+magnetized emissivity model outside that regime. The mode-resolved ECE
+absorption coefficient must come from the appropriate magnetized plasma
+calculation.
 
 ## Ray tracing and paraxial beam covariance
 
-`trace_cold_plasma_ray` can accept an initial transverse phase-space
-covariance and one symplectic 4x4 paraxial transfer matrix per adjacent ray
-sample. The covariance is propagated through the supplied Hamiltonian/ABCD
-maps. `trace_cts_frequency_resolved_beams` uses the propagated 2-D transverse
-covariances in the local Gaussian overlap integral.
+`trace_cold_plasma_ray` accepts an initial transverse phase-space covariance
+and one symplectic 4x4 paraxial transfer matrix per adjacent ray sample. The
+covariance is propagated through the supplied Hamiltonian/ABCD maps.
+`trace_cts_frequency_resolved_beams` uses the propagated 2-D transverse
+covariances in the local Gaussian overlap integral. The transverse overlap is
+two-dimensional; its units and path-integrated units are returned explicitly.
 
-This is a genuine covariance propagation path, but the transfer matrices are
-supplied by the caller. The ray solver does not derive the full dispersion
-Hessian or solve a general vector quasi-optical equation. Non-paraxial
-diffraction, mode conversion, absorption and non-Gaussian beam evolution are
-not implied by this interface.
+This is covariance propagation through supplied paraxial maps, not a complete
+self-contained quasi-optical solver. The code does not derive the transfer
+matrices from the full anisotropic dispersion Hessian. Non-paraxial
+diffraction, general vector mode conversion, absorption and non-Gaussian beam
+evolution are not implied by this interface.
 
 ## Full-EM relativistic electron and fast-ion VDF shape inversion
 
@@ -99,7 +101,8 @@ The inversion is conditional on fixed bulk `n_e`, `T_e`, thermal-ion
 temperatures, magnetic field, geometry, mode polarizations, instrument
 response and population density. The electron branch requires an explicitly
 zero projected electron flow because a drifted relativistic gyrotropic VDF is
-not implemented. A rank-deficient fit returns a conditional regularized
+not implemented. Identifiability is assessed from the data Jacobian, not from
+regularization rows. A rank-deficient fit returns a conditional regularized
 candidate rather than claiming a uniquely measured distribution.
 
 ## Multi-view 3-D EVDF reconstruction
@@ -118,14 +121,16 @@ those kernels from arbitrary experimental geometry and a fully relativistic
 
 ## Completion and limitations
 
-The code now provides independent operators and explicit inverse paths for
-the items above, but not every one is fully propagated through all dashboard,
-registry and parameter-uncertainty surfaces. In particular:
+The code now contains working API-level implementations for the count
+likelihood, independent CTS discrepancy covariance, free-free/ECE background
+transfer, paraxial covariance propagation, nonlinear Full-EM gyrotropic shape
+inversion and multi-view 3-D EVDF inversion. The following uncertainty and
+integration boundaries remain explicit:
 
 1. CTS PCA basis covariance is estimated but not propagated into plasma
    parameter covariance.
-2. Optical Thomson Poisson likelihood is currently integrated only for the
-   non-collective Maxwellian model.
+2. Optical Thomson Poisson likelihood is a separate count-space Maxwellian
+   API; it is not a likelihood option for Kappa or relativistic fits.
 3. The GP discrepancy covariance is consumed by electrostatic CTS, not every
    optical and Full-EM inverse.
 4. Full-EM ECE requires externally supplied mode-resolved absorption.
@@ -134,7 +139,28 @@ registry and parameter-uncertainty surfaces. In particular:
 6. Drifted relativistic electron VDF inversion is not implemented.
 7. 3-D EVDF kernels must be supplied per view and must themselves contain the
    appropriate relativistic scattering physics.
-8. Dashboard and registry exposure must be synchronized before these
-   functions are considered fully available through the graphical workflow.
+8. The new APIs are registered in the diagnostic registry, but not all have
+   dedicated dashboard controls or automated orchestration paths.
+
+## Scientific references
+
+- Rybicki, G. B. & Lightman, A. P., *Radiative Processes in Astrophysics*
+  (1979): thermal free-free emissivity and radiative-transfer conventions.
+- Bekefi, G., *Radiation Processes in Plasmas* (1966): magnetized plasma
+  emission and absorption framework.
+- Verdier et al. (2025), *Review of Scientific Instruments* 96, 043513,
+  DOI: 10.1063/5.0238948: CTS thermal/fast-ion background estimation.
+- Carole et al. (2025), *Journal of Instrumentation* 20, P07014,
+  DOI: 10.1088/1748-0221/20/07/P07014: high-resolution Thomson spectral
+  modelling for WEST.
+- Skolar, Longley & Goodwin (2025), *Physics of Plasmas*,
+  DOI: 10.1063/5.0261966: generalized plasma-dispersion treatment for
+  non-Maxwellian Thomson scattering.
+- Sakai et al. (2026), *Journal of Instrumentation* 21, C01002,
+  DOI: 10.1088/1748-0221/21/01/C01002: Monte Carlo Thomson spectra from
+  arbitrary electron distributions.
+- Flocken et al. (2026), *Fusion Engineering and Design*,
+  DOI: 10.1016/j.fusengdes.2026.115845: accuracy-driven CTS optimisation,
+  ray tracing and Bayesian inversion.
 
 No experimental validation has been performed.
