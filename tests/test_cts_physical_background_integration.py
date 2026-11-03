@@ -62,3 +62,14 @@ def test_full_em_physical_background_rejects_nonpositive_absolute_frequency():
     shifts, probe, _, inputs = _case()
     with pytest.raises(ValueError, match="must remain positive"):
         build_full_em_cts_physical_background(np.array([-2.0 * probe, -probe]), probe, np.eye(2), radiative_transfer=inputs)
+
+
+
+def test_full_em_physical_background_is_exposed_by_dashboard_contract():
+    from pathlib import Path
+
+    app = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
+    assert "cts_full_physical_background_json" in app
+    assert "cts_full_physical_background_covariance_upload" in app
+    assert "physical_background_radiative_transfer" in app
+    assert "physical_background_covariance_W2_per_Hz2" in app
