@@ -1208,9 +1208,17 @@ def analyze_thomson_spectra(
         # Full channel-major covariance is retained for the joint relativistic
         # shared-parameter fit below; marginal channel fits use diagonal blocks.
     independent_discrepancy_blocks = None
+    discrepancy_added_to_joint_covariance = False
     if model_discrepancy_covariance is not None:
-        if model not in {"non_collective_maxwellian", "non_collective_kappa"}:
-            raise ValueError("independent model_discrepancy_covariance is currently integrated for non_collective_maxwellian and non_collective_kappa optical Thomson fits; relativistic Maxwell-Juttner and CTS require model-specific covariance paths")
+        if model not in {
+            "non_collective_maxwellian", "non_collective_kappa",
+            "non_collective_relativistic_maxwell_juttner",
+        }:
+            raise ValueError(
+                "model_discrepancy_covariance is supported for non-collective "
+                "Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits; "
+                "collective CTS requires a model-specific discrepancy covariance"
+            )
         discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
         nchan_disc, nlam_disc = y.shape
         if discrepancy.shape == (nlam_disc, nlam_disc):
@@ -1220,7 +1228,10 @@ def analyze_thomson_spectra(
         elif discrepancy.shape == (nchan_disc, nlam_disc, nlam_disc):
             independent_discrepancy_blocks = discrepancy.copy()
         else:
-            raise ValueError("model_discrepancy_covariance must be (n_wavelength,n_wavelength) or (n_channels,n_wavelength,n_wavelength)")
+            raise ValueError(
+                "model_discrepancy_covariance must be (n_wavelength,n_wavelength) "
+                "or (n_channels,n_wavelength,n_wavelength)"
+            )
         for channel_index, block in enumerate(independent_discrepancy_blocks):
             if not np.allclose(block, block.T, rtol=1e-10, atol=1e-13):
                 raise ValueError(f"model_discrepancy_covariance[{channel_index}] must be symmetric")
@@ -1228,6 +1239,21 @@ def analyze_thomson_spectra(
             scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
             if float(np.min(eigenvalues)) < -1e-10*scale:
                 raise ValueError(f"model_discrepancy_covariance[{channel_index}] must be positive semidefinite")
+        # For the relativistic shared-parameter fit, preserve the supplied
+        # cross-channel measurement covariance and add each channel's
+        # discrepancy block to the matching diagonal block exactly once.
+        if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
+            for channel_index, block in enumerate(independent_discrepancy_blocks):
+                channel_slice = slice(channel_index*nlam_disc, (channel_index+1)*nlam_disc)
+                joint_covariance[channel_slice, channel_slice] += block
+            try:
+                joint_cholesky = np.linalg.cholesky(joint_covariance)
+            except np.linalg.LinAlgError as exc:
+                raise ValueError(
+                    "joint_spectral_covariance plus model_discrepancy_covariance "
+                    "must remain positive definite"
+                ) from exc
+            discrepancy_added_to_joint_covariance = True
     cross_channel_covariance_present = False
     if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
         nchan_cov, nlam_cov = y.shape
@@ -1260,7 +1286,7 @@ def analyze_thomson_spectra(
             channel_slice = slice(i*y.shape[1], (i+1)*y.shape[1])
             channel_covariance = joint_covariance[channel_slice, channel_slice]
             ui = None
-        if independent_discrepancy_blocks is not None:
+        if independent_discrepancy_blocks is not None and not discrepancy_added_to_joint_covariance:
             discrepancy_block = independent_discrepancy_blocks[i]
             if channel_covariance is not None:
                 channel_covariance = channel_covariance + discrepancy_block
