@@ -184,12 +184,22 @@ def bootstrap_reference_pca_basis(
     for _ in range(int(bootstrap_samples)):
         sample = reference[rng.integers(0, reference.shape[0], size=reference.shape[0])]
         sample_mean = sample.mean(axis=0)
-        _, _, sample_vt = np.linalg.svd(sample - sample_mean, full_matrices=False)
+        _, sample_singular, sample_vt = np.linalg.svd(sample - sample_mean, full_matrices=False)
+        if sample_vt.shape[0] < int(components):
+            continue
+        sample_rank = int(np.count_nonzero(
+            sample_singular > np.finfo(float).eps * max(sample.shape)
+            * (sample_singular[0] if sample_singular.size else 0.0)
+        ))
+        if sample_rank < int(components):
+            continue
         basis = sample_vt[:int(components)].T
         rotation, _ = orthogonal_procrustes(basis, nominal)
         basis = basis @ rotation
         aligned_components.append(basis)
         draws.append(np.concatenate((sample_mean, basis.ravel())))
+    if len(draws) < max(30, int(np.ceil(0.7 * bootstrap_samples))):
+        raise ValueError("too few full-rank bootstrap PCA bases; reduce the requested component count or supply more independent reference spectra")
     draws = np.asarray(draws)
     covariance = np.cov(draws, rowvar=False, ddof=1)
     return {
