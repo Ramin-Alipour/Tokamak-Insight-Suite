@@ -528,3 +528,22 @@ The result includes `background_state_is_explicit`,
 `background_state_provenance`. This corrects the prior metadata ambiguity
 without changing the numerical constant-offset nuisance fit. It does not
 measure or independently calibrate the physical receiver background.
+
+
+## Descriptive CTS spectrum analysis (separate from physical inversion)
+
+`describe_cts_spectrum` provides detector-spectrum descriptors only:
+integrated positive contrast, spectral centroid, RMS width, peak location and
+5/50/95-percent weighted frequency quantiles. The caller must provide an
+explicit non-negative `baseline_level` on the same calibrated
+detector scale as the spectrum. The routine uses trapezoidal frequency-bin
+weights and clips baseline-subtracted negative bins to zero for descriptive
+weighting; it does not estimate a missing baseline.
+
+The result labels itself
+`analysis_type='descriptive_spectral_shape_only'` and sets
+`physical_parameter_inference_performed=False`. These descriptors
+must not be interpreted as electron density, electron or ion temperature,
+flow, composition, or an electron/ion velocity distribution. Physical
+parameter inference remains the separate responsibility of
+`analyze_cts_spectrum` and its explicitly selected forward model.
