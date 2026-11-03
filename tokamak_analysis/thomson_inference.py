@@ -2524,34 +2524,61 @@ def analyze_thomson_spectra(
     if joint_covariance is not None and model != "non_collective_relativistic_maxwell_juttner":
         from scipy.optimize import least_squares
         nchan, nlam = y.shape
+        from .thomson_background import _background_design
+        physical_parameter_count = 3 if model == "non_collective_maxwellian" else 4
+        if background_templates is not None and np.asarray(background_templates).ndim == 3:
+            templates_by_channel = [np.asarray(background_templates, dtype=float)[j] for j in range(nchan)]
+        elif isinstance(background_templates, (list, tuple)):
+            if len(background_templates) != nchan:
+                raise ValueError("background_templates list must contain one matrix per channel")
+            templates_by_channel = list(background_templates)
+        else:
+            templates_by_channel = [background_templates] * nchan
+        background_designs = [
+            _background_design(
+                xs[j], background_model, degree=background_degree,
+                interior_knots=background_interior_knots,
+                templates=templates_by_channel[j],
+            )
+            for j in range(nchan)
+        ]
+        background_parameter_count = background_designs[0].shape[1]
+        if any(item.shape[1] != background_parameter_count for item in background_designs):
+            raise ValueError("All channel background bases must have the same number of columns for joint GLS.")
         initial = np.concatenate([np.asarray(item["fit_parameters"], dtype=float) for item in results])
+        joint_parameter_count = physical_parameter_count + background_parameter_count
         lower_parts, upper_parts = [], []
-        joint_parameter_count=5 if model=="non_collective_maxwellian" else 6
         for i in range(nchan):
             dx = float(np.median(np.diff(xs[i])))
             span_i = float(xs[i, -1] - xs[i, 0])
-            if model=="non_collective_maxwellian":
-                lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), -np.inf, -np.inf])
-                upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf])
+            if model == "non_collective_maxwellian":
+                lower_physical = [0.0, xs[i, 0], max(dx * 0.2, 1e-12)]
+                upper_physical = [np.inf, xs[i, -1], span_i]
             else:
-                lower_parts.append([0.0, xs[i, 0], max(dx * 0.2, 1e-12), 1.51, -np.inf, -np.inf])
-                upper_parts.append([np.inf, xs[i, -1], span_i, np.inf, np.inf, np.inf])
+                lower_physical = [0.0, xs[i, 0], max(dx * 0.2, 1e-12), 1.51]
+                upper_physical = [np.inf, xs[i, -1], span_i, np.inf]
+            lower_parts.append(lower_physical + [-np.inf] * background_parameter_count)
+            upper_parts.append(upper_physical + [np.inf] * background_parameter_count)
         lower = np.asarray(lower_parts).ravel()
         upper = np.asarray(upper_parts).ravel()
         def joint_forward(parameters):
             predicted = []
             for channel in range(nchan):
-                p=parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
-                if model=="non_collective_maxwellian":
-                    amp,center,sigma,offset,slope=p
-                    signal_component=amp*np.exp(-0.5*((xs[channel]-center)/sigma)**2)
+                p = parameters[joint_parameter_count*channel:joint_parameter_count*(channel+1)]
+                if model == "non_collective_maxwellian":
+                    amp, center, sigma = p[:3]
+                    signal_component = amp*np.exp(-0.5*((xs[channel]-center)/sigma)**2)
                 else:
-                    amp,center,sigma,kappa,offset,slope=p
-                    df=2.0*kappa-1.0
-                    scale=sigma*np.sqrt((df-2.0)/df)
-                    signal_component=amp*(1.0+((xs[channel]-center)/scale)**2/df)**(-kappa)
-                predicted.append(_apply_response(channel_responses[channel], signal_component, xs[channel])
-                                 + offset + slope*(xs[channel]-center))
+                    amp, center, sigma, kappa = p[:4]
+                    df = 2.0*kappa-1.0
+                    scale = sigma*np.sqrt((df-2.0)/df)
+                    signal_component = amp*(1.0+((xs[channel]-center)/scale)**2/df)**(-kappa)
+                background_coefficients = p[physical_parameter_count:]
+                background_component = background_designs[channel] @ background_coefficients
+                predicted.append(
+                    _apply_response(channel_responses[channel], signal_component, xs[channel])
+                    + background_component
+                )
             return np.asarray(predicted)
         measured_flat = y.ravel()
         def joint_residual(parameters):
@@ -2628,15 +2655,24 @@ def analyze_thomson_spectra(
                                         joint_parameter_count*channel:joint_parameter_count*(channel+1)]
             te_index=2*channel; velocity_index=te_index+1
             fit=results[channel]
-            if model=="non_collective_maxwellian":
-                amp,center,sigma,offset,slope=p
-                extra={}
+            if model == "non_collective_maxwellian":
+                amp, center, sigma = p[:3]
+                extra = {}
             else:
-                amp,center,sigma,kappa,offset,slope=p
-                extra={"kappa_index":float(kappa)}
+                amp, center, sigma, kappa = p[:4]
+                extra = {"kappa_index": float(kappa)}
+            background_coefficients = p[physical_parameter_count:]
+            background_spectrum = background_designs[channel] @ background_coefficients
+            laser_index = int(np.argmin(np.abs(xs[channel]-float(laser_wavelength_nm))))
+            background_intercept = float(background_spectrum[laser_index])
+            background_slope = float(np.gradient(background_spectrum, xs[channel])[laser_index])
             fit.update({
                 "amplitude":float(amp),"fitted_center_nm":float(center),"intrinsic_sigma_nm":float(sigma),
-                "background_intercept":float(offset),"background_slope_per_nm":float(slope),**extra,
+                "background_intercept":background_intercept,"background_slope_per_nm":background_slope,
+                "background_coefficients":background_coefficients.copy(),
+                "background_spectrum":background_spectrum.copy(),
+                "background_model":background_model,
+                "background_basis_matrix":background_designs[channel].copy(),**extra,
                 "fit_parameters":p.copy(),"fit_covariance":block.copy(),
                 "electron_temperature_eV":float(base_physical[te_index]),
                 "electron_velocity_projection_m_s":float(base_physical[velocity_index]),
