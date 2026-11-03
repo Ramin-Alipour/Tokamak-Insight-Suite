@@ -3345,7 +3345,7 @@ elif page=='Tomography & Bolometry':
 
 elif page=='Advanced Analysis':
     st.title('Advanced Diagnostic Analysis')
-    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
+    workflow=st.selectbox('Select workflow',['Profile integration & gradients','Fast-ion / neutron energy spectrum','Data-driven correlation matrix','Triple-probe temperature','Analysis 1 / Optical multi-channel Thomson inference','Analysis 1 / Two-population optical Thomson subanalysis','Analysis 1 / Kappa-MJ structured-background subanalysis','Analysis 1 / Spectral-distribution subanalysis','Analysis 1 / Microwave CTS subanalysis','Analysis 1 / Spatial-profile reconstruction','Flux-loop magnetic-flux reconstruction','Poloidal magnetic-flux map reconstruction','Faraday-rotation polarimetry','Registered analysis modules'])
     if workflow=='Analysis 1 / Optical multi-channel Thomson inference':
         st.info('Analysis 1 has one canonical execution interface. Opening it from Advanced Analysis avoids a second implementation with divergent inputs or outputs.')
         if st.button('Open canonical Thomson inference workflow',type='primary',key='open_canonical_thomson_from_advanced'):
@@ -3372,6 +3372,8 @@ elif page=='Advanced Analysis':
             pop_fraction=st.text_input('Optional initial hot-population number fraction (0–1)',value='',key='ts_population_fraction')
             pop_flow=st.text_input('Optional initial flow projection (m/s)',value='',key='ts_population_flow')
         st.caption('Leave all four initial-value fields blank to let TIS estimate deterministic optimizer seeds from the measured spectral moments and run three starts. If you enter any initial value, all four must be supplied. These are optimizer seeds, not inferred plasma measurements.')
+        pop_include_recoil=st.checkbox('Include single-scattering Compton recoil and polarized Klein-Nishina weighting',value=False,key='ts_population_include_compton_recoil',help='Selects recoil-corrected single-photon scattering; it does not model multiple scattering.')
+        pop_recoil_limit=st.text_input('Maximum accepted no-recoil Compton correction fraction',value='0.01',key='ts_population_recoil_limit')
         if st.button('Fit two-population Thomson spectrum',type='primary',key='run_ts_population_fit'):
             try:
                 if pop_spectrum_upload is None or pop_response_upload is None:
@@ -3408,6 +3410,8 @@ elif page=='Advanced Analysis':
                     _parse_ts_scalar(pop_angle,'Scattering angle',minimum=1e-12),
                     response_values,
                     incident_polarization=_parse_ts_vector(pop_polarization,'Incident polarization'),
+                    include_compton_recoil=bool(pop_include_recoil),
+                    maximum_recoil_correction_fraction=_parse_ts_scalar(pop_recoil_limit,'Maximum no-recoil Compton correction fraction',minimum=1e-12,maximum=0.999999),
                     **initial_parameters,
                     **optional,
                 )
@@ -3422,6 +3426,82 @@ elif page=='Advanced Analysis':
                 add_report_section('Two-population relativistic optical Thomson inference',result)
             except Exception as exc:
                 st.error(f'Two-population Thomson inference failed: {exc}')
+    elif workflow=='Analysis 1 / Kappa-MJ structured-background subanalysis':
+        from tokamak_analysis.thomson_workflow import fit_noncollective_kinetic_thomson_with_background
+        st.info('Joint measured-spectrum fit for a finite-variance isotropic Kappa projection or relativistic Maxwell-Juttner electrons, with detector-space background coefficients optimized simultaneously. The full local covariance retains physical/amplitude/background cross terms. Absolute density is not inferred.')
+        spectrum_upload=st.file_uploader('Measured calibrated optical Thomson spectrum CSV (wavelength_nm, intensity)',type=['csv','txt'],key='ts_kinetic_bg_spectrum')
+        response_upload=st.file_uploader('Measured calibrated wavelength-response matrix CSV',type=['csv','txt'],key='ts_kinetic_bg_response')
+        uncertainty_upload=st.file_uploader('Optional pointwise measured 1-sigma uncertainty CSV',type=['csv','txt'],key='ts_kinetic_bg_uncertainty')
+        covariance_upload=st.file_uploader('Optional full measured spectral covariance CSV (mutually exclusive with uncertainty)',type=['csv','txt'],key='ts_kinetic_bg_covariance')
+        model=st.selectbox('Physical electron model',['kappa','relativistic_maxwell_juttner'],key='ts_kinetic_bg_model')
+        c1,c2,c3=st.columns(3)
+        with c1:
+            laser_text=st.text_input('Laser wavelength (nm)',value='',key='ts_kinetic_bg_laser')
+            angle_text=st.text_input('Scattering angle (rad)',value='',key='ts_kinetic_bg_angle')
+            te_seed=st.text_input('Initial electron temperature (eV)',value='',key='ts_kinetic_bg_te')
+        with c2:
+            flow_seed=st.text_input('Initial q-projected flow (m/s)',value='0',key='ts_kinetic_bg_flow')
+            kappa_seed=st.text_input('Initial Kappa index (>1.5; Kappa only)',value='3.0',key='ts_kinetic_bg_kappa')
+            polarization_text=st.text_input('Incident polarization x,y,z in scattering frame (MJ only)',value='',key='ts_kinetic_bg_polarization')
+        with c3:
+            bg_model=st.selectbox('Detector-background basis',['constant','linear','polynomial','cubic_spline','templates'],key='ts_kinetic_bg_basis')
+            bg_degree=st.number_input('Polynomial degree',min_value=0,max_value=8,value=2,step=1,key='ts_kinetic_bg_degree')
+            bg_knots=st.number_input('Cubic-spline interior knots',min_value=0,max_value=12,value=3,step=1,key='ts_kinetic_bg_knots')
+        template_upload=st.file_uploader('Optional measured background template matrix CSV (one template per column)',type=['csv','txt'],key='ts_kinetic_bg_templates')
+        include_recoil=False
+        recoil_limit_text='0.01'
+        if model=='relativistic_maxwell_juttner':
+            include_recoil=st.checkbox('Include single-scattering Compton recoil and polarized Klein-Nishina weighting',value=False,key='ts_kinetic_bg_recoil')
+            recoil_limit_text=st.text_input('Maximum accepted no-recoil Compton correction fraction',value='0.01',key='ts_kinetic_bg_recoil_limit')
+        st.caption('Supply measured calibrated spectra and response only. Optimizer initial values are seeds, not measurements. Kappa is the analytic isotropic finite-variance Student-t projection, not the generalized Skolar collective-dielectric algorithm.')
+        if st.button('Fit kinetic Thomson spectrum with structured background',type='primary',key='run_ts_kinetic_bg_fit'):
+            try:
+                if spectrum_upload is None or response_upload is None:
+                    raise ValueError('Upload the measured calibrated spectrum and measured response matrix.')
+                table=pd.read_csv(spectrum_upload,header=None).to_numpy(dtype=float)
+                if table.ndim!=2 or table.shape[1]!=2:
+                    raise ValueError('Spectrum CSV must contain exactly wavelength_nm and intensity columns.')
+                wavelengths=table[:,0]
+                measured=table[:,1]
+                if np.any(np.diff(wavelengths)<=0):
+                    raise ValueError('Wavelength samples must already be strictly increasing; input order is not repaired.')
+                response=pd.read_csv(response_upload,header=None).to_numpy(dtype=float)
+                if uncertainty_upload is not None and covariance_upload is not None:
+                    raise ValueError('Supply pointwise uncertainty or full covariance, not both.')
+                optional={}
+                if uncertainty_upload is not None:
+                    optional['measurement_uncertainty']=pd.read_csv(uncertainty_upload,header=None).to_numpy(dtype=float).reshape(-1)
+                if covariance_upload is not None:
+                    optional['measurement_covariance']=pd.read_csv(covariance_upload,header=None).to_numpy(dtype=float)
+                initial=[_parse_ts_scalar(te_seed,'Initial electron temperature',minimum=1e-12),_parse_ts_scalar(flow_seed,'Initial flow projection')]
+                if model=='kappa':
+                    initial.append(_parse_ts_scalar(kappa_seed,'Initial Kappa index',minimum=1.500001))
+                kwargs={
+                    'physical_model':model,
+                    'laser_wavelength_nm':_parse_ts_scalar(laser_text,'Laser wavelength',minimum=1e-12),
+                    'scattering_angle_rad':_parse_ts_scalar(angle_text,'Scattering angle',minimum=1e-12,maximum=np.pi-1e-12),
+                    'instrument_response':response,
+                    'physical_initial':initial,
+                    'background_model':bg_model,
+                    'background_degree':int(bg_degree),
+                    'background_interior_knots':int(bg_knots),
+                    'include_compton_recoil':bool(include_recoil),
+                    'maximum_recoil_correction_fraction':_parse_ts_scalar(recoil_limit_text,'Maximum no-recoil Compton correction fraction',minimum=1e-12,maximum=0.999999),
+                    **optional,
+                }
+                if model=='relativistic_maxwell_juttner':
+                    kwargs['incident_polarization']=_parse_ts_vector(polarization_text,'Incident polarization')
+                if bg_model=='templates':
+                    if template_upload is None:
+                        raise ValueError('Upload the measured background template matrix when templates are selected.')
+                    kwargs['background_templates']=pd.read_csv(template_upload,header=None).to_numpy(dtype=float)
+                result=fit_noncollective_kinetic_thomson_with_background(wavelengths,measured,**kwargs)
+                st.success('Joint kinetic Thomson/background fit completed within the selected model scope.')
+                st.json(result)
+                json_download('Export kinetic Thomson/background joint covariance',result,'tis_thomson_kinetic_background_fit.json')
+                add_report_section('Kappa/MJ Thomson structured-background inference',result)
+            except Exception as exc:
+                st.error(f'Kinetic Thomson/background inference failed: {exc}')
     elif workflow=='Analysis 1 / Spectral-distribution subanalysis':
         st.caption('Analysis 1 subanalysis: spectral-shape diagnostics are available only together with the physical parameters inferred by the canonical Thomson forward fit of the same calibrated measured spectrum.')
         saved_ts=st.session_state.get('tis_thomson_spectral_inference')
