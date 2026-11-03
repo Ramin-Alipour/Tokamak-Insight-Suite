@@ -508,7 +508,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if parameter_bounds is not None and not isinstance(parameter_bounds, Mapping):
         raise ValueError("parameter_bounds must be a mapping")
     b=parameter_bounds or {}
-    allowed_bound_names={"electron_density_m3","electron_temperature_eV","ion_temperature_eV","electron_velocity_projection_m_s","ion_velocity_projection_m_s"}
+    allowed_bound_names={"electron_density_m3","electron_temperature_eV","ion_temperature_eV","electron_velocity_projection_m_s","ion_velocity_projection_m_s"} | {f"ion_temperature_eV_{i}" for i in range(len(ions))}
     unknown_bound_names=set(b)-allowed_bound_names
     if unknown_bound_names:
         raise ValueError(f"parameter_bounds contains unknown parameter names: {sorted(unknown_bound_names)}")
@@ -522,6 +522,13 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     nb=positive_bounds("electron_density_m3")
     tb=positive_bounds("electron_temperature_eV")
     ib=positive_bounds("ion_temperature_eV")
+    species_bound_keys = [f"ion_temperature_eV_{i}" for i in range(len(ions))]
+    if ib is not None and any(key in b for key in species_bound_keys):
+        raise ValueError("Use either the shared ion_temperature_eV bounds or species-specific ion_temperature_eV_i bounds, not both.")
+    ib_species = [
+        positive_bounds(key) if key in b else ib
+        for key in species_bound_keys
+    ]
     physical_flow_limit=float(np.nextafter(C,0.0))
     q_fit = _maximum_geometry_wave_number(scattering_geometry, f0)
     spectral_flow_limit = min(physical_flow_limit, 2.0*np.pi*float(np.max(np.abs(f)))/q_fit)
@@ -561,12 +568,14 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             initial_density=float(np.clip(initial_density,nb[0],nb[1]))
         if electron_temperature_initial_eV is None and tb is not None:
             initial_te=float(np.clip(initial_te,tb[0],tb[1]))
-        if ion_temperature_initial_eV is None and ib is not None:
-            initial_ti=np.clip(initial_ti,ib[0],ib[1])
+        if ion_temperature_initial_eV is None:
+            for species_index, pair in enumerate(ib_species):
+                if pair is not None:
+                    initial_ti[species_index] = np.clip(initial_ti[species_index], pair[0], pair[1])
     for name,value,pair in (
         ("electron_density_m3",initial_density,nb),
         ("electron_temperature_eV",initial_te,tb),
-        *[(f"ion_temperature_eV_{j}", float(value), ib) for j, value in enumerate(initial_ti)],
+        *[(f"ion_temperature_eV_{j}", float(value), ib_species[j]) for j, value in enumerate(initial_ti)],
     ):
         if pair is not None and not pair[0]<=value<=pair[1]:
             raise ValueError(f"initial value for {name} must lie inside its supplied parameter_bounds")
@@ -600,19 +609,19 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     lo=np.r_[
         np.log10(nb[0]) if nb is not None else log10_min,
         np.log10(tb[0]) if tb is not None else log10_min,
-        np.full(n_species, np.log10(ib[0]) if ib is not None else log10_min),
+        np.asarray([np.log10(pair[0]) if pair is not None else log10_min for pair in ib_species], dtype=float),
         eub[0]/us, ub[0]/us,
     ]
     hi=np.r_[
         np.log10(nb[1]) if nb is not None else log10_max,
         np.log10(tb[1]) if tb is not None else log10_max,
-        np.full(n_species, np.log10(ib[1]) if ib is not None else log10_max),
+        np.asarray([np.log10(pair[1]) if pair is not None else log10_max for pair in ib_species], dtype=float),
         eub[1]/us, ub[1]/us,
     ]
     if not isinstance(global_search,(bool,np.bool_)):
         raise ValueError("global_search must be boolean")
     if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
-        nb is None or tb is None or ib is None
+        nb is None or tb is None or any(pair is None for pair in ib_species)
         or "electron_velocity_projection_m_s" not in b
         or "ion_velocity_projection_m_s" not in b
     ):
