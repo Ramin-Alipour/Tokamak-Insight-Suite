@@ -321,7 +321,7 @@ def _fit_noncollective(
     wavelength, signal, laser_nm, angle, response, uncertainty, *,
     background_model="linear", background_degree=2,
     background_interior_knots=3, background_templates=None,
-    likelihood="gaussian",
+    likelihood="gaussian", spectral_covariance=None,
 ):
     """Fit the Maxwellian Thomson feature jointly with a detector-space background basis."""
     from .thomson_background import _background_design
@@ -331,6 +331,19 @@ def _fit_noncollective(
         raise ValueError("signal must have a positive finite scale")
     y = np.asarray(signal, dtype=float) / signal_scale
     sigma_y = None if uncertainty is None else np.asarray(uncertainty, dtype=float) / signal_scale
+    covariance_cholesky = None
+    if spectral_covariance is not None:
+        if likelihood == "poisson":
+            raise ValueError("Poisson count likelihood cannot be combined with Gaussian spectral_covariance")
+        covariance = _finite_array(spectral_covariance, "spectral_covariance", 2)
+        if covariance.shape != (wavelength.size, wavelength.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
+            raise ValueError("spectral_covariance must be symmetric and match the wavelength grid")
+        if uncertainty is not None:
+            raise ValueError("Supply uncertainty or spectral_covariance, not both")
+        try:
+            covariance_cholesky = np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
     basis = _background_design(
@@ -365,6 +378,8 @@ def _fit_noncollective(
             return poisson_deviance_residual(np.asarray(signal, dtype=float), expected_counts)
         if likelihood != "gaussian":
             raise ValueError("likelihood must be 'gaussian' or 'poisson'")
+        if covariance_cholesky is not None:
+            return np.linalg.solve(covariance_cholesky, difference)
         return difference if sigma_y is None else difference/sigma_y
 
     fit = least_squares(
@@ -391,7 +406,7 @@ def _fit_noncollective(
     residual_physical = np.asarray(signal,dtype=float)-fitted
     dof = max(1, wavelength.size-fit.x.size)
     covariance_scaled = np.linalg.pinv(fit.jac.T@fit.jac)
-    if sigma_y is None:
+    if sigma_y is None and covariance_cholesky is None and likelihood == "gaussian":
         covariance_scaled *= float(fit.fun@fit.fun/dof)
     scales = np.r_[signal_scale,1.0,1.0,np.full(n_background,signal_scale)]
     raw_covariance = covariance_scaled*np.outer(scales,scales)
@@ -450,7 +465,7 @@ def _fit_noncollective(
         "fit_covariance": covariance, "residual": residual_physical,
         "integrated_scattered_power_W": area,
         "integrated_scattered_power_uncertainty_W": area_unc,
-        "reduced_chi_square": float(fit.fun@fit.fun/dof) if uncertainty is not None and likelihood == "gaussian" else None,
+        "reduced_chi_square": float(fit.fun@fit.fun/dof) if (uncertainty is not None or covariance_cholesky is not None) and likelihood == "gaussian" else None,
         "likelihood": likelihood,
         "likelihood_interpretation": ("independent_Poisson_count_likelihood_using_signed_deviance_residuals" if likelihood == "poisson" else "Gaussian_or_GLS_residual_likelihood"),
         "fitted_spectrum": fitted,
@@ -462,6 +477,8 @@ def _fit_noncollective(
         "uncertainty_interpretation": (
             "local covariance from the independent Poisson-deviance likelihood curvature"
             if likelihood == "poisson" else
+            "local covariance from supplied full spectral covariance"
+            if covariance_cholesky is not None else
             "local covariance from supplied pointwise measurement uncertainty"
             if uncertainty is not None else
             "residual-variance-scaled local covariance; not measurement-noise-calibrated"
@@ -789,7 +806,7 @@ def analyze_thomson_spectra(
     collective_initial_density_m3=None, collective_initial_temperature_eV=None,
     collective_density_bounds_m3=None, collective_temperature_bounds_eV=None,
     instrument_response_mc_samples=200, instrument_response_mc_min_success_fraction=0.8,
-    joint_spectral_covariance=None,
+    joint_spectral_covariance=None, model_discrepancy_covariance=None,
     ion_temperature_uncertainty_eV=None, ion_velocity_uncertainty_m_s=None,
     electron_velocity_uncertainty_m_s=None, collective_external_parameter_mc_samples=None,
     collective_kappa_initial=None, collective_kappa_bounds=None,
@@ -1186,6 +1203,27 @@ def analyze_thomson_spectra(
             raise ValueError("joint_spectral_covariance must be positive definite") from exc
         # Full channel-major covariance is retained for the joint relativistic
         # shared-parameter fit below; marginal channel fits use diagonal blocks.
+    independent_discrepancy_blocks = None
+    if model_discrepancy_covariance is not None:
+        if model != "non_collective_maxwellian":
+            raise ValueError("independent model_discrepancy_covariance is currently integrated only for non_collective_maxwellian optical Thomson fits")
+        discrepancy = _finite_array(model_discrepancy_covariance, "model_discrepancy_covariance")
+        nchan_disc, nlam_disc = y.shape
+        if discrepancy.shape == (nlam_disc, nlam_disc):
+            independent_discrepancy_blocks = np.broadcast_to(
+                discrepancy, (nchan_disc, nlam_disc, nlam_disc)
+            ).copy()
+        elif discrepancy.shape == (nchan_disc, nlam_disc, nlam_disc):
+            independent_discrepancy_blocks = discrepancy.copy()
+        else:
+            raise ValueError("model_discrepancy_covariance must be (n_wavelength,n_wavelength) or (n_channels,n_wavelength,n_wavelength)")
+        for channel_index, block in enumerate(independent_discrepancy_blocks):
+            if not np.allclose(block, block.T, rtol=1e-10, atol=1e-13):
+                raise ValueError(f"model_discrepancy_covariance[{channel_index}] must be symmetric")
+            eigenvalues = np.linalg.eigvalsh(block)
+            scale = max(float(np.max(np.abs(eigenvalues))), np.finfo(float).tiny)
+            if float(np.min(eigenvalues)) < -1e-10*scale:
+                raise ValueError(f"model_discrepancy_covariance[{channel_index}] must be positive semidefinite")
     cross_channel_covariance_present = False
     if joint_covariance is not None and model == "non_collective_relativistic_maxwell_juttner":
         nchan_cov, nlam_cov = y.shape
@@ -1218,11 +1256,21 @@ def analyze_thomson_spectra(
             channel_slice = slice(i*y.shape[1], (i+1)*y.shape[1])
             channel_covariance = joint_covariance[channel_slice, channel_slice]
             ui = None
+        if independent_discrepancy_blocks is not None:
+            discrepancy_block = independent_discrepancy_blocks[i]
+            if channel_covariance is not None:
+                channel_covariance = channel_covariance + discrepancy_block
+            elif ui is not None:
+                channel_covariance = np.diag(np.asarray(ui, dtype=float)**2) + discrepancy_block
+            else:
+                channel_covariance = discrepancy_block
+            ui = None
         if model == "non_collective_maxwellian":
             fit = _fit_noncollective(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui,
                                 background_model=background_model, background_degree=background_degree,
                                 background_interior_knots=background_interior_knots,
-                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None)
+                                background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
+                                spectral_covariance=channel_covariance)
         elif model == "non_collective_kappa":
             fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui)
         elif model == "non_collective_relativistic_maxwell_juttner":
@@ -1451,7 +1499,7 @@ def analyze_thomson_spectra(
         )
         fit.update(quality)
         fit_covariance_for_discrepancy=fit.get("fit_covariance")
-        if fit.get("fit_reduced_chi_square") is not None and fit_covariance_for_discrepancy is not None:
+        if independent_discrepancy_blocks is None and fit.get("fit_reduced_chi_square") is not None and fit_covariance_for_discrepancy is not None:
             discrepancy_scale=max(float(fit["fit_reduced_chi_square"])-1.0,0.0)
             discrepancy_covariance=discrepancy_scale*np.asarray(fit_covariance_for_discrepancy,dtype=float)
             fit["model_discrepancy_scale"]=discrepancy_scale
@@ -1506,10 +1554,18 @@ def analyze_thomson_spectra(
                 "electron_density": "not identifiable from normalized spectral shape; requires absolute calibrated scattered power and optical geometry",
                 "ion_parameters": "not inferred by this non-collective electron feature model",
             }
+        if independent_discrepancy_blocks is not None:
+            fit["independent_model_discrepancy_covariance"] = independent_discrepancy_blocks[i].copy()
+            fit["independent_model_discrepancy_supplied"] = True
+            fit["model_discrepancy_model"] = "researcher_supplied_correlated_covariance_independent_of_reduced_chi_square"
+            fit["model_discrepancy_covariance_included"] = True
+        else:
+            fit["independent_model_discrepancy_covariance"] = None
+            fit["independent_model_discrepancy_supplied"] = False
         fit["model_discrepancy_uncertainty_available"] = bool(
             fit.get("model_discrepancy_covariance") is not None
             and float(fit.get("model_discrepancy_scale", 0.0)) > 0.0
-        )
+        ) or independent_discrepancy_blocks is not None
         if fit.get("model_discrepancy_covariance") is None:
             fit["model_discrepancy_diagnostics"] = {
                 "residual_rms": fit.get("fit_residual_rms"),
