@@ -329,6 +329,8 @@ def _fit_noncollective(
     signal_scale = float(np.max(np.abs(signal)))
     if not np.isfinite(signal_scale) or signal_scale <= 0:
         raise ValueError("signal must have a positive finite scale")
+    if likelihood == "poisson" and uncertainty is not None:
+        raise ValueError("Poisson count likelihood cannot be combined with Gaussian pointwise uncertainty")
     y = np.asarray(signal, dtype=float) / signal_scale
     sigma_y = None if uncertainty is None else np.asarray(uncertainty, dtype=float) / signal_scale
     covariance_cholesky = None
