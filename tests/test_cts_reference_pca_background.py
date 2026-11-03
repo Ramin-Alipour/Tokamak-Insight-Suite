@@ -47,6 +47,8 @@ def test_cts_reference_pca_background_is_fitted_as_detector_space_nuisance():
         ion_temperature_initial_eV=truth["ion_temperature_eV"],
         ion_velocity_initial_m_s=truth["ion_velocity_projection_m_s"],
         background_reference_spectra=reference, background_components=1,
+        background_reference_basis_mc_samples=40,
+        background_reference_parameter_mc_samples=20,
         global_search=False, inversion_method="local_least_squares",
     )
     assert result["background_model"] == "reference_spectrum_PCA"
@@ -109,17 +111,19 @@ def test_cts_reference_pca_background_reports_conditional_coefficient_and_spectr
         ion_velocity_initial_m_s=truth["ion_velocity_projection_m_s"],
         background_reference_spectra=references, background_components=2,
         background_reference_basis_mc_samples=40,
+        background_reference_parameter_mc_samples=20,
         global_search=False, inversion_method="local_least_squares",
     )
     assert result["background_reference_basis_covariance"].shape == (3*frequency.size, 3*frequency.size)
-    assert result["background_reference_basis_uncertainty_propagated"] is False
-    assert "not_yet_propagated" in result["background_reference_basis_uncertainty_status"]
+    assert result["background_reference_basis_uncertainty_propagated"] is True
+    assert result["background_reference_parameter_mc_successes"] >= 14
+    assert result["background_reference_parameter_covariance"].shape == result["fit_covariance"].shape
     coefficient_covariance = result["background_coefficient_covariance"]
     spectrum_covariance = result["background_spectrum_covariance"]
     assert coefficient_covariance.shape == (3, 3)
     assert spectrum_covariance.shape == (frequency.size, frequency.size)
     assert result["background_spectrum_uncertainty"].shape == frequency.shape
-    assert result["background_reference_basis_uncertainty_propagated"] is False
+    assert result["background_reference_basis_uncertainty_propagated"] is True
     assert result["background_uncertainty_status"] == (
         "conditional_linear_nuisance_covariance_from_supplied_spectral_uncertainty"
     )
