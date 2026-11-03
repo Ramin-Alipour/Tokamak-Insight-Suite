@@ -481,3 +481,25 @@ It is applied unchanged after scattering-volume integration; TIS does not
 silently renormalize the supplied base operator. These are software contract
 and synthetic regression checks, not instrument calibration or experimental
 validation.
+
+## Full-EM physical-background zero-state output
+
+The measured-spectrum inversion preserves the lower-level radiative-transfer
+background state in its top-level result:
+
+- `physical_background_zero` is `true` only for an explicitly modelled
+  zero-radiance background or an explicitly supplied receiver-grid spectrum
+  whose bins are all exactly zero;
+- it is `false` for a nonzero supplied background, including incident
+  radiance with no plasma emission/absorption;
+- it is `null` when no physical background was supplied. An omitted input is
+  unknown and is not silently interpreted as a measured zero background;
+- `physical_background_zero_status` preserves the radiative-transfer
+  distinction or identifies the fixed-spectrum/omitted-input state.
+
+The additive fitted spectrum still contains a numerical zero vector when no
+background is supplied, because no additive component is available to add.
+That numerical placeholder is not a physical assertion that the receiver
+background is zero. Regression tests cover the zero, nonzero, incident-only,
+omitted and malformed-status cases.
+
