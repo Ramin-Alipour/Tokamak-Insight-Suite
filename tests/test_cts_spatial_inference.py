@@ -202,6 +202,10 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
     packaged = json.loads(Path("tis/data/DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
     for registry in (root, packaged):
         cts = next(item for item in registry if item["diagnostic"] == "Collective Thomson / coherent scattering (CTS)")
+        input_names = {
+            item["name"] for item in cts["execution_contract"]["input_specs"]
+        }
+        assert "geometry_ensemble" in input_names
         output_names = {
             item["name"] for item in cts["execution_contract"]["output_specs"]
         }
@@ -215,6 +219,12 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
             if item["name"] == "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse"
         )
         assert any("data-only spectral Jacobian" in item for item in profile_mode["outputs"])
+        geometry_mode = next(
+            item for item in cts["execution_contract"]["workflow_modes"]
+            if item["name"] == "full_forward_ray_geometry_uncertainty"
+        )
+        assert any("geometry_ensemble JSON array" in item for item in geometry_mode["inputs"])
+        assert "Dashboard accepts a precomputed JSON ensemble" in geometry_mode["scope"]
 
     app = Path("app.py").read_text(encoding="utf-8")
     assert "cts_geometry_ensemble_upload" in app
