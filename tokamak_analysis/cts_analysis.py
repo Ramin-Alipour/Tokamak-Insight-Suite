@@ -463,7 +463,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     regularization_strength=0.0, external_parameter_uncertainties=None, external_parameter_covariance=None, external_parameter_order=None,
     background_reference_spectra=None, background_components=None,
     background_reference_basis_mc_samples=200, background_reference_basis_mc_seed=1729,
-    model_discrepancy_covariance=None):
+    background_reference_parameter_mc_samples=30, model_discrepancy_covariance=None,
+    _skip_reference_basis_mc=False):
     """Infer CTS plasma parameters, including electron flow fitted from the spectrum.
     electron_velocity_projection_m_s is an optional optimizer seed only, never fixed.
     Omission uses zero solely as a numerical seed, not a stationary-flow assumption.
@@ -623,6 +624,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         np.asarray([np.log10(pair[1]) if pair is not None else log10_max for pair in ib_species], dtype=float),
         eub[1]/us, ub[1]/us,
     ]
+    if not isinstance(_skip_reference_basis_mc, (bool, np.bool_)):
+        raise ValueError("_skip_reference_basis_mc must be boolean")
     if not isinstance(global_search,(bool,np.bool_)):
         raise ValueError("global_search must be boolean")
     if global_search and inversion_method in {"differential_evolution","improved_genetic"} and (
@@ -1013,6 +1016,8 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
     if background_basis is not None:
         if isinstance(background_reference_basis_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_basis_mc_samples, (int, np.integer)) or background_reference_basis_mc_samples < 30:
             raise ValueError("background_reference_basis_mc_samples must be an integer >=30 when PCA reference background is selected")
+        if isinstance(background_reference_parameter_mc_samples, (bool, np.bool_)) or not isinstance(background_reference_parameter_mc_samples, (int, np.integer)) or background_reference_parameter_mc_samples < 20:
+            raise ValueError("background_reference_parameter_mc_samples must be an integer >=20 when PCA reference background is selected")
         from .advanced_inference import bootstrap_reference_pca_basis
         basis_uncertainty = bootstrap_reference_pca_basis(
             reference, components=background_pca_components_used,
@@ -1024,8 +1029,85 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         out["background_reference_basis_relative_singular_value_gaps"] = basis_uncertainty["component_relative_singular_value_gaps"]
         out["background_reference_basis_weakly_identified_components"] = basis_uncertainty["weakly_identified_components"]
         out["background_reference_basis_bootstrap_samples"] = basis_uncertainty["bootstrap_samples"]
-        out["background_reference_basis_uncertainty_status"] = "bootstrap_covariance_of_reference_mean_and_PCA_basis;_not_yet_propagated_to_plasma_parameter_covariance"
+        out["background_reference_basis_uncertainty_status"] = "bootstrap_covariance_of_reference_mean_and_PCA_basis"
         out["background_reference_basis_uncertainty_propagated"] = False
+        out["background_reference_parameter_mc_requested"] = int(background_reference_parameter_mc_samples)
+        if not _skip_reference_basis_mc:
+            rng_reference = np.random.default_rng(int(background_reference_basis_mc_seed) + 1)
+            parameter_draws = []
+            fit_method_for_draw = (
+                "regularized" if fast is not None and fast["kind"] == "infer_tabulated_1d"
+                else "local_least_squares"
+            )
+            for _ in range(int(background_reference_parameter_mc_samples)):
+                sampled_reference = reference[
+                    rng_reference.integers(0, reference.shape[0], size=reference.shape[0])
+                ]
+                try:
+                    draw = analyze_cts_spectrum(
+                        f, y, probe_frequency_Hz=f0, scattering_geometry=scattering_geometry,
+                        ion_species=ion_species, ion_fractions=ion_fractions,
+                        instrument_response=response, signal_uncertainty=signal_uncertainty,
+                        electron_density_initial_m3=out["electron_density_m3"],
+                        electron_temperature_initial_eV=out["electron_temperature_eV"],
+                        ion_temperature_initial_eV=out["ion_temperature_eV"],
+                        ion_velocity_initial_m_s=out["ion_velocity_projection_m_s"],
+                        electron_velocity_projection_m_s=out["electron_velocity_projection_m_s"],
+                        parameter_bounds=parameter_bounds, fast_ion=fast_ion,
+                        global_search=False, random_seed=random_seed,
+                        inversion_method=fit_method_for_draw,
+                        spectral_covariance=spectral_covariance,
+                        instrument_response_uncertainty=None, response_mc_samples=20,
+                        regularization_strength=regularization_strength,
+                        external_parameter_uncertainties=None,
+                        external_parameter_covariance=None, external_parameter_order=None,
+                        background_reference_spectra=sampled_reference,
+                        background_components=background_components,
+                        background_reference_basis_mc_samples=30,
+                        background_reference_basis_mc_seed=int(background_reference_basis_mc_seed),
+                        background_reference_parameter_mc_samples=20,
+                        model_discrepancy_covariance=model_discrepancy_covariance,
+                        _skip_reference_basis_mc=True,
+                    )
+                    ion_values = np.atleast_1d(draw["ion_temperature_eV"]).astype(float)
+                    parameter_draws.append(np.r_[
+                        float(draw["electron_density_m3"]),
+                        float(draw["electron_temperature_eV"]),
+                        ion_values,
+                        float(draw["electron_velocity_projection_m_s"]),
+                        float(draw["ion_velocity_projection_m_s"]),
+                    ])
+                except (ValueError, RuntimeError, np.linalg.LinAlgError, FloatingPointError):
+                    continue
+            out["background_reference_parameter_mc_successes"] = len(parameter_draws)
+            if len(parameter_draws) >= max(20, int(np.ceil(0.7*background_reference_parameter_mc_samples))):
+                reference_parameter_covariance = np.cov(np.asarray(parameter_draws), rowvar=False, ddof=1)
+                base_count = 4 + n_species
+                full_reference_covariance = np.zeros_like(out["fit_covariance"])
+                full_reference_covariance[:base_count, :base_count] = reference_parameter_covariance
+                out["background_reference_parameter_covariance"] = full_reference_covariance
+                out["fit_covariance"] = out["fit_covariance"] + full_reference_covariance
+                out["background_reference_basis_uncertainty_propagated"] = True
+                out["background_reference_basis_uncertainty_status"] = "bootstrap_reference_basis_covariance_propagated_to_base_plasma_parameter_covariance"
+                total_covariance = out["fit_covariance"]
+                if out.get("model_discrepancy_covariance") is not None:
+                    total_covariance = total_covariance + out["model_discrepancy_covariance"]
+                out["total_fit_covariance_including_discrepancy"] = total_covariance
+                total_sigma = np.sqrt(np.maximum(np.diag(total_covariance), 0.0))
+                out["parameter_uncertainties"] = total_sigma
+                out["electron_density_uncertainty_m3"] = float(total_sigma[0])
+                out["electron_temperature_uncertainty_eV"] = float(total_sigma[1])
+                out["ion_temperature_uncertainty_eV"] = (float(total_sigma[2]) if n_species == 1 else total_sigma[2:2+n_species].copy())
+                out["ion_temperature_species_uncertainties_eV"] = total_sigma[2:2+n_species].copy()
+                out["electron_velocity_projection_uncertainty_m_s"] = float(total_sigma[2+n_species])
+                out["ion_velocity_projection_uncertainty_m_s"] = float(total_sigma[3+n_species])
+            else:
+                out["background_reference_parameter_covariance"] = None
+                out["background_reference_basis_uncertainty_status"] = "basis_covariance_estimated_but_parameter_refit_success_fraction_insufficient"
+        else:
+            out["background_reference_parameter_mc_successes"] = 0
+            out["background_reference_parameter_covariance"] = None
+    
     if independent_discrepancy_covariance is not None:
         out["independent_model_discrepancy_covariance"] = independent_discrepancy_covariance.copy()
         out["independent_model_discrepancy_supplied"] = True
