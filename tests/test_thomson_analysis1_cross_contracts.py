@@ -49,6 +49,14 @@ def test_thomson_profile_and_spectral_distribution_remain_distinct_workflows():
         "thomson_distribution", "analyze_thomson_spectral_distribution"
     )
 
+    profile_inputs = {
+        item["name"] for item in profile["execution_contract"]["input_specs"]
+    }
+    assert {
+        "profile_coordinate_covariance_m2",
+        "profile_coordinate_value_cross_covariance",
+    } <= profile_inputs
+
     distribution_inputs = {
         item["name"] for item in distribution["execution_contract"]["input_specs"]
     }
