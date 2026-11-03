@@ -137,3 +137,18 @@ measurements.
   **32**, 043907, DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966).
 - Sakai, K. et al. (2026), *Journal of Instrumentation* **21**, C01002,
   DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002).
+
+
+## 2026-11-03 numerical correction — projected EVDF velocity quadrature
+
+The relativistic projected-1D optical Thomson inverse now includes explicit
+trapezoidal integration weights over the supplied uniform velocity grid in its
+forward operator. The modeled spectral density is therefore the discrete
+approximation to S(lambda)=integral K(lambda,v) f_q(v) dv, rather than an
+unweighted sum over velocity nodes. This removes the unphysical dependence of
+the forward amplitude on the number of velocity-grid points. The endpoint
+weights are half-interval weights, consistent with trapezoidal normalization
+of the returned projected EVDF. The change does not relax the model's stated
+1-D, symmetric-geometry, zero-recoil, fixed-background or fixed-response
+assumptions. Synthetic regression coverage checks quadrature normalization
+and uses the same integral convention when generating the test spectrum.
