@@ -60,8 +60,8 @@ def test_spatial_full_em_inverse_uses_local_profiles_and_full_covariance(monkeyp
         frequency, measured, probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
         spectral_covariance=np.eye(8) * 1e-4, background_mode="zero",
-        fit_electron_density_relative=True,
-        fit_electron_temperature_relative=True,
+        fit_electron_density_profile=True,
+        fit_electron_temperature_profile=True,
         initial_profiles={
             "electron_density_relative": np.ones(3),
             "electron_temperature_relative": np.ones(3),
@@ -130,8 +130,8 @@ def test_spatial_full_em_inverse_reports_regularization_choice_sensitivity(monke
     result = spatial.analyze_full_em_cts_spatial_profiles(
         frequency, np.ones(8), probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
-        signal_uncertainty=np.ones(8), background_mode="zero", fit_electron_density_relative=True,
-        fit_electron_temperature_relative=False, regularization_strength=0.2, profile_bounds_relative=(0.05, 20.0),
+        signal_uncertainty=np.ones(8), background_mode="zero", fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False, regularization_strength=0.2, profile_bounds_relative=(0.05, 20.0),
         regularization_sensitivity_strengths=[0.1, 0.2, 1.0],
         max_nfev=40,
     )
@@ -170,8 +170,8 @@ def test_regularization_cannot_create_full_em_profile_identifiability(monkeypatc
         frequency, measured, probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
         signal_uncertainty=np.full(frequency.size, 0.01), background_mode="zero",
-        fit_electron_density_relative=True,
-        fit_electron_temperature_relative=False,
+        fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False,
         regularization_strength=0.5, profile_bounds_relative=(0.05, 20.0),
         max_nfev=100,
     )
@@ -284,8 +284,8 @@ def test_spatial_full_em_inverse_adds_model_discrepancy_covariance_once(monkeypa
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
         spectral_covariance=measurement,
         model_discrepancy_covariance=discrepancy,
-        background_mode="zero", fit_electron_density_relative=True,
-        fit_electron_temperature_relative=False,
+        background_mode="zero", fit_electron_density_profile=True,
+        fit_electron_temperature_profile=False,
         regularization_strength=0.1, profile_bounds_relative=(0.05, 20.0),
         max_nfev=20,
     )
@@ -331,8 +331,8 @@ def test_spatial_profile_regularization_mapping_must_cover_each_active_profile()
         probe_frequency_Hz=140e9, scattering_geometry=_geometry(),
         forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8),
         background_mode="zero", profile_bounds_relative=(0.05, 20.0),
-        fit_electron_density_relative=True, fit_electron_temperature_relative=True,
-        fit_ion_temperature_relative=False,
+        fit_electron_density_profile=True, fit_electron_temperature_profile=True,
+        fit_ion_temperature_profile=False,
     )
     with pytest.raises(ValueError, match="must explicitly define every fitted profile"):
         spatial.analyze_full_em_cts_spatial_profiles(
