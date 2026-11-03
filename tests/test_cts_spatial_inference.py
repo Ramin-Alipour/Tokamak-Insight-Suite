@@ -323,3 +323,26 @@ def test_spatial_full_em_inverse_requires_unit_column_sum_response():
             background_mode="zero", regularization_strength=0.1,
             profile_bounds_relative=(0.05, 20.0),
         )
+
+
+def test_spatial_profile_regularization_mapping_must_cover_each_active_profile():
+    base = dict(
+        frequency_shift_Hz=np.linspace(-1.0, 1.0, 8), measured_spectrum=np.ones(8),
+        probe_frequency_Hz=140e9, scattering_geometry=_geometry(),
+        forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8),
+        background_mode="zero", profile_bounds_relative=(0.05, 20.0),
+        fit_electron_density_profile=True, fit_electron_temperature_profile=True,
+        fit_ion_temperature_profile=False,
+    )
+    with pytest.raises(ValueError, match="must explicitly define every fitted profile"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            **base, regularization_strength={"electron_density_profile": 0.1}
+        )
+    with pytest.raises(ValueError, match="profiles that are not fitted"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            **base, regularization_strength={
+                "electron_density_profile": 0.1,
+                "electron_temperature_profile": 0.1,
+                "ion_temperature_profile": 0.1,
+            }
+        )
