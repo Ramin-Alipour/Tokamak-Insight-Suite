@@ -1100,9 +1100,9 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             out["electron_velocity_projection_uncertainty_m_s"]=float(total[2+n_species])
             out["ion_velocity_projection_uncertainty_m_s"]=float(total[3+n_species])
             if fast:
-                out["fast_ion_fraction_uncertainty"]=float(total[5])
+                out["fast_ion_fraction_uncertainty"]=float(total[fast_offset])
                 if fast["kind"]=="maxwellian":
-                    out["fast_ion_temperature_uncertainty_eV"]=float(total[6])
+                    out["fast_ion_temperature_uncertainty_eV"]=float(total[fast_offset+1])
                 elif fast["kind"]=="infer_tabulated_1d":
                     response_vdf_covariance=pdf_jac@response_cov[fast_offset+1:,fast_offset+1:]@pdf_jac.T
                     out["fast_ion_vdf_covariance"]=out["fast_ion_vdf_covariance"]+response_vdf_covariance
