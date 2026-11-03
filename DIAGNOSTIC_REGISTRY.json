@@ -6817,6 +6817,12 @@
           "unit": "n_channels x n_channels; m times physical-parameter unit",
           "required": false,
           "description": "Optional Cov(radius_i, inferred_parameter_j) block. Requires both profile_coordinate_covariance_m2 and a profile-value covariance (or pointwise uncertainty). The complete joint block covariance [[C_radius,C_radius,value],[C_radius,value.T,C_value]] must be positive semidefinite; it is sampled jointly with the marginal uncertainties."
+        },
+        {
+          "name": "profile_coordinate_covariance_m2",
+          "unit": "n_channels x n_channels; m^2",
+          "required": false,
+          "description": "Optional supplied covariance of the measured channel radial coordinates. Must be finite, symmetric and positive semidefinite; propagated jointly with profile-value uncertainty by Monte Carlo. It does not infer equilibrium mapping or flux coordinates."
         }
       ],
       "output_specs": [
