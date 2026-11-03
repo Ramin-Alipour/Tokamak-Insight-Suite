@@ -183,3 +183,40 @@ def test_regularization_cannot_create_full_em_profile_identifiability(monkeypatc
     assert identifiability["locally_identifiable"] is False
     assert result["profile_covariance_relative"] is None
     assert result["log_profile_covariance"] is None
+
+
+def test_spatial_profile_data_only_identifiability_contract_is_registered_and_exposed():
+    import json
+    from pathlib import Path
+    from tokamak_analysis.analysis_registry import get_analysis
+
+    entry = get_analysis(30)
+    mode = next(
+        item for item in entry["execution_contract"]["workflow_modes"]
+        if item["name"] == "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse"
+    )
+    assert any("data-only spectral Jacobian" in item for item in mode["outputs"])
+    assert any("regularization rows cannot establish data identifiability" in item for item in mode["outputs"])
+
+    root = json.loads(Path("DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    packaged = json.loads(Path("tis/data/DIAGNOSTIC_REGISTRY.json").read_text(encoding="utf-8"))
+    for registry in (root, packaged):
+        cts = next(item for item in registry if item["diagnostic"] == "Collective Thomson / coherent scattering (CTS)")
+        output_names = {
+            item["name"] for item in cts["execution_contract"]["output_specs"]
+        }
+        assert {
+            "profile_data_only_jacobian_rank",
+            "profile_augmented_jacobian_rank",
+            "regularization_contributed_to_identifiability",
+        } <= output_names
+        profile_mode = next(
+            item for item in cts["execution_contract"]["workflow_modes"]
+            if item["name"] == "spatially_varying_magnetized_full_electromagnetic_cts_profile_inverse"
+        )
+        assert any("data-only spectral Jacobian" in item for item in profile_mode["outputs"])
+
+    app = Path("app.py").read_text(encoding="utf-8")
+    assert "cts_geometry_ensemble_upload" in app
+    assert "cts_geometry_mc_samples" in app
+    assert "propagate_full_em_cts_ray_geometry_uncertainty(" in app
