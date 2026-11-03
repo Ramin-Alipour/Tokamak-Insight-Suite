@@ -52,6 +52,7 @@ def two_population_relativistic_thomson_spectrum(
     radial_order=36,
     angular_order=18,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
 ):
     """Return the cross-section-weighted spectrum of two MJ electron populations.
 
@@ -64,6 +65,12 @@ def two_population_relativistic_thomson_spectrum(
     wavelength = _vector(wavelength_nm, "wavelength_nm")
     if np.any(wavelength <= 0) or np.any(np.diff(wavelength) <= 0):
         raise ValueError("wavelength_nm must be positive and strictly increasing")
+    if isinstance(background_degree, (bool, np.bool_)) or not isinstance(background_degree, (int, np.integer)) or not 0 <= int(background_degree) <= 2:
+        raise ValueError("background_degree must be an integer in {0, 1, 2}")
+    background_degree = int(background_degree)
+    if not isinstance(include_compton_recoil, (bool, np.bool_)):
+        raise ValueError("include_compton_recoil must be boolean")
+
     laser = _positive(laser_wavelength_nm, "laser_wavelength_nm")
     angle = float(scattering_angle_rad)
     if not np.isfinite(angle) or not 0 < angle < np.pi:
@@ -88,6 +95,7 @@ def two_population_relativistic_thomson_spectrum(
         radial_order=radial_order,
         angular_order=angular_order,
         maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+        include_compton_recoil=include_compton_recoil,
     )
     cold = relativistic_maxwell_juttner_spectrum(
         electron_temperature_eV=tc, **common
@@ -139,14 +147,18 @@ def fit_two_population_relativistic_thomson_spectrum(
     radial_order=24,
     angular_order=12,
     maximum_recoil_correction_fraction=0.01,
+    include_compton_recoil=False,
+    background_degree=0,
     max_nfev=500,
 ):
     """Fit the two-population model directly to measured calibrated spectra.
 
-    The measured response is applied as a fixed forward operator. A linear
-    amplitude and constant detector-space offset are profiled as nuisance
-    parameters. Absolute density is deliberately not inferred by this
-    normalized shape-only subanalysis.
+    The measured response is applied as a fixed forward operator. Signal amplitude
+    and a structured detector-space polynomial background are jointly profiled
+    with the nonlinear population parameters. The polynomial degree is an explicit
+    modelling choice (0=constant, 1=linear, 2=quadratic); it is not a substitute
+    for a measured background template. Absolute density is deliberately not
+    inferred by this normalized shape-only subanalysis.
     """
     x = _vector(wavelength_nm, "wavelength_nm")
     y = _vector(measured_spectrum, "measured_spectrum")
@@ -254,23 +266,36 @@ def fit_two_population_relativistic_thomson_spectrum(
             radial_order=radial_order,
             angular_order=angular_order,
             maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+            include_compton_recoil=include_compton_recoil,
         )["spectral_density_per_nm"]
         return _apply_response(response, model, x)
 
+    # Center and scale the wavelength coordinate so polynomial background
+    # columns remain numerically well conditioned across nm-scale axes.
+    x_center = float(np.mean(x))
+    x_scale = float(np.ptp(x))
+    x_scaled = (x - x_center) / x_scale
+    background_basis = np.column_stack([x_scaled**degree for degree in range(background_degree + 1)])
+
     def profile(p):
         z = forward(p)
-        design = whitening(np.column_stack((z, np.ones_like(z))))
+        design_unwhitened = np.column_stack((z, background_basis))
+        design = whitening(design_unwhitened)
         coefficients = np.linalg.lstsq(design, whitening(y), rcond=None)[0]
         amplitude = float(coefficients[0])
         if amplitude < 0:
             amplitude = 0.0
-            offset = float(np.mean(y))
+            background_coefficients = np.linalg.lstsq(
+                whitening(background_basis), whitening(y), rcond=None
+            )[0]
         else:
-            offset = float(coefficients[1])
-        return amplitude, offset, amplitude*z + offset
+            background_coefficients = coefficients[1:]
+        background = background_basis @ background_coefficients
+        fitted = amplitude * z + background
+        return amplitude, background_coefficients, background, fitted
 
     def residual(p):
-        _, _, fitted = profile(p)
+        _, _, _, fitted = profile(p)
         return whitening(fitted-y)
 
     fit_candidates = []
@@ -291,7 +316,7 @@ def fit_two_population_relativistic_thomson_spectrum(
         raise ValueError("two-population Thomson fit failed for every deterministic start: " + "; ".join(fit_failures[:3]))
     fit_candidates.sort(key=lambda item: item[0])
     _, fit = fit_candidates[0]
-    amplitude, offset, fitted = profile(fit.x)
+    amplitude, background_coefficients, fitted_background, fitted = profile(fit.x)
     tc, th, fraction, flow = decode(fit.x)
     jac = np.asarray(fit.jac, dtype=float)
     column_norms = np.linalg.norm(jac, axis=0)
@@ -322,7 +347,18 @@ def fit_two_population_relativistic_thomson_spectrum(
         flow_projection_m_s=flow, incident_polarization=incident_polarization,
         radial_order=radial_order, angular_order=angular_order,
         maximum_recoil_correction_fraction=maximum_recoil_correction_fraction,
+        include_compton_recoil=include_compton_recoil,
     )
+    # Conditional covariance of linear background coefficients at the fitted
+    # nonlinear population parameters. This block is not cross-covariance with
+    # the nonlinear parameters; the latter is represented only through the
+    # profiled nonlinear Jacobian covariance below.
+    final_shape = forward(fit.x)
+    background_design = whitening(np.column_stack((final_shape, background_basis)))
+    background_covariance_whitened = np.linalg.pinv(background_design.T @ background_design)
+    if signal_uncertainty is None and spectral_covariance is None:
+        background_covariance_whitened *= float(residual(fit.x) @ residual(fit.x) / dof)
+    background_covariance = background_covariance_whitened[1:, 1:]
     return {
         "cold_electron_temperature_eV": tc,
         "hot_electron_temperature_eV": th,
@@ -336,7 +372,15 @@ def fit_two_population_relativistic_thomson_spectrum(
         "fitted_spectrum": fitted,
         "residual": y-fitted,
         "fitted_amplitude": amplitude,
-        "fitted_constant_background": offset,
+        "fitted_constant_background": float(background_coefficients[0]) if background_degree == 0 else None,
+        "fitted_background_coefficients_scaled_wavelength": np.asarray(background_coefficients, dtype=float),
+        "fitted_background_degree": background_degree,
+        "background_wavelength_center_nm": x_center,
+        "background_wavelength_scale_nm": x_scale,
+        "background_coefficient_covariance_conditional": background_covariance,
+        "background_covariance_scope": "conditional linear-background covariance at fitted nonlinear population parameters; nonlinear-background cross-covariance is not reported",
+        "compton_recoil_included": bool(include_compton_recoil),
+        "cross_section_model": "polarized Klein-Nishina with single-scattering recoil" if include_compton_recoil else "polarized Thomson; recoil screened only",
         "fit_covariance": covariance_physical,
         "fit_jacobian_rank": rank,
         "fit_jacobian_condition_number": condition,
@@ -355,6 +399,9 @@ def fit_two_population_relativistic_thomson_spectrum(
             "Both populations share one bulk-flow projection along the scattering vector.",
             "The fitted population fraction and temperatures are conditional on the selected two-population model and measured response.",
             "Absolute electron density is not inferred by this normalized shape-only subanalysis.",
+            "Polynomial background is a detector-space nuisance model; inspect fitted_background_degree and coefficients, and do not interpret it as a measured stray-light template.",
+            "Background coefficient covariance is conditional and does not include cross-covariance with nonlinear population parameters.",
+            "Compton recoil is included only when include_compton_recoil=True; otherwise the Thomson approximation is used subject to the recoil screen.",
             "No experimental validation is performed or claimed.",
         ],
     }
