@@ -53,6 +53,12 @@ def thermal_bremsstrahlung_emissivity_si(
         raise ValueError("ion densities and charge states must be matching finite vectors with n_i>=0 and Z_i>0")
     if np.any(~np.isfinite(g)) or np.any(g <= 0):
         raise ValueError("gaunt_factor must be positive and finite")
+    try:
+        g = np.broadcast_to(g, nu.shape)
+    except ValueError as exc:
+        raise ValueError(
+            "gaunt_factor must be scalar or broadcastable to frequency_Hz"
+        ) from exc
     temp_K = te * E_CHARGE / K_B
     charge_weighted_ions = float(np.sum(z**2 * ni))
     x = H * nu / (K_B * temp_K)
@@ -85,6 +91,26 @@ def integrate_thermal_microwave_background(
         raise ValueError("ion_densities_m3 must be (n_path,n_species) and ion_charge_states one value per species")
     if np.any(~np.isfinite(length)) or np.any(length <= 0) or np.any(~np.isfinite(te)) or np.any(te <= 0) or np.any(~np.isfinite(ne)) or np.any(ne <= 0):
         raise ValueError("path lengths, temperatures and electron densities must be positive finite")
+    gaunt = np.asarray(gaunt_factor, dtype=float)
+    if np.any(~np.isfinite(gaunt)) or np.any(gaunt <= 0.0):
+        raise ValueError("gaunt_factor must contain positive finite values")
+    if gaunt.ndim == 0:
+        gaunt_path = np.full((length.size, nu.size), float(gaunt))
+        gaunt_status = "scalar"
+    elif gaunt.shape == (nu.size,):
+        gaunt_path = np.broadcast_to(gaunt, (length.size, nu.size))
+        gaunt_status = "frequency_resolved"
+    elif gaunt.shape == (length.size,):
+        gaunt_path = np.broadcast_to(gaunt[:, None], (length.size, nu.size))
+        gaunt_status = "path_resolved"
+    elif gaunt.shape == (length.size, nu.size):
+        gaunt_path = gaunt
+        gaunt_status = "path_and_frequency_resolved"
+    else:
+        raise ValueError(
+            "gaunt_factor must be scalar, (n_frequency,), (n_path,), "
+            "or (n_path,n_frequency)"
+        )
     if ece_absorption_coefficient_m_inverse is None:
         ece_alpha = np.zeros((length.size, nu.size), dtype=float)
         ece_status = "ECE omitted; no mode-resolved absorption supplied"
@@ -103,7 +129,8 @@ def integrate_thermal_microwave_background(
     tau_ece_total = np.zeros(nu.size)
     for index in range(length.size):
         j_ff = thermal_bremsstrahlung_emissivity_si(
-            nu, ne[index], ni[index], z, te[index], gaunt_factor=gaunt_factor,
+            nu, ne[index], ni[index], z, te[index],
+            gaunt_factor=gaunt_path[index],
         )
         b_nu = planck_spectral_radiance(nu, te[index] * E_CHARGE / K_B)
         alpha_ff = j_ff / np.maximum(b_nu, np.finfo(float).tiny)
@@ -120,11 +147,13 @@ def integrate_thermal_microwave_background(
         "ece_optical_depth": tau_ece_total,
         "total_optical_depth": alpha_ff_total + tau_ece_total,
         "ece_model_status": ece_status,
+        "gaunt_factor_resolution": gaunt_status,
         "free_free_model": "nonrelativistic_Maxwellian_thermal_bremsstrahlung_with_supplied_Gaunt_factor",
         "radiative_transfer": "slab-by-slab exact formal solution with LTE Kirchhoff source function",
         "receiver_plane_conversion": "multiply radiance by measured receiver etendue and end-to-end efficiency; do not count the same throughput twice",
         "limitations": [
             "Free-free emissivity is non-relativistic and unmagnetized; use a relativistic/magnetized emissivity kernel outside that regime.",
+            "The supplied Gaunt factor may be scalar, frequency-resolved, path-resolved, or path-and-frequency-resolved; it is not inferred from incomplete plasma inputs.",
             "ECE absorption must be supplied by a mode-resolved magnetized plasma solver; no scalar approximation is silently substituted.",
             "The result is spectral radiance, not detector power; receiver etendue and efficiency are external measured inputs.",
         ],
