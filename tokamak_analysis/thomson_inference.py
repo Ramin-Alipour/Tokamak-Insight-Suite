@@ -572,44 +572,83 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_cova
         "interpretation": "Conditional one-parameter profile likelihood; a grid-censored limit is not a physical bound. The finite upper grid edge is numerical only."
     }
 
-def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spectral_covariance=None):
-    """Fit the 1-D projection of an isotropic kappa VDF (Student-t form)."""
-    signal_scale=float(np.max(np.abs(signal)))
-    if not np.isfinite(signal_scale) or signal_scale<=0:
+def _fit_kappa(
+    wavelength, signal, laser_nm, angle, response, uncertainty,
+    spectral_covariance=None, *, background_model="linear",
+    background_degree=2, background_interior_knots=3,
+    background_templates=None,
+):
+    """Fit an isotropic finite-variance Kappa spectrum with a joint detector-space background."""
+    from .thomson_background import _background_design
+
+    signal_scale = float(np.max(np.abs(signal)))
+    if not np.isfinite(signal_scale) or signal_scale <= 0:
         raise ValueError("signal must have a positive finite scale")
-    signal_scaled=signal/signal_scale
+    signal_scaled = signal / signal_scale
     if uncertainty is not None and spectral_covariance is not None:
         raise ValueError("Kappa fitting accepts pointwise uncertainty or spectral_covariance, not both")
-    uncertainty_scaled=None if uncertainty is None else uncertainty/signal_scale
+    uncertainty_scaled = None if uncertainty is None else uncertainty / signal_scale
     covariance_cholesky = None
+    covariance_scaled_input = None
     if spectral_covariance is not None:
-        covariance = _finite_array(spectral_covariance, "spectral_covariance", 2) / signal_scale**2
-        if covariance.shape != (wavelength.size, wavelength.size) or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13):
+        covariance_scaled_input = _finite_array(
+            spectral_covariance, "spectral_covariance", 2
+        ) / signal_scale**2
+        if (covariance_scaled_input.shape != (wavelength.size, wavelength.size)
+                or not np.allclose(covariance_scaled_input, covariance_scaled_input.T,
+                                   rtol=1e-10, atol=1e-13)):
             raise ValueError("spectral_covariance must be symmetric and match the wavelength grid")
         try:
-            covariance_cholesky = np.linalg.cholesky(covariance)
+            covariance_cholesky = np.linalg.cholesky(covariance_scaled_input)
         except np.linalg.LinAlgError as exc:
             raise ValueError("spectral_covariance must be positive definite") from exc
+
+    basis = _background_design(
+        wavelength, background_model, degree=background_degree,
+        interior_knots=background_interior_knots, templates=background_templates,
+    )
+    n_background = basis.shape[1]
     spacing = float(np.median(np.diff(wavelength)))
     span = float(wavelength[-1] - wavelength[0])
     edge = max(2, wavelength.size // 10)
-    baseline = float(np.median(np.r_[signal_scaled[:edge], signal_scaled[-edge:]]))
+    edge_mask = np.zeros(wavelength.size, dtype=bool)
+    edge_mask[:edge] = True
+    edge_mask[-edge:] = True
+    try:
+        background_seed = np.linalg.lstsq(
+            basis[edge_mask], signal_scaled[edge_mask], rcond=None
+        )[0]
+    except np.linalg.LinAlgError:
+        background_seed = np.zeros(n_background, dtype=float)
     peak = int(np.argmax(signal_scaled))
+    baseline = float(np.median(signal_scaled[edge_mask]))
     amp0 = max(float(signal_scaled[peak] - baseline), np.finfo(float).eps)
-    p0 = [amp0, float(wavelength[peak]), max(spacing, span/10), 3.0, baseline, 0.0]
-    lower = [0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51, -np.inf, -np.inf]
-    upper = [np.inf, wavelength[-1], span, np.inf, np.inf, np.inf]
-    def intrinsic(x, amp, center, sigma, kappa, offset, slope):
-        df = 2.0*kappa-1.0
-        scale = sigma*np.sqrt((df-2.0)/df)
-        return amp*(1.0+((x-center)/scale)**2/df)**(-kappa)+offset+slope*(x-center)
-    def observed(x, amp, center, sigma, kappa, offset, slope):
-        component = intrinsic(x, amp, center, sigma, kappa, 0.0, 0.0)
-        return _apply_response(response, component, x) + offset+slope*(x-center)
-    # A single curve_fit start can settle on a local Kappa/background
-    # compensation minimum.  Use a deterministic, physically admissible
-    # multi-start search over width and Kappa, then retain the lowest
-    # weighted-residual solution.  These are numerical starts, not priors.
+    p0 = np.r_[amp0, float(wavelength[peak]), max(spacing, span/10), 3.0,
+               background_seed]
+    lower = np.r_[0.0, wavelength[0], max(spacing*0.2, 1e-12), 1.51,
+                  np.full(n_background, -np.inf)]
+    upper = np.r_[np.inf, wavelength[-1], span, np.inf,
+                  np.full(n_background, np.inf)]
+
+    def intrinsic(x, amp, center, sigma, kappa):
+        df = 2.0*kappa - 1.0
+        scale = sigma * np.sqrt((df - 2.0) / df)
+        return amp * (1.0 + ((x-center)/scale)**2/df)**(-kappa)
+
+    def background_at(x, coefficients):
+        # Evaluate the selected basis on the measured grid and interpolate only
+        # within its domain; all fitted samples lie inside this interval.
+        return np.column_stack([
+            np.interp(np.asarray(x, dtype=float), wavelength, basis[:, j])
+            for j in range(n_background)
+        ]) @ np.asarray(coefficients, dtype=float)
+
+    def observed(x, *parameters):
+        amp, center, sigma, kappa = parameters[:4]
+        coefficients = np.asarray(parameters[4:], dtype=float)
+        component = intrinsic(x, amp, center, sigma, kappa)
+        return _apply_response(response, component, x) + background_at(x, coefficients)
+
     def weighted_residual(parameters):
         difference = observed(wavelength, *parameters) - signal_scaled
         if covariance_cholesky is not None:
@@ -617,13 +656,15 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spect
         return difference if uncertainty_scaled is None else difference / uncertainty_scaled
 
     kappa_seeds = (1.6, 2.0, 3.0, 5.0, 10.0, 30.0)
-    width_seeds = (max(spacing, span/10), max(2.0*spacing, span/5), max(4.0*spacing, span/3))
+    width_seeds = (max(spacing, span/10), max(2.0*spacing, span/5),
+                   max(4.0*spacing, span/3))
     candidate_fits = []
     attempted_starts = 0
     for kappa_seed in kappa_seeds:
         for width_seed in width_seeds:
-            start = np.asarray(p0, dtype=float)
-            start[2] = min(max(width_seed, lower[2] * (1.0 + 1e-8)), upper[2] * (1.0 - 1e-8))
+            start = p0.copy()
+            start[2] = min(max(width_seed, lower[2]*(1.0+1e-8)),
+                           upper[2]*(1.0-1e-8))
             start[3] = kappa_seed
             attempted_starts += 1
             try:
@@ -644,50 +685,52 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spect
     covariance_scaled = np.linalg.pinv(fit.jac.T @ fit.jac)
     if uncertainty_scaled is None and covariance_cholesky is None:
         covariance_scaled *= float(fit.fun @ fit.fun / dof_fit)
-    cov = covariance_scaled
-    # observed() operates on normalized intensity; retain its optimizer
-    # parameters separately from the public, measured-unit fit parameters.
-    parameter_scales=np.array([signal_scale,1.0,1.0,1.0,signal_scale,signal_scale])
-    p=p_scaled*parameter_scales
-    cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
-    amp,center,sigma,kappa,offset,slope=map(float,p)
-    # A kappa spectrum has power-law tails; Gaussian ±3-sigma coverage is not
-    # a valid universal truncation criterion. Report the actual Student-t
-    # probability captured by the measured wavelength window instead.
-    kappa_df = 2.0 * kappa - 1.0
+    parameter_scales = np.r_[signal_scale, 1.0, 1.0, 1.0,
+                             np.full(n_background, signal_scale)]
+    p = p_scaled * parameter_scales
+    cov = np.asarray(covariance_scaled, dtype=float) * np.outer(parameter_scales, parameter_scales)
+    amp, center, sigma, kappa = map(float, p[:4])
+    background_coefficients = p[4:].copy()
+    background_curve = basis @ p_scaled[4:] * signal_scale
+    basis_derivative = np.gradient(basis, wavelength, axis=0)
+    center_basis = np.array([
+        np.interp(center, wavelength, basis[:, j]) for j in range(n_background)
+    ])
+    center_basis_derivative = np.array([
+        np.interp(center, wavelength, basis_derivative[:, j]) for j in range(n_background)
+    ])
+    background_intercept = float(center_basis @ background_coefficients)
+    background_slope = float(center_basis_derivative @ background_coefficients)
+
+    kappa_df = 2.0*kappa - 1.0
     kappa_scale = sigma * np.sqrt((kappa_df - 2.0) / kappa_df)
     captured_probability = float(
-        stdtr(kappa_df, (wavelength[-1] - center) / kappa_scale)
-        - stdtr(kappa_df, (wavelength[0] - center) / kappa_scale)
+        stdtr(kappa_df, (wavelength[-1]-center)/kappa_scale)
+        - stdtr(kappa_df, (wavelength[0]-center)/kappa_scale)
     )
-    te=thomson_electron_temperature_from_spectral_width(
+    te = thomson_electron_temperature_from_spectral_width(
         sigma, laser_nm, angle
     )["electron_temperature_eV"]
-    velocity=thomson_velocity_projection(
-        center, laser_nm, angle
-    )["electron_velocity_projection_m_s"]
-    q_projection=2.0*np.sin(angle/2.0)
+    velocity = thomson_velocity_projection(center, laser_nm, angle)[
+        "electron_velocity_projection_m_s"
+    ]
+    q_projection = 2.0*np.sin(angle/2.0)
     if te / ELECTRON_REST_ENERGY_EV >= NONRELATIVE_THETA_E_SCREEN:
         raise ValueError("Non-relativistic kappa model rejected: fitted electron temperature is not safely small relative to the electron rest energy; the selected non-relativistic model is outside its declared validity range.")
-    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN * C_M_S:
+    if abs(velocity) >= NONRELATIVE_FLOW_BETA_SCREEN*C_M_S:
         raise ValueError("Non-relativistic kappa model rejected: fitted flow projection is outside the declared |v|/c < 0.1 regime.")
-    fitted_spectrum=signal_scale*observed(wavelength,*p_scaled)
-    residual=signal-fitted_spectrum
+    fitted_spectrum = signal_scale * observed(wavelength, *p_scaled)
+    residual = signal - fitted_spectrum
 
-    # Diagnose whether the extra Kappa shape parameter is distinguishable
-    # from amplitude, centroid, width and the local linear background.  The
-    # diagnostic uses the Jacobian of the actual response-convolved forward
-    # model, not the optimizer's covariance alone.
     jacobian = np.empty((wavelength.size, p_scaled.size), dtype=float)
     for parameter_index in range(p_scaled.size):
         step = np.cbrt(np.finfo(float).eps) * max(abs(float(p_scaled[parameter_index])), 1.0)
-        plus = p_scaled.copy()
-        minus = p_scaled.copy()
+        plus, minus = p_scaled.copy(), p_scaled.copy()
         plus[parameter_index] += step
         minus[parameter_index] -= step
         jacobian[:, parameter_index] = (
             observed(wavelength, *plus) - observed(wavelength, *minus)
-        ) / (2.0 * step)
+        ) / (2.0*step)
     if covariance_cholesky is not None:
         weighted_jacobian = np.linalg.solve(covariance_cholesky, jacobian)
     elif uncertainty_scaled is not None:
@@ -701,29 +744,28 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spect
         weighted_jacobian[:, nonzero_columns] / column_norms[nonzero_columns]
     )
     singular_values = np.linalg.svd(normalized_jacobian, compute_uv=False)
-    rank_tolerance = (
-        np.finfo(float).eps * max(normalized_jacobian.shape)
-        * (float(singular_values[0]) if singular_values.size else 0.0)
+    rank_tolerance = np.finfo(float).eps * max(normalized_jacobian.shape) * (
+        float(singular_values[0]) if singular_values.size else 0.0
     )
     jacobian_rank = int(np.sum(singular_values > rank_tolerance))
     jacobian_condition = (
-        float(singular_values[0] / singular_values[-1])
-        if singular_values.size and singular_values[-1] > rank_tolerance
-        else float("inf")
+        float(singular_values[0]/singular_values[-1])
+        if singular_values.size and singular_values[-1] > rank_tolerance else float("inf")
     )
     kappa_column = weighted_jacobian[:, 3]
-    nuisance_columns = weighted_jacobian[:, [0, 1, 2, 4, 5]]
-    nuisance_coefficients = np.linalg.lstsq(nuisance_columns, kappa_column, rcond=None)[0]
+    nuisance_indices = [j for j in range(p_scaled.size) if j != 3]
+    nuisance_columns = weighted_jacobian[:, nuisance_indices]
+    nuisance_coefficients = np.linalg.lstsq(
+        nuisance_columns, kappa_column, rcond=None
+    )[0]
     conditional_kappa_sensitivity = float(
-        np.linalg.norm(kappa_column - nuisance_columns @ nuisance_coefficients)
+        np.linalg.norm(kappa_column - nuisance_columns@nuisance_coefficients)
         / max(np.linalg.norm(kappa_column), np.finfo(float).tiny)
     )
     kappa_standard_uncertainty = float(np.sqrt(max(cov[3, 3], 0.0)))
     kappa_identifiable = bool(
-        jacobian_rank == p_scaled.size
-        and np.isfinite(jacobian_condition)
-        and jacobian_condition <= 1e12
-        and conditional_kappa_sensitivity > 1e-8
+        jacobian_rank == p_scaled.size and np.isfinite(jacobian_condition)
+        and jacobian_condition <= 1e12 and conditional_kappa_sensitivity > 1e-8
         and np.isfinite(kappa_standard_uncertainty)
     )
     kappa_identifiability = {
@@ -734,65 +776,107 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spect
         "normalized_jacobian_condition_number": jacobian_condition,
         "conditional_kappa_sensitivity": conditional_kappa_sensitivity,
         "kappa_index_standard_uncertainty": kappa_standard_uncertainty,
-        "diagnostic_basis": "finite-difference Jacobian of the response-convolved six-parameter Kappa spectrum; Kappa sensitivity is projected orthogonally to nuisance-parameter sensitivities",
+        "diagnostic_basis": "finite-difference Jacobian of the response-convolved Kappa spectrum and selected detector-background basis; Kappa sensitivity is projected orthogonally to all nuisance-parameter sensitivities",
         "threshold_semantics": "rank and floating-point conditioning diagnostics; not an empirical or universal physical threshold",
         "limitation": None if kappa_identifiable else "The measured spectral window and supplied response do not locally distinguish the Kappa shape parameter from the remaining fitted parameters; do not interpret the optimizer candidate as an identified physical Kappa index.",
     }
-    kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(wavelength, signal_scaled, response, p_scaled, uncertainty_scaled, spectral_covariance=None if spectral_covariance is None else covariance)
-    dof=max(1,wavelength.size-len(p))
-    def area_from_params(values):
-        a, cen, sig, kap, off, sl = values
-        df_local=2.0*kap-1.0
-        scale_local=sig*np.sqrt((df_local-2.0)/df_local)
-        return float(a*scale_local*np.sqrt(df_local*np.pi)
-                     * np.exp(gammaln(kap-0.5)-gammaln(kap)))
-    area=area_from_params(p)
-    area_gradient=np.zeros(len(p))
-    for j in range(len(p)):
-        step=np.cbrt(np.finfo(float).eps)*max(abs(float(p[j])),1.0)
-        plus=np.array(p,dtype=float); minus=np.array(p,dtype=float)
-        plus[j]+=step; minus[j]-=step
-        area_gradient[j]=(area_from_params(plus)-area_from_params(minus))/(2.0*step)
-    area_unc=float(np.sqrt(max(float(area_gradient@cov@area_gradient),0.0)))
-    return {"electron_temperature_eV":float(te),
-            "electron_temperature_uncertainty_eV":float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
-            "electron_velocity_projection_m_s":float(velocity),
-            "electron_velocity_projection_uncertainty_m_s":float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
-            "fitted_center_nm":center,"intrinsic_sigma_nm":sigma,"kappa_index":kappa,"kappa_index_identifiability":kappa_identifiability,"kappa_profile_likelihood":kappa_profile_likelihood,
-            "amplitude":amp,"background_intercept":offset,"background_slope_per_nm":slope,
-            "fit_covariance":np.asarray(cov,dtype=float),"residual":residual,
-            "fit_parameters":np.asarray(p,dtype=float),
-            "fit_parameter_names":["amplitude","center_nm","intrinsic_sigma_nm","kappa_index","background_intercept","background_slope_per_nm"],
-            "integrated_scattered_power_W":area,"integrated_scattered_power_uncertainty_W":area_unc,
-            "captured_spectral_probability":captured_probability,
-            "spectral_window_truncation_warning":("The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window." if captured_probability < 0.999 else None),
-            "reduced_chi_square":(float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else float(fit.fun @ fit.fun / dof) if covariance_cholesky is not None else None),
-            "spectral_covariance_used": covariance_cholesky is not None,
-            "spectral_covariance_interpretation": "researcher_supplied_within_channel_covariance_including_model_discrepancy_when_provided" if covariance_cholesky is not None else "not_supplied",
-            "fitted_spectrum":fitted_spectrum,
-            "optimizer": {
-                "method": "deterministic_multistart_bounded_least_squares",
-                "attempted_starts": int(attempted_starts),
-                "successful_starts": int(len(candidate_fits)),
-                "selected_weighted_residual_sum_squares": float(fit.fun @ fit.fun),
-                "selected_initialization_kappa_grid": list(kappa_seeds),
-                "selected_initialization_width_grid_nm": list(width_seeds),
-                "success": bool(fit.success),
-                "message": str(fit.message),
-                "nfev": int(fit.nfev),
-            },
-            "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
-            "validity_screening":{
-                "theta_e":float(te/ELECTRON_REST_ENERGY_EV),
-                "theta_e_limit":NONRELATIVE_THETA_E_SCREEN,
-                "bulk_flow_beta":float(abs(velocity)/C_M_S),
-                "bulk_flow_beta_limit":NONRELATIVE_FLOW_BETA_SCREEN,
-                "rationale":"Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal validity boundaries."
-            },
-            "assumptions":["non-collective single-particle scattering","isotropic kappa electron velocity distribution",
-                           "non-relativistic velocities","finite-variance kappa index > 1.5",
-                           "known scattering geometry"]}
 
+    kappa_profile_likelihood = None
+    if background_model == "linear" and n_background == 2:
+        z_center = 2.0*(center-float(wavelength.min()))/span - 1.0
+        profile_parameters = np.array([
+            p_scaled[0], p_scaled[1], p_scaled[2], p_scaled[3],
+            p_scaled[4] + p_scaled[5]*z_center,
+            p_scaled[5]*2.0/span,
+        ])
+        kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(
+            wavelength, signal_scaled, response, profile_parameters,
+            uncertainty_scaled, spectral_covariance=covariance_scaled_input,
+        )
+    else:
+        kappa_profile_likelihood = {
+            "status": "not_computed_for_structured_background",
+            "reason": "The existing one-dimensional profile-likelihood routine is defined for a linear background; the selected higher-order/template basis is instead covered by the full joint-fit covariance and Jacobian identifiability diagnostic.",
+        }
+
+    def area_from_params(values):
+        a, cen, sig, kap = values[:4]
+        df_local = 2.0*kap - 1.0
+        scale_local = sig*np.sqrt((df_local-2.0)/df_local)
+        return float(a*scale_local*np.sqrt(df_local*np.pi)
+                     * np.exp(gammaln(kap-0.5)))
+    area = area_from_params(p)
+    area_gradient = np.zeros(len(p))
+    for j in range(4):
+        step = np.cbrt(np.finfo(float).eps)*max(abs(float(p[j])), 1.0)
+        plus, minus = p.copy(), p.copy()
+        plus[j] += step
+        minus[j] -= step
+        area_gradient[j] = (area_from_params(plus)-area_from_params(minus))/(2.0*step)
+    area_unc = float(np.sqrt(max(float(area_gradient@cov@area_gradient), 0.0)))
+    names = ["amplitude", "center_nm", "intrinsic_sigma_nm", "kappa_index"] + [
+        f"background_coefficient_{j}" for j in range(n_background)
+    ]
+    return {
+        "electron_temperature_eV": float(te),
+        "electron_temperature_uncertainty_eV": float(te*2*np.sqrt(max(cov[2,2],0.0))/sigma),
+        "electron_velocity_projection_m_s": float(velocity),
+        "electron_velocity_projection_uncertainty_m_s": float(C_M_S*np.sqrt(max(cov[1,1],0.0))/(laser_nm*q_projection)),
+        "fitted_center_nm": center, "intrinsic_sigma_nm": sigma,
+        "kappa_index": kappa, "kappa_index_identifiability": kappa_identifiability,
+        "kappa_profile_likelihood": kappa_profile_likelihood,
+        "amplitude": amp, "background_intercept": background_intercept,
+        "background_slope_per_nm": background_slope,
+        "background_model": background_model,
+        "background_coefficients": background_coefficients,
+        "background_basis": basis,
+        "background_fitted_spectrum": background_curve,
+        "fit_covariance": np.asarray(cov, dtype=float), "residual": residual,
+        "fit_parameters": np.asarray(p, dtype=float), "fit_parameter_names": names,
+        "integrated_scattered_power_W": area,
+        "integrated_scattered_power_uncertainty_W": area_unc,
+        "captured_spectral_probability": captured_probability,
+        "spectral_window_truncation_warning": (
+            "The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window."
+            if captured_probability < 0.999 else None
+        ),
+        "reduced_chi_square": (
+            float(np.sum((residual/uncertainty)**2)/max(1, wavelength.size-len(p)))
+            if uncertainty is not None else
+            float(fit.fun@fit.fun/max(1, wavelength.size-len(p)))
+            if covariance_cholesky is not None else None
+        ),
+        "spectral_covariance_used": covariance_cholesky is not None,
+        "spectral_covariance_interpretation": (
+            "researcher_supplied_within_channel_covariance_including_model_discrepancy_when_provided"
+            if covariance_cholesky is not None else "not_supplied"
+        ),
+        "fitted_spectrum": fitted_spectrum,
+        "optimizer": {
+            "method": "deterministic_multistart_bounded_least_squares",
+            "attempted_starts": int(attempted_starts),
+            "successful_starts": int(len(candidate_fits)),
+            "selected_weighted_residual_sum_squares": float(fit.fun@fit.fun),
+            "selected_initialization_kappa_grid": list(kappa_seeds),
+            "selected_initialization_width_grid_nm": list(width_seeds),
+            "success": bool(fit.success), "message": str(fit.message),
+            "nfev": int(fit.nfev),
+        },
+        "model": "non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
+        "validity_screening": {
+            "theta_e": float(te/ELECTRON_REST_ENERGY_EV),
+            "theta_e_limit": NONRELATIVE_THETA_E_SCREEN,
+            "bulk_flow_beta": float(abs(velocity)/C_M_S),
+            "bulk_flow_beta_limit": NONRELATIVE_FLOW_BETA_SCREEN,
+            "rationale": "Conservative asymptotic error-budget screens: thermal relativistic corrections scale with theta_e and leading bulk-flow corrections scale with beta_flow squared; not universal validity boundaries.",
+        },
+        "assumptions": [
+            "non-collective single-particle scattering", "isotropic kappa electron velocity distribution",
+            "non-relativistic velocities", "finite-variance kappa index > 1.5",
+            "known scattering geometry",
+            "selected detector-space background is a nuisance model, not plasma emission",
+        ],
+    }
 
 def _default_collective_bounds(initial_density_m3, initial_temperature_eV):
     """Return adaptive two-decade bounds when no experiment-specific bounds are supplied."""
@@ -929,15 +1013,14 @@ def analyze_thomson_spectra(
             "Optical collective dielectric models are outside this shortlist; microwave CTS "
             "is implemented as a separate child subanalysis of primary Analysis 1."
         )
-    if model != "non_collective_maxwellian" and (
+    if model == "non_collective_relativistic_maxwell_juttner" and (
         background_model != "linear" or background_templates is not None
         or background_degree != 2 or background_interior_knots != 3
     ):
         raise ValueError(
-            "Structured optical background bases are currently integrated only with "
-            "non_collective_maxwellian inference. Kappa and relativistic Maxwell-Juttner "
-            "fits retain their existing linear detector-background models; no silent "
-            "background-model substitution is performed."
+            "Structured channel-wise background bases are not yet implemented for the "
+            "relativistic Maxwell-Juttner optimizer; use its explicit linear background "
+            "contract or the joint spatial-spectral structured-background workflow."
         )
     if (incident_direction_unc is not None or scattered_direction_unc is not None) and model != "non_collective_relativistic_maxwell_juttner":
         raise ValueError(
@@ -1320,7 +1403,17 @@ def analyze_thomson_spectra(
                                 background_templates=(background_templates[i] if np.asarray(background_templates).ndim == 3 else background_templates) if background_templates is not None else None,
                                 spectral_covariance=channel_covariance)
         elif model == "non_collective_kappa":
-            fit = _fit_kappa(xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad), response, ui, spectral_covariance=channel_covariance)
+            fit = _fit_kappa(
+                xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
+                response, ui, spectral_covariance=channel_covariance,
+                background_model=background_model, background_degree=background_degree,
+                background_interior_knots=background_interior_knots,
+                background_templates=(
+                    background_templates[i]
+                    if background_templates is not None and np.asarray(background_templates).ndim == 3
+                    else background_templates
+                ),
+            )
         elif model == "non_collective_relativistic_maxwell_juttner":
             fit = fit_relativistic_maxwell_juttner(
                 xi, y[i], float(laser_wavelength_nm), float(scattering_angle_rad),
