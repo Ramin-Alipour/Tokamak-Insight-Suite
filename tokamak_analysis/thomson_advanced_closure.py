@@ -121,7 +121,11 @@ def propagate_pca_reference_uncertainty(reference_spectra, query_spectrum, *,
         matrix = flat.reshape(nr, nw)
         m = matrix.mean(axis=0)
         _, _, vectors = np.linalg.svd(matrix-m, full_matrices=False)
-        return (query-m) @ vectors[:k].T
+        local_basis = vectors[:k].copy()
+        for component in range(k):
+            if float(local_basis[component] @ vt[component]) < 0.0:
+                local_basis[component] *= -1.0
+        return (query-m) @ local_basis.T
     cov_scores = np.zeros((k, k), dtype=float)
     if ref_cov is not None:
         flat = refs.reshape(-1)
