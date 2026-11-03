@@ -1875,3 +1875,44 @@ def test_cts_inferred_fast_ion_validates_regularization_before_vdf_setup(invalid
                 "smoothness": 0.5,
             },
         )
+
+
+def test_describe_cts_spectrum_is_descriptive_and_requires_explicit_baseline():
+    from tokamak_analysis.cts_analysis import describe_cts_spectrum
+
+    frequency = np.linspace(-5.0, 5.0, 101)
+    spectrum = 2.0 + np.exp(-0.5 * (frequency / 1.2) ** 2)
+    result = describe_cts_spectrum(frequency, spectrum, baseline_level=2.0)
+    assert result["analysis_type"] == "descriptive_spectral_shape_only"
+    assert result["physical_parameter_inference_performed"] is False
+    assert result["spectral_centroid_Hz"] == pytest.approx(0.0, abs=1e-12)
+    assert result["spectral_rms_width_Hz"] == pytest.approx(1.2, rel=0.02)
+    assert result["peak_frequency_Hz"] == pytest.approx(0.0)
+    assert result["frequency_quantile_50_Hz"] == pytest.approx(0.0, abs=0.11)
+
+
+@pytest.mark.parametrize(
+    "frequency, spectrum, baseline",
+    [
+        ([0.0, 1.0], [1.0, 2.0], 0.0),
+        ([0.0, 1.0, 0.5], [1.0, 2.0, 1.0], 0.0),
+        ([0.0, 1.0, 2.0], [1.0, 2.0], 0.0),
+        ([0.0, 1.0, 2.0], [1.0, 2.0, 1.0], None),
+        ([0.0, 1.0, 2.0], [1.0, 2.0, 1.0], -1.0),
+        ([0.0, 1.0, 2.0], [1.0, 2.0, 1.0], True),
+    ],
+)
+def test_describe_cts_spectrum_rejects_invalid_inputs(frequency, spectrum, baseline):
+    from tokamak_analysis.cts_analysis import describe_cts_spectrum
+
+    with pytest.raises(ValueError):
+        describe_cts_spectrum(frequency, spectrum, baseline_level=baseline)
+
+
+def test_describe_cts_spectrum_rejects_zero_contrast():
+    from tokamak_analysis.cts_analysis import describe_cts_spectrum
+
+    with pytest.raises(ValueError, match="no positive integrated contrast"):
+        describe_cts_spectrum(
+            np.array([0.0, 1.0, 2.0]), np.ones(3), baseline_level=1.0
+        )
