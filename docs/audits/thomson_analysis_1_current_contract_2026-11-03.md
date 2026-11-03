@@ -18,9 +18,12 @@ This page supersedes stale statements in older Analysis 1 notes.
 - Supplied spatial-coordinate covariance is propagated by the profile
   reconstruction API; coordinate/value cross-covariance and automatic
   equilibrium/flux-coordinate mapping are not inferred.
-- Full-EM CTS still assumes spatially uniform fitted plasma parameters over
-  its sampled scattering volume. A profile-varying kinetic response requires
-  evaluating the kinetic forward model at each spatial quadrature point.
+- The ordinary Full-EM bulk optimizer retains spatially uniform fitted plasma
+  parameters. A separate spatial-profile inverse now fits node-wise relative
+  density and temperature profiles by evaluating the local Full-EM kinetic
+  forward model at every supplied scattering-volume quadrature point. It is
+  conditioned on reference bulk values, node geometry, beam weights and mode
+  polarizations; it does not infer those inputs.
 
 The calibrated forward-model comparison callable is
 `tokamak_analysis.thomson_model_comparison.compare_thomson_forward_models`.
@@ -29,3 +32,29 @@ likelihood, and reports Gaussian GLS objective, AIC, AICc and BIC. It does not
 fit parameters and does not validate a physical model.
 
 Synthetic software regression tests are not experimental validation.
+
+
+## Addendum — spatial CTS inversion and relativistic drift (2026-11-03)
+
+The dedicated dispatcher model `full_em_spatial_profiles` is implemented by
+`tokamak_analysis.cts_spatial_inference.analyze_full_em_cts_spatial_profiles`.
+It fits node-wise relative electron density and electron temperature, with
+optional node-wise ion temperature, using full spectral GLS covariance,
+measured-response convolution with finite frequency-bin widths, explicit
+profile regularization and local identifiability diagnostics. Optional
+regularization-grid refits report regularization-choice sensitivity separately
+from measurement uncertainty. The ordinary bulk inverse remains unchanged.
+
+The Full-EM forward model also accepts an explicitly supplied
+`drifted_relativistic_maxwell_juttner` electron distribution. Its momentum
+space density and derivatives are evaluated after a Lorentz boost parallel to
+the magnetic field. The drift is part of the distribution and must not be
+duplicated as an additional electron-flow frequency shift. This is a forward
+population capability; it does not claim that the distribution or drift is
+uniquely inferred by the bulk spectral optimizer.
+
+A conserving linearized Landau collision operator with its consistent
+fluctuation source, and non-paraxial dissipative full-vector beam propagation,
+remain outside the implemented model scope. Classical collision-rate estimates
+and paraxial/cold-plasma ray propagation must not be described as those
+complete operators.
