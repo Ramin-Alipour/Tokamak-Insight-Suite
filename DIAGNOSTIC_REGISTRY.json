@@ -5641,6 +5641,26 @@
           "name": "ray_phase_space_covariance",
           "unit": "n_ray_samples x 6 x 6",
           "description": "Propagated 6-D position/wavevector covariance from the local cold-plasma dispersion Hessian."
+        },
+        {
+          "name": "damping_rate_is_physical_collision_frequency",
+          "unit": "boolean",
+          "description": "Always false for the current Full-EM model; numerical resonance broadening is not a physical collision frequency."
+        },
+        {
+          "name": "resonance_broadening_semantics",
+          "unit": "text",
+          "description": "Identifies the imaginary denominator term as numerical resonance regularization only."
+        },
+        {
+          "name": "collisional_cts_model_status",
+          "unit": "text",
+          "description": "Explicitly reports not_implemented until a conserving collisional dynamic-structure-factor model is available."
+        },
+        {
+          "name": "collision_operator",
+          "unit": "structured or null",
+          "description": "Null in the current collisionless kinetic response; no BGK/Mermin collision operator is applied."
         }
       ],
       "assumptions": [
