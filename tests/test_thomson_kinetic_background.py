@@ -13,7 +13,7 @@ def test_kappa_structured_background_fit_retains_joint_cross_covariance():
     truth = np.array([300.0, 8.0e4, 3.5])
     q = 2.0 * np.sin(angle / 2.0)
     center = laser * (1.0 - q * truth[1] / 299792458.0)
-    sigma = laser * np.sqrt(2.0) * np.sin(angle / 2.0) * np.sqrt(truth[0] / 510998.95069)
+    sigma = laser * 2.0 * np.sin(angle / 2.0) * np.sqrt(truth[0] / 510998.95069)
     df = 2.0 * truth[2] - 1.0
     scale = sigma * np.sqrt((df - 2.0) / df)
     shape = (1.0 + ((wavelength - center) / scale) ** 2 / df) ** (-truth[2])
