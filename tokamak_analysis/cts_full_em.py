@@ -1771,3 +1771,149 @@ def assess_full_em_cts_numerical_convergence(
             "does not quantify physical-model discrepancy or external-input uncertainty."
         ),
     }
+
+
+def fit_full_em_gyrotropic_population_shape(
+    frequency_shift_Hz, measured_spectrum, *,
+    probe_frequency_Hz, scattering_geometry, population_kind,
+    p_perpendicular_kg_m_s, p_parallel_kg_m_s,
+    initial_distribution_kg_m_s_inverse3,
+    electron_density_m3, electron_temperature_eV, ion_temperature_eV,
+    ion_species, ion_fractions, magnetic_field_T,
+    incident_polarization, scattered_polarization,
+    instrument_response, regularization_matrix, regularization_strength,
+    population_density_m3=None, population_mass_amu=None,
+    population_charge_state=None, population_name="nonthermal_population",
+    electron_flow_projection_m_s=None, ion_flow_projection_m_s=None,
+    measurement_uncertainty=None, measurement_covariance=None,
+    harmonic_order=8, quadrature_order=12, damping_rate_rad_s=None,
+    max_nfev=300, bindslev_validity_theta_e_limit=None,
+):
+    """Infer a relativistic gyrotropic electron or fast-ion VDF shape with Full-EM CTS.
+
+    Bulk plasma parameters, geometry, composition, population density (for a
+    fast-ion component), and receiver response are fixed external inputs.
+    The VDF shape is optimized through repeated calls to the full relativistic
+    gyrotropic Full-EM forward solver; this is not a linear-kernel shortcut.
+
+    For an electron population, electron_flow_projection_m_s must be explicitly
+    zero because a drifted relativistic gyrotropic VDF is not implemented.
+    For a fast-ion population, density, mass and charge state must be supplied.
+    """
+    from .advanced_inference import fit_nonlinear_nonnegative_distribution
+    from .cts_relativistic import _momentum_grid
+
+    if population_kind not in {"electron", "fast_ion"}:
+        raise ValueError("population_kind must be 'electron' or 'fast_ion'")
+    pp = _real_array(p_perpendicular_kg_m_s, "p_perpendicular_kg_m_s", 1)
+    pa = _real_array(p_parallel_kg_m_s, "p_parallel_kg_m_s", 1)
+    if pp.size < 4 or pa.size < 4 or np.any(pp <= 0) or np.any(np.diff(pp) <= 0) or np.any(np.diff(pa) <= 0):
+        raise ValueError("momentum grids require >=4 increasing samples; p_perpendicular must be strictly positive")
+    initial = _real_array(initial_distribution_kg_m_s_inverse3, "initial_distribution_kg_m_s_inverse3", 2)
+    if initial.shape != (pp.size, pa.size) or np.any(initial < 0):
+        raise ValueError("initial distribution must be non-negative with shape (n_p_perp,n_p_parallel)")
+    def trap_weights(axis):
+        edges = np.empty(axis.size + 1)
+        edges[1:-1] = 0.5 * (axis[:-1] + axis[1:])
+        edges[0] = axis[0] - 0.5 * (axis[1] - axis[0])
+        edges[-1] = axis[-1] + 0.5 * (axis[-1] - axis[-2])
+        widths = np.diff(edges)
+        if np.any(widths <= 0):
+            raise ValueError("momentum grid must define positive finite-volume weights")
+        return widths
+    weights = 2.0 * np.pi * pp[:, None] * trap_weights(pp)[:, None] * trap_weights(pa)[None, :]
+    initial_norm = float(np.sum(initial * weights))
+    if not np.isfinite(initial_norm) or initial_norm <= 0:
+        raise ValueError("initial gyrotropic distribution must have positive momentum-space integral")
+    initial = initial / initial_norm
+    f = _real_array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    y = _real_array(measured_spectrum, "measured_spectrum", 1)
+    if y.shape != f.shape or f.size < 8 or np.any(np.diff(f) <= 0) or np.any(y < 0):
+        raise ValueError("frequency and measured spectrum must be matching increasing/non-negative vectors with >=8 bins")
+    response = _real_array(instrument_response, "instrument_response", 2)
+    if response.shape != (f.size, f.size) or np.any(response < 0) or not np.allclose(response.sum(axis=0), 1.0, rtol=1e-8, atol=1e-10):
+        raise ValueError("instrument_response must be a calibrated non-negative square matrix with unit-sum columns")
+    if population_kind == "electron":
+        if electron_flow_projection_m_s is None or float(electron_flow_projection_m_s) != 0.0:
+            raise ValueError("electron VDF shape inversion requires an explicitly supplied zero electron-flow projection; drifted relativistic VDF fitting is not implemented")
+        if any(value is not None for value in (population_density_m3, population_mass_amu, population_charge_state)):
+            raise ValueError("electron density, mass and charge are supplied by the bulk electron species; omit fast-ion population fields")
+    else:
+        if electron_flow_projection_m_s is None:
+            raise ValueError("electron_flow_projection_m_s must be supplied explicitly for fast-ion VDF inference")
+        population_density = _positive(population_density_m3, "population_density_m3")
+        population_mass = _positive(population_mass_amu, "population_mass_amu")
+        population_charge = _positive(population_charge_state, "population_charge_state")
+    def forward(pdf):
+        distribution = {
+            "kind": "tabulated_gyrotropic",
+            "p_perpendicular_kg_m_s": pp,
+            "p_parallel_kg_m_s": pa,
+            "distribution_kg_m_s_inverse3": np.asarray(pdf, dtype=float).reshape(pp.size, pa.size),
+        }
+        fast_populations = None
+        electron_vdf = None
+        if population_kind == "electron":
+            electron_vdf = distribution
+        else:
+            fast_populations = [{
+                "name": str(population_name),
+                "charge_state": population_charge,
+                "mass_amu": population_mass,
+                "density_m3": population_density,
+                "distribution": distribution,
+            }]
+        local = full_em_cts_spectral_density(
+            f, probe_frequency_Hz, scattering_geometry,
+            electron_density_m3=electron_density_m3,
+            electron_temperature_eV=electron_temperature_eV,
+            ion_temperature_eV=ion_temperature_eV,
+            ion_species=ion_species, ion_fractions=ion_fractions,
+            magnetic_field_T=magnetic_field_T,
+            electron_flow_projection_m_s=float(electron_flow_projection_m_s),
+            ion_flow_projection_m_s=ion_flow_projection_m_s,
+            incident_polarization=incident_polarization,
+            scattered_polarization=scattered_polarization,
+            harmonic_order=harmonic_order, quadrature_order=quadrature_order,
+            damping_rate_rad_s=damping_rate_rad_s,
+            fast_ion_populations=fast_populations,
+            electron_distribution=electron_vdf,
+            bindslev_validity_theta_e_limit=bindslev_validity_theta_e_limit,
+        )["spectral_density"]
+        return _apply_frequency_response(response, local, f)
+    initial_flat = initial.ravel()
+    weights_flat = weights.ravel()
+    result = fit_nonlinear_nonnegative_distribution(
+        y, initial_flat, weights_flat,
+        forward_model=lambda pdf: forward(pdf.reshape(pp.size, pa.size)),
+        regularization_matrix=regularization_matrix,
+        regularization_strength=regularization_strength,
+        measurement_uncertainty=measurement_uncertainty,
+        measurement_covariance=measurement_covariance,
+        max_nfev=max_nfev,
+    )
+    result.update({
+        "model": "magnetized_full_electromagnetic_CTS_relativistic_gyrotropic_Vlasov_inverse",
+        "population_kind": population_kind,
+        "population_name": str(population_name),
+        "p_perpendicular_kg_m_s": pp.copy(),
+        "p_parallel_kg_m_s": pa.copy(),
+        "distribution_kg_m_s_inverse3": (
+            None if result["distribution"] is None
+            else result["distribution"].reshape(pp.size, pa.size)
+        ),
+        "regularized_candidate_distribution_kg_m_s_inverse3": result["regularized_candidate_distribution"].reshape(pp.size, pa.size),
+        "bulk_plasma_and_geometry_fixed": True,
+        "population_density_fixed": True,
+        "electron_flow_projection_m_s_fixed": float(electron_flow_projection_m_s),
+        "inversion_scope": "VDF shape only; bulk ne/Te/Ti, magnetic field, geometry, mode polarizations, response and population density are fixed",
+        "physics": "each optimizer evaluation calls the relativistic gyrotropic conductivity, Klimontovich covariance and second-order Full-EM kinetic vertex; no linearized VDF kernel is substituted",
+        "limitations": [
+            "The inferred shape is conditional on the selected momentum grid and regularization matrix.",
+            "A rank-deficient spectral Jacobian yields a conditional candidate, not a uniquely measured distribution.",
+            "Drifted relativistic electron VDFs are not included; the electron branch requires zero projected bulk drift.",
+            "No finite-orbit-width, collisional or spatially varying kinetic corrections are included.",
+            "No experimental validation is claimed.",
+        ],
+    })
+    return result
