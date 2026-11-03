@@ -273,7 +273,7 @@
           "name": "model_discrepancy_covariance",
           "unit": "n_wavelength x n_wavelength or n_channels x n_wavelength x n_wavelength spectral covariance",
           "required": false,
-          "description": "Independent correlated additive model-discrepancy covariance for non-collective Maxwellian optical Thomson only; added to measurement covariance before GLS and not estimated from reduced chi-square."
+          "description": "Independent correlated additive model-discrepancy covariance for non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical Thomson fits; added to the applicable measurement covariance before GLS and not estimated from reduced chi-square."
         }
       ],
       "output_specs": [
@@ -433,7 +433,7 @@
         {
           "name": "background_model_limitation",
           "unit": "text",
-          "description": "States the selected detector-space nuisance basis and model-specific scope; Kappa structured bases are included in the joint physical/background fit covariance."
+          "description": "Reports the selected detector-space nuisance basis and model-specific scope; Maxwellian and Kappa channel-wise structured bases are included in the joint physical/background fit covariance."
         },
         {
           "name": "spectral_distribution",
@@ -468,7 +468,7 @@
         {
           "name": "kappa_index_identifiability",
           "unit": "structured; per channel for non-collective Kappa",
-          "description": "Response-convolved Jacobian rank, normalized condition number and conditional Kappa sensitivity after projection against amplitude, centroid, width and linear-background nuisance parameters. Consumers must honor reportable_as_inferred_parameter; an optimizer candidate is not an identified result."
+          "description": "Response-convolved Jacobian rank, normalized condition number and conditional Kappa sensitivity after projection against amplitude, centroid, width and every fitted detector-background nuisance coefficient. Consumers must honor reportable_as_inferred_parameter; an optimizer candidate is not an identified result."
         },
         {
           "name": "kappa_profile_likelihood",
@@ -523,7 +523,7 @@
         {
           "name": "independent_model_discrepancy_covariance",
           "unit": "spectral covariance",
-          "description": "Researcher-supplied covariance used in the optical Maxwellian GLS fit; independent of reduced-chi-square scaling."
+          "description": "Researcher-supplied covariance used by supported non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner optical GLS fits; independent of reduced-chi-square scaling."
         }
       ],
       "assumptions": [
@@ -592,7 +592,7 @@
             "instrument_response",
             "model (non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner)",
             "model-specific external geometry and ion inputs",
-            "optional model_discrepancy_covariance (non-collective Maxwellian only; independent of reduced-chi-square scaling)"
+            "optional model_discrepancy_covariance (non-collective Maxwellian, Kappa and relativistic Maxwell-Juttner; independent of reduced-chi-square scaling)"
           ],
           "outputs": [
             "electron_temperature_profile_eV",
