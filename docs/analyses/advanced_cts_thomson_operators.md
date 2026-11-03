@@ -68,18 +68,20 @@ calculation.
 
 ## Ray tracing and paraxial beam covariance
 
-`trace_cold_plasma_ray` accepts an initial transverse phase-space covariance
-and one symplectic 4x4 paraxial transfer matrix per adjacent ray sample. The
-covariance is propagated through the supplied Hamiltonian/ABCD maps.
+`trace_cold_plasma_ray` now supports two propagation paths. The 4-D transverse
+path accepts a covariance plus one supplied symplectic 4x4 ABCD map per adjacent
+ray sample. The 6-D path accepts an initial covariance in
+`[x,y,z,kx,ky,kz]` and derives the local linearized Hamiltonian transfer from
+the Hessian of the selected cold-plasma dispersion eigenvalue along the ray.
+The 6-D path rejects propagation across an eigenvalue-order branch crossing.
 `trace_cts_frequency_resolved_beams` uses the propagated 2-D transverse
 covariances in the local Gaussian overlap integral. The transverse overlap is
 two-dimensional; its units and path-integrated units are returned explicitly.
 
-This is covariance propagation through supplied paraxial maps, not a complete
-self-contained quasi-optical solver. The code does not derive the transfer
-matrices from the full anisotropic dispersion Hessian. Non-paraxial
-diffraction, general vector mode conversion, absorption and non-Gaussian beam
-evolution are not implied by this interface.
+The 6-D method is a paraxial Gaussian phase-space approximation based on the
+local dispersion Hessian, not a complete full-vector quasi-optical solver.
+Non-paraxial diffraction, general vector mode conversion, absorption and
+non-Gaussian beam evolution are not implied by this interface.
 
 ## Full-EM relativistic electron and fast-ion VDF shape inversion
 
@@ -134,8 +136,10 @@ integration boundaries remain explicit:
 3. The GP discrepancy covariance is consumed by electrostatic CTS, not every
    optical and Full-EM inverse.
 4. Full-EM ECE requires externally supplied mode-resolved absorption.
-5. Paraxial transfer maps are supplied; the full anisotropic quasi-optical
-   operator is not derived internally.
+5. The 6-D ray covariance path derives a linearized paraxial transfer from the
+   selected cold-plasma dispersion Hessian; the alternative 4-D path accepts
+   supplied ABCD maps. Full vector quasi-optical mode conversion and
+   non-paraxial diffraction are not solved.
 6. Drifted relativistic electron VDF inversion is not implemented.
 7. 3-D EVDF kernels must be supplied per view and must themselves contain the
    appropriate relativistic scattering physics.
