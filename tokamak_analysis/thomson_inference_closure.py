@@ -195,7 +195,13 @@ def reconstruct_joint_thomson_profiles(
         p = flat.reshape(3, nchan)
         if nchan < 3:
             return np.empty(0)
-        return np.diff(p, n=2, axis=1).ravel()
+        spacing = np.diff(r)
+        left_slope = np.diff(p, axis=1)[:, :-1] / spacing[:-1]
+        right_slope = np.diff(p, axis=1)[:, 1:] / spacing[1:]
+        curvature = 2.0 * (right_slope - left_slope) / (spacing[:-1] + spacing[1:])
+        # Radius-aware second derivative; unlike an unscaled second difference,
+        # this remains meaningful on nonuniform diagnostic-channel spacing.
+        return curvature.ravel()
     def objective(flat):
         data = data_residual(flat)
         return np.r_[data, np.sqrt(lam) * second_difference(flat)] if lam > 0 else data
