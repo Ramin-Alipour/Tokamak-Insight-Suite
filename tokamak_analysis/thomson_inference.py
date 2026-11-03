@@ -136,10 +136,10 @@ def _laser_source_response(wavelength_nm, laser_wavelength_nm,
 
     The supplied laser profile is a measured, calibrated spectral density. Its
     absolute power is deliberately irrelevant here: it is normalized to unit
-    area and used only as the source spectral shape. For narrow-band optical
-    Thomson scattering, the incident wavelength offset is transferred to the
-    scattered spectrum as an additive wavelength shift. The resulting operator
-    is composed with (not substituted for) the spectrometer response.
+    area and used only as the source spectral shape. For elastic Thomson
+    scattering at fixed electron velocity, the scattered wavelength scales
+    with the incident wavelength; the operator maps nominal scattered
+    wavelengths by the incident-wavelength ratio before the measured response.
     """
     x = _finite_array(wavelength_nm, "wavelength_nm", 1)
     source_x = _finite_array(laser_spectrum_wavelength_nm,
