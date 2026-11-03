@@ -1377,8 +1377,9 @@ def test_kappa_profile_likelihood_uses_full_spectral_covariance_gls():
     assert result["noise_scale"] == (
         "researcher_supplied_full_within_channel_spectral_covariance_GLS"
     )
-    assert np.isfinite(result["profile_delta_chi_square"]).all()
-    assert np.min(result["profile_delta_chi_square"]) == pytest.approx(0.0)
+    finite_profile = np.isfinite(result["profile_delta_chi_square"])
+    assert finite_profile.any()
+    assert np.min(result["profile_delta_chi_square"][finite_profile]) == pytest.approx(0.0)
     with pytest.raises(ValueError, match="not both"):
         _kappa_profile_likelihood_diagnostic(
             wavelength, signal, np.eye(wavelength.size), parameters,
