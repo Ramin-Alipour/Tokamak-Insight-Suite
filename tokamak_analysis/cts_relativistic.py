@@ -21,10 +21,20 @@ AMU = 1.66053906660e-27
 
 
 def _positive(x, name):
-    x = float(x)
-    if not np.isfinite(x) or x <= 0:
-        raise ValueError(f"{name} must be positive and finite")
-    return x
+    """Validate a strictly positive finite real scalar without coercion.
+
+    Reject booleans, strings, complex values and array-like inputs instead of
+    silently converting them to floats. This keeps physical API parameters
+    explicit and prevents True from being accepted as a value of one.
+    """
+    if isinstance(x, (bool, np.bool_)) or not isinstance(
+        x, (int, float, np.integer, np.floating)
+    ):
+        raise ValueError(f"{name} must be a positive finite real scalar")
+    value = float(x)
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be a positive finite real scalar")
+    return value
 
 
 def _momentum_grid(distribution, mass_kg, quadrature_order):
