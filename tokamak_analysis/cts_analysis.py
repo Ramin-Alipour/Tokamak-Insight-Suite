@@ -720,8 +720,18 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         raise ValueError("differential_evolution and improved_genetic require global_search=True")
     if inversion_method in {"local_least_squares","regularized"} and global_search:
         raise ValueError("global_search must be disabled for local_least_squares and regularized inversion")
-    regularization_strength=float(regularization_strength)
-    if not np.isfinite(regularization_strength) or regularization_strength<0:
+    if (
+        isinstance(regularization_strength, (bool, np.bool_))
+        or not isinstance(
+            regularization_strength,
+            (int, float, np.integer, np.floating),
+        )
+    ):
+        raise ValueError(
+            "regularization_strength must be a real numeric scalar, not a boolean or string"
+        )
+    regularization_strength = float(regularization_strength)
+    if not np.isfinite(regularization_strength) or regularization_strength < 0:
         raise ValueError("regularization_strength must be finite and non-negative")
     if inversion_method=="regularized" and (not np.isfinite(regularization_strength) or regularization_strength<=0):
         raise ValueError("regularized inversion requires regularization_strength to be finite and > 0")
