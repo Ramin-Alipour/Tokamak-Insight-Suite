@@ -722,6 +722,7 @@ def reconstruct_thomson_profile_from_spectra(
                     points=profile_reconstruction_points,
                     mc_samples=profile_reconstruction_mc_samples,
                     random_seed=18473 + 10 + species_index,
+                    coordinate_covariance=profile_coordinate_covariance_m2,
                 )
             except ValueError as exc:
                 profiles[name] = {"status": "not_reconstructed", "reason": str(exc)}
