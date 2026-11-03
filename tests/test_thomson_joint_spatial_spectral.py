@@ -36,6 +36,15 @@ def test_joint_spatial_spectral_inverse_recovers_synthetic_te_and_flow_profiles(
     np.testing.assert_allclose(out["electron_velocity_projection_profile_m_s"], flow, atol=2.5e3)
     assert out["fitted_spectra"].shape == y.shape
     assert out["parameter_covariance"].shape == (3*r.size+2*y.shape[0],)*2
+    assert out["profile_parameter_covariance"].shape == (3*r.size, 3*r.size)
+    assert out["regularized_parameter_covariance"].shape == out["parameter_covariance"].shape
+    assert out["covariance_decomposition"]["reported_parameter_covariance"] == (
+        "data_only_GLS_covariance_excluding_regularization_penalty"
+    )
+    np.testing.assert_allclose(
+        out["profile_parameter_covariance"],
+        out["parameter_covariance"][:3*r.size, :3*r.size],
+    )
     assert out["spatial_mixing_operator"] == "researcher_supplied_fixed_forward_operator"
     assert out["experimental_validation"] == "not_performed; numerical software inference only"
     assert out["electron_temperature_uncertainty_profile_eV"].shape == (r.size,)

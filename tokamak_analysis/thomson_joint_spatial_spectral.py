@@ -434,15 +434,55 @@ def reconstruct_joint_thomson_spatial_spectra(
     else:
         primary_status = "not_identifiable_from_measured_data"
     dof = max(1, data_residual.size - parameter_count)
-    covariance_p = np.linalg.pinv(optimizer_jacobian.T @ optimizer_jacobian)
+
+    # Keep two covariance products distinct.  The optimizer covariance is
+    # conditional on the selected regularizer; it is useful for describing
+    # the stabilized numerical candidate, but its penalty rows are not data.
+    regularized_covariance_p = np.linalg.pinv(
+        optimizer_jacobian.T @ optimizer_jacobian
+    )
     if joint_spectral_covariance is None and signal_uncertainty is None:
-        covariance_p *= float(data_residual @ data_residual / dof)
+        residual_scale = float(data_residual @ data_residual / dof)
+        regularized_covariance_p *= residual_scale
+    else:
+        residual_scale = None
+
+    # The reported measurement covariance is derived from the data-only
+    # Jacobian, never from the augmented optimizer Jacobian.  A full-rank
+    # result is required; otherwise no finite data-identified covariance is
+    # published, even if regularization made the optimizer Hessian invertible.
+    data_covariance_p = None
+    if data_rank == parameter_count:
+        data_information = data_jacobian.T @ data_jacobian
+        data_covariance_p = np.linalg.pinv(data_information)
+        if residual_scale is not None:
+            data_covariance_p *= residual_scale
+
     transform = np.diag(np.r_[amp, te, np.full(r.size, 1e6),
                               np.array([fitted_kappa-1.5]) if kappa_parameter_count else np.empty(0),
                               np.ones(m*n_background)])
-    physical_covariance = transform @ covariance_p @ transform.T
-    diagonal = np.maximum(np.diag(physical_covariance), 0.0)
-    uncertainties = np.sqrt(diagonal)
+    regularized_parameter_covariance = (
+        transform @ regularized_covariance_p @ transform.T
+    )
+    physical_covariance = (
+        transform @ data_covariance_p @ transform.T
+        if data_covariance_p is not None and data_identifiable else None
+    )
+    regularized_diagonal = np.maximum(
+        np.diag(regularized_parameter_covariance), 0.0
+    )
+    regularized_uncertainties = np.sqrt(regularized_diagonal)
+    if physical_covariance is not None:
+        diagonal = np.maximum(np.diag(physical_covariance), 0.0)
+        uncertainties = np.sqrt(diagonal)
+    else:
+        uncertainties = np.full(parameter_count, np.nan, dtype=float)
+    n = r.size
+    profile_parameter_count = 3 * r.size
+    profile_parameter_covariance = (
+        physical_covariance[:profile_parameter_count, :profile_parameter_count].copy()
+        if physical_covariance is not None else None
+    )
     n = r.size
     return {
         "laser_spectral_profile": laser_source_metadata or {"assumption": "monochromatic_incident_laser"},
@@ -492,11 +532,23 @@ def reconstruct_joint_thomson_spatial_spectra(
             "electron_temperature_profile_eV": te,
             "electron_velocity_projection_profile_m_s": flow,
             "relative_spectral_amplitude_profile": amp,
-            "regularized_local_parameter_covariance": physical_covariance,
+            "regularized_local_parameter_covariance": regularized_parameter_covariance,
         },
         "fitted_spectra": predicted,
         "residuals": y-predicted,
-        "parameter_covariance": physical_covariance if data_identifiable else None,
+        "parameter_covariance": physical_covariance,
+        "profile_parameter_covariance": profile_parameter_covariance,
+        "regularized_parameter_covariance": regularized_parameter_covariance,
+        "covariance_decomposition": {
+            "reported_parameter_covariance": "data_only_GLS_covariance_excluding_regularization_penalty",
+            "regularized_parameter_covariance": "optimizer_local_covariance_including_selected_regularization_penalty",
+            "profile_parameter_order": ([f"amplitude_{i}" for i in range(n)] +
+                                       [f"Te_{i}_eV" for i in range(n)] +
+                                       [f"flow_projection_{i}_m_s" for i in range(n)]),
+            "cross_covariance_retained_between_amplitude_temperature_flow_and_spatial_nodes": physical_covariance is not None,
+            "data_only_covariance_available": data_covariance_p is not None and data_identifiable,
+            "unweighted_residual_scale": residual_scale,
+        },
         "parameter_order": ([f"amplitude_{i}" for i in range(n)] +
                             [f"Te_{i}_eV" for i in range(n)] +
                             [f"flow_projection_{i}_m_s" for i in range(n)] +
@@ -545,7 +597,7 @@ def reconstruct_joint_thomson_spatial_spectra(
                                  "spatial structures in the null space of the supplied mixing operator",
                                  "sub-resolution spatial structure not encoded by the measured mixing operator",
                                  "unrestricted anisotropic or non-Maxwellian electron distributions"]},
-        "uncertainty_semantics": f"local linearized covariance conditional on the selected {physical_model} model, fixed spatial/spectral response operators, supplied noise model, and user-selected regularization; inspect primary_result_status because regularization is excluded from the data-only identifiability rank",
+        "uncertainty_semantics": f"parameter_covariance is the local linearized data-only GLS covariance conditional on the selected {physical_model} model, fixed spatial/spectral response operators and supplied noise model; regularization is excluded. regularized_parameter_covariance is separately exposed for the stabilized numerical candidate. Full cross-covariance among amplitude, Te, flow and spatial nodes is retained.",
         "parameter_identifiability": {
             "primary": ["electron_temperature_profile_eV", "electron_velocity_projection_profile_m_s", "relative_spectral_amplitude_profile"] if data_identifiable else [],
             "conditional": ["absolute electron density requires a separate absolute-power and optical-collection inference with its complete auxiliary inputs"],
