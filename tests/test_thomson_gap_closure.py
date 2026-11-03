@@ -45,7 +45,9 @@ def test_relativistic_projected_evdf_normalizes_and_reports_model_scope():
         frac = (centre-wavelength[left])/(wavelength[right]-wavelength[left])
         latent[left,j] = (1-frac)/widths[left]
         latent[right,j] = frac/widths[right]
-    forward = latent * widths[:,None] / widths[:,None]
+    dv_weights = np.full(velocity.size, velocity[1] - velocity[0])
+    dv_weights[[0, -1]] *= 0.5
+    forward = latent * dv_weights[None, :]
     truth = np.exp(-0.5*(velocity/7e5)**2)
     truth /= np.trapz(truth, velocity)
     measured = forward @ truth
@@ -64,3 +66,18 @@ def test_relativistic_projected_evdf_normalizes_and_reports_model_scope():
         assert result["projected_evdf_s_m"] is None
     assert result["absolute_density_inferred"] is False
     assert "Compton recoil" in " ".join(result["assumptions"])
+
+
+def test_velocity_quadrature_is_included_and_grid_integral_is_resolution_consistent():
+    from tokamak_analysis.thomson_gap_closure import _trapezoid_quadrature_weights
+
+    coarse = np.linspace(-2.0e6, 2.0e6, 101)
+    fine = np.linspace(-2.0e6, 2.0e6, 401)
+    coarse_weights = _trapezoid_quadrature_weights(coarse, "velocity_grid_m_s")
+    fine_weights = _trapezoid_quadrature_weights(fine, "velocity_grid_m_s")
+    coarse_integral = np.sum(np.ones_like(coarse) * coarse_weights)
+    fine_integral = np.sum(np.ones_like(fine) * fine_weights)
+    np.testing.assert_allclose(coarse_integral, 4.0e6, rtol=1e-12)
+    np.testing.assert_allclose(fine_integral, coarse_integral, rtol=1e-12)
+    assert coarse_weights[0] == 0.5 * (coarse[1] - coarse[0])
+    assert coarse_weights[-1] == coarse_weights[0]
