@@ -1346,3 +1346,41 @@ def test_relativistic_maxwell_juttner_adds_model_discrepancy_to_joint_spectral_c
     )
     assert fit["fit_covariance"].shape == (5, 5)
     assert out["joint_inference"]["fit_covariance"].shape == (4, 4)
+
+
+
+def test_kappa_profile_likelihood_uses_full_spectral_covariance_gls():
+    from tokamak_analysis.thomson_inference import _kappa_profile_likelihood_diagnostic
+
+    wavelength = np.linspace(-10.0, 10.0, 61)
+    parameters = np.array([1.0, 0.15, 2.0, 4.0, 0.025, 0.001])
+    amplitude, center, width, kappa, offset, slope = parameters
+    degrees = 2.0 * kappa - 1.0
+    student_scale = width * np.sqrt((degrees - 2.0) / degrees)
+    signal = (
+        amplitude
+        * (1.0 + ((wavelength - center) / student_scale) ** 2 / degrees) ** (-kappa)
+        + offset
+        + slope * (wavelength - center)
+    )
+    correlation = 0.25 ** np.abs(
+        np.subtract.outer(np.arange(wavelength.size), np.arange(wavelength.size))
+    )
+    covariance = 2.5e-5 * correlation
+
+    result = _kappa_profile_likelihood_diagnostic(
+        wavelength, signal, np.eye(wavelength.size), parameters, None,
+        spectral_covariance=covariance,
+    )
+
+    assert result["status"] in {"finite_profile_interval", "grid_censored"}
+    assert result["noise_scale"] == (
+        "researcher_supplied_full_within_channel_spectral_covariance_GLS"
+    )
+    assert np.isfinite(result["profile_delta_chi_square"]).all()
+    assert np.min(result["profile_delta_chi_square"]) == pytest.approx(0.0)
+    with pytest.raises(ValueError, match="not both"):
+        _kappa_profile_likelihood_diagnostic(
+            wavelength, signal, np.eye(wavelength.size), parameters,
+            np.full(wavelength.size, 0.01), spectral_covariance=covariance,
+        )
