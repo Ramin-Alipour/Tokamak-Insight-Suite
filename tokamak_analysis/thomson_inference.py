@@ -1528,14 +1528,47 @@ def analyze_thomson_spectra(
                         _integrated_power_at(plus)[0] - _integrated_power_at(minus)[0]
                     ) / (plus[parameter_index] - minus[parameter_index])
                 power_gradient[parameter_index] = derivative
+            cross_section_gradient = np.zeros(
+                joint_parameter_covariance.shape[0], dtype=float
+            )
+            for parameter_index in (0, 1):
+                step = np.cbrt(np.finfo(float).eps) * max(
+                    abs(float(power_point[parameter_index])), 1.0
+                )
+                plus, minus = power_point.copy(), power_point.copy()
+                plus[parameter_index] += step
+                minus[parameter_index] -= step
+                if parameter_index == 0 and minus[0] <= 0.0:
+                    minus[0] = power_point[0]
+                    derivative = (
+                        _integrated_power_at(plus)[1] - effective_cross_section
+                    ) / step
+                else:
+                    derivative = (
+                        _integrated_power_at(plus)[1] - _integrated_power_at(minus)[1]
+                    ) / (plus[parameter_index] - minus[parameter_index])
+                cross_section_gradient[parameter_index] = derivative
             power_variance = float(
                 power_gradient @ joint_parameter_covariance @ power_gradient
+            )
+            cross_section_variance = float(
+                cross_section_gradient @ joint_parameter_covariance @ cross_section_gradient
+            )
+            power_cross_section_covariance = float(
+                power_gradient @ joint_parameter_covariance @ cross_section_gradient
             )
             fit["integrated_scattered_power_W"] = integrated_power
             fit["integrated_scattered_power_uncertainty_W"] = float(
                 np.sqrt(max(power_variance, 0.0))
             )
             fit["effective_differential_cross_section_m2_sr"] = effective_cross_section
+            fit["effective_differential_cross_section_uncertainty_m2_sr"] = float(
+                np.sqrt(max(cross_section_variance, 0.0))
+            )
+            fit["power_cross_section_relative_covariance"] = (
+                power_cross_section_covariance / (integrated_power * effective_cross_section)
+                if integrated_power > 0.0 and effective_cross_section > 0.0 else None
+            )
             fit["integrated_power_uncertainty_method"] = (
                 "finite_difference_delta_method_from_full_joint_physical_amplitude_background_covariance"
             )
