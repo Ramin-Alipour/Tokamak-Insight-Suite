@@ -562,7 +562,7 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
         if electron_temperature_initial_eV is None and tb is not None:
             initial_te=float(np.clip(initial_te,tb[0],tb[1]))
         if ion_temperature_initial_eV is None and ib is not None:
-            initial_ti=float(np.clip(initial_ti,ib[0],ib[1]))
+            initial_ti=np.clip(initial_ti,ib[0],ib[1])
     for name,value,pair in (
         ("electron_density_m3",initial_density,nb),
         ("electron_temperature_eV",initial_te,tb),
@@ -1034,11 +1034,11 @@ def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scatte
             sampled_electron_flow=None
             sampled_geometry=scattering_geometry
             sampled_fractions=np.asarray(ion_fractions,dtype=float).copy()
+            sampled_species=[dict(item) for item in ion_species]
+            sampled_temperatures=ti_values.copy()
             if external_covariance is not None:
                 external_draw=external_root @ rng.normal(size=len(external_order))
                 sampled_angle=None
-                sampled_species=[dict(item) for item in ion_species]
-                sampled_temperatures=ti_values.copy()
                 for key, perturbation in zip(external_order, external_draw):
                     if key == "probe_frequency_Hz":
                         sampled_f0 += float(perturbation)
