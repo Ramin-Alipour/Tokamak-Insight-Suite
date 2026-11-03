@@ -604,7 +604,8 @@
             "scattering_angle_rad",
             "instrument_response",
             "model (non-collective Maxwellian/Kappa/relativistic Maxwell-Juttner)",
-            "model-specific external geometry and ion inputs"
+            "model-specific external geometry and ion inputs",
+            "optional model_discrepancy_covariance (non-collective Maxwellian only; independent of reduced-chi-square scaling)"
           ],
           "outputs": [
             "electron_temperature_profile_eV",
@@ -615,6 +616,47 @@
             "shared instrument-response cross-channel parameter covariance where available"
           ],
           "scope": "Canonical physical inference from measured calibrated multi-channel optical Thomson spectra using one of the three explicitly selected non-collective forward models; no pre-derived ne/Te profile input."
+        },
+        {
+          "name": "poisson_count_space_maxwellian",
+          "function": "tokamak_analysis.thomson_inference.fit_optical_thomson_poisson_counts",
+          "inputs": [
+            "wavelength_nm (uniform increasing grid)",
+            "photon_counts (raw non-negative integer counts per bin)",
+            "laser_wavelength_nm",
+            "scattering_angle_rad",
+            "measured instrument_response"
+          ],
+          "outputs": [
+            "electron_temperature_eV",
+            "electron_velocity_projection_m_s",
+            "integrated_signal_counts",
+            "fitted_spectrum",
+            "residual",
+            "fit_covariance"
+          ],
+          "scope": "Separate count-space non-collective Maxwellian fit using independent Poisson deviance; no calibrated power, absolute density or Gaussian covariance input."
+        },
+        {
+          "name": "multi_view_3d_evdf_reconstruction",
+          "function": "tokamak_analysis.advanced_inference.reconstruct_multiview_3d_evdf",
+          "inputs": [
+            "spectral_kernels (n_view x n_frequency x n_velocity_voxel)",
+            "measured_spectra (n_view x n_frequency)",
+            "velocity_grid_m_s (n_voxel x 3)",
+            "voxel_volume_m3_s3",
+            "regularization_matrix",
+            "regularization_strength",
+            "optional measurement uncertainty or full covariance"
+          ],
+          "outputs": [
+            "3-D EVDF or conditional regularized candidate",
+            "distribution_covariance when identifiable",
+            "data-only rank/condition/null-space diagnostics",
+            "fitted_spectra",
+            "residual_spectra"
+          ],
+          "scope": "Multi-view 3-D inverse from supplied view-specific kernels. Relativistic interpretation requires each kernel to contain the correct relativistic Doppler, polarization and differential-cross-section physics; rank-deficient data never produce a unique 3-D EVDF."
         }
       ],
       "completion_scope": "Measured calibrated multi-channel optical Thomson spectrum-to-physics inference using non-collective Maxwellian, non-collective Kappa and relativistic Maxwell-Juttner forward models. Collective microwave CTS is handled by its dedicated registered subanalysis within primary Analysis 1. No detector calibration or independent experimental validation is performed.",
@@ -5695,7 +5737,10 @@
             "ion_temperature_initial_eV (optional optimizer seed; automatic initialization if omitted)",
             "ion_velocity_initial_m_s (optional optimizer seed only)",
             "optional signal_uncertainty or spectral_covariance",
-            "optional fast_ion model and researcher-supplied parameter bounds"
+            "optional fast_ion model and researcher-supplied parameter bounds",
+            "optional model_discrepancy_covariance (independent correlated spectral covariance; bypasses reduced-chi-square overdispersion)",
+            "background_reference_basis_mc_samples (bootstrap PCA mean/basis covariance)",
+            "background_reference_parameter_mc_samples (bootstrap plasma-parameter refits)"
           ],
           "outputs": [
             "electron_density_m3",
@@ -5740,7 +5785,8 @@
             "external_input_covariance",
             "external_input_parameter_order",
             "external_input_mc_samples",
-            "external_input_mc_seed"
+            "external_input_mc_seed",
+            "optional physical_background_spectrum_W_Hz (fixed additive receiver-plane free-free/ECE spectrum)"
           ],
           "outputs": [
             "electron_density_m3",
@@ -5765,7 +5811,7 @@
             "external_inputs_fixed",
             "external_inputs_with_supplied_covariance"
           ],
-          "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. Explicit relativistic gyrotropic electron distributions are forward-model capabilities only and are not accepted by the current inversion."
+          "scope": "Magnetized full-electromagnetic kinetic CTS forward model and measured-spectrum inversion. The inversion fits scalar electron- and species-resolved ion-flow projections, not 3-D flow vectors. Fixed fast-ion populations and frequency-resolved cold-plasma ray/beam-overlap geometry are supported. A separate nonlinear gyrotropic VDF-shape inverse now exists conditional on fixed bulk plasma, geometry, response and population density; the standard bulk-fit API remains distinct."
         },
         {
           "name": "full_forward_ray_geometry_uncertainty",
@@ -5775,7 +5821,8 @@
             "geometry_sampler(rng, realization_index) returning a complete frequency_resolved_geometry",
             "samples (integer >=20)",
             "seed",
-            "minimum_success_fraction"
+            "minimum_success_fraction",
+            "optional initial_ray_phase_space_covariance (6x6; Hessian-driven paraxial covariance propagation on a continuous mode branch)"
           ],
           "outputs": [
             "ray_geometry_parameter_covariance",
@@ -5784,6 +5831,38 @@
             "ray_geometry_uncertainty diagnostics"
           ],
           "scope": "API-level full-forward Monte-Carlo propagation. The sampler must regenerate equilibrium and beam covariance and rerun ray tracing/overlap for every realization. It is not yet a dashboard workflow and does not infer correlations with other external uncertainty sources."
+        },
+        {
+          "name": "full_em_gyrotropic_vdf_shape_inverse",
+          "function": "tokamak_analysis.cts_analysis.analyze_cts_spectrum_model",
+          "inputs": [
+            "model='full_em_gyrotropic_vdf_shape'",
+            "frequency_shift_Hz",
+            "measured_spectrum",
+            "probe_frequency_Hz",
+            "scattering_geometry",
+            "population_kind='electron'|'fast_ion'",
+            "p_perpendicular_kg_m_s",
+            "p_parallel_kg_m_s",
+            "initial_distribution_kg_m_s_inverse3",
+            "fixed bulk electron density/temperature and thermal-ion temperatures",
+            "ion species/fractions",
+            "magnetic_field_T",
+            "incident/scattered polarization",
+            "instrument_response",
+            "regularization_matrix",
+            "regularization_strength",
+            "fixed fast-ion density/mass/charge when population_kind='fast_ion'",
+            "explicitly zero electron_flow_projection_m_s for electron VDF"
+          ],
+          "outputs": [
+            "distribution_kg_m_s_inverse3 or conditional candidate",
+            "distribution_covariance when identifiable",
+            "fitted_spectrum",
+            "residual",
+            "data-Jacobian identifiability diagnostics"
+          ],
+          "scope": "Nonlinear tabulated relativistic gyrotropic electron or fast-ion VDF shape inversion through the full Full-EM forward model. Bulk parameters, geometry, receiver response and population density are fixed; drifted relativistic electron VDFs are not implemented."
         }
       ],
       "uncertainty": "undefined When the Maxwellian Bindslev bulk-electron closure is used, theta_e is reported; a researcher-supplied bindslev_validity_theta_e_limit enforces a low-temperature asymptotic screen, while omission is reported as not quantitatively screened.",
