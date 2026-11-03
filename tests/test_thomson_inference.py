@@ -1264,3 +1264,43 @@ def test_relativistic_maxwell_juttner_full_cross_channel_covariance_is_integrate
     assert out["channels"][0]["spectral_weighting_status"] == (
         "within_channel_marginal_gls_cross_channel_covariance_used_in_joint_shared_parameter_fit"
     )
+
+
+def test_kappa_analysis_accepts_model_discrepancy_covariance():
+    wavelength = np.linspace(492.0, 572.0, 241)
+    center = 532.0
+    sigma = 2.0 * 532.0 * np.sqrt(120.0 / 510998.95069) * np.sin(np.pi / 4.0)
+    kappa = 3.5
+    df = 2.0 * kappa - 1.0
+    scale = sigma * np.sqrt((df - 2.0) / df)
+    signal = 900.0 * (1.0 + ((wavelength - center) / scale) ** 2 / df) ** (-kappa)
+    signal += 18.0 + 0.015 * (wavelength - center)
+    covariance = np.eye(wavelength.size) * 0.04
+    covariance += np.eye(wavelength.size, k=1) * 0.008
+    covariance += np.eye(wavelength.size, k=-1) * 0.008
+
+    result = _analyze_thomson_spectra(
+        wavelength, signal[None, :], [0.2],
+        laser_wavelength_nm=532.0, scattering_angle_rad=np.pi / 2.0,
+        instrument_response=np.eye(wavelength.size),
+        model="non_collective_kappa",
+        model_discrepancy_covariance=covariance,
+    )
+
+    channel = result["channels"][0]
+    assert channel["spectral_covariance_used"] is True
+    assert channel["spectral_covariance_interpretation"].startswith("researcher_supplied")
+    assert channel["fit_covariance"].shape == (6, 6)
+    assert np.isfinite(channel["reduced_chi_square"])
+
+
+def test_kappa_fit_rejects_simultaneous_pointwise_and_full_covariance():
+    from tokamak_analysis.thomson_inference import _fit_kappa
+
+    wavelength = np.linspace(500.0, 564.0, 65)
+    signal = np.exp(-0.5 * ((wavelength - 532.0) / 3.0) ** 2) + 0.1
+    with pytest.raises(ValueError, match="pointwise uncertainty or spectral_covariance"):
+        _fit_kappa(
+            wavelength, signal, 532.0, np.pi / 2.0, np.eye(wavelength.size),
+            np.ones(wavelength.size), spectral_covariance=np.eye(wavelength.size),
+        )
