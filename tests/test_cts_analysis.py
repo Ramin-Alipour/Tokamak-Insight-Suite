@@ -1766,3 +1766,37 @@ def test_cts_public_inversion_api_rejects_invalid_regularization_strength(
             inversion_method="local_least_squares",
             regularization_strength=invalid_strength,
         )
+
+
+@pytest.mark.parametrize("invalid_strength", [True, "0.01", None, np.nan])
+def test_cts_inferred_fast_ion_validates_regularization_before_vdf_setup(invalid_strength):
+    """Invalid regularization controls fail consistently before VDF construction."""
+    f0, f, geometry, ions, fractions, response = _case()
+    velocity = np.linspace(-1.2e6, 1.2e6, 81)
+    initial_pdf = np.exp(-0.5 * (velocity / 2.8e5) ** 2)
+    with pytest.raises(ValueError, match="regularization_strength"):
+        analyze_cts_spectrum(
+            f,
+            np.ones_like(f),
+            probe_frequency_Hz=f0,
+            scattering_geometry=geometry,
+            ion_species=ions,
+            ion_fractions=fractions,
+            instrument_response=response,
+            electron_density_initial_m3=2.0e19,
+            electron_temperature_initial_eV=1200.0,
+            ion_temperature_initial_eV=800.0,
+            ion_velocity_initial_m_s=0.0,
+            electron_velocity_projection_m_s=0.0,
+            inversion_method="regularized",
+            regularization_strength=invalid_strength,
+            fast_ion={
+                "species_index": 0,
+                "kind": "infer_tabulated_1d",
+                "velocity_m_s": velocity,
+                "initial_probability_density_m_s_inverse": initial_pdf,
+                "fraction_initial": 0.06,
+                "fraction_bounds": (0.01, 0.15),
+                "smoothness": 0.5,
+            },
+        )
