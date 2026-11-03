@@ -225,6 +225,11 @@ def test_non_maxwellian_kappa_model_returns_temperature_and_kappa_index():
     assert profile["numerical_profile_domain"][0] > 1.5
     assert profile["numerical_profile_domain"][1] >= 20.0
     assert 0.0 < out["channels"][0]["captured_spectral_probability"] <= 1.0
+    optimizer = out["channels"][0]["optimizer"]
+    assert optimizer["method"] == "deterministic_multistart_bounded_least_squares"
+    assert optimizer["attempted_starts"] == 18
+    assert optimizer["successful_starts"] >= 1
+    assert optimizer["selected_weighted_residual_sum_squares"] >= 0.0
 
 
 def test_legacy_relativistic_model_alias_is_rejected():
