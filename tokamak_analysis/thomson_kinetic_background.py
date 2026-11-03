@@ -305,7 +305,7 @@ def fit_noncollective_kinetic_thomson_with_joint_background(*args, **kwargs):
         if model == "kappa":
             te, flow, kap = p
             center = laser*(1-q*flow/_C)
-            sigma_nm = laser*np.sqrt(2)*np.sin(angle/2)*np.sqrt(te/_E_REST_EV)
+            sigma_nm = laser*2.0*np.sin(angle/2)*np.sqrt(te/_E_REST_EV)
             df = 2*kap-1
             scale = sigma_nm*np.sqrt((df-2)/df)
             intrinsic = (1+((x-center)/scale)**2/df)**(-kap)
