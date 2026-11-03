@@ -947,6 +947,33 @@ elif page=='Spectral Analysis':
                 identity_response=st.checkbox('Use identity response only if the supplied spectrum is already corrected for the instrument line-spread function',value=False,key='ts_infer_identity_response')
                 st.caption('Measured response matrices are used unchanged and must already have unit-sum columns. A 1-D measured kernel must already have unit total area; response tails outside the finite wavelength window are left outside the recorded bins, so edge-column sums may be below one.')
             joint_spatial_spectral=st.checkbox('Use joint wavelength-resolved spatial inversion (selected Maxwellian / Kappa / relativistic model)',value=False,disabled=model not in {'non_collective_maxwellian','non_collective_kappa','non_collective_relativistic_maxwell_juttner'},key='ts_infer_joint_spatial')
+            channel_background_model='linear'
+            channel_background_degree=2
+            channel_background_interior_knots=3
+            channel_background_templates_upload=None
+            if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa'}:
+                st.markdown('**Channel-wise physical-fit detector background**')
+                channel_background_model=st.selectbox(
+                    'Channel-wise detector-background basis',
+                    ['constant','linear','polynomial','cubic_spline','templates'],
+                    index=1,key='ts_infer_channel_background_model',
+                )
+                if channel_background_model=='polynomial':
+                    channel_background_degree=st.number_input(
+                        'Channel background polynomial degree (0–8)',min_value=0,max_value=8,
+                        value=2,step=1,key='ts_infer_channel_background_degree',
+                    )
+                if channel_background_model=='cubic_spline':
+                    channel_background_interior_knots=st.number_input(
+                        'Channel background spline interior knots',min_value=0,max_value=20,
+                        value=3,step=1,key='ts_infer_channel_background_knots',
+                    )
+                if channel_background_model=='templates':
+                    channel_background_templates_upload=st.file_uploader(
+                        'Channel-wise researcher-supplied detector-background templates CSV (wavelength rows × basis columns)',
+                        type=['csv','txt'],key='ts_infer_channel_background_templates',
+                    )
+                st.caption('The selected nuisance basis is fitted simultaneously with each measured Thomson spectrum. It is not interpreted as plasma emission.')
             spatial_mixing_upload=None
             spatial_regularization_text='0'
             spatial_background_model='linear'
@@ -1062,6 +1089,10 @@ elif page=='Spectral Analysis':
                 'channel_response_uncertainty_upload': _ts_upload_digest(response_channel_unc_upload),
                 'joint_spectral_covariance_upload': _ts_upload_digest(joint_covariance_upload),
                 'joint_spatial_spectral': joint_spatial_spectral,
+                'channel_background_model': channel_background_model,
+                'channel_background_degree': channel_background_degree,
+                'channel_background_interior_knots': channel_background_interior_knots,
+                'channel_background_templates_upload': _ts_upload_digest(channel_background_templates_upload),
                 'spatial_mixing_upload': _ts_upload_digest(spatial_mixing_upload),
                 'spatial_background_model': spatial_background_model,
                 'spatial_background_degree': spatial_background_degree,
@@ -1182,6 +1213,18 @@ elif page=='Spectral Analysis':
                         'joint_spectral_covariance':joint_spectral_covariance,
                         'model':model,
                     }
+                    if not joint_spatial_spectral and model in {'non_collective_maxwellian','non_collective_kappa'}:
+                        kwargs.update({
+                            'background_model':channel_background_model,
+                            'background_degree':int(channel_background_degree),
+                            'background_interior_knots':int(channel_background_interior_knots),
+                        })
+                        if channel_background_model=='templates':
+                            if channel_background_templates_upload is None:
+                                raise ValueError('Upload the researcher-supplied channel-wise background template matrix for the templates background model.')
+                            kwargs['background_templates']=pd.read_csv(
+                                channel_background_templates_upload,header=None
+                            ).to_numpy(dtype=float)
                     if joint_spatial_spectral:
                         if spatial_mixing_upload is None:
                             raise ValueError('Upload the fixed spatial mixing matrix to run joint spatial-spectral inversion.')
