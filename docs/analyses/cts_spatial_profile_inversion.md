@@ -29,7 +29,10 @@ parameter-specific strengths are accepted. The penalty is reported separately
 from measurement covariance. A full spectral covariance is Cholesky-whitened.
 The local profile covariance is returned only when the augmented Jacobian has
 full column rank; otherwise the fit is explicitly marked locally
-non-identifiable and no finite covariance is asserted.
+non-identifiable and no finite covariance is asserted. An optional strictly
+increasing grid of regularization strengths reruns the full inverse and
+reports profile spread as regularization-choice sensitivity, separate from
+measurement uncertainty.
 
 The response matrix is applied once after the spatially integrated spectrum.
 An optional fixed background is added in detector space. The function does
