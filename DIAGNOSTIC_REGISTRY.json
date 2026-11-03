@@ -4717,7 +4717,7 @@
           "name": "parameter_bounds",
           "unit": "structured",
           "required": false,
-          "description": "Optional researcher-supplied bounds. When omitted, positive log-parameters remain unbounded and the common ion-flow projection is restricted only by the physical subluminal domain. Global search requires finite explicit bounds for every fitted parameter."
+          "description": "Optional researcher-supplied bounds for density, electron temperature, species-resolved ion temperatures, and flow projections. Ion-temperature bounds may use one shared ion_temperature_eV pair or species-specific ion_temperature_eV_0, ion_temperature_eV_1, ... pairs, but not both. Global search requires finite explicit bounds for every fitted parameter."
         },
         {
           "name": "spectral_covariance",
@@ -4766,9 +4766,9 @@
         },
         {
           "name": "ion_temperature_initial_eV",
-          "unit": "eV; common ion-temperature optimizer initial estimate",
+          "unit": "eV; scalar or one optimizer seed per supplied ion species",
           "required": false,
-          "description": "Optional optimizer seed. If omitted, an automatic numerical starting estimate is derived from the calibrated CTS spectral shape and width; it is not a measured result or fixed parameter. Researcher-supplied values override the corresponding automatic seed."
+          "description": "Optional scalar seed (broadcast to every ion species for backward compatibility) or a vector with one seed per supplied species. If omitted, a common automatic numerical starting estimate is derived from calibrated CTS spectral shape and width and broadcast to the species; it is not a measured result or fixed parameter."
         },
         {
           "name": "ion_velocity_initial_m_s",
