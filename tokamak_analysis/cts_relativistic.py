@@ -46,31 +46,41 @@ def _momentum_grid(distribution, mass_kg, quadrature_order):
         dpperp = -pperp/(mass_kg*tperp*E_CHARGE)*f0
         dppar = -ppar/(mass_kg*tpar*E_CHARGE)*f0
         return pperp, ppar, f0, dpperp, dppar, weights
-    if kind == "relativistic_maxwell_juttner":
+    if kind in {"relativistic_maxwell_juttner", "drifted_relativistic_maxwell_juttner"}:
         temperature = _positive(distribution.get("temperature_eV"), "temperature_eV")
         if int(quadrature_order) < 4:
             raise ValueError("quadrature_order must be >=4")
         nodes, node_weights = np.polynomial.legendre.leggauss(int(quadrature_order))
         theta = temperature*E_CHARGE/(mass_kg*C*C)
         umax = max(12.0*np.sqrt(theta)+12.0*theta, 1e-5)
+        beta = 0.0
+        if kind == "drifted_relativistic_maxwell_juttner":
+            drift = float(distribution.get("drift_velocity_m_s", np.nan))
+            if not np.isfinite(drift) or abs(drift) >= C:
+                raise ValueError("drift_velocity_m_s must be finite and strictly subluminal")
+            beta = drift/C
+        gamma_drift = 1.0/np.sqrt(1.0-beta*beta)
+        # The transverse momentum is invariant under a boost parallel to B.
+        # The parallel quadrature is widened to contain the Lorentz-boosted
+        # thermal support, rather than applying a non-relativistic shift.
+        pparallel_extent = gamma_drift*(umax+abs(beta)*np.sqrt(1.0+umax*umax))
         pperp_axis = 0.5*umax*(nodes+1.0)*mass_kg*C
         pperp_weights = 0.5*umax*node_weights*mass_kg*C
-        ppar_axis = umax*nodes*mass_kg*C
-        ppar_weights = umax*node_weights*mass_kg*C
+        ppar_axis = pparallel_extent*nodes*mass_kg*C
+        ppar_weights = pparallel_extent*node_weights*mass_kg*C
         pperp, ppar = np.meshgrid(pperp_axis, ppar_axis, indexing="ij")
-        weights = (
-            2.0*np.pi*pperp
-            *pperp_weights[:,None]*ppar_weights[None,:]
-        )
-        gamma = np.sqrt(1.0+(pperp*pperp+ppar*ppar)/(mass_kg*mass_kg*C*C))
-        f0 = np.exp(-(gamma-1.0)/theta)
+        weights = 2.0*np.pi*pperp*pperp_weights[:,None]*ppar_weights[None,:]
+        gamma_lab = np.sqrt(1.0+(pperp*pperp+ppar*ppar)/(mass_kg*mass_kg*C*C))
+        gamma_rest = gamma_drift*(gamma_lab-beta*ppar/(mass_kg*C))
+        f0 = np.exp(-np.maximum(gamma_rest-1.0, 0.0)/theta)
         norm = float(np.sum(weights*f0))
         if not np.isfinite(norm) or norm <= 0:
-            raise ValueError("Maxwell-Juttner momentum quadrature failed to normalize")
+            raise ValueError("relativistic Maxwell-Juttner momentum quadrature failed to normalize")
         f0 /= norm
-        denominator = gamma*mass_kg*mass_kg*C*C*theta
-        dpperp = -pperp/denominator*f0
-        dppar = -ppar/denominator*f0
+        dgamma_dpperp = gamma_drift*pperp/(gamma_lab*mass_kg*mass_kg*C*C)
+        dgamma_dppar = gamma_drift*(ppar/(gamma_lab*mass_kg*mass_kg*C*C)-beta/(mass_kg*C))
+        dpperp = -dgamma_dpperp*f0/theta
+        dppar = -dgamma_dppar*f0/theta
         return pperp, ppar, f0, dpperp, dppar, weights
     if kind == "tabulated_gyrotropic":
         pp = np.asarray(distribution.get("p_perpendicular_kg_m_s"), dtype=float)
