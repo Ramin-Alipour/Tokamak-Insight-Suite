@@ -38,6 +38,8 @@ def test_full_em_cts_reports_which_optimizer_seeds_were_automatic(monkeypatch):
             jac=np.eye(len(initial)),
             success=True,
             message="mocked deterministic fit",
+            fun=np.zeros(len(initial), dtype=float),
+            nfev=1,
         )
 
     monkeypatch.setattr(scipy.optimize, "least_squares", fake_least_squares)
@@ -65,3 +67,6 @@ def test_full_em_cts_reports_which_optimizer_seeds_were_automatic(monkeypatch):
         "ion_temperature_eV",
     ]
     assert result["optimizer_initial_estimates"]["role"] == "optimizer_initial_estimates_only"
+    assert result["optimizer"]["method"] == "deterministic_multistart_bounded_least_squares"
+    assert result["optimizer"]["attempted_starts"] == 7
+    assert result["optimizer"]["successful_starts"] == 7
