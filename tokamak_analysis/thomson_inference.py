@@ -167,10 +167,9 @@ def _laser_source_response(wavelength_nm, laser_wavelength_nm,
     weights = normalized * quadrature
     weights /= np.sum(weights)
     operator = np.zeros((x.size, x.size), dtype=float)
-    offsets = source_x - float(laser_wavelength_nm)
+    source_wavelength_ratio = source_x / float(laser_wavelength_nm)
     for column, true_wavelength in enumerate(x):
-        shifted = true_wavelength + offsets
-        right = np.searchsorted(x, shifted, side="right")
+        shifted = true_wavelength * source_wavelength_ratio
         for position, weight in zip(shifted, weights):
             if position < x[0] or position > x[-1]:
                 continue
@@ -196,7 +195,7 @@ def _laser_source_response(wavelength_nm, laser_wavelength_nm,
         "source_profile_samples": int(source_x.size),
         "source_operator_column_sums_min": float(np.min(operator.sum(axis=0))),
         "source_operator_column_sums_max": float(np.max(operator.sum(axis=0))),
-        "convolution_approximation": "additive_wavelength_shift_valid_for_narrow_optical_source_bandwidth",
+        "convolution_approximation": "incident_wavelength_ratio_scaling_for_elastic_Thomson_kinematics",
     }
 
 def _gaussian(x, amp, center, sigma, offset, slope):
