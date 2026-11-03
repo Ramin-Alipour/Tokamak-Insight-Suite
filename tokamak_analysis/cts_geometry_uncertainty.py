@@ -79,6 +79,14 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     frequency_resolved_geometry. It may also return magnetic_field_T and the
     incident/scattered polarization vectors for that same realization.
 
+    For correlated external inputs, the sampler may additionally return
+    ``inference_updates``: per-realization replacements for existing inference
+    keyword arguments (for example density, temperature, damping, species fractions,
+    or calibrated response inputs). They are applied in the same draw as regenerated
+    geometry, retaining their joint effects and cross-covariances in the empirical
+    parameter covariance. Do not replace measured-spectrum arrays, covariance
+    contracts, or optimizer controls. Correlations must be sampled by the caller.
+
     The routine performs one baseline fit and one complete spectral refit per
     accepted geometry draw. It reports the sample covariance of the fitted
     physical parameters, including cross-parameter terms. This covariance is
@@ -129,6 +137,24 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
             for key in ("magnetic_field_T", "incident_polarization", "scattered_polarization"):
                 if key in realization:
                     kwargs[key] = realization[key]
+            updates = realization.get("inference_updates", {})
+            if not isinstance(updates, Mapping):
+                raise ValueError("inference_updates must be a mapping when supplied")
+            protected = {
+                "measured_spectrum", "spectrum", "frequency_shift_Hz",
+                "frequency_shifts_Hz", "external_input_covariance",
+                "external_input_parameter_order", "instrument_response_uncertainty",
+                "instrument_response_parameter_covariance",
+            }
+            forbidden = protected.intersection(updates)
+            if forbidden:
+                raise ValueError("inference_updates cannot replace measured data or covariance contracts: " + ", ".join(sorted(forbidden)))
+            unknown = set(updates).difference(kwargs)
+            if unknown:
+                raise ValueError("inference_updates may only replace existing inference_kwargs keys: " + ", ".join(sorted(unknown)))
+            kwargs.update(copy.deepcopy(dict(updates)))
+            # The joint sampler owns the external-input distribution; do not
+            # add its baseline covariance a second time.
             kwargs["external_input_covariance"] = None
             kwargs["external_input_parameter_order"] = None
             kwargs["instrument_response_uncertainty"] = None
@@ -144,7 +170,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     required = max(12, int(np.ceil(threshold * int(samples))))
     output = dict(baseline)
     diagnostics = {
-        "method": "full_forward_monte_carlo_geometry_refit",
+        "method": "joint_full_forward_monte_carlo_geometry_and_external_input_refit",
         "requested_samples": int(samples),
         "successful_samples": len(draws),
         "failed_samples": len(failures),
@@ -154,7 +180,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
         "sampler_contract": (
             "Each realization resamples equilibrium and local beam covariance, "
             "reruns incident/receiver ray tracing, and recomputes scattering locations, "
-            "path-length quadrature and Gaussian overlap before refitting."
+            "path-length quadrature and Gaussian overlap before refitting. Optional inference_updates are applied in the same draw, preserving correlations among jointly sampled inputs."
         ),
         "failed_realizations": failures,
         "propagated": False,
@@ -197,7 +223,7 @@ def propagate_full_em_cts_ray_geometry_uncertainty(
     output["parameter_covariance_scope"] = (
         "conditional local-fit covariance plus any successfully propagated baseline instrument-response "
         "covariance and full-forward Monte-Carlo ray/equilibrium/beam-geometry covariance; "
-        "cross-covariance between response and geometry sources is not included"
+        "cross-covariance among jointly sampled geometry/external inputs is retained; cross-covariance with separately propagated instrument-response covariance is not included"
     )
     diagnostics.update({
         "propagated": True,
