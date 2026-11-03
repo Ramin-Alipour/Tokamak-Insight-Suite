@@ -45,8 +45,11 @@ def test_two_population_fit_recovers_synthetic_shape_parameters():
         hot_population_fraction_initial=0.19,
         flow_projection_initial_m_s=2.8e5,
         signal_uncertainty=np.full(wavelength.size, 1.0),
+        background_model="linear",
         radial_order=12, angular_order=8,
     )
+    assert result["fitted_background_model"] == "linear"
+    assert result["fitted_background_coefficients_scaled_wavelength"].shape == (2,)
     assert result["cold_electron_temperature_eV"] == pytest.approx(100.0, rel=0.15)
     assert result["hot_electron_temperature_eV"] == pytest.approx(5000.0, rel=0.2)
     assert result["hot_population_fraction"] == pytest.approx(0.2, abs=0.08)
