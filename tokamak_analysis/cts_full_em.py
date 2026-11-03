@@ -1812,16 +1812,13 @@ def fit_full_em_gyrotropic_population_shape(
     initial = _real_array(initial_distribution_kg_m_s_inverse3, "initial_distribution_kg_m_s_inverse3", 2)
     if initial.shape != (pp.size, pa.size) or np.any(initial < 0):
         raise ValueError("initial distribution must be non-negative with shape (n_p_perp,n_p_parallel)")
-    def trap_weights(axis):
-        edges = np.empty(axis.size + 1)
-        edges[1:-1] = 0.5 * (axis[:-1] + axis[1:])
-        edges[0] = axis[0] - 0.5 * (axis[1] - axis[0])
-        edges[-1] = axis[-1] + 0.5 * (axis[-1] - axis[-2])
-        widths = np.diff(edges)
-        if np.any(widths <= 0):
-            raise ValueError("momentum grid must define positive finite-volume weights")
-        return widths
-    weights = 2.0 * np.pi * pp[:, None] * trap_weights(pp)[:, None] * trap_weights(pa)[None, :]
+    # Match the quadrature measure used by cts_relativistic._momentum_grid
+    # exactly: 2*pi*p_perp*gradient(p_perp)*gradient(p_parallel).
+    dpp = np.gradient(pp)
+    dpa = np.gradient(pa)
+    if np.any(dpp <= 0) or np.any(dpa <= 0):
+        raise ValueError("momentum grids must define positive quadrature weights")
+    weights = 2.0 * np.pi * pp[:, None] * dpp[:, None] * dpa[None, :]
     initial_norm = float(np.sum(initial * weights))
     if not np.isfinite(initial_norm) or initial_norm <= 0:
         raise ValueError("initial gyrotropic distribution must have positive momentum-space integral")
