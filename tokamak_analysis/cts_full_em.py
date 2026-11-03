@@ -553,20 +553,28 @@ def full_em_cts_spectral_density(
     if electron_distribution is not None:
         if electron_flow_projection_m_s is not None and abs(electron_flow_projection_m_s) > 0.0:
             raise ValueError(
-                "Full-EM electron-flow inference with an explicit relativistic electron distribution "
-                "requires a drifted relativistic VDF model; this solver does not silently approximate "
-                "that distribution by a frequency shift"
+                "With an explicit electron distribution, encode any parallel drift in the distribution "
+                "itself; a separate electron_flow_projection_m_s frequency shift is not applied."
             )
         if not isinstance(electron_distribution, Mapping):
             raise ValueError("electron_distribution must be an explicit relativistic gyrotropic distribution mapping")
-        if electron_distribution.get("kind") not in {"relativistic_maxwell_juttner", "relativistic_bigaussian", "tabulated_gyrotropic"}:
-            raise ValueError("electron_distribution kind must be relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic")
+        if electron_distribution.get("kind") not in {
+            "relativistic_maxwell_juttner", "drifted_relativistic_maxwell_juttner",
+            "relativistic_bigaussian", "tabulated_gyrotropic",
+        }:
+            raise ValueError("electron_distribution kind must be relativistic_maxwell_juttner, drifted_relativistic_maxwell_juttner, relativistic_bigaussian or tabulated_gyrotropic")
         electron_distribution_used = dict(electron_distribution)
-        if electron_distribution_used["kind"] == "relativistic_maxwell_juttner":
+        if electron_distribution_used["kind"] in {
+            "relativistic_maxwell_juttner", "drifted_relativistic_maxwell_juttner",
+        }:
             distribution_temperature = _positive(electron_distribution_used.get("temperature_eV", te), "electron_distribution.temperature_eV")
             if not np.isclose(distribution_temperature, te, rtol=1e-8, atol=0.0):
-                raise ValueError("relativistic Maxwell-Juttner electron distribution temperature must equal electron_temperature_eV")
+                raise ValueError("relativistic Maxwell-Juttner distribution temperature must equal electron_temperature_eV")
             electron_distribution_used["temperature_eV"] = te
+        if electron_distribution_used["kind"] == "drifted_relativistic_maxwell_juttner":
+            drift = float(electron_distribution_used.get("drift_velocity_m_s", np.nan))
+            if not np.isfinite(drift) or abs(drift) >= C:
+                raise ValueError("drifted relativistic electron distribution requires a finite subluminal drift_velocity_m_s")
         species[0].update({
             "distribution": electron_distribution_used,
             "fast_ion": True,
