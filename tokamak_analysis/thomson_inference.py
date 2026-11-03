@@ -1226,16 +1226,19 @@ def analyze_thomson_spectra(
             column_check, 0.0, rtol=0.0, atol=1e-14
         ):
             raise ValueError(
-                f"{name} must have zero scattered-power rows and columns when joint spectral "
-                "covariance or measured-response uncertainty is supplied; those independent "
-                "power uncertainties are propagated from the spectrum/response Monte Carlo."
+                f"{name} must have zero scattered-power rows and columns when spectral "
+                "measurement covariance, model-discrepancy covariance, or measured-response "
+                "uncertainty is supplied; those power uncertainties are propagated from the "
+                "spectrum/response fit and must not be counted twice."
             )
         return matrix
 
     if density_relative_covariance is not None and joint_spectral_covariance is not None:
         raise ValueError("Per-channel density_relative_covariance is not compatible with joint_spectral_covariance; do not combine it with joint_spectral_covariance.")
     if density_relative_covariance is not None and (
-        joint_spectral_covariance is not None or lsf_unc is not None
+        joint_spectral_covariance is not None
+        or model_discrepancy_covariance is not None
+        or lsf_unc is not None
     ):
         require_zero_scattered_power_covariance(
             density_relative_covariance, "density_relative_covariance"
@@ -1245,7 +1248,11 @@ def analyze_thomson_spectra(
             raise ValueError("joint_density_relative_covariance is for non-collective absolute-density inversion; collective models infer density from the dielectric spectral shape.")
         if density_relative_covariance is not None:
             raise ValueError("Supply density_relative_covariance or joint_density_relative_covariance, not both.")
-        if joint_spectral_covariance is not None or lsf_unc is not None:
+        if (
+            joint_spectral_covariance is not None
+            or model_discrepancy_covariance is not None
+            or lsf_unc is not None
+        ):
             require_zero_scattered_power_covariance(
                 joint_density_relative_covariance, "joint_density_relative_covariance"
             )
@@ -1270,7 +1277,11 @@ def analyze_thomson_spectra(
             raise ValueError("joint_density_relative_covariance must be symmetric")
         if not _covariance_is_positive_semidefinite(joint_density_covariance):
             raise ValueError("joint_density_relative_covariance must be positive semidefinite")
-        if joint_spectral_covariance is not None or lsf_unc is not None:
+        if (
+            joint_spectral_covariance is not None
+            or model_discrepancy_covariance is not None
+            or lsf_unc is not None
+        ):
             require_zero_scattered_power_covariance(
                 joint_density_covariance, "joint_density_relative_covariance"
             )
