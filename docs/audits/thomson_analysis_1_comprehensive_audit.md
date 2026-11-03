@@ -950,3 +950,14 @@ Relevant model-selection references:
 The new regression test has been committed but was not executed in this
 environment. GitHub Actions status is not available for the resulting
 contents-API commits; no test-pass or experimental-validation claim is made.
+
+
+## Implementation update — 2026-11-03: channel-wise Kappa structured-background parity
+
+The canonical channel-wise non-collective Kappa fitter now fits the selected detector-space background basis simultaneously with the response-convolved Kappa plasma spectrum. Supported bases are constant, linear, Legendre polynomial, cubic spline and researcher-supplied templates. Background coefficients are part of the optimizer vector and full local fit covariance; the Kappa-shape identifiability Jacobian projects against every fitted background nuisance coefficient.
+
+The Kappa profile-likelihood diagnostic remains available for the linear background parameterization. For higher-order or template backgrounds, the routine explicitly reports that the existing linear-only profile-likelihood calculation is not applicable and retains the joint covariance/Jacobian diagnostics instead. No background template is inferred or treated as plasma emission.
+
+The Streamlit channel-wise Thomson workflow exposes the same basis choices and template upload for Maxwellian and Kappa fits. The canonical root and packaged diagnostic registries and the new polynomial-background regression test were updated with the implementation.
+
+**Verification boundary:** these changes were committed directly to main. The new regression test and the complete Analysis 1 test suite have not been executed in this environment. No passing-CI or experimental-validation claim is made. Relativistic Maxwell-Juttner channel-wise fitting retains its linear baseline contract; extending structured bases there requires updating its model-specific optimizer and covariance calculation rather than silently reusing the Kappa implementation.
