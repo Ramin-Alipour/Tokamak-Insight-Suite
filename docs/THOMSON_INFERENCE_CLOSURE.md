@@ -67,3 +67,71 @@ contract.
   DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966).
 - Sakai et al., *Journal of Instrumentation* **21** (2026) C01002,
   DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002).
+
+
+## Follow-on implementation: kinetic backgrounds, generalized projected VDF and workflow exposure
+
+### Kappa and relativistic Maxwell-Juttner structured backgrounds
+
+`tokamak_analysis.thomson_kinetic_background.fit_noncollective_kinetic_thomson_with_background`
+provides a dedicated measured-spectrum API for the finite-variance isotropic
+Kappa projection and relativistic Maxwell-Juttner forward model. The physical
+parameters, spectral amplitude and detector-background coefficients are
+optimized jointly. Its full local covariance includes the physical/background
+cross block; it is conditional on the supplied measured response and noise
+model. With no measurement uncertainty/covariance, the reported covariance is
+residual-scaled and is not measurement-noise uncertainty. Absolute density is
+not inferred. Kappa is screened by the declared non-relativistic limits
+\(T_e/(m_ec^2)<0.01\) and \(|v_q|/c<0.1\).
+
+This is a distinct lower-level workflow subanalysis. It does not silently
+replace the existing channel-wise selector or claim that every dashboard path
+has been migrated to this fitter.
+
+### Generalized tabulated electron VDF in electrostatic CTS
+
+`tokamak_analysis.thomson_generalized_dispersion` adds a forward response for
+a researcher-supplied tabulated 1-D electron VDF projected along the scattering
+vector, with Maxwellian ion populations. The first-order Landau integral is
+evaluated by analytic interval integration of the derivative of a
+piecewise-linear VDF using a positive imaginary pole displacement. This is a
+Skolar-inspired simple-pole implementation, not a claim to reproduce the
+paper's full arbitrary-order-pole algorithm. The forward model is
+non-relativistic, unmagnetized and electrostatic; it does not infer an
+unrestricted EVDF or its uncertainty. A measured-spectrum inverse must still
+establish data-only identifiability before reporting distribution parameters.
+
+### Full-forward ray geometry uncertainty
+
+The CTS geometry Monte Carlo routine is now exposed through
+`thomson_workflow.propagate_full_em_cts_ray_geometry_uncertainty` and included
+in the canonical diagnostic registry. The sampler must jointly regenerate
+equilibrium, probe/receiver rays, local beam covariance, scattering-volume
+quadrature and overlap for each realization; every draw is then refitted through
+the Full-EM spectral model. Geometry covariance is therefore not approximated
+by a final-parameter covariance addition. Correlations with separately
+propagated instrument-response uncertainty remain outside the joint sampler
+unless the caller includes them in the same realization.
+
+### Recoil contract and joint profile status
+
+The Compton/recoil selector is recorded in the primary optical inference,
+joint spatial-spectral path, relativistic multi-channel GLS and two-population
+MJ registry inputs. The output must distinguish polarized elastic Thomson
+scattering from single-scattering Compton kinematics with polarized
+Klein-Nishina weighting; neither branch claims multiple-scattering transport.
+
+The joint \(n_e(r),T_e(r),T_i(r)\) closure now reports
+`optimizer_failed` rather than a primary inference if the nonlinear
+optimizer fails, even when a Jacobian rank calculation alone appears full
+rank. Full cross-profile covariance remains conditional on convergence,
+data-only full rank, the supplied forward model and the declared measurement
+covariance. Regularization does not promote null-space components to primary
+measurements.
+
+## References for the added generalized response
+
+- Skolar, C. R., Longley, W. J. & Goodwin, L. V. (2025), *Physics of Plasmas*
+  **32**, 043907, DOI: [10.1063/5.0261966](https://doi.org/10.1063/5.0261966).
+- Sakai, K. et al. (2026), *Journal of Instrumentation* **21**, C01002,
+  DOI: [10.1088/1748-0221/21/01/C01002](https://doi.org/10.1088/1748-0221/21/01/C01002).
