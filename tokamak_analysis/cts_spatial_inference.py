@@ -81,8 +81,8 @@ def analyze_full_em_cts_spatial_profiles(
     fixed_background_spectrum=None, fit_electron_density_profile=True,
     fit_electron_temperature_profile=True, fit_ion_temperature_profile=False,
     initial_profiles=None, regularization_matrix=None,
-    regularization_strength=1.0, regularization_sensitivity_strengths=None,
-    profile_bounds_relative=(0.05, 20.0), max_nfev=300,
+    regularization_strength=None, regularization_sensitivity_strengths=None,
+    profile_bounds_relative=None, max_nfev=300,
 ):
     """Infer node-wise relative profiles using repeated local Full-EM solves.
 
@@ -122,9 +122,13 @@ def analyze_full_em_cts_spatial_profiles(
     missing = sorted(required - set(forward_model_kwargs))
     if missing:
         raise ValueError(f"missing required Full-EM inputs: {missing}")
+    if profile_bounds_relative is None:
+        raise ValueError("profile_bounds_relative must be supplied explicitly; no scientific profile range is assumed")
     lower, upper = map(float, profile_bounds_relative)
     if not np.isfinite(lower + upper) or lower <= 0 or upper <= lower:
         raise ValueError("profile bounds must be finite positive (lower, upper)")
+    if regularization_strength is None:
+        raise ValueError("regularization_strength must be supplied explicitly; no default smoothness prior is assumed")
     if isinstance(regularization_strength, Mapping):
         lambdas = {name: float(regularization_strength.get(name, 0.0)) for name in active}
     else:

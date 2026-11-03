@@ -66,7 +66,7 @@ def test_spatial_full_em_inverse_uses_local_profiles_and_full_covariance(monkeyp
             "electron_density_relative": np.ones(3),
             "electron_temperature_relative": np.ones(3),
         },
-        regularization_strength=1e-8, max_nfev=100,
+        regularization_strength=1e-8, profile_bounds_relative=(0.05, 20.0), max_nfev=100,
     )
     assert result["forward_model_evaluations_use_local_full_em_kinetics"] is True
     assert result["profiles_relative_to_reference"]["electron_density_relative"].shape == (3,)
@@ -89,7 +89,7 @@ def test_spatial_full_em_inverse_requires_positive_regularization():
         spatial.analyze_full_em_cts_spatial_profiles(
             np.linspace(-1, 1, 8), np.ones(8), probe_frequency_Hz=140e9,
             scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
-            signal_uncertainty=np.ones(8), regularization_strength=0.0,
+            signal_uncertainty=np.ones(8), regularization_strength=0.0, profile_bounds_relative=(0.05, 20.0),
         )
 
 
@@ -131,7 +131,7 @@ def test_spatial_full_em_inverse_reports_regularization_choice_sensitivity(monke
         frequency, np.ones(8), probe_frequency_Hz=140e9,
         scattering_geometry=_geometry(), forward_model_kwargs=_kwargs(),
         signal_uncertainty=np.ones(8), fit_electron_density_profile=True,
-        fit_electron_temperature_profile=False, regularization_strength=0.2,
+        fit_electron_temperature_profile=False, regularization_strength=0.2, profile_bounds_relative=(0.05, 20.0),
         regularization_sensitivity_strengths=[0.1, 0.2, 1.0],
         max_nfev=40,
     )
@@ -172,7 +172,7 @@ def test_regularization_cannot_create_full_em_profile_identifiability(monkeypatc
         signal_uncertainty=np.full(frequency.size, 0.01),
         fit_electron_density_profile=True,
         fit_electron_temperature_profile=False,
-        regularization_strength=0.5,
+        regularization_strength=0.5, profile_bounds_relative=(0.05, 20.0),
         max_nfev=100,
     )
 
@@ -230,3 +230,19 @@ def test_spatial_profile_data_only_identifiability_contract_is_registered_and_ex
     assert "cts_geometry_ensemble_upload" in app
     assert "cts_geometry_mc_samples" in app
     assert "propagate_full_em_cts_ray_geometry_uncertainty(" in app
+
+
+def test_spatial_full_em_inverse_requires_explicit_profile_bounds_and_regularization():
+    base = dict(
+        frequency_shift_Hz=np.linspace(-1.0, 1.0, 8), measured_spectrum=np.ones(8),
+        probe_frequency_Hz=140e9, scattering_geometry=_geometry(),
+        forward_model_kwargs=_kwargs(), signal_uncertainty=np.ones(8),
+    )
+    with pytest.raises(ValueError, match="profile_bounds_relative must be supplied explicitly"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            **base, regularization_strength=0.1
+        )
+    with pytest.raises(ValueError, match="regularization_strength must be supplied explicitly"):
+        spatial.analyze_full_em_cts_spatial_profiles(
+            **base, profile_bounds_relative=(0.05, 20.0)
+        )

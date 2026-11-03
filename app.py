@@ -3870,7 +3870,9 @@ elif page=='Advanced Analysis':
                 spatial_density=st.text_input('Reference electron density (m⁻³)',key='cts_spatial_density')
                 spatial_te=st.text_input('Reference electron temperature (eV)',key='cts_spatial_te')
                 spatial_ti=st.text_input('Reference ion temperatures (eV; one per species)',key='cts_spatial_ti')
-                spatial_regularization=st.number_input('Profile smoothness strength',min_value=0.0,value=1.0,format='%.4g',key='cts_spatial_regularization')
+                spatial_regularization=st.text_input('Profile smoothness strength (required; non-negative)',value='',key='cts_spatial_regularization')
+                spatial_profile_lower=st.text_input('Relative profile lower bound (required)',value='',key='cts_spatial_profile_lower')
+                spatial_profile_upper=st.text_input('Relative profile upper bound (required)',value='',key='cts_spatial_profile_upper')
                 spatial_reg_sensitivity_text=st.text_input('Optional regularization-sensitivity grid (comma-separated positive values)',value='',key='cts_spatial_reg_sensitivity')
                 spatial_fit_ne=st.checkbox('Fit spatial electron-density profile',value=True,key='cts_spatial_fit_ne')
                 spatial_fit_te=st.checkbox('Fit spatial electron-temperature profile',value=True,key='cts_spatial_fit_te')
@@ -3931,7 +3933,11 @@ elif page=='Advanced Analysis':
                         'fit_electron_density_profile':bool(spatial_fit_ne),
                         'fit_electron_temperature_profile':bool(spatial_fit_te),
                         'fit_ion_temperature_profile':bool(spatial_fit_ti),
-                        'regularization_strength':float(spatial_regularization),
+                        'regularization_strength':_parse_ts_scalar(spatial_regularization,'Profile smoothness strength',minimum=0.0),
+                        'profile_bounds_relative':(
+                            _parse_ts_scalar(spatial_profile_lower,'Relative profile lower bound',minimum=0.0),
+                            _parse_ts_scalar(spatial_profile_upper,'Relative profile upper bound',minimum=0.0),
+                        ),
                     }
                     if spatial_reg_sensitivity_text.strip():
                         kwargs_spatial['regularization_sensitivity_strengths']=_parse_ts_float_list(spatial_reg_sensitivity_text,'Regularization sensitivity grid')
