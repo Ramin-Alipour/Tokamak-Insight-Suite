@@ -489,11 +489,45 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
     def observed(x, amp, center, sigma, kappa, offset, slope):
         component = intrinsic(x, amp, center, sigma, kappa, 0.0, 0.0)
         return _apply_response(response, component, x) + offset+slope*(x-center)
-    p, cov = curve_fit(observed,wavelength,signal_scaled,p0=p0,bounds=(lower,upper),
-                       sigma=uncertainty_scaled,absolute_sigma=uncertainty_scaled is not None,maxfev=80000)
+    # A single curve_fit start can settle on a local Kappa/background
+    # compensation minimum.  Use a deterministic, physically admissible
+    # multi-start search over width and Kappa, then retain the lowest
+    # weighted-residual solution.  These are numerical starts, not priors.
+    def weighted_residual(parameters):
+        difference = observed(wavelength, *parameters) - signal_scaled
+        return difference if uncertainty_scaled is None else difference / uncertainty_scaled
+
+    kappa_seeds = (1.6, 2.0, 3.0, 5.0, 10.0, 30.0)
+    width_seeds = (max(spacing, span/10), max(2.0*spacing, span/5), max(4.0*spacing, span/3))
+    candidate_fits = []
+    attempted_starts = 0
+    for kappa_seed in kappa_seeds:
+        for width_seed in width_seeds:
+            start = np.asarray(p0, dtype=float)
+            start[2] = min(max(width_seed, lower[2] * (1.0 + 1e-8)), upper[2] * (1.0 - 1e-8))
+            start[3] = kappa_seed
+            attempted_starts += 1
+            try:
+                candidate = least_squares(
+                    weighted_residual, start, bounds=(lower, upper),
+                    method="trf", x_scale="jac", max_nfev=30000,
+                    ftol=1e-10, xtol=1e-10, gtol=1e-10,
+                )
+                if candidate.success and np.all(np.isfinite(candidate.x)) and np.all(np.isfinite(candidate.fun)):
+                    candidate_fits.append(candidate)
+            except (ValueError, FloatingPointError, np.linalg.LinAlgError):
+                continue
+    if not candidate_fits:
+        raise ValueError("All deterministic multi-start Kappa spectral fits failed to converge.")
+    fit = min(candidate_fits, key=lambda candidate: float(candidate.fun @ candidate.fun))
+    p_scaled = np.asarray(fit.x, dtype=float)
+    dof_fit = max(1, wavelength.size - p_scaled.size)
+    covariance_scaled = np.linalg.pinv(fit.jac.T @ fit.jac)
+    if uncertainty_scaled is None:
+        covariance_scaled *= float(fit.fun @ fit.fun / dof_fit)
+    cov = covariance_scaled
     # observed() operates on normalized intensity; retain its optimizer
     # parameters separately from the public, measured-unit fit parameters.
-    p_scaled=np.asarray(p,dtype=float)
     parameter_scales=np.array([signal_scale,1.0,1.0,1.0,signal_scale,signal_scale])
     p=p_scaled*parameter_scales
     cov=np.asarray(cov,dtype=float)*np.outer(parameter_scales,parameter_scales)
@@ -613,6 +647,17 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty):
             "spectral_window_truncation_warning":("The measured wavelength window captures only a fraction of the fitted heavy-tailed kappa spectrum; integrated model area is extrapolated beyond the measured window." if captured_probability < 0.999 else None),
             "reduced_chi_square":float(np.sum((residual/uncertainty)**2)/dof) if uncertainty is not None else None,
             "fitted_spectrum":fitted_spectrum,
+            "optimizer": {
+                "method": "deterministic_multistart_bounded_least_squares",
+                "attempted_starts": int(attempted_starts),
+                "successful_starts": int(len(candidate_fits)),
+                "selected_weighted_residual_sum_squares": float(fit.fun @ fit.fun),
+                "selected_initialization_kappa_grid": list(kappa_seeds),
+                "selected_initialization_width_grid_nm": list(width_seeds),
+                "success": bool(fit.success),
+                "message": str(fit.message),
+                "nfev": int(fit.nfev),
+            },
             "model":"non-collective isotropic kappa electron VDF (Student-t projected spectrum)",
             "validity_screening":{
                 "theta_e":float(te/ELECTRON_REST_ENERGY_EV),
