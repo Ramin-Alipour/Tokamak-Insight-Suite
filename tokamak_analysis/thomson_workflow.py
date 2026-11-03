@@ -959,3 +959,11 @@ def generalized_thomson_landau_integral(*args, **kwargs):
     """Evaluate the piecewise-linear first-order generalized Landau integral."""
     from .thomson_generalized_dispersion import generalized_landau_integral
     return generalized_landau_integral(*args, **kwargs)
+
+
+def fit_n_population_relativistic_thomson_spectrum(*args, **kwargs):
+    """Fit a finite N-population relativistic optical Thomson model to measured spectra."""
+    from .thomson_n_population import (
+        fit_n_population_relativistic_thomson_spectrum as _fit,
+    )
+    return _fit(*args, **kwargs)
