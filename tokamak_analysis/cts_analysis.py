@@ -499,6 +499,59 @@ def estimate_cts_optimizer_initial_parameters(
     }
 
 
+
+def describe_cts_spectrum(
+    frequency_shift_Hz, spectrum, *, baseline_level,
+):
+    """Describe a calibrated CTS spectrum without inferring plasma parameters.
+
+    The caller supplies the detector-scale baseline explicitly. Negative
+    baseline-subtracted bins are clipped to zero for descriptive weighting.
+    Returned moments and quantiles are spectral descriptors, not estimates
+    of density, temperature, flow, composition or a velocity distribution.
+    """
+    frequency = _array(frequency_shift_Hz, "frequency_shift_Hz", 1)
+    power = _array(spectrum, "spectrum", 1)
+    baseline = _nonnegative_real(baseline_level, "baseline_level")
+    if frequency.size != power.size or frequency.size < 3:
+        raise ValueError("frequency_shift_Hz and spectrum must have the same length of at least three")
+    if np.any(np.diff(frequency) <= 0):
+        raise ValueError("frequency_shift_Hz must be strictly increasing")
+    if np.any(power < 0):
+        raise ValueError("calibrated spectrum must be non-negative")
+    contrast = np.maximum(power - baseline, 0.0)
+    weighted_power = contrast * _trapezoid_node_weights(frequency)
+    area = float(np.sum(weighted_power))
+    if not np.isfinite(area) or area <= np.finfo(float).tiny:
+        raise ValueError("spectrum has no positive integrated contrast above the explicit baseline")
+    centroid = float(np.sum(weighted_power * frequency) / area)
+    variance = float(np.sum(weighted_power * (frequency - centroid) ** 2) / area)
+    if not np.isfinite(variance) or variance < 0:
+        raise ValueError("spectral variance is invalid")
+    order = np.argsort(frequency)
+    cumulative = np.cumsum(weighted_power[order]) / area
+    quantiles = {}
+    for probability in (0.05, 0.50, 0.95):
+        index = min(int(np.searchsorted(cumulative, probability, side="left")), order.size - 1)
+        quantiles[f"frequency_quantile_{int(probability * 100):02d}_Hz"] = float(frequency[order[index]])
+    peak_index = int(np.argmax(contrast))
+    return {
+        "analysis_type": "descriptive_spectral_shape_only",
+        "physical_parameter_inference_performed": False,
+        "baseline_level": baseline,
+        "integrated_spectral_contrast": area,
+        "spectral_centroid_Hz": centroid,
+        "spectral_rms_width_Hz": float(np.sqrt(variance)),
+        "peak_frequency_Hz": float(frequency[peak_index]),
+        **quantiles,
+        "weighting": "trapezoidal_frequency_bin_weights_times_positive_baseline_subtracted_spectrum",
+        "interpretation_limit": (
+            "Spectral descriptors only; not plasma density, temperature, "
+            "flow, composition or EVDF estimates."
+        ),
+    }
+
+
 def analyze_cts_spectrum(frequency_shift_Hz,spectrum,*,probe_frequency_Hz,scattering_geometry,
     ion_species,ion_fractions,instrument_response,signal_uncertainty=None,
     electron_density_initial_m3=None,electron_temperature_initial_eV=None,ion_temperature_initial_eV=None,
