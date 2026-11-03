@@ -483,7 +483,7 @@ def _fit_noncollective(
                         "selected detector-space background basis"],
     }
 
-def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
+def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma, spectral_covariance=None):
     """Profile Kappa while re-optimizing amplitude, centroid, width and baseline."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -505,18 +505,36 @@ def _kappa_profile_likelihood_diagnostic(x, y, response, p, sigma):
         convolved = component if response_is_identity else _apply_response(response, component, x)
         return convolved + offset + slope * (x - center)
 
-    if sigma is None:
+    if sigma is not None and spectral_covariance is not None:
+        raise ValueError("Profile likelihood accepts pointwise uncertainty or spectral_covariance, not both")
+    covariance_cholesky = None
+    if spectral_covariance is not None:
+        covariance = np.asarray(spectral_covariance, dtype=float)
+        if (covariance.shape != (y.size, y.size) or np.any(~np.isfinite(covariance))
+                or not np.allclose(covariance, covariance.T, rtol=1e-10, atol=1e-13)):
+            raise ValueError("spectral_covariance must be finite, symmetric and match the wavelength grid")
+        try:
+            covariance_cholesky = np.linalg.cholesky(covariance)
+        except np.linalg.LinAlgError as exc:
+            raise ValueError("spectral_covariance must be positive definite") from exc
+        whiten = lambda residual: np.linalg.solve(covariance_cholesky, residual)
+        noise_semantics = "researcher_supplied_full_within_channel_spectral_covariance_GLS"
+    elif sigma is None:
         best_residual = forward(p[[0, 1, 2, 4, 5]], p[3]) - y
         residual_scale = float(np.sqrt(np.sum(best_residual ** 2) / max(1, y.size - p.size)))
-        scale = np.full_like(y, max(residual_scale, np.finfo(float).tiny))
+        scale = max(residual_scale, np.finfo(float).tiny)
+        whiten = lambda residual: residual / scale
         noise_semantics = "unweighted_fit_residual_variance_estimated_from_best_fit; not_measurement_noise_calibrated"
     else:
         scale = np.asarray(sigma, dtype=float)
+        if scale.shape != y.shape or np.any(~np.isfinite(scale)) or np.any(scale <= 0):
+            raise ValueError("pointwise sigma must be positive, finite and match the wavelength grid")
+        whiten = lambda residual: residual / scale
         noise_semantics = "researcher_supplied_pointwise_measurement_uncertainty"
 
     profile = np.full(grid.shape, np.inf)
     for i, kappa in enumerate(grid):
-        objective = lambda z: (forward(z, kappa) - y) / scale
+        objective = lambda z: whiten(forward(z, kappa) - y)
         try:
             fit = least_squares(objective, p[[0, 1, 2, 4, 5]], bounds=(lower, upper),
                                 x_scale="jac", max_nfev=3000)
@@ -720,7 +738,7 @@ def _fit_kappa(wavelength, signal, laser_nm, angle, response, uncertainty, spect
         "threshold_semantics": "rank and floating-point conditioning diagnostics; not an empirical or universal physical threshold",
         "limitation": None if kappa_identifiable else "The measured spectral window and supplied response do not locally distinguish the Kappa shape parameter from the remaining fitted parameters; do not interpret the optimizer candidate as an identified physical Kappa index.",
     }
-    kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(wavelength, signal_scaled, response, p_scaled, uncertainty_scaled)
+    kappa_profile_likelihood = _kappa_profile_likelihood_diagnostic(wavelength, signal_scaled, response, p_scaled, uncertainty_scaled, spectral_covariance=None if spectral_covariance is None else covariance)
     dof=max(1,wavelength.size-len(p))
     def area_from_params(values):
         a, cen, sig, kap, off, sl = values
