@@ -3920,6 +3920,8 @@ elif page=='Advanced Analysis':
                     }
                     if spatial_reg_sensitivity_text.strip():
                         kwargs_spatial['regularization_sensitivity_strengths']=_parse_ts_float_list(spatial_reg_sensitivity_text,'Regularization sensitivity grid')
+                    if spatial_unc_col!='<none>' and spatial_covariance_upload is not None:
+                        raise ValueError('Supply either a spectral 1σ uncertainty column or a full covariance file, not both.')
                     if spatial_unc_col!='<none>':
                         sigma=pd.to_numeric(df[spatial_unc_col],errors='coerce').to_numpy(dtype=float)
                         if not np.all(np.isfinite(sigma)) or np.any(sigma<=0):
