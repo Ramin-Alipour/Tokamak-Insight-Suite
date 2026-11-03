@@ -69,3 +69,30 @@ queued at the time of this record:
 No successful CI result is claimed until those workflows complete. Synthetic
 regression tests are software checks only. No experimental validation is
 claimed or performed.
+
+
+## Relativistic channel-wise structured-background and full-GLS parity
+
+The relativistic Maxwell-Juttner multi-channel fitter now fits a researcher-
+selected detector-space background basis simultaneously with its shared
+physical parameters and channel amplitudes. Supported bases are constant,
+linear, polynomial, cubic spline and researcher-supplied templates; template
+matrices may be shared or channel-specific. The full supplied channel-major
+spectral covariance, including cross-channel blocks, is used in the same
+whitened objective. The complete parameter covariance is transformed from
+optimizer coordinates to physical amplitude/background units, and outputs
+retain basis coefficients, basis matrices, model identity and parameter
+ordering.
+
+The Analysis 1 workflow forwards the same background selection to the
+cross-channel relativistic fit. The Streamlit channel-wise background controls
+are enabled for the relativistic model and pass the selected basis/template
+to the canonical inference API. Python and JSON diagnostic contracts and the
+Thomson analysis documentation were synchronized. Regression tests cover
+polynomial-background recovery and rank-deficient template rejection.
+
+This is conditional on the supplied calibrated response and positive-definite
+measurement covariance. It does not remove common-Te/common-flow assumptions,
+and it does not infer background templates or cross-covariances. Software test
+execution and CI success are not claimed until confirmed for the exact commit;
+no experimental validation is claimed.
