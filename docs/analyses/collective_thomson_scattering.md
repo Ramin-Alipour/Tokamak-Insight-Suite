@@ -376,3 +376,26 @@ ECE opacity from scalar magnetic-field magnitude. It also does not add a
 collision operator to the CTS dielectric response: numerical resonance
 damping remains distinct from physical collisional kinetics. No experimental
 validation is claimed; tests are synthetic software-contract checks only.
+
+## Dashboard input for Full-EM receiver backgrounds
+
+The Full-EM CTS dashboard exposes the same physical receiver-background
+contract as the Python inversion API. An optional JSON mapping may supply
+path-resolved electron temperature and density, ion densities and charge
+states, a scalar/frequency/path/path-frequency Gaunt factor, ECE absorption
+coefficients (including independently propagated mode-resolved opacity and
+receiver mode weights), incident radiance, receiver etendue, and end-to-end
+efficiency. The mapping is passed unchanged to
+`physical_background_radiative_transfer`; TIS does not infer path profiles,
+Gaunt factors, ECE opacity, mode weights, etendue, or efficiency. Set the ECE
+absorption field to JSON `null` only when ECE is intentionally omitted.
+An optional frequency-bin covariance CSV is passed as
+`physical_background_covariance_W2_per_Hz2` and is included in the
+conditional GLS covariance after validation. The measured frequency-response
+operator is applied once by the physical-background builder.
+
+The dashboard controls do not turn the free-free approximation into a
+magnetized/relativistic emissivity model. The free-free emissivity remains
+non-relativistic Maxwellian with an explicit Gaunt factor; ECE opacity remains
+an externally supplied mode-resolved kinetic/radiative-transfer result. The
+independently propagated mode approximation neglects coherent mode coupling.
